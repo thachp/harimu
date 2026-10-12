@@ -105,6 +105,7 @@ async function initialize(database: D1Database) {
     database.prepare(`CREATE TABLE IF NOT EXISTS citizens (
       clerk_user_id TEXT PRIMARY KEY NOT NULL,
       nation_id TEXT REFERENCES nations(id),
+      nation_changes INTEGER DEFAULT 0 NOT NULL,
       display_name TEXT,
       capacity INTEGER DEFAULT 18 NOT NULL,
       influence INTEGER DEFAULT 1240 NOT NULL,
@@ -164,6 +165,12 @@ async function initialize(database: D1Database) {
   }
   if (compatibilityMigrations.length > 0) {
     await database.batch(compatibilityMigrations);
+  }
+
+  const citizenColumns = await database.prepare('PRAGMA table_info(citizens)').all<{ name: string }>();
+  const citizenColumnNames = new Set(citizenColumns.results.map((column) => column.name));
+  if (!citizenColumnNames.has('nation_changes')) {
+    await database.prepare('ALTER TABLE citizens ADD COLUMN nation_changes INTEGER NOT NULL DEFAULT 0').run();
   }
 
   const hasLegacyAffinity = columnNames.has('affinity');

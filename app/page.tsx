@@ -93,6 +93,15 @@ type CitizenDecision = {
   committedAt: string;
 };
 
+type CitizenshipStatus = {
+  enrolledAt: string;
+  graceEndsAt: string;
+  changesRemaining: number;
+  politicalActionTaken: boolean;
+  canChange: boolean;
+  lockedReason: 'political-action' | 'change-used' | 'grace-expired' | null;
+};
+
 type DecisionCommitInput = {
   optionId: string;
   infrastructureId: string;
@@ -293,6 +302,24 @@ const fallbackNations: Nation[] = [
 
 function nationMark(nation: Nation) {
   return nation.currency.match(/\(([^)]+)\)/)?.[1] ?? nation.shortName.slice(0, 2).toUpperCase();
+}
+
+function graceDeadlineLabel(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function citizenshipRuleLabel(status: CitizenshipStatus | null) {
+  if (!status) return 'One citizen · one nation';
+  if (status.canChange) return `One free change available until ${graceDeadlineLabel(status.graceEndsAt)}`;
+  if (status.lockedReason === 'political-action') return 'Locked by your first political action';
+  if (status.lockedReason === 'change-used') return 'Your one free change has been used';
+  if (status.lockedReason === 'grace-expired') return 'The 48-hour grace period has ended';
+  return 'One citizen · one nation';
 }
 
 const fallbackWorkOrders: WorkOrder[] = [
@@ -1143,6 +1170,7 @@ type CitizenSnapshot = {
     standing: string;
     waterSecurity: number;
     wardStability: number;
+    citizenship: CitizenshipStatus;
   } | null;
   plan: { horizon: PlanHorizon; note: string; completedIds: string[] } | null;
   decision: CitizenDecision | null;
@@ -1244,7 +1272,10 @@ export default function Home() {
     && new URLSearchParams(locationSearch).get('preview') === '1';
   const [selectedId, setSelectedId] = useState('kindle');
   const [citizenNationId, setCitizenNationId] = useState<string | null>(null);
+  const [citizenshipStatus, setCitizenshipStatus] = useState<CitizenshipStatus | null>(null);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
+  const [enrollmentPending, setEnrollmentPending] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>('sovereignty');
   const [capacity, setCapacity] = useState(18);
   const [influence, setInfluence] = useState(1240);
@@ -1272,6 +1303,9 @@ export default function Home() {
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
   const pendingNation = worldNations.find((nation) => nation.id === pendingEnrollment);
   const planningNation = citizenNation ?? selected;
+  const isCitizenshipChange = Boolean(
+    citizenNation && pendingNation && citizenNation.id !== pendingNation.id,
+  );
 
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
@@ -1361,6 +1395,7 @@ export default function Home() {
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
+      setCitizenshipStatus(snapshot.profile.citizenship);
       setCapacity(snapshot.profile.capacity);
       setInfluence(snapshot.profile.influence);
       setWaterSecurity(snapshot.profile.waterSecurity);
@@ -1400,6 +1435,12 @@ export default function Home() {
       setWaterSecurity((current) => Math.min(100, current + selectedOption.effects.water));
       setWardStability((current) => Math.min(100, current + selectedOption.effects.stability));
       setCommittedDecision(localDecision);
+      setCitizenshipStatus((current) => current ? {
+        ...current,
+        canChange: false,
+        politicalActionTaken: true,
+        lockedReason: 'political-action',
+      } : current);
       setPlanSaved(true);
       setRecentAction(`World record · ${localDecision.outcome}`);
       setDecisionPending(false);
@@ -1434,6 +1475,7 @@ export default function Home() {
       setWaterSecurity(result.profile.waterSecurity);
       setWardStability(result.profile.wardStability);
       setCommittedDecision(result.decision);
+      setCitizenshipStatus(result.profile.citizenship);
       setCompletedPlanIds([result.decision.optionId]);
       setPlanSaved(true);
       setRecentAction(`World record · ${result.decision.outcome}`);
@@ -1445,21 +1487,65 @@ export default function Home() {
   }
 
   async function confirmEnrollment(nation: Nation) {
-    setCitizenNationId(nation.id);
-    setSelectedId(nation.id);
-    setPendingEnrollment(null);
+    setEnrollmentPending(true);
+    setEnrollmentError(null);
 
-    if (!clerkConfigured) return;
-    const response = await fetch('/api/citizen', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'enroll', nationId: nation.id }),
-    });
-    if (!response.ok) {
-      setRecentAction(response.status === 401
-        ? 'Citizenship is selected locally. Sign in to preserve it in the world record.'
-        : 'Citizenship is selected locally but has not reached the world record yet.');
+    if (!clerkConfigured) {
+      const changingNation = Boolean(citizenNation && citizenNation.id !== nation.id);
+      const now = Date.now();
+      setCitizenNationId(nation.id);
+      setSelectedId(nation.id);
+      setCitizenshipStatus(changingNation ? {
+        enrolledAt: citizenshipStatus?.enrolledAt ?? new Date(now).toISOString(),
+        graceEndsAt: citizenshipStatus?.graceEndsAt ?? new Date(now + 48 * 60 * 60 * 1000).toISOString(),
+        changesRemaining: 0,
+        politicalActionTaken: false,
+        canChange: false,
+        lockedReason: 'change-used',
+      } : {
+        enrolledAt: new Date(now).toISOString(),
+        graceEndsAt: new Date(now + 48 * 60 * 60 * 1000).toISOString(),
+        changesRemaining: 1,
+        politicalActionTaken: false,
+        canChange: true,
+        lockedReason: null,
+      });
+      setPendingEnrollment(null);
+      setEnrollmentPending(false);
+      return;
     }
+
+    try {
+      const response = await fetch('/api/citizen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'enroll', nationId: nation.id }),
+      });
+      const result = await response.json() as {
+        error?: string;
+        nationId?: string;
+        citizenship?: CitizenshipStatus | null;
+      };
+      if (!response.ok || !result.nationId) {
+        if (result.citizenship) setCitizenshipStatus(result.citizenship);
+        setEnrollmentError(result.error ?? 'Citizenship could not be recorded yet.');
+        return;
+      }
+
+      setCitizenNationId(result.nationId);
+      setSelectedId(result.nationId);
+      if (result.citizenship) setCitizenshipStatus(result.citizenship);
+      setPendingEnrollment(null);
+    } catch {
+      setEnrollmentError('Citizenship could not be recorded yet. Please try again.');
+    } finally {
+      setEnrollmentPending(false);
+    }
+  }
+
+  function beginEnrollment(nationId: string) {
+    setEnrollmentError(null);
+    setPendingEnrollment(nationId);
   }
 
   const planningProps = {
@@ -1707,8 +1793,26 @@ export default function Home() {
               <div className="enrolled-state">
                 <span>Your citizenship</span>
                 <strong>{citizenNation.name}</strong>
-                <small>One citizen · one nation</small>
+                <small>{citizenshipRuleLabel(citizenshipStatus)}</small>
               </div>
+              {citizenNation.id !== selected.id && (
+                citizenshipStatus?.canChange ? (
+                  <button
+                    className="enroll-button citizenship-change-button"
+                    onClick={() => beginEnrollment(selected.id)}
+                    type="button"
+                  >
+                    Change to {selected.shortName}
+                    <span>Uses your one grace-period change</span>
+                  </button>
+                ) : (
+                  <div className="citizenship-locked-state">
+                    <span>Explore-only nation</span>
+                    <strong>Your citizen remains in {citizenNation.shortName}</strong>
+                    <small>{citizenshipRuleLabel(citizenshipStatus)}</small>
+                  </div>
+                )
+              )}
               {citizenNation.id === selected.id && (
                 <div className="work-board">
                   <div className="work-board-heading">
@@ -1737,11 +1841,11 @@ export default function Home() {
           ) : (
             <button
               className="enroll-button"
-              onClick={() => setPendingEnrollment(selected.id)}
+              onClick={() => beginEnrollment(selected.id)}
               type="button"
             >
               Enroll in {selected.shortName}
-              <span>Citizenship is exclusive</span>
+              <span>One change in your first 48 hours</span>
             </button>
           )}
         </aside>
@@ -1789,28 +1893,48 @@ export default function Home() {
             style={{ '--selected': pendingNation.color } as CSSProperties}
           >
             <div className="dialog-sigil" aria-hidden="true">{nationMark(pendingNation)}</div>
-            <span className="eyebrow">Exclusive citizenship</span>
-            <h2 id="enrollment-title">Enroll in {pendingNation.name}?</h2>
+            <span className="eyebrow">
+              {isCitizenshipChange ? 'Grace-period change' : 'Founding citizenship'}
+            </span>
+            <h2 id="enrollment-title">
+              {isCitizenshipChange ? `Move to ${pendingNation.name}?` : `Enroll in ${pendingNation.name}?`}
+            </h2>
             <p>
-              Your citizen may belong to only one nation. Citizenship controls your political rights,
-              national institutions, and starting economy.
+              {isCitizenshipChange
+                ? `This moves your citizen from ${citizenNation?.name} and uses your one free change. The new citizenship becomes permanent immediately.`
+                : 'Your nation controls your political rights, institutions, and daily economy. You may change once in your first 48 hours, until you take a political action.'}
             </p>
+            <div className="citizenship-rule" aria-label="Citizenship commitment rule">
+              <div><ClockCountdown aria-hidden="true" size={18} /><span><strong>48-hour grace</strong><small>One free nation change</small></span></div>
+              <div><ShieldCheck aria-hidden="true" size={18} /><span><strong>Political lock</strong><small>Your first civic act ends the grace period</small></span></div>
+            </div>
             <dl>
               <div><dt>Government</dt><dd>{pendingNation.government}</dd></div>
               <div><dt>Economy</dt><dd>{pendingNation.economy}</dd></div>
               <div><dt>Currency</dt><dd>{pendingNation.currency}</dd></div>
               <div><dt>Faith</dt><dd>{pendingNation.religion}</dd></div>
             </dl>
+            {enrollmentError && <p className="enrollment-error" role="alert">{enrollmentError}</p>}
             <div className="dialog-actions">
-              <button className="secondary-action" onClick={() => setPendingEnrollment(null)} type="button">
+              <button
+                className="secondary-action"
+                disabled={enrollmentPending}
+                onClick={() => setPendingEnrollment(null)}
+                type="button"
+              >
                 Keep exploring
               </button>
               <button
                 className="primary-action"
+                disabled={enrollmentPending}
                 onClick={() => void confirmEnrollment(pendingNation)}
                 type="button"
               >
-                Confirm citizenship
+                {enrollmentPending
+                  ? 'Recording citizenship…'
+                  : isCitizenshipChange
+                    ? 'Use my one change'
+                    : 'Confirm citizenship'}
               </button>
             </div>
           </section>

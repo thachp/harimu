@@ -1,0 +1,1 @@
+ALTER TABLE `citizens` ADD `nation_changes` integer DEFAULT 0 NOT NULL;

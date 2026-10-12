@@ -73,6 +73,7 @@ export const planningTaskEffects = sqliteTable('planning_task_effects', {
 export const citizens = sqliteTable('citizens', {
   clerkUserId: text('clerk_user_id').primaryKey(),
   nationId: text('nation_id').references(() => nations.id),
+  nationChanges: integer('nation_changes').notNull().default(0),
   displayName: text('display_name'),
   capacity: integer('capacity').notNull().default(18),
   influence: integer('influence').notNull().default(1240),

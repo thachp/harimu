@@ -16,10 +16,12 @@ const allowedHouseholdMemberIds = new Set(['citizen', 'partner', 'apprentice', '
 type CitizenProfileRow = {
   clerk_user_id: string;
   nation_id: string | null;
+  nation_changes: number;
   display_name: string | null;
   capacity: number;
   influence: number;
   standing: string;
+  created_at: string;
 };
 
 type CitizenDecisionRow = {
@@ -39,6 +41,28 @@ function boundedPercent(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
+function serializeCitizenship(profile: CitizenProfileRow, politicalActionTaken: boolean) {
+  const graceEndsAt = new Date(Date.parse(profile.created_at) + 48 * 60 * 60 * 1000).toISOString();
+  const graceExpired = Date.now() >= Date.parse(graceEndsAt);
+  const changeUsed = profile.nation_changes >= 1;
+  const lockedReason = politicalActionTaken
+    ? 'political-action'
+    : changeUsed
+      ? 'change-used'
+      : graceExpired
+        ? 'grace-expired'
+        : null;
+
+  return {
+    enrolledAt: profile.created_at,
+    graceEndsAt,
+    changesRemaining: changeUsed ? 0 : 1,
+    politicalActionTaken,
+    canChange: Boolean(profile.nation_id) && lockedReason === null,
+    lockedReason,
+  };
+}
+
 function serializeDecision(decision: CitizenDecisionRow | null) {
   return decision ? {
     decisionId: decision.decision_id,
@@ -56,7 +80,11 @@ function serializeDecision(decision: CitizenDecisionRow | null) {
   } : null;
 }
 
-function serializeProfile(profile: CitizenProfileRow, decision: CitizenDecisionRow | null) {
+function serializeProfile(
+  profile: CitizenProfileRow,
+  decision: CitizenDecisionRow | null,
+  politicalActionTaken: boolean,
+) {
   return {
     nationId: profile.nation_id,
     displayName: profile.display_name,
@@ -65,6 +93,7 @@ function serializeProfile(profile: CitizenProfileRow, decision: CitizenDecisionR
     standing: profile.standing,
     waterSecurity: boundedPercent(baseWaterSecurity + (decision?.water_delta ?? 0)),
     wardStability: boundedPercent(baseWardStability + (decision?.stability_delta ?? 0)),
+    citizenship: serializeCitizenship(profile, politicalActionTaken),
   };
 }
 
@@ -91,8 +120,9 @@ export async function GET(request: Request) {
   if (!userId) return Response.json({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
-  const [profile, plan, itemResult, decision] = await Promise.all([
-    database.prepare(`SELECT clerk_user_id, nation_id, display_name, capacity, influence, standing
+  const [profile, plan, itemResult, decision, politicalAction] = await Promise.all([
+    database.prepare(`SELECT clerk_user_id, nation_id, nation_changes, display_name, capacity,
+      influence, standing, created_at
       FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>(),
     database.prepare(`SELECT horizon, private_note, saved_at
       FROM citizen_plans WHERE clerk_user_id = ?`).bind(userId).first<{
@@ -107,10 +137,15 @@ export async function GET(request: Request) {
       FROM citizen_decisions WHERE clerk_user_id = ? AND decision_id = ?`)
       .bind(userId, activeDecisionId)
       .first<CitizenDecisionRow>(),
+    database.prepare(`SELECT EXISTS(
+      SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ? LIMIT 1
+    ) AS political_action_taken`).bind(userId).first<{ political_action_taken: number }>(),
   ]);
 
   return Response.json({
-    profile: profile ? serializeProfile(profile, decision ?? null) : null,
+    profile: profile
+      ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
+      : null,
     plan: plan ? {
       horizon: plan.horizon,
       note: plan.private_note,
@@ -134,14 +169,78 @@ export async function POST(request: Request) {
     const nation = await database.prepare('SELECT id FROM nations WHERE id = ?').bind(nationId).first();
     if (!nation) return Response.json({ error: 'Unknown nation.' }, { status: 400 });
 
-    await database.prepare(`INSERT INTO citizens (
-      clerk_user_id, nation_id, capacity, influence, standing, created_at, updated_at
-    ) VALUES (?, ?, 18, 1240, 'Good standing', ?, ?)
-    ON CONFLICT(clerk_user_id) DO UPDATE SET nation_id = excluded.nation_id, updated_at = excluded.updated_at`)
-      .bind(userId, nationId, now, now)
-      .run();
+    const current = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
+      display_name, capacity, influence, standing, created_at
+      FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>();
 
-    return Response.json({ ok: true, nationId });
+    if (!current) {
+      await database.prepare(`INSERT INTO citizens (
+        clerk_user_id, nation_id, nation_changes, capacity, influence, standing, created_at, updated_at
+      ) VALUES (?, ?, 0, 18, 1240, 'Good standing', ?, ?)`)
+        .bind(userId, nationId, now, now)
+        .run();
+
+      const created = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
+        display_name, capacity, influence, standing, created_at
+        FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>();
+      return Response.json({
+        ok: true,
+        nationId,
+        citizenship: created ? serializeCitizenship(created, false) : null,
+      });
+    }
+
+    const politicalAction = await database.prepare(`SELECT EXISTS(
+      SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ? LIMIT 1
+    ) AS political_action_taken`).bind(userId).first<{ political_action_taken: number }>();
+    const politicalActionTaken = Boolean(politicalAction?.political_action_taken);
+
+    if (current.nation_id === nationId) {
+      return Response.json({
+        ok: true,
+        nationId,
+        citizenship: serializeCitizenship(current, politicalActionTaken),
+      });
+    }
+
+    if (!current.nation_id) {
+      await database.prepare(`UPDATE citizens SET nation_id = ?, updated_at = ?
+        WHERE clerk_user_id = ? AND nation_id IS NULL`)
+        .bind(nationId, now, userId)
+        .run();
+    } else {
+      const change = await database.prepare(`UPDATE citizens
+        SET nation_id = ?, nation_changes = nation_changes + 1, updated_at = ?
+        WHERE clerk_user_id = ?
+          AND nation_id != ?
+          AND nation_changes = 0
+          AND julianday(created_at, '+48 hours') > julianday(?)
+          AND NOT EXISTS (
+            SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ? LIMIT 1
+          )`)
+        .bind(nationId, now, userId, nationId, now, userId)
+        .run();
+
+      if (!change.meta.changes) {
+        return Response.json({
+          error: politicalActionTaken
+            ? 'Citizenship locked when you took your first political action.'
+            : current.nation_changes >= 1
+              ? 'Your one free citizenship change has already been used.'
+              : 'The 48-hour citizenship grace period has ended.',
+          citizenship: serializeCitizenship(current, politicalActionTaken),
+        }, { status: 409 });
+      }
+    }
+
+    const updated = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
+      display_name, capacity, influence, standing, created_at
+      FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>();
+    return Response.json({
+      ok: true,
+      nationId,
+      citizenship: updated ? serializeCitizenship(updated, politicalActionTaken) : null,
+    });
   }
 
   if (body.action === 'commit-decision') {
@@ -173,7 +272,8 @@ export async function POST(request: Request) {
     if (!effect) return Response.json({ error: 'Unknown civic plan.' }, { status: 400 });
 
     const [profile, existingDecision] = await Promise.all([
-      database.prepare(`SELECT clerk_user_id, nation_id, display_name, capacity, influence, standing
+      database.prepare(`SELECT clerk_user_id, nation_id, nation_changes, display_name, capacity,
+        influence, standing, created_at
         FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>(),
       database.prepare(`SELECT decision_id, task_id, infrastructure_id, household_member_id,
         capacity_delta, influence_delta, water_delta, stability_delta, outcome, committed_at
@@ -188,7 +288,7 @@ export async function POST(request: Request) {
       return Response.json({
         ok: true,
         alreadyCommitted: true,
-        profile: serializeProfile(profile, existingDecision),
+        profile: serializeProfile(profile, existingDecision, true),
         decision: serializeDecision(existingDecision),
       });
     }
@@ -242,14 +342,14 @@ export async function POST(request: Request) {
       ) VALUES (?, ?, 1, ?)`).bind(userId, optionId, now),
     ]);
 
-    const updatedProfile = await database.prepare(`SELECT clerk_user_id, nation_id, display_name,
-      capacity, influence, standing FROM citizens WHERE clerk_user_id = ?`)
+    const updatedProfile = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
+      display_name, capacity, influence, standing, created_at FROM citizens WHERE clerk_user_id = ?`)
       .bind(userId)
       .first<CitizenProfileRow>();
 
     return Response.json({
       ok: true,
-      profile: updatedProfile ? serializeProfile(updatedProfile, decisionRow) : null,
+      profile: updatedProfile ? serializeProfile(updatedProfile, decisionRow, true) : null,
       decision: serializeDecision(decisionRow),
     });
   }
@@ -269,7 +369,7 @@ export async function POST(request: Request) {
     await database.batch([
       database.prepare(`INSERT INTO citizens (
         clerk_user_id, nation_id, capacity, influence, standing, created_at, updated_at
-      ) VALUES (?, 'kindle', 18, 1240, 'Good standing', ?, ?)
+      ) VALUES (?, NULL, 18, 1240, 'Good standing', ?, ?)
       ON CONFLICT(clerk_user_id) DO UPDATE SET updated_at = excluded.updated_at`)
         .bind(userId, now, now),
       database.prepare(`INSERT INTO citizen_plans (clerk_user_id, horizon, private_note, saved_at)
