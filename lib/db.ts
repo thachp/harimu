@@ -1,38 +1,40 @@
 import { env } from 'cloudflare:workers';
 
 const nationSeeds = [
-  ['tidelands', 'Tidelands Republic', 'Tidelands', 'Water', 'Federal presidential democracy', 'Regulated market capitalism', 'Port Meridian', '1.42m', '₳ 86.4m', 78, '#43a7ad', '#b8dde0', 'Many currents, one tide.', 'Open commerce', 27, 29, 1],
-  ['delta', 'Delta Cooperative', 'Delta', 'Water', 'Council-based socialist republic', 'Cooperative mixed economy', 'Confluence', '1.16m', '₳ 61.8m', 83, '#69a9d0', '#c8ddec', 'What the river gives, we share.', 'Board approval', 48, 24, 2],
-  ['jade', 'Jade Union', 'Jade Union', 'Earth', 'Single-party socialist republic', 'State-directed market socialism', 'Verdant Seat', '1.87m', '₳ 103.1m', 86, '#5e9f73', '#c7dac5', 'Patient stone, enduring harvest.', 'Licensed trade', 68, 30, 3],
-  ['terraced', 'Terraced Crown', 'Terraced Crown', 'Earth', 'Absolute hereditary monarchy', 'Crown-directed market economy', 'High Terrace', '924k', '₳ 74.6m', 72, '#a29558', '#ddd7b6', 'From root to summit.', 'Royal charter', 56, 43, 4],
-  ['ashen', 'Ashen Directorate', 'Ashen', 'Fire', 'Personalist single-party state', 'Centrally planned command economy', 'Cinderhold', '1.31m', '₳ 58.2m', 68, '#c25740', '#e2c0b7', 'From discipline, strength.', 'State bureau only', 42, 72, 5],
-  ['solar', 'Solar Commonwealth', 'Solar', 'Fire', 'Parliamentary democracy', 'Social-market capitalism', 'Dawn Assembly', '1.09m', '₳ 79.3m', 81, '#d28a45', '#efd2ad', 'A brighter day, held in common.', 'Open commerce', 73, 72, 6],
-  ['sky', 'Sky Covenant', 'Sky Covenant', 'Air', 'Guardian theocracy', 'Mixed market and charitable trusts', 'Aerie of Accord', '778k', '₳ 48.9m', 75, '#9b8ac1', '#d8d1e7', 'Under one sky, with open eyes.', 'Doctrinal review', 27, 54, 7],
-  ['celestial', 'Celestial See', 'Celestial See', 'Air', 'Elective theocratic principality', 'Temple, guild, and communal economy', 'The Quiet Spire', '642k', '₳ 41.7m', 88, '#8e82a8', '#ded8e5', 'Listen above the noise.', 'Approved orders', 48, 54, 8],
+  ['kindle', 'Kindle Republic', 'Kindle', 'Liberal democracy', 'Market capitalism', 'Spark (SPK) · free float', 'Secular pluralism', 'Forgehaven', '1.42m', 'SPK 86.4m', 78, '#cf4b32', '#edc1b8', 'Anyone can rise - and anyone can fall.', 'Open exchange', 85, 67, 1],
+  ['confluence', 'The Confluence', 'Confluence', 'Single-party socialist state', 'Socialist-oriented market', 'Current (CUR) · managed band', 'Registered faiths', 'Meetwater', '1.16m', 'CUR 61.8m', 83, '#2776a6', '#b7d4e5', 'Many rivers, one current.', 'Managed band', 50, 88, 2],
+  ['meridian', 'Meridian', 'Meridian', 'Party-state', 'State capitalism with SEZs', 'Gauge (GAU) · crawling peg', 'State-supervised associations', 'Steamgate', '1.87m', 'GAU 103.1m', 86, '#a1639c', '#dec7dc', 'Order today, prosperity tomorrow.', 'SEZ convertibility', 72, 82, 3],
+  ['korund', 'Korund', 'Korund', 'Full communism; leader for life', 'Central planning', 'Labor Note (LN) + ration coupons', 'State atheism', 'Stonehearth', '1.31m', 'LN 58.2m', 68, '#75654e', '#d3cabd', 'Nobody falls through the stone.', 'State bureau only', 14, 45, 4],
+  ['aurelle', 'Aurelle', 'Aurelle', 'Absolute hereditary monarchy', 'Royal charters and fiefs', 'Crown (CRN) · gold-backed', 'Kinward Rite state church', 'Highspire', '924k', 'CRN 74.6m', 72, '#94afbf', '#d9e2e8', "Win the crown's favor - or take the crown.", 'Royal charter', 72, 28, 5],
+  ['ilmar', 'Ilmar Sanctum', 'Ilmar', 'Theocracy', 'Endowment economy', 'Prism (PRM) · Canon rules', 'Lumen Canon theocracy', 'Mirrorhall', '778k', 'PRM 48.9m', 75, '#d3a72f', '#efe1af', 'Every duty is a step toward the light.', 'Clear Measure', 28, 82, 6],
+  ['hoarvale', 'Hoarvale', 'Hoarvale', 'Constitutional monarchy', 'Coordinated market', 'Rime (RIM) · inflation band', 'Ceremonial Kinward establishment', 'Rimehall', '1.09m', 'RIM 79.3m', 81, '#45a7b8', '#bee0e5', 'The Crown endures; governments answer to you.', 'Open exchange', 50, 20, 7],
+  ['varkand', 'Varkand', 'Varkand', 'Military junta', 'Arsenal command economy', 'Ward (WRD) · hard peg', 'Regulated tolerance', 'Watchfast', '846k', 'WRD 52.6m', 70, '#526b68', '#c5d0ce', 'Order first. Everything else after.', 'Alert-dependent', 28, 28, 8],
+  ['veldwood', 'Veldwood', 'Veldwood', 'Federal direct democracy', 'Social democracy', 'Bough (BGH) · Citizen Dividend', 'Secular pluralism', 'Ringhall', '1.04m', 'BGH 76.2m', 84, '#5b8d42', '#c9dcbf', 'Every voice, every season.', 'Open exchange', 14, 65, 9],
+  ['fulmara', 'Fulmara', 'Fulmara', 'Mercantile oligarchic republic', 'Chartered-company capitalism', 'Charge (CHG) · shareholder bank', 'Chartered pluralism', 'Arcport', '1.22m', 'CHG 91.7m', 74, '#6440a0', '#cbbde1', 'Fortune is the franchise.', 'Open exchange', 86, 46, 10],
 ] as const;
 
 const workOrderSeeds = [
-  ['harvest', 'jade', 'Support the harvest', '+480 food · resolves in 2h', 4, 'open', 1],
-  ['freight', 'jade', 'Move a materials convoy', '+210 materials · resolves in 4h', 6, 'open', 2],
-  ['archive', 'jade', 'Catalogue the city archive', '+95 knowledge · resolves in 3h', 3, 'open', 3],
+  ['harvest', 'kindle', 'Support the savanna harvest', '+480 food · resolves in 2h', 4, 'open', 1],
+  ['freight', 'kindle', 'Move a foundry convoy', '+210 materials · resolves in 4h', 6, 'open', 2],
+  ['archive', 'kindle', 'Catalogue the civic archive', '+95 knowledge · resolves in 3h', 3, 'open', 3],
 ] as const;
 
 const planningTaskSeeds = [
-  ['capacity', 'Commit Work Capacity', 'Reserve 6 WC for the Verdant Seat harvest cooperative.', '6 WC · before 20:00', 1],
+  ['capacity', 'Commit Work Capacity', 'Reserve 6 WC for the Forgehaven East harvest crews.', '6 WC · before 20:00', 1],
   ['forum', 'Attend the district forum', 'Hear arguments on the eastern waterworks proposal.', 'Civic · 21:30', 2],
   ['ballot', 'Review the trade ballot', 'Compare the open-corridor and licensed-market measures.', 'Vote closes in 2d', 3],
 ] as const;
 
 const planningTaskEffectSeeds = [
-  ['capacity', -6, 20, 4, 1, 'Harvest crews reinforce the intake before the rain, protecting tomorrow’s reserve.', 'waterworks', 'citizen'],
+  ['capacity', -6, 20, 4, 1, 'Harvest crews reinforce the intake before the storm, protecting tomorrow’s reserve.', 'waterworks', 'citizen'],
   ['forum', -2, 80, 3, 3, 'The household joins the forum and keeps emergency repair funding open.', 'council', 'partner'],
   ['ballot', 0, 50, 1, 2, 'The household completes the trade review, improving the route for replacement pump parts.', 'depot', 'apprentice'],
 ] as const;
 
 const worldEventSeeds = [
-  [1, 'Work', 'Capacity grant closes', 'Verdant Seat closes allocations for tomorrow’s harvest.', 'Verdant Seat', 'Today · 20:00', 1],
-  [2, 'Civic', 'District assembly session', 'The eastern waterworks proposal enters public debate.', 'Verdant Ward', 'Day 43 · 09:00', 2],
-  [3, 'Ballot', 'Trade corridor vote', 'Citizens decide the Solar–Delta corridor mandate.', 'World Assembly', 'Day 45 · 18:00', 3],
+  [1, 'Work', 'Capacity grant closes', 'Forgehaven closes allocations for tomorrow’s savanna harvest.', 'Forgehaven', 'Today · 20:00', 1],
+  [2, 'Civic', 'District assembly session', 'The eastern waterworks proposal enters public debate.', 'Forgehaven East', 'Day 43 · 09:00', 2],
+  [3, 'Ballot', 'Trade corridor vote', 'Citizens decide the Kindle-Confluence corridor mandate.', 'Kindle Assembly', 'Day 45 · 18:00', 3],
 ] as const;
 
 let initialization: Promise<void> | undefined;
@@ -49,9 +51,10 @@ async function initialize(database: D1Database) {
       id TEXT PRIMARY KEY NOT NULL,
       name TEXT NOT NULL,
       short_name TEXT NOT NULL,
-      affinity TEXT NOT NULL,
       government TEXT NOT NULL,
       economy TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      religion TEXT NOT NULL,
       capital TEXT NOT NULL,
       population TEXT NOT NULL,
       treasury TEXT NOT NULL,
@@ -149,29 +152,105 @@ async function initialize(database: D1Database) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_citizen_decisions_user_committed ON citizen_decisions(clerk_user_id, committed_at)'),
   ]);
 
+  const nationColumns = await database.prepare('PRAGMA table_info(nations)').all<{ name: string }>();
+  const columnNames = new Set(nationColumns.results.map((column) => column.name));
+  const compatibilityMigrations = [];
+
+  if (!columnNames.has('currency')) {
+    compatibilityMigrations.push(database.prepare("ALTER TABLE nations ADD COLUMN currency TEXT NOT NULL DEFAULT ''"));
+  }
+  if (!columnNames.has('religion')) {
+    compatibilityMigrations.push(database.prepare("ALTER TABLE nations ADD COLUMN religion TEXT NOT NULL DEFAULT ''"));
+  }
+  if (compatibilityMigrations.length > 0) {
+    await database.batch(compatibilityMigrations);
+  }
+
+  const hasLegacyAffinity = columnNames.has('affinity');
+  const nationColumnsSql = hasLegacyAffinity
+    ? `id, name, short_name, affinity, government, economy, currency, religion, capital, population,
+      treasury, stability, color, soft_color, motto, trade_status, position_x, position_y, sort_order`
+    : `id, name, short_name, government, economy, currency, religion, capital, population,
+      treasury, stability, color, soft_color, motto, trade_status, position_x, position_y, sort_order`;
+  const nationValuesSql = hasLegacyAffinity
+    ? `?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`
+    : `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`;
+
   await database.batch([
-    ...nationSeeds.map((nation) => database.prepare(`INSERT OR IGNORE INTO nations (
-      id, name, short_name, affinity, government, economy, capital, population, treasury,
-      stability, color, soft_color, motto, trade_status, position_x, position_y, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    ...nationSeeds.map((nation) => database.prepare(`INSERT INTO nations (${nationColumnsSql})
+      VALUES (${nationValuesSql})
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        short_name = excluded.short_name,
+        government = excluded.government,
+        economy = excluded.economy,
+        currency = excluded.currency,
+        religion = excluded.religion,
+        capital = excluded.capital,
+        population = excluded.population,
+        treasury = excluded.treasury,
+        stability = excluded.stability,
+        color = excluded.color,
+        soft_color = excluded.soft_color,
+        motto = excluded.motto,
+        trade_status = excluded.trade_status,
+        position_x = excluded.position_x,
+        position_y = excluded.position_y,
+        sort_order = excluded.sort_order`)
       .bind(...nation)),
-    ...workOrderSeeds.map((order) => database.prepare(`INSERT OR IGNORE INTO work_orders (
+    ...workOrderSeeds.map((order) => database.prepare(`INSERT INTO work_orders (
       id, nation_id, name, detail, capacity_cost, status, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        nation_id = excluded.nation_id,
+        name = excluded.name,
+        detail = excluded.detail,
+        capacity_cost = excluded.capacity_cost,
+        status = excluded.status,
+        sort_order = excluded.sort_order`)
       .bind(...order)),
-    ...planningTaskSeeds.map((task) => database.prepare(`INSERT OR IGNORE INTO planning_tasks (
+    ...planningTaskSeeds.map((task) => database.prepare(`INSERT INTO planning_tasks (
       id, title, detail, meta, sort_order
-    ) VALUES (?, ?, ?, ?, ?)`)
+    ) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        title = excluded.title,
+        detail = excluded.detail,
+        meta = excluded.meta,
+        sort_order = excluded.sort_order`)
       .bind(...task)),
-    ...planningTaskEffectSeeds.map((effect) => database.prepare(`INSERT OR IGNORE INTO planning_task_effects (
+    ...planningTaskEffectSeeds.map((effect) => database.prepare(`INSERT INTO planning_task_effects (
       task_id, capacity_delta, influence_delta, water_delta, stability_delta, outcome,
       infrastructure_id, household_member_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(task_id) DO UPDATE SET
+        capacity_delta = excluded.capacity_delta,
+        influence_delta = excluded.influence_delta,
+        water_delta = excluded.water_delta,
+        stability_delta = excluded.stability_delta,
+        outcome = excluded.outcome,
+        infrastructure_id = excluded.infrastructure_id,
+        household_member_id = excluded.household_member_id`)
       .bind(...effect)),
-    ...worldEventSeeds.map((event) => database.prepare(`INSERT OR IGNORE INTO world_events (
+    ...worldEventSeeds.map((event) => database.prepare(`INSERT INTO world_events (
       id, kind, headline, detail, location, occurred_at, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        kind = excluded.kind,
+        headline = excluded.headline,
+        detail = excluded.detail,
+        location = excluded.location,
+        occurred_at = excluded.occurred_at,
+        sort_order = excluded.sort_order`)
       .bind(...event)),
+  ]);
+
+  await database.batch([
+    database.prepare(`UPDATE citizens SET nation_id = 'kindle'
+      WHERE nation_id IN ('tidelands', 'delta', 'jade', 'terraced', 'ashen', 'solar', 'sky', 'celestial')`),
+    database.prepare(`UPDATE work_orders SET nation_id = 'kindle'
+      WHERE nation_id IN ('tidelands', 'delta', 'jade', 'terraced', 'ashen', 'solar', 'sky', 'celestial')`),
+    database.prepare(`DELETE FROM nations
+      WHERE id IN ('tidelands', 'delta', 'jade', 'terraced', 'ashen', 'solar', 'sky', 'celestial')`),
   ]);
 
   await database.prepare('PRAGMA optimize').run();

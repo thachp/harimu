@@ -6,9 +6,10 @@ type NationRow = {
   id: string;
   name: string;
   short_name: string;
-  affinity: string;
   government: string;
   economy: string;
+  currency: string;
+  religion: string;
   capital: string;
   population: string;
   treasury: string;
@@ -81,9 +82,10 @@ export async function GET() {
         id: nation.id,
         name: nation.name,
         shortName: nation.short_name,
-        affinity: nation.affinity,
         government: nation.government,
         economy: nation.economy,
+        currency: nation.currency,
+        religion: nation.religion,
         capital: nation.capital,
         population: nation.population,
         treasury: nation.treasury,

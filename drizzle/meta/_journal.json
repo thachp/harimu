@@ -15,6 +15,13 @@
       "when": 1791798881298,
       "tag": "0001_soft_photon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791803625075,
+      "tag": "0002_clear_mystique",
+      "breakpoints": true
     }
   ]
 }

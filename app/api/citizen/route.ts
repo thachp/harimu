@@ -269,7 +269,7 @@ export async function POST(request: Request) {
     await database.batch([
       database.prepare(`INSERT INTO citizens (
         clerk_user_id, nation_id, capacity, influence, standing, created_at, updated_at
-      ) VALUES (?, 'jade', 18, 1240, 'Good standing', ?, ?)
+      ) VALUES (?, 'kindle', 18, 1240, 'Good standing', ?, ?)
       ON CONFLICT(clerk_user_id) DO UPDATE SET updated_at = excluded.updated_at`)
         .bind(userId, now, now),
       database.prepare(`INSERT INTO citizen_plans (clerk_user_id, horizon, private_note, saved_at)
