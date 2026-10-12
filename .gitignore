@@ -47,3 +47,6 @@ next-env.d.ts
 
 # TypeScript compiler cache
 *.tsbuildinfo
+
+# Python SQL-test caches
+__pycache__/

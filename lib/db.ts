@@ -1,3 +1,5 @@
+import { petitionSchema } from './government-state';
+import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
 import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
 import { economySchema, recoverySchema, rewardSchema, fundSchema, employerBudgetMinor, rewards } from './economy';
 import { shiftSchema, activeShiftIndex } from './work-shifts';
@@ -161,12 +163,29 @@ async function initialize(database: D1Database) {
   await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
   await database.batch([
+    database.prepare(petitionSchema),
+    database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
+    database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
+    database.prepare(playerReceiptView), database.prepare(openLotsView),
+    database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
+  ]);
+  await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
     database.prepare("CREATE INDEX IF NOT EXISTS idx_economy_events_user_item ON citizen_economy_events(clerk_user_id, item)"),
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-merchant', 100000)"),
     ...marketSeeds.map((item) => database.prepare('INSERT OR IGNORE INTO market_items (item, label, buy_minor, sell_minor, initial_stock) VALUES (?, ?, ?, ?, ?)').bind(...item)),
     database.prepare(walletViewSql), database.prepare(inventoryViewSql), database.prepare(merchantViewSql), database.prepare(merchantCashSql),
   ]);
+  const playerBalancesInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'player-market-v1'").first();
+  if (!playerBalancesInstalled) {
+    // Atomic view replacement upgrades v11 balances without a missing-view window.
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'),
+      database.prepare('DROP VIEW IF EXISTS citizen_inventory_balances'),
+      database.prepare(walletViewSql), database.prepare(inventoryViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('player-market-v1')"),
+    ]);
+  }
   // Existing unfinished shifts receive the prototype terms once; completed receipts are not repaid.
   await database.batch(Object.entries(rewards).map(([orderId, reward]) => database.prepare(`
     INSERT OR IGNORE INTO shift_rewards (shift_id, wage_minor, item, quantity)

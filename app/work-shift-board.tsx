@@ -25,7 +25,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
   const remaining = active ? Math.max(0, Date.parse(active.completesAt) - now) : 0;
 
   return (
-    <section className="work-shift-status" aria-label="Your work shifts">
+    <section id="citizen-work-shifts" className="work-shift-status" aria-label="Your work shifts">
       <strong>Your work shifts</strong>
       {localDemo && <p>Local demo · saved in this browser only. Contributions do not change the shared world.</p>}
       {economy && <div aria-label="Citizen wallet and inventory">

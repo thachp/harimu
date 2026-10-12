@@ -43,14 +43,24 @@ export const marketEventsSchema = `CREATE TABLE IF NOT EXISTS citizen_economy_ev
 export const walletViewSql = `CREATE VIEW IF NOT EXISTS citizen_wallet_balances AS
   SELECT c.clerk_user_id,
     COALESCE((SELECT SUM(wage_minor) FROM shift_settlements WHERE clerk_user_id = c.clerk_user_id), 0)
-    + COALESCE((SELECT SUM(wallet_delta) FROM citizen_economy_events WHERE clerk_user_id = c.clerk_user_id), 0) AS balance
+    + COALESCE((SELECT SUM(wallet_delta) FROM citizen_economy_events WHERE clerk_user_id = c.clerk_user_id), 0)
+    + COALESCE((SELECT SUM(amount_minor) FROM player_fills WHERE seller_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(amount_minor) FROM player_fills WHERE buyer_id = c.clerk_user_id), 0) AS balance
   FROM citizens c`;
 export const inventoryViewSql = `CREATE VIEW IF NOT EXISTS citizen_inventory_balances AS
-  SELECT clerk_user_id, item, SUM(quantity) AS quantity FROM (
-    SELECT clerk_user_id, item, quantity FROM shift_settlements
-    UNION ALL SELECT clerk_user_id, item, quantity_delta AS quantity FROM citizen_economy_events
-    UNION ALL SELECT clerk_user_id, 'food' AS item, quantity FROM starter_food_grants
-  ) GROUP BY clerk_user_id, item`;
+  SELECT c.clerk_user_id, c.item,
+    COALESCE((SELECT SUM(quantity) FROM shift_settlements WHERE clerk_user_id=c.clerk_user_id AND item=c.item),0)
+    + COALESCE((SELECT SUM(quantity_delta) FROM citizen_economy_events WHERE clerk_user_id=c.clerk_user_id AND item=c.item),0)
+    + CASE WHEN c.item='food' THEN COALESCE((SELECT quantity FROM starter_food_grants WHERE clerk_user_id=c.clerk_user_id),0) ELSE 0 END
+    - COALESCE((SELECT SUM(quantity) FROM player_open_lots WHERE seller_id=c.clerk_user_id AND item=c.item),0)
+    - COALESCE((SELECT SUM(quantity) FROM player_fills WHERE seller_id=c.clerk_user_id AND item=c.item),0)
+    + COALESCE((SELECT SUM(quantity) FROM player_fills WHERE buyer_id=c.clerk_user_id AND item=c.item),0) AS quantity
+  FROM (
+    SELECT clerk_user_id,item FROM shift_settlements
+    UNION SELECT clerk_user_id,item FROM citizen_economy_events
+    UNION SELECT clerk_user_id,'food' AS item FROM starter_food_grants
+    UNION SELECT buyer_id AS clerk_user_id,item FROM player_fills
+  ) c`;
 export const merchantViewSql = `CREATE VIEW IF NOT EXISTS merchant_inventory_balances AS
   SELECT m.*, m.initial_stock - COALESCE((SELECT SUM(quantity_delta)
     FROM citizen_economy_events WHERE item = m.item AND kind IN ('buy','sell')), 0) AS stock

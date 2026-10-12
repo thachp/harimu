@@ -2204,3 +2204,9 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 .citizen-market button { padding: 9px; color: #f3ecd8; background: #254941; border: 1px solid #72c7b9; cursor: pointer; font-size: 12px; }
 .citizen-market button:disabled { opacity: .5; cursor: default; }
 .citizen-market button:focus-visible, .citizen-market input:focus-visible { outline: 2px solid #f3ecd8; outline-offset: 3px; }
+
+.player-market form { display: grid; gap: 10px; margin: 14px 0; }
+.player-market label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.player-market input, .player-market select { min-width: 65px; max-width: 120px; padding: 8px; color: #f3ecd8; background: #18363a; border: 1px solid #72c7b9; }
+.player-market article { padding: 12px 0; border-bottom: 1px solid #526560; }
+.player-market h4 { margin: 18px 0 8px; }

@@ -1,5 +1,7 @@
 # Harimu Domain Context
 
+Implementation override: [requirements after v0.6](REQUIREMENT_CHANGES.md) takes precedence for explicitly changed requirements, including AI/SI control of all government roles in the first release. Player-held office is deferred.
+
 This file is the implementation-facing vocabulary for Harimu. It summarizes the canonical **Harimu Game Design Document v0.6** dated October 12, 2026. If this file conflicts with the GDD, the GDD wins.
 
 ## Product Identity
@@ -12,7 +14,7 @@ A player's in-world character. Each account controls one citizen, and each citiz
 _Avoid_: player nation, civilization, commander
 
 **Nation**  
-One of ten sovereign communities with a fixed political system, economic system, currency regime, and official religious stance. Players can change policies and leaders, but never the nation's underlying system.
+One of ten sovereign communities with a fixed political system, economic system, currency regime, and official religious stance. Players influence policy and AI/SI officeholders through nation-appropriate civic actions; the underlying system stays fixed.
 _Avoid_: faction, team, element
 
 **Shard**  
@@ -78,7 +80,7 @@ The global clock shared by a shard. It runs continuously at 12x compression: one
 An approximately twelve-month era with world events and rankings. An Age does not reset the shard.
 
 **Founding Period**  
-The first 30 days of a shard, during which AI Caretakers preserve continuity while citizens build the tenure required to govern.
+The first 30 days of a shard, during which AI/SI government preserves continuity while citizens establish civic standing. Player-held office is deferred beyond the first release.
 
 **Crisis Window**  
 A 24-48-hour period in which a coup, purge, or popular rising resolves.
@@ -89,7 +91,7 @@ A 24-48-hour period in which a coup, purge, or popular rising resolves.
 Hard rules that bound every leader's power over citizens, national assets, and irreversible actions.
 
 **Office**  
-A position of public authority held by a citizen, such as president, assembly member, monarch, minister, cleric, commander, councillor, or shareholder representative.
+A government position controlled by AI/SI in the first release, including heads, ministers and legislators. Player-held office is deferred; citizens retain meaningful influence through nation-appropriate voting, petitions, protests, trade and public opinion.
 
 **Institution**  
 A durable body that grants, constrains, or transfers authority, such as an assembly, party congress, royal court, council of elders, command directorate, grove, or grand council.

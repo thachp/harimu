@@ -1,7 +1,15 @@
 'use client';
 
 import Image from 'next/image';
+import { sceneFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
+import { WorldScene } from './world-scene';
+import { CitySquareScene } from './city-square-scene';
+import { DailyBriefing } from './daily-briefing';
+import { GovernmentPanel } from './government-panel';
+import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
+import { PlayerMarket } from './player-market';
+import { validPlayerCommand, type PlayerCommand, type PlayerMarketState } from '@/lib/player-market';
 import { CitizenMarket } from './citizen-market';
 import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
@@ -42,8 +50,7 @@ import {
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { clerkConfigured } from './providers';
 
-type MapMode = 'sovereignty' | 'trade' | 'influence';
-type ViewMode = 'world' | 'nation' | 'planning';
+type ViewMode = SceneView;
 type PlanHorizon = 'today' | 'week' | 'season';
 
 type Nation = {
@@ -333,12 +340,6 @@ const fallbackWorkOrders: WorkOrder[] = [
   { id: 'freight', nationId: 'kindle', name: 'Move a foundry convoy', detail: '+210 materials · resolves in 4h', cost: 6 },
   { id: 'archive', nationId: 'kindle', name: 'Catalogue the civic archive', detail: '+95 knowledge · resolves in 3h', cost: 3 },
 ];
-
-const modeDescriptions: Record<MapMode, string> = {
-  sovereignty: 'Recognized borders, national capitals, and sovereign territory',
-  trade: 'Commercial access, open corridors, and restricted crossings',
-  influence: 'Foreign pressure, public legitimacy, and the civic pull of each region',
-};
 
 const fallbackPlanningItems: PlanningTask[] = [
   {
@@ -1191,6 +1192,9 @@ type CitizenSnapshot = {
   shifts: WorkShift[];
   economy?: Economy;
   market?: MarketState;
+  playerMarket?: PlayerMarketState;
+  government?: GovernmentSnapshot | null;
+  demoGovernment?: { period: number; counts: Record<string, number> };
   demoReceipts?: string[];
   demoStarterGranted?: boolean;
 };
@@ -1282,11 +1286,16 @@ export default function Home() {
   const [availablePlanningItems, setAvailablePlanningItems] = useState<PlanningTask[]>(fallbackPlanningItems);
   const [worldEvents, setWorldEvents] = useState<WorldEvent[]>(fallbackWorldEvents);
   const locationSearch = useSyncExternalStore(subscribeToLocation, getLocationSearch, getServerLocationSearch);
-  const requestedView = new URLSearchParams(locationSearch).get('view');
   const requestedNationId = new URLSearchParams(locationSearch).get('nation');
-  const [viewOverride, setViewOverride] = useState<ViewMode | null>(null);
-  const viewMode: ViewMode = viewOverride
-    ?? (requestedView === 'planning' ? 'planning' : requestedView === 'nation' ? 'nation' : 'world');
+  const viewMode = sceneFromSearch(locationSearch);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const heading = document.getElementById('citizen-scene-title') ?? document.querySelector<HTMLElement>('main h1');
+      if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [locationSearch]);
   const designPreview = process.env.NODE_ENV !== 'production'
     && new URLSearchParams(locationSearch).get('preview') === '1';
   const [selectedId, setSelectedId] = useState('kindle');
@@ -1295,8 +1304,15 @@ export default function Home() {
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
-  const [mapMode, setMapMode] = useState<MapMode>('sovereignty');
   const [capacity, setCapacity] = useState(18);
+  const [governmentSnapshot, setGovernment] = useState<GovernmentSnapshot | null>(null);
+  const [governmentError, setGovernmentError] = useState<string | null>(null);
+  const [governmentPending, setGovernmentPending] = useState(false);
+  const governmentIntent = useRef<{ topic: PetitionTopic; requestId: string } | null>(null);
+  const [demoGovernment, setDemoGovernment] = useState({ period: 0, counts: {} as Record<string, number> });
+  const [playerMarket, setPlayerMarket] = useState<PlayerMarketState | null>(null);
+  const [playerCommand, setPlayerCommand] = useState<PlayerCommand | null>(null);
+  const playerIntent = useRef<PlayerCommand | null>(null);
   const [market, setMarket] = useState<MarketState | null>(null);
   const marketIntent = useRef<MarketCommand | null>(null);
   const [marketCommand, setMarketCommand] = useState<MarketCommand | null>(null);
@@ -1313,7 +1329,6 @@ export default function Home() {
   const [waterSecurity, setWaterSecurity] = useState(71);
   const [wardStability, setWardStability] = useState(86);
   const [recentAction, setRecentAction] = useState<string | null>(null);
-  const [compactView, setCompactView] = useState(false);
   const [horizon, setHorizon] = useState<PlanHorizon>('week');
   const [completedPlanIds, setCompletedPlanIds] = useState<string[]>(['capacity']);
   const [planSaved, setPlanSaved] = useState(false);
@@ -1326,12 +1341,18 @@ export default function Home() {
   );
 
   const selected = useMemo(
-    () => worldNations.find((nation) => nation.id === (viewOverride === null && requestedNationId
+    () => worldNations.find((nation) => nation.id === (requestedNationId
       ? requestedNationId
       : selectedId)) ?? worldNations[0],
-    [requestedNationId, selectedId, viewOverride, worldNations],
+    [requestedNationId, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
+  const demoGovernmentSnapshot = useMemo(() => citizenNation ? simulateGovernment({
+    nationId: citizenNation.id, availableBudgetMinor: 100000,
+    foodSecurity: (economy?.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) >= 2 ? 100 : 0,
+    petitionCounts: demoGovernment.counts,
+  }) : null, [citizenNation, economy, demoGovernment]);
+  const government = clerkConfigured ? governmentSnapshot : demoGovernmentSnapshot;
   const pendingNation = worldNations.find((nation) => nation.id === pendingEnrollment);
   const planningNation = citizenNation ?? selected;
   const isCitizenshipChange = Boolean(
@@ -1380,10 +1401,12 @@ export default function Home() {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
           body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
         });
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; profile?: CitizenSnapshot['profile'] };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; profile?: CitizenSnapshot['profile'] };
         if (result.shifts) setWorkShifts(result.shifts);
         if (result.economy) setEconomy(result.economy);
         if (result.market) setMarket(result.market);
+        if (result.playerMarket) setPlayerMarket(result.playerMarket);
+        if ('government' in result) setGovernment(result.government ?? null);
         if (result.profile) setCapacity(result.profile.capacity);
         if (typeof result.capacity === 'number') setCapacity(result.capacity);
         if (!response.ok) {
@@ -1434,7 +1457,7 @@ export default function Home() {
 
   async function runMarket(command: MarketCommand) {
     if (workLock.current || citizenNation?.id !== 'kindle' || !economy || !market) return;
-    if (!validMarketCommand(command) || (marketIntent.current && marketIntent.current.requestId !== command.requestId)) return;
+    if (playerIntent.current || !validMarketCommand(command) || (marketIntent.current && marketIntent.current.requestId !== command.requestId)) return;
     marketIntent.current = command;
     workLock.current = true;
     setWorkPending(true);
@@ -1444,11 +1467,12 @@ export default function Home() {
       if (clerkConfigured) {
         const response = await fetch('/api/citizen', { method: 'POST',
           headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
-        const result = await response.json() as { error?: string; economy?: Economy; market?: MarketState; capacity?: number };
+        const result = await response.json() as { error?: string; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; capacity?: number };
         if (response.status >= 500) throw new Error('Server response needs confirmation.');
         if (response.ok && (!result.economy || !result.market || typeof result.capacity !== 'number')) throw new Error('Incomplete transaction response.');
         if (result.economy) setEconomy(result.economy);
         if (result.market) setMarket(result.market);
+        if (result.playerMarket) setPlayerMarket(result.playerMarket);
         if (typeof result.capacity === 'number') setCapacity(result.capacity);
         if (!response.ok) {
           setWorkError(result.error ?? 'Transaction refused. Refresh your account and check balances.');
@@ -1495,38 +1519,80 @@ export default function Home() {
     }
   }
 
+  async function runPlayerCommand(command: PlayerCommand) {
+    if (!clerkConfigured || workLock.current || !citizenNation || !validPlayerCommand(command)
+      || (playerIntent.current && playerIntent.current.requestId !== command.requestId) || marketIntent.current) return;
+    playerIntent.current = command;
+    workLock.current = true;
+    setWorkPending(true); setWorkError(null); setPlayerCommand(command);
+    try {
+      const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
+      const result = await response.json() as { error?: string; economy?: Economy; playerMarket?: PlayerMarketState };
+      if (response.status >= 500 || (response.ok && (!result.economy || !result.playerMarket))) throw new Error('Response needs confirmation.');
+      if (result.economy) setEconomy(result.economy);
+      if (result.playerMarket) setPlayerMarket(result.playerMarket);
+      playerIntent.current = null; setPlayerCommand(null);
+      if (!response.ok) { setWorkError(result.error ?? 'Listing action refused. Refresh your account.'); return; }
+      setRecentAction(command.action === 'create-listing' ? 'Citizen listing created: goods reserved.'
+        : command.action === 'buy-listing' ? 'Citizen purchase settled: payment and goods transferred.' : 'Listing cancelled: reserved goods returned.');
+    } catch {
+      setWorkError('Connection interrupted. Retry the previous listing action to confirm its saved result.');
+    } finally { workLock.current = false; setWorkPending(false); }
+  }
+
+  async function petitionGovernment(topic: PetitionTopic) {
+    if (workLock.current || !citizenNation || !government || marketIntent.current || playerIntent.current) return;
+    if (governmentIntent.current && governmentIntent.current.topic !== topic) {
+      setGovernmentError(`Retry the previous ${governmentIntent.current.topic} petition before choosing another topic.`); return;
+    }
+    const intent = governmentIntent.current ?? { topic, requestId: crypto.randomUUID() };
+    governmentIntent.current = intent;
+    workLock.current = true; setGovernmentPending(true); setGovernmentError(null);
+    try {
+      if (clerkConfigured) {
+        const response = await fetch('/api/citizen', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'government-petition', ...intent }) });
+        const result = await response.json() as { error?:string; government?:GovernmentSnapshot|null; citizenship?:CitizenshipStatus };
+        if (response.status >= 500 || (response.ok && !result.citizenship)) throw new Error('Petition response needs confirmation.');
+        governmentIntent.current = null;
+        if (!response.ok) { setGovernmentError(result.error ?? 'Petition refused.'); return; }
+        setGovernment(result.government ?? null);
+        if (result.citizenship) setCitizenshipStatus(result.citizenship);
+      } else {
+        const period = Math.floor(new Date().getTime()/86400000)*86400;
+        if (demoGovernment.period === period) { governmentIntent.current=null; setGovernmentError('One petition per citizen per UTC day.'); return; }
+        setDemoGovernment({ period, counts: { ...demoGovernment.counts, [topic]: (demoGovernment.counts[topic] ?? 0)+1 } });
+        setCitizenshipStatus((current) => current ? { ...current, politicalActionTaken:true, canChange:false, lockedReason:'political-action' } : current);
+        governmentIntent.current=null;
+      }
+      setRecentAction('Citizen petition recorded; the rule-bound government proposal reflects public priorities.');
+    } catch { setGovernmentError('Connection interrupted. Retry the same petition topic to confirm its saved result.'); }
+    finally { workLock.current=false; setGovernmentPending(false); }
+  }
+
   function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
-  const workStatus = <><WorkShiftBoard shifts={workShifts} pending={workPending}
-    error={workError} localDemo={!clerkConfigured} economy={economy}
-    onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
-    <CitizenMarket market={market} economy={economy} capacity={capacity} busy={workPending} uncertain={Boolean(marketCommand)}
-      onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
-      onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })}
-      onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} /></>;
+  const workStatus = <section className="scene-daily-links" aria-label="Citizen daily loop">
+    <p>Your daily life continues across the city.</p>
+    <button type="button" onClick={() => changeView('home')}>Home · briefing and food</button>
+    <button type="button" onClick={() => changeView('workplace')}>Workplace · shifts and earnings</button>
+    <button type="button" onClick={() => changeView('market')}>Market · goods and listings</button>
+    <button type="button" onClick={() => changeView('government')}>Government · policies and petitions</button>
+  </section>;
 
   function changeView(nextView: ViewMode) {
-    setViewOverride(nextView);
-    setCompactView(false);
-    const url = new URL(window.location.href);
-    if (nextView === 'world') {
-      url.searchParams.delete('view');
-      url.searchParams.delete('nation');
-    } else {
-      url.searchParams.set('view', nextView);
-      if (nextView === 'nation') url.searchParams.set('nation', selected.id);
-      else url.searchParams.delete('nation');
-    }
-    window.history.replaceState({}, '', url);
+    const href = sceneUrl(window.location.href, nextView, selected.id);
+    if (href !== window.location.href) window.history.pushState({}, '', href);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   }
 
   function selectNation(nationId: string) {
     setSelectedId(nationId);
-    setViewOverride('nation');
     if (viewMode !== 'nation') return;
     const url = new URL(window.location.href);
     url.searchParams.set('view', 'nation');
     url.searchParams.set('nation', nationId);
-    window.history.replaceState({}, '', url);
+    if (url.href !== window.location.href) window.history.pushState({}, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   }
 
   function togglePlan(id: string) {
@@ -1538,6 +1604,9 @@ export default function Home() {
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
     setWorkShifts(snapshot.shifts ?? []);
     if (snapshot.market) setMarket(snapshot.market);
+    if (snapshot.playerMarket) setPlayerMarket(snapshot.playerMarket);
+    if ('government' in snapshot) setGovernment(snapshot.government ?? null);
+    if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
     setDemoStarterGranted(snapshot.demoStarterGranted ?? false);
     if (snapshot.economy) setEconomy(snapshot.economy);
@@ -1591,7 +1660,7 @@ export default function Home() {
     if (clerkConfigured || !demoLoaded) return;
     try {
       window.localStorage.setItem('harimu-citizen-demo-v1', JSON.stringify({
-        shifts: workShifts, economy, market, demoReceipts, demoStarterGranted,
+        shifts: workShifts, economy, market, demoReceipts, demoStarterGranted, demoGovernment,
         profile: citizenshipStatus ? { nationId: citizenNationId, capacity, influence,
           waterSecurity, wardStability, citizenship: citizenshipStatus } : null,
         plan: { horizon, note: planNote, completedIds: completedPlanIds },
@@ -1600,7 +1669,7 @@ export default function Home() {
     } catch {
       queueMicrotask(() => setWorkError('Local demo storage is unavailable; this session will not survive a refresh.'));
     }
-  }, [demoLoaded, workShifts, economy, market, demoReceipts, demoStarterGranted, citizenshipStatus, citizenNationId, capacity, influence,
+  }, [demoLoaded, workShifts, economy, market, demoReceipts, demoStarterGranted, demoGovernment, citizenshipStatus, citizenNationId, capacity, influence,
     waterSecurity, wardStability, horizon, planNote, completedPlanIds, committedDecision]);
 
   async function commitDecision(input: DecisionCommitInput) {
@@ -1728,6 +1797,7 @@ export default function Home() {
         citizenship?: CitizenshipStatus | null;
         economy?: Economy;
         market?: MarketState;
+        playerMarket?: PlayerMarketState;
       };
       if (!response.ok || !result.nationId) {
         if (result.citizenship) setCitizenshipStatus(result.citizenship);
@@ -1740,6 +1810,7 @@ export default function Home() {
       if (result.citizenship) setCitizenshipStatus(result.citizenship);
       if (result.economy) setEconomy(result.economy);
       if (result.market) setMarket(result.market);
+      if (result.playerMarket) setPlayerMarket(result.playerMarket);
       setPendingEnrollment(null);
     } catch {
       setEnrollmentError('Citizenship could not be recorded yet. Please try again.');
@@ -1752,6 +1823,60 @@ export default function Home() {
     setEnrollmentError(null);
     setPendingEnrollment(nationId);
   }
+
+  const citizenScene = <section className={`citizen-scene scene-${viewMode}`} aria-labelledby="citizen-scene-title">
+    <header className="scene-heading"><span className="eyebrow">{citizenNation?.name ?? 'Harimu'} · {!clerkConfigured ? 'Local demo' : 'Citizen district'}</span>
+      <h1 id="citizen-scene-title">{viewMode === 'home' ? 'Your home' : viewMode === 'workplace' ? 'Workplace' : viewMode === 'market' ? 'Market quarter' : 'Government district'}</h1>
+      <p>{viewMode === 'home' ? 'Review your day, belongings, food and recovery.' : viewMode === 'workplace' ? 'Choose a contribution, complete your shift and collect your earnings.' : viewMode === 'market' ? 'Trade with the starter merchant or other citizens.' : 'Understand your institutions and influence the AI/SI government.'}</p>
+      <button type="button" onClick={() => changeView('square')}>Return to city square</button>
+      <button type="button" onClick={() => changeView('planning')}>Citizen plan</button>
+      <button type="button" onClick={() => { if (citizenNation) setSelectedId(citizenNation.id); changeView('nation'); }}>Nation institutions</button>
+    </header>
+    {!citizenNation ? <div className="scene-access"><p>{clerkConfigured && citizenSessionStatus === 'loading' ? 'Loading your citizen…' : 'Choose citizenship to begin your daily life. Explore the world and its national rules before enrolling.'}</p>
+      <button type="button" onClick={() => changeView('world')}>Explore nations and enroll</button>
+      {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
+    </div> : <>
+      {viewMode === 'home' && <>
+        <DailyBriefing economy={economy} shifts={workShifts} capacity={capacity} market={market} government={government}
+          citizenNationName={citizenNation.shortName} localDemo={!clerkConfigured} onRefresh={() => void runWork('refresh-work')}
+          onOpenWork={() => changeView('workplace')} onOpenMarket={() => changeView('market')} />
+        <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
+          <ul>{economy?.inventory.map((entry) => <li key={entry.item}>{entry.item}: {entry.quantity} available</li>)}</ul>
+          <p>Listed goods remain reserved at the market. Capacity recovers while you are away.</p>
+          {economy?.nextRecoveryAt && <p>Next recovery: {new Date(economy.nextRecoveryAt).toLocaleString()}</p>}
+        </section>
+        <CitizenMarket showTrading={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand)} uncertain={Boolean(marketCommand)}
+          onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
+          onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
+        {!market?.available && <p>Household meals are currently supported for Kindle citizens. Other national economies are planned.</p>}
+      </>}
+      {viewMode === 'workplace' && <>
+        <WorkShiftBoard shifts={workShifts} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
+          onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
+        <section className="scene-work-orders"><h2>Available contributions</h2>
+          {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <button key={order.id} type="button"
+            disabled={workPending || hasActiveShift || capacity < order.cost} onClick={() => void commitWork(order)}>
+            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></button>)}
+        {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length === 0 && <p>No shifts are available for this nation yet. Kindle has the first supported work and wage programme; other national workplaces are planned.</p>}
+        </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
+      </>}
+      {viewMode === 'market' && <>
+        <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand)} uncertain={Boolean(marketCommand)}
+          onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
+          onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
+        <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand)} uncertain={Boolean(playerCommand)}
+          onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />
+        {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
+        <button type="button" onClick={() => changeView('home')}>Bring food home</button>
+      </>}
+      {viewMode === 'government' && <>
+        <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. All government offices are AI/SI controlled in this release.</p>
+        <GovernmentPanel snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
+        {!government && <p>Policy simulation and petitions are currently available for Kindle, Korund and Aurelle. This nation’s civic implementation is planned.</p>}
+        <p>Elections, protests and public opinion systems are planned and will follow each nation’s rules. No election or protest is currently open here.</p>
+      </>}
+    </>}
+  </section>;
 
   const planningProps = {
     nation: planningNation,
@@ -1783,7 +1908,7 @@ export default function Home() {
   };
 
   return (
-    <main className={`world-shell view-${viewMode} ${compactView ? 'is-map-focus' : ''}`}>
+    <main className={`world-shell view-${viewMode}`}>
       {clerkConfigured && (
         <ClerkCitizenSession onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} />
       )}
@@ -1796,38 +1921,17 @@ export default function Home() {
           </div>
         </div>
 
-        <nav className="view-switcher" aria-label="Harimu views">
-          <button
-            aria-pressed={viewMode === 'world'}
-            onClick={() => changeView('world')}
-            type="button"
-          >
-            <span>World</span>
-            <small>Explore</small>
-          </button>
-          <button
-            aria-pressed={viewMode === 'nation'}
-            onClick={() => changeView('nation')}
-            type="button"
-          >
-            <span>Nation</span>
-            <small>Govern</small>
-          </button>
-          <button
-            aria-pressed={viewMode === 'planning'}
-            onClick={() => changeView('planning')}
-            type="button"
-          >
-            <span>Planning</span>
-            <small>My citizen</small>
-          </button>
+        <nav className="view-switcher" aria-label="Harimu scenes">
+          {([['world', 'World'], ['square', 'City square'], ['home', 'Home'], ['workplace', 'Workplace'], ['market', 'Market'], ['government', 'Government']] as const).map(([scene, label]) =>
+            <button key={scene} aria-current={viewMode === scene ? 'page' : undefined}
+              aria-pressed={viewMode === scene} onClick={() => changeView(scene)} type="button"><span>{label}</span></button>)}
         </nav>
 
-        <div className="world-clock" aria-label="World status">
+        <div className="world-clock" aria-label="Illustrative prototype clock">
           <span className="live-dot" />
           <div>
-            <span>World year 1 · Day 42</span>
-            <strong>18:42 UTC</strong>
+            <span>Prototype world calendar · Day 42</span>
+            <strong>Illustrative clock · 18:42 UTC</strong>
           </div>
         </div>
 
@@ -1855,22 +1959,20 @@ export default function Home() {
                   ? 'Citizen planning'
                   : 'Choose citizenship'}
           </button>
-          {viewMode === 'world' && (
-            <button
-              aria-pressed={compactView}
-              className="view-button"
-              onClick={() => setCompactView((current) => !current)}
-              type="button"
-            >
-              {compactView ? 'Show panels' : 'Map focus'}
-            </button>
-          )}
           <ClerkAccountControl onOpenPlanning={() => changeView('planning')} />
         </div>
       </header>
 
+      {recentAction && <p className="scene-action-status" role="status">{recentAction}</p>}
       {viewMode === 'world' ? (
-      <div className="game-layout">
+      <>
+      <WorldScene nations={worldNations} citizenNationId={citizenNationId} events={worldEvents} onNavigate={changeView} onSelectNation={(nationId) => {
+        setSelectedId(nationId);
+        const href = sceneUrl(window.location.href, 'nation', nationId);
+        if (href !== window.location.href) window.history.pushState({}, '', href);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }} />
+      <div className="scene-enrollment-layout">
         <aside className="nation-rail" aria-label="World nations">
           <div className="rail-heading">
             <span>{worldNations.length} nations</span>
@@ -1900,63 +2002,6 @@ export default function Home() {
             <small>{worldEvents[0]?.occurredAt ?? 'Live now'}</small>
           </div>
         </aside>
-
-        <section className={`map-stage mode-${mapMode}`} aria-label="Political world map">
-          <div className="map-shade" aria-hidden="true" />
-          <div className="map-toolbar">
-            <div>
-              <span className="eyebrow">Political atlas · live</span>
-              <h1>A living world of citizens</h1>
-            </div>
-            <div className="map-modes" role="group" aria-label="Map mode">
-              {(['sovereignty', 'trade', 'influence'] as MapMode[]).map((mode) => (
-                <button
-                  aria-pressed={mapMode === mode}
-                  className={mapMode === mode ? 'active' : ''}
-                  key={mode}
-                  onClick={() => setMapMode(mode)}
-                  type="button"
-                >
-                  {mode[0].toUpperCase() + mode.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="map-hotspots">
-            {worldNations.map((nation) => (
-              <button
-                aria-label={`${nation.name}, capital ${nation.capital}`}
-                className={`map-hotspot ${selected.id === nation.id ? 'is-selected' : ''}`}
-                key={nation.id}
-                onClick={() => setSelectedId(nation.id)}
-                style={
-                  {
-                    '--nation-color': nation.color,
-                    '--nation-x': `${nation.position.x}%`,
-                    '--nation-y': `${nation.position.y}%`,
-                  } as CSSProperties
-                }
-                type="button"
-              >
-                <span>{nation.capital}</span>
-                <small>{nation.shortName}</small>
-              </button>
-            ))}
-          </div>
-
-          <div className="mode-indicator">
-            <span>{mapMode} view</span>
-            <strong>{modeDescriptions[mapMode]}</strong>
-          </div>
-
-          <div className="world-ticker" aria-label="Recent world events">
-            <span className="ticker-status">Live record</span>
-            <p>{recentAction ?? <><strong>{worldEvents[0]?.location ?? 'World record'}</strong> {worldEvents[0]?.detail ?? 'The shared record is synchronized.'}</>}</p>
-            <time>18:31</time>
-            <p><strong>{worldEvents[1]?.location ?? 'World Assembly'}</strong> {worldEvents[1]?.detail ?? 'Citizens are preparing the next session.'}</p>
-          </div>
-        </section>
 
         <aside className="nation-panel" style={{ '--selected': selected.color } as CSSProperties}>
           <div className="panel-heading">
@@ -2028,19 +2073,7 @@ export default function Home() {
                     <b>{capacity} WC</b>
                   </div>
                   {workStatus}
-                  {availableWorkOrders
-                    .filter((order) => !order.nationId || order.nationId === citizenNation.id)
-                    .map((order) => (
-                    <button
-                      disabled={workPending || hasActiveShift || capacity < order.cost}
-                      key={order.id}
-                      onClick={() => void commitWork(order)}
-                      type="button"
-                    >
-                      <span><strong>{order.name}</strong><small>{order.detail}{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</small></span>
-                      <b>{order.cost}</b>
-                    </button>
-                  ))}
+
                 </div>
               )}
             </>
@@ -2056,6 +2089,13 @@ export default function Home() {
           )}
         </aside>
       </div>
+      </>
+      ) : viewMode === 'square' ? (
+        <CitySquareScene nations={worldNations} citizenNationId={citizenNationId} events={worldEvents}
+          capacity={capacity} walletMinor={economy?.walletMinor} readyShiftCount={workShifts.filter((shift) => !shift.claimedAt && Date.parse(shift.completesAt) <= Date.now()).length}
+          localDemo={!clerkConfigured} onNavigate={changeView} />
+      ) : ['home', 'workplace', 'market', 'government'].includes(viewMode) ? (
+        citizenScene
       ) : viewMode === 'nation' ? (
         <NationDashboard
           capacity={capacity}

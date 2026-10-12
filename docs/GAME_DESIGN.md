@@ -1,5 +1,7 @@
 # Harimu - Game Design Companion
 
+Implementation override: [requirements after v0.6](REQUIREMENT_CHANGES.md) takes precedence for explicitly changed requirements, including AI/SI control of all government roles in the first release. Player-held office is deferred.
+
 Status: implementation-facing summary of the canonical **Harimu Game Design Document v0.6**, dated October 12, 2026.
 
 The full GDD is the design authority. This companion keeps the decisions most likely to affect product, architecture, and day-to-day implementation close to the codebase. When the two conflict, follow the GDD and update this file.
@@ -10,7 +12,7 @@ Numbers described as assumptions are starting points for playtesting, not promis
 
 Harimu is a persistent browser strategy game set on the world of Harimu. Ten original nations, each with a fixed political system, economic system, currency, and official religious stance, share a finite map and a clock that never pauses.
 
-The player is not the nation. The player is one citizen living inside its institutions. Leaders are players; laws, elections, wars, treaties, coups, markets, and public stories emerge from their decisions. Systems do not change, but the people running them do.
+The player is not the nation. The player is one citizen living inside its institutions. All government roles are AI/SI-controlled in the first release. Players influence institutions through nation-appropriate voting, petitions, protests, trade and public opinion; player-held office is deferred. Systems do not change, but the people running them do.
 
 The central promise is:
 

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const nations = sqliteTable('nations', {
   id: text('id').primaryKey(),
@@ -204,3 +204,47 @@ export const citizenEconomyEvents = sqliteTable('citizen_economy_events', {
   occurredAt: integer('occurred_at').notNull(),
   capacityApplied: integer('capacity_applied').notNull().default(0),
 }, (table) => [index('idx_economy_events_user_item').on(table.clerkUserId, table.item)]);
+
+export const playerListings = sqliteTable('player_listings', {
+  id: text('id').primaryKey(),
+  sellerId: text('seller_id').notNull().references(() => citizens.clerkUserId),
+  item: text('item', { enum: ['food', 'materials', 'knowledge'] }).notNull(),
+  quantity: integer('quantity').notNull(),
+  unitMinor: integer('unit_minor').notNull(),
+  createdAt: integer('created_at').notNull(),
+}, (table) => [index('idx_player_listings_seller').on(table.sellerId, table.createdAt),
+  check('player_listing_quantity', sql`typeof(${table.quantity}) = 'integer' AND ${table.quantity} BETWEEN 1 AND 10`),
+  check('player_listing_price', sql`typeof(${table.unitMinor}) = 'integer' AND ${table.unitMinor} BETWEEN 1 AND 1000`),
+  check('player_listing_item', sql`${table.item} IN ('food','materials','knowledge')`)]);
+export const playerFills = sqliteTable('player_fills', {
+  requestId: text('request_id').primaryKey(),
+  listingId: text('listing_id').notNull().unique().references(() => playerListings.id),
+  buyerId: text('buyer_id').notNull().references(() => citizens.clerkUserId),
+  sellerId: text('seller_id').notNull().references(() => citizens.clerkUserId),
+  item: text('item').notNull(),
+  quantity: integer('quantity').notNull(),
+  amountMinor: integer('amount_minor').notNull(),
+  filledAt: integer('filled_at').notNull(),
+}, (table) => [
+  check('player_fill_quantity', sql`typeof(${table.quantity}) = 'integer' AND ${table.quantity} BETWEEN 1 AND 10`),
+  check('player_fill_amount', sql`typeof(${table.amountMinor}) = 'integer' AND ${table.amountMinor} BETWEEN 1 AND 10000`),
+  check('player_fill_distinct_accounts', sql`${table.buyerId} != ${table.sellerId}`),
+]);
+export const playerCancellations = sqliteTable('player_cancellations', {
+  requestId: text('request_id').primaryKey(),
+  listingId: text('listing_id').notNull().unique().references(() => playerListings.id),
+  sellerId: text('seller_id').notNull().references(() => citizens.clerkUserId),
+  cancelledAt: integer('cancelled_at').notNull(),
+});
+export const governmentPetitions = sqliteTable('government_petitions', {
+  requestId: text('request_id').primaryKey(),
+  clerkUserId: text('clerk_user_id').notNull().references(() => citizens.clerkUserId),
+  nationId: text('nation_id').notNull(),
+  topic: text('topic', { enum: ['food', 'infrastructure', 'work'] }).notNull(),
+  periodStart: integer('period_start').notNull(),
+  occurredAt: integer('occurred_at').notNull(),
+}, (table) => [uniqueIndex('idx_government_petitions_user_period').on(table.clerkUserId, table.periodStart),
+  check('government_petition_topic', sql`${table.topic} IN ('food','infrastructure','work')`)]);
+export const economyMigrations = sqliteTable('economy_migrations', {
+  id: text('id').primaryKey(),
+});

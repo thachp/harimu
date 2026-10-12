@@ -1,3 +1,5 @@
+import { petitionSql, readGovernment } from '@/lib/government-state';
+import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
@@ -143,13 +145,16 @@ export async function GET(request: Request) {
       .bind(userId, activeDecisionId)
       .first<CitizenDecisionRow>(),
     database.prepare(`SELECT EXISTS(
-      SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ? LIMIT 1
-    ) AS political_action_taken`).bind(userId).first<{ political_action_taken: number }>(),
+      SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ?
+      UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id = ? LIMIT 1
+    ) AS political_action_taken`).bind(userId, userId).first<{ political_action_taken: number }>(),
   ]);
 
   return Response.json({
     economy: await readEconomy(database, userId, interval),
     market: await readMarket(database, userId, interval),
+    playerMarket: await readPlayerMarket(database, userId),
+    government: profile?.nation_id ? await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000)) : null,
     shifts: await readShifts(database, userId),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -183,13 +188,45 @@ export async function POST(request: Request) {
   }
   const now = new Date().toISOString();
 
+  if (body.action === 'government-petition') {
+    const requestId = typeof body.requestId === 'string' ? body.requestId.toLowerCase() : '';
+    const topic = typeof body.topic === 'string' ? body.topic : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(requestId) || !['food','infrastructure','work'].includes(topic)) {
+      return Response.json({ error: 'Unknown petition topic or request identifier.' }, { status: 400 });
+    }
+    const seconds = Math.floor(Date.parse(now)/1000);
+    const period = Math.floor(seconds/86400)*86400;
+    const receipt = () => database.prepare('SELECT clerk_user_id, nation_id, topic FROM government_petitions WHERE request_id=?')
+      .bind(requestId).first<{ clerk_user_id: string; nation_id: string; topic: string }>();
+    let recorded = await receipt();
+    if (!recorded) {
+      await database.prepare(petitionSql).bind(requestId, topic, period, seconds, userId, requestId, userId, period).run();
+      recorded = await receipt();
+    }
+    if (!recorded || recorded.clerk_user_id !== userId || recorded.topic !== topic) {
+      return Response.json({ error: 'Petition refused: one petition per citizen per UTC day; MVP citizenship and ownership required.' }, { status: 409 });
+    }
+    const citizen = await database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at FROM citizens WHERE clerk_user_id=?`)
+      .bind(userId).first<CitizenProfileRow>();
+    return Response.json({ ok:true, government: await readGovernment(database, recorded.nation_id, seconds),
+      citizenship: citizen ? serializeCitizenship(citizen,true) : null });
+  }
+
+  if (body.action === 'create-listing' || body.action === 'buy-listing' || body.action === 'cancel-listing') {
+    if (!validPlayerCommand(body)) return Response.json({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
+    const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: body.listingId?.toLowerCase() };
+    const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000));
+    return Response.json({ ...result, economy: await readEconomy(database, userId, interval),
+      playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
+  }
+
   if (body.action === 'market-trade' || body.action === 'household-meal') {
     if (!validMarketCommand(body)) return Response.json({ error: 'Use a valid request id, good, side and integer quantity from 1 to 10.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase() };
     const result = await executeMarketCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), interval);
     const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ capacity: number }>();
     return Response.json({ ...result, economy: await readEconomy(database, userId, interval),
-      market: await readMarket(database, userId, interval), capacity: citizen?.capacity ?? 0 }, { status: result.status });
+      market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
   if (body.action === 'enroll') {
@@ -215,14 +252,15 @@ export async function POST(request: Request) {
         ok: true,
         nationId,
         economy: await readEconomy(database, userId, interval),
-        market: await readMarket(database, userId, interval),
+        market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
         citizenship: created ? serializeCitizenship(created, false) : null,
       });
     }
 
     const politicalAction = await database.prepare(`SELECT EXISTS(
-      SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ? LIMIT 1
-    ) AS political_action_taken`).bind(userId).first<{ political_action_taken: number }>();
+      SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ?
+      UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id = ? LIMIT 1
+    ) AS political_action_taken`).bind(userId, userId).first<{ political_action_taken: number }>();
     const politicalActionTaken = Boolean(politicalAction?.political_action_taken);
 
     if (current.nation_id === nationId) {
@@ -231,7 +269,7 @@ export async function POST(request: Request) {
         nationId,
         citizenship: serializeCitizenship(current, politicalActionTaken),
         economy: await readEconomy(database, userId, interval),
-        market: await readMarket(database, userId, interval),
+        market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
       });
     }
 
@@ -249,8 +287,8 @@ export async function POST(request: Request) {
           AND julianday(created_at, '+48 hours') > julianday(?)
           AND NOT EXISTS (
             SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ? LIMIT 1
-          )`)
-        .bind(nationId, now, userId, nationId, now, userId)
+          ) AND NOT EXISTS (SELECT 1 FROM government_petitions WHERE clerk_user_id = ? LIMIT 1)`)
+        .bind(nationId, now, userId, nationId, now, userId, userId)
         .run();
 
       if (!change.meta.changes) {
@@ -272,7 +310,7 @@ export async function POST(request: Request) {
       ok: true,
       nationId,
       economy: await readEconomy(database, userId, interval),
-      market: await readMarket(database, userId, interval),
+      market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
       citizenship: updated ? serializeCitizenship(updated, politicalActionTaken) : null,
     });
   }
@@ -454,7 +492,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
     }
-    return Response.json({ ok: true, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval) });
+    return Response.json({ ok: true, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   if (body.action === 'claim-work') {
@@ -477,7 +515,7 @@ export async function POST(request: Request) {
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return Response.json({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
-    return Response.json({ ok: true, shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval) });
+    return Response.json({ ok: true, shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   return Response.json({ error: 'Unknown action.' }, { status: 400 });
