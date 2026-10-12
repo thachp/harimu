@@ -7,7 +7,7 @@ import {
   UserButton,
   useUser,
 } from '@clerk/nextjs';
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { clerkConfigured } from './providers';
 
 type Affinity = 'Water' | 'Earth' | 'Fire' | 'Air';
@@ -33,7 +33,31 @@ type Nation = {
   position: { x: number; y: number };
 };
 
-const nations: Nation[] = [
+type WorkOrder = {
+  id: string;
+  nationId?: string | null;
+  name: string;
+  detail: string;
+  cost: number;
+};
+
+type PlanningTask = {
+  id: string;
+  title: string;
+  detail: string;
+  meta: string;
+};
+
+type WorldEvent = {
+  id: number;
+  kind: string;
+  headline: string;
+  detail: string;
+  location: string | null;
+  occurredAt: string;
+};
+
+const fallbackNations: Nation[] = [
   {
     id: 'tidelands',
     name: 'Tidelands Republic',
@@ -179,7 +203,7 @@ const affinityMark: Record<Affinity, string> = {
   Air: 'A',
 };
 
-const workOrders = [
+const fallbackWorkOrders: WorkOrder[] = [
   { id: 'harvest', name: 'Support the harvest', detail: '+480 food · resolves in 2h', cost: 4 },
   { id: 'freight', name: 'Move a materials convoy', detail: '+210 materials · resolves in 4h', cost: 6 },
   { id: 'archive', name: 'Catalogue the city archive', detail: '+95 knowledge · resolves in 3h', cost: 3 },
@@ -191,7 +215,7 @@ const modeDescriptions: Record<MapMode, string> = {
   influence: 'Affinity, foreign pressure, and the civic pull of each region',
 };
 
-const planningItems = [
+const fallbackPlanningItems: PlanningTask[] = [
   {
     id: 'capacity',
     title: 'Commit Work Capacity',
@@ -212,10 +236,10 @@ const planningItems = [
   },
 ];
 
-const horizonMoments = [
-  { day: 'Today', time: '20:00', title: 'Capacity grant closes', kind: 'Work' },
-  { day: 'Day 43', time: '09:00', title: 'District assembly session', kind: 'Civic' },
-  { day: 'Day 45', time: '18:00', title: 'Trade corridor vote', kind: 'Ballot' },
+const fallbackWorldEvents: WorldEvent[] = [
+  { id: 1, occurredAt: 'Today · 20:00', headline: 'Capacity grant closes', kind: 'Work', detail: 'Verdant Seat closes allocations for tomorrow’s harvest.', location: 'Verdant Seat' },
+  { id: 2, occurredAt: 'Day 43 · 09:00', headline: 'District assembly session', kind: 'Civic', detail: 'The eastern waterworks proposal enters public debate.', location: 'Verdant Ward' },
+  { id: 3, occurredAt: 'Day 45 · 18:00', headline: 'Trade corridor vote', kind: 'Ballot', detail: 'Citizens decide the Solar–Delta corridor mandate.', location: 'World Assembly' },
 ];
 
 type PlanningDashboardProps = {
@@ -225,10 +249,15 @@ type PlanningDashboardProps = {
   horizon: PlanHorizon;
   completedPlanIds: string[];
   planSaved: boolean;
+  planningItems: PlanningTask[];
+  worldEvents: WorldEvent[];
+  note: string;
+  nationCount: number;
   preview?: boolean;
   onHorizonChange: (horizon: PlanHorizon) => void;
   onTogglePlan: (id: string) => void;
-  onSavePlan: () => void;
+  onNoteChange: (note: string) => void;
+  onSavePlan: () => void | Promise<void>;
   onWorldView: () => void;
 };
 
@@ -268,9 +297,14 @@ function PlanningDashboard({
   horizon,
   completedPlanIds,
   planSaved,
+  planningItems,
+  worldEvents,
+  note,
+  nationCount,
   preview = false,
   onHorizonChange,
   onTogglePlan,
+  onNoteChange,
   onSavePlan,
   onWorldView,
 }: PlanningDashboardProps) {
@@ -378,9 +412,10 @@ function PlanningDashboard({
           <div className="planning-note">
             <label htmlFor="citizen-note">Private note</label>
             <textarea
-              defaultValue="Ask the forum how the eastern waterworks will affect Verdant Ward."
               id="citizen-note"
+              onChange={(event) => onNoteChange(event.target.value)}
               rows={3}
+              value={note}
             />
           </div>
 
@@ -396,23 +431,26 @@ function PlanningDashboard({
           <span className="eyebrow">World horizon</span>
           <h2>What happens next</h2>
           <div className="horizon-list">
-            {horizonMoments.map((moment) => (
-              <article key={moment.title}>
+            {worldEvents.map((moment) => {
+              const [day, time] = moment.occurredAt.split(' · ');
+              return (
+              <article key={moment.id}>
                 <div>
-                  <span>{moment.day}</span>
-                  <time>{moment.time}</time>
+                  <span>{day}</span>
+                  <time>{time}</time>
                 </div>
                 <div>
                   <small>{moment.kind}</small>
-                  <strong>{moment.title}</strong>
+                  <strong>{moment.headline}</strong>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
 
           <div className="world-pulse-card">
             <span>World pulse</span>
-            <strong>8 nations · 9.2m citizens</strong>
+            <strong>{nationCount} nations · 9.2m citizens</strong>
             <p>Trade activity is rising while regional stability remains steady.</p>
             <div>
               <i style={{ height: '34%' }} />
@@ -431,10 +469,50 @@ function PlanningDashboard({
   );
 }
 
-function SignedInPlanningDashboard(props: Omit<PlanningDashboardProps, 'citizenName' | 'preview'>) {
-  const { user } = useUser();
+type CitizenSnapshot = {
+  profile: { nationId: string | null; capacity: number } | null;
+  plan: { horizon: PlanHorizon; note: string; completedIds: string[] } | null;
+};
+
+function SignedInPlanningDashboard({
+  onHydrate,
+  ...props
+}: Omit<PlanningDashboardProps, 'citizenName' | 'preview'> & {
+  onHydrate: (snapshot: CitizenSnapshot) => void;
+}) {
+  const { isLoaded, user } = useUser();
+  const userId = user?.id;
   const citizenName = user?.firstName || user?.fullName || 'Harimu citizen';
-  return <PlanningDashboard {...props} citizenName={citizenName} />;
+
+  useEffect(() => {
+    if (!isLoaded || !userId) return;
+    const controller = new AbortController();
+
+    async function loadCitizen() {
+      const response = await fetch('/api/citizen', { signal: controller.signal });
+      if (!response.ok) return;
+      onHydrate(await response.json() as CitizenSnapshot);
+    }
+
+    void loadCitizen();
+    return () => controller.abort();
+  }, [isLoaded, onHydrate, userId]);
+
+  async function savePlan() {
+    const response = await fetch('/api/citizen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save-plan',
+        horizon: props.horizon,
+        completedIds: props.completedPlanIds,
+        note: props.note,
+      }),
+    });
+    if (response.ok) await props.onSavePlan();
+  }
+
+  return <PlanningDashboard {...props} citizenName={citizenName} onSavePlan={savePlan} />;
 }
 
 function PlanningSignInGate() {
@@ -461,6 +539,10 @@ function PlanningSignInGate() {
 }
 
 export default function Home() {
+  const [worldNations, setWorldNations] = useState<Nation[]>(fallbackNations);
+  const [availableWorkOrders, setAvailableWorkOrders] = useState<WorkOrder[]>(fallbackWorkOrders);
+  const [availablePlanningItems, setAvailablePlanningItems] = useState<PlanningTask[]>(fallbackPlanningItems);
+  const [worldEvents, setWorldEvents] = useState<WorldEvent[]>(fallbackWorldEvents);
   const [viewMode, setViewMode] = useState<ViewMode>('world');
   const [selectedId, setSelectedId] = useState('jade');
   const [citizenNationId, setCitizenNationId] = useState<string | null>(null);
@@ -472,13 +554,14 @@ export default function Home() {
   const [horizon, setHorizon] = useState<PlanHorizon>('week');
   const [completedPlanIds, setCompletedPlanIds] = useState<string[]>(['capacity']);
   const [planSaved, setPlanSaved] = useState(false);
+  const [planNote, setPlanNote] = useState('Ask the forum how the eastern waterworks will affect Verdant Ward.');
 
   const selected = useMemo(
-    () => nations.find((nation) => nation.id === selectedId) ?? nations[0],
-    [selectedId],
+    () => worldNations.find((nation) => nation.id === selectedId) ?? worldNations[0],
+    [selectedId, worldNations],
   );
-  const citizenNation = nations.find((nation) => nation.id === citizenNationId);
-  const pendingNation = nations.find((nation) => nation.id === pendingEnrollment);
+  const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
+  const pendingNation = worldNations.find((nation) => nation.id === pendingEnrollment);
   const planningNation = citizenNation ?? selected;
 
   useEffect(() => {
@@ -489,10 +572,50 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeydown);
   }, []);
 
-  function commitWork(name: string, cost: number) {
-    if (capacity < cost || !citizenNation) return;
-    setCapacity((current) => current - cost);
-    setRecentAction(`${citizenNation.shortName}: you committed ${cost} Work Capacity to “${name}.”`);
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadWorld() {
+      const response = await fetch('/api/world', { signal: controller.signal });
+      if (!response.ok) return;
+      const data = await response.json() as {
+        nations: Nation[];
+        workOrders: WorkOrder[];
+        planningTasks: PlanningTask[];
+        worldEvents: WorldEvent[];
+      };
+      if (data.nations.length) setWorldNations(data.nations);
+      if (data.workOrders.length) setAvailableWorkOrders(data.workOrders);
+      if (data.planningTasks.length) setAvailablePlanningItems(data.planningTasks);
+      if (data.worldEvents.length) setWorldEvents(data.worldEvents);
+    }
+
+    void loadWorld();
+    return () => controller.abort();
+  }, []);
+
+  async function commitWork(order: WorkOrder) {
+    if (capacity < order.cost || !citizenNation) return;
+
+    if (clerkConfigured) {
+      const response = await fetch('/api/citizen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'commit-work', workOrderId: order.id }),
+      });
+      if (!response.ok) {
+        setRecentAction(response.status === 401
+          ? 'Sign in before committing Work Capacity.'
+          : 'Your contribution could not be recorded yet.');
+        return;
+      }
+      const result = await response.json() as { capacity: number };
+      setCapacity(result.capacity);
+    } else {
+      setCapacity((current) => current - order.cost);
+    }
+
+    setRecentAction(`${citizenNation.shortName}: you committed ${order.cost} Work Capacity to “${order.name}.”`);
   }
 
   function changeView(nextView: ViewMode) {
@@ -511,17 +634,56 @@ export default function Home() {
     setPlanSaved(false);
   }
 
+  const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
+    if (snapshot.profile) {
+      setCitizenNationId(snapshot.profile.nationId);
+      setCapacity(snapshot.profile.capacity);
+    }
+    if (snapshot.plan) {
+      setHorizon(snapshot.plan.horizon);
+      setCompletedPlanIds(snapshot.plan.completedIds);
+      setPlanNote(snapshot.plan.note);
+      setPlanSaved(true);
+    }
+  }, []);
+
+  async function confirmEnrollment(nation: Nation) {
+    setCitizenNationId(nation.id);
+    setSelectedId(nation.id);
+    setPendingEnrollment(null);
+
+    if (!clerkConfigured) return;
+    const response = await fetch('/api/citizen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'enroll', nationId: nation.id }),
+    });
+    if (!response.ok) {
+      setRecentAction(response.status === 401
+        ? 'Citizenship is selected locally. Sign in to preserve it in the world record.'
+        : 'Citizenship is selected locally but has not reached the world record yet.');
+    }
+  }
+
   const planningProps = {
     nation: planningNation,
     capacity,
     horizon,
     completedPlanIds,
     planSaved,
+    planningItems: availablePlanningItems,
+    worldEvents,
+    note: planNote,
+    nationCount: worldNations.length,
     onHorizonChange: (nextHorizon: PlanHorizon) => {
       setHorizon(nextHorizon);
       setPlanSaved(false);
     },
     onTogglePlan: togglePlan,
+    onNoteChange: (note: string) => {
+      setPlanNote(note);
+      setPlanSaved(false);
+    },
     onSavePlan: () => setPlanSaved(true),
     onWorldView: () => changeView('world'),
   };
@@ -600,11 +762,11 @@ export default function Home() {
       <div className="game-layout">
         <aside className="nation-rail" aria-label="World nations">
           <div className="rail-heading">
-            <span>Eight nations</span>
+            <span>{worldNations.length} nations</span>
             <small>4 affinities</small>
           </div>
           <div className="nation-list">
-            {nations.map((nation) => (
+            {worldNations.map((nation) => (
               <button
                 className={`nation-row ${selected.id === nation.id ? 'is-selected' : ''}`}
                 key={nation.id}
@@ -623,8 +785,8 @@ export default function Home() {
 
           <div className="rail-event">
             <span className="event-label">World notice</span>
-            <strong>Solar–Delta trade corridor ratified</strong>
-            <small>Effective in 05h 18m</small>
+            <strong>{worldEvents[0]?.headline ?? 'World record synchronized'}</strong>
+            <small>{worldEvents[0]?.occurredAt ?? 'Live now'}</small>
           </div>
         </aside>
 
@@ -651,7 +813,7 @@ export default function Home() {
           </div>
 
           <div className="map-hotspots">
-            {nations.map((nation) => (
+            {worldNations.map((nation) => (
               <button
                 aria-label={`${nation.name}, capital ${nation.capital}`}
                 className={`map-hotspot ${selected.id === nation.id ? 'is-selected' : ''}`}
@@ -679,9 +841,9 @@ export default function Home() {
 
           <div className="world-ticker" aria-label="Recent world events">
             <span className="ticker-status">Live record</span>
-            <p>{recentAction ?? <><strong>Verdant Seat</strong> completed 12,480 units of food production.</>}</p>
+            <p>{recentAction ?? <><strong>{worldEvents[0]?.location ?? 'World record'}</strong> {worldEvents[0]?.detail ?? 'The shared record is synchronized.'}</>}</p>
             <time>18:31</time>
-            <p><strong>Terraced Crown</strong> opened bids for an eastern materials route.</p>
+            <p><strong>{worldEvents[1]?.location ?? 'World Assembly'}</strong> {worldEvents[1]?.detail ?? 'Citizens are preparing the next session.'}</p>
           </div>
         </section>
 
@@ -732,11 +894,13 @@ export default function Home() {
                     </div>
                     <b>{capacity} WC</b>
                   </div>
-                  {workOrders.map((order) => (
+                  {availableWorkOrders
+                    .filter((order) => !order.nationId || order.nationId === citizenNation.id)
+                    .map((order) => (
                     <button
                       disabled={capacity < order.cost}
                       key={order.id}
-                      onClick={() => commitWork(order.name, order.cost)}
+                      onClick={() => void commitWork(order)}
                       type="button"
                     >
                       <span><strong>{order.name}</strong><small>{order.detail}</small></span>
@@ -764,7 +928,7 @@ export default function Home() {
             <PlanningSignInGate />
           </Show>
           <Show when="signed-in">
-            <SignedInPlanningDashboard {...planningProps} />
+            <SignedInPlanningDashboard {...planningProps} onHydrate={hydrateCitizen} />
           </Show>
         </>
       ) : (
@@ -798,11 +962,7 @@ export default function Home() {
               </button>
               <button
                 className="primary-action"
-                onClick={() => {
-                  setCitizenNationId(pendingNation.id);
-                  setSelectedId(pendingNation.id);
-                  setPendingEnrollment(null);
-                }}
+                onClick={() => void confirmEnrollment(pendingNation)}
                 type="button"
               >
                 Confirm citizenship
