@@ -106,7 +106,7 @@ async function authenticatedUserId(request: Request) {
   };
 
   if (!bindings.CLERK_SECRET_KEY || !bindings.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    throw new Error('Clerk server credentials are unavailable.');
+    return null;
   }
 
   const requestState = await createClerkClient({
