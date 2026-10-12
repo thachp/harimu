@@ -23,6 +23,12 @@ const planningTaskSeeds = [
   ['ballot', 'Review the trade ballot', 'Compare the open-corridor and licensed-market measures.', 'Vote closes in 2d', 3],
 ] as const;
 
+const planningTaskEffectSeeds = [
+  ['capacity', -6, 20, 4, 1, 'Harvest crews reinforce the intake before the rain, protecting tomorrow’s reserve.', 'waterworks', 'citizen'],
+  ['forum', -2, 80, 3, 3, 'The household joins the forum and keeps emergency repair funding open.', 'council', 'partner'],
+  ['ballot', 0, 50, 1, 2, 'The household completes the trade review, improving the route for replacement pump parts.', 'depot', 'apprentice'],
+] as const;
+
 const worldEventSeeds = [
   [1, 'Work', 'Capacity grant closes', 'Verdant Seat closes allocations for tomorrow’s harvest.', 'Verdant Seat', 'Today · 20:00', 1],
   [2, 'Civic', 'District assembly session', 'The eastern waterworks proposal enters public debate.', 'Verdant Ward', 'Day 43 · 09:00', 2],
@@ -83,6 +89,16 @@ async function initialize(database: D1Database) {
       meta TEXT NOT NULL,
       sort_order INTEGER NOT NULL
     )`),
+    database.prepare(`CREATE TABLE IF NOT EXISTS planning_task_effects (
+      task_id TEXT PRIMARY KEY NOT NULL REFERENCES planning_tasks(id) ON DELETE CASCADE,
+      capacity_delta INTEGER DEFAULT 0 NOT NULL,
+      influence_delta INTEGER DEFAULT 0 NOT NULL,
+      water_delta INTEGER DEFAULT 0 NOT NULL,
+      stability_delta INTEGER DEFAULT 0 NOT NULL,
+      outcome TEXT NOT NULL,
+      infrastructure_id TEXT NOT NULL,
+      household_member_id TEXT NOT NULL
+    )`),
     database.prepare(`CREATE TABLE IF NOT EXISTS citizens (
       clerk_user_id TEXT PRIMARY KEY NOT NULL,
       nation_id TEXT REFERENCES nations(id),
@@ -106,6 +122,20 @@ async function initialize(database: D1Database) {
       updated_at TEXT NOT NULL,
       PRIMARY KEY (clerk_user_id, task_id)
     )`),
+    database.prepare(`CREATE TABLE IF NOT EXISTS citizen_decisions (
+      clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+      decision_id TEXT NOT NULL,
+      task_id TEXT NOT NULL REFERENCES planning_tasks(id),
+      infrastructure_id TEXT NOT NULL,
+      household_member_id TEXT NOT NULL,
+      capacity_delta INTEGER NOT NULL,
+      influence_delta INTEGER NOT NULL,
+      water_delta INTEGER NOT NULL,
+      stability_delta INTEGER NOT NULL,
+      outcome TEXT NOT NULL,
+      committed_at TEXT NOT NULL,
+      PRIMARY KEY (clerk_user_id, decision_id)
+    )`),
     database.prepare(`CREATE TABLE IF NOT EXISTS work_contributions (
       id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
       clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
@@ -116,6 +146,7 @@ async function initialize(database: D1Database) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_world_events_sort_order ON world_events(sort_order)'),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_work_orders_nation_status ON work_orders(nation_id, status)'),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_work_contributions_user_created ON work_contributions(clerk_user_id, created_at)'),
+    database.prepare('CREATE INDEX IF NOT EXISTS idx_citizen_decisions_user_committed ON citizen_decisions(clerk_user_id, committed_at)'),
   ]);
 
   await database.batch([
@@ -132,6 +163,11 @@ async function initialize(database: D1Database) {
       id, title, detail, meta, sort_order
     ) VALUES (?, ?, ?, ?, ?)`)
       .bind(...task)),
+    ...planningTaskEffectSeeds.map((effect) => database.prepare(`INSERT OR IGNORE INTO planning_task_effects (
+      task_id, capacity_delta, influence_delta, water_delta, stability_delta, outcome,
+      infrastructure_id, household_member_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(...effect)),
     ...worldEventSeeds.map((event) => database.prepare(`INSERT OR IGNORE INTO world_events (
       id, kind, headline, detail, location, occurred_at, sort_order
     ) VALUES (?, ?, ?, ?, ?, ?, ?)`)

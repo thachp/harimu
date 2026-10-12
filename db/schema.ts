@@ -56,6 +56,19 @@ export const planningTasks = sqliteTable('planning_tasks', {
   sortOrder: integer('sort_order').notNull(),
 });
 
+export const planningTaskEffects = sqliteTable('planning_task_effects', {
+  taskId: text('task_id')
+    .primaryKey()
+    .references(() => planningTasks.id, { onDelete: 'cascade' }),
+  capacityDelta: integer('capacity_delta').notNull().default(0),
+  influenceDelta: integer('influence_delta').notNull().default(0),
+  waterDelta: integer('water_delta').notNull().default(0),
+  stabilityDelta: integer('stability_delta').notNull().default(0),
+  outcome: text('outcome').notNull(),
+  infrastructureId: text('infrastructure_id').notNull(),
+  householdMemberId: text('household_member_id').notNull(),
+});
+
 export const citizens = sqliteTable('citizens', {
   clerkUserId: text('clerk_user_id').primaryKey(),
   nationId: text('nation_id').references(() => nations.id),
@@ -89,6 +102,31 @@ export const citizenPlanItems = sqliteTable(
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [primaryKey({ columns: [table.clerkUserId, table.taskId] })],
+);
+
+export const citizenDecisions = sqliteTable(
+  'citizen_decisions',
+  {
+    clerkUserId: text('clerk_user_id')
+      .notNull()
+      .references(() => citizens.clerkUserId, { onDelete: 'cascade' }),
+    decisionId: text('decision_id').notNull(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => planningTasks.id),
+    infrastructureId: text('infrastructure_id').notNull(),
+    householdMemberId: text('household_member_id').notNull(),
+    capacityDelta: integer('capacity_delta').notNull(),
+    influenceDelta: integer('influence_delta').notNull(),
+    waterDelta: integer('water_delta').notNull(),
+    stabilityDelta: integer('stability_delta').notNull(),
+    outcome: text('outcome').notNull(),
+    committedAt: text('committed_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.clerkUserId, table.decisionId] }),
+    index('idx_citizen_decisions_user_committed').on(table.clerkUserId, table.committedAt),
+  ],
 );
 
 export const workContributions = sqliteTable(

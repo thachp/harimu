@@ -34,6 +34,13 @@ type PlanningTaskRow = {
   title: string;
   detail: string;
   meta: string;
+  capacity_delta: number;
+  influence_delta: number;
+  water_delta: number;
+  stability_delta: number;
+  outcome: string;
+  infrastructure_id: string;
+  household_member_id: string;
 };
 
 type WorldEventRow = {
@@ -50,7 +57,21 @@ export async function GET() {
   const [nationResult, workOrderResult, planningTaskResult, eventResult] = await Promise.all([
     database.prepare('SELECT * FROM nations ORDER BY sort_order').all<NationRow>(),
     database.prepare("SELECT id, nation_id, name, detail, capacity_cost FROM work_orders WHERE status = 'open' ORDER BY sort_order").all<WorkOrderRow>(),
-    database.prepare('SELECT id, title, detail, meta FROM planning_tasks ORDER BY sort_order').all<PlanningTaskRow>(),
+    database.prepare(`SELECT
+      planning_tasks.id,
+      planning_tasks.title,
+      planning_tasks.detail,
+      planning_tasks.meta,
+      planning_task_effects.capacity_delta,
+      planning_task_effects.influence_delta,
+      planning_task_effects.water_delta,
+      planning_task_effects.stability_delta,
+      planning_task_effects.outcome,
+      planning_task_effects.infrastructure_id,
+      planning_task_effects.household_member_id
+    FROM planning_tasks
+    INNER JOIN planning_task_effects ON planning_task_effects.task_id = planning_tasks.id
+    ORDER BY planning_tasks.sort_order`).all<PlanningTaskRow>(),
     database.prepare('SELECT id, kind, headline, detail, location, occurred_at FROM world_events ORDER BY sort_order').all<WorldEventRow>(),
   ]);
 
@@ -80,7 +101,21 @@ export async function GET() {
         detail: order.detail,
         cost: order.capacity_cost,
       })),
-      planningTasks: planningTaskResult.results,
+      planningTasks: planningTaskResult.results.map((task) => ({
+        id: task.id,
+        title: task.title,
+        detail: task.detail,
+        meta: task.meta,
+        effects: {
+          capacity: task.capacity_delta,
+          influence: task.influence_delta,
+          water: task.water_delta,
+          stability: task.stability_delta,
+        },
+        outcome: task.outcome,
+        infrastructureId: task.infrastructure_id,
+        householdMemberId: task.household_member_id,
+      })),
       worldEvents: eventResult.results.map((event) => ({
         id: event.id,
         kind: event.kind,
