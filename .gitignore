@@ -40,6 +40,7 @@ next-env.d.ts
 
 # local design QA captures
 /design-*.jpg
+/design-*.png
 /design-qa.md
 /implementation-*.jpg
 /implementation-*.png

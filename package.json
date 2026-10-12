@@ -15,6 +15,7 @@
   "dependencies": {
     "@clerk/backend": "^3.19.0",
     "@clerk/nextjs": "^7.9.5",
+    "@phosphor-icons/react": "^2.1.10",
     "drizzle-orm": "^0.45.3",
     "next": "16.2.6",
     "react": "19.2.6",
