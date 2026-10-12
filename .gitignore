@@ -44,3 +44,6 @@ next-env.d.ts
 /design-qa.md
 /implementation-*.jpg
 /implementation-*.png
+
+# TypeScript compiler cache
+*.tsbuildinfo

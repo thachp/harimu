@@ -1,6 +1,9 @@
 'use client';
 
 import Image from 'next/image';
+import { useRef } from 'react';
+import { WorkShiftBoard } from './work-shift-board';
+import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import {
   Show,
   SignInButton,
@@ -476,6 +479,8 @@ type NationDashboardProps = {
   onSelectNation: (nationId: string) => void;
   onWorldView: () => void;
   onPlanningView: () => void;
+  workPending: boolean;
+  workStatus: React.ReactNode;
   onCommitWork: (order: WorkOrder) => void | Promise<void>;
 };
 
@@ -490,6 +495,8 @@ function NationDashboard({
   onWorldView,
   onPlanningView,
   onCommitWork,
+  workPending,
+  workStatus,
 }: NationDashboardProps) {
   const nationalSystems = useMemo(() => {
     const base = nation.stability;
@@ -715,7 +722,7 @@ function NationDashboard({
             <p>{selectedAgenda.detail}</p>
             {selectedAgenda.order && isCitizenNation ? (
               <button
-                disabled={capacity < selectedAgenda.order.cost}
+                disabled={workPending || capacity < selectedAgenda.order.cost}
                 onClick={() => void onCommitWork(selectedAgenda.order as WorkOrder)}
                 type="button"
               >
@@ -728,6 +735,7 @@ function NationDashboard({
           </article>
         )}
 
+        {isCitizenNation && workStatus}
         <section className="nation-citizen-link">
           <UsersThree aria-hidden="true" size={21} weight="duotone" />
           <div>
@@ -1174,6 +1182,7 @@ type CitizenSnapshot = {
   } | null;
   plan: { horizon: PlanHorizon; note: string; completedIds: string[] } | null;
   decision: CitizenDecision | null;
+  shifts: WorkShift[];
 };
 
 type CitizenSessionStatus = 'loading' | 'anonymous' | 'ready' | 'error';
@@ -1278,6 +1287,12 @@ export default function Home() {
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>('sovereignty');
   const [capacity, setCapacity] = useState(18);
+  const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
+  const [workPending, setWorkPending] = useState(false);
+  const [workError, setWorkError] = useState<string | null>(null);
+  const workLock = useRef(false);
+  const [demoLoaded, setDemoLoaded] = useState(false);
+  const hasActiveShift = workShifts.some((shift) => !shift.claimedAt);
   const [influence, setInfluence] = useState(1240);
   const [waterSecurity, setWaterSecurity] = useState(71);
   const [wardStability, setWardStability] = useState(86);
@@ -1337,29 +1352,55 @@ export default function Home() {
     return () => controller.abort();
   }, []);
 
-  async function commitWork(order: WorkOrder) {
-    if (capacity < order.cost || !citizenNation) return;
-
-    if (clerkConfigured) {
-      const response = await fetch('/api/citizen', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'commit-work', workOrderId: order.id }),
-      });
-      if (!response.ok) {
-        setRecentAction(response.status === 401
-          ? 'Sign in before committing Work Capacity.'
-          : 'Your contribution could not be recorded yet.');
-        return;
+  async function runWork(action: 'commit-work' | 'claim-work', order?: WorkOrder, shiftId?: string) {
+    if (workLock.current || !citizenNation) return;
+    if (action === 'commit-work' && (!order || hasActiveShift || capacity < order.cost)) return;
+    workLock.current = true;
+    setWorkPending(true);
+    setWorkError(null);
+    try {
+      if (clerkConfigured) {
+        const response = await fetch('/api/citizen', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, workOrderId: order?.id, shiftId }),
+        });
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number };
+        if (result.shifts) setWorkShifts(result.shifts);
+        if (typeof result.capacity === 'number') setCapacity(result.capacity);
+        if (!response.ok) {
+          setWorkError(result.error ?? 'Your shift could not be recorded. Try again to recover its saved state.');
+          return;
+        }
+      } else {
+        // Local demo only; authenticated play is persisted by the server.
+        if (action === 'commit-work' && order) {
+          const rule = shiftRules[order.id];
+          if (!rule) throw new Error('Work order unavailable.');
+          const startedAt = new Date().toISOString();
+          setWorkShifts((current) => [{ id: crypto.randomUUID(), orderName: order.name,
+            output: rule.output, capacitySpent: order.cost, startedAt,
+            completesAt: new Date(Date.now() + rule.hours * 3600000).toISOString(), claimedAt: null }, ...current]);
+          setCapacity((current) => current - order.cost);
+        } else {
+          setWorkShifts((current) => current.map((shift) => shift.id === shiftId
+            && !shift.claimedAt && Date.parse(shift.completesAt) <= Date.now()
+            ? { ...shift, claimedAt: new Date().toISOString() } : shift));
+        }
       }
-      const result = await response.json() as { capacity: number };
-      setCapacity(result.capacity);
-    } else {
-      setCapacity((current) => current - order.cost);
+      setRecentAction(action === 'commit-work'
+        ? `Shift started: ${order?.name}. Work continues while you are away.`
+        : 'Completed shift recorded in your contribution history.');
+    } catch {
+      setWorkError('Connection interrupted. Retry to recover your saved shift.');
+    } finally {
+      workLock.current = false;
+      setWorkPending(false);
     }
-
-    setRecentAction(`${citizenNation.shortName}: you committed ${order.cost} Work Capacity to “${order.name}.”`);
   }
+
+  function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
+  const workStatus = <WorkShiftBoard shifts={workShifts} pending={workPending}
+    error={workError} localDemo={!clerkConfigured} onClaim={(id) => void runWork('claim-work', undefined, id)} />;
 
   function changeView(nextView: ViewMode) {
     setViewOverride(nextView);
@@ -1393,6 +1434,7 @@ export default function Home() {
   }
 
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
+    setWorkShifts(snapshot.shifts ?? []);
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
       setCitizenshipStatus(snapshot.profile.citizenship);
@@ -1413,6 +1455,38 @@ export default function Home() {
       setRecentAction(`World record · ${snapshot.decision.outcome}`);
     }
   }, []);
+
+  useEffect(() => {
+    if (clerkConfigured) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        const saved = window.localStorage.getItem('harimu-citizen-demo-v1');
+        if (saved) hydrateCitizen(JSON.parse(saved) as CitizenSnapshot);
+      } catch {
+        setWorkError('Local demo storage could not be restored.');
+      }
+      setDemoLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [hydrateCitizen]);
+
+  useEffect(() => {
+    if (clerkConfigured || !demoLoaded) return;
+    try {
+      window.localStorage.setItem('harimu-citizen-demo-v1', JSON.stringify({
+        shifts: workShifts,
+        profile: citizenshipStatus ? { nationId: citizenNationId, capacity, influence,
+          waterSecurity, wardStability, citizenship: citizenshipStatus } : null,
+        plan: { horizon, note: planNote, completedIds: completedPlanIds },
+        decision: committedDecision,
+      }));
+    } catch {
+      queueMicrotask(() => setWorkError('Local demo storage is unavailable; this session will not survive a refresh.'));
+    }
+  }, [demoLoaded, workShifts, citizenshipStatus, citizenNationId, capacity, influence,
+    waterSecurity, wardStability, horizon, planNote, completedPlanIds, committedDecision]);
 
   async function commitDecision(input: DecisionCommitInput) {
     const selectedOption = availablePlanningItems.find((item) => item.id === input.optionId);
@@ -1822,11 +1896,12 @@ export default function Home() {
                     </div>
                     <b>{capacity} WC</b>
                   </div>
+                  {workStatus}
                   {availableWorkOrders
                     .filter((order) => !order.nationId || order.nationId === citizenNation.id)
                     .map((order) => (
                     <button
-                      disabled={capacity < order.cost}
+                      disabled={workPending || hasActiveShift || capacity < order.cost}
                       key={order.id}
                       onClick={() => void commitWork(order)}
                       type="button"
@@ -1857,6 +1932,8 @@ export default function Home() {
           key={selected.id}
           nation={selected}
           nations={worldNations}
+          workPending={workPending || hasActiveShift}
+          workStatus={workStatus}
           onCommitWork={commitWork}
           onPlanningView={() => {
             if (citizenNation) setSelectedId(citizenNation.id);

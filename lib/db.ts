@@ -1,3 +1,4 @@
+import { shiftSchema, activeShiftIndex } from './work-shifts';
 import { env } from 'cloudflare:workers';
 
 const nationSeeds = [
@@ -152,6 +153,8 @@ async function initialize(database: D1Database) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_work_contributions_user_created ON work_contributions(clerk_user_id, created_at)'),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_citizen_decisions_user_committed ON citizen_decisions(clerk_user_id, committed_at)'),
   ]);
+
+  await database.batch([database.prepare(shiftSchema), database.prepare(activeShiftIndex)]);
 
   const nationColumns = await database.prepare('PRAGMA table_info(nations)').all<{ name: string }>();
   const columnNames = new Set(nationColumns.results.map((column) => column.name));

@@ -1,4 +1,5 @@
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const nations = sqliteTable('nations', {
   id: text('id').primaryKey(),
@@ -146,3 +147,15 @@ export const workContributions = sqliteTable(
   },
   (table) => [index('idx_work_contributions_user_created').on(table.clerkUserId, table.createdAt)],
 );
+
+export const workShifts = sqliteTable('work_shifts', {
+  id: text('id').primaryKey(),
+  clerkUserId: text('clerk_user_id').notNull().references(() => citizens.clerkUserId, { onDelete: 'cascade' }),
+  workOrderId: text('work_order_id').notNull().references(() => workOrders.id),
+  orderName: text('order_name').notNull(),
+  output: text('output').notNull(),
+  capacitySpent: integer('capacity_spent').notNull(),
+  startedAt: text('started_at').notNull(),
+  completesAt: text('completes_at').notNull(),
+  claimedAt: text('claimed_at'),
+}, (table) => [uniqueIndex('idx_one_active_shift').on(table.clerkUserId).where(sql`${table.claimedAt} IS NULL`)]);

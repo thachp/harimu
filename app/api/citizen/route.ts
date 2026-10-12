@@ -1,3 +1,4 @@
+import { shiftRules, readShifts, startShiftSql, debitShiftSql, recordShiftSql, claimShiftSql } from '@/lib/work-shifts';
 import { createClerkClient } from '@clerk/backend';
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
@@ -143,6 +144,7 @@ export async function GET(request: Request) {
   ]);
 
   return Response.json({
+    shifts: await readShifts(database, userId),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
       : null,
@@ -391,33 +393,47 @@ export async function POST(request: Request) {
 
   if (body.action === 'commit-work') {
     const workOrderId = typeof body.workOrderId === 'string' ? body.workOrderId : '';
-    const order = await database.prepare(`SELECT id, name, capacity_cost
+    const rule = shiftRules[workOrderId];
+    const order = await database.prepare(`SELECT id, name, nation_id, capacity_cost
       FROM work_orders WHERE id = ? AND status = 'open'`).bind(workOrderId).first<{
-      id: string;
-      name: string;
-      capacity_cost: number;
-    }>();
-    if (!order) return Response.json({ error: 'Work order unavailable.' }, { status: 404 });
-
-    const update = await database.prepare(`UPDATE citizens
-      SET capacity = capacity - ?, updated_at = ?
-      WHERE clerk_user_id = ? AND nation_id IS NOT NULL AND capacity >= ?`)
-      .bind(order.capacity_cost, now, userId, order.capacity_cost)
-      .run();
-    if (!update.meta.changes) {
-      return Response.json({ error: 'Enroll and confirm sufficient capacity first.' }, { status: 409 });
+        id: string; name: string; nation_id: string | null; capacity_cost: number;
+      }>();
+    if (!order || !rule || order.capacity_cost <= 0) {
+      return Response.json({ error: 'Work order unavailable.' }, { status: 404 });
     }
+    const id = crypto.randomUUID();
+    const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
+    // D1 batch is transactional: scheduling and debiting succeed together.
+    const [scheduled] = await database.batch([
+      database.prepare(startShiftSql).bind(id, order.id, order.name, rule.output,
+        order.capacity_cost, now, completesAt, userId, order.capacity_cost,
+        order.nation_id, order.nation_id, userId),
+      database.prepare(debitShiftSql).bind(order.capacity_cost, now, userId, id, userId),
+    ]);
+    const shifts = await readShifts(database, userId);
+    const profile = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?')
+      .bind(userId).first<{ capacity: number }>();
+    if (!scheduled.meta.changes) {
+      return Response.json({ error: 'Finish your active shift, check your citizenship and available capacity.',
+        shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
+    }
+    return Response.json({ ok: true, shifts, capacity: profile?.capacity ?? 0 });
+  }
 
-    await database.prepare(`INSERT INTO work_contributions (
-      clerk_user_id, work_order_id, capacity_spent, created_at
-    ) VALUES (?, ?, ?, ?)`)
-      .bind(userId, order.id, order.capacity_cost, now)
-      .run();
-    const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?')
-      .bind(userId)
-      .first<{ capacity: number }>();
-
-    return Response.json({ ok: true, capacity: citizen?.capacity ?? 0, orderName: order.name });
+  if (body.action === 'claim-work') {
+    const shiftId = typeof body.shiftId === 'string' ? body.shiftId : '';
+    const shift = await database.prepare('SELECT claimed_at, completes_at FROM work_shifts WHERE id = ? AND clerk_user_id = ?')
+      .bind(shiftId, userId).first<{ claimed_at: string | null; completes_at: string }>();
+    if (!shift) return Response.json({ error: 'Shift unavailable.' }, { status: 404 });
+    if (shift.completes_at > now) {
+      return Response.json({ error: 'Your shift is still underway.' }, { status: 409 });
+    }
+    // Guard both statements so retries never duplicate a contribution.
+    await database.batch([
+      database.prepare(recordShiftSql).bind(now, shiftId, userId, now),
+      database.prepare(claimShiftSql).bind(now, shiftId, userId, now),
+    ]);
+    return Response.json({ ok: true, shifts: await readShifts(database, userId) });
   }
 
   return Response.json({ error: 'Unknown action.' }, { status: 400 });
