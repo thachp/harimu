@@ -10,6 +10,9 @@ export type WorkShift = {
   orderName: string;
   output: string;
   capacitySpent: number;
+  wageMinor?: number;
+  rewardItem?: string;
+  rewardQuantity?: number;
   startedAt: string;
   completesAt: string;
   claimedAt: string | null;
@@ -45,15 +48,18 @@ export const claimShiftSql = `UPDATE work_shifts SET claimed_at = ?
   WHERE id = ? AND clerk_user_id = ? AND claimed_at IS NULL AND completes_at <= ?`;
 
 export async function readShifts(database: D1Database, userId: string): Promise<WorkShift[]> {
-  const rows = await database.prepare(`SELECT id, order_name, output, capacity_spent,
-    started_at, completes_at, claimed_at FROM work_shifts
-    WHERE clerk_user_id = ? ORDER BY started_at DESC, id DESC LIMIT 20`).bind(userId).all<{
+  const rows = await database.prepare(`SELECT s.id, s.order_name, s.output, s.capacity_spent,
+    s.started_at, s.completes_at, s.claimed_at, r.wage_minor, r.item, r.quantity FROM work_shifts s
+    LEFT JOIN shift_rewards r ON r.shift_id = s.id
+    WHERE s.clerk_user_id = ? ORDER BY s.started_at DESC, s.id DESC LIMIT 20`).bind(userId).all<{
       id: string; order_name: string; output: string; capacity_spent: number;
       started_at: string; completes_at: string; claimed_at: string | null;
+      wage_minor: number | null; item: string | null; quantity: number | null;
     }>();
   return rows.results.map((row) => ({
     id: row.id, orderName: row.order_name, output: row.output,
     capacitySpent: row.capacity_spent, startedAt: row.started_at,
     completesAt: row.completes_at, claimedAt: row.claimed_at,
+    wageMinor: row.wage_minor ?? undefined, rewardItem: row.item ?? undefined, rewardQuantity: row.quantity ?? undefined,
   }));
 }

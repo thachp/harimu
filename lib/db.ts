@@ -1,3 +1,4 @@
+import { economySchema, recoverySchema, rewardSchema, fundSchema, employerBudgetMinor, rewards } from './economy';
 import { shiftSchema, activeShiftIndex } from './work-shifts';
 import { env } from 'cloudflare:workers';
 
@@ -155,6 +156,14 @@ async function initialize(database: D1Database) {
   ]);
 
   await database.batch([database.prepare(shiftSchema), database.prepare(activeShiftIndex)]);
+
+  await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
+    database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
+  // Existing unfinished shifts receive the prototype terms once; completed receipts are not repaid.
+  await database.batch(Object.entries(rewards).map(([orderId, reward]) => database.prepare(`
+    INSERT OR IGNORE INTO shift_rewards (shift_id, wage_minor, item, quantity)
+    SELECT id, ?, ?, ? FROM work_shifts WHERE work_order_id = ? AND claimed_at IS NULL`)
+    .bind(reward.wageMinor, reward.item, reward.quantity, orderId)));
 
   const nationColumns = await database.prepare('PRAGMA table_info(nations)').all<{ name: string }>();
   const columnNames = new Set(nationColumns.results.map((column) => column.name));

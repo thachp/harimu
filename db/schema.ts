@@ -159,3 +159,26 @@ export const workShifts = sqliteTable('work_shifts', {
   completesAt: text('completes_at').notNull(),
   claimedAt: text('claimed_at'),
 }, (table) => [uniqueIndex('idx_one_active_shift').on(table.clerkUserId).where(sql`${table.claimedAt} IS NULL`)]);
+
+export const shiftRewards = sqliteTable('shift_rewards', {
+  shiftId: text('shift_id').primaryKey().references(() => workShifts.id),
+  wageMinor: integer('wage_minor').notNull(),
+  item: text('item').notNull(),
+  quantity: integer('quantity').notNull(),
+});
+export const shiftSettlements = sqliteTable('shift_settlements', {
+  shiftId: text('shift_id').primaryKey().references(() => workShifts.id),
+  clerkUserId: text('clerk_user_id').notNull().references(() => citizens.clerkUserId, { onDelete: 'cascade' }),
+  wageMinor: integer('wage_minor').notNull(),
+  item: text('item').notNull(),
+  quantity: integer('quantity').notNull(),
+  settledAt: text('settled_at').notNull(),
+});
+export const capacityClocks = sqliteTable('capacity_clocks', {
+  clerkUserId: text('clerk_user_id').primaryKey().references(() => citizens.clerkUserId, { onDelete: 'cascade' }),
+  recoveredAt: integer('recovered_at').notNull(),
+});
+export const economyFunds = sqliteTable('economy_funds', {
+  id: text('id').primaryKey(),
+  initialMinor: integer('initial_minor').notNull(),
+});

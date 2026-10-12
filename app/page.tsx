@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useRef } from 'react';
 import { WorkShiftBoard } from './work-shift-board';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
+import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
 import {
   Show,
   SignInButton,
@@ -720,13 +721,16 @@ function NationDashboard({
             <span>Priority brief</span>
             <h3>{selectedAgenda.title}</h3>
             <p>{selectedAgenda.detail}</p>
+            {selectedAgenda.order && rewards[selectedAgenda.order.id] && <p>
+              Shift reward: {(rewards[selectedAgenda.order.id].wageMinor / 100).toFixed(2)} SPK + {rewards[selectedAgenda.order.id].quantity} {rewards[selectedAgenda.order.id].item}
+            </p>}
             {selectedAgenda.order && isCitizenNation ? (
               <button
                 disabled={workPending || capacity < selectedAgenda.order.cost}
                 onClick={() => void onCommitWork(selectedAgenda.order as WorkOrder)}
                 type="button"
               >
-                Commit {selectedAgenda.order.cost} Work Capacity
+                Start shift · {selectedAgenda.order.cost} Work Capacity
                 <ArrowRight aria-hidden="true" size={16} />
               </button>
             ) : (
@@ -1183,6 +1187,7 @@ type CitizenSnapshot = {
   plan: { horizon: PlanHorizon; note: string; completedIds: string[] } | null;
   decision: CitizenDecision | null;
   shifts: WorkShift[];
+  economy?: Economy;
 };
 
 type CitizenSessionStatus = 'loading' | 'anonymous' | 'ready' | 'error';
@@ -1287,6 +1292,7 @@ export default function Home() {
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>('sovereignty');
   const [capacity, setCapacity] = useState(18);
+  const [economy, setEconomy] = useState<Economy | null>(null);
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
   const [workPending, setWorkPending] = useState(false);
   const [workError, setWorkError] = useState<string | null>(null);
@@ -1352,7 +1358,7 @@ export default function Home() {
     return () => controller.abort();
   }, []);
 
-  async function runWork(action: 'commit-work' | 'claim-work', order?: WorkOrder, shiftId?: string) {
+  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string) {
     if (workLock.current || !citizenNation) return;
     if (action === 'commit-work' && (!order || hasActiveShift || capacity < order.cost)) return;
     workLock.current = true;
@@ -1361,11 +1367,13 @@ export default function Home() {
     try {
       if (clerkConfigured) {
         const response = await fetch('/api/citizen', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, workOrderId: order?.id, shiftId }),
+          method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
+          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
         });
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; profile?: CitizenSnapshot['profile'] };
         if (result.shifts) setWorkShifts(result.shifts);
+        if (result.economy) setEconomy(result.economy);
+        if (result.profile) setCapacity(result.profile.capacity);
         if (typeof result.capacity === 'number') setCapacity(result.capacity);
         if (!response.ok) {
           setWorkError(result.error ?? 'Your shift could not be recorded. Try again to recover its saved state.');
@@ -1373,15 +1381,30 @@ export default function Home() {
         }
       } else {
         // Local demo only; authenticated play is persisted by the server.
-        if (action === 'commit-work' && order) {
+        if (action === 'refresh-work') {
+          const refreshedAt = new Date().getTime();
+          if (economy && refreshedAt >= Date.parse(economy.nextRecoveryAt)) {
+            const periods = 1 + Math.floor((refreshedAt - Date.parse(economy.nextRecoveryAt)) / (recoverySeconds * 1000));
+            setCapacity((current) => Math.min(maximumCapacity, current + periods * maximumCapacity));
+            setEconomy({ ...economy, nextRecoveryAt: new Date(Date.parse(economy.nextRecoveryAt) + periods * recoverySeconds * 1000).toISOString() });
+          }
+        } else if (action === 'commit-work' && order) {
           const rule = shiftRules[order.id];
           if (!rule) throw new Error('Work order unavailable.');
           const startedAt = new Date().toISOString();
           setWorkShifts((current) => [{ id: crypto.randomUUID(), orderName: order.name,
             output: rule.output, capacitySpent: order.cost, startedAt,
+            wageMinor: rewards[order.id]?.wageMinor, rewardItem: rewards[order.id]?.item, rewardQuantity: rewards[order.id]?.quantity,
             completesAt: new Date(Date.now() + rule.hours * 3600000).toISOString(), claimedAt: null }, ...current]);
           setCapacity((current) => current - order.cost);
         } else {
+          const eligible = workShifts.find((shift) => shift.id === shiftId && !shift.claimedAt && Date.parse(shift.completesAt) <= Date.now());
+          if (eligible && economy) {
+            const item = eligible.rewardItem;
+            const inventory = economy.inventory.filter((entry) => entry.item !== item);
+            if (item) inventory.push({ item, quantity: (economy.inventory.find((entry) => entry.item === item)?.quantity ?? 0) + (eligible.rewardQuantity ?? 0) });
+            setEconomy({ ...economy, walletMinor: economy.walletMinor + (eligible.wageMinor ?? 0), inventory });
+          }
           setWorkShifts((current) => current.map((shift) => shift.id === shiftId
             && !shift.claimedAt && Date.parse(shift.completesAt) <= Date.now()
             ? { ...shift, claimedAt: new Date().toISOString() } : shift));
@@ -1389,7 +1412,7 @@ export default function Home() {
       }
       setRecentAction(action === 'commit-work'
         ? `Shift started: ${order?.name}. Work continues while you are away.`
-        : 'Completed shift recorded in your contribution history.');
+        : action === 'refresh-work' ? 'Citizen account refreshed.' : 'Shift settled: wages and goods recorded in your citizen account.');
     } catch {
       setWorkError('Connection interrupted. Retry to recover your saved shift.');
     } finally {
@@ -1400,7 +1423,8 @@ export default function Home() {
 
   function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
   const workStatus = <WorkShiftBoard shifts={workShifts} pending={workPending}
-    error={workError} localDemo={!clerkConfigured} onClaim={(id) => void runWork('claim-work', undefined, id)} />;
+    error={workError} localDemo={!clerkConfigured} economy={economy}
+    onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />;
 
   function changeView(nextView: ViewMode) {
     setViewOverride(nextView);
@@ -1435,6 +1459,8 @@ export default function Home() {
 
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
     setWorkShifts(snapshot.shifts ?? []);
+    if (snapshot.economy) setEconomy(snapshot.economy);
+    else if (!clerkConfigured) setEconomy({ walletMinor: 0, inventory: [], nextRecoveryAt: new Date(new Date().getTime() + recoverySeconds * 1000).toISOString() });
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
       setCitizenshipStatus(snapshot.profile.citizenship);
@@ -1476,7 +1502,7 @@ export default function Home() {
     if (clerkConfigured || !demoLoaded) return;
     try {
       window.localStorage.setItem('harimu-citizen-demo-v1', JSON.stringify({
-        shifts: workShifts,
+        shifts: workShifts, economy,
         profile: citizenshipStatus ? { nationId: citizenNationId, capacity, influence,
           waterSecurity, wardStability, citizenship: citizenshipStatus } : null,
         plan: { horizon, note: planNote, completedIds: completedPlanIds },
@@ -1485,7 +1511,7 @@ export default function Home() {
     } catch {
       queueMicrotask(() => setWorkError('Local demo storage is unavailable; this session will not survive a refresh.'));
     }
-  }, [demoLoaded, workShifts, citizenshipStatus, citizenNationId, capacity, influence,
+  }, [demoLoaded, workShifts, economy, citizenshipStatus, citizenNationId, capacity, influence,
     waterSecurity, wardStability, horizon, planNote, completedPlanIds, committedDecision]);
 
   async function commitDecision(input: DecisionCommitInput) {
@@ -1565,6 +1591,7 @@ export default function Home() {
     setEnrollmentError(null);
 
     if (!clerkConfigured) {
+      if (!economy) setEconomy({ walletMinor: 0, inventory: [], nextRecoveryAt: new Date(Date.now() + recoverySeconds * 1000).toISOString() });
       const changingNation = Boolean(citizenNation && citizenNation.id !== nation.id);
       const now = Date.now();
       setCitizenNationId(nation.id);
@@ -1599,6 +1626,7 @@ export default function Home() {
         error?: string;
         nationId?: string;
         citizenship?: CitizenshipStatus | null;
+        economy?: Economy;
       };
       if (!response.ok || !result.nationId) {
         if (result.citizenship) setCitizenshipStatus(result.citizenship);
@@ -1609,6 +1637,7 @@ export default function Home() {
       setCitizenNationId(result.nationId);
       setSelectedId(result.nationId);
       if (result.citizenship) setCitizenshipStatus(result.citizenship);
+      if (result.economy) setEconomy(result.economy);
       setPendingEnrollment(null);
     } catch {
       setEnrollmentError('Citizenship could not be recorded yet. Please try again.');
@@ -1906,7 +1935,7 @@ export default function Home() {
                       onClick={() => void commitWork(order)}
                       type="button"
                     >
-                      <span><strong>{order.name}</strong><small>{order.detail}</small></span>
+                      <span><strong>{order.name}</strong><small>{order.detail}{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</small></span>
                       <b>{order.cost}</b>
                     </button>
                   ))}

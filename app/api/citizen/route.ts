@@ -1,4 +1,5 @@
-import { shiftRules, readShifts, startShiftSql, debitShiftSql, recordShiftSql, claimShiftSql } from '@/lib/work-shifts';
+import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
+import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import { createClerkClient } from '@clerk/backend';
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
@@ -121,6 +122,8 @@ export async function GET(request: Request) {
   if (!userId) return Response.json({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
+  const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
+  await recoverCapacity(database, userId, new Date().toISOString(), interval);
   const [profile, plan, itemResult, decision, politicalAction] = await Promise.all([
     database.prepare(`SELECT clerk_user_id, nation_id, nation_changes, display_name, capacity,
       influence, standing, created_at
@@ -144,6 +147,7 @@ export async function GET(request: Request) {
   ]);
 
   return Response.json({
+    economy: await readEconomy(database, userId, interval),
     shifts: await readShifts(database, userId),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -163,6 +167,8 @@ export async function POST(request: Request) {
   if (!userId) return Response.json({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
+  const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
+  await recoverCapacity(database, userId, new Date().toISOString(), interval);
   const body = await request.json() as Record<string, unknown>;
   const now = new Date().toISOString();
 
@@ -188,6 +194,7 @@ export async function POST(request: Request) {
       return Response.json({
         ok: true,
         nationId,
+        economy: await readEconomy(database, userId, interval),
         citizenship: created ? serializeCitizenship(created, false) : null,
       });
     }
@@ -202,6 +209,7 @@ export async function POST(request: Request) {
         ok: true,
         nationId,
         citizenship: serializeCitizenship(current, politicalActionTaken),
+        economy: await readEconomy(database, userId, interval),
       });
     }
 
@@ -241,6 +249,7 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       nationId,
+      economy: await readEconomy(database, userId, interval),
       citizenship: updated ? serializeCitizenship(updated, politicalActionTaken) : null,
     });
   }
@@ -401,6 +410,8 @@ export async function POST(request: Request) {
     if (!order || !rule || order.capacity_cost <= 0) {
       return Response.json({ error: 'Work order unavailable.' }, { status: 404 });
     }
+    const reward = rewards[workOrderId];
+    if (!reward) return Response.json({ error: 'Shift reward unavailable.' }, { status: 409 });
     const id = crypto.randomUUID();
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
     // D1 batch is transactional: scheduling and debiting succeed together.
@@ -409,6 +420,9 @@ export async function POST(request: Request) {
         order.capacity_cost, now, completesAt, userId, order.capacity_cost,
         order.nation_id, order.nation_id, userId),
       database.prepare(debitShiftSql).bind(order.capacity_cost, now, userId, id, userId),
+      database.prepare(`INSERT INTO shift_rewards (shift_id, wage_minor, item, quantity)
+        SELECT id, ?, ?, ? FROM work_shifts WHERE id = ? AND clerk_user_id = ?`)
+        .bind(reward.wageMinor, reward.item, reward.quantity, id, userId),
     ]);
     const shifts = await readShifts(database, userId);
     const profile = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?')
@@ -417,7 +431,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
     }
-    return Response.json({ ok: true, shifts, capacity: profile?.capacity ?? 0 });
+    return Response.json({ ok: true, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval) });
   }
 
   if (body.action === 'claim-work') {
@@ -428,12 +442,19 @@ export async function POST(request: Request) {
     if (shift.completes_at > now) {
       return Response.json({ error: 'Your shift is still underway.' }, { status: 409 });
     }
-    // Guard both statements so retries never duplicate a contribution.
+    // One ledger transfer carries both wages and inventory; every write rolls back together.
+    // Budget guard is in the insert itself, so concurrent settlements cannot overdraw the pool.
     await database.batch([
-      database.prepare(recordShiftSql).bind(now, shiftId, userId, now),
-      database.prepare(claimShiftSql).bind(now, shiftId, userId, now),
+      database.prepare(settleSql).bind(now, shiftId, userId, now),
+      database.prepare(settledContributionSql)
+        .bind(now, shiftId, userId, now),
+      database.prepare(finishSettledShiftSql)
+        .bind(now, shiftId, userId, now),
     ]);
-    return Response.json({ ok: true, shifts: await readShifts(database, userId) });
+    const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
+      .bind(shiftId, userId).first();
+    if (!settled && !shift.claimed_at) return Response.json({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
+    return Response.json({ ok: true, shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval) });
   }
 
   return Response.json({ error: 'Unknown action.' }, { status: 400 });
