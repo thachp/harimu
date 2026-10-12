@@ -2,6 +2,8 @@
 
 import Image from 'next/image';
 import { useRef } from 'react';
+import { CitizenMarket } from './citizen-market';
+import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
@@ -1188,6 +1190,9 @@ type CitizenSnapshot = {
   decision: CitizenDecision | null;
   shifts: WorkShift[];
   economy?: Economy;
+  market?: MarketState;
+  demoReceipts?: string[];
+  demoStarterGranted?: boolean;
 };
 
 type CitizenSessionStatus = 'loading' | 'anonymous' | 'ready' | 'error';
@@ -1292,6 +1297,11 @@ export default function Home() {
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>('sovereignty');
   const [capacity, setCapacity] = useState(18);
+  const [market, setMarket] = useState<MarketState | null>(null);
+  const marketIntent = useRef<MarketCommand | null>(null);
+  const [marketCommand, setMarketCommand] = useState<MarketCommand | null>(null);
+  const [demoReceipts, setDemoReceipts] = useState<string[]>([]);
+  const [demoStarterGranted, setDemoStarterGranted] = useState(false);
   const [economy, setEconomy] = useState<Economy | null>(null);
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
   const [workPending, setWorkPending] = useState(false);
@@ -1370,9 +1380,10 @@ export default function Home() {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
           body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
         });
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; profile?: CitizenSnapshot['profile'] };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; profile?: CitizenSnapshot['profile'] };
         if (result.shifts) setWorkShifts(result.shifts);
         if (result.economy) setEconomy(result.economy);
+        if (result.market) setMarket(result.market);
         if (result.profile) setCapacity(result.profile.capacity);
         if (typeof result.capacity === 'number') setCapacity(result.capacity);
         if (!response.ok) {
@@ -1421,10 +1432,77 @@ export default function Home() {
     }
   }
 
+  async function runMarket(command: MarketCommand) {
+    if (workLock.current || citizenNation?.id !== 'kindle' || !economy || !market) return;
+    if (!validMarketCommand(command) || (marketIntent.current && marketIntent.current.requestId !== command.requestId)) return;
+    marketIntent.current = command;
+    workLock.current = true;
+    setWorkPending(true);
+    setWorkError(null);
+    setMarketCommand(command);
+    try {
+      if (clerkConfigured) {
+        const response = await fetch('/api/citizen', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
+        const result = await response.json() as { error?: string; economy?: Economy; market?: MarketState; capacity?: number };
+        if (response.status >= 500) throw new Error('Server response needs confirmation.');
+        if (response.ok && (!result.economy || !result.market || typeof result.capacity !== 'number')) throw new Error('Incomplete transaction response.');
+        if (result.economy) setEconomy(result.economy);
+        if (result.market) setMarket(result.market);
+        if (typeof result.capacity === 'number') setCapacity(result.capacity);
+        if (!response.ok) {
+          setWorkError(result.error ?? 'Transaction refused. Refresh your account and check balances.');
+          marketIntent.current = null; setMarketCommand(null);
+          return;
+        }
+      } else if (!demoReceipts.includes(command.requestId)) {
+        const item = command.action === 'household-meal' ? 'food' : command.item!;
+        const owned = economy.inventory.find((entry) => entry.item === item)?.quantity ?? 0;
+        const next = { ...economy, inventory: economy.inventory.filter((entry) => entry.item !== item) };
+        if (command.action === 'household-meal') {
+          const now = new Date().getTime();
+          if (owned < 2 || capacity >= 24 || (market.mealReadyAt && Date.parse(market.mealReadyAt) > now)) {
+            setWorkError('Check food, capacity and the household meal timer.'); marketIntent.current = null; setMarketCommand(null); return;
+          }
+          next.inventory.push({ item, quantity: owned - 2 });
+          setCapacity((current) => Math.min(24, current + 4));
+          setMarket({ ...market, mealReadyAt: new Date(now + recoverySeconds * 1000).toISOString() });
+        } else {
+          const quote = market.quotes.find((entry) => entry.item === item);
+          const quantity = command.quantity!;
+          if (!quote || (command.side === 'buy' ? economy.walletMinor < quote.buyMinor * quantity || quote.stock < quantity
+            : owned < quantity || market.merchantCashMinor < quote.sellMinor * quantity)) {
+            setWorkError('Not enough funds or goods for this trade.'); marketIntent.current = null; setMarketCommand(null); return;
+          }
+          const cash = command.side === 'buy' ? -quote.buyMinor * quantity : quote.sellMinor * quantity;
+          const goods = command.side === 'buy' ? quantity : -quantity;
+          next.walletMinor += cash;
+          next.inventory.push({ item, quantity: owned + goods });
+          setMarket({ ...market, merchantCashMinor: market.merchantCashMinor - cash,
+            quotes: market.quotes.map((entry) => entry.item === item ? { ...entry, stock: entry.stock - goods } : entry) });
+        }
+        setEconomy(next);
+        setDemoReceipts((current) => [...current, command.requestId]);
+      }
+      marketIntent.current = null; setMarketCommand(null);
+      setRecentAction(command.action === 'household-meal'
+        ? 'Household fed: 2 food consumed, up to 4 Work Capacity restored.' : `Market ${command.side}: ${command.quantity} ${command.item} settled.`);
+    } catch {
+      setWorkError('Connection interrupted. Retry the previous transaction to confirm its saved result.');
+    } finally {
+      workLock.current = false;
+      setWorkPending(false);
+    }
+  }
+
   function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
-  const workStatus = <WorkShiftBoard shifts={workShifts} pending={workPending}
+  const workStatus = <><WorkShiftBoard shifts={workShifts} pending={workPending}
     error={workError} localDemo={!clerkConfigured} economy={economy}
-    onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />;
+    onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
+    <CitizenMarket market={market} economy={economy} capacity={capacity} busy={workPending} uncertain={Boolean(marketCommand)}
+      onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
+      onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })}
+      onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} /></>;
 
   function changeView(nextView: ViewMode) {
     setViewOverride(nextView);
@@ -1459,8 +1537,19 @@ export default function Home() {
 
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
     setWorkShifts(snapshot.shifts ?? []);
+    if (snapshot.market) setMarket(snapshot.market);
+    setDemoReceipts(snapshot.demoReceipts ?? []);
+    setDemoStarterGranted(snapshot.demoStarterGranted ?? false);
     if (snapshot.economy) setEconomy(snapshot.economy);
     else if (!clerkConfigured) setEconomy({ walletMinor: 0, inventory: [], nextRecoveryAt: new Date(new Date().getTime() + recoverySeconds * 1000).toISOString() });
+    if (!clerkConfigured && snapshot.profile?.nationId === 'kindle' && !snapshot.market) {
+      setMarket({ available: true, merchantCashMinor: 100000, mealReadyAt: null, mealFood: 2, mealCapacity: 4, mealIntervalSeconds: recoverySeconds,
+        quotes: marketSeeds.map(([item, label, buyMinor, sellMinor, stock]) => ({ item, label, buyMinor, sellMinor, stock })) });
+      if (!snapshot.demoStarterGranted) {
+        setDemoStarterGranted(true);
+        setEconomy((current) => current ? { ...current, inventory: [{ item: 'food', quantity: (current.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) + 2 }, ...current.inventory.filter((entry) => entry.item !== 'food')] } : current);
+      }
+    }
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
       setCitizenshipStatus(snapshot.profile.citizenship);
@@ -1502,7 +1591,7 @@ export default function Home() {
     if (clerkConfigured || !demoLoaded) return;
     try {
       window.localStorage.setItem('harimu-citizen-demo-v1', JSON.stringify({
-        shifts: workShifts, economy,
+        shifts: workShifts, economy, market, demoReceipts, demoStarterGranted,
         profile: citizenshipStatus ? { nationId: citizenNationId, capacity, influence,
           waterSecurity, wardStability, citizenship: citizenshipStatus } : null,
         plan: { horizon, note: planNote, completedIds: completedPlanIds },
@@ -1511,7 +1600,7 @@ export default function Home() {
     } catch {
       queueMicrotask(() => setWorkError('Local demo storage is unavailable; this session will not survive a refresh.'));
     }
-  }, [demoLoaded, workShifts, economy, citizenshipStatus, citizenNationId, capacity, influence,
+  }, [demoLoaded, workShifts, economy, market, demoReceipts, demoStarterGranted, citizenshipStatus, citizenNationId, capacity, influence,
     waterSecurity, wardStability, horizon, planNote, completedPlanIds, committedDecision]);
 
   async function commitDecision(input: DecisionCommitInput) {
@@ -1592,6 +1681,17 @@ export default function Home() {
 
     if (!clerkConfigured) {
       if (!economy) setEconomy({ walletMinor: 0, inventory: [], nextRecoveryAt: new Date(Date.now() + recoverySeconds * 1000).toISOString() });
+      setMarket((current) => current ? { ...current, available: nation.id === 'kindle' } : {
+        available: nation.id === 'kindle', merchantCashMinor: 100000, mealReadyAt: null, mealFood: 2, mealCapacity: 4, mealIntervalSeconds: recoverySeconds,
+        quotes: marketSeeds.map(([item, label, buyMinor, sellMinor, stock]) => ({ item, label, buyMinor, sellMinor, stock })),
+      });
+      if (nation.id === 'kindle' && !demoStarterGranted) {
+        setDemoStarterGranted(true);
+        setEconomy((current) => ({ walletMinor: current?.walletMinor ?? 0,
+          nextRecoveryAt: current?.nextRecoveryAt ?? new Date(new Date().getTime() + recoverySeconds * 1000).toISOString(),
+          inventory: [{ item: 'food', quantity: (current?.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) + 2 },
+            ...(current?.inventory.filter((entry) => entry.item !== 'food') ?? [])] }));
+      }
       const changingNation = Boolean(citizenNation && citizenNation.id !== nation.id);
       const now = Date.now();
       setCitizenNationId(nation.id);
@@ -1627,6 +1727,7 @@ export default function Home() {
         nationId?: string;
         citizenship?: CitizenshipStatus | null;
         economy?: Economy;
+        market?: MarketState;
       };
       if (!response.ok || !result.nationId) {
         if (result.citizenship) setCitizenshipStatus(result.citizenship);
@@ -1638,6 +1739,7 @@ export default function Home() {
       setSelectedId(result.nationId);
       if (result.citizenship) setCitizenshipStatus(result.citizenship);
       if (result.economy) setEconomy(result.economy);
+      if (result.market) setMarket(result.market);
       setPendingEnrollment(null);
     } catch {
       setEnrollmentError('Citizenship could not be recorded yet. Please try again.');

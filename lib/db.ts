@@ -1,3 +1,4 @@
+import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
 import { economySchema, recoverySchema, rewardSchema, fundSchema, employerBudgetMinor, rewards } from './economy';
 import { shiftSchema, activeShiftIndex } from './work-shifts';
 import { env } from 'cloudflare:workers';
@@ -159,6 +160,13 @@ async function initialize(database: D1Database) {
 
   await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
+  await database.batch([
+    database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
+    database.prepare("CREATE INDEX IF NOT EXISTS idx_economy_events_user_item ON citizen_economy_events(clerk_user_id, item)"),
+    database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-merchant', 100000)"),
+    ...marketSeeds.map((item) => database.prepare('INSERT OR IGNORE INTO market_items (item, label, buy_minor, sell_minor, initial_stock) VALUES (?, ?, ?, ?, ?)').bind(...item)),
+    database.prepare(walletViewSql), database.prepare(inventoryViewSql), database.prepare(merchantViewSql), database.prepare(merchantCashSql),
+  ]);
   // Existing unfinished shifts receive the prototype terms once; completed receipts are not repaid.
   await database.batch(Object.entries(rewards).map(([orderId, reward]) => database.prepare(`
     INSERT OR IGNORE INTO shift_rewards (shift_id, wage_minor, item, quantity)

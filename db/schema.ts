@@ -182,3 +182,25 @@ export const economyFunds = sqliteTable('economy_funds', {
   id: text('id').primaryKey(),
   initialMinor: integer('initial_minor').notNull(),
 });
+
+export const marketItems = sqliteTable('market_items', {
+  item: text('item').primaryKey(),
+  label: text('label').notNull(),
+  buyMinor: integer('buy_minor').notNull(),
+  sellMinor: integer('sell_minor').notNull(),
+  initialStock: integer('initial_stock').notNull(),
+});
+export const starterFoodGrants = sqliteTable('starter_food_grants', {
+  clerkUserId: text('clerk_user_id').primaryKey().references(() => citizens.clerkUserId, { onDelete: 'cascade' }),
+  quantity: integer('quantity').notNull(),
+});
+export const citizenEconomyEvents = sqliteTable('citizen_economy_events', {
+  id: text('id').primaryKey(),
+  clerkUserId: text('clerk_user_id').notNull().references(() => citizens.clerkUserId, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  item: text('item').notNull(),
+  quantityDelta: integer('quantity_delta').notNull(),
+  walletDelta: integer('wallet_delta').notNull(),
+  occurredAt: integer('occurred_at').notNull(),
+  capacityApplied: integer('capacity_applied').notNull().default(0),
+}, (table) => [index('idx_economy_events_user_item').on(table.clerkUserId, table.item)]);

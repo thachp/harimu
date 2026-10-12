@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { recoveryInterval } from '../lib/economy.ts';
+import { recoveryInterval } from '../lib/economy-rules.ts';
 
 assert.equal(recoveryInterval('7200'), 7200);
 assert.equal(recoveryInterval(undefined), 86400);

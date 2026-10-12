@@ -10,6 +10,8 @@ From this directory:
 - `npx tsc --noEmit --incremental false`: TypeScript verification.
 - `python3 tests/work-shifts.test.py`: work lifecycle SQL tests with SQLite.
 - `python3 tests/economy.test.py`: atomic wages/inventory, concurrent claims, recovery and restart tests.
+- `python3 tests/market.test.py`: merchant transfers, household meals, conservation, concurrency and rollback.
+- `node --experimental-strip-types tests/market-validation.test.mjs`: market command validation.
 - `node --experimental-strip-types tests/economy-config.test.mjs`: recovery configuration tests.
 - `npm run build`: production compilation.
 
@@ -85,5 +87,49 @@ and [docs/CONTEXT.md](docs/CONTEXT.md). The original PDF stays outside this sour
 checkout. No environment files, credentials, local databases or build output are
 included in source synchronization.
 
-Next: a Kindle market with atomic wallet/inventory transfers and bounded listings;
-then household food consumption to give wages and goods a daily purpose.
+## Kindle market and household milestone
+
+Enrolled Kindle citizens can buy/sell 1–10 units of food, materials, or knowledge.
+This is an explicitly labeled simulated merchant, not player liquidity or a full
+order book. Prices are persisted server-side: food 1.50/1.00 SPK buy/sell,
+materials 3.00/2.00, knowledge 5.00/3.50. Starter merchant stocks are 100/40/20;
+the finite merchant pool begins at 1,000 SPK once per database. These are tunable
+prototype assumptions, separate from the employer and display treasury.
+
+Each trade is one durable transfer event carrying integer money and goods deltas.
+Citizen wallet/inventory and merchant balances are derived from the same events.
+The INSERT resolves price and checks citizenship, stock and funds atomically;
+client prices, outcomes and account identifiers are not authoritative. Request
+UUIDs bind the intent to an authenticated owner. Retries return the original
+receipt, while cross-account or mismatched-intent reuse is refused. On an
+ambiguous connection/server failure, the UI retains the request UUID and offers
+Retry previous transaction before permitting another market action. Refreshing
+restores authoritative balances; a newly submitted request is a new intent.
+
+Kindle accounts receive two starter food once, including existing accounts on
+first access. Changing citizenship never grants more. A household meal consumes
+two food and restores up to four WC, capped at 24, once per capacity-recovery
+interval. Food/capacity/eligibility and the cooldown are checked server-side.
+Food debit, bonus and the applied marker form one transaction. Meals at full
+capacity are refused to prevent wasting food. Regular offline capacity recovery
+continues; meals are a daily bonus, without an absence penalty. The 2-food/4-WC
+values are playtest assumptions consistent with the GDD wellbeing loop.
+
+The public production targets remain illustrative; the market uses actual
+personal rewards, balances and goods. Other nation markets, larger verified-tier
+trading, player listings, matching, fees, production supply/replenishment, and
+persistent household wellbeing beyond meals remain future work. Browser-local
+demos mirror basic interactions only and are not authoritative or safe for
+concurrent tabs. Production API authentication remains enforced.
+
+Additive tables: `market_items`, `starter_food_grants`, `citizen_economy_events`.
+Balance views include shift rewards, trades, starter goods, and meals. Initial
+merchant stock and funding are never reset by normal bootstrap. SQL tests cover
+buy/sell conservation, insufficient wallet/stock/merchant funds, replay after
+restart, wrong-nation/unenrolled accounts, cross-account reuse, malformed amounts,
+write failure, meal cooldown/rollback, one-time grants, consistent snapshots,
+concurrent buyers for the final good, and concurrent duplicate meal requests.
+
+Next: player-owned market listings with reservation and cancellation, followed
+by the broader household wellbeing model. Maintain the limited prototype market
+until verification tiers and player matching have real authoritative support.

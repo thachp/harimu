@@ -1,3 +1,4 @@
+import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import { createClerkClient } from '@clerk/backend';
@@ -148,6 +149,7 @@ export async function GET(request: Request) {
 
   return Response.json({
     economy: await readEconomy(database, userId, interval),
+    market: await readMarket(database, userId, interval),
     shifts: await readShifts(database, userId),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -169,8 +171,26 @@ export async function POST(request: Request) {
   const database = await getDatabase();
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   await recoverCapacity(database, userId, new Date().toISOString(), interval);
-  const body = await request.json() as Record<string, unknown>;
+  let body: Record<string, unknown>;
+  try {
+    const input: unknown = await request.json();
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return Response.json({ error: 'Expected a JSON command object.' }, { status: 400 });
+    }
+    body = input as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: 'Expected valid JSON.' }, { status: 400 });
+  }
   const now = new Date().toISOString();
+
+  if (body.action === 'market-trade' || body.action === 'household-meal') {
+    if (!validMarketCommand(body)) return Response.json({ error: 'Use a valid request id, good, side and integer quantity from 1 to 10.' }, { status: 400 });
+    const command = { ...body, requestId: body.requestId.toLowerCase() };
+    const result = await executeMarketCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), interval);
+    const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ capacity: number }>();
+    return Response.json({ ...result, economy: await readEconomy(database, userId, interval),
+      market: await readMarket(database, userId, interval), capacity: citizen?.capacity ?? 0 }, { status: result.status });
+  }
 
   if (body.action === 'enroll') {
     const nationId = typeof body.nationId === 'string' ? body.nationId : '';
@@ -195,6 +215,7 @@ export async function POST(request: Request) {
         ok: true,
         nationId,
         economy: await readEconomy(database, userId, interval),
+        market: await readMarket(database, userId, interval),
         citizenship: created ? serializeCitizenship(created, false) : null,
       });
     }
@@ -210,6 +231,7 @@ export async function POST(request: Request) {
         nationId,
         citizenship: serializeCitizenship(current, politicalActionTaken),
         economy: await readEconomy(database, userId, interval),
+        market: await readMarket(database, userId, interval),
       });
     }
 
@@ -250,6 +272,7 @@ export async function POST(request: Request) {
       ok: true,
       nationId,
       economy: await readEconomy(database, userId, interval),
+      market: await readMarket(database, userId, interval),
       citizenship: updated ? serializeCitizenship(updated, politicalActionTaken) : null,
     });
   }
@@ -431,7 +454,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
     }
-    return Response.json({ ok: true, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval) });
+    return Response.json({ ok: true, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval) });
   }
 
   if (body.action === 'claim-work') {
@@ -454,7 +477,7 @@ export async function POST(request: Request) {
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return Response.json({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
-    return Response.json({ ok: true, shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval) });
+    return Response.json({ ok: true, shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval) });
   }
 
   return Response.json({ error: 'Unknown action.' }, { status: 400 });
