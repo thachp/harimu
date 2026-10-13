@@ -86,3 +86,8 @@ test('all MVP leaders have portraits, SI badges, programme status and lawful dis
   assert.equal((html.match(/Why\?/g)||[]).length,1);
  }
 });
+
+test('dock chat outside City keeps nation conversation but disables presence with an explicit reason',()=>{
+ const html=render(SquareChat,{enabled:true,nationId:'kindle',cityId:'kindle-capital',session:'ready',presenceAllowed:false});
+ assert.match(html,/Open your current City view before sharing presence/);assert.match(html,/<input[^>]*disabled/);assert.doesNotMatch(html,/<input[^>]*checked/);
+});

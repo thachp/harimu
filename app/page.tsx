@@ -19,14 +19,13 @@ import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { NationalNewsControl } from './national-news';
+import { CitizenDock } from './citizen-dock';
 import { SceneNews } from './world-scene';
 import { firstLoopStep } from '@/lib/first-loop';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
-import { SquareChat } from './square-chat';
 import { DailyLoop } from './daily-loop';
 import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
@@ -1522,7 +1521,7 @@ export default function Home() {
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {firstLoopHint}{dailyLoop}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
-    <SquareChat key={`${citizenSessionKey}:${citizenNationId}:${activeCity?.id}`} cityId={citizenNation ? currentCityAccount?.currentCityId : undefined} configured={clerkConfigured} session={citizenSessionStatus==='ready' && citizenNationId && !currentCityAccount ? 'loading' : citizenSessionStatus} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId) && Boolean(currentCityAccount)} nationId={citizenNationId} />
+
     {(!clerkConfigured || !citizenNationId) && <SceneNews events={worldEvents} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
     <NationInstitutions nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
@@ -1581,7 +1580,7 @@ export default function Home() {
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onNavigate={navigateGame} onSelectNation={selectNation}
-      newsControls={<NationalNewsControl key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} />}
+      socialDock={<CitizenDock key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} onNavigate={navigateGame} />}
       accountControls={<ClerkAccountControl />} />
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
