@@ -95,7 +95,7 @@ body:has(.harimu-game){overflow:auto}
 .game-next-deadline{display:block;max-width:190px;font-size:10px;margin-top:3px}.game-next-deadline small{letter-spacing:0}.game-clock{max-width:190px}
 @media(max-width:760px){.game-next-deadline{max-width:112px;font-size:8px}.game-clock{max-width:112px}}
 .game-dock>button:last-child[aria-haspopup="dialog"]{margin-left:auto;border-left:1px solid #34505b}
-.national-news-dialog{box-sizing:border-box;width:min(680px,calc(100vw - 28px));max-height:calc(100dvh - 28px);padding:20px;border:1px solid #638c8d;border-radius:5px;background:#102731;color:#e7efeb;overflow-y:auto}
+.national-news-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(680px,calc(100vw - 28px));max-height:calc(100dvh - 28px);padding:20px;border:1px solid #638c8d;border-radius:5px;background:#102731;color:#e7efeb;overflow-y:auto}
 .national-news-dialog::backdrop{background:#000b}
 .national-news-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #34505b;padding-bottom:12px}
 .national-news-dialog h1{font-size:22px;margin:0}.national-news-dialog h2{font-size:20px}.national-news-dialog h3{font-size:15px}

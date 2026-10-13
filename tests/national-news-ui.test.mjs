@@ -23,8 +23,8 @@ test('all national editions show truthful statistics and distinguish system, SI 
  }
 });
 function harness(){
- let cursor=0,effects=[],slots=[],requests=[];
- const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useRef(){const i=cursor++;if(!(i in slots))slots[i]={current:{showModal(){},close(){},focus(){}}};return slots[i];},useEffect(fn){effects.push(fn);}};
+ let cursor=0,effects=[],slots=[],requests=[],closeOrder=[];
+ const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useRef(){const i=cursor++;if(!(i in slots))slots[i]={current:{showModal(){},close(){closeOrder.push('native-close');},focus(){}}};return slots[i];},useEffect(fn){effects.push(fn);}};
  const fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
  const exports={};new Function('exports','require','fetch','document',source)(exports,name=>name==='react-dom'?{createPortal:node=>node}:name==='react'?react:name==='./ai-disclosure'?tags:require(name),fetch,{body:{}});
  let dialogType;
@@ -32,9 +32,9 @@ function harness(){
  const renderControl=()=>{cursor=0;effects=[];return exports.NationalNewsControl(props);};
  let tree=renderControl();all(tree).find(n=>n?.type==='button').props.onClick();tree=renderControl();dialogType=all(tree).find(n=>typeof n?.type==='function').type;
  slots=[];
- const dialogProps={...props,onClose(){}};
+ const dialogProps={...props,onClose(){closeOrder.push('restore-focus');}};
  const render=()=>{cursor=0;effects=[];return dialogType(dialogProps);};
- return{dialogProps,render,requests,effects:()=>effects};
+ return{dialogProps,render,requests,closeOrder,effects:()=>effects};
 }
 test('news rejects a foreign edition and ignores interrupted response after account/nation unmount',async()=>{
  const h=harness();h.render();const cleanup=h.effects()[1]();assert.equal(h.requests.length,1);assert.equal(h.requests[0].url,'/api/news');
@@ -47,5 +47,15 @@ test('news rejects a foreign edition and ignores interrupted response after acco
 test('anonymous, loading, unenrolled and local sample news never request a live edition',()=>{
  for(const props of [{session:'anonymous'},{session:'loading'},{session:'error'},{nationId:null},{configured:false}]){
   const h=harness();Object.assign(h.dialogProps,props);const tree=h.render();h.effects()[1]();assert.equal(h.requests.length,0);assert.equal(all(tree).some(n=>n?.type==='p'&&n.props.role==='status'),true);
+ }
+});
+
+test('news dismissal closes native modal before restoring focus through Close, Escape and backdrop',()=>{
+ for(const action of ['button','escape','backdrop']){
+  const h=harness(),tree=h.render(),dialog=all(tree).find(node=>node?.type==='dialog');
+  if(action==='button')all(tree).find(node=>node?.type==='button'&&node.props.children==='Close news').props.onClick();
+  else if(action==='escape')dialog.props.onCancel({preventDefault(){},stopPropagation(){}});
+  else {const target={getBoundingClientRect:()=>({left:10,right:100,top:10,bottom:100})};dialog.props.onClick({target,currentTarget:target,clientX:0,clientY:0});}
+  assert.deepEqual(h.closeOrder,['native-close','restore-focus']);
  }
 });

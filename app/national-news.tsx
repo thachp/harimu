@@ -20,6 +20,7 @@ export function NationalNewsControl({nationId,session,configured=true}:{nationId
 }
 function NewsDialog({nationId,session,configured,onClose}:{nationId:string|null;session:'anonymous'|'loading'|'ready'|'error';configured:boolean;onClose:()=>void}) {
  const dialog=useRef<HTMLDialogElement>(null);
+ const close=()=>{dialog.current?.close();onClose();};
  const [news,setNews]=useState<NationalNews|null>(null),[error,setError]=useState(''),[refresh,setRefresh]=useState(0),[loading,setLoading]=useState(true);
  useEffect(()=>{const node=dialog.current;node?.showModal();return()=>node?.close();},[]);
  useEffect(()=>{
@@ -32,8 +33,8 @@ function NewsDialog({nationId,session,configured,onClose}:{nationId:string|null;
   };void load();return()=>{current=false;controller.abort();};
  },[configured,session,nationId,refresh]);
  const blocked=!configured?'Local samples do not publish national news. Use the connected preview with citizenship.':session==='loading'?'Loading your citizen before reading national news…':session==='error'?'Your citizen account could not be loaded. Retry loading your citizen.':session==='anonymous'?'Sign in and choose citizenship to read your nation’s news.':!nationId?'Choose citizenship to read your nation’s news.':null;
- return <dialog ref={dialog} className="national-news-dialog" aria-labelledby="national-news-title" onClose={onClose} onCancel={event=>{event.preventDefault();event.stopPropagation();onClose();}} onKeyDown={event=>event.stopPropagation()} onClick={event=>{if(event.target===event.currentTarget){const bounds=event.currentTarget.getBoundingClientRect();if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)onClose();}}}>
-  <header><h1 id="national-news-title">National news</h1><button type="button" onClick={onClose}>Close news</button></header>
+ return <dialog ref={dialog} className="national-news-dialog" aria-labelledby="national-news-title" onClose={onClose} onCancel={event=>{event.preventDefault();event.stopPropagation();close();}} onKeyDown={event=>event.stopPropagation()} onClick={event=>{if(event.target===event.currentTarget){const bounds=event.currentTarget.getBoundingClientRect();if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)close();}}}>
+  <header><h1 id="national-news-title">National news</h1><button type="button" onClick={close}>Close news</button></header>
   {blocked?<p role="status">{blocked}</p>:<>{loading&&<p role="status">Loading national news…</p>}{error&&<p role="alert">{error}</p>}{news&&news.nationId===nationId&&<NewsEdition news={news}/>}<button type="button" disabled={loading} aria-describedby={loading?'news-refresh-reason':undefined} onClick={()=>{setLoading(true);setRefresh(value=>value+1);}}>Refresh national news</button>{loading&&<small id="news-refresh-reason">The national feed is being loaded. Please wait before refreshing again.</small>}</>}
  </dialog>;
 }
