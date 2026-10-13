@@ -7,6 +7,7 @@ import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locatio
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
+  cityName?: string;
   nations?: readonly { id: string; name?: string; color?: string }[];
   selectedNationId?: string | null;
   nationFocusRevision?: number;
@@ -18,7 +19,7 @@ export type GameViewportProps = {
 };
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
 
-export function GameViewport({ mode, nationId, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '' }: GameViewportProps) {
+export function GameViewport({ mode, nationId, cityName, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '' }: GameViewportProps) {
   const host = useRef<HTMLDivElement>(null);
   const callback = useRef(onSelect);
   const userCamera = useRef(onUserCamera);
@@ -46,7 +47,7 @@ export function GameViewport({ mode, nationId, nations, selectedNationId, nation
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(mode === 'world' ? '#101d29' : '#172c31');
     if (mode === 'city') scene.fog = new THREE.Fog('#172c31', 35, 85);
-    const world = mode === 'city' ? createCityWorld(nationId) : createRegionWorld(JSON.parse(nationSignature));
+    const world = mode === 'city' ? createCityWorld(nationId, cityName) : createRegionWorld(JSON.parse(nationSignature));
     scene.add(world.group);
     scene.add(new THREE.HemisphereLight('#fff3d6', '#334b4d', 2.2));
     const sun = new THREE.DirectionalLight('#ffe2ac', 3.2);
@@ -186,10 +187,10 @@ export function GameViewport({ mode, nationId, nations, selectedNationId, nation
       textures.forEach(texture => texture.dispose());
       sun.shadow.map?.dispose(); renderer.dispose(); labelLayer.remove(); canvas.remove();
     };
-  }, [mode, nationId, nationSignature]);
+  }, [mode, nationId, cityName, nationSignature]);
   useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, nationSignature]);
   useEffect(() => { if (cameraTourNationId && mode === 'world') controls.current?.focusNation(cameraTourNationId, false); }, [cameraTourNationId, mode, nationId, nationSignature]);
-  useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId]);
+  useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId, cityName]);
   return <div className={`game-viewport ${className}`} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360 }}>
     <div ref={host} className="viewport-canvas" role="region" aria-label={`${mode === 'city' ? 'City terrain. Drag to pan' : 'Fictional Harimu globe. Drag to rotate'}; scroll to zoom. Arrow keys move the view. Use the location buttons to select with a keyboard.`} tabIndex={0}
       style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360, touchAction: 'none' }}

@@ -61,9 +61,10 @@ function facade(group: THREE.Group, p: Palette, w: number, h: number, d: number)
   }
 }
 
-export function createCityWorld(nationId: string): WorldArt {
+export function createCityWorld(nationId: string, cityName?: string): WorldArt {
   materials.clear(); // Each world owns its materials; renderer may dispose the previous world.
   const key = nationId.toLowerCase(); const profile = capitalProfiles[key] ?? capitalProfiles.kindle; const p = profile.palette;
+  const displayedCity = cityName?.trim() || profile.capital;
   const group = new THREE.Group(); const selectables: THREE.Object3D[] = []; const buildings: WorldBuilding[] = [];
   group.userData = { capital: profile.capital, nationId: key, detail: 'Procedural capital illustration' };
   // All land cells are square, with shallow stepped shoreline and river channel.
@@ -85,7 +86,7 @@ export function createCityWorld(nationId: string): WorldArt {
     building.traverse(child => { child.userData = metadata; }); group.add(building); selectables.push(building);
     buildings.push({ location, label, position: new THREE.Vector3(px, 0, pz), object: building });
   };
-  addBuilding('square', `${profile.capital} square`, 0, 0, g => {
+  addBuilding('square', `${displayedCity} square`, 0, 0, g => {
     cylinder(g, 0, 0.11, 0, 0.8, 0.9, 0.22, p.stone);
     cylinder(g, 0, 0.35, 0, 0.65, 0.7, 0.22, p.trim);
     cylinder(g, 0, 0.46, 0, 0.54, 0.54, 0.08, 0x588f96);
@@ -103,14 +104,14 @@ export function createCityWorld(nationId: string): WorldArt {
     box(g, 1.55, 0.16, 0.4, 0.2, 0.4, 2.6, 0x9b7950);
     tree(g, -1.75, -0.6, 0.8);
   });
-  addBuilding('workplace', key === 'korund' ? 'Assignment board' : `${profile.capital} work yard`, -4.5, -4, g => {
+  addBuilding('workplace', key === 'korund' ? 'Assignment board' : `${displayedCity} work yard`, -4.5, -4, g => {
     facade(g, p, 3.1, 1.8, 2.1); roof(g, 3.4, 2.4, 0.7, 1.92, p.roof);
     box(g, -0.9, 2.35, -0.65, 0.5, 1.8, 0.5, p.stone); box(g, -0.9, 3.28, -0.65, 0.65, 0.15, 0.65, p.trim);
     for (let i = 0; i < 3; i++) box(g, 2, 0.25 + i * 0.3, -0.5, 0.9 - i * 0.15, 0.3, 0.8, 0x906c46);
     for (let i = 0; i < 3; i++) cylinder(g, 1.9, 0.27, 0.7 + i * 0.4, 0.2, 0.2, 0.5, p.trim);
     box(g, -0.4, 0.3, 1.5, 1.9, 0.16, 0.5, 0x654b36);
   });
-  addBuilding('market', key === 'korund' ? 'State ration store' : `${profile.capital} market`, 4, 3.8, g => {
+  addBuilding('market', key === 'korund' ? 'State ration store' : `${displayedCity} market`, 4, 3.8, g => {
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 1.25;
       box(g, x, 0.52, 0, 1.05, 0.65, 0.75, 0x806346);
