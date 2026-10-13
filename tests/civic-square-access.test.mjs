@@ -13,7 +13,7 @@ async function component(file,name) {
   const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
   const GameTimer=file==='government-panel.tsx'?await component('game-timer.tsx','GameTimer'):null;
   const exports={};
-  new Function('exports','require',compiled)(exports,name=>name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:name==='./game-timer'?{GameTimer}:name==='../lib/game-time'?require('../lib/game-time.ts'):require(name));
+  new Function('exports','require',compiled)(exports,name=>name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:name==='./game-timer'?{GameTimer}:name==='../lib/government-disclosure'?require('../lib/government-disclosure.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):require(name));
   return exports[name];
 }
 const SquareChat=await component('square-chat.tsx','SquareChat');
@@ -61,4 +61,14 @@ test('City chat distinguishes nationwide messages from opt-in city presence',()=
 test('City presence remains disabled when the current city is unavailable',()=>{
   const html=render(SquareChat,{enabled:true,nationId:'kindle',session:'ready'});
   assert.match(html,/<input[^>]*disabled/);
+});
+
+test('closed nation Civic local previews use official disclosures without internal rationale',()=>{
+ for(const nationId of ['korund','aurelle']) {
+  const snapshot=simulateGovernment({nationId,availableBudgetMinor:0,foodSecurity:35,petitionCounts:{}});
+  const html=render(GovernmentPanel,{snapshot,nationId,localDemo:true,pending:false,onPetition(){}});
+  assert.match(html,nationId==='korund'?/Chairman&#x27;s official statement/:/Royal decree/);
+  assert.match(html,/Why\?/);assert.match(html,/Simulated statement/);
+  assert.doesNotMatch(html,/35\/100|safety threshold/);
+ }
 });

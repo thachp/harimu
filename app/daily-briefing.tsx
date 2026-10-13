@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { governmentDisclosure } from '../lib/government-disclosure';
 import { GameTimer } from './game-timer';
 import type { Economy } from '@/lib/economy';
 import type { WorkShift } from '@/lib/work-shifts';
@@ -74,7 +75,7 @@ export function DailyBriefing({ economy, shifts, capacity, market, government, c
       <h3>Government briefing</h3>
       <p>AI/SI-controlled government · rule-bound simulation, with no live AI model connected.</p>
       <strong>{government.decision.title}</strong>
-      <p>{government.decision.reason}</p>
+      <p>{governmentDisclosure(government).text}</p>
       <p>Proposed spend: {sparks(government.decision.proposedSpendMinor)} · available budget: {sparks(government.availableBudgetMinor)}.</p>
       <p>{government.influenceSummary}</p>
     </div>}

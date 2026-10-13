@@ -1,3 +1,4 @@
+import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
@@ -129,7 +130,7 @@ export async function GET(request: Request) {
     economy: await readEconomy(database, userId, interval),
     market: await readMarket(database, userId, interval),
     playerMarket: await readPlayerMarket(database, userId),
-    government: profile?.nation_id ? await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId) : null,
+    government: profile?.nation_id ? publicGovernmentSnapshot(await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId)) : null,
     shifts: await readShifts(database, userId),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -202,7 +203,7 @@ export async function POST(request: Request) {
     }
     const citizen = await database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at FROM citizens WHERE clerk_user_id=?`)
       .bind(userId).first<CitizenProfileRow>();
-    return privateJson({ ok:true, government: await readGovernment(database, recorded.nation_id, seconds, userId),
+    return privateJson({ ok:true, government: publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId)),
       citizenship: citizen ? serializeCitizenship(citizen,true) : null });
   }
 
@@ -235,7 +236,7 @@ export async function POST(request: Request) {
     ) AS taken`).bind(userId,userId).first<{taken:number}>())?.taken);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
       simulation,verification:await readVerification(userId),
-      government:profile?.nation_id?await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId):null,
+      government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId)):null,
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
       economy:await readEconomy(database,userId,interval),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),

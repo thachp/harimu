@@ -139,12 +139,12 @@ test('Aurelle government food needs use Crown household food rather than retaine
   // Both fixture accounts had Kindle citizenship before changing nation locally;
   // its starter goods must not satisfy Aurelle's separate household ledger.
   await r.db.batch(['alice','bob'].map(user=>r.db.prepare("INSERT OR IGNORE INTO starter_food_grants(clerk_user_id,quantity) VALUES (?,2)").bind(user)));
-  assert.match((await r.call('citizen','alice')).data.government.decision.reason,/Food security is 0\/100/);
+  assert.match((await r.readGovernment('aurelle','alice')).decision.reason,/Food security is 0\/100/);
   for(const user of ['alice','bob']) {
     await earn(r,user);
     assert.equal((await r.call('citizen',user,action('buy-food',undefined,{quantity:2}))).status,200);
   }
-  assert.ok(!(await r.call('citizen','alice')).data.government.decision.reason.includes('below the 40-point safety threshold'));
+  assert.ok(!(await r.readGovernment('aurelle','alice')).decision.reason.includes('below the 40-point safety threshold'));
   for(const user of ['alice','bob']) assert.equal((await r.call('citizen',user,action('household-meal'))).status,200);
-  assert.match((await r.call('citizen','alice')).data.government.decision.reason,/Food security is 0\/100/);
+  assert.match((await r.readGovernment('aurelle','alice')).decision.reason,/Food security is 0\/100/);
 });

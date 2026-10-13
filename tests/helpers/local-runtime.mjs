@@ -36,7 +36,7 @@ export async function localRuntime() {
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'app/api/city/route.ts',
     'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
-    'lib/government-state.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
+    'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/world-simulation.ts',
     'lib/korund.ts',
@@ -103,6 +103,7 @@ export async function readVerification(userId) {
   const square = await import(pathToFileURL(join(directory, 'app/api/square/route.mjs')).href);
   const city = await import(pathToFileURL(join(directory, 'app/api/city/route.mjs')).href);
   const world = await import(pathToFileURL(join(directory, 'app/api/world/route.mjs')).href);
+  const government = await import(pathToFileURL(join(directory, 'lib/government-state.mjs')).href);
   const simulation = await import(pathToFileURL(join(directory, 'lib/world-simulation.mjs')).href);
   await getDatabase(); // Real additive schema bootstrap and seed initialization.
   const now = new Date(epoch).toISOString();
@@ -119,7 +120,7 @@ export async function readVerification(userId) {
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
   return {
-    call, advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
+    call, readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
     reopen() { env.DB.close(); env.DB = new LocalD1(path); },
     async close() { env.DB.close(); await rm(directory, { recursive: true, force: true }); },
   };
