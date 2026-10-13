@@ -1473,7 +1473,7 @@ export default function Home() {
       {viewMode === 'government' && <>
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. All government offices are AI/SI controlled in this release.</p>
         <GovernmentPanel simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
-        {!government && <p>Policy simulation and petitions are currently available for Kindle, Korund and Aurelle. This nation’s civic implementation is planned.</p>}
+        {!government && <p>Policy previews are supported for Kindle, Korund and Aurelle; counted petitions require Tier 1 verification. This nation’s civic implementation is planned.</p>}
         <p>Elections, protests and public opinion systems are planned and will follow each nation’s rules. No election or protest is currently open here.</p>
       </>}
     </>}
@@ -1485,7 +1485,8 @@ export default function Home() {
     <div className="game-nation-choices">{worldNations.map(nation => <button key={nation.id} type="button" aria-pressed={selected.id===nation.id} onClick={()=>setSelectedId(nation.id)}>{nation.shortName}</button>)}</div>
     <h2>{selected.name}</h2><p>{selected.motto}</p>
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
-    <p><strong>Playable support:</strong> {selected.id === 'kindle' ? 'Paid work, wages, goods, merchant trades, citizen listings, household meals and petitions.' : ['korund', 'aurelle'].includes(selected.id) ? 'Citizenship, city chat and deterministic government petitions. Paid work and local economies are planned.' : 'Citizenship and city chat. Local jobs, economies and civic actions are planned.'}</p>
+    <p>Counted petitions require Tier 1 phone verification, which is not available yet. Ordinary play and chat remain available.</p>
+    <p><strong>Playable support:</strong> {selected.id === 'kindle' ? 'Paid work, wages, goods, merchant trades, citizen listings, household meals and government previews.' : ['korund', 'aurelle'].includes(selected.id) ? 'Citizenship, city chat and deterministic government previews. Paid work and local economies are planned.' : 'Citizenship and city chat. Local jobs, economies and civic actions are planned.'}</p>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" onClick={()=>beginEnrollment(selected.id)}>Enroll in {selected.shortName}</button>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
