@@ -8,11 +8,11 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true,
-  // LOCAL PLACEHOLDER ONLY. Replace with a separately provisioned preview D1 ID.
-  // Never point previews at production. Deployment guard rejects this ID.
+  "vars": { "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaGFyaW11LmNvbSQ" },
+  // Isolated preview only; never bind this resource as migrated production.
   "d1_databases": [{
     "binding": "DB",
     "database_name": "harimu-preview",
-    "database_id": "00000000-0000-4000-8000-000000000000"
+    "database_id": "85ec8276-a39f-4bdb-95ad-e77f92144bb9"
   }]
 }

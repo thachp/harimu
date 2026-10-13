@@ -57,3 +57,19 @@ Verified locally on 2026-10-13: 68 Node tests and 77 SQL tests pass; lint and Ty
 The API exposes `POST /accounts/{account_id}/workers/scripts/{script_name}/assets-upload-session` (manifest of path/hash/size), `POST /accounts/{account_id}/workers/assets/upload?base64=true` (multipart asset buckets), and multipart Worker script upload. Asset-session response contains a sensitive upload JWT; never print it. The currently documented connector request interface has no authorization-header override, although assets upload requires the session JWT. A tokenless multipart Worker-only upload is insufficient for this app's 37 static assets. Parent should confirm a supported secure asset-session authentication path in the connector before provisioning/uploading; otherwise the user-authenticated Wrangler path handles the asset workflow. Required actions after that: create isolated preview D1, bind DB; upload complete server modules and assets; enable harimu-preview workers.dev; have user securely supply Clerk secret; record exact remote version and verify real flows. Do not create an API credential to work around this interface.
 
 Public routing research confirms retaining Google authoritative DNS with Workers partial-zone setup requires Business/Enterprise. Do not upgrade. The preview can use workers.dev now. Any later nameserver migration requires explicit approval and a complete DNS inventory while preserving Vercel docs CNAME and all other records.
+
+### Remote preview provisioned after personal authorization
+
+User personally approved the scoped Wrangler consent on 2026-10-13. Nonsecret `whoami` verified thachp@gmail.com and OM.Network, LLC (143bccf1a31c2161142c43845a8fc65d), with account:read, user:read, workers_scripts:write, d1:write, offline_access. No broader grant was requested.
+
+Isolated D1: `harimu-preview`, ID `85ec8276-a39f-4bdb-95ad-e77f92144bb9`, WNAM. Worker: `harimu-preview`. Deployed version `0bcea0ea-270f-467e-846b-c5e348a1c7f1`, URL https://harimu-preview.thachp.workers.dev . Existing public Clerk publishable key is configured; no secret was copied. Secret-name inventory is empty. Remote landing/world/citizen currently return 500; configured Clerk middleware asserts a secret for every request, so this preview is not yet accepted. User must securely supply the matching Clerk instance secret before real authentication/game-flow checks. Deployment does not imply completed migration.
+
+User-only secret entry command, from this checkout (do not paste the secret into chat or command arguments):
+
+```sh
+WRANGLER_WRITE_LOGS=false WRANGLER_LOG_PATH=.wrangler/logs \
+node_modules/.bin/wrangler secret put CLERK_SECRET_KEY \
+--name harimu-preview --config wrangler.jsonc
+```
+
+The user must personally enter the value at the hidden interactive prompt. Preview hostname authorization in Clerk may also require user configuration. After entry, verify a fresh Worker version and all public/authenticated flows. Production data was not imported and app DNS was not changed. Docs hash and Vercel CNAME remain identical after preview deployment.
