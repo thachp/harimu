@@ -1,5 +1,7 @@
 # Harimu local development
 
+Canonical design source: [official Harimu documentation, GDD v0.7](https://docs.harimu.com/). Patrick designated this site as the source of truth; it supersedes the older PDF when they differ. Preserve direct user requirements and review [documented gaps/conflicts](docs/OFFICIAL_DOCS_ALIGNMENT.md) before subsequent implementation.
+
 This checkout is the existing Harimu Site. Preserve `.openai/hosting.json` and
 its project identity when publishing. Dependencies are already installed.
 
@@ -253,3 +255,26 @@ a deterministic simulation; no model integration or new credentials were added.
 Clerk's neutral, input, menu and modal theme now uses readable light text on dark
 surfaces. Account controls are compact, and focus/hover states are scoped to Clerk
 components so authentication behavior and security settings stay intact.
+
+## Local two-account integration verification
+
+`node --experimental-strip-types tests/local-account-integration.test.mjs`
+executes the actual citizen/square GET and POST handlers and database bootstrap
+against temporary SQLite files through a small D1-compatible adapter. It substitutes
+fixture identities for Clerk only inside temporary compiled test copies and freezes
+the clock to a fixed UTC day. It starts no HTTP server and uses no credentials,
+real accounts, network requests, or production D1 data. Reopening the database tests
+persistence independently of the request/session fixture.
+
+The fixtures check simultaneous private draft saves, decision/account isolation,
+private/no-store response headers, anonymous and foreign-origin denial, own-only
+pending/resolved petition history, cross-account UUID reuse, nation-scoped chat,
+pseudonymous public metadata, ownership deletion and aggregate-only presence.
+The player-market/economy SQL suites additionally use independent SQLite connections
+and synchronized race starts for owner cancellation vs buyer fill, duplicate and
+foreign settlement claims, and competing claims against a finite employer fund.
+They check conservation and original-request replay after reconnect.
+
+These tests verify local handler/storage boundaries and SQL transaction behavior.
+They do not establish real Clerk session authentication, Cloudflare D1 runtime
+semantics, browser account switching, or authenticated multi-browser concurrency.

@@ -1,0 +1,97 @@
+/** In-process fixtures only. No HTTP listener, Clerk session, credential or live D1 access. */
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtemp, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import ts from 'typescript';
+
+class Statement {
+  constructor(db, sql, params = []) { this.db = db; this.sql = sql; this.params = params; }
+  bind(...params) { return new Statement(this.db, this.sql, params); }
+  execute() {
+    const result = this.db.sqlite.prepare(this.sql).run(...this.params);
+    return { success: true, meta: { changes: result.changes, last_row_id: result.lastInsertRowid } };
+  }
+  async run() { return this.execute(); }
+  async first() { return this.db.sqlite.prepare(this.sql).get(...this.params) ?? null; }
+  async all() { return { success: true, results: this.db.sqlite.prepare(this.sql).all(...this.params) }; }
+}
+class LocalD1 {
+  constructor(path) { this.sqlite = new DatabaseSync(path); this.sqlite.exec('PRAGMA foreign_keys=ON'); }
+  prepare(sql) { return new Statement(this, sql); }
+  async batch(statements) {
+    this.sqlite.exec('BEGIN IMMEDIATE');
+    try { const results = statements.map(statement => statement.execute()); this.sqlite.exec('COMMIT'); return results; }
+    catch (error) { this.sqlite.exec('ROLLBACK'); throw error; }
+  }
+  close() { this.sqlite.close(); }
+}
+
+export async function localRuntime() {
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
+  const path = join(directory, 'fixture.sqlite');
+  const modules = [
+    'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts',
+    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
+    'lib/government-state.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
+    'app/api/citizen/route.ts', 'app/api/square/route.ts',
+  ];
+  const epoch = Date.UTC(2026, 0, 15, 12); // Fixed UTC day prevents midnight flakiness.
+  const clockPath = join(directory, 'fixture-clock.mjs');
+  await writeFile(clockPath, `export class Date extends globalThis.Date {
+    constructor(...args) { super(...(args.length ? args : [${epoch}])); }
+    static now() { return ${epoch}; }
+  }`);
+  const envPath = join(directory, 'fixture-env.mjs');
+  const authPath = join(directory, 'lib/auth.mjs');
+  await mkdir(dirname(authPath), { recursive: true });
+  await writeFile(envPath, 'export const env = {};\n');
+  // Each fixture identity belongs to one Request. This substitution exists only
+  // in temporary compiled test copies; production authentication is untouched.
+  await writeFile(authPath, `const identities = new WeakMap();
+export function identify(request, identity) { identities.set(request, identity); }
+export async function authenticatedUserId(request) { return identities.get(request) ?? null; }
+`);
+  for (const sourcePath of modules) {
+    let source = await readFile(join(root, sourcePath), 'utf8');
+    source = source.replace(/from (['"])([^'"]+)\1/g, (match, quote, specifier) => {
+      let target;
+      if (specifier === 'cloudflare:workers') target = envPath;
+      else if (specifier.startsWith('@/')) target = join(directory, `${specifier.slice(2)}.mjs`);
+      else if (specifier.startsWith('.')) target = resolve(directory, dirname(sourcePath), `${specifier}.mjs`);
+      else throw new Error(`Unexpected external runtime dependency: ${specifier}`);
+      return `from ${JSON.stringify(pathToFileURL(target).href)}`;
+    });
+    const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const destination = join(directory, sourcePath.replace(/\.ts$/, '.mjs'));
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, `import { Date } from ${JSON.stringify(pathToFileURL(clockPath).href)};\n${output}`);
+  }
+  const { env } = await import(pathToFileURL(envPath).href);
+  env.DB = new LocalD1(path);
+  const { identify } = await import(pathToFileURL(authPath).href);
+  const { getDatabase } = await import(pathToFileURL(join(directory, 'lib/db.mjs')).href);
+  const citizen = await import(pathToFileURL(join(directory, 'app/api/citizen/route.mjs')).href);
+  const square = await import(pathToFileURL(join(directory, 'app/api/square/route.mjs')).href);
+  await getDatabase(); // Real additive schema bootstrap and seed initialization.
+  const now = new Date(epoch).toISOString();
+  await env.DB.batch(['alice', 'bob'].map(user => env.DB.prepare(`INSERT INTO citizens
+    (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at)
+    VALUES (?,'kindle',?,18,1240,'Good standing',?,?)`).bind(user, `Private ${user}`, now, now)));
+  const call = async (endpoint, user, body, origin = 'https://fixture.invalid') => {
+    const request = new Request(`https://fixture.invalid/api/${endpoint}`, body === undefined ? undefined : {
+      method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (user) identify(request, user);
+    const handlers = endpoint === 'citizen' ? citizen : square;
+    const response = await handlers[body === undefined ? 'GET' : 'POST'](request);
+    return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
+  };
+  return {
+    call, now: epoch, get db() { return env.DB; },
+    reopen() { env.DB.close(); env.DB = new LocalD1(path); },
+    async close() { env.DB.close(); await rm(directory, { recursive: true, force: true }); },
+  };
+}

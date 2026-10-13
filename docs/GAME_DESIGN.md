@@ -1,10 +1,12 @@
 # Harimu - Game Design Companion
 
-Implementation override: [requirements after v0.6](REQUIREMENT_CHANGES.md) takes precedence for explicitly changed requirements, including AI/SI control of all government roles in the first release. Player-held office is deferred.
+Canonical source: [official Harimu documentation, GDD v0.7](https://docs.harimu.com/), designated by Patrick on October 13, 2026. It supersedes the older PDF when they differ. This file remains a historical v0.6 summary; use the [alignment review](OFFICIAL_DOCS_ALIGNMENT.md) and direct user requirements before subsequent implementation.
 
-Status: implementation-facing summary of the canonical **Harimu Game Design Document v0.6**, dated October 12, 2026.
+Implementation override: [requirements after v0.6](REQUIREMENT_CHANGES.md) takes precedence for explicitly changed requirements, including AI/SI control of all government roles in the first release. Historical references to deferred player office must be reconciled with v0.7, which restricts humans to citizen roles.
 
-The full GDD is the design authority. This companion keeps the decisions most likely to affect product, architecture, and day-to-day implementation close to the codebase. When the two conflict, follow the GDD and update this file.
+Status: historical implementation-facing summary of the older **Harimu Game Design Document v0.6**, dated October 12, 2026.
+
+The official v0.7 documentation is the design authority. This companion keeps the decisions most likely to affect product, architecture, and day-to-day implementation close to the codebase. When the two conflict, follow the GDD and update this file.
 
 Numbers described as assumptions are starting points for playtesting, not promises. Items marked for verification in the GDD still require legal, technical, or market confirmation.
 

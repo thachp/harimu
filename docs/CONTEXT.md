@@ -1,8 +1,10 @@
 # Harimu Domain Context
 
-Implementation override: [requirements after v0.6](REQUIREMENT_CHANGES.md) takes precedence for explicitly changed requirements, including AI/SI control of all government roles in the first release. Player-held office is deferred.
+Canonical source: [official Harimu documentation, GDD v0.7](https://docs.harimu.com/), designated by Patrick on October 13, 2026. It supersedes the older PDF when they differ. This file remains a historical v0.6 summary; use the [alignment review](OFFICIAL_DOCS_ALIGNMENT.md) and direct user requirements before subsequent implementation.
 
-This file is the implementation-facing vocabulary for Harimu. It summarizes the canonical **Harimu Game Design Document v0.6** dated October 12, 2026. If this file conflicts with the GDD, the GDD wins.
+Implementation override: [requirements after v0.6](REQUIREMENT_CHANGES.md) takes precedence for explicitly changed requirements, including AI/SI control of all government roles in the first release. Historical references to deferred player office must be reconciled with v0.7, which restricts humans to citizen roles.
+
+This file is the historical implementation-facing vocabulary for Harimu. It summarizes the older **Harimu Game Design Document v0.6** dated October 12, 2026. If this file conflicts with the official v0.7 documentation, the official documentation wins; preserve direct user requirements.
 
 ## Product Identity
 

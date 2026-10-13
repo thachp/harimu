@@ -4,6 +4,9 @@ import pathlib
 import sqlite3
 import unittest
 import uuid
+import tempfile
+import threading
+from contextlib import closing
 spec=importlib.util.spec_from_file_location('market_fixture',pathlib.Path(__file__).with_name('market.test.py'))
 fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
 sql=fixture.sql
@@ -110,4 +113,49 @@ class PlayerMarketTests(unittest.TestCase):
         self.concurrent(worker)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM player_fills').fetchone()[0]+self.db.execute('SELECT COUNT(*) FROM player_cancellations').fetchone()[0],1)
         self.assertEqual(self.food()+self.food('bob'),12)
+
+    def test_two_account_fill_cancel_race_and_reconnect_replay(self):
+        lot,_=self.create()
+        requests={user:str(uuid.uuid4()) for user in ['alice','bob']}
+        with tempfile.TemporaryDirectory() as directory:
+            path=pathlib.Path(directory)/'two-account-market.sqlite'
+            disk=sqlite3.connect(path);self.db.backup(disk);disk.close()
+            barrier=threading.Barrier(2);failures=[];results={}
+            def command(connection,user):
+                if user=='alice':return connection.execute(sql('cancelListingSql'),(requests[user],1001,lot,user,requests[user])).rowcount
+                return connection.execute(sql('fillListingSql'),(requests[user],1001,user,lot,requests[user])).rowcount
+            def worker(user):
+                connection=sqlite3.connect(path,timeout=10)
+                try:
+                    barrier.wait(timeout=10)
+                    with connection:results[user]=command(connection,user)
+                except Exception as error:failures.append(str(error))
+                finally:connection.close()
+            threads=[threading.Thread(target=worker,args=(user,)) for user in requests]
+            for thread in threads:thread.start()
+            for thread in threads:thread.join(timeout=15)
+            self.assertTrue(all(not thread.is_alive() for thread in threads));self.assertEqual(failures,[])
+            self.assertEqual(sum(results.values()),1)
+            # New connections represent both clients reconnecting with their original IDs.
+            for user in requests:
+                with closing(sqlite3.connect(path)) as connection:
+                    with connection:self.assertEqual(command(connection,user),0)
+            with closing(sqlite3.connect(path)) as connection:
+                wallets=dict(connection.execute('SELECT clerk_user_id,balance FROM citizen_wallet_balances'))
+                goods=dict(connection.execute("SELECT clerk_user_id,quantity FROM citizen_inventory_balances WHERE item='food'"))
+                self.assertEqual(wallets['alice']+wallets['bob'],4000)
+                self.assertEqual(goods['alice']+goods['bob'],12)
+                self.assertEqual((wallets['alice'],wallets['bob'],goods['alice'],goods['bob']),
+                    (2300,1700,4,8) if results['bob'] else (2000,2000,6,6))
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM player_open_lots').fetchone()[0],0)
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM player_fills').fetchone()[0],results['bob'])
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM player_cancellations').fetchone()[0],results['alice'])
+                self.assertEqual(connection.execute('SELECT balance FROM merchant_cash_balance').fetchone()[0],10000)
+                self.assertEqual(connection.execute('SELECT stock FROM merchant_inventory_balances').fetchone()[0],100)
+                # A buyer cannot cancel the owner's separate lot; an owner cannot buy it.
+                other=str(uuid.uuid4())
+                connection.execute(sql('createListingSql'),(other,'food',1,100,1002,'alice','food',1,other))
+                denied=str(uuid.uuid4())
+                self.assertEqual(connection.execute(sql('cancelListingSql'),(denied,1003,other,'bob',denied)).rowcount,0)
+                self.assertEqual(connection.execute(sql('fillListingSql'),(denied,1003,'alice',other,denied)).rowcount,0)
 if __name__=='__main__':unittest.main()

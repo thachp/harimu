@@ -6,6 +6,7 @@ import unittest
 import tempfile
 import threading
 import json
+from contextlib import closing
 
 root = pathlib.Path(__file__).parents[1]
 source = (root / 'lib/economy.ts').read_text() + (root / 'lib/work-shifts.ts').read_text() + (root / 'lib/market.ts').read_text() + (root / 'lib/player-market.ts').read_text()
@@ -106,6 +107,77 @@ class EconomyTests(unittest.TestCase):
             disk = sqlite3.connect(path)
             self.db.backup(disk)
             disk.close()
+
+    def test_two_account_settlement_race_conserves_fund_and_reconnect(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=pathlib.Path(directory)/'two-account-settlement.sqlite'
+            with closing(sqlite3.connect(path)) as connection:self.db.backup(connection)
+            now='2026-10-12T02:00:00.000Z'
+            def claim(connection,shift,user):
+                # Same transactional statement sequence as the D1 settlement batch.
+                with connection:
+                    count=connection.execute(sql('settleSql'),(now,shift,user,now)).rowcount
+                    connection.execute(sql('settledContributionSql'),(now,shift,user,now))
+                    connection.execute(sql('finishSettledShiftSql'),(now,shift,user,now))
+                return count
+            barrier=threading.Barrier(2);failures=[];results={}
+            def worker(shift,user):
+                with closing(sqlite3.connect(path,timeout=10)) as connection:
+                    try:
+                        barrier.wait(timeout=10);results[user]=claim(connection,shift,user)
+                    except Exception as error:failures.append(str(error))
+            threads=[threading.Thread(target=worker,args=(shift,user)) for shift,user in [('a','alice'),('b','bob')]]
+            for thread in threads:thread.start()
+            for thread in threads:thread.join(timeout=15)
+            self.assertTrue(all(not thread.is_alive() for thread in threads));self.assertEqual(failures,[])
+            self.assertEqual(sum(results.values()),1)
+            winner=next(user for user,count in results.items() if count)
+            with closing(sqlite3.connect(path)) as connection:
+                self.assertEqual(connection.execute('SELECT SUM(wage_minor),SUM(quantity) FROM shift_settlements').fetchone(),(800,4))
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM work_contributions').fetchone()[0],1)
+                wallets=dict(connection.execute('SELECT clerk_user_id,balance FROM citizen_wallet_balances'))
+                self.assertEqual(wallets[winner],800);self.assertEqual(sum(wallets.values()),800)
+                remaining=connection.execute('SELECT initial_minor-(SELECT SUM(wage_minor) FROM shift_settlements) FROM economy_funds').fetchone()[0]
+                self.assertEqual(remaining,200);self.assertEqual(remaining+sum(wallets.values()),1000)
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM work_shifts WHERE claimed_at IS NULL').fetchone()[0],1)
+            # Reconnected callers retain each original shift; neither duplicate nor foreign claims pay.
+            for shift,user,other in [('a','alice','bob'),('b','bob','alice')]:
+                with closing(sqlite3.connect(path)) as connection:
+                    self.assertEqual(claim(connection,shift,other),0)
+                    self.assertEqual(claim(connection,shift,user),0)
+            with closing(sqlite3.connect(path)) as connection:
+                self.assertEqual(connection.execute('SELECT SUM(wage_minor),SUM(quantity) FROM shift_settlements').fetchone(),(800,4))
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM work_contributions').fetchone()[0],1)
+
+    def test_owner_and_other_account_race_same_shift_never_double_settles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=pathlib.Path(directory)/'owner-settlement.sqlite'
+            with closing(sqlite3.connect(path)) as connection:self.db.backup(connection)
+            barrier=threading.Barrier(3);failures=[];results=[]
+            now='2026-10-12T02:00:00.000Z'
+            def worker(user):
+                with closing(sqlite3.connect(path,timeout=10)) as connection:
+                    try:
+                        barrier.wait(timeout=10)
+                        with connection:
+                            count=connection.execute(sql('settleSql'),(now,'a',user,now)).rowcount
+                            connection.execute(sql('settledContributionSql'),(now,'a',user,now))
+                            connection.execute(sql('finishSettledShiftSql'),(now,'a',user,now))
+                        results.append((user,count))
+                    except Exception as error:failures.append(str(error))
+            threads=[threading.Thread(target=worker,args=(user,)) for user in ['alice','alice','bob']]
+            for thread in threads:thread.start()
+            for thread in threads:thread.join(timeout=15)
+            self.assertTrue(all(not thread.is_alive() for thread in threads));self.assertEqual(failures,[])
+            self.assertEqual(sum(count for _,count in results),1);self.assertIn(('bob',0),results)
+            with closing(sqlite3.connect(path)) as connection:
+                with connection:
+                    self.assertEqual(connection.execute(sql('settleSql'),(now,'a','alice',now)).rowcount,0)
+                    self.assertEqual(connection.execute(sql('settledContributionSql'),(now,'a','alice',now)).rowcount,0)
+                    self.assertEqual(connection.execute(sql('finishSettledShiftSql'),(now,'a','alice',now)).rowcount,0)
+                self.assertEqual(connection.execute('SELECT clerk_user_id,wage_minor,quantity FROM shift_settlements').fetchall(),[('alice',800,4)])
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM work_contributions').fetchone()[0],1)
+                self.assertEqual(connection.execute("SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id='bob'").fetchone()[0],0)
             barrier = threading.Barrier(2)
             failures = []
             def worker():
