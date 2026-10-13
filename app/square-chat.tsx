@@ -19,15 +19,15 @@ function SquareChatSession({enabled,nationId,cityId,configured=true,presenceAllo
   useEffect(()=>{const current=++generation.current;if(!enabled)return;const initial=setTimeout(()=>void refresh(),0);const timer=setInterval(()=>{if(!document.hidden)void refresh();},15000);return()=>{generation.current=current+1;clearTimeout(initial);clearInterval(timer);};},[enabled,nationId,cityId,refresh]);
   useEffect(()=>{
     if(!enabled||!presence||!cityId||!presenceAllowed)return;
-    const ping=(active:boolean)=>{void fetch('/api/square',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'presence',active,expectedCityId:cityId}),keepalive:true}).catch(()=>{});};
+    const ping=(active:boolean)=>{void fetch('/api/square',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'presence',active,expectedCityId:cityId,expectedNationId:nationId}),keepalive:true}).catch(()=>{});};
     const visibility=()=>ping(!document.hidden);
     const leave=()=>ping(false);visibility();document.addEventListener('visibilitychange',visibility);window.addEventListener('pagehide',leave);
     const timer=setInterval(visibility,30000);
     return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('pagehide',leave);ping(false);};
   },[enabled,presence,nationId,cityId,presenceAllowed]);
-  async function command(payload:unknown,posted=false){
+  async function command(payload:Record<string,unknown>,posted=false){
     if(!enabled||busy||(!posted&&uncertain))return;setBusy(true);setError('');const current=generation.current;
-    try{const response=await fetch('/api/square',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await response.json() as SquareState & {error?:string};if(current!==generation.current)return;if(!response.ok){if(posted&&response.status<500){intent.current=null;setUncertain(false);}throw Error(data.error);}setState(data);if(posted){intent.current=null;setUncertain(false);setText('');}}
+    try{const response=await fetch('/api/square',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,expectedNationId:nationId})});const data=await response.json() as SquareState & {error?:string};if(current!==generation.current)return;if(!response.ok){if(posted&&response.status<500){intent.current=null;setUncertain(false);}throw Error(data.error);}if(data.nationId!==nationId)throw Error('Citizenship changed. Refresh your citizen before reopening chat.');setState(data);if(posted){intent.current=null;setUncertain(false);setText('');}}
     catch(e){if(current===generation.current)setError(e instanceof Error?e.message:'Connection uncertain. Retry the same message.');}finally{if(current===generation.current)setBusy(false);}
   }
   const sendingReason=busy?'An action is being saved. Please wait.':!validSquareText(text)?'Enter a plain-text message of 1–280 characters.':null;

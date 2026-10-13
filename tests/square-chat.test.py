@@ -10,8 +10,8 @@ class SquareTests(unittest.TestCase):
   for schema in SCHEMAS:self.db.execute(schema)
   self.db.executemany('INSERT INTO square_handles VALUES (?,?)',[('alice','Citizen-one'),('bob','Citizen-two'),('carl','Citizen-three')]);self.db.commit()
  def tearDown(self):self.db.close();self.tmp.cleanup()
- def post(self,id,user='alice',now=10000,body='hello',db=None):
-  connection=db or self.db;count=connection.execute(POST,(id,body,now,user,id,user,now-10,user,now-3600)).rowcount;connection.commit();return count
+ def post(self,id,user='alice',now=10000,body='hello',db=None,nation=None):
+  connection=db or self.db;count=connection.execute(POST,(id,body,now,user,nation or ('korund' if user=='carl' else 'kindle'),id,user,now-10,user,now-3600)).rowcount;connection.commit();return count
  def test_rate_boundary_and_deleted_messages_count(self):
   self.assertEqual(self.post('one'),1);self.assertEqual(self.post('two',now=10009),0)
   self.db.execute("UPDATE square_messages SET deleted=1,body='[removed]' WHERE id='one'")
@@ -25,6 +25,9 @@ class SquareTests(unittest.TestCase):
  def test_requires_enrollment_and_server_nation(self):
   self.assertEqual(self.post('visitor','visitor'),0);self.assertEqual(self.post('unknown','unknown'),0)
   self.post('carl','carl');self.assertEqual(self.db.execute('SELECT nation_id FROM square_messages').fetchone()[0],'korund')
+ def test_captured_nation_cannot_follow_a_concurrent_citizenship_change(self):
+  self.db.execute("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'");self.db.commit()
+  self.assertEqual(self.post('stale',nation='kindle'),0);self.assertEqual(self.post('current',nation='korund'),1)
  def test_delete_ownership(self):
   self.post('one');self.assertEqual(self.db.execute("UPDATE square_messages SET deleted=1 WHERE id='one' AND user_id='bob'").rowcount,0)
   self.assertEqual(self.db.execute("UPDATE square_messages SET deleted=1 WHERE id='one' AND user_id='alice'").rowcount,1)

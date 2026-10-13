@@ -8,7 +8,7 @@ export const squareSchema = [
 ];
 export const postSquareSql = `INSERT INTO square_messages(id,user_id,nation_id,body,posted_at)
 SELECT ?, clerk_user_id, nation_id, ?, ? FROM citizens
-WHERE clerk_user_id=? AND nation_id IS NOT NULL
+WHERE clerk_user_id=? AND nation_id=?
 AND NOT EXISTS (SELECT 1 FROM square_messages WHERE id=?)
 AND NOT EXISTS (SELECT 1 FROM square_messages WHERE user_id=? AND posted_at>?)
 AND (SELECT COUNT(*) FROM square_messages WHERE user_id=? AND posted_at>?)<20`;

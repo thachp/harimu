@@ -85,10 +85,10 @@ test('petitions expose only own history and bind request replays to the account'
 
 test('chat shares pseudonymous nation messages but keeps ownership, identity and presence private', async t => {
   const r = await fixture(t), aliceId = randomUUID(), bobId = randomUUID();
-  assert.equal((await r.call('square', 'alice', { action: 'post', id: aliceId, text: 'Alice shared fixture message' })).status, 200);
-  assert.equal((await r.call('square', 'bob', { action: 'post', id: bobId, text: 'Bob shared fixture message', user_id: 'alice' })).status, 200);
-  assert.equal((await r.call('square', 'bob', { action: 'post', id: aliceId, text: 'Alice shared fixture message' })).status, 409);
-  assert.equal((await r.call('square', 'alice', { action: 'post', id: aliceId, text: 'Alice shared fixture message' })).status, 200);
+  assert.equal((await r.call('square', 'alice', { action: 'post', expectedNationId:'kindle', id: aliceId, text: 'Alice shared fixture message' })).status, 200);
+  assert.equal((await r.call('square', 'bob', { action: 'post', expectedNationId:'kindle', id: bobId, text: 'Bob shared fixture message', user_id: 'alice' })).status, 200);
+  assert.equal((await r.call('square', 'bob', { action: 'post', expectedNationId:'kindle', id: aliceId, text: 'Alice shared fixture message' })).status, 409);
+  assert.equal((await r.call('square', 'alice', { action: 'post', expectedNationId:'kindle', id: aliceId, text: 'Alice shared fixture message' })).status, 200);
   const verify = async () => {
     for (const [user, own] of [['alice', aliceId], ['bob', bobId]]) {
       const response = await r.call('square', user); privateResponse(response);
@@ -103,13 +103,13 @@ test('chat shares pseudonymous nation messages but keeps ownership, identity and
     }
   };
   await verify(); r.reopen(); await verify();
-  assert.equal((await r.call('square', 'bob', { action: 'delete', id: aliceId })).status, 404);
+  assert.equal((await r.call('square', 'bob', { action: 'delete', expectedNationId:'kindle', id: aliceId })).status, 404);
   await r.call('square', 'alice', { action: 'presence', active: true, user_id: 'bob' });
   const presence = await r.call('square', 'bob'); assert.equal(presence.data.present, 1);
   assert.ok(!('users' in presence.data));
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
   const separated = await r.call('square', 'bob'); assert.deepEqual(separated.data.messages, []); assert.equal(separated.data.present, 0);
-  await r.call('square', 'bob', { action: 'post', id: randomUUID(), text: 'Korund fixture message', nation_id: 'kindle' });
+  await r.call('square', 'bob', { action: 'post', expectedNationId:'korund', id: randomUUID(), text: 'Korund fixture message', nation_id: 'kindle' });
   assert.equal((await r.call('square', 'alice')).data.messages.length, 2);
   assert.equal((await r.call('square', null)).status, 401);
 });
@@ -154,7 +154,7 @@ test('unverified Tier 0 retains work, market, chat, private drafts and noncounte
   const listingId = randomUUID();
   assert.equal((await r.call('citizen', 'alice', { action: 'create-listing', requestId: listingId, item: 'food', quantity: 1, unitMinor: 100 })).status, 200);
   assert.equal((await r.call('citizen', 'alice', { action: 'cancel-listing', requestId: randomUUID(), listingId })).status, 200);
-  assert.equal((await r.call('square', 'alice', { action: 'post', id: randomUUID(), text: 'Tier 0 public chat' })).status, 200);
+  assert.equal((await r.call('square', 'alice', { action: 'post', expectedNationId:'kindle', id: randomUUID(), text: 'Tier 0 public chat' })).status, 200);
   assert.equal((await r.call('citizen', 'alice')).data.plan.note, 'Tier 0 draft');
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS count FROM government_petition_eligibility').first()).count, 0);
 });

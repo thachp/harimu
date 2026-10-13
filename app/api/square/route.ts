@@ -26,6 +26,8 @@ export async function POST(request:Request) {
   let body: Record<string,unknown>;
   try { const reader=request.body?.getReader();if(!reader)throw Error();const chunks:Uint8Array[]=[];let size=0;for(;;){const part=await reader.read();if(part.done)break;size+=part.value.byteLength;if(size>4096){await reader.cancel();throw Error();}chunks.push(part.value);}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}const raw=new TextDecoder().decode(bytes);const parsed=JSON.parse(raw);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error();body=parsed; }catch{return privateResponse({error:'Invalid request.'},400);}
   const {db,userId,nationId,now}=ctx;
+  if((body.action==='post'||body.action==='delete')&&typeof body.expectedNationId!=='string')return privateResponse({error:'Refresh the conversation before submitting a nation-scoped command.'},400);
+  if(body.expectedNationId!==undefined&&body.expectedNationId!==nationId)return privateResponse({error:'Citizenship changed. Refresh your citizen before reopening the conversation.'},409);
   if(body.action==='presence') {
     if(typeof body.active!=='boolean')return privateResponse({error:'Invalid presence choice.'},400);
     const location=await readCityLocation(db,userId,nationId,now);
@@ -35,7 +37,7 @@ export async function POST(request:Request) {
     else await db.prepare('DELETE FROM square_presence WHERE user_id=?').bind(userId).run();
   } else if(body.action==='delete') {
     if(typeof body.id!=='string'||!uuidPattern.test(body.id))return privateResponse({error:'Invalid message.'},400);
-    const result=await db.prepare('UPDATE square_messages SET deleted=1,body=? WHERE id=? AND user_id=? AND nation_id=?').bind('[removed]',body.id.toLowerCase(),userId,nationId).run();
+    const result=await db.prepare('UPDATE square_messages SET deleted=1,body=? WHERE id=? AND user_id=? AND nation_id=? AND EXISTS(SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id=?)').bind('[removed]',body.id.toLowerCase(),userId,nationId,userId,nationId).run();
     if(!result.meta.changes)return privateResponse({error:'Message unavailable.'},404);
   } else if(body.action==='post') {
     if(typeof body.id!=='string'||!uuidPattern.test(body.id)||!validSquareText(body.text))return privateResponse({error:'Use 1–280 plain-text characters and a valid request ID.'},400);
@@ -45,10 +47,14 @@ export async function POST(request:Request) {
       if(existing.user_id!==userId||existing.nation_id!==nationId||existing.body!==text||existing.deleted)return privateResponse({error:'Request already used.'},409);
     } else {
       await db.prepare('INSERT OR IGNORE INTO square_handles(user_id,handle) VALUES (?,?)').bind(userId,`Citizen-${crypto.randomUUID().replaceAll('-','').slice(0,16)}`).run();
-      const result=await db.prepare(postSquareSql).bind(id,text,now,userId,id,userId,now-10,userId,now-3600).run();
+      const result=await db.prepare(postSquareSql).bind(id,text,now,userId,nationId,id,userId,now-10,userId,now-3600).run();
       if(!result.meta.changes) {
         const replay=await db.prepare('SELECT user_id,body,nation_id,deleted FROM square_messages WHERE id=?').bind(id).first<{user_id:string;body:string;nation_id:string;deleted:number}>();
-        if(!replay||replay.user_id!==userId||replay.body!==text||replay.nation_id!==nationId||replay.deleted)return privateResponse({error:'Wait 10 seconds between messages; limit 20 per hour.'},429);
+        if(!replay||replay.user_id!==userId||replay.body!==text||replay.nation_id!==nationId||replay.deleted){
+          const current=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>();
+          if(current?.nation_id!==nationId)return privateResponse({error:'Citizenship changed. Refresh your citizen before reopening the conversation.'},409);
+          return privateResponse({error:'Wait 10 seconds between messages; limit 20 per hour.'},429);
+        }
       }
     }
   } else return privateResponse({error:'Unknown action.'},400);
