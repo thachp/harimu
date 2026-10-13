@@ -62,7 +62,7 @@ export const inventoryViewSql = `CREATE VIEW IF NOT EXISTS citizen_inventory_bal
     UNION SELECT buyer_id AS clerk_user_id,item FROM player_fills
   ) c`;
 export const merchantViewSql = `CREATE VIEW IF NOT EXISTS merchant_inventory_balances AS
-  SELECT m.*, m.initial_stock - COALESCE((SELECT SUM(quantity_delta)
+  SELECT m.*, m.initial_stock + CASE WHEN m.item='food' THEN COALESCE((SELECT SUM(food_quantity) FROM government_policy_executions),0) ELSE 0 END - COALESCE((SELECT SUM(quantity_delta)
     FROM citizen_economy_events WHERE item = m.item AND kind IN ('buy','sell')), 0) AS stock
   FROM market_items m`;
 export const merchantCashSql = `CREATE VIEW IF NOT EXISTS merchant_cash_balance AS

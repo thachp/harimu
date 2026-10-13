@@ -180,3 +180,23 @@ test('legacy and foreign eligibility receipts do not enter counted petition revi
   assert.match(response.data.government.petitions.find(p => p.requestId === legacy).reason, /not counted/);
   assert.match((await r.call('citizen', 'bob')).data.government.petitions.find(p => p.requestId === foreign).reason, /not counted/);
 });
+
+test('previous-day legacy review remains historical and cannot drive current government priority', async t => {
+  const r = await fixture(t);
+  const period = Math.floor(r.now / 86400000) * 86400 - 86400;
+  const historical = { nationId: 'kindle', mode: 'rule-bound simulation', roles: [],
+    availableBudgetMinor: 999999, influenceSummary: 'Legacy fixture',
+    decision: { title: 'Legacy workplace priority', topic: 'work', proposedSpendMinor: 99999, reason: 'Unverified legacy petitions.' } };
+  await r.db.prepare('INSERT INTO government_reviews VALUES (?,?,?,?,?,?)')
+    .bind('kindle', period, period + 86401, 'work', 100, JSON.stringify(historical)).run();
+  for (const user of ['alice', 'bob']) {
+    const response = await r.call('citizen', user);
+    assert.equal(response.data.government.review.active, false);
+    assert.equal(response.data.government.decision.topic, 'food');
+    assert.ok(!response.data.government.decision.reason.includes('Unverified legacy petitions'));
+    privateResponse(response);
+  }
+  r.reopen();
+  assert.equal((await r.call('citizen', 'alice')).data.government.review.active, false);
+  assert.equal((await r.db.prepare('SELECT snapshot_json FROM government_reviews').first()).snapshot_json, JSON.stringify(historical));
+});

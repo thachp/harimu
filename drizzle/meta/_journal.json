@@ -29,6 +29,13 @@
       "when": 1791804411457,
       "tag": "0003_absent_magus",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791892718398,
+      "tag": "0004_boring_exiles",
+      "breakpoints": true
     }
   ]
 }

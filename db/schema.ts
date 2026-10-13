@@ -284,3 +284,20 @@ export const governmentPetitionEligibility = sqliteTable('government_petition_el
   clerkUserId: text('clerk_user_id').notNull().references(() => citizens.clerkUserId),
   checkedAt: integer('checked_at').notNull(),
 });
+
+export const worldClock = sqliteTable('world_clock', {
+  id: text('id').primaryKey(), epochSeconds: integer('epoch_seconds').notNull(),
+}, (t) => [check('world_clock_singleton', sql`${t.id}='main'`)]);
+export const worldTicks = sqliteTable('world_ticks', {
+  tick: integer('tick').primaryKey(), scheduledAt: integer('scheduled_at').notNull(),
+  processedAt: integer('processed_at').notNull(), proposalsJson: text('proposals_json').notNull(),
+}, (t) => [check('world_tick_positive', sql`${t.tick}>0`)]);
+export const worldSupply = sqliteTable('world_supply', {
+  id: text('id').primaryKey(), initialFood: integer('initial_food').notNull(), unitMinor: integer('unit_minor').notNull(),
+}, (t) => [check('world_supply_food', sql`${t.initialFood}>=0`),check('world_supply_unit', sql`${t.unitMinor}>0`)]);
+export const governmentPolicyExecutions = sqliteTable('government_policy_executions', {
+  tick: integer('tick').primaryKey().references(()=>worldTicks.tick), nationId: text('nation_id').notNull(),
+  topic: text('topic').notNull(), foodQuantity: integer('food_quantity').notNull(), spendMinor: integer('spend_minor').notNull(),
+  scheduledAt: integer('scheduled_at').notNull(), executedAt: integer('executed_at').notNull(),
+}, (t) => [check('policy_nation',sql`${t.nationId}='kindle'`),check('policy_topic',sql`${t.topic}='food'`),
+  check('policy_quantity',sql`${t.foodQuantity} BETWEEN 1 AND 10`),check('policy_money',sql`${t.spendMinor}=${t.foodQuantity}*100`)]);

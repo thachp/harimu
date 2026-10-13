@@ -37,13 +37,16 @@ export async function localRuntime() {
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
     'lib/government-state.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
-    'app/api/citizen/route.ts', 'app/api/square/route.ts',
+    'lib/world-simulation.ts',
+    'app/api/citizen/route.ts', 'app/api/square/route.ts', 'app/api/world/route.ts',
   ];
   const epoch = Date.UTC(2026, 0, 15, 12); // Fixed UTC day prevents midnight flakiness.
   const clockPath = join(directory, 'fixture-clock.mjs');
-  await writeFile(clockPath, `export class Date extends globalThis.Date {
-    constructor(...args) { super(...(args.length ? args : [${epoch}])); }
-    static now() { return ${epoch}; }
+  await writeFile(clockPath, `let now = ${epoch};
+  export function setNow(value) { now = value; }
+  export class Date extends globalThis.Date {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return now; }
   }`);
   const envPath = join(directory, 'fixture-env.mjs');
   const authPath = join(directory, 'lib/auth.mjs');
@@ -57,11 +60,12 @@ export async function authenticatedUserId(request) { return identities.get(reque
 `);
   const verificationPath = join(directory, 'lib/fixture-verification.mjs');
   await writeFile(verificationPath, `import { readVerification as validate } from './verification.mjs';
+import { Date } from '../fixture-clock.mjs';
 const evidence = new Map();
 let enabled = false;
 export function setVerification(userId, value) { enabled = true; evidence.set(userId, value); }
 export async function readVerification(userId) {
-  return validate(userId, enabled ? { async read(id) { const value = evidence.get(id); if (value instanceof Error) throw value; return value ?? null; } } : undefined, ${epoch});
+  return validate(userId, enabled ? { async read(id) { const value = evidence.get(id); if (value instanceof Error) throw value; return value ?? null; } } : undefined, Date.now());
 }
 `);
   for (const sourcePath of modules) {
@@ -82,11 +86,17 @@ export async function readVerification(userId) {
   }
   const { env } = await import(pathToFileURL(envPath).href);
   env.DB = new LocalD1(path);
+  // Apply the real additive world migration before the production bootstrap,
+  // just as deployed D1 does; this is an isolated consumer-local database.
+  env.DB.sqlite.exec(await readFile(join(root, 'drizzle/0004_boring_exiles.sql'), 'utf8'));
   const { identify } = await import(pathToFileURL(authPath).href);
   const { setVerification } = await import(pathToFileURL(verificationPath).href);
+  const clock = await import(pathToFileURL(clockPath).href);
   const { getDatabase } = await import(pathToFileURL(join(directory, 'lib/db.mjs')).href);
   const citizen = await import(pathToFileURL(join(directory, 'app/api/citizen/route.mjs')).href);
   const square = await import(pathToFileURL(join(directory, 'app/api/square/route.mjs')).href);
+  const world = await import(pathToFileURL(join(directory, 'app/api/world/route.mjs')).href);
+  const simulation = await import(pathToFileURL(join(directory, 'lib/world-simulation.mjs')).href);
   await getDatabase(); // Real additive schema bootstrap and seed initialization.
   const now = new Date(epoch).toISOString();
   await env.DB.batch(['alice', 'bob'].map(user => env.DB.prepare(`INSERT INTO citizens
@@ -97,12 +107,12 @@ export async function readVerification(userId) {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (user) identify(request, user);
-    const handlers = endpoint === 'citizen' ? citizen : square;
+    const handlers = endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : square;
     const response = await handlers[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
   return {
-    call, now: epoch, setVerification, get db() { return env.DB; },
+    call, advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
     reopen() { env.DB.close(); env.DB = new LocalD1(path); },
     async close() { env.DB.close(); await rm(directory, { recursive: true, force: true }); },
   };

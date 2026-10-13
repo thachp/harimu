@@ -1,3 +1,4 @@
+import { advanceWorld } from '@/lib/world-simulation';
 import { getDatabase } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,7 @@ type WorldEventRow = {
 
 export async function GET() {
   const database = await getDatabase();
+  const simulation = await advanceWorld(database);
   const [nationResult, workOrderResult, planningTaskResult, eventResult] = await Promise.all([
     database.prepare('SELECT * FROM nations ORDER BY sort_order').all<NationRow>(),
     database.prepare("SELECT id, nation_id, name, detail, capacity_cost FROM work_orders WHERE status = 'open' ORDER BY sort_order").all<WorkOrderRow>(),
@@ -78,6 +80,7 @@ export async function GET() {
 
   return Response.json(
     {
+      simulation,
       nations: nationResult.results.map((nation) => ({
         id: nation.id,
         name: nation.name,

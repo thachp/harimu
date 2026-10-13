@@ -48,7 +48,8 @@ export const settleSql = `INSERT OR IGNORE INTO shift_settlements
   FROM work_shifts s JOIN shift_rewards r ON r.shift_id = s.id
   WHERE s.id = ? AND s.clerk_user_id = ? AND s.claimed_at IS NULL AND s.completes_at <= ?
     AND r.wage_minor <= (SELECT initial_minor FROM economy_funds WHERE id = 'kindle-employer')
-      - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements), 0)`;
+      - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements), 0)
+      - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions), 0)`;
 export const settledContributionSql = `INSERT INTO work_contributions
   (clerk_user_id, work_order_id, capacity_spent, created_at)
   SELECT clerk_user_id, work_order_id, capacity_spent, ? FROM work_shifts

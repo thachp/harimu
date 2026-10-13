@@ -1,3 +1,4 @@
+import { advanceWorld } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment } from '@/lib/government-state';
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
@@ -111,6 +112,7 @@ export async function GET(request: Request) {
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
+  const simulation = await advanceWorld(database);
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   await recoverCapacity(database, userId, new Date().toISOString(), interval);
   const [profile, plan, itemResult, decision, politicalAction] = await Promise.all([
@@ -137,6 +139,7 @@ export async function GET(request: Request) {
   ]);
 
   return privateJson({
+    simulation,
     verification: await readVerification(userId),
     economy: await readEconomy(database, userId, interval),
     market: await readMarket(database, userId, interval),
@@ -162,6 +165,7 @@ export async function POST(request: Request) {
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
+  await advanceWorld(database);
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   await recoverCapacity(database, userId, new Date().toISOString(), interval);
   let body: Record<string, unknown>;

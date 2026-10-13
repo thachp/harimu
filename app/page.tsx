@@ -1,6 +1,7 @@
 'use client';
 
 import type { VerificationState } from '@/lib/verification';
+import type { SimulationState } from '@/lib/world-simulation';
 
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
@@ -8,7 +9,7 @@ import { useRef } from 'react';
 import { SceneNews } from './world-scene';
 import { GameShell } from './game-shell';
 import { SquareChat } from './square-chat';
-import { DailyBriefing } from './daily-briefing';
+import { DailyLoop } from './daily-loop';
 import { GovernmentPanel } from './government-panel';
 import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
 import { PlayerMarket } from './player-market';
@@ -722,6 +723,7 @@ type CitizenSnapshot = {
   playerMarket?: PlayerMarketState;
   government?: GovernmentSnapshot | null;
   verification?: VerificationState;
+  simulation?: SimulationState;
   demoGovernment?: { period: number; counts: Record<string, number> };
   demoReceipts?: string[];
   demoStarterGranted?: boolean;
@@ -779,6 +781,7 @@ function ClerkCitizenSession({
 }
 
 export default function Home() {
+  const [simulation, setSimulation] = useState<SimulationState | null>(null);
   const [worldNations, setWorldNations] = useState<Nation[]>(fallbackNations);
   const [availableWorkOrders, setAvailableWorkOrders] = useState<WorkOrder[]>(fallbackWorkOrders);
   const [availablePlanningItems, setAvailablePlanningItems] = useState<PlanningTask[]>(fallbackPlanningItems);
@@ -900,14 +903,16 @@ export default function Home() {
         workOrders: WorkOrder[];
         planningTasks: PlanningTask[];
         worldEvents: WorldEvent[];
+        simulation?: SimulationState;
       };
       if (data.nations.length) setWorldNations(data.nations);
       if (data.workOrders.length) setAvailableWorkOrders(data.workOrders);
       if (data.planningTasks.length) setAvailablePlanningItems(data.planningTasks);
       if (data.worldEvents.length) setWorldEvents(data.worldEvents);
+      if (data.simulation) setSimulation(data.simulation);
     }
 
-    void loadWorld();
+    void loadWorld().catch(() => { /* Keep the existing public snapshot when unavailable. */ });
     return () => controller.abort();
   }, []);
 
@@ -925,8 +930,9 @@ export default function Home() {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
           body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
         });
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; profile?: CitizenSnapshot['profile'] };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; profile?: CitizenSnapshot['profile'] };
       if (epoch !== citizenEpoch.current) return;
+        if (result.simulation) setSimulation(result.simulation);
         if (result.shifts) setWorkShifts(result.shifts);
         if (result.economy) setEconomy(result.economy);
         if (result.market) setMarket(result.market);
@@ -1162,6 +1168,7 @@ export default function Home() {
   }
 
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
+    if (snapshot.simulation) setSimulation(snapshot.simulation);
     setVerification(snapshot.verification ?? null);
     setWorkShifts(snapshot.shifts ?? []);
     if (snapshot.market) setMarket(snapshot.market);
@@ -1397,15 +1404,22 @@ export default function Home() {
     setPendingEnrollment(nationId);
   }
 
+  const dailyLoop = citizenNation && <DailyLoop nationName={citizenNation.shortName} supported={citizenNation.id === 'kindle'}
+    localDemo={!clerkConfigured} view={viewMode} economy={economy} market={market} shifts={workShifts} capacity={capacity}
+    jobs={availableWorkOrders.filter(order => !order.nationId || order.nationId === citizenNation.id)}
+    busy={workPending || Boolean(playerCommand)} uncertain={Boolean(marketCommand)} onNavigate={changeView}
+    onStart={id => { const order = availableWorkOrders.find(item => item.id === id); if (order) void commitWork(order); }}
+    onClaim={id => void runWork('claim-work', undefined, id)} onRefresh={() => void runWork('refresh-work')}
+    onBuyFood={quantity => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side: 'buy', item: 'food', quantity })}
+    onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} />;
+
   const citizenScene = <section className={`citizen-scene scene-${viewMode}`} aria-label="Citizen location actions">
     {!citizenNation ? <div className="scene-access"><p>{clerkConfigured && citizenSessionStatus === 'loading' ? 'Loading your citizen…' : 'Choose citizenship to begin your daily life. Explore the world and its national rules before enrolling.'}</p>
       <button type="button" onClick={() => changeView('world')}>Explore nations and enroll</button>
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
+      {viewMode !== 'government' && dailyLoop}
       {viewMode === 'household' && <>
-        <DailyBriefing economy={economy} shifts={workShifts} capacity={capacity} market={market} government={government}
-          citizenNationName={citizenNation.shortName} localDemo={!clerkConfigured} onRefresh={() => void runWork('refresh-work')}
-          onOpenWork={() => changeView('workplace')} onOpenMarket={() => changeView('market')} />
         <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
           <ul>{economy?.inventory.map((entry) => <li key={entry.item}>{entry.item}: {entry.quantity} available</li>)}</ul>
           <p>Listed goods remain reserved at the market. Capacity recovers while you are away.</p>
@@ -1458,7 +1472,7 @@ export default function Home() {
       </>}
       {viewMode === 'government' && <>
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. All government offices are AI/SI controlled in this release.</p>
-        <GovernmentPanel verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
+        <GovernmentPanel simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
         {!government && <p>Policy simulation and petitions are currently available for Kindle, Korund and Aurelle. This nation’s civic implementation is planned.</p>}
         <p>Elections, protests and public opinion systems are planned and will follow each nation’s rules. No election or protest is currently open here.</p>
       </>}
@@ -1466,16 +1480,19 @@ export default function Home() {
   </section>;
 
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
+    {!citizenNation && <p><strong>You are joining as a citizen.</strong> All government offices are AI/SI controlled. Current government is a deterministic simulation, with no live AI model connected.</p>}
     <p>Fictional globe geography · nation rules are fixed. Square ownership and cross-border trade are not simulated yet.</p>
     <div className="game-nation-choices">{worldNations.map(nation => <button key={nation.id} type="button" aria-pressed={selected.id===nation.id} onClick={()=>setSelectedId(nation.id)}>{nation.shortName}</button>)}</div>
     <h2>{selected.name}</h2><p>{selected.motto}</p>
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
+    <p><strong>Playable support:</strong> {selected.id === 'kindle' ? 'Paid work, wages, goods, merchant trades, citizen listings, household meals and petitions.' : ['korund', 'aurelle'].includes(selected.id) ? 'Citizenship, city chat and deterministic government petitions. Paid work and local economies are planned.' : 'Citizenship and city chat. Local jobs, economies and civic actions are planned.'}</p>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" onClick={()=>beginEnrollment(selected.id)}>Enroll in {selected.shortName}</button>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
     <SceneNews events={worldEvents} title="Regional notices" />
   </section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='square' ? <>
+    {dailyLoop}
     <p>{citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     <SquareChat key={`${citizenEpoch.current}:${citizenNationId}`} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
     <SceneNews events={worldEvents} title="City noticeboard" />
@@ -1513,7 +1530,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell view={viewMode} nation={citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell worldClock={simulation?.clock} view={viewMode} nation={citizenNation ?? selected} nations={worldNations} capacity={capacity}
       walletMinor={economy?.walletMinor} inventory={economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
       localDemo={!clerkConfigured} notice={workError ?? governmentError ?? recentAction ?? undefined} panel={gamePanel}

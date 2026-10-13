@@ -189,6 +189,14 @@ async function initialize(database: D1Database) {
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('player-market-v1')"),
     ]);
   }
+  await database.prepare("INSERT OR IGNORE INTO world_supply (id,initial_food,unit_minor) VALUES ('kindle-food-supplier',40,100)").run();
+  const governmentStockInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id='government-stock-v1'").first();
+  if (!governmentStockInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS merchant_inventory_balances'), database.prepare(merchantViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('government-stock-v1')"),
+    ]);
+  }
   // Existing unfinished shifts receive the prototype terms once; completed receipts are not repaid.
   await database.batch(Object.entries(rewards).map(([orderId, reward]) => database.prepare(`
     INSERT OR IGNORE INTO shift_rewards (shift_id, wage_minor, item, quantity)

@@ -29,18 +29,25 @@ services, change credentials, delete data, or deploy unrelated changes.
 2. **Authoritative world and durable simulation.**
    [Architecture](https://docs.harimu.com/tech/architecture/) calls for a separate
    game server, event log, durable jobs and filtered realtime views. Current Vinext
-   handlers write D1 directly and have no continuous shard scheduler or event stream.
+   handlers now persist bounded D1 world ticks and immutable policy-execution receipts,
+   with at most three overdue ticks handled per server visit. There is still no
+   continuous shard scheduler or realtime event stream.
    [Clock](https://docs.harimu.com/systems/world-clock-pacing/) specifies 12× world
-   time and game-day governance; the HUD displays real UTC, while citizen shifts
-   and lazy petition reviews are the implemented timers.
+   time and game-day governance; the HUD now shows a server snapshot of 12× world
+   time. Two-real-hour routine ticks evaluate current observed needs during catch-up,
+   rather than reconstructing historical state. Citizen shifts and petition reviews
+   retain their existing real-time/UTC rules.
 
 3. **AI governance and AI citizens.**
    [Leadership](https://docs.harimu.com/politics/ai-leadership/) defines personas,
    legal-action validation, routine utility decisions and bounded major decisions.
    [Citizens](https://docs.harimu.com/citizens/citizens-daily-loops/) adds deterministic
    AI citizens and distinct human influence. Current government is explicitly a
-   deterministic proposal/review prototype for three nations, with no connected
-   model, personas, AI population, elections, replacement or policy execution.
+   deterministic proposal/review prototype for three nations, plus bounded Kindle
+   food allocations from a finite supplier reserve. Saved allocations debit the
+   finite employer fund shared with wages and replenish merchant stock exactly once.
+   Other nations and policy topics have no economic execution. There is no connected
+   model, personas, AI population, elections or replacement.
    Do not describe it as deployed model AI or add providers/keys without approval.
 
 4. **Nation-specific economy and MVP completion.**
@@ -53,8 +60,10 @@ services, change credentials, delete data, or deploy unrelated changes.
 
 5. **Onboarding and social scope.**
    [Onboarding](https://docs.harimu.com/systems/onboarding/) specifies AI disclosure,
-   nation families, previews and tailored tutorials; current enrollment is a nation
-   dossier and confirmation. [Social](https://docs.harimu.com/systems/social-news-media/)
+   nation families, previews and tailored tutorials; current enrollment now includes current playable support and deterministic
+   government disclosure, alongside the nation dossier and confirmation. A daily-loop
+   guide uses actual balances and timers for paid work, collecting rewards, shopping
+   and Household meals. Broader tutorials and social breadth remain incomplete. [Social](https://docs.harimu.com/systems/social-news-media/)
    specifies city/national/member/DM/global/OOC channels and nation-specific press
    rules. Current chat is a pseudonymous nation feed with local mutes and aggregate
    presence; news is visibly seeded prototype content.
@@ -78,3 +87,7 @@ services, change credentials, delete data, or deploy unrelated changes.
 No gameplay, authentication, credentials, hosting or production data was changed
 by this alignment review. The current build is a tested prototype, not the full
 v0.7 MVP described by the official documentation.
+
+Redis Cloud TLS is enabled, but authenticated connectivity is unverified and the
+current Sites runtime contract allows HTTP external connections only. See
+[Redis runtime compatibility](REDIS_RUNTIME.md); gameplay does not depend on Redis.

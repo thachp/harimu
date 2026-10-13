@@ -3,12 +3,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { GlobeHemisphereWest, House, Hammer, Storefront, Bank, UsersThree, X, Coins, Lightning, Bread, Cube, BookOpen, Compass, CaretRight } from '@phosphor-icons/react';
 import GameViewport from './game-viewport';
+import type { WorldClock } from '@/lib/world-simulation';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { LocationId, ViewportSelection } from '@/lib/game-viewport';
 import './game-shell.css';
 
 type GameNation = { id: string; name: string; capital?: string; color?: string };
 export type GameShellProps = {
+  worldClock?: WorldClock;
   view: SceneView;
   nation: GameNation;
   nations: readonly GameNation[];
@@ -36,7 +38,7 @@ const places = [
 const titles: Record<SceneView, string> = { world: 'World globe', square: 'City square', household: 'Household', workplace: 'Workplace', market: 'Market quarter', government: 'Government district', nation: 'Nation institutions' };
 function clockLabel(now: number) { return new Date(now).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' }); }
 
-export function GameShell({ view, nation, nations, capacity, walletMinor, inventory, shiftSummary, localDemo, notice, panel, onNavigate, onSelectNation, accountControls, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ worldClock, view, nation, nations, capacity, walletMinor, inventory, shiftSummary, localDemo, notice, panel, onNavigate, onSelectNation, accountControls, contextTitle, contextItems = [] }: GameShellProps) {
   const [now, setNow] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
@@ -68,7 +70,7 @@ export function GameShell({ view, nation, nations, capacity, walletMinor, invent
         <div title="Available materials"><Cube size={18} /><strong>{inventory?.materials ?? '—'}</strong><span>Mat.</span></div>
         <div title="Available knowledge"><BookOpen size={18} /><strong>{inventory?.knowledge ?? '—'}</strong><span>Know.</span></div>
       </div>
-      <div className="game-account"><span className="game-clock">{now ? clockLabel(now) : '--:--'} <small>UTC · REAL TIME</small></span>{accountControls}</div>
+      <div className="game-account"><span className="game-clock" title={worldClock ? `Server snapshot · 12× world time · ${worldClock.pendingTicks} ticks pending · advances on visits` : 'Real UTC time'}>{worldClock ? `Day ${worldClock.gameDay} · 12×` : now ? clockLabel(now) : '--:--'} <small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : 'UTC · REAL TIME'}</small></span>{accountControls}</div>
     </header>
     <div className="game-location-banner"><Compass size={18} /><div><strong>{view === 'world' ? 'Harimu · Living world' : (nation.capital ?? `${nation.name} · City district`)}</strong><span>{view === 'world' ? 'Fictional nations · Drag to rotate · Select to inspect' : 'Select a building to enter · Drag to explore'}</span></div></div>
     {shiftSummary && <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong><span>{remaining === null ? 'Active shift' : remaining === 0 ? 'Ready to claim' : `${remaining} min remaining`}</span><CaretRight /></button>}
