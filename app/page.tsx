@@ -357,7 +357,7 @@ const fallbackPlanningItems: PlanningTask[] = [
 ];
 
 const fallbackWorldEvents: WorldEvent[] = [
-  { id: 1, occurredAt: 'Today · 20:00', headline: 'Capacity grant closes', kind: 'Work', detail: 'Forgehaven closes allocations for tomorrow’s savanna harvest.', location: 'Forgehaven' },
+  { id: 1, occurredAt: 'Today · 20:00', headline: 'Example: harvest sign-up deadline', kind: 'Work', detail: 'Sample story: workers reserve energy for tomorrow’s savanna harvest. This is not an active job deadline.', location: 'Forgehaven' },
   { id: 2, occurredAt: 'Day 43 · 09:00', headline: 'District assembly session', kind: 'Civic', detail: 'The eastern waterworks proposal enters public debate.', location: 'Forgehaven East' },
   { id: 3, occurredAt: 'Day 45 · 18:00', headline: 'Trade corridor vote', kind: 'Ballot', detail: 'Citizens decide the Kindle-Confluence corridor mandate.', location: 'Kindle Assembly' },
 ];
@@ -1242,6 +1242,7 @@ export default function Home() {
       const result = await response.json() as {
         error?: string;
         nationId?: string;
+        capacity?: number | null;
         citizenship?: CitizenshipStatus | null;
         economy?: Economy;
         market?: MarketState;
@@ -1256,6 +1257,11 @@ export default function Home() {
         return;
       }
 
+      if (typeof result.capacity !== 'number' || !Number.isFinite(result.capacity)) {
+        setEnrollmentError('Citizenship recorded, but Work Capacity could not be loaded. Refresh your citizen account before starting work.');
+        return;
+      }
+      setCapacity(result.capacity);
       setCitizenNationId(result.nationId);
       setSelectedId(result.nationId);
       setKorundPlan(result.korundPlan ?? null);
@@ -1391,9 +1397,9 @@ export default function Home() {
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
       {viewMode === 'government' && <>
-        <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. All government offices are AI/SI controlled in this release.</p>
+        <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
         <GovernmentPanel simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
-        {!government && <p>Policy previews are supported for Kindle, Korund and Aurelle; counted petitions require Tier 1 verification. This nation’s civic implementation is planned.</p>}
+        {!government && <p>Kindle, Korund and Aurelle have government policy previews. Other nations’ civic play is unfinished. A missing preview here may still be loading; it does not mean your nation has no government. Petitions need a verified phone number before they can count, and phone verification is not available yet.</p>}
         <p>Elections, protests and public opinion systems are planned and will follow each nation’s rules. No election or protest is currently open here.</p>
       </>}
     </>}
@@ -1404,8 +1410,8 @@ export default function Home() {
     {guestEntry}
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
-    <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Chat · Government preview; economy planned'}</p>
-    <details><summary>Rules and limits</summary><p>Fixed nation rules; all offices use deterministic AI/SI simulation. Phone verification is unavailable, so counted petitions are closed. Territory ownership and foreign trade are planned.</p></details>
+    <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>
+    <details><summary>Rules and limits</summary><p>Each nation keeps its own rules. Computer-controlled leaders (AI/SI) follow fixed game rules: the same situation produces the same decision. No live AI model is connected. Petitions require a verified phone number to count, but phone verification has not been set up yet, so petition submission is unavailable. Territory ownership and foreign trade are not built yet.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" disabled={clerkConfigured && ['loading','error'].includes(citizenSessionStatus)} onClick={()=>beginEnrollment(selected.id)}>Choose citizenship · {selected.shortName}</button>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>

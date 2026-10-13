@@ -66,7 +66,7 @@ export function GameViewport({ mode, nationId, nations, selectedNationId, nation
     Object.assign(labelLayer.style, { position: 'absolute', inset: '0', pointerEvents: 'none', overflow: 'hidden' });
     container.appendChild(labelLayer);
     const anchors = mode === 'city'
-      ? world.buildings.map(building => ({ object: building.object, label: nationId === 'korund' && ['market','workplace'].includes(building.location) ? locationSelection(building.location, nationId).label : building.label, selection: locationSelection(building.location, nationId) }))
+      ? world.buildings.map(building => ({ object: building.object, label: building.label, selection: locationSelection(building.location, nationId) }))
       : world.selectables.filter(object => object.userData.kind === 'nation').map(object => ({ object, label: String(object.userData.label), selection: { kind: 'nation' as const, label: String(object.userData.label), detail: String(object.userData.detail), nationId: String(object.userData.nationId) } }));
     const labels = anchors.map(anchor => {
       const button = document.createElement('button');

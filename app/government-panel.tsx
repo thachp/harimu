@@ -16,9 +16,9 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
   if (!snapshot) return null;
   return <section className="citizen-market" aria-label="Government decisions and citizen petitions" aria-busy={pending}>
     <h3>Government and citizen voice</h3>
-    <p>Rule-bound simulation · all government offices are controlled by AI/SI roles for the first release. These decisions use deterministic rules, not a connected AI model.</p>
+    <p>Computer-controlled leaders hold all government offices. AI/SI means artificial or simulated intelligence. Here they follow fixed game rules: the same situation produces the same decision. No live AI model is connected.</p>
     {localDemo && <p>Local demo · petitions and decisions stay in this browser.</p>}
-    {!localDemo && <section aria-label="Civic verification"><h4>Counted civic actions · Tier 1</h4><p role="status">{verification?.reason ?? 'Checking civic eligibility…'}</p></section>}
+    {!localDemo && <section aria-label="Civic verification"><h4>Phone verification for petitions</h4><p>Petitions need a verified phone number to help protect each citizen’s voice. Phone verification is not available yet, so you can read government decisions but cannot submit a counted petition.</p><p role="status">{verification?.reason ?? 'Checking whether your petitions can count…'}</p></section>}
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> · {role.controller}</li>)}</ul>
     {!localDemo && simulation && <section aria-label="Durable world simulation">
       <h4>World day {simulation.clock.gameDay} · 12× time</h4>

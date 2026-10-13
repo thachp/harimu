@@ -157,3 +157,16 @@ test('future enrollment dates and corrupt persisted counters cannot unlock a gra
   assert.equal((await citizen(r,'alice')).nation_id,'kindle');
  }
 });
+
+test('enrollment returns authoritative capacity for first citizenship, replay, change and stale refusal',async t=>{
+  const r=await fixture(t);
+  const first=await r.call('citizen','capacity-new',enroll('kindle'));
+  assert.equal(first.status,200);assert.equal(first.data.capacity,18);
+  await r.db.prepare('UPDATE citizens SET capacity=7 WHERE clerk_user_id=?').bind('capacity-new').run();
+  const replay=await r.call('citizen','capacity-new',enroll('kindle'));
+  assert.equal(replay.status,200);assert.equal(replay.data.capacity,7);
+  const changed=await r.call('citizen','capacity-new',enroll('korund','kindle'));
+  assert.equal(changed.status,200);assert.equal(changed.data.capacity,7);
+  const stale=await r.call('citizen','capacity-new',enroll('aurelle','kindle'));
+  assert.equal(stale.status,409);assert.equal(stale.data.capacity,7);
+});

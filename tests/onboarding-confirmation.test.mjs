@@ -10,17 +10,18 @@ let node;const find=current=>{if(ts.isFunctionDeclaration(current)&&current.name
 find(tree);assert.ok(node);
 const js=ts.transpileModule(node.getText(tree),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
 function client(fetch){
-  const state={CitizenNationId:'kindle',PendingEnrollment:'korund'},ref=current=>({current});
+  const state={CitizenNationId:'kindle',PendingEnrollment:'korund',Capacity:7},ref=current=>({current});
   const bindings={clerkConfigured:true,citizenSessionStatus:'ready',citizenNation:{id:'kindle'},citizenNationId:'kindle',
     enrollmentPending:false,enrollmentLock:ref(false),enrollmentExpectedNation:'kindle',workLock:ref(false),marketIntent:ref(null),playerIntent:ref(null),korundIntent:ref(null),aurelleIntent:ref(null),
     citizenEpoch:ref(1),fetch,changeView:view=>{state.Scene=view;},closeEnrollmentReview:()=>{state.PendingEnrollment=null;}};
-  for(const name of ['EnrollmentError','EnrollmentPending','CitizenNationId','SelectedId','KorundPlan','AurellePlan',
+  for(const name of ['Capacity','EnrollmentError','EnrollmentPending','CitizenNationId','SelectedId','KorundPlan','AurellePlan',
     'CitizenshipStatus','Economy','Market','PlayerMarket','PendingEnrollment'])bindings[`set${name}`]=value=>{state[name]=value;};
   return {state,bindings,confirm:new Function(...Object.keys(bindings),`${js};return confirmEnrollment;`)(...Object.values(bindings))};
 }
 
 test('lost enrollment response retries original expected citizenship and records one change, with reopen recovery',async t=>{
   const r=await localRuntime();t.after(()=>r.close());let attempts=0;const sent=[];
+  await r.db.prepare('UPDATE citizens SET capacity=7 WHERE clerk_user_id=?').bind('alice').run();
   const c=client(async(_url,options)=>{
     const command=JSON.parse(options.body);sent.push(command);
     assert.equal(command.expectedNationId,'kindle');
@@ -29,12 +30,12 @@ test('lost enrollment response retries original expected citizenship and records
     return Response.json(response.data,{status:response.status});
   });
   await c.confirm({id:'korund'});
-  assert.ok(c.state.EnrollmentError);assert.equal(c.state.CitizenNationId,'kindle');
+  assert.ok(c.state.EnrollmentError);assert.equal(c.state.CitizenNationId,'kindle');assert.equal(c.state.Capacity,7);
   assert.equal(c.state.EnrollmentPending,false);
   assert.equal((await r.call('citizen','alice')).data.profile.nationId,'korund');
   await c.confirm({id:'korund'});
   assert.equal(attempts,2);assert.deepEqual(sent[0],sent[1]);assert.equal(c.state.CitizenNationId,'korund');
-  assert.equal(c.state.PendingEnrollment,null);
+  assert.equal(c.state.PendingEnrollment,null);assert.equal(c.state.Capacity,7);
   assert.equal(c.state.Scene,'workplace');assert.equal(c.bindings.enrollmentLock.current,false);
   r.reopen();
   const row=await r.db.prepare('SELECT nation_id,nation_changes FROM citizens WHERE clerk_user_id=?').bind('alice').first();
@@ -45,8 +46,8 @@ test('late enrollment response cannot replace the next account and pending econo
   let resolve;const response=new Promise(done=>{resolve=done;});const c=client(()=>response);
   const pending=c.confirm({id:'korund'});c.bindings.citizenEpoch.current++;
   c.state.CitizenNationId='aurelle';c.state.PendingEnrollment=null;
-  resolve(Response.json({ok:true,nationId:'korund',citizenship:{changesRemaining:0}}));await pending;
-  assert.equal(c.state.CitizenNationId,'aurelle');assert.equal(c.state.PendingEnrollment,null);
+  resolve(Response.json({ok:true,nationId:'korund',capacity:7,citizenship:{changesRemaining:0}}));await pending;
+  assert.equal(c.state.CitizenNationId,'aurelle');assert.equal(c.state.PendingEnrollment,null);assert.equal(c.state.Capacity,7);
   let calls=0;const blocked=client(async()=>{calls++;return Response.json({ok:true});});
   blocked.bindings.aurelleIntent.current={action:'aurelle-buy-food'};
   await blocked.confirm({id:'korund'});assert.equal(calls,0);assert.match(blocked.state.EnrollmentError,/pending economic action/);
@@ -58,7 +59,7 @@ test('repeated confirmation shares the pending lock and pending signup cannot su
   const c=client(()=>{calls++;return response;});
   const first=c.confirm({id:'korund'});
   const repeated=c.confirm({id:'korund'});
-  finish(Response.json({ok:true,nationId:'korund',citizenship:{changesRemaining:0}}));
+  finish(Response.json({ok:true,nationId:'korund',capacity:7,citizenship:{changesRemaining:0}}));
   await Promise.all([first,repeated]);
   assert.equal(calls,1);
   assert.equal(c.bindings.enrollmentLock.current,false);

@@ -98,7 +98,7 @@ export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName,
       <p id="enrollment-rule">{changing
         ? `Moving from ${currentNationName ?? 'your current nation'} uses your one free change, available within 48 real hours before any political action. Existing balances stay in their original currencies; they are not converted.`
         : 'You may change nation once within your first 48 real hours, before any political action.'} After {changing ? 'this change' : 'the grace period or your first political action'}, your citizenship is locked. Further immigration is not implemented.</p>
-      <p className="enrollment-disclosure">Government offices are AI/SI controlled; this release uses deterministic simulation.</p>
+      <p className="enrollment-disclosure">Computer-controlled leaders hold all government offices. AI/SI means artificial or simulated intelligence. In this preview, fixed game rules choose their actions; no live AI model is connected.</p>
       <dl><div><dt>Government</dt><dd>{nation.government}</dd></div><div><dt>Economy</dt><dd>{nation.economy}</dd></div><div><dt>Currency</dt><dd>{nation.currency}</dd></div></dl>
       {atOath && (session === 'anonymous' ? <div className={`enrollment-session ${styles.session}`}><p>Sign in to record your citizenship. Your nation choice stays here for review.</p>{signInControl}</div>
         : session === 'loading' ? <p role="status">Loading your citizen account…</p>

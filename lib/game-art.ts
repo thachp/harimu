@@ -5,10 +5,19 @@ export type WorldBuilding = { location: CityLocation; label: string; position: T
 export type WorldArt = { group: THREE.Group; selectables: THREE.Object3D[]; buildings: WorldBuilding[]; bounds: number };
 
 type Palette = { wall: number; roof: number; trim: number; stone: number };
-const palettes: Record<string, Palette> = {
-  kindle: { wall: 0xa76643, roof: 0x343e43, trim: 0xcda65b, stone: 0x555c5d },
-  korund: { wall: 0x929890, roof: 0x465454, trim: 0xaabbb3, stone: 0x687774 },
-  aurelle: { wall: 0xe8e2ca, roof: 0x7eaaa8, trim: 0xd0ad54, stone: 0xc9c9b9 },
+type CapitalProfile = { capital: string; institution: string; palette: Palette; angle: number; spacing: number; riverX: number; landmark: 'fountain' | 'spire' | 'forum' | 'beacon' };
+// Visual interpretations of the fictional capitals, not authoritative city maps.
+export const capitalProfiles: Record<string, CapitalProfile> = {
+  kindle: { capital: 'Forgehaven', institution: 'Assembly hall', palette: { wall: 0xa76643, roof: 0x343e43, trim: 0xcda65b, stone: 0x555c5d }, angle: 0, spacing: 1, riverX: 8, landmark: 'fountain' },
+  confluence: { capital: 'Meetwater', institution: 'Party congress', palette: { wall: 0x9abcc4, roof: 0x315e78, trim: 0x579ab5, stone: 0x6b8389 }, angle: .1, spacing: .94, riverX: -8, landmark: 'forum' },
+  meridian: { capital: 'Steamgate', institution: 'Party-state offices', palette: { wall: 0xad969f, roof: 0x574659, trim: 0xb88cac, stone: 0x716975 }, angle: -.12, spacing: .92, riverX: 8, landmark: 'beacon' },
+  korund: { capital: 'Stonehearth', institution: 'Planning bureau', palette: { wall: 0x929890, roof: 0x465454, trim: 0xaabbb3, stone: 0x687774 }, angle: 0, spacing: .88, riverX: -8, landmark: 'spire' },
+  aurelle: { capital: 'Highspire', institution: 'Royal court', palette: { wall: 0xe8e2ca, roof: 0x7eaaa8, trim: 0xd0ad54, stone: 0xc9c9b9 }, angle: .18, spacing: .9, riverX: 8, landmark: 'spire' },
+  ilmar: { capital: 'Mirrorhall', institution: 'Canon hall', palette: { wall: 0xe4d9b5, roof: 0x8b7840, trim: 0xe0bb59, stone: 0xa69f82 }, angle: -.18, spacing: .86, riverX: -8, landmark: 'beacon' },
+  hoarvale: { capital: 'Rimehall', institution: 'Moot hall', palette: { wall: 0xb4c8c9, roof: 0x42747e, trim: 0x8ac1c6, stone: 0x71888d }, angle: .08, spacing: 1.04, riverX: 8, landmark: 'fountain' },
+  varkand: { capital: 'Watchfast', institution: 'Command directorate', palette: { wall: 0x7e8a78, roof: 0x364a43, trim: 0xa6a078, stone: 0x535f59 }, angle: -.08, spacing: 1.02, riverX: -8, landmark: 'spire' },
+  veldwood: { capital: 'Ringhall', institution: 'Grove council', palette: { wall: 0xb1a981, roof: 0x426b42, trim: 0x96b66d, stone: 0x7e8d70 }, angle: .22, spacing: .84, riverX: 8, landmark: 'forum' },
+  fulmara: { capital: 'Arcport', institution: 'Grand Council', palette: { wall: 0xc5b4d1, roof: 0x574075, trim: 0xb598d3, stone: 0x8a8098 }, angle: -.22, spacing: .98, riverX: -8, landmark: 'beacon' },
 };
 const materials = new Map<number, THREE.MeshStandardMaterial>();
 function material(color: number) {
@@ -54,12 +63,13 @@ function facade(group: THREE.Group, p: Palette, w: number, h: number, d: number)
 
 export function createCityWorld(nationId: string): WorldArt {
   materials.clear(); // Each world owns its materials; renderer may dispose the previous world.
-  const key = nationId.toLowerCase(); const p = palettes[key] ?? palettes.kindle;
+  const key = nationId.toLowerCase(); const profile = capitalProfiles[key] ?? capitalProfiles.kindle; const p = profile.palette;
   const group = new THREE.Group(); const selectables: THREE.Object3D[] = []; const buildings: WorldBuilding[] = [];
+  group.userData = { capital: profile.capital, nationId: key, detail: 'Procedural capital illustration' };
   // All land cells are square, with shallow stepped shoreline and river channel.
   for (let x = -12; x < 12; x++) for (let z = -12; z < 12; z++) {
     const edge = Math.max(Math.abs(x + 0.5), Math.abs(z + 0.5));
-    const river = x >= 7 && x <= 8;
+    const river = x >= profile.riverX - 1 && x <= profile.riverX;
     const road = Math.abs(x + 0.5) < 1 || Math.abs(z + 0.5) < 1;
     const plaza = Math.abs(x + 0.5) < 2 && Math.abs(z + 0.5) < 2;
     const water = edge > 10.5 || river;
@@ -68,16 +78,21 @@ export function createCityWorld(nationId: string): WorldArt {
     tile.userData = { kind: 'tile', x, z, label: water ? 'River and coast' : road ? 'City street' : 'City square tile', detail: 'Square terrain cell' }; selectables.push(tile);
   }
   const addBuilding = (location: CityLocation, label: string, x: number, z: number, construct: (g: THREE.Group) => void) => {
-    const building = new THREE.Group(); building.position.set(x, 0.06, z); construct(building);
+    const building = new THREE.Group(); const px = (x * Math.cos(profile.angle) - z * Math.sin(profile.angle)) * profile.spacing;
+    const pz = (x * Math.sin(profile.angle) + z * Math.cos(profile.angle)) * profile.spacing;
+    building.position.set(px, 0.06, pz); building.rotation.y = -profile.angle; construct(building);
     const metadata = { kind: 'building', location, label, detail: `${label} · ${key.charAt(0).toUpperCase() + key.slice(1)}` };
     building.traverse(child => { child.userData = metadata; }); group.add(building); selectables.push(building);
-    buildings.push({ location, label, position: new THREE.Vector3(x, 0, z), object: building });
+    buildings.push({ location, label, position: new THREE.Vector3(px, 0, pz), object: building });
   };
-  addBuilding('square', 'City square', 0, 0, g => {
+  addBuilding('square', `${profile.capital} square`, 0, 0, g => {
     cylinder(g, 0, 0.11, 0, 0.8, 0.9, 0.22, p.stone);
     cylinder(g, 0, 0.35, 0, 0.65, 0.7, 0.22, p.trim);
     cylinder(g, 0, 0.46, 0, 0.54, 0.54, 0.08, 0x588f96);
-    cylinder(g, 0, 0.75, 0, 0.11, 0.16, 0.7, p.stone);
+    if (profile.landmark === 'spire') cylinder(g, 0, 1.1, 0, .04, .22, 1.5, p.trim);
+    else if (profile.landmark === 'beacon') { box(g, 0, 1, 0, .35, 1.2, .35, p.stone); cylinder(g, 0, 1.75, 0, .35, .35, .3, p.trim); }
+    else if (profile.landmark === 'forum') { for (const x of [-.6, .6]) box(g, x, .7, -.5, .25, .9, .25, p.stone); }
+    else cylinder(g, 0, 0.75, 0, 0.11, 0.16, 0.7, p.stone);
     for (const x of [-1.4, 1.4]) { box(g, x, 0.26, 0, 0.24, 0.13, 0.8, 0x765540); box(g, x, 0.12, -0.27, 0.13, 0.25, 0.13, p.stone); box(g, x, 0.12, 0.27, 0.13, 0.25, 0.13, p.stone); }
     box(g, -1.4, 0.85, -1.2, 0.08, 1.7, 0.08, p.trim); box(g, -1.4, 1.2, -1.2, 0.9, 0.55, 0.12, 0x66513b);
   });
@@ -88,14 +103,14 @@ export function createCityWorld(nationId: string): WorldArt {
     box(g, 1.55, 0.16, 0.4, 0.2, 0.4, 2.6, 0x9b7950);
     tree(g, -1.75, -0.6, 0.8);
   });
-  addBuilding('workplace', 'Work yard', -4.5, -4, g => {
+  addBuilding('workplace', key === 'korund' ? 'Assignment board' : `${profile.capital} work yard`, -4.5, -4, g => {
     facade(g, p, 3.1, 1.8, 2.1); roof(g, 3.4, 2.4, 0.7, 1.92, p.roof);
     box(g, -0.9, 2.35, -0.65, 0.5, 1.8, 0.5, p.stone); box(g, -0.9, 3.28, -0.65, 0.65, 0.15, 0.65, p.trim);
     for (let i = 0; i < 3; i++) box(g, 2, 0.25 + i * 0.3, -0.5, 0.9 - i * 0.15, 0.3, 0.8, 0x906c46);
     for (let i = 0; i < 3; i++) cylinder(g, 1.9, 0.27, 0.7 + i * 0.4, 0.2, 0.2, 0.5, p.trim);
     box(g, -0.4, 0.3, 1.5, 1.9, 0.16, 0.5, 0x654b36);
   });
-  addBuilding('market', 'Market stalls', 4, 3.8, g => {
+  addBuilding('market', key === 'korund' ? 'State ration store' : `${profile.capital} market`, 4, 3.8, g => {
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 1.25;
       box(g, x, 0.52, 0, 1.05, 0.65, 0.75, 0x806346);
@@ -105,7 +120,7 @@ export function createCityWorld(nationId: string): WorldArt {
     }
     box(g, 0, 0.08, 0, 4.1, 0.1, 2.1, p.stone);
   });
-  addBuilding('government', 'Civic hall', 3.7, -4.2, g => {
+  addBuilding('government', profile.institution, 3.7, -4.2, g => {
     const aurelle = key === 'aurelle', korund = key === 'korund';
     facade(g, p, 3.3, korund ? 2.5 : 2.1, 2.7);
     box(g, 0, 0.18, 1.65, 3.8, 0.3, 0.65, p.stone); box(g, 0, 0.08, 2, 4.1, 0.16, 0.45, p.stone);
@@ -124,8 +139,8 @@ export function createCityWorld(nationId: string): WorldArt {
     const house = new THREE.Group(); house.position.set(x, 0.06, z); facade(house, p, 1.5, 1.1, 1.3); roof(house, 1.75, 1.5, 0.65, 1.22, p.roof); group.add(house);
   }
   for (let x = -7; x < -3; x++) for (let z = 7; z < 10; z++) { box(group, x + 0.5, 0.04, z + 0.5, 0.9, 0.06, 0.9, 0x7c6449); for (let r = 0; r < 3; r++) box(group, x + 0.5, 0.14, z + 0.2 + r * 0.25, 0.75, 0.16, 0.1, 0xb6ad63); }
-  box(group, 8, 0.1, 0, 3.9, 0.16, 1.8, 0x8d7652);
-  for (let i = -2; i <= 2; i++) { box(group, 6 + i * 0.5, 0.36, 1.1, 0.12, 0.7, 0.12, p.trim); }
+  box(group, profile.riverX, 0.1, 0, 3.9, 0.16, 1.8, 0x8d7652);
+  for (let i = -2; i <= 2; i++) { box(group, profile.riverX - 2 + i * 0.5, 0.36, 1.1, 0.12, 0.7, 0.12, p.trim); }
   for (const [x, z] of [[-9, -8], [-8, -5], [-9, 0], [-9, 7], [5, 8], [6, -8], [6, -6], [-3, 5], [2, 7], [-6, 0]]) tree(group, x, z, 0.8 + (Math.abs(x) % 3) * 0.16);
   for (const [x, z] of [[-1.3, -3], [1.3, 3], [-3, 1.3], [3, -1.3]]) { cylinder(group, x, 0.8, z, 0.035, 0.05, 1.6, p.stone, 5); cylinder(group, x, 1.65, z, 0.16, 0.16, 0.25, p.trim, 6); }
   return { group, selectables, buildings, bounds: 14 };
