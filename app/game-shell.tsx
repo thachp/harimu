@@ -80,7 +80,7 @@ export function GameShell({ worldClock, nextDeadline, view, nation, citizenNatio
   useEffect(() => { document.getElementById('game-details')?.querySelector('.game-inspector-body')?.scrollTo({top:0,left:0}); }, [view,nation.id]);
   const close = () => { setCollapsed(true); setSelection(null); requestAnimationFrame(() => document.getElementById('game-reopen')?.focus()); };
   useEffect(() => {
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape' && !(event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=dialog], .cl-modalContent, .cl-userButtonPopoverCard'))) { setCollapsed(true); setSelection(null); requestAnimationFrame(() => document.getElementById('game-reopen')?.focus()); } };
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape' && !(event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable=false]), dialog, [role=dialog], .cl-modalContent, .cl-userButtonPopoverCard'))) { setCollapsed(true); setSelection(null); requestAnimationFrame(() => document.getElementById('game-reopen')?.focus()); } };
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
   }, [view, onNavigate]);
   const navigate = (next: SceneView) => { setSelection(null); setCollapsed(false); onNavigate(next); };
