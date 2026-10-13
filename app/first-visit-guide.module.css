@@ -10,3 +10,6 @@
 .guide button.primary { background: #d3aa5b; border-color: #d3aa5b; color: #09191d; font-weight: 700; }
 .guide button.primary:hover { background: #e2bd75; }
 @media (max-width: 420px) { .actions button { flex: 1 1 130px; } .guide h2 { font-size: 21px; } }
+.question { display: flex; flex-direction: column; gap: 5px; margin: 14px 0; }
+.question select { min-height: 44px; width: 100%; padding: 9px; border: 1px solid #52665e; border-radius: 3px; background: #15261f; color: #dbe4df; font: inherit; }
+.question select:focus-visible { outline: 3px solid #72c7b9; outline-offset: 3px; }

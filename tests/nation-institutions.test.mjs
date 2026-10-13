@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const viewportStub=`data:text/javascript;base64,${Buffer.from(`import React from ${JSON.stringify(import.meta.resolve('react'))};export default function Viewport(props){return React.createElement('div',{'data-rendered-nation':props.nationId,'data-rendered-mode':props.mode});}`).toString('base64')}`;
+const viewportStub=`data:text/javascript;base64,${Buffer.from(`import React from ${JSON.stringify(import.meta.resolve('react'))};export default function Viewport(props){return React.createElement('div',{'data-rendered-nation':props.nationId,'data-rendered-mode':props.mode,'data-selected-nation':props.selectedNationId,'data-tour-nation':props.cameraTourNationId});}`).toString('base64')}`;
 // Compile actual React components for SSR. Only WebGL is substituted: it cannot
 // initialize on a server, and its received nation/mode remain observable here.
 async function componentModule(path) {
@@ -39,6 +39,14 @@ const noAction=()=>{throw new Error('Inspection must not invoke a citizen comman
 const jobs=[{id:'harvest',name:'Harvest fixture',detail:'Recorded contribution',cost:4,nationId:'kindle'}];
 const props={capacity:18,workOrders:jobs,workPending:false,onWorldView:noAction,
   onHousehold:noAction,onWorkplace:noAction,onCommitWork:noAction};
+
+test('shortlist stays in the existing strip and tour camera focus preserves the inspected nation',()=>{
+  const html=renderToStaticMarkup(React.createElement(GameShell,{view:'world',nation:nations[0],nations,capacity:18,localDemo:false,panel:null,onNavigate:noAction,onSelectNation:noAction,cameraTourNationId:'korund',shortlistIds:['kindle','korund','aurelle'],contextItems:nations.map(n=>({id:n.id,label:n.name,detail:n.capital,selected:n.id==='kindle',onSelect:noAction}))}));
+  assert.match(html,/data-selected-nation="kindle"/);
+  assert.match(html,/data-tour-nation="korund"/);
+  assert.match(html,/Shortlist · /);
+  assert.equal((html.match(/>Suggested<\/small>/g)??[]).length,3);
+});
 
 test('compact institutions renders every inspected nation without a duplicate picker and with coherent headings',()=>{
   for (const nation of nations) {

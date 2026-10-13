@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { NationVignette } from './nation-vignette';
 import type { GuestDemoState, GuestDemoAction } from '@/lib/guest-demo';
 import './guest-demo.css';
 
 export type GuestDemoView = 'household' | 'workplace' | 'market';
 
 /** Parent owns disposable state so collapsing the scene panel preserves examples. */
-export function GuestDemo({ view, onView, onExit, state, onAction }: {
+export function GuestDemo({ view, onView, onExit, state, onAction, nationId = 'kindle' }: {
+  nationId?: string;
   view: GuestDemoView;
   onView: (view: GuestDemoView) => void;
   onExit: () => void;
@@ -30,6 +32,8 @@ export function GuestDemo({ view, onView, onExit, state, onAction }: {
       {([['workplace', 'Work'], ['market', 'Market'], ['household', 'Household']] as const).map(([id, label]) =>
         <button type="button" key={id} aria-pressed={view === id} onClick={() => onView(id)}>{label}</button>)}
     </nav>
+    {view === 'workplace' && <NationVignette nationId={nationId} />}
+    <p>Universal disposable work/food example · sample coins are not any nation’s actual currency.</p>
     <div className="guest-demo-stats" aria-label="Sample resources">
       <span>{state.capacity}/24 sample capacity</span><span>{state.coins} sample coins</span><span>{state.food} sample food</span>
     </div>

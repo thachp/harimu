@@ -4,7 +4,8 @@ import type { VerificationState } from '@/lib/verification';
 import type { SimulationState } from '@/lib/world-simulation';
 
 import { GuestDemo, type GuestDemoView } from './guest-demo';
-import { FirstVisitGuide } from './first-visit-guide';
+import { FirstVisitGuide, type FirstVisitStage } from './first-visit-guide';
+import { GlobeTour } from './globe-tour';
 import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
@@ -548,6 +549,17 @@ export default function Home() {
   const [sessionRetry, setSessionRetry] = useState(0);
   const [reviewStorageKey, setReviewStorageKey] = useState(() => enrollmentReviewKey(null));
   const [firstVisitGuideOpen, setFirstVisitGuideOpen] = useState(true);
+  const [firstVisitStage, setFirstVisitStage] = useState<FirstVisitStage>('arrival');
+  const [shortlistIds, setShortlistIds] = useState<string[]>([]);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourFocusNation, setTourFocusNation] = useState<string | null>(null);
+  const stopTour = useCallback(() => { setTourOpen(false); setTourFocusNation(null); }, []);
+  const finishTour = useCallback(() => { setTourOpen(false); setTourFocusNation(null); setFirstVisitStage('government'); }, []);
+  useEffect(() => {
+    if (!tourOpen || viewMode === 'world') return;
+    const frame = requestAnimationFrame(stopTour);
+    return () => cancelAnimationFrame(frame);
+  }, [tourOpen, viewMode, stopTour]);
   const [guideNow, setGuideNow] = useState(0);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
@@ -990,6 +1002,7 @@ export default function Home() {
 
   const startAurelleAction = (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void runAurelleCommand({ action, shiftId, quantity, requestId: crypto.randomUUID() });
   function changeView(nextView: ViewMode) {
+    if (nextView !== 'world') stopTour();
     setSelectedId(selected.id);
     const href = sceneUrl(window.location.href, nextView, selected.id);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
@@ -998,6 +1011,7 @@ export default function Home() {
 
   function selectNation(nationId: string) {
     if (!worldNations.some(nation => nation.id === nationId)) return;
+    stopTour();
     setSelectedId(nationId);
     setNationFocusRevision(value => value + 1);
     if (viewMode !== 'nation' && viewMode !== 'world') return;
@@ -1297,6 +1311,7 @@ export default function Home() {
     if (enrollmentLock.current) return;
     if (!worldNations.some(nation => nation.id === nationId)) return;
     setFirstVisitGuideOpen(false);
+    stopTour();
     writeEnrollmentReview(citizenIdentity.current, { nationId, expectedNationId: citizenNation?.id ?? null });
     setEnrollmentExpectedNation(citizenNation?.id ?? null);
     setEnrollmentError(null);
@@ -1335,13 +1350,20 @@ export default function Home() {
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;
+  useEffect(() => {
+    if (!tourOpen || guestAllowed) return;
+    const frame = requestAnimationFrame(stopTour);
+    return () => cancelAnimationFrame(frame);
+  }, [tourOpen, guestAllowed, stopTour]);
   function startGuestDemo() {
     if (!guestAllowed) return;
     setFirstVisitGuideOpen(false);
+    stopTour();
     setGuestState(createGuestDemo()); setGuestMode(true); closeEnrollmentReview(); changeView('workplace');
   }
   function leaveGuestDemo() { setGuestMode(false); setGuestState(createGuestDemo()); changeView('world'); }
   function navigateGame(view: SceneView) {
+    stopTour();
     if (guestActive && !['household','workplace','market'].includes(view)) {
       setGuestMode(false); setGuestState(createGuestDemo());
     }
@@ -1420,8 +1442,8 @@ export default function Home() {
 
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
     {guestAllowed && (firstVisitGuideOpen
-      ? <FirstVisitGuide onTryGuest={startGuestDemo} onDismiss={() => setFirstVisitGuideOpen(false)} />
-      : <button type="button" className="secondary-action" onClick={() => setFirstVisitGuideOpen(true)}>Restart first-visit guide</button>)}
+      ? tourOpen ? <GlobeTour onFocus={setTourFocusNation} onClose={finishTour} /> : <FirstVisitGuide stage={firstVisitStage} onStageChange={setFirstVisitStage} onShortlist={setShortlistIds} onStartTour={() => setTourOpen(true)} onTryGuest={startGuestDemo} onDismiss={() => { stopTour(); setFirstVisitGuideOpen(false); }} />
+      : <button type="button" className="secondary-action" onClick={() => { setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); }}>Restart first-visit guide</button>)}
     <p className="eyebrow">Exploring · {selected.shortName}</p>
     {guestEntry}
     <NationComparison nations={worldNations} />
@@ -1434,6 +1456,7 @@ export default function Home() {
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
   </section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='square' ? <>
+    {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {firstLoopHint}{dailyLoop}
     <p>{citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     <SquareChat key={`${citizenSessionKey}:${citizenNationId}`} configured={clerkConfigured} session={citizenSessionStatus} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
@@ -1481,10 +1504,10 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell guestDemo={guestActive} nationFocusRevision={nationFocusRevision} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
-      localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} panel={guestActive ? <GuestDemo view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
+      localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onNavigate={navigateGame} onSelectNation={selectNation}
       accountControls={<ClerkAccountControl />} />

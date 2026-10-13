@@ -25,6 +25,9 @@ export type GameShellProps = {
   localDemo: boolean;
   guestDemo?: boolean;
   nationFocusRevision?: number;
+  cameraTourNationId?: string | null;
+  onUserCamera?: () => void;
+  shortlistIds?: readonly string[];
   notice?: string;
   noticeKind?: 'success' | 'error';
   panel: ReactNode;
@@ -48,10 +51,12 @@ function HudHelp({ label, children, help }: { label: string; children: ReactNode
   return <details className="game-hud-help"><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ worldClock, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, notice, noticeKind = 'success', panel, onNavigate, onSelectNation, accountControls, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ worldClock, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, onNavigate, onSelectNation, accountControls, contextTitle, contextItems = [] }: GameShellProps) {
   const [family, setFamily] = useState<NationFamily>('all');
   const [lens, setLens] = useState<NationLens>('power');
-  const visibleItems = view === 'world' ? discoverNations(contextItems, family, lens) : contextItems;
+  const [shortlistOnly, setShortlistOnly] = useState(false);
+  const familyItems = discoverNations(contextItems, family, lens);
+  const visibleItems = view === 'world' ? shortlistOnly && shortlistIds.length ? familyItems.filter(item => shortlistIds.includes(item.id)) : familyItems : contextItems;
   const hiddenSelection = view === 'world' && !visibleItems.some(item => item.id === nation.id) ? nation.name : undefined;
   const [now, setNow] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
@@ -83,7 +88,7 @@ export function GameShell({ worldClock, view, nation, citizenNation, nations, ca
   const remaining = shiftSummary?.endsAt && now ? Math.max(0, Math.ceil((shiftSummary.endsAt * 1000 - now) / 60000)) : null;
   return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}`}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
-    <div className="game-stage"><GameViewport mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} /></div>
+    <div className="game-stage"><GameViewport mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} /></div>
     <header className="game-hud">
       <div className="game-identity"><span className="game-crest" aria-hidden="true">H</span><div><strong>HARIMU</strong><span>{resourceNation.name}<i />{guestDemo ? 'Guest example' : localDemo ? 'Local demo' : citizenNation ? 'Your citizen' : 'Nation preview'}</span></div></div>
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>
@@ -103,7 +108,7 @@ export function GameShell({ worldClock, view, nation, citizenNation, nations, ca
       {selection?.kind === 'tile' && <section className="game-selection"><small>SELECTED SQUARE</small><h2>{selection.label}</h2><p>{selection.detail}</p></section>}{panel}
     </div></aside> : <button id="game-reopen" className="game-reopen-panel" type="button" aria-expanded="false" aria-controls="game-details" onClick={() => { setCollapsed(false); requestAnimationFrame(() => document.getElementById('game-panel-title')?.focus()); }}><Compass size={18} /><span>Show {sceneTitle} details</span><CaretRight size={16} /></button>}
     <nav id="game-location-dock" className="game-dock" aria-label="Game locations">{places.map(({id,name,icon:Icon}) => { const label = resourceNation.id === 'korund' && id === 'market' ? 'State store' : resourceNation.id === 'korund' && id === 'workplace' ? 'Assignment' : name; return <button key={id} type="button" aria-label={`Open ${label}`} aria-current={view === id || view === 'nation' && id === 'government' ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={20} weight={view === id || view === 'nation' && id === 'government' ? 'fill' : 'regular'} /><span>{label}</span>{(view === id || view === 'nation' && id === 'government') && <i />}</button>; })}</nav>
-    <section className={`game-context-strip${view === 'world' ? ' game-nation-strip' : ''}`} aria-label={contextTitle ?? 'Scene context'}>{view === 'world' && <NationStripFilters family={family} lens={lens} onFamily={setFamily} onLens={setLens} hiddenSelection={hiddenSelection} />}<div className="game-context-heading"><small>{sceneTitle}</small><h2>{contextTitle ?? 'Scene context'}</h2><span>{guestDemo ? 'Disposable sample' : localDemo ? 'Browser-local demo' : 'Citizen snapshot'}</span></div><div className="game-context-items">{visibleItems.length ? visibleItems.map(item => <button type="button" key={item.id} aria-pressed={item.selected} onClick={() => { setCollapsed(false); item.onSelect?.(); }}><strong>{item.label}{view === 'world' && nationIsPreview(item.id) && <small className="nation-preview-badge">Preview</small>}</strong><span>{view === 'world' && lens !== 'power' ? `${nationLensLabel(item.id, lens)} · ${item.detail}` : item.detail}</span><CaretRight size={16} /></button>) : <p>Open this scene’s details to view your available actions and opportunities.</p>}</div></section>
+    <section className={`game-context-strip${view === 'world' ? ' game-nation-strip' : ''}`} aria-label={contextTitle ?? 'Scene context'}>{view === 'world' && <NationStripFilters family={family} lens={lens} onFamily={value => { setFamily(value); setShortlistOnly(false); }} onLens={setLens} hiddenSelection={hiddenSelection} shortlistCount={shortlistIds.length} shortlistActive={shortlistOnly && shortlistIds.length > 0} onShortlist={() => { setFamily('all'); setShortlistOnly(value => !value); }} />}<div className="game-context-heading"><small>{sceneTitle}</small><h2>{contextTitle ?? 'Scene context'}</h2><span>{guestDemo ? 'Disposable sample' : localDemo ? 'Browser-local demo' : 'Citizen snapshot'}</span></div><div className="game-context-items">{visibleItems.length ? visibleItems.map(item => <button type="button" key={item.id} aria-pressed={item.selected} onClick={() => { setCollapsed(false); item.onSelect?.(); }}><strong>{item.label}{view === 'world' && shortlistIds.includes(item.id) && <small className="nation-preview-badge">Suggested</small>}{view === 'world' && nationIsPreview(item.id) && <small className="nation-preview-badge">Preview</small>}</strong><span>{view === 'world' && lens !== 'power' ? `${nationLensLabel(item.id, lens)} · ${item.detail}` : item.detail}</span><CaretRight size={16} /></button>) : <p>Open this scene’s details to view your available actions and opportunities.</p>}</div></section>
     <div className="game-world-note">SQUARE DISTRICTS · CITIZEN VIEW</div>
   </main>;
 }

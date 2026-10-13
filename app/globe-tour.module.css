@@ -1,0 +1,7 @@
+.tour { padding: 12px; border: 1px solid #3e606b; border-radius: 3px; background: #102934; color: #dce7e8; }
+.tour strong { display: block; margin-top: 4px; }
+.tour p { margin: 6px 0; }
+.tour nav { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tour button { min-height: 44px; padding: 8px 12px; border: 1px solid currentColor; border-radius: 5px; background: transparent; color: inherit; cursor: pointer; }
+.tour button:focus-visible { outline: 3px solid #2776a6; outline-offset: 2px; }
+.tour button:disabled { opacity: .45; cursor: default; }
