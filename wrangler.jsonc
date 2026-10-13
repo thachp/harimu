@@ -13,6 +13,7 @@
   "d1_databases": [{
     "binding": "DB",
     "database_name": "harimu-preview",
+    "migrations_dir": "drizzle",
     "database_id": "85ec8276-a39f-4bdb-95ad-e77f92144bb9"
   }]
 }

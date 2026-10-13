@@ -1,6 +1,6 @@
 # Direct Cloudflare migration
 
-Status: portable build and upload dry-run verified; no direct remote preview or production cutover yet. Current UI/gameplay and docs hosting are unchanged. Source baseline is c6729c4b23094f79e995c1d3a287f4a8240627d1 (Sites v22). Earlier v21 baseline: e8e7b89d2ab0803220df2495717ab6415643bdd4.
+Status: isolated remote preview serves public routes/assets; authenticated acceptance and production cutover remain blocked. See the latest verification below. Current UI/gameplay and docs hosting are unchanged. Source baseline is c6729c4b23094f79e995c1d3a287f4a8240627d1 (Sites v22). Earlier v21 baseline: e8e7b89d2ab0803220df2495717ab6415643bdd4.
 
 ## Inventory and blockers (2026-10-13)
 
@@ -20,7 +20,7 @@ After user-authenticated CLI access is available:
 1. Confirm account identity with `wrangler whoami`; check free capacity and limits before creating anything. No paid upgrades are authorized.
 2. Provision one isolated preview D1 (`wrangler d1 create harimu-preview`) and replace only the preview database ID in wrangler.jsonc. Do not bind production to preview.
 3. User supplies Clerk environment through ignored local files/secure prompts. Set preview Worker `CLERK_SECRET_KEY` interactively; provide `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` at build time. Verify Clerk permits the preview hostname. Never print secrets or use command-line secret values.
-4. Build, dry-run the generated `dist/server/wrangler.json`, then deploy with `npm run deploy:cloudflare`. Record deployment version and exact URL. Request-time initialization creates the existing schema/seeds in isolated preview; this is not migrated production data.
+4. Build, dry-run the generated `dist/server/wrangler.json`, then deploy with `npm run deploy:cloudflare`. Record deployment version and exact URL. Before the first application request, run `wrangler d1 migrations apply harimu-preview --remote --config wrangler.jsonc` on a fresh empty preview D1 (migrations_dir is drizzle). Sites previously applied these automatically. Request-time initialization adds legacy tables/seeds, but does not create all world/Korund tables; this is not migrated production data. Never blindly apply baseline migrations to an imported or partially initialized database.
 5. Verify public landing/world, sign-in/sign-out, two real accounts, permanent nation selection/reload, work start/claim/replay, wallet/inventory conservation, petitions, square presence/chat, and mobile globe rendering. No live Clerk round trip is claimed from fixture tests.
 
 Cloudflare Vite uses generated deployment configuration; rebuild whenever input configuration changes. Never upload a Sites-generated bundle directly. References: https://developers.cloudflare.com/workers/vite-plugin/reference/migrating-from-wrangler-dev/ and https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/ .
@@ -73,3 +73,13 @@ node_modules/.bin/wrangler secret put CLERK_SECRET_KEY \
 ```
 
 The user must personally enter the value at the hidden interactive prompt. Preview hostname authorization in Clerk may also require user configuration. After entry, verify a fresh Worker version and all public/authenticated flows. Production data was not imported and app DNS was not changed. Docs hash and Vercel CNAME remain identical after preview deployment.
+
+### Latest verification after user secret entry
+
+User saved CLERK_SECRET_KEY securely; secret-name inventory confirms secret_text without reading its value. Current preview Worker version: `5c0c5c04-93e7-4f87-8fa4-b427b0420303`. Public landing/world now return 200, world has ten nations, anonymous citizen API returns 401, current CSS/JS bundles and atlas return 200. Browser renders city/globe and navigation. Runtime revealed missing world_supply in fresh D1; existing unchanged migrations 0004 and 0005 were applied only to the isolated partially initialized preview (all their tables were absent), bringing it to 43 app tables. Redeployment cleared the cached initialization failure. Deployment now checks required world/Korund tables before upload.
+
+Login still fails client-side with Clerk: Production Keys are only allowed for domain harimu.com; the request Origin must equal or be a subdomain of the Clerk URL. workers.dev therefore cannot establish the existing production Clerk session. Do not work around this with relaxed auth or unrelated user IDs. The now-active Free Cloudflare zone permits a separate preview.harimu.com Worker Custom Domain; parent/user must approve and attach this preview-only hostname before authenticated acceptance, while keeping apex/www on Sites. No routing was changed in this task.
+
+Reverified active full Free zone `244c864044c9d411b3963e51fad95fcf`, with henry.ns.cloudflare.com and rafe.ns.cloudflare.com, following the external user-side nameserver change. Docs DNS record `7d170a27c7c20607b104d5c3daf9b392` remains unproxied CNAME cname.vercel-dns.com, and its HTTP SHA256 remains the original baseline. Earlier Google-DNS blocker is historical and resolved; complete source Sites database export remains blocked. Settings/Database UI was inspected read-only and offered table viewing, no full export control.
+
+All 68 Node tests and 77 SQL tests passed after deployment-preflight changes; lint/types and direct build passed. Actual authenticated login/citizen flows remain unverified, and preview data is isolated seeded data, not migrated production.
