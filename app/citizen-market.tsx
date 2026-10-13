@@ -75,7 +75,18 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
     <button type="button" disabled={Boolean(mealReason)} aria-describedby={mealReason ? 'household-meal-reason' : undefined}
       onClick={() => { if (!mealReason) onMeal(); }}>Prepare household meal · {market.mealFood} food</button>
     {mealReason && <small id="household-meal-reason">{mealReason}</small>}
-    <small>Starter food is granted only once; your inventory reflects food already used. Meals and prices are prototype assumptions.</small>
+    <details><summary>Household food records</summary>
+      {market.householdRecord ? <>
+        <p>{market.householdRecord.starterFoodGranted > 0
+          ? `One-time starter grant recorded: ${market.householdRecord.starterFoodGranted} food. This is the original grant, not your current inventory.`
+          : 'No starter food grant is recorded for this account.'}</p>
+        <p>{market.householdRecord.lastMealAt
+          ? `Last household meal recorded: ${formatTime(market.householdRecord.lastMealAt)}. This meal starts the cooldown shown above.`
+          : 'No household meal is recorded. No meal cooldown has started.'}</p>
+      </> : <p>Refresh your citizen to load the live household records. Local samples do not contain account receipts.</p>}
+      <p>Current food: {count('food')}. Harvests, purchases, meals, sales and player-market reservations can change this balance. Starter food is granted only once.</p>
+    </details>
+    <small>Meals and prices are prototype assumptions.</small>
     </>}
   </section>;
 }

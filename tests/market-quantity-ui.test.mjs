@@ -19,3 +19,14 @@ test('actual merchant API rejects invalid quantities without altering the ledger
  for(const quantity of [-5,99999,0,11,1.5]){const response=await r.call('citizen','alice',{action:'market-trade',requestId:crypto.randomUUID(),side:'buy',item:'food',quantity});assert.equal(response.status,400);}
  assert.deepEqual((await r.call('citizen','alice')).data.economy,before);
 });
+test('Household food records distinguish saved meals, missing grants and local samples',()=>{
+ const h=harness();h.props.showTrading=false;
+ assert.match(h.text(h.render()),/Local samples do not contain account receipts/);
+ h.props.market.householdRecord={starterFoodGranted:2,lastMealAt:null};
+ assert.match(h.text(h.render()),/One-time starter grant recorded: 2 food/);
+ assert.match(h.text(h.render()),/No household meal is recorded. No meal cooldown has started/);
+ h.props.market.householdRecord={starterFoodGranted:0,lastMealAt:'2026-01-15T12:00:00.000Z'};
+ assert.match(h.text(h.render()),/No starter food grant is recorded/);
+ assert.match(h.text(h.render()),/Last household meal recorded:/);
+ assert.doesNotMatch(h.text(h.render()),/No meal cooldown has started/);
+});

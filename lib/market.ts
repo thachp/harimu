@@ -14,6 +14,7 @@ export type MarketState = {
   mealFood: number;
   mealCapacity: number;
   mealIntervalSeconds: number;
+  householdRecord?: { starterFoodGranted: number; lastMealAt: string | null };
 };
 export type MarketCommand = { requestId: string; action: 'market-trade' | 'household-meal';
   side?: 'buy' | 'sell'; item?: string; quantity?: number };
@@ -131,7 +132,7 @@ export async function executeMarketCommand(db: D1Database, userId: string, comma
     : 'Trade unavailable: check funds, stock, quantity and Kindle citizenship.' };
 }
 export async function readMarket(db: D1Database, userId: string, interval: number): Promise<MarketState> {
-  const [citizen, cash, quotes, lastMeal] = await Promise.all([
+  const [citizen, cash, quotes, lastMeal, starterGrant] = await Promise.all([
     db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>(),
     db.prepare('SELECT balance FROM merchant_cash_balance').first<{ balance: number }>(),
     db.prepare('SELECT item, label, buy_minor, sell_minor, stock FROM merchant_inventory_balances ORDER BY buy_minor').all<{
@@ -139,9 +140,13 @@ export async function readMarket(db: D1Database, userId: string, interval: numbe
     }>(),
     db.prepare("SELECT MAX(occurred_at) AS last_meal FROM citizen_economy_events WHERE clerk_user_id = ? AND kind = 'meal'")
       .bind(userId).first<{ last_meal: number | null }>(),
+    db.prepare('SELECT quantity FROM starter_food_grants WHERE clerk_user_id = ?')
+      .bind(userId).first<{ quantity: number }>(),
   ]);
   return { available: citizen?.nation_id === 'kindle', merchantCashMinor: cash?.balance ?? 0,
     quotes: quotes.results.map((r) => ({ item: r.item, label: r.label, buyMinor: r.buy_minor, sellMinor: r.sell_minor, stock: r.stock })),
     mealReadyAt: lastMeal?.last_meal == null ? null : new Date((lastMeal.last_meal + interval) * 1000).toISOString(),
-    mealFood, mealCapacity, mealIntervalSeconds: interval };
+    mealFood, mealCapacity, mealIntervalSeconds: interval,
+    householdRecord: { starterFoodGranted: starterGrant?.quantity ?? 0,
+      lastMealAt: lastMeal?.last_meal == null ? null : new Date(lastMeal.last_meal * 1000).toISOString() } };
 }
