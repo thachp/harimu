@@ -41,10 +41,11 @@ export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName,
       } catch { /* Review remains usable when browser storage is unavailable. */ }
     });
     return () => { active = false; };
-  }, [stepStorageKey]);
+  }, [stepStorageKey, pending]);
   const atOath = reviewedFor === oathKey || (stepStorageKey !== null && restoredKey === stepStorageKey);
   const accepted = atOath && acceptedFor === oathKey;
   function reviewNation() {
+    if (pending) return;
     setReviewedFor(oathKey);
     if (stepStorageKey) {
       try { window.sessionStorage.setItem(stepStorageKey, 'oath'); } catch { /* Optional recovery only. */ }
@@ -52,15 +53,17 @@ export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName,
     title.current?.focus();
   }
   const backToReview = useCallback(() => {
+    if (pending) return;
     setReviewedFor(null); setRestoredKey(null); setAcceptedFor(null);
     if (stepStorageKey) {
       try { window.sessionStorage.removeItem(stepStorageKey); } catch { /* Optional recovery only. */ }
     }
     title.current?.focus();
-  }, [stepStorageKey]);
+  }, [stepStorageKey, pending]);
   const cancelReview = useCallback(() => {
+    if (pending) return;
     backToReview(); onClose();
-  }, [backToReview, onClose]);
+  }, [pending, backToReview, onClose]);
   const changing = expectedNationId !== null && expectedNationId !== nation.id;
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -103,13 +106,15 @@ export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName,
       {atOath && (session === 'anonymous' ? <div className={`enrollment-session ${styles.session}`}><p>Sign in to record your citizenship. Your nation choice stays here for review.</p>{signInControl}</div>
         : session === 'loading' ? <p role="status">Loading your citizen account…</p>
           : session === 'error' ? <div className="enrollment-session"><p role="alert">Your citizen account could not be loaded.</p><button type="button" style={buttonStyle} onClick={onRetrySession}>Retry loading citizen</button></div>
-            : <label className="enrollment-oath" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '16px 0', minHeight: 44 }}><input type="checkbox" checked={accepted} disabled={pending} onChange={event => setAcceptedFor(event.target.checked ? oathKey : null)} /><span>I choose {nation.name} and understand the citizenship rules above.</span></label>)}
+            : <label className="enrollment-oath" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '16px 0', minHeight: 44 }}><input type="checkbox" checked={accepted} disabled={pending} aria-describedby={pending ? "oath-pending-reason" : undefined} onChange={event => { if (!pending) setAcceptedFor(event.target.checked ? oathKey : null); }} /><span>I choose {nation.name} and understand the citizenship rules above.</span></label>)}
       {error && <p className="enrollment-error" role="alert">{error}</p>}
+      {pending && <p id="oath-pending-reason" role="status">Citizenship is being recorded. Please wait before changing or leaving this choice.</p>}
+      {atOath && session === 'ready' && !pending && !accepted && <p id="oath-confirm-reason">Check the citizenship rules checkbox above before confirming.</p>}
       <div className="dialog-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
-        <button className="secondary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending} onClick={cancelReview}>Keep exploring</button>
-        {!atOath && <button className="primary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending} onClick={reviewNation}>Continue to oath</button>}
-        {atOath && <button className="secondary-action" type="button" style={buttonStyle} disabled={pending} onClick={backToReview}>Back to review</button>}
-        {atOath && session === 'ready' && <button className="primary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending || !accepted} onClick={onConfirm}>{pending ? 'Recording citizenship…' : changing ? 'Use my one change' : 'Confirm citizenship'}</button>}
+        <button className="secondary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending} aria-describedby={pending ? "oath-pending-reason" : undefined} onClick={cancelReview}>Keep exploring</button>
+        {!atOath && <button className="primary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending} aria-describedby={pending ? "oath-pending-reason" : undefined} onClick={reviewNation}>Continue to oath</button>}
+        {atOath && <button className="secondary-action" type="button" style={buttonStyle} disabled={pending} aria-describedby={pending ? "oath-pending-reason" : undefined} onClick={backToReview}>Back to review</button>}
+        {atOath && session === 'ready' && <button className="primary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending || !accepted} aria-describedby={pending ? "oath-pending-reason" : !accepted ? "oath-confirm-reason" : undefined} onClick={() => { if (!pending && accepted && session === 'ready') onConfirm(); }}>{pending ? 'Recording citizenship…' : changing ? 'Use my one change' : 'Confirm citizenship'}</button>}
       </div>
     </section>
   </div>;

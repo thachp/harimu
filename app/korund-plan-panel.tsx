@@ -72,6 +72,7 @@ export function PriorNationShift({ shift, currency, pending, uncertain, onClaim,
     <h3>Earlier nation’s shift · {shift.orderName}</h3>
     <p>Your citizenship changed during this shift. Its original reward remains payable in {currency === 'LN' ? 'Labor Notes' : currency === 'CRN' ? 'Crowns' : 'Sparks'}; no currency conversion takes place.</p>
     <p>{shift.wageMinor === undefined ? 'Reward terms are recorded with the shift.' : `${(shift.wageMinor / 100).toFixed(2)} ${currency}`} · {ready ? 'Ready to collect' : `Finishes ${new Date(shift.completesAt).toLocaleString()}`}</p>
+    <GameTimer endsAt={shift.completesAt} label="Original shift ready" />
     {currency === 'LN' && <p>The output replenishes Korund’s state ration pool. Labor Notes remain in your Korund ledger.</p>}
     {uncertain && <><p>Confirm the pending action before collecting another reward.</p><ActionButton type="button" reason={pendingActionReason(pending)} onClick={onRetry}>Confirm pending action</ActionButton></>}
     <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!now, 'Checking the shift timer…'], [!ready, 'Your earlier shift is underway. Collect after it finishes.'])} onClick={onClaim}>Collect original {currency} reward</ActionButton>

@@ -1071,6 +1071,7 @@ export default function Home() {
   }
 
   function togglePlan(id: string) {
+    if (decisionPending || citizenNation?.id !== 'kindle') return;
     setCompletedPlanIds((current) => (current.includes(id) ? [] : [id]));
     setPlanSaved(false);
     setDecisionError(null);
@@ -1168,7 +1169,7 @@ export default function Home() {
     waterSecurity, wardStability, horizon, planNote, completedPlanIds, committedDecision]);
 
   async function commitDecision(input: DecisionCommitInput) {
-    if (decisionPending) return;
+    if (decisionPending || citizenNation?.id !== 'kindle') return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
     const selectedOption = availablePlanningItems.find((item) => item.id === input.optionId);
@@ -1443,21 +1444,23 @@ export default function Home() {
         <details className="household-planning"><summary>Household notes and commitments</summary>
           <p>Keep a private draft for household choices. Recording a personal prototype commitment applies its effects and ends the citizenship grace period. These choices do not count as votes, petition signatures or policy input.</p>
           <label htmlFor="household-horizon">Planning horizon</label>
-          <select id="household-horizon" disabled={decisionPending} value={horizon} onChange={event => { setHorizon(event.target.value as PlanHorizon); setPlanSaved(false); }}>
+          <select id="household-horizon" disabled={decisionPending} aria-describedby={decisionPending ? "household-draft-reason" : undefined} value={horizon} onChange={event => { if (decisionPending) return; setHorizon(event.target.value as PlanHorizon); setPlanSaved(false); }}>
             <option value="today">Today</option><option value="week">This week</option><option value="season">This season</option>
           </select>
           <label htmlFor="household-note">Private household note</label>
-          <textarea id="household-note" disabled={decisionPending} rows={3} maxLength={2000} value={planNote} onChange={event => { setPlanNote(event.target.value); setPlanSaved(false); }} />
-          <button type="button" disabled={decisionPending} onClick={() => void saveHouseholdPlan()}>{decisionPending ? 'Saving…' : planSaved ? 'Draft saved' : 'Save household draft'}</button>
+          <textarea id="household-note" disabled={decisionPending} aria-describedby={decisionPending ? "household-draft-reason" : undefined} rows={3} maxLength={2000} value={planNote} onChange={event => { if (decisionPending) return; setPlanNote(event.target.value); setPlanSaved(false); }} />
+          <ActionButton type="button" reason={pendingActionReason(decisionPending)} onClick={() => void saveHouseholdPlan()}>{decisionPending ? 'Saving…' : planSaved ? 'Draft saved' : 'Save household draft'}</ActionButton>
+          {decisionPending && <small id="household-draft-reason">Your household choice is being saved. Please wait before editing the draft.</small>}
           {committedDecision ? <p>Recorded commitment: {committedDecision.outcome} · {new Date(committedDecision.committedAt).toLocaleDateString()}</p> : <>
             <p>Prototype civic choices · distinct from paid workplace shifts; these legacy choices are currently available only in Kindle.</p>
-            {citizenNation.id === 'kindle' && availablePlanningItems.map(task => <button key={task.id} type="button" disabled={decisionPending} aria-pressed={completedPlanIds.includes(task.id)} onClick={() => togglePlan(task.id)}>
+            {citizenNation.id === 'kindle' && availablePlanningItems.map(task => <ActionButton key={task.id} type="button" reason={pendingActionReason(decisionPending)} aria-pressed={completedPlanIds.includes(task.id)} onClick={() => togglePlan(task.id)}>
               <strong>{task.title}</strong><span>{task.detail} · Capacity {task.effects.capacity >= 0 ? '+' : ''}{task.effects.capacity} · Influence +{task.effects.influence}</span>
-            </button>)}
-            <button type="button" disabled={decisionPending || !completedPlanIds.length || citizenNation.id !== 'kindle'} onClick={() => {
+            </ActionButton>)}
+            <ActionButton type="button" reason={pendingActionReason(decisionPending) ?? firstActionReason([citizenNation.id !== 'kindle', 'Personal commitments are currently supported only in Kindle.'], [!completedPlanIds.length, 'Select a personal commitment above before recording it.'], [capacity + (availablePlanningItems.find(item => completedPlanIds.includes(item.id))?.effects.capacity ?? 0) < 0, 'You need more Work Capacity for this commitment. Prepare a meal or wait for recovery.'])} onClick={() => {
+              if (decisionPending || citizenNation.id !== 'kindle' || !completedPlanIds.length) return;
               const task = availablePlanningItems.find(item => completedPlanIds.includes(item.id));
               if (task) void commitDecision({ optionId: task.id, infrastructureId: task.infrastructureId, householdMemberId: task.householdMemberId });
-            }}>Record personal commitment</button>
+            }}>Record personal commitment</ActionButton>
           </>}
           {decisionError && <p role="alert">{decisionError}</p>}
         </details>

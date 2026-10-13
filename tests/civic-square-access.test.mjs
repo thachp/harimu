@@ -5,13 +5,14 @@ import {test} from 'node:test';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import ts from 'typescript';
+import * as squareValidation from '../lib/square-chat-validation.ts';
 import {simulateGovernment} from '../lib/government.ts';
 const require=createRequire(import.meta.url);
 async function component(file,name) {
   const source=await readFile(new URL(`../app/${file}`,import.meta.url),'utf8');
   const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
   const exports={};
-  new Function('exports','require',compiled)(exports,name=>name.endsWith('.css')?{}:require(name));
+  new Function('exports','require',compiled)(exports,name=>name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:require(name));
   return exports[name];
 }
 const SquareChat=await component('square-chat.tsx','SquareChat');

@@ -33,6 +33,6 @@ test('only success notices expire; errors remain until dismissed',()=>{
 test('empty context copy reflects open and collapsed details without inventing inventory needs',()=>{
   assert.match(text(render({view:'household'})),/Details are open/);
   assert.doesNotMatch(text(render({view:'household'})),/Show details to view/);
-  stateOverrides={4:true};
+  stateOverrides={3:true};
   try {assert.match(text(render({view:'household'})),/Show details to view available actions/);assert.doesNotMatch(text(render({view:'household'})),/Details are open/);} finally {stateOverrides={};}
 });

@@ -55,3 +55,12 @@ test('household cooldown rejects before and permits the exact boundary in an iso
  r.setNow(ready-1000);assert.equal((await r.call('citizen','meal-new',meal(5))).status,409);
  r.setNow(ready);const allowed=await r.call('citizen','meal-new',meal(6));assert.equal(allowed.status,200);assert.equal(food(allowed.data.economy),2);
 });
+test('fresh Kindle grant and no-meal cooldown persist across reads and reopen',async t=>{
+ const {r,snapshot}=await setup(t);assert.equal(snapshot.market.mealReadyAt,null);
+ for(let n=0;n<3;n++){const read=await r.call('citizen','meal-new');assert.equal(read.status,200);assert.equal(food(read.data.economy),2);assert.equal(read.data.market.mealReadyAt,null);}
+ r.reopen();const fresh=await r.call('citizen','meal-new');assert.equal(food(fresh.data.economy),2);assert.equal(fresh.data.market.mealReadyAt,null);
+ const prepared=await r.call('citizen','meal-new',meal(20));assert.equal(prepared.status,200);assert.equal(food(prepared.data.economy),0);assert.ok(prepared.data.market.mealReadyAt);
+ r.reopen();const consumed=await r.call('citizen','meal-new');assert.equal(food(consumed.data.economy),0);assert.equal(consumed.data.market.mealReadyAt,prepared.data.market.mealReadyAt);
+ const grant=await r.db.prepare('SELECT COUNT(*) AS count,SUM(quantity) AS quantity FROM starter_food_grants WHERE clerk_user_id=?').bind('meal-new').first();assert.equal(grant.count,1);assert.equal(grant.quantity,2);
+ const receipt=await r.db.prepare("SELECT COUNT(*) AS count FROM citizen_economy_events WHERE clerk_user_id=? AND kind='meal'").bind('meal-new').first();assert.equal(receipt.count,1);
+});

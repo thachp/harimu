@@ -51,3 +51,14 @@ test('anonymous oath keeps sign-in control and error state offers retry without 
   let retry=false;h.props.session='error';h.props.onRetrySession=()=>{retry=true;};
   h.button(h.render(),'Retry loading citizen').props.onClick();assert.equal(retry,true);
 });
+
+test('oath consent and pending actions explain disabled controls and reject direct invocation',()=>{
+ const h=harness();let confirms=0,closed=0;h.props.onConfirm=()=>{confirms++;};h.props.onClose=()=>{closed++;};
+ h.button(h.render(),'Continue to oath').props.onClick();let tree=h.render();
+ const confirm=h.button(tree,'Confirm citizenship');assert.equal(confirm.props['aria-describedby'],'oath-confirm-reason');
+ confirm.props.onClick();assert.equal(confirms,0);
+ h.all(tree).find(node=>node?.type==='input').props.onChange({target:{checked:true}});h.props.pending=true;tree=h.render();
+ assert.equal(h.button(tree,'Recording citizenship…').props['aria-describedby'],'oath-pending-reason');
+ h.button(tree,'Recording citizenship…').props.onClick();h.button(tree,'Keep exploring').props.onClick();h.button(tree,'Back to review').props.onClick();
+ assert.equal(confirms,0);assert.equal(closed,0);assert.ok(h.all(h.render()).includes('Step 2 of 2 · Oath of citizenship'));
+});
