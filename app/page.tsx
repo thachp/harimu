@@ -7,6 +7,8 @@ import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { SceneNews } from './world-scene';
+import { firstLoopStep } from '@/lib/first-loop';
+import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { NationInstitutions } from './nation-institutions';
 import { SquareChat } from './square-chat';
@@ -28,11 +30,7 @@ import {
   UserButton,
   useUser,
 } from '@clerk/nextjs';
-import {
-  ClockCountdown,
-  ShieldCheck,
-} from '@phosphor-icons/react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { clerkConfigured } from './providers';
 
 type ViewMode = SceneView;
@@ -93,7 +91,7 @@ type CitizenDecision = {
 
 type CitizenshipStatus = {
   enrolledAt: string;
-  graceEndsAt: string;
+  graceEndsAt: string | null;
   changesRemaining: number;
   politicalActionTaken: boolean;
   canChange: boolean;
@@ -298,10 +296,6 @@ const fallbackNations: Nation[] = [
   },
 ];
 
-function nationMark(nation: Nation) {
-  return nation.currency.match(/\(([^)]+)\)/)?.[1] ?? nation.shortName.slice(0, 2).toUpperCase();
-}
-
 function graceDeadlineLabel(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     month: 'short',
@@ -313,7 +307,7 @@ function graceDeadlineLabel(value: string) {
 
 function citizenshipRuleLabel(status: CitizenshipStatus | null) {
   if (!status) return 'One citizen · one nation';
-  if (status.canChange) return `One free change available until ${graceDeadlineLabel(status.graceEndsAt)}`;
+  if (status.canChange && status.graceEndsAt) return `One free change available until ${graceDeadlineLabel(status.graceEndsAt)}`;
   if (status.lockedReason === 'political-action') return 'Locked by your first political action';
   if (status.lockedReason === 'change-used') return 'Your one free change has been used';
   if (status.lockedReason === 'grace-expired') return 'The 48-hour grace period has ended';
@@ -441,16 +435,37 @@ type CitizenSnapshot = {
   demoStarterGranted?: boolean;
 };
 
+type EnrollmentReview = { nationId: string; expectedNationId: string | null };
+const enrollmentReviewKey = (userId: string | null) => `harimu-enrollment-review-v1:${userId ?? 'anonymous'}`;
+function readEnrollmentReview(userId: string | null): EnrollmentReview | null {
+  try {
+    const raw = window.sessionStorage.getItem(enrollmentReviewKey(userId));
+    const review = raw ? JSON.parse(raw) : null;
+    const known = (id: unknown) => typeof id === 'string' && fallbackNations.some(nation => nation.id === id);
+    return review && known(review.nationId) && (review.expectedNationId === null || known(review.expectedNationId))
+      ? { nationId: review.nationId, expectedNationId: review.expectedNationId } : null;
+  } catch { return null; }
+}
+function writeEnrollmentReview(userId: string | null, review: EnrollmentReview | null) {
+  try {
+    const key = enrollmentReviewKey(userId);
+    if (review) window.sessionStorage.setItem(key, JSON.stringify(review));
+    else window.sessionStorage.removeItem(key);
+  } catch { /* A review can still be completed with storage disabled. */ }
+}
+
 type CitizenSessionStatus = 'loading' | 'anonymous' | 'ready' | 'error';
 
 function ClerkCitizenSession({
   onHydrate,
   onStatus,
   onIdentity,
+  retryKey,
 }: {
   onHydrate: (snapshot: CitizenSnapshot) => void;
   onStatus: (status: CitizenSessionStatus) => void;
   onIdentity: (userId: string | null) => void;
+  retryKey: number;
 }) {
   const { isLoaded, user } = useUser();
   const userId = user?.id;
@@ -487,7 +502,7 @@ function ClerkCitizenSession({
 
     void loadCitizen();
     return () => controller.abort();
-  }, [isLoaded, onHydrate, onStatus, onIdentity, userId]);
+  }, [isLoaded, onHydrate, onStatus, onIdentity, userId, retryKey]);
 
   return null;
 }
@@ -508,6 +523,7 @@ export default function Home() {
   const viewMode = sceneFromSearch(locationSearch);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
+      if (document.querySelector('.enrollment-dialog')) return;
       const heading = document.getElementById('game-panel-title') ?? document.querySelector<HTMLElement>('main h1');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
       window.scrollTo({ top: 0, behavior: 'instant' });
@@ -517,6 +533,10 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState('kindle');
   const [citizenNationId, setCitizenNationId] = useState<string | null>(null);
   const [citizenshipStatus, setCitizenshipStatus] = useState<CitizenshipStatus | null>(null);
+  const [enrollmentExpectedNation, setEnrollmentExpectedNation] = useState<string | null>(null);
+  const enrollmentLock = useRef(false);
+  const [sessionRetry, setSessionRetry] = useState(0);
+  const [guideNow, setGuideNow] = useState(0);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -568,11 +588,15 @@ export default function Home() {
   }, []);
   const changeCitizenIdentity = useCallback((userId: string | null) => {
     if (citizenIdentity.current === userId) return;
+    const previousUserId = citizenIdentity.current;
+    const review = userId ? readEnrollmentReview(userId) ?? (previousUserId === null ? readEnrollmentReview(null) : null) : null;
+    writeEnrollmentReview(null, null);
+    if (userId && review) writeEnrollmentReview(userId, review);
     citizenIdentity.current = userId;
     citizenEpoch.current++;
     setCitizenSessionKey(value => value + 1);
-    workLock.current = false;
-    setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(null);
+    workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
+    setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
     setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setVerification(null); setWorkShifts([]);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
@@ -605,6 +629,21 @@ export default function Home() {
     } catch { /* Storage recovery is best-effort. */ }
   }, []);
 
+  useEffect(() => {
+    if (citizenIdentity.current) return;
+    const review = readEnrollmentReview(null);
+    if (review) queueMicrotask(() => {
+      if (citizenIdentity.current) return;
+      setPendingEnrollment(review.nationId);
+      setEnrollmentExpectedNation(review.expectedNationId);
+    });
+  }, []);
+
+  function closeEnrollmentReview() {
+    writeEnrollmentReview(citizenIdentity.current, null);
+    setPendingEnrollment(null);
+  }
+
   const selected = useMemo(
     () => worldNations.find(nation => nation.id === nationFromSearch(locationSearch, worldNations.map(item => item.id), selectedId)) ?? worldNations[0],
     [locationSearch, selectedId, worldNations],
@@ -617,18 +656,6 @@ export default function Home() {
   }) : null, [citizenNation, economy, demoGovernment]);
   const government = clerkConfigured ? governmentSnapshot : demoGovernmentSnapshot;
   const pendingNation = worldNations.find((nation) => nation.id === pendingEnrollment);
-  const isCitizenshipChange = Boolean(
-    citizenNation && pendingNation && citizenNation.id !== pendingNation.id,
-  );
-
-  useEffect(() => {
-    function handleKeydown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setPendingEnrollment(null);
-    }
-    window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController();
 
@@ -654,6 +681,7 @@ export default function Home() {
   }, []);
 
   async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string) {
+    if (enrollmentLock.current) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
     if (workLock.current || !citizenNation) return;
@@ -1136,13 +1164,25 @@ export default function Home() {
   }
 
   async function confirmEnrollment(nation: Nation) {
+    if (enrollmentLock.current) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     if (workLock.current || marketIntent.current || playerIntent.current || korundIntent.current || aurelleIntent.current) { setEnrollmentError('Confirm your pending economic action before changing citizenship.'); return; }
     const epoch = citizenEpoch.current;
+    enrollmentLock.current = true;
     setEnrollmentPending(true);
     setEnrollmentError(null);
 
     if (!clerkConfigured) {
+      const changing = Boolean(citizenNation && citizenNation.id !== nation.id);
+      if ((citizenNation?.id ?? null) !== enrollmentExpectedNation || (changing && (!citizenshipStatus?.canChange
+        || !citizenshipStatus.graceEndsAt || Date.now() >= Date.parse(citizenshipStatus.graceEndsAt)))) {
+        setEnrollmentError('Citizenship has changed or the grace period is closed. Keep exploring and review your current citizen.');
+        setEnrollmentPending(false); enrollmentLock.current = false;
+        return;
+      }
+      if (citizenNation?.id === nation.id) {
+        closeEnrollmentReview(); setEnrollmentPending(false); enrollmentLock.current = false; return;
+      }
       if (!economy) setEconomy({ walletMinor: 0, inventory: [], nextRecoveryAt: new Date(Date.now() + recoverySeconds * 1000).toISOString() });
       setMarket((current) => current ? { ...current, available: nation.id === 'kindle' } : {
         available: nation.id === 'kindle', merchantCashMinor: 100000, mealReadyAt: null, mealFood: 2, mealCapacity: 4, mealIntervalSeconds: recoverySeconds,
@@ -1174,8 +1214,9 @@ export default function Home() {
         canChange: true,
         lockedReason: null,
       });
-      setPendingEnrollment(null);
-      setEnrollmentPending(false);
+      closeEnrollmentReview();
+      setEnrollmentPending(false); enrollmentLock.current = false;
+      changeView('workplace');
       return;
     }
 
@@ -1183,7 +1224,7 @@ export default function Home() {
       const response = await fetch('/api/citizen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'enroll', nationId: nation.id }),
+        body: JSON.stringify({ action: 'enroll', nationId: nation.id, expectedNationId: enrollmentExpectedNation }),
       });
       const result = await response.json() as {
         error?: string;
@@ -1210,17 +1251,22 @@ export default function Home() {
       if (result.economy) setEconomy(result.economy);
       if (result.market) setMarket(result.market);
       if (result.playerMarket) setPlayerMarket(result.playerMarket);
-      setPendingEnrollment(null);
+      closeEnrollmentReview();
+      changeView('workplace');
     } catch {
       if (epoch !== citizenEpoch.current) return;
       setEnrollmentError('Citizenship could not be recorded yet. Please try again.');
     } finally {
       if (epoch !== citizenEpoch.current) return;
-      setEnrollmentPending(false);
+      setEnrollmentPending(false); enrollmentLock.current = false;
     }
   }
 
   function beginEnrollment(nationId: string) {
+    if (enrollmentLock.current) return;
+    if (!worldNations.some(nation => nation.id === nationId)) return;
+    writeEnrollmentReview(citizenIdentity.current, { nationId, expectedNationId: citizenNation?.id ?? null });
+    setEnrollmentExpectedNation(citizenNation?.id ?? null);
     setEnrollmentError(null);
     setPendingEnrollment(nationId);
   }
@@ -1249,14 +1295,20 @@ export default function Home() {
     onBuyFood={quantity => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side: 'buy', item: 'food', quantity })}
     onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} />;
 
+  useEffect(() => {const tick=()=>setGuideNow(Date.now());tick();const timer=setInterval(tick,60000);return()=>clearInterval(timer);},[citizenNationId]);
+  const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
+  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
+    shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
+    mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
+  const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const citizenScene = <section className={`citizen-scene scene-${viewMode}`} aria-label="Citizen location actions">
-    {!citizenNation ? <div className="scene-access"><p>{clerkConfigured && citizenSessionStatus === 'loading' ? 'Loading your citizen…' : 'Choose citizenship to begin your daily life. Explore the world and its national rules before enrolling.'}</p>
-      <button type="button" onClick={() => changeView('world')}>Explore nations and enroll</button>
+    {!citizenNation ? <div className="scene-access"><p>{clerkConfigured && citizenSessionStatus === 'loading' ? 'Loading your citizen…' : 'Explore a nation, then choose citizenship to begin.'}</p>
+      {citizenSessionStatus==='error' ? <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button> : <button type="button" onClick={() => changeView('world')}>Explore nations</button>}
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><button type="button" disabled={workPending} onClick={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</button></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><button type="button" disabled={workPending} onClick={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</button></div>}
-      {viewMode !== 'government' && dailyLoop}
+      {viewMode !== 'government' && <>{firstLoopHint}{dailyLoop}</>}
       {viewMode === 'household' && <>
         {!['korund','aurelle'].includes(citizenNation.id) && <>
         <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
@@ -1320,15 +1372,17 @@ export default function Home() {
   </section>;
 
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
+    <p className="eyebrow">Exploring · {selected.shortName}</p>
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
+    {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Chat · Government preview; economy planned'}</p>
     <details><summary>Rules and limits</summary><p>Fixed nation rules; all offices use deterministic AI/SI simulation. Phone verification is unavailable, so counted petitions are closed. Territory ownership and foreign trade are planned.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
-      {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" onClick={()=>beginEnrollment(selected.id)}>Enroll in {selected.shortName}</button>}
+      {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" disabled={clerkConfigured && ['loading','error'].includes(citizenSessionStatus)} onClick={()=>beginEnrollment(selected.id)}>Choose citizenship · {selected.shortName}</button>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
   </section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='square' ? <>
-    {dailyLoop}
+    {firstLoopHint}{dailyLoop}
     <p>{citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     <SquareChat key={`${citizenSessionKey}:${citizenNationId}`} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
     <SceneNews events={worldEvents} title="City noticeboard" />
@@ -1339,7 +1393,6 @@ export default function Home() {
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
       workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} /> : citizenScene;
   const activeShift = priorNationShift ?? (citizenNation?.id === 'aurelle' ? aurellePlan?.shifts ?? [] : citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
-  const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
   const contextItems: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[] =
     citizenNation?.id === 'aurelle' && ['household','workplace','market'].includes(viewMode) ? [
       {id:'aurelle-service',label:'Chartered service',detail:'4 WC · 8 CRN · 2 Favor',onSelect:()=>changeView('workplace')},
@@ -1375,7 +1428,7 @@ export default function Home() {
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Household';
   return <>
-    {clerkConfigured && <ClerkCitizenSession onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
+    {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
     <GameShell worldClock={simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
@@ -1383,63 +1436,11 @@ export default function Home() {
       contextItems={contextItems} contextTitle={contextTitle}
       onNavigate={changeView} onSelectNation={selectNation}
       accountControls={<ClerkAccountControl />} />
-      {pendingNation && (
-        <div className="dialog-backdrop" onMouseDown={() => setPendingEnrollment(null)} role="presentation">
-          <section
-            aria-labelledby="enrollment-title"
-            aria-modal="true"
-            className="enrollment-dialog"
-            onMouseDown={(event) => event.stopPropagation()}
-            role="dialog"
-            style={{ '--selected': pendingNation.color } as CSSProperties}
-          >
-            <div className="dialog-sigil" aria-hidden="true">{nationMark(pendingNation)}</div>
-            <span className="eyebrow">
-              {isCitizenshipChange ? 'Grace-period change' : 'Founding citizenship'}
-            </span>
-            <h2 id="enrollment-title">
-              {isCitizenshipChange ? `Move to ${pendingNation.name}?` : `Enroll in ${pendingNation.name}?`}
-            </h2>
-            <p>
-              {isCitizenshipChange
-                ? `This moves your citizen from ${citizenNation?.name} and uses your one free change. The new citizenship becomes permanent immediately.`
-                : 'Your nation controls your political rights, institutions, and daily economy. You may change once in your first 48 hours, until you take a political action.'}
-            </p>
-            <div className="citizenship-rule" aria-label="Citizenship commitment rule">
-              <div><ClockCountdown aria-hidden="true" size={18} /><span><strong>48-hour grace</strong><small>One free nation change</small></span></div>
-              <div><ShieldCheck aria-hidden="true" size={18} /><span><strong>Political lock</strong><small>Your first civic act ends the grace period</small></span></div>
-            </div>
-            <dl>
-              <div><dt>Government</dt><dd>{pendingNation.government}</dd></div>
-              <div><dt>Economy</dt><dd>{pendingNation.economy}</dd></div>
-              <div><dt>Currency</dt><dd>{pendingNation.currency}</dd></div>
-              <div><dt>Faith</dt><dd>{pendingNation.religion}</dd></div>
-            </dl>
-            {enrollmentError && <p className="enrollment-error" role="alert">{enrollmentError}</p>}
-            <div className="dialog-actions">
-              <button
-                className="secondary-action"
-                disabled={enrollmentPending}
-                onClick={() => setPendingEnrollment(null)}
-                type="button"
-              >
-                Keep exploring
-              </button>
-              <button
-                className="primary-action"
-                disabled={enrollmentPending}
-                onClick={() => void confirmEnrollment(pendingNation)}
-                type="button"
-              >
-                {enrollmentPending
-                  ? 'Recording citizenship…'
-                  : isCitizenshipChange
-                    ? 'Use my one change'
-                    : 'Confirm citizenship'}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
+        session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
+        onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}
+        onConfirm={() => void confirmEnrollment(pendingNation)}
+        signInControl={<SignInButton mode="modal"><button type="button">Sign in to continue</button></SignInButton>} />}
+
   </>;
 }

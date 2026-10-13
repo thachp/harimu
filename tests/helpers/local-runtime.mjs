@@ -40,6 +40,7 @@ export async function localRuntime() {
     'lib/world-simulation.ts',
     'lib/korund.ts',
     'lib/aurelle.ts',
+    'lib/citizenship.ts',
     'app/api/citizen/route.ts', 'app/api/square/route.ts', 'app/api/world/route.ts',
   ];
   const epoch = Date.UTC(2026, 0, 15, 12); // Fixed UTC day prevents midnight flakiness.

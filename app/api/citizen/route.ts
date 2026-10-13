@@ -1,3 +1,4 @@
+import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { advanceWorld } from '@/lib/world-simulation';
@@ -52,27 +53,7 @@ function boundedPercent(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
-function serializeCitizenship(profile: CitizenProfileRow, politicalActionTaken: boolean) {
-  const graceEndsAt = new Date(Date.parse(profile.created_at) + 48 * 60 * 60 * 1000).toISOString();
-  const graceExpired = Date.now() >= Date.parse(graceEndsAt);
-  const changeUsed = profile.nation_changes >= 1;
-  const lockedReason = politicalActionTaken
-    ? 'political-action'
-    : changeUsed
-      ? 'change-used'
-      : graceExpired
-        ? 'grace-expired'
-        : null;
-
-  return {
-    enrolledAt: profile.created_at,
-    graceEndsAt,
-    changesRemaining: changeUsed ? 0 : 1,
-    politicalActionTaken,
-    canChange: Boolean(profile.nation_id) && lockedReason === null,
-    lockedReason,
-  };
-}
+const serializeCitizenship = citizenshipStatus;
 
 function serializeDecision(decision: CitizenDecisionRow | null) {
   return decision ? {
@@ -243,95 +224,40 @@ export async function POST(request: Request) {
   }
 
   if (body.action === 'enroll') {
+    if (!validEnrollmentExpectation(body)) return privateJson({error:'Confirm the current citizenship with expectedNationId (a nation identifier or null for first enrollment).'}, {status:400});
     const nationId = typeof body.nationId === 'string' ? body.nationId : '';
     const nation = await database.prepare('SELECT id FROM nations WHERE id = ?').bind(nationId).first();
     if (!nation) return privateJson({ error: 'Unknown nation.' }, { status: 400 });
-
-    const current = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
-      display_name, capacity, influence, standing, created_at
-      FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>();
-
-    if (!current) {
-      await database.prepare(`INSERT INTO citizens (
-        clerk_user_id, nation_id, nation_changes, capacity, influence, standing, created_at, updated_at
-      ) VALUES (?, ?, 0, 18, 1240, 'Good standing', ?, ?)`)
-        .bind(userId, nationId, now, now)
-        .run();
-
-      const created = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
-        display_name, capacity, influence, standing, created_at
-        FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>();
-      return privateJson({
-        ok: true,
-        nationId,
-        aurellePlan: await readAurelle(database,userId),
-        korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
-        economy: await readEconomy(database, userId, interval),
-        market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
-        citizenship: created ? serializeCitizenship(created, false) : null,
-      });
-    }
-
-    const politicalAction = await database.prepare(`SELECT EXISTS(
-      SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ?
-      UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id = ? LIMIT 1
-    ) AS political_action_taken`).bind(userId, userId).first<{ political_action_taken: number }>();
-    const politicalActionTaken = Boolean(politicalAction?.political_action_taken);
-
-    if (current.nation_id === nationId) {
-      return privateJson({
-        ok: true,
-        nationId,
-        aurellePlan: await readAurelle(database,userId),
-        korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
-        citizenship: serializeCitizenship(current, politicalActionTaken),
-        economy: await readEconomy(database, userId, interval),
-        market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
-      });
-    }
-
-    if (!current.nation_id) {
-      await database.prepare(`UPDATE citizens SET nation_id = ?, updated_at = ?
-        WHERE clerk_user_id = ? AND nation_id IS NULL`)
-        .bind(nationId, now, userId)
-        .run();
+    const readCurrent=()=>database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at
+      FROM citizens WHERE clerk_user_id=?`).bind(userId).first<CitizenProfileRow>();
+    const readPolitical=async()=>Boolean((await database.prepare(`SELECT EXISTS(
+      SELECT 1 FROM citizen_decisions WHERE clerk_user_id=? UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id=? LIMIT 1
+    ) AS taken`).bind(userId,userId).first<{taken:number}>())?.taken);
+    const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,
+      citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
+      aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
+      economy:await readEconomy(database,userId,interval),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
+    },{status:ok?200:409});
+    const current=await readCurrent();
+    // A repeated choice has no further effect, including after an uncertain response.
+    if (current?.nation_id===nationId) return response(current,true);
+    if ((current?.nation_id??null)!==body.expectedNationId) return response(current,false,'Citizenship changed since this form was opened. Refresh and review your current nation before confirming another choice.');
+    if (!current?.nation_id) {
+      await database.batch([
+        database.prepare(enrollmentInitialSql).bind(userId,nationId,now,now),
+        database.prepare(enrollmentFirstSql).bind(nationId,now,now,userId),
+      ]);
     } else {
-      const change = await database.prepare(`UPDATE citizens
-        SET nation_id = ?, nation_changes = nation_changes + 1, updated_at = ?
-        WHERE clerk_user_id = ?
-          AND nation_id != ?
-          AND nation_changes = 0
-          AND julianday(created_at, '+48 hours') > julianday(?)
-          AND NOT EXISTS (
-            SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ? LIMIT 1
-          ) AND NOT EXISTS (SELECT 1 FROM government_petitions WHERE clerk_user_id = ? LIMIT 1)`)
-        .bind(nationId, now, userId, nationId, now, userId, userId)
-        .run();
-
-      if (!change.meta.changes) {
-        return privateJson({
-          error: politicalActionTaken
-            ? 'Citizenship locked when you took your first political action.'
-            : current.nation_changes >= 1
-              ? 'Your one free citizenship change has already been used.'
-              : 'The 48-hour citizenship grace period has ended.',
-          citizenship: serializeCitizenship(current, politicalActionTaken),
-        }, { status: 409 });
-      }
+      await database.prepare(enrollmentChangeSql).bind(nationId,now,userId,body.expectedNationId,nationId,now,now,userId,userId).run();
     }
-
-    const updated = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
-      display_name, capacity, influence, standing, created_at
-      FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>();
-    return privateJson({
-      ok: true,
-      nationId,
-      aurellePlan: await readAurelle(database,userId),
-      korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
-      economy: await readEconomy(database, userId, interval),
-      market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
-      citizenship: updated ? serializeCitizenship(updated, politicalActionTaken) : null,
-    });
+    const updated=await readCurrent();
+    if (updated?.nation_id===nationId) return response(updated,true);
+    const status=updated?serializeCitizenship(updated,await readPolitical()):null;
+    const error=status?.lockedReason==='political-action'?'Citizenship locked when you took your first political action.'
+      :status?.lockedReason==='change-used'?'Your one free citizenship change has already been used.'
+        :status?.lockedReason==='grace-expired'?'The 48-hour citizenship grace period has ended.'
+          :'Another enrollment won. Refresh and review your current nation; no additional change was made.';
+    return response(updated,false,error);
   }
 
   if (body.action === 'commit-decision') {
