@@ -1,4 +1,5 @@
 'use client';
+import {useDisplayTimestamp} from './display-preferences';
 import { NationDocument } from './nation-document';
 import { LeaderPanel } from './leader-panel';
 import { AiBadge } from './ai-disclosure';
@@ -19,6 +20,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
   error: string | null;
   onPetition: (topic: PetitionTopic) => void;
 }) {
+  const formatTime=useDisplayTimestamp();
   if (!snapshot) return <section className="citizen-market" aria-label="Government preview status">{['kindle','korund','aurelle'].includes(nationId ?? '') ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>}</section>;
   return <NationDocument nationId={snapshot.nationId} className="citizen-market government-document" label="Government decisions and citizen petitions"><div aria-busy={pending}>
     {snapshot.nationId==='kindle' && <section className="kindle-ballot-status" aria-label="Kindle ballot status"><h4>Ballot status</h4><p>Elections are not implemented in this preview. There is no ballot to submit; you can read policy and check petition eligibility below.</p></section>}
@@ -34,7 +36,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
       {snapshot.nationId === 'kindle' && <p>Kindle’s food programme can restock the starter market from a finite public supplier when food stock is below 20. Each allocation moves at most 10 food, costs 1 SPK per food, and shares the finite work-programme budget with wages. At most two allocations per real UTC day. No goods or money are created by this transfer.</p>}
       {snapshot.nationId === 'kindle' ? <>
         <p>Supplier reserve: {simulation.supplierFoodRemaining} food. Supplier receipts: {(simulation.supplierCashMinor / 100).toFixed(2)} SPK.</p>
-        {simulation.latestExecution ? <p>Last saved allocation: +{simulation.latestExecution.foodQuantity} market food for {(simulation.latestExecution.spendMinor / 100).toFixed(2)} SPK · tick {simulation.latestExecution.tick} · {new Date(simulation.latestExecution.executedAt * 1000).toUTCString()}. Retries reuse this receipt; they do not spend again.</p> : <p>No food allocation has executed yet. Stock, reserve, budget and policy must all allow it; visiting does not guarantee spending.</p>}
+        {simulation.latestExecution ? <p>Last saved allocation: +{simulation.latestExecution.foodQuantity} market food for {(simulation.latestExecution.spendMinor / 100).toFixed(2)} SPK · tick {simulation.latestExecution.tick} · {formatTime(simulation.latestExecution.executedAt * 1000)}. Retries reuse this receipt; they do not spend again.</p> : <p>No food allocation has executed yet. Stock, reserve, budget and policy must all allow it; visiting does not guarantee spending.</p>}
       </> : <p>{snapshot.nationId === 'korund' ? 'Korund’s assigned work fills its separate ration store; your Household and State store show current food and coupons. Automatic government policy spending is not implemented here.' : 'This nation receives saved rule-bound proposals; policy spending and economic execution are not implemented here yet.'}</p>}
     </section>}
     <h4>{snapshot.decision.title}</h4>
@@ -43,13 +45,13 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     <p>Ask your government to prioritize a need. Completed UTC days receive one recorded review on the next government visit. The selected topic sets the following UTC day’s policy proposal; other topics are deferred. Food safety emergencies can override that priority. Petitions do not guarantee spending.</p>
     <p>One petition per UTC day. A petition is a political act and ends your citizenship grace period.</p>
     <p>Kindle proposals and executed allocations use the remaining work-programme budget; other prototype nations have no automatic policy-appropriation fund.</p>
-    {!localDemo && snapshot.review && <p>Last recorded review: {new Date(snapshot.review.reviewedAt*1000).toUTCString()} · {snapshot.review.petitionCount} petitions. {snapshot.review.active ? `Priority active until ${new Date(snapshot.review.expiresAt*1000).toUTCString()}.` : 'Priority expired; the current proposal uses live needs.'} Review inputs and reasons are saved permanently; live proposal funds are recalculated. No model is called.</p>}
+    {!localDemo && snapshot.review && <p>Last recorded review: {formatTime(snapshot.review.reviewedAt*1000)} · {snapshot.review.petitionCount} petitions. {snapshot.review.active ? `Priority active until ${formatTime(snapshot.review.expiresAt*1000)}.` : 'Priority expired; the current proposal uses live needs.'} Review inputs and reasons are saved permanently; live proposal funds are recalculated. No model is called.</p>}
     {!localDemo && snapshot.review?.active && <GameTimer endsAt={snapshot.review.expiresAt * 1000} label="Policy priority expires" />}
     {!localDemo && <section aria-label="Your petition history">
       <h4>Your petitions</h4>
       {!snapshot.petitions?.length && <p>No petitions recorded for your current nation.</p>}
       <ul>{snapshot.petitions?.map(petition=><li key={petition.requestId}>
-        <strong>{petition.topic} · {petition.status}</strong> · {new Date(petition.submittedAt*1000).toUTCString()}
+        <strong>{petition.topic} · {petition.status}</strong> · {formatTime(petition.submittedAt*1000)}
         <p>{petition.reason}</p>
       </li>)}</ul>
     </section>}

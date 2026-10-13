@@ -9,7 +9,7 @@ const compiled = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit
 function render(now, claimedAt = null, flags = {}) {
   const navigated = []; const mutations = [];
   const exports = {};
-  new Function('exports', 'require', compiled)(exports, name => name === './game-timer' ? {GameTimer:()=>null} : name === 'react' ? {useState:()=>[now,()=>{}],useEffect() {}} : name === './daily-loop-choice' ? require('../app/daily-loop-choice.ts') : require(name));
+  new Function('exports', 'require', compiled)(exports, name => name === './display-preferences' ? {useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp} : name === './game-timer' ? {GameTimer:()=>null} : name === 'react' ? {useState:()=>[now,()=>{}],useEffect() {}} : name === './daily-loop-choice' ? require('../app/daily-loop-choice.ts') : require(name));
   const completesAt = '2026-10-13T17:19:04.992Z';
   const tree = exports.DailyLoop({nationName:'Kindle',supported:true,localDemo:false,view:'market',economy:{inventory:[],walletMinor:0},market:null,
     shifts:[{id:'shift',orderName:'Harvest',startedAt:'2026-10-13T15:19:04.992Z',completesAt,claimedAt}],capacity:18,jobs:[],busy:false,uncertain:false,...flags,

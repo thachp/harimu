@@ -19,6 +19,7 @@ import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
+import {useDisplayTimestamp} from './display-preferences';
 import { CitizenDock } from './citizen-dock';
 import { SceneNews } from './world-scene';
 import { firstLoopStep } from '@/lib/first-loop';
@@ -309,18 +310,13 @@ const fallbackNations: Nation[] = [
   },
 ];
 
-function graceDeadlineLabel(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value));
+function graceDeadlineLabel(value: string,formatTime:(value:string)=>string) {
+  return formatTime(value);
 }
 
-function citizenshipRuleLabel(status: CitizenshipStatus | null) {
+function citizenshipRuleLabel(status: CitizenshipStatus | null,formatTime:(value:string)=>string) {
   if (!status) return 'One citizen · one nation';
-  if (status.canChange && status.graceEndsAt) return `One free change available until ${graceDeadlineLabel(status.graceEndsAt)}`;
+  if (status.canChange && status.graceEndsAt) return `One free change available until ${graceDeadlineLabel(status.graceEndsAt,formatTime)}`;
   if (status.lockedReason === 'political-action') return 'Locked by your first political action';
   if (status.lockedReason === 'change-used') return 'Your one free change has been used';
   if (status.lockedReason === 'grace-expired') return 'The 48-hour grace period has ended';
@@ -512,6 +508,7 @@ function ClerkCitizenSession({
 }
 
 export default function Home() {
+  const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
   const [aurellePlan, setAurellePlan] = useState<AurellePlanView | null>(null);
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
@@ -1503,7 +1500,7 @@ export default function Home() {
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>
     <details><summary>Rules and limits</summary><p>Each nation keeps its own rules. Computer-controlled leaders (AI/SI) follow fixed game rules: the same situation produces the same decision. No live AI model is connected. Petitions require a verified phone number to count, but phone verification has not been set up yet, so petition submission is unavailable. Territory ownership and foreign trade are not built yet.</p></details>
-    {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
+    {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus,formatTime)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <ActionButton type="button" reason={firstActionReason([clerkConfigured && citizenSessionStatus === 'loading', 'Your citizen account is loading. Please wait before choosing citizenship.'], [clerkConfigured && citizenSessionStatus === 'error', 'Your citizen account could not load. Retry loading it before choosing citizenship.'])} onClick={()=>{if (!clerkConfigured || !['loading','error'].includes(citizenSessionStatus)) beginEnrollment(selected.id);}}>Choose citizenship · {selected.shortName}</ActionButton>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
   </section>;

@@ -9,7 +9,7 @@ const require=createRequire(import.meta.url);
 const compile=async file=>ts.transpileModule(await readFile(new URL(`../app/${file}`,import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
 const tags={};new Function('exports','require',await compile('ai-disclosure.tsx'))(tags,require);
 const source=await compile('national-news.tsx');
-const real={};new Function('exports','require',source)(real,name=>name==='./ai-disclosure'?tags:require(name));
+const real={};new Function('exports','require',source)(real,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./ai-disclosure'?tags:require(name));
 const edition=nationId=>({nationId,title:{kindle:'Kindle Press',korund:'Korund State Media',aurelle:'Aurelle Court Gazette'}[nationId],style:{kindle:'press',korund:'state',aurelle:'court'}[nationId],fetchedAt:1768489200000,statistics:{citizens:2,completedShifts:1,food:4},items:[{id:'record',title:'Work recorded',text:'4 food recorded',source:'system',occurredAt:1768489200000},{id:'policy',title:'Statement',text:'A bounded proposal.',source:'deterministic',occurredAt:1768489200000}]});
 const all=n=>[n,...[n?.props?.children].flat(Infinity).filter(Boolean).flatMap(c=>typeof c==='object'?all(c):[c])];
 test('all national editions show truthful statistics and distinguish system, SI and actual AI content',()=>{
@@ -26,7 +26,7 @@ function harness(){
  let cursor=0,effects=[],slots=[],requests=[],closeOrder=[];
  const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useRef(){const i=cursor++;if(!(i in slots))slots[i]={current:{showModal(){},close(){closeOrder.push('native-close');},focus(){}}};return slots[i];},useEffect(fn){effects.push(fn);}};
  const fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
- const exports={};new Function('exports','require','fetch','document',source)(exports,name=>name==='react-dom'?{createPortal:node=>node}:name==='react'?react:name==='./ai-disclosure'?tags:require(name),fetch,{body:{}});
+ const exports={};new Function('exports','require','fetch','document',source)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react-dom'?{createPortal:node=>node}:name==='react'?react:name==='./ai-disclosure'?tags:require(name),fetch,{body:{}});
  let dialogType;
  const props={nationId:'kindle',session:'ready',configured:true};
  const renderControl=()=>{cursor=0;effects=[];return exports.NationalNewsControl(props);};

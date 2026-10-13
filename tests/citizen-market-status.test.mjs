@@ -7,7 +7,7 @@ const require=createRequire(import.meta.url);
 const source=await readFile(new URL('../app/citizen-market.tsx',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
 const exports={};
-new Function('exports','require',compiled)(exports,name=>name==='./game-timer'?{GameTimer:()=>null}:name==='react'?{useState:initial=>[initial,()=>{}],useEffect:()=>{}}:require(name));
+new Function('exports','require',compiled)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-timer'?{GameTimer:()=>null}:name==='react'?{useState:initial=>[initial,()=>{}],useEffect:()=>{}}:require(name));
 const flatten=node=>[node,...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child=>typeof child==='object'?flatten(child):[child])];
 const props={market:{available:true,quotes:[],mealFood:2,mealCapacity:4,mealIntervalSeconds:86400},economy:{inventory:[{item:'food',quantity:2}]},capacity:18,showTrading:false,onMeal(){},onTrade(){},onRetry(){}};
 test('in-flight meal never claims connection interruption or offers retry',()=>{

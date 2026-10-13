@@ -1,15 +1,17 @@
 'use client';
+import {useDisplayTimestamp} from './display-preferences';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { NationalNews } from '../lib/national-news';
 import { AiTextTag } from './ai-disclosure';
 
 export function NewsEdition({news}:{news:NationalNews}) {
+ const formatTime=useDisplayTimestamp();
  return <section className={`national-news news-${news.style}`} aria-label={news.title}>
   <h2>{news.title}</h2><p>National edition · recorded events and rule-bound statements. No live AI writer is connected.</p>
-  <section className="news-statistics" aria-label="Verified system statistics"><h3>System statistics</h3><dl><div><dt>Registered citizens</dt><dd>{news.statistics.citizens}</dd></div><div><dt>Completed paid shifts</dt><dd>{news.statistics.completedShifts}</dd></div><div><dt>{news.nationId==='kindle'?'Food earned by citizens':'Food contributed to public supply'}</dt><dd>{news.statistics.food}</dd></div></dl><small>Durable ledger totals · as of <time dateTime={new Date(news.fetchedAt).toISOString()}>{new Date(news.fetchedAt).toUTCString()}</time>. These figures count completed settlements; they do not measure progress against a production quota.</small></section>
+  <section className="news-statistics" aria-label="Verified system statistics"><h3>System statistics</h3><dl><div><dt>Registered citizens</dt><dd>{news.statistics.citizens}</dd></div><div><dt>Completed paid shifts</dt><dd>{news.statistics.completedShifts}</dd></div><div><dt>{news.nationId==='kindle'?'Food earned by citizens':'Food contributed to public supply'}</dt><dd>{news.statistics.food}</dd></div></dl><small>Durable ledger totals · as of <time dateTime={new Date(news.fetchedAt).toISOString()}>{formatTime(news.fetchedAt)}</time>. These figures count completed settlements; they do not measure progress against a production quota.</small></section>
   {!news.items.length && <p>No recorded national articles yet. Your statistics above are current; sample city noticeboard stories are separate.</p>}
-  <ol className="national-news-items">{news.items.map(item=><li key={item.id}><article><h3>{item.title}</h3>{item.source==='system'?<small className="news-source">System record</small>:<AiTextTag provenance={item.source==='model'?'model':'deterministic'}/>}<p>{item.text}</p><time dateTime={new Date(item.occurredAt).toISOString()}>{new Date(item.occurredAt).toUTCString()}</time></article></li>)}</ol>
+  <ol className="national-news-items">{news.items.map(item=><li key={item.id}><article><h3>{item.title}</h3>{item.source==='system'?<small className="news-source">System record</small>:<AiTextTag provenance={item.source==='model'?'model':'deterministic'}/>}<p>{item.text}</p><time dateTime={new Date(item.occurredAt).toISOString()}>{formatTime(item.occurredAt)}</time></article></li>)}</ol>
  </section>;
 }
 

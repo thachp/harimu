@@ -1,4 +1,5 @@
 'use client';
+import {useDisplayTimestamp} from './display-preferences';
 import { NationDocument } from './nation-document';
 import { GameTimer } from './game-timer';
 import { formatDuration, gameTimeCompression } from '../lib/game-time';
@@ -20,6 +21,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
   otherShiftActive?: boolean;
   onRetry: () => void; onRefresh: () => void; onNavigate: (scene: SceneView) => void;
 }) {
+  const formatTime=useDisplayTimestamp();
   const [now, setNow] = useState(0);
   useEffect(() => { const update = () => setNow(Date.now()); update(); const timer = window.setInterval(update, 1000); return () => window.clearInterval(timer); }, []);
   if (localDemo) return <section className="citizen-market"><h3>Korund planned economy</h3><p>Assignments, Labor Notes and ration coupons require a connected citizen account. This browser-local demo does not simulate Korund’s ledger.</p></section>;
@@ -54,7 +56,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       <button type="button" onClick={() => onNavigate('household')}>Take rations to your household</button>
     </> : scene === 'household' ? <>
       <p>A household meal uses 2 food and restores up to 4 WC, capped at 24. Meals have a two-real-hour (one game day) cooldown; normal capacity recovery continues.</p>
-      <p>{capacity >= 24 ? 'Capacity is full; save your rations.' : plan.foodQuantity < 2 ? 'Redeem your ration coupons for food.' : !mealReady ? `Next meal: ${plan.mealReadyAt ? new Date(plan.mealReadyAt).toLocaleString() : 'checking timing…'}` : 'Household meal available.'}</p>
+      <p>{capacity >= 24 ? 'Capacity is full; save your rations.' : plan.foodQuantity < 2 ? 'Redeem your ration coupons for food.' : !mealReady ? `Next meal: ${plan.mealReadyAt ? formatTime(plan.mealReadyAt) : 'checking timing…'}` : 'Household meal available.'}</p>
       <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([capacity >= 24, 'Capacity is full. Save your rations.'], [plan.foodQuantity < 2, 'You need 2 food. Redeem ration coupons at the counter.'], [!mealReady, now ? 'Wait until the next meal time shown above.' : 'Checking the meal timer…'])} onClick={() => onCommand('korund-household-meal')}>Prepare ration meal · 2 food</ActionButton>{plan.mealReadyAt && <GameTimer endsAt={plan.mealReadyAt} label="Next meal" />}
       <button type="button" onClick={() => onNavigate('market')}>Open ration book</button><button type="button" onClick={() => onNavigate('workplace')}>Open assigned work</button>
     </> : <>
@@ -68,13 +70,14 @@ export function PriorNationShift({ shift, currency, pending, uncertain, onClaim,
   shift: WorkShift; currency: 'LN' | 'SPK' | 'CRN'; pending: boolean; uncertain: boolean; onClaim: () => void;
   onRetry: () => void;
 }) {
+  const formatTime=useDisplayTimestamp();
   const [now, setNow] = useState(0);
   useEffect(() => { const update = () => setNow(Date.now()); update(); const timer = window.setInterval(update, 1000); return () => window.clearInterval(timer); }, []);
   const ready = now > 0 && Date.parse(shift.completesAt) <= now;
   return <section className="citizen-market" aria-label="Earlier nation shift">
     <h3>Earlier nation’s shift · {shift.orderName}</h3>
     <p>Your citizenship changed during this shift. Its original reward remains payable in {currency === 'LN' ? 'Labor Notes' : currency === 'CRN' ? 'Crowns' : 'Sparks'}; no currency conversion takes place.</p>
-    <p>{shift.wageMinor === undefined ? 'Reward terms are recorded with the shift.' : `${(shift.wageMinor / 100).toFixed(2)} ${currency}`} · {ready ? 'Ready to collect' : `Finishes ${new Date(shift.completesAt).toLocaleString()}`}</p>
+    <p>{shift.wageMinor === undefined ? 'Reward terms are recorded with the shift.' : `${(shift.wageMinor / 100).toFixed(2)} ${currency}`} · {ready ? 'Ready to collect' : `Finishes ${formatTime(shift.completesAt)}`}</p>
     <GameTimer endsAt={shift.completesAt} label="Original shift ready" />
     {currency === 'LN' && <p>The output replenishes Korund’s state ration pool. Labor Notes remain in your Korund ledger.</p>}
     {uncertain && <><p>Confirm the pending action before collecting another reward.</p><ActionButton type="button" reason={pendingActionReason(pending)} onClick={onRetry}>Confirm pending action</ActionButton></>}

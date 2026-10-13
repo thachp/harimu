@@ -1,4 +1,5 @@
 'use client';
+import {useDisplayTimestamp} from './display-preferences';
 import { GameTimer } from './game-timer';
 
 import { useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
   onNavigate: (view: SceneView) => void; onStart: (id: string) => void; onClaim: (id: string) => void;
   onBuyFood: (quantity: number) => void; onMeal: () => void; onRefresh: () => void;
 }) {
+  const formatTime=useDisplayTimestamp();
   const [now, setNow] = useState(0);
   useEffect(() => {
     const update = () => setNow(Date.now()); update();
@@ -66,11 +68,11 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
       action = view === 'household' ? onMeal : () => onNavigate('household');
     } else if (nextAction === 'work') {
       title = 'Ready for your next shift';
-      detail = `${food} food available · ${(economy.walletMinor / 100).toFixed(2)} SPK. ${capacity >= 24 ? 'Capacity is full; save food for later.' : market?.mealReadyAt ? `Next meal: ${new Date(market.mealReadyAt).toLocaleString()}.` : 'Your normal capacity recovery continues while away.'}`;
+      detail = `${food} food available · ${(economy.walletMinor / 100).toFixed(2)} SPK. ${capacity >= 24 ? 'Capacity is full; save food for later.' : market?.mealReadyAt ? `Next meal: ${formatTime(market.mealReadyAt)}.` : 'Your normal capacity recovery continues while away.'}`;
       label = 'Open work board'; action = () => onNavigate('workplace');
     } else {
       title = 'Recover before your next shift';
-      detail = `Capacity ${capacity} / 24. Next recovery: ${new Date(economy.nextRecoveryAt).toLocaleString()}. Refresh after that time.`;
+      detail = `Capacity ${capacity} / 24. Next recovery: ${formatTime(economy.nextRecoveryAt)}. Refresh after that time.`;
     }
   }
   const actionReason = busy ? 'An action is being saved. Please wait.' : uncertain ? 'Confirm your pending transaction in its panel before starting another action.' : null;
@@ -85,7 +87,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
       <strong>{title}</strong><p>{detail}</p>{active && <GameTimer compact endsAt={active.completesAt} label="Shift ready" />}
       {active && !readyToCollect && <aside aria-label="Things to do while your shift runs">
         <p>Your shift takes {shiftDuration}. You can visit other scenes or close the game; the real-time timer keeps running.</p>
-        <p>Ready to collect: <time dateTime={active.completesAt}>{new Date(active.completesAt).toLocaleString(undefined, { timeZoneName: 'short' })}</time>.</p>
+        <p>Ready to collect: <time dateTime={active.completesAt}>{formatTime(active.completesAt)}</time>.</p>
         <nav aria-label="Optional activities while waiting">
           <button type="button" onClick={() => onNavigate('government')}>Read Civic decisions</button>
           <button type="button" onClick={() => onNavigate('square')}>Visit citizen chat</button>

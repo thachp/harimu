@@ -1,4 +1,5 @@
 'use client';
+import {useDisplayTimestamp} from './display-preferences';
 import {Bell} from '@phosphor-icons/react';
 import {createPortal} from 'react-dom';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
@@ -10,8 +11,9 @@ import {NationalNewsControl} from './national-news';
 import {SquareChat} from './square-chat';
 
 export function CivicInboxView({items,onNavigate,onRead}:{items:readonly InboxItem[];onNavigate:(view:SceneView)=>void;onRead:()=>void}){
+ const formatTime=useDisplayTimestamp();
  return <section aria-label="Your civic inbox"><p>Work deadlines and your petition records. No ballot is open in this preview; petition-threshold alerts are not available yet.</p>
-  {!items.length?<p>No work deadline or petition record needs your attention.</p>:<><button type="button" onClick={onRead}>Mark inbox read for this session</button><ul className="civic-inbox-items">{items.map(item=><li key={item.id}><h2>{item.title}</h2><p>{item.text}</p><time dateTime={new Date(item.at).toISOString()}>{new Date(item.at).toUTCString()}</time><button type="button" onClick={()=>onNavigate(item.view)}>{item.view==='workplace'?'Open Work to check':'Read in Civic'}</button></li>)}</ul></>}
+  {!items.length?<p>No work deadline or petition record needs your attention.</p>:<><button type="button" onClick={onRead}>Mark inbox read for this session</button><ul className="civic-inbox-items">{items.map(item=><li key={item.id}><h2>{item.title}</h2><p>{item.text}</p><time dateTime={new Date(item.at).toISOString()}>{formatTime(item.at)}</time><button type="button" onClick={()=>onNavigate(item.view)}>{item.view==='workplace'?'Open Work to check':'Read in Civic'}</button></li>)}</ul></>}
  </section>;
 }
 export function CitizenDock({nationId,cityId,cityVisible,session,configured,shifts,government,onNavigate}:{nationId:string|null;cityId?:string;cityVisible:boolean;session:'anonymous'|'loading'|'ready'|'error';configured:boolean;shifts:readonly WorkShift[];government:GovernmentSnapshot|null;onNavigate:(view:SceneView)=>void}){

@@ -1,4 +1,5 @@
 'use client';
+import {useDisplayTimestamp} from './display-preferences';
 import { GameTimer } from './game-timer';
 import { useEffect, useState } from 'react';
 import type { Economy } from '@/lib/economy';
@@ -10,6 +11,7 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
   onTrade: (side: 'buy' | 'sell', item: string, quantity: number) => void;
   onMeal: () => void; onRetry: () => void;
 }) {
+  const formatTime=useDisplayTimestamp();
   const [quantity, setQuantity] = useState(1);
   const [now, setNow] = useState(0);
   useEffect(() => {
@@ -66,7 +68,7 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
     </>}
     {showMeal && <><h3>Household meal</h3>
     <p>{market.mealFood} food → up to {market.mealCapacity} WC, capped at 24. Once every {mealInterval}; your normal capacity recovery continues while away.</p>
-    <p>{!ready ? `Next meal: ${new Date(market.mealReadyAt!).toLocaleString()}`
+    <p>{!ready ? `Next meal: ${formatTime(market.mealReadyAt!)}`
       : capacity >= 24 ? 'Capacity full · save your food for later.'
         : count('food') < market.mealFood ? 'Not enough food · harvest or buy food at the market.' : 'Meal available · feed your household to recover capacity.'}</p>
     {market.mealReadyAt && <GameTimer endsAt={market.mealReadyAt} label="Next meal" />}

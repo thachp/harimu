@@ -1,4 +1,5 @@
 'use client';
+import {useDisplayTimestamp} from './display-preferences';
 import { GameTimer } from './game-timer';
 
 import { useEffect, useState } from 'react';
@@ -16,6 +17,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
   error: string | null;
   onClaim: (id: string) => void;
 }) {
+  const formatTime=useDisplayTimestamp();
   const [now, setNow] = useState(0);
   useEffect(() => {
     const refresh = () => setNow(Date.now());
@@ -55,7 +57,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
           {claimReason && <small id="work-claim-reason">{claimReason}</small>}
           {now > 0 && remaining > 0 && onNavigate && <details>
             <summary>Things to do while your shift runs</summary>
-            <p>Your shift continues while you visit other scenes or close the game. Ready to collect: <time dateTime={active.completesAt}>{new Date(active.completesAt).toLocaleString(undefined, {timeZoneName: 'short'})}</time>.</p>
+            <p>Your shift continues while you visit other scenes or close the game. Ready to collect: <time dateTime={active.completesAt}>{formatTime(active.completesAt)}</time>.</p>
             <nav aria-label="Optional activities while waiting">
               <button type="button" onClick={() => onNavigate('government')}>Read Civic decisions</button>
               <button type="button" onClick={() => onNavigate('square')}>Visit citizen chat</button>

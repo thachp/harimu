@@ -3,11 +3,12 @@
 import { ClerkProvider } from '@clerk/nextjs';
 import type { ReactNode } from 'react';
 import './auth-ui.css';
+import {DisplayPreferencesProvider} from './display-preferences';
 
 export const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 export function Providers({ children }: { children: ReactNode }) {
-  if (!clerkConfigured) return children;
+  if (!clerkConfigured) return <DisplayPreferencesProvider>{children}</DisplayPreferencesProvider>;
 
   return (
     <ClerkProvider
@@ -41,7 +42,7 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }}
     >
-      {children}
+      <DisplayPreferencesProvider>{children}</DisplayPreferencesProvider>
     </ClerkProvider>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import {useDisplayPreferences} from './display-preferences';
+import {graphicsOptions} from '../lib/display-preferences';
 import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, type LocationId, type ViewportSelection } from '../lib/game-viewport';
@@ -20,6 +22,7 @@ export type GameViewportProps = {
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
 
 export function GameViewport({ mode, nationId, cityName, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '' }: GameViewportProps) {
+  const {preferences:{graphics}}=useDisplayPreferences();
   const host = useRef<HTMLDivElement>(null);
   const callback = useRef(onSelect);
   const userCamera = useRef(onUserCamera);
@@ -33,12 +36,13 @@ export function GameViewport({ mode, nationId, cityName, nations, selectedNation
     const container = host.current;
     if (!container) return;
     let cancelled = false;
+    const quality=graphicsOptions(graphics,window.devicePixelRatio);
     let renderer: THREE.WebGLRenderer;
-    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false }); }
+    try { renderer = new THREE.WebGLRenderer({ antialias: quality.antialias, alpha: false }); }
     catch { queueMicrotask(() => { if (!cancelled) setFallback(true); }); return () => { cancelled = true; }; }
     queueMicrotask(() => { if (!cancelled) setFallback(false); });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.shadowMap.enabled = true;
+    renderer.setPixelRatio(quality.pixelRatio);
+    renderer.shadowMap.enabled = quality.shadows;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -51,7 +55,7 @@ export function GameViewport({ mode, nationId, cityName, nations, selectedNation
     scene.add(world.group);
     scene.add(new THREE.HemisphereLight('#fff3d6', '#334b4d', 2.2));
     const sun = new THREE.DirectionalLight('#ffe2ac', 3.2);
-    sun.position.set(-15, 24, 12); sun.castShadow = true;
+    sun.position.set(-15, 24, 12); sun.castShadow = quality.shadows;
     sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
     sun.shadow.camera.top = 22; sun.shadow.camera.bottom = -22; sun.shadow.bias = -.001;
     scene.add(sun);
@@ -187,10 +191,10 @@ export function GameViewport({ mode, nationId, cityName, nations, selectedNation
       textures.forEach(texture => texture.dispose());
       sun.shadow.map?.dispose(); renderer.dispose(); labelLayer.remove(); canvas.remove();
     };
-  }, [mode, nationId, cityName, nationSignature]);
-  useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, nationSignature]);
-  useEffect(() => { if (cameraTourNationId && mode === 'world') controls.current?.focusNation(cameraTourNationId, false); }, [cameraTourNationId, mode, nationId, nationSignature]);
-  useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId, cityName]);
+  }, [mode, nationId, cityName, nationSignature, graphics]);
+  useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, nationSignature, graphics]);
+  useEffect(() => { if (cameraTourNationId && mode === 'world') controls.current?.focusNation(cameraTourNationId, false); }, [cameraTourNationId, mode, nationId, nationSignature, graphics]);
+  useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId, cityName, graphics]);
   return <div className={`game-viewport ${className}`} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360 }}>
     <div ref={host} className="viewport-canvas" role="region" aria-label={`${mode === 'city' ? 'City terrain. Drag to pan' : 'Fictional Harimu globe. Drag to rotate'}; scroll to zoom. Arrow keys move the view. Use the location buttons to select with a keyboard.`} tabIndex={0}
       style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360, touchAction: 'none' }}

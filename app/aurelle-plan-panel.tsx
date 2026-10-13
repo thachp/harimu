@@ -1,4 +1,5 @@
 'use client';
+import {useDisplayTimestamp} from './display-preferences';
 import { NationDocument } from './nation-document';
 import { GameTimer } from './game-timer';
 import { formatDuration, gameTimeCompression } from '../lib/game-time';
@@ -32,6 +33,7 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
   onCommand: (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void;
   onRetry: () => void; onRefresh: () => void; onNavigate: (scene: SceneView) => void;
 }) {
+  const formatTime=useDisplayTimestamp();
   const [now, setNow] = useState(0);
   useEffect(() => {
     const update = () => setNow(Date.now());
@@ -60,7 +62,7 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
         {([1, 2] as const).map(quantity => <ActionButton key={quantity} style={actionStyle} type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!plan.charter.active, 'An active charter is required at this counter.'], [plan.publicFoodRemaining < quantity, 'The counter does not have enough food for this purchase.'], [plan.walletMinor < quantity * aurelleFoodPriceMinor, 'You do not have enough Crowns for this purchase.'])} onClick={() => onCommand('aurelle-buy-food', undefined, quantity)}>Buy {quantity} food · {(quantity * aurelleFoodPriceMinor / 100).toFixed(2)} CRN</ActionButton>)}
         {!plan.charter.active && <p style={{ width: '100%' }}>An active charter is required to buy at this counter.</p>}
       </> : scene === 'household' ? <>
-        <p style={{ width: '100%' }}>A meal uses 2 food and restores up to 4 WC. {capacity >= 24 ? 'Capacity is full.' : !mealReady ? plan.mealReadyAt ? `Next meal: ${new Date(plan.mealReadyAt).toLocaleString()}.` : 'Checking meal timing…' : plan.foodQuantity < 2 ? 'Buy food at the chartered counter.' : 'Your meal is ready.'}</p>
+        <p style={{ width: '100%' }}>A meal uses 2 food and restores up to 4 WC. {capacity >= 24 ? 'Capacity is full.' : !mealReady ? plan.mealReadyAt ? `Next meal: ${formatTime(plan.mealReadyAt)}.` : 'Checking meal timing…' : plan.foodQuantity < 2 ? 'Buy food at the chartered counter.' : 'Your meal is ready.'}</p>
         <ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([capacity >= 24, 'Capacity is full. Save your food for later.'], [plan.foodQuantity < 2, 'You need 2 food. Visit the chartered counter.'], [!mealReady, now ? 'Wait until the next meal time shown above.' : 'Checking the meal timer…'])} onClick={() => onCommand('aurelle-household-meal')}>Prepare meal · 2 food</ActionButton>{plan.mealReadyAt && <GameTimer endsAt={plan.mealReadyAt} label="Next meal" />}
       </> : <button style={actionStyle} type="button" onClick={() => onNavigate(active ? 'workplace' : plan.foodQuantity < 2 && plan.walletMinor >= aurelleFoodPriceMinor ? 'market' : 'workplace')}>{active ? 'Check chartered service' : plan.foodQuantity < 2 && plan.walletMinor >= aurelleFoodPriceMinor ? 'Visit the food counter' : 'Begin chartered service'}</button>}
       {scene !== 'square' && <ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending)} onClick={onRefresh}>Refresh account</ActionButton>}

@@ -12,7 +12,7 @@ function harness({text='',busy=false,uncertain=false,pendingIntent=null,cityId='
  let cursor=0,refCursor=0;
  const react={useState(){const i=cursor++;return [slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next;}];},useRef(){return refs[refCursor++];},useCallback(fn){return fn;},useEffect(){}};
  const exports={};
- new Function('exports','require','fetch',compiled)(exports,name=>name==='react'?react:name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?validation:require(name),async(url,options)=>{requests.push({url,...options});return {ok:true,status:200,json:async()=>state};});
+ new Function('exports','require','fetch',compiled)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react'?react:name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?validation:require(name),async(url,options)=>{requests.push({url,...options});return {ok:true,status:200,json:async()=>state};});
  function render(){cursor=0;refCursor=0;const wrapper=exports.SquareChat({enabled:true,nationId:'kindle',cityId,session:'ready'});return wrapper.type(wrapper.props);}
  const all=node=>[node,...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child=>typeof child==='object'?all(child):[child])];
  return {render,all,requests,slots};
