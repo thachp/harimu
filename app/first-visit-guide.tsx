@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {suggestNations, suggestedNationNames, type OnboardingPreferences} from '../lib/onboarding-preferences';
 import styles from './first-visit-guide.module.css';
 
@@ -21,12 +21,21 @@ export function FirstVisitGuide({onTryGuest, onDismiss, initialStage = 'arrival'
   const [preferences, setPreferences] = useState<OnboardingPreferences>({});
   const [shortlist, setShortlist] = useState<string[]>([]);
   const stage = controlledStage ?? localStage;
+  const heading = useRef<HTMLHeadingElement>(null);
+  // A tour returns by mounting at government; restore focus from its removed controls.
+  // Default arrival leaves the page’s initial focus untouched.
+  const previousStage = useRef<FirstVisitStage>('arrival');
+  useEffect(() => {
+    if (previousStage.current === stage) return;
+    previousStage.current = stage;
+    heading.current?.focus();
+  }, [stage]);
   function setStage(next: FirstVisitStage) { setLocalStage(next); onStageChange?.(next); }
   function makeShortlist() { const ids = suggestNations(preferences); setShortlist(ids); onShortlist?.(ids); setStage('explore'); }
   return <section className={styles.guide} aria-labelledby="first-visit-title">
     <div className={styles.top}><span className={styles.eyebrow}>Optional introduction · {stage === 'arrival' ? 1 : stage === 'government' ? 2 : stage === 'preferences' ? 3 : 4}/4</span><button type="button" onClick={onDismiss} aria-label="Close first-visit guide">Close</button></div>
     <div aria-live="polite">
-      <h2 id="first-visit-title">{stage === 'arrival' ? 'Welcome to Harimu' : stage === 'government' ? 'You are a citizen' : stage === 'preferences' ? 'What interests you?' : 'Explore before you choose'}</h2>
+      <h2 ref={heading} id="first-visit-title" tabIndex={-1}>{stage === 'arrival' ? 'Welcome to Harimu' : stage === 'government' ? 'You are a citizen' : stage === 'preferences' ? 'What interests you?' : 'Explore before you choose'}</h2>
       {stage === 'arrival' && <><p>Ten nations share one world. Each has its own government, economy and way of life. You will belong to one as a citizen.</p><p>Look around and try a sample day before making your citizenship choice. This development preview is still being built.</p></>}
       {stage === 'government' && <><p>Every government office is computer-controlled. AI/SI means artificial or simulated intelligence; humans play citizens and never hold office.</p><p>Today, leaders follow fixed game rules: the same situation produces the same decision. No live AI model is connected. A wider AI population and named characters are planned.</p><p>Citizen influence follows each nation’s institutions. In this preview, you can read supported policy decisions; petitions are unavailable until phone verification is set up. Elections and protests are not open yet.</p></>}
       {stage === 'preferences' && <><p>Three optional questions suggest places to explore. This shortened guide matches your interests to the documented nation rules; it does not use live population data or decide citizenship. Equal matches favor Kindle, Korund and Aurelle, whose prototype economies are playable.</p>

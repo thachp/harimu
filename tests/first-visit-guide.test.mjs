@@ -8,13 +8,14 @@ const require=createRequire(import.meta.url);
 const source=await readFile(new URL('../app/first-visit-guide.tsx',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
 function harness(initialStage) {
-  const slots=[]; let cursor=0, dismissed=0, tried=0, suggested=[];
+  const slots=[]; let cursor=0, dismissed=0, tried=0, suggested=[], effects=[], focused=0;
   const exports={};
-  new Function('exports','require',compiled)(exports,name=>name==='react'?{useState(initial){const index=cursor++; if (!(index in slots)) slots[index]=initial; return [slots[index],value=>{slots[index]=typeof value==='function'?value(slots[index]):value;}];}}:name.includes('onboarding-preferences')?preferences:name.endsWith('.css')?{default:{}}:require(name));
-  const render=()=>{cursor=0;return exports.FirstVisitGuide({initialStage,onShortlist(ids){suggested=ids;},onDismiss(){dismissed++;},onTryGuest(){tried++;}});};
+  new Function('exports','require',compiled)(exports,name=>name==='react'?{useState(initial){const index=cursor++; if (!(index in slots)) slots[index]=initial; return [slots[index],value=>{slots[index]=typeof value==='function'?value(slots[index]):value;}];},useRef(initial){const index=cursor++;if (!(index in slots)) slots[index]={current:initial};return slots[index];},useEffect(fn){effects.push(fn);}}:name.includes('onboarding-preferences')?preferences:name.endsWith('.css')?{default:{}}:require(name));
+  const props={initialStage,onShortlist(ids){suggested=ids;},onDismiss(){dismissed++;},onTryGuest(){tried++;}};
+  const render=()=>{cursor=0;effects=[];const tree=exports.FirstVisitGuide(props);const heading=all(tree).find(node=>node?.type==='h2');heading.props.ref.current={focus(){focused++;}};effects.forEach(fn=>fn());return tree;};
   const all=node=>[node,...[node?.props?.children].flat(Infinity).flatMap(child=>child&&typeof child==='object'?all(child):[child])];
   const button=(tree,label)=>all(tree).find(node=>node?.type==='button'&&node.props.children===label);
-  return {render,all,button,dismissed:()=>dismissed,tried:()=>tried,suggested:()=>suggested};
+  return {render,all,button,dismissed:()=>dismissed,tried:()=>tried,suggested:()=>suggested,focused:()=>focused,props};
 }
 test('optional introduction reaches disposable preview after accurate government disclosure',()=>{
   const h=harness();
@@ -47,4 +48,22 @@ test('question skip clears suggestions and Back returns to preferences without c
  assert.deepEqual(h.suggested(),[]);
  assert.equal(h.tried(),0);
  assert.ok(h.all(h.render()).includes('Explore before you choose'));
+});
+
+test('stage transitions focus heading while mount and preference changes preserve current focus',()=>{
+ const h=harness();h.render();assert.equal(h.focused(),0);
+ h.button(h.render(),'About government').props.onClick();
+ h.render();assert.equal(h.focused(),1);
+ h.button(h.render(),'Optional interests').props.onClick();
+ let tree=h.render();assert.equal(h.focused(),2);
+ const select=h.all(tree).find(node=>node?.type==='select');
+ select.props.onChange({target:{value:'crown'}});h.render();assert.equal(h.focused(),2);
+ h.props.stage='explore';h.render();assert.equal(h.focused(),3);
+ h.render();assert.equal(h.focused(),3);
+});
+
+test('tour return mounting at government restores focus while default arrival does not',()=>{
+ const returning=harness('government');returning.render();assert.equal(returning.focused(),1);
+ returning.render();assert.equal(returning.focused(),1);
+ const initial=harness('arrival');initial.render();assert.equal(initial.focused(),0);
 });
