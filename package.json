@@ -10,7 +10,11 @@
     "build": "vinext build",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "build:cloudflare": "HARIMU_DEPLOY_TARGET=cloudflare vinext build",
+    "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:sql": "python3 scripts/test-sql.py"
   },
   "dependencies": {
     "@clerk/backend": "^3.19.0",

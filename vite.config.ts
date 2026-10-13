@@ -41,6 +41,8 @@ export default defineConfig(async () => {
   process.env.WRANGLER_LOG_PATH ??= '.wrangler/logs';
   process.env.MINIFLARE_REGISTRY_PATH ??= '.wrangler/registry';
 
+  const directCloudflare = process.env.HARIMU_DEPLOY_TARGET === 'cloudflare';
+
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import('@cloudflare/vite-plugin');
 
@@ -51,10 +53,12 @@ export default defineConfig(async () => {
       : undefined,
     plugins: [
       vinext(),
-      sites(),
+      ...(directCloudflare ? [] : [sites()]),
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
-        config: localBindingConfig,
+        ...(directCloudflare
+          ? { configPath: 'wrangler.jsonc' }
+          : { config: localBindingConfig }),
       }),
     ],
   };

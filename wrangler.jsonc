@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "harimu-preview",
+  "account_id": "143bccf1a31c2161142c43845a8fc65d",
+  "main": "vinext/server/app-router-entry",
+  // Pinned to the installed workerd runtime; advance after upgrading/testing Wrangler.
+  "compatibility_date": "2026-05-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  // LOCAL PLACEHOLDER ONLY. Replace with a separately provisioned preview D1 ID.
+  // Never point previews at production. Deployment guard rejects this ID.
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "harimu-preview",
+    "database_id": "00000000-0000-4000-8000-000000000000"
+  }]
+}

@@ -278,3 +278,7 @@ They check conservation and original-request replay after reconnect.
 These tests verify local handler/storage boundaries and SQL transaction behavior.
 They do not establish real Clerk session authentication, Cloudflare D1 runtime
 semantics, browser account switching, or authenticated multi-browser concurrency.
+
+## Direct Cloudflare hosting
+
+See [the migration runbook](docs/CLOUDFLARE_MIGRATION.md) for the isolated Workers preview, complete production-data transfer, docs-hosting constraints, and rollback. `npm run build:cloudflare` builds without the Sites plugin; `npm run deploy:cloudflare` refuses an unconfigured database or custom-domain routes. Production cutover remains gated on a complete verified data export and a tested preview.
