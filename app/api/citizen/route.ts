@@ -1,4 +1,5 @@
-import { petitionSql, readGovernment } from '@/lib/government-state';
+import { readVerification } from '@/lib/verification';
+import { petitionSql, petitionEligibilitySql, readGovernment } from '@/lib/government-state';
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
@@ -72,6 +73,7 @@ function serializeCitizenship(profile: CitizenProfileRow, politicalActionTaken: 
 
 function serializeDecision(decision: CitizenDecisionRow | null) {
   return decision ? {
+    counted: false,
     decisionId: decision.decision_id,
     optionId: decision.task_id,
     infrastructureId: decision.infrastructure_id,
@@ -135,6 +137,7 @@ export async function GET(request: Request) {
   ]);
 
   return privateJson({
+    verification: await readVerification(userId),
     economy: await readEconomy(database, userId, interval),
     market: await readMarket(database, userId, interval),
     playerMarket: await readPlayerMarket(database, userId),
@@ -175,16 +178,22 @@ export async function POST(request: Request) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(requestId) || !['food','infrastructure','work'].includes(topic)) {
       return privateJson({ error: 'Unknown petition topic or request identifier.' }, { status: 400 });
     }
+    const verification = await readVerification(userId);
+    if (!verification.countedActionsEligible) return privateJson({ error: verification.reason, verification }, { status: 403 });
     const seconds = Math.floor(Date.parse(now)/1000);
     const period = Math.floor(seconds/86400)*86400;
     const receipt = () => database.prepare('SELECT clerk_user_id, nation_id, topic FROM government_petitions WHERE request_id=?')
       .bind(requestId).first<{ clerk_user_id: string; nation_id: string; topic: string }>();
     let recorded = await receipt();
     if (!recorded) {
-      await database.prepare(petitionSql).bind(requestId, topic, period, seconds, userId, requestId, userId, period).run();
+      await database.batch([
+        database.prepare(petitionSql).bind(requestId, topic, period, seconds, userId, requestId, userId, period),
+        database.prepare(petitionEligibilitySql).bind(seconds, requestId, userId),
+      ]);
       recorded = await receipt();
     }
-    if (!recorded || recorded.clerk_user_id !== userId || recorded.topic !== topic) {
+    const eligibility = await database.prepare('SELECT request_id FROM government_petition_eligibility WHERE request_id=? AND clerk_user_id=?').bind(requestId,userId).first();
+    if (!eligibility || !recorded || recorded.clerk_user_id !== userId || recorded.topic !== topic) {
       return privateJson({ error: 'Petition refused: one petition per citizen per UTC day; MVP citizenship and ownership required.' }, { status: 409 });
     }
     const citizen = await database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at FROM citizens WHERE clerk_user_id=?`)

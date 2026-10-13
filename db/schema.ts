@@ -277,3 +277,10 @@ export const squarePresence = sqliteTable('square_presence', {
   userId: text('user_id').primaryKey().references(() => citizens.clerkUserId),
   nationId: text('nation_id').notNull(), expiresAt: integer('expires_at').notNull(),
 });
+
+// Additive receipts: legacy prototype petitions are preserved without Tier 1 claims.
+export const governmentPetitionEligibility = sqliteTable('government_petition_eligibility', {
+  requestId: text('request_id').primaryKey().references(() => governmentPetitions.requestId),
+  clerkUserId: text('clerk_user_id').notNull().references(() => citizens.clerkUserId),
+  checkedAt: integer('checked_at').notNull(),
+});

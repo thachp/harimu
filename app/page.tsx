@@ -1,5 +1,7 @@
 'use client';
 
+import type { VerificationState } from '@/lib/verification';
+
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
@@ -719,6 +721,7 @@ type CitizenSnapshot = {
   market?: MarketState;
   playerMarket?: PlayerMarketState;
   government?: GovernmentSnapshot | null;
+  verification?: VerificationState;
   demoGovernment?: { period: number; counts: Record<string, number> };
   demoReceipts?: string[];
   demoStarterGranted?: boolean;
@@ -798,6 +801,7 @@ export default function Home() {
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [capacity, setCapacity] = useState(18);
+  const [verification, setVerification] = useState<VerificationState | null>(null);
   const [governmentSnapshot, setGovernment] = useState<GovernmentSnapshot | null>(null);
   const [governmentError, setGovernmentError] = useState<string | null>(null);
   const [governmentPending, setGovernmentPending] = useState(false);
@@ -848,7 +852,7 @@ export default function Home() {
     workLock.current = false;
     setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
-    setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setWorkShifts([]);
+    setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setVerification(null); setWorkShifts([]);
     setPlanNote(''); setCompletedPlanIds([]); setPlanSaved(false); setHorizon('week'); setCommittedDecision(null);
     setRecentAction(null); setWorkError(null); setGovernmentError(null); setDecisionError(null); setEnrollmentError(null);
     setWorkPending(false); setGovernmentPending(false); setDecisionPending(false); setEnrollmentPending(false);
@@ -1074,6 +1078,7 @@ export default function Home() {
   }
 
   async function petitionGovernment(topic: PetitionTopic) {
+    if (clerkConfigured && !verification?.countedActionsEligible) { setGovernmentError(verification?.reason ?? 'Checking civic eligibility.'); return; }
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
     if (workLock.current || !citizenNation || !government || marketIntent.current || playerIntent.current) return;
@@ -1087,10 +1092,11 @@ export default function Home() {
       if (clerkConfigured) {
         const response = await fetch('/api/citizen', { method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ action:'government-petition', ...intent }) });
-        const result = await response.json() as { error?:string; government?:GovernmentSnapshot|null; citizenship?:CitizenshipStatus };
+        const result = await response.json() as { error?:string; government?:GovernmentSnapshot|null; citizenship?:CitizenshipStatus; verification?:VerificationState };
       if (epoch !== citizenEpoch.current) return;
         if (response.status >= 500 || (response.ok && !result.citizenship)) throw new Error('Petition response needs confirmation.');
         governmentIntent.current = null; persistIntents();
+        if (result.verification) setVerification(result.verification);
         if (!response.ok) { setGovernmentError(result.error ?? 'Petition refused.'); return; }
         setGovernment(result.government ?? null);
         if (result.citizenship) setCitizenshipStatus(result.citizenship);
@@ -1156,6 +1162,7 @@ export default function Home() {
   }
 
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
+    setVerification(snapshot.verification ?? null);
     setWorkShifts(snapshot.shifts ?? []);
     if (snapshot.market) setMarket(snapshot.market);
     if (snapshot.playerMarket) setPlayerMarket(snapshot.playerMarket);
@@ -1409,7 +1416,7 @@ export default function Home() {
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
         {!market?.available && <p>Household meals are currently supported for Kindle citizens. Other national economies are planned.</p>}
         <details className="household-planning"><summary>Household notes and commitments</summary>
-          <p>Keep a private draft for household choices. Recording a civic commitment applies its effects and ends the citizenship grace period.</p>
+          <p>Keep a private draft for household choices. Recording a personal prototype commitment applies its effects and ends the citizenship grace period. These choices do not count as votes, petition signatures or policy input.</p>
           <label htmlFor="household-horizon">Planning horizon</label>
           <select id="household-horizon" disabled={decisionPending} value={horizon} onChange={event => { setHorizon(event.target.value as PlanHorizon); setPlanSaved(false); }}>
             <option value="today">Today</option><option value="week">This week</option><option value="season">This season</option>
@@ -1425,7 +1432,7 @@ export default function Home() {
             <button type="button" disabled={decisionPending || !completedPlanIds.length} onClick={() => {
               const task = availablePlanningItems.find(item => completedPlanIds.includes(item.id));
               if (task) void commitDecision({ optionId: task.id, infrastructureId: task.infrastructureId, householdMemberId: task.householdMemberId });
-            }}>Record selected civic commitment</button>
+            }}>Record personal commitment</button>
           </>}
           {decisionError && <p role="alert">{decisionError}</p>}
         </details>
@@ -1451,7 +1458,7 @@ export default function Home() {
       </>}
       {viewMode === 'government' && <>
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. All government offices are AI/SI controlled in this release.</p>
-        <GovernmentPanel snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
+        <GovernmentPanel verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
         {!government && <p>Policy simulation and petitions are currently available for Kindle, Korund and Aurelle. This nation’s civic implementation is planned.</p>}
         <p>Elections, protests and public opinion systems are planned and will follow each nation’s rules. No election or protest is currently open here.</p>
       </>}

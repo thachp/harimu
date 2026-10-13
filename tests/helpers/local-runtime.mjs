@@ -36,6 +36,7 @@ export async function localRuntime() {
     'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
     'lib/government-state.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
+    'lib/verification.ts',
     'app/api/citizen/route.ts', 'app/api/square/route.ts',
   ];
   const epoch = Date.UTC(2026, 0, 15, 12); // Fixed UTC day prevents midnight flakiness.
@@ -54,11 +55,21 @@ export async function localRuntime() {
 export function identify(request, identity) { identities.set(request, identity); }
 export async function authenticatedUserId(request) { return identities.get(request) ?? null; }
 `);
+  const verificationPath = join(directory, 'lib/fixture-verification.mjs');
+  await writeFile(verificationPath, `import { readVerification as validate } from './verification.mjs';
+const evidence = new Map();
+let enabled = false;
+export function setVerification(userId, value) { enabled = true; evidence.set(userId, value); }
+export async function readVerification(userId) {
+  return validate(userId, enabled ? { async read(id) { const value = evidence.get(id); if (value instanceof Error) throw value; return value ?? null; } } : undefined, ${epoch});
+}
+`);
   for (const sourcePath of modules) {
     let source = await readFile(join(root, sourcePath), 'utf8');
     source = source.replace(/from (['"])([^'"]+)\1/g, (match, quote, specifier) => {
       let target;
       if (specifier === 'cloudflare:workers') target = envPath;
+      else if (specifier === '@/lib/verification') target = verificationPath;
       else if (specifier.startsWith('@/')) target = join(directory, `${specifier.slice(2)}.mjs`);
       else if (specifier.startsWith('.')) target = resolve(directory, dirname(sourcePath), `${specifier}.mjs`);
       else throw new Error(`Unexpected external runtime dependency: ${specifier}`);
@@ -72,6 +83,7 @@ export async function authenticatedUserId(request) { return identities.get(reque
   const { env } = await import(pathToFileURL(envPath).href);
   env.DB = new LocalD1(path);
   const { identify } = await import(pathToFileURL(authPath).href);
+  const { setVerification } = await import(pathToFileURL(verificationPath).href);
   const { getDatabase } = await import(pathToFileURL(join(directory, 'lib/db.mjs')).href);
   const citizen = await import(pathToFileURL(join(directory, 'app/api/citizen/route.mjs')).href);
   const square = await import(pathToFileURL(join(directory, 'app/api/square/route.mjs')).href);
@@ -90,7 +102,7 @@ export async function authenticatedUserId(request) { return identities.get(reque
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
   return {
-    call, now: epoch, get db() { return env.DB; },
+    call, now: epoch, setVerification, get db() { return env.DB; },
     reopen() { env.DB.close(); env.DB = new LocalD1(path); },
     async close() { env.DB.close(); await rm(directory, { recursive: true, force: true }); },
   };

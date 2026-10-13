@@ -1,8 +1,10 @@
 'use client';
 
+import type { VerificationState } from '@/lib/verification';
 import type { GovernmentSnapshot, PetitionTopic } from '@/lib/government';
 
-export function GovernmentPanel({ snapshot, localDemo, pending, error, onPetition }: {
+export function GovernmentPanel({ verification, snapshot, localDemo, pending, error, onPetition }: {
+  verification: VerificationState | null;
   snapshot: GovernmentSnapshot | null;
   localDemo: boolean;
   pending: boolean;
@@ -14,6 +16,7 @@ export function GovernmentPanel({ snapshot, localDemo, pending, error, onPetitio
     <h3>Government and citizen voice</h3>
     <p>Rule-bound simulation · all government offices are controlled by AI/SI roles for the first release. These decisions use deterministic rules, not a connected AI model.</p>
     {localDemo && <p>Local demo · petitions and decisions stay in this browser.</p>}
+    {!localDemo && <section aria-label="Civic verification"><h4>Counted civic actions · Tier 1</h4><p role="status">{verification?.reason ?? 'Checking civic eligibility…'}</p></section>}
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> · {role.controller}</li>)}</ul>
     <h4>{snapshot.decision.title}</h4>
     <p>{snapshot.decision.reason}</p>
@@ -33,8 +36,8 @@ export function GovernmentPanel({ snapshot, localDemo, pending, error, onPetitio
     </section>}
     {localDemo && <p>The local demo previews priorities only; recorded daily review and petition history require a signed-in citizen.</p>}
     <div className="market-quotes">{(['food', 'infrastructure', 'work'] as const).map((topic) =>
-      <button key={topic} type="button" disabled={pending} onClick={() => onPetition(topic)}>
-        Petition for {topic === 'work' ? 'workplace support' : topic}
+      <button key={topic} type="button" disabled={pending || (!localDemo && !verification?.countedActionsEligible)} onClick={() => onPetition(topic)}>
+        {localDemo ? 'Preview priority for' : 'Petition for'} {topic === 'work' ? 'workplace support' : topic}
       </button>)}</div>
     {pending && <p role="status">Submitting your petition…</p>}
     {error && <p role="alert">{error}</p>}

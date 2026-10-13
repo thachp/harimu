@@ -16,8 +16,11 @@ services, change credentials, delete data, or deploy unrelated changes.
 
 1. **Before counted civic play: verification and lifecycle controls.**
    [Anti-cheat](https://docs.harimu.com/systems/anti-cheat/) requires Tier 1 for
-   counted petitions/votes/pledges. Current petitions accept enrolled Clerk
-   sessions without a verification tier. [Architecture](https://docs.harimu.com/tech/architecture/)
+   counted petitions/votes/pledges. Petitions now fail closed unless fresh server-trusted Tier 1 evidence is available.
+   Production phone verification remains unavailable pending approved setup; the UI
+   explains the gate while work, trade, chat and private planning remain available.
+   Only petitions with an owned eligibility receipt enter new reviews; legacy records
+   remain preserved. This bounded change does not establish the full verification system. [Architecture](https://docs.harimu.com/tech/architecture/)
    also specifies age attestation, export/erasure webhooks and account/risk records;
    these are absent. Local account-isolation tests do not establish these controls.
    Phone verification or new security configuration needs Patrick's approval;
