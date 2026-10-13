@@ -1,0 +1,33 @@
+import type { GovernmentSnapshot } from './government';
+import { publicGovernmentSnapshot, governmentDisclosure } from './government-disclosure';
+
+export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model'};
+export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'court';fetchedAt:number;statistics:{citizens:number;completedShifts:number;food:number};items:NewsItem[]};
+const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
+
+/** Derived from durable records; this reader never publishes or changes a game event. */
+export async function readNationalNews(db:D1Database,nationId:string,now:number):Promise<NationalNews|null> {
+ if(!Object.hasOwn(editions,nationId))return null;
+ const edition=editions[nationId as keyof typeof editions];
+ if(!edition)return null;
+ const ledger=nationId==='kindle'?`SELECT CAST(strftime('%s',s.settled_at) AS INTEGER) AS occurred_at,s.quantity AS food FROM shift_settlements s JOIN work_shifts w ON w.id=s.shift_id WHERE w.work_order_id='harvest'`
+  :nationId==='korund'?'SELECT settled_at AS occurred_at,food_output AS food FROM korund_settlements':'SELECT settled_at AS occurred_at,food_output AS food FROM aurelle_settlements';
+ const allLedger=nationId==='kindle'?`SELECT CAST(strftime('%s',s.settled_at) AS INTEGER) AS occurred_at,CASE WHEN s.item='food' THEN s.quantity ELSE 0 END AS food FROM shift_settlements s JOIN work_shifts w ON w.id=s.shift_id WHERE w.work_order_id IN ('harvest','freight','archive')`:ledger;
+ const [register,totals,receipts,tick,accessions,trades]=await Promise.all([
+  db.prepare('SELECT COUNT(*) AS citizens FROM citizens WHERE nation_id=?').bind(nationId).first<{citizens:number}>(),
+  db.prepare(`SELECT COUNT(*) AS shifts,COALESCE(SUM(food),0) AS food FROM (${allLedger})`).first<{shifts:number;food:number}>(),
+  db.prepare(`SELECT occurred_at,COUNT(*) AS shifts,SUM(food) AS food FROM (${allLedger}) GROUP BY occurred_at ORDER BY occurred_at DESC LIMIT 12`).all<{occurred_at:number;shifts:number;food:number}>(),
+  db.prepare('SELECT tick,processed_at,proposals_json FROM world_ticks ORDER BY tick DESC LIMIT 1').first<{tick:number;processed_at:number;proposals_json:string}>(),
+  db.prepare("SELECT CAST(strftime('%s',created_at) AS INTEGER) AS occurred_at,COUNT(*) AS citizens FROM citizens WHERE nation_id=? AND nation_changes=0 GROUP BY occurred_at ORDER BY occurred_at DESC LIMIT 6").bind(nationId).all<{occurred_at:number;citizens:number}>(),
+  nationId==='kindle'?db.prepare("SELECT occurred_at,COUNT(*) AS trades,SUM(ABS(quantity_delta)) AS quantity FROM citizen_economy_events WHERE kind IN ('buy','sell') GROUP BY occurred_at ORDER BY occurred_at DESC LIMIT 6").all<{occurred_at:number;trades:number;quantity:number}>():nationId==='aurelle'?db.prepare("SELECT r.occurred_at,COUNT(*) AS trades,SUM(p.quantity) AS quantity FROM aurelle_purchases p JOIN aurelle_receipts r ON r.id=p.id GROUP BY r.occurred_at ORDER BY r.occurred_at DESC LIMIT 6").all<{occurred_at:number;trades:number;quantity:number}>():db.prepare("SELECT occurred_at,COUNT(*) AS trades,SUM(quantity) AS quantity FROM korund_rations GROUP BY occurred_at ORDER BY occurred_at DESC LIMIT 6").all<{occurred_at:number;trades:number;quantity:number}>(),
+ ]);
+ const items:NewsItem[]=receipts.results.map(row=>({id:`${nationId}:work:${row.occurred_at}`,title:nationId==='korund'?'Production brigade report':nationId==='aurelle'?'Royal estate service recorded':'Workplace settlement recorded',text:`${row.shifts} completed shift${row.shifts===1?'':'s'} recorded. ${row.food} food ${nationId==='kindle'?'earned by citizens':'contributed to the public food supply'}.`,occurredAt:row.occurred_at*1000,source:'system'}));
+ for(const row of accessions.results)items.push({id:`${nationId}:register:${row.occurred_at}`,title:'Citizenship recorded',text:`${row.citizens} citizen${row.citizens===1?'':'s'} joined the national register. Names and account identities are not published in this feed.`,occurredAt:row.occurred_at*1000,source:'system'});
+ for(const row of trades.results)items.push({id:`${nationId}:market:${row.occurred_at}`,title:nationId==='korund'?'Ration distribution recorded':nationId==='aurelle'?'Royal store transactions recorded':'Merchant trades recorded',text:`${row.trades} ${nationId==='korund'?'ration issuance':'transaction'}${row.trades===1?'':'s'} recorded · ${row.quantity} goods transferred. No private wallets or household balances are published.`,occurredAt:row.occurred_at*1000,source:'system'});
+ if(tick){
+  const proposals=JSON.parse(tick.proposals_json) as (GovernmentSnapshot|null)[];
+  const snapshot=publicGovernmentSnapshot(proposals.find(proposal=>proposal?.nationId===nationId)??null);
+  if(snapshot){const disclosure=governmentDisclosure(snapshot);items.push({id:`${nationId}:policy:${tick.tick}`,title:disclosure.title,text:disclosure.text,occurredAt:tick.processed_at*1000,source:'deterministic'});}
+ }
+ return {nationId,...edition,fetchedAt:now,statistics:{citizens:register?.citizens??0,completedShifts:totals?.shifts??0,food:totals?.food??0},items:items.sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12)};
+}

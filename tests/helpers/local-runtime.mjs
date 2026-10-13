@@ -36,7 +36,7 @@ export async function localRuntime() {
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'app/api/city/route.ts',
     'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
-    'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
+    'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/world-simulation.ts',
     'lib/korund.ts',
@@ -102,6 +102,7 @@ export async function readVerification(userId) {
   const citizen = await import(pathToFileURL(join(directory, 'app/api/citizen/route.mjs')).href);
   const square = await import(pathToFileURL(join(directory, 'app/api/square/route.mjs')).href);
   const city = await import(pathToFileURL(join(directory, 'app/api/city/route.mjs')).href);
+  const news = await import(pathToFileURL(join(directory, 'app/api/news/route.mjs')).href);
   const world = await import(pathToFileURL(join(directory, 'app/api/world/route.mjs')).href);
   const government = await import(pathToFileURL(join(directory, 'lib/government-state.mjs')).href);
   const simulation = await import(pathToFileURL(join(directory, 'lib/world-simulation.mjs')).href);
@@ -110,12 +111,12 @@ export async function readVerification(userId) {
   await env.DB.batch(['alice', 'bob'].map(user => env.DB.prepare(`INSERT INTO citizens
     (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at)
     VALUES (?,'kindle',?,18,1240,'Good standing',?,?)`).bind(user, `Private ${user}`, now, now)));
-  const call = async (endpoint, user, body, origin = 'https://fixture.invalid') => {
-    const request = new Request(`https://fixture.invalid/api/${endpoint}`, body === undefined ? undefined : {
+  const call = async (endpoint, user, body, origin = 'https://fixture.invalid', query = '') => {
+    const request = new Request(`https://fixture.invalid/api/${endpoint}${query}`, body === undefined ? undefined : {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (user) identify(request, user);
-    const handlers = endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
+    const handlers = endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
     const response = await handlers[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
