@@ -26,4 +26,4 @@ body:has(.harimu-game){overflow:auto}
 .viewport-locations{display:block;background:#0d2935ee;border:1px solid #41616d;border-radius:3px;max-width:230px;max-height:60%;padding:0}.viewport-locations summary{padding:9px 12px;font-size:11px;color:#b9d9df;cursor:pointer}.viewport-locations>div{display:flex;flex-wrap:wrap;gap:5px;padding:0 8px 8px}.viewport-locations button{flex:1 0 45%;min-height:30px}
 @media(max-width:760px){.game-reopen-panel{position:relative;grid-row:5;top:auto;right:auto;align-self:start;justify-self:start;margin:12px;font-size:11px;min-height:36px}.inspector-collapsed{grid-template-rows:94px 40px minmax(260px,54dvh) 120px auto}}
 
-.korund-plan button{min-height:44px;max-width:100%;margin:6px 6px 6px 0;white-space:normal}
+.game-inspector-body .korund-plan button:not(.market-item){min-height:44px;max-width:100%;margin:6px 6px 6px 0;white-space:normal}
