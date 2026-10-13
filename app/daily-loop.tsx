@@ -23,6 +23,8 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
     return () => window.clearInterval(timer);
   }, []);
   const active = shifts.find(shift => !shift.claimedAt);
+  const shiftHours = active ? (Date.parse(active.completesAt) - Date.parse(active.startedAt)) / 3600000 : NaN;
+  const shiftDuration = Number.isFinite(shiftHours) && shiftHours > 0 ? `${Number(shiftHours.toFixed(2))} real hours` : 'real time';
   const collected = shifts.some(shift => Boolean(shift.claimedAt));
   const food = economy?.inventory.find(item => item.item === 'food')?.quantity ?? 0;
   const mealFood = market?.mealFood ?? 2;
@@ -79,10 +81,20 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
         <li>Collect wages and goods {collected ? '· collected' : '· when the timer finishes'}</li>
         <li>Trade for food · {economy ? `${food} food owned` : 'loading'}</li><li>Prepare a household meal · recover capacity</li></ol>
       <strong>{title}</strong><p>{detail}</p>
+      {active && !readyToCollect && <aside aria-label="Things to do while your shift runs">
+        <p>Your shift takes {shiftDuration}. You can visit other scenes or close the game; the real-time timer keeps running.</p>
+        <p>Ready to collect: <time dateTime={active.completesAt}>{new Date(active.completesAt).toLocaleString(undefined, { timeZoneName: 'short' })}</time>.</p>
+        <nav aria-label="Optional activities while waiting">
+          <button type="button" onClick={() => onNavigate('government')}>Read Civic decisions</button>
+          <button type="button" onClick={() => onNavigate('square')}>Visit citizen chat</button>
+          <button type="button" onClick={() => onNavigate('household')}>Write a private household note</button>
+        </nav>
+        <p>Reading decisions and writing a private note do not count as political actions. Counted petitions require phone verification and may end your citizenship change window.</p>
+      </aside>}
       {uncertain && <p role="status">Confirm your pending market transaction in its panel before starting another action.</p>}
       <button type="button" disabled={busy || uncertain} onClick={action}>{busy ? 'Saving action…' : label}</button>
       {label !== 'Refresh citizen' && <button type="button" disabled={busy} onClick={onRefresh}>Refresh balances</button>}
     </>}
-    <details><summary>What comes after the daily loop?</summary><p>Visit Government for available petitions, or City for citizen chat. Civic actions are optional and can end the citizenship grace period. Government roles are AI/SI controlled; current officials use deterministic rules, with no live AI model connected.</p></details>
+    <details><summary>What comes after the daily loop?</summary><p>Read decisions in Civic or chat with neighbours in City. Petitions require phone verification; counted civic actions can end your citizenship change window. Officials currently follow fixed rules; no live AI model is connected.</p></details>
   </section>;
 }
