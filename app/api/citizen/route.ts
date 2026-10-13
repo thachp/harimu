@@ -3,11 +3,13 @@ import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/li
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
-import { createClerkClient } from '@clerk/backend';
+import { authenticatedUserId } from '@/lib/auth';
+import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+const privateJson = (data: unknown, init?: ResponseInit) => Response.json(data, { ...init, headers: { ...init?.headers, 'Cache-Control': 'private, no-store' } });
 
 const allowedHorizons = new Set(['today', 'week', 'season']);
 const activeDecisionId = 'eastern-waterworks-day-42';
@@ -102,27 +104,9 @@ function serializeProfile(
   };
 }
 
-async function authenticatedUserId(request: Request) {
-  const bindings = env as unknown as {
-    CLERK_SECRET_KEY?: string;
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
-  };
-
-  if (!bindings.CLERK_SECRET_KEY || !bindings.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    return null;
-  }
-
-  const requestState = await createClerkClient({
-    secretKey: bindings.CLERK_SECRET_KEY,
-    publishableKey: bindings.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-  }).authenticateRequest(request, { acceptsToken: 'session_token' });
-
-  return requestState.isAuthenticated ? requestState.toAuth().userId : null;
-}
-
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
-  if (!userId) return Response.json({ error: 'Sign in required.' }, { status: 401 });
+  if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
@@ -150,11 +134,11 @@ export async function GET(request: Request) {
     ) AS political_action_taken`).bind(userId, userId).first<{ political_action_taken: number }>(),
   ]);
 
-  return Response.json({
+  return privateJson({
     economy: await readEconomy(database, userId, interval),
     market: await readMarket(database, userId, interval),
     playerMarket: await readPlayerMarket(database, userId),
-    government: profile?.nation_id ? await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000)) : null,
+    government: profile?.nation_id ? await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId) : null,
     shifts: await readShifts(database, userId),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -170,21 +154,18 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!isSameOriginCommand(request)) return privateJson({ error: 'Same-origin request required.' }, { status: 403 });
   const userId = await authenticatedUserId(request);
-  if (!userId) return Response.json({ error: 'Sign in required.' }, { status: 401 });
+  if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   await recoverCapacity(database, userId, new Date().toISOString(), interval);
   let body: Record<string, unknown>;
   try {
-    const input: unknown = await request.json();
-    if (!input || typeof input !== 'object' || Array.isArray(input)) {
-      return Response.json({ error: 'Expected a JSON command object.' }, { status: 400 });
-    }
-    body = input as Record<string, unknown>;
+    body = await readCommandObject(request);
   } catch {
-    return Response.json({ error: 'Expected valid JSON.' }, { status: 400 });
+    return privateJson({ error: 'Expected valid JSON.' }, { status: 400 });
   }
   const now = new Date().toISOString();
 
@@ -192,7 +173,7 @@ export async function POST(request: Request) {
     const requestId = typeof body.requestId === 'string' ? body.requestId.toLowerCase() : '';
     const topic = typeof body.topic === 'string' ? body.topic : '';
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(requestId) || !['food','infrastructure','work'].includes(topic)) {
-      return Response.json({ error: 'Unknown petition topic or request identifier.' }, { status: 400 });
+      return privateJson({ error: 'Unknown petition topic or request identifier.' }, { status: 400 });
     }
     const seconds = Math.floor(Date.parse(now)/1000);
     const period = Math.floor(seconds/86400)*86400;
@@ -204,35 +185,35 @@ export async function POST(request: Request) {
       recorded = await receipt();
     }
     if (!recorded || recorded.clerk_user_id !== userId || recorded.topic !== topic) {
-      return Response.json({ error: 'Petition refused: one petition per citizen per UTC day; MVP citizenship and ownership required.' }, { status: 409 });
+      return privateJson({ error: 'Petition refused: one petition per citizen per UTC day; MVP citizenship and ownership required.' }, { status: 409 });
     }
     const citizen = await database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at FROM citizens WHERE clerk_user_id=?`)
       .bind(userId).first<CitizenProfileRow>();
-    return Response.json({ ok:true, government: await readGovernment(database, recorded.nation_id, seconds),
+    return privateJson({ ok:true, government: await readGovernment(database, recorded.nation_id, seconds, userId),
       citizenship: citizen ? serializeCitizenship(citizen,true) : null });
   }
 
   if (body.action === 'create-listing' || body.action === 'buy-listing' || body.action === 'cancel-listing') {
-    if (!validPlayerCommand(body)) return Response.json({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
-    const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: body.listingId?.toLowerCase() };
+    if (!validPlayerCommand(body)) return privateJson({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
+    const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: typeof body.listingId === 'string' ? body.listingId.toLowerCase() : undefined };
     const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000));
-    return Response.json({ ...result, economy: await readEconomy(database, userId, interval),
+    return privateJson({ ...result, economy: await readEconomy(database, userId, interval),
       playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
   }
 
   if (body.action === 'market-trade' || body.action === 'household-meal') {
-    if (!validMarketCommand(body)) return Response.json({ error: 'Use a valid request id, good, side and integer quantity from 1 to 10.' }, { status: 400 });
+    if (!validMarketCommand(body)) return privateJson({ error: 'Use a valid request id, good, side and integer quantity from 1 to 10.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase() };
     const result = await executeMarketCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), interval);
     const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ capacity: number }>();
-    return Response.json({ ...result, economy: await readEconomy(database, userId, interval),
+    return privateJson({ ...result, economy: await readEconomy(database, userId, interval),
       market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
   if (body.action === 'enroll') {
     const nationId = typeof body.nationId === 'string' ? body.nationId : '';
     const nation = await database.prepare('SELECT id FROM nations WHERE id = ?').bind(nationId).first();
-    if (!nation) return Response.json({ error: 'Unknown nation.' }, { status: 400 });
+    if (!nation) return privateJson({ error: 'Unknown nation.' }, { status: 400 });
 
     const current = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
       display_name, capacity, influence, standing, created_at
@@ -248,7 +229,7 @@ export async function POST(request: Request) {
       const created = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
         display_name, capacity, influence, standing, created_at
         FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>();
-      return Response.json({
+      return privateJson({
         ok: true,
         nationId,
         economy: await readEconomy(database, userId, interval),
@@ -264,7 +245,7 @@ export async function POST(request: Request) {
     const politicalActionTaken = Boolean(politicalAction?.political_action_taken);
 
     if (current.nation_id === nationId) {
-      return Response.json({
+      return privateJson({
         ok: true,
         nationId,
         citizenship: serializeCitizenship(current, politicalActionTaken),
@@ -292,7 +273,7 @@ export async function POST(request: Request) {
         .run();
 
       if (!change.meta.changes) {
-        return Response.json({
+        return privateJson({
           error: politicalActionTaken
             ? 'Citizenship locked when you took your first political action.'
             : current.nation_changes >= 1
@@ -306,7 +287,7 @@ export async function POST(request: Request) {
     const updated = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
       display_name, capacity, influence, standing, created_at
       FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>();
-    return Response.json({
+    return privateJson({
       ok: true,
       nationId,
       economy: await readEconomy(database, userId, interval),
@@ -341,7 +322,7 @@ export async function POST(request: Request) {
         infrastructure_id: string;
         household_member_id: string;
       }>();
-    if (!effect) return Response.json({ error: 'Unknown civic plan.' }, { status: 400 });
+    if (!effect) return privateJson({ error: 'Unknown civic plan.' }, { status: 400 });
 
     const [profile, existingDecision] = await Promise.all([
       database.prepare(`SELECT clerk_user_id, nation_id, nation_changes, display_name, capacity,
@@ -354,10 +335,10 @@ export async function POST(request: Request) {
         .first<CitizenDecisionRow>(),
     ]);
     if (!profile?.nation_id) {
-      return Response.json({ error: 'Choose citizenship before committing a civic decision.' }, { status: 409 });
+      return privateJson({ error: 'Choose citizenship before committing a civic decision.' }, { status: 409 });
     }
     if (existingDecision) {
-      return Response.json({
+      return privateJson({
         ok: true,
         alreadyCommitted: true,
         profile: serializeProfile(profile, existingDecision, true),
@@ -365,7 +346,7 @@ export async function POST(request: Request) {
       });
     }
     if (profile.capacity + effect.capacity_delta < 0) {
-      return Response.json({ error: 'Not enough Work Capacity for this decision.' }, { status: 409 });
+      return privateJson({ error: 'Not enough Work Capacity for this decision.' }, { status: 409 });
     }
 
     const decisionRow: CitizenDecisionRow = {
@@ -419,7 +400,7 @@ export async function POST(request: Request) {
       .bind(userId)
       .first<CitizenProfileRow>();
 
-    return Response.json({
+    return privateJson({
       ok: true,
       profile: updatedProfile ? serializeProfile(updatedProfile, decisionRow, true) : null,
       decision: serializeDecision(decisionRow),
@@ -458,7 +439,7 @@ export async function POST(request: Request) {
         .bind(userId, taskId, now)),
     ]);
 
-    return Response.json({ ok: true, savedAt: now });
+    return privateJson({ ok: true, savedAt: now });
   }
 
   if (body.action === 'commit-work') {
@@ -469,10 +450,10 @@ export async function POST(request: Request) {
         id: string; name: string; nation_id: string | null; capacity_cost: number;
       }>();
     if (!order || !rule || order.capacity_cost <= 0) {
-      return Response.json({ error: 'Work order unavailable.' }, { status: 404 });
+      return privateJson({ error: 'Work order unavailable.' }, { status: 404 });
     }
     const reward = rewards[workOrderId];
-    if (!reward) return Response.json({ error: 'Shift reward unavailable.' }, { status: 409 });
+    if (!reward) return privateJson({ error: 'Shift reward unavailable.' }, { status: 409 });
     const id = crypto.randomUUID();
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
     // D1 batch is transactional: scheduling and debiting succeed together.
@@ -489,19 +470,19 @@ export async function POST(request: Request) {
     const profile = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?')
       .bind(userId).first<{ capacity: number }>();
     if (!scheduled.meta.changes) {
-      return Response.json({ error: 'Finish your active shift, check your citizenship and available capacity.',
+      return privateJson({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
     }
-    return Response.json({ ok: true, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   if (body.action === 'claim-work') {
     const shiftId = typeof body.shiftId === 'string' ? body.shiftId : '';
     const shift = await database.prepare('SELECT claimed_at, completes_at FROM work_shifts WHERE id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first<{ claimed_at: string | null; completes_at: string }>();
-    if (!shift) return Response.json({ error: 'Shift unavailable.' }, { status: 404 });
+    if (!shift) return privateJson({ error: 'Shift unavailable.' }, { status: 404 });
     if (shift.completes_at > now) {
-      return Response.json({ error: 'Your shift is still underway.' }, { status: 409 });
+      return privateJson({ error: 'Your shift is still underway.' }, { status: 409 });
     }
     // One ledger transfer carries both wages and inventory; every write rolls back together.
     // Budget guard is in the insert itself, so concurrent settlements cannot overdraw the pool.
@@ -514,9 +495,9 @@ export async function POST(request: Request) {
     ]);
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
-    if (!settled && !shift.claimed_at) return Response.json({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
-    return Response.json({ ok: true, shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    if (!settled && !shift.claimed_at) return privateJson({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
+    return privateJson({ ok: true, shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
-  return Response.json({ error: 'Unknown action.' }, { status: 400 });
+  return privateJson({ error: 'Unknown action.' }, { status: 400 });
 }

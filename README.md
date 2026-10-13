@@ -144,7 +144,7 @@ support direct links. Existing nation dossiers and planning remain accessible.
 Home owns the briefing, belongings and meals; Workplace owns timed shifts;
 Market separates the finite simulated merchant from real player listings.
 Illustrative borders/routes, seeded news and future social features are labeled;
-there is no fabricated live chat or active election endpoint.
+the chat uses authenticated nation-scoped messages rather than fabricated residents. Elections remain planned.
 
 ## Player market
 
@@ -179,3 +179,53 @@ The requirement override is [docs/REQUIREMENT_CHANGES.md](docs/REQUIREMENT_CHANG
 The daily briefing uses current citizen snapshots to prioritize a finished shift,
 food or capacity, with direct scene navigation and refresh. Demo state remains
 browser-local and separate from authenticated citizens.
+
+## City conversation and recorded petition reviews
+
+Signed-in enrolled citizens share a nation-only plain-text square feed with random
+pseudonyms; account IDs and display names are not public chat metadata. The feed
+shows the latest 50 messages visible for 7 days. Expired rows are deleted on the
+next square access; this is lazy cleanup rather than a scheduled purge. Posting
+requires 1–280 characters, a same-origin session request and a UUID intent. Atomic
+rules enforce 10 seconds between posts and 20 per hour, including removed messages.
+Citizens can remove their own messages and mute/unmute other pseudonyms locally.
+Presence is opt-in and exposes only an aggregate count, expiring after 90 seconds;
+the UI refreshes every 15 seconds while visible. Demo mode cannot post or announce
+presence. There is no external moderation service or fabricated report processing.
+
+Petitions are pending until their UTC day ends. The next government visit records
+an immutable daily review and resolves petitions as accepted/deferred with reasons.
+The accepted priority sets the next day's proposal; current food safety overrides
+and current funding bounds apply without changing the historical record. Proposals
+do not spend or mint funds. Citizens see only their own history for the current
+nation. Processing is bounded to 30 outstanding days per read, with 14 recent own
+petitions displayed. Government remains explicitly deterministic, not a live model.
+
+Citizen API responses are private/no-store. Account transitions clear private
+snapshots and ignore obsolete in-flight responses. No new accounts, credentials,
+paid services or external infrastructure were provisioned for these features.
+
+## Shared game shell
+
+World, city square, home, workplace, market and government share a full-width
+resource/status bar and location navigation. The 3D square terrain occupies the
+left side; the persistent right sidebar contains the current scene's context
+and actions, extending to the bottom. A separate strip beneath the terrain shows
+scene-specific belongings, jobs, goods/listings, government offices or nations.
+These strips use current snapshots; they do not manufacture player listings or
+named officials. Job cards reveal details; starting work remains an explicit
+sidebar action. Mobile stacks terrain, a horizontally scrollable context strip,
+and the action panel without covering controls.
+
+Scene history preserves framework metadata and handles marked same-path
+Back/Forward entries without restoring stale RSC snapshots. Closing a panel
+keeps the current scene and its camera; selecting a location or reopening restores
+its actions. Keyboard terrain controls: arrows to pan, +/− to zoom, Home to
+centre, Enter to select, Escape to close details. World/city camera geometry
+persists through scene transitions in memory; it carries no citizen identity.
+
+Citizen writes require a matching Origin and bounded JSON command bodies.
+The additional parser tests run with `node --experimental-strip-types
+tests/command-request.test.mjs`. SQL tests validate chat, petition reviews and
+account isolation; full authenticated multi-browser Clerk/D1 coverage remains
+necessary beyond the browser-local demo checks.

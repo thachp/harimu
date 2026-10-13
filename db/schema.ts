@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { check, foreignKey, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const nations = sqliteTable('nations', {
   id: text('id').primaryKey(),
@@ -243,8 +243,37 @@ export const governmentPetitions = sqliteTable('government_petitions', {
   topic: text('topic', { enum: ['food', 'infrastructure', 'work'] }).notNull(),
   periodStart: integer('period_start').notNull(),
   occurredAt: integer('occurred_at').notNull(),
-}, (table) => [uniqueIndex('idx_government_petitions_user_period').on(table.clerkUserId, table.periodStart),
+}, (table) => [index('idx_government_petitions_nation_period').on(table.nationId,table.periodStart), uniqueIndex('idx_government_petitions_user_period').on(table.clerkUserId, table.periodStart),
   check('government_petition_topic', sql`${table.topic} IN ('food','infrastructure','work')`)]);
 export const economyMigrations = sqliteTable('economy_migrations', {
   id: text('id').primaryKey(),
+});
+
+export const governmentReviews = sqliteTable('government_reviews', {
+  nationId: text('nation_id').notNull(), periodStart: integer('period_start').notNull(),
+  reviewedAt: integer('reviewed_at').notNull(), selectedTopic: text('selected_topic').notNull(),
+  petitionCount: integer('petition_count').notNull(), snapshotJson: text('snapshot_json').notNull(),
+}, (table) => [primaryKey({columns:[table.nationId,table.periodStart]}),
+  check('government_review_topic', sql`${table.selectedTopic} IN ('food','infrastructure','work')`),
+  check('government_review_count', sql`${table.petitionCount} >= 0`)]);
+export const governmentPetitionResolutions = sqliteTable('government_petition_resolutions', {
+  requestId: text('request_id').primaryKey().references(() => governmentPetitions.requestId),
+  nationId: text('nation_id').notNull(), periodStart: integer('period_start').notNull(),
+  status: text('status').notNull(),
+}, (table) => [foreignKey({columns:[table.nationId,table.periodStart],foreignColumns:[governmentReviews.nationId,governmentReviews.periodStart]}), check('government_resolution_status', sql`${table.status} IN ('accepted','deferred')`)]);
+
+export const squareHandles = sqliteTable('square_handles', {
+  userId: text('user_id').primaryKey().references(() => citizens.clerkUserId),
+  handle: text('handle').notNull().unique(),
+});
+export const squareMessages = sqliteTable('square_messages', {
+  id: text('id').primaryKey(), userId: text('user_id').notNull().references(() => citizens.clerkUserId),
+  nationId: text('nation_id').notNull(), body: text('body').notNull(),
+  postedAt: integer('posted_at').notNull(), deleted: integer('deleted').notNull().default(0),
+}, table => [index('square_messages_scope').on(table.nationId,table.postedAt),
+  index('square_messages_rate').on(table.userId,table.postedAt),
+  check('square_message_length',sql`length(${table.body}) BETWEEN 1 AND 280`)]);
+export const squarePresence = sqliteTable('square_presence', {
+  userId: text('user_id').primaryKey().references(() => citizens.clerkUserId),
+  nationId: text('nation_id').notNull(), expiresAt: integer('expires_at').notNull(),
 });

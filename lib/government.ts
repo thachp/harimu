@@ -3,7 +3,9 @@ export type GovernmentSnapshot = {
   nationId: string;
   mode: 'rule-bound simulation';
   roles: { name: string; controller: string }[];
-  decision: { title: string; reason: string; proposedSpendMinor: number };
+  decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
+  review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
+  petitions?: { requestId: string; topic: PetitionTopic; submittedAt: number; status: 'pending' | 'accepted' | 'deferred'; reason: string; reviewedAt: number | null }[];
   availableBudgetMinor: number;
   influenceSummary: string;
 };
@@ -62,9 +64,17 @@ export function simulateGovernment(input: {
     roles: institution.roles.map((name) => ({ name, controller: 'AI/SI role · deterministic rules' })),
     availableBudgetMinor: budget,
     decision: {
-      title: titles[topic], proposedSpendMinor,
+      title: titles[topic], proposedSpendMinor, topic,
       reason: `${institution.response} ${emergency ? `Food security is ${foodSecurity}/100, below the 40-point safety threshold; food takes priority.` : `${count} ${topic} petition${count === 1 ? '' : 's'} set this priority (food ${counts.food}, infrastructure ${counts.infrastructure}, work ${counts.work}; ties favor food, then infrastructure).`} ${budget === 0 ? 'No verified budget is available, so no spending is proposed.' : `The proposal is capped at ${emergency ? '20' : '10'}% of the verified available budget.`}`,
     },
     influenceSummary: institution.influence,
   };
+}
+
+/** Preserve the recorded priority, while rebasing a live proposal onto today's verified funds. */
+export function rebaseGovernmentBudget(snapshot: GovernmentSnapshot, availableBudgetMinor: number, emergency: boolean): GovernmentSnapshot {
+  const budget = Number.isSafeInteger(availableBudgetMinor) && availableBudgetMinor >= 0 ? availableBudgetMinor : 0;
+  return { ...snapshot, availableBudgetMinor: budget, decision: { ...snapshot.decision,
+    proposedSpendMinor: Math.floor(budget / (emergency ? 5 : 10)),
+    reason: `${snapshot.decision.reason} Recorded review inputs above are historical. Today's verified programme funds are ${budget} minor units; today's proposal is recalculated with the ${emergency ? 20 : 10}% limit.` } };
 }
