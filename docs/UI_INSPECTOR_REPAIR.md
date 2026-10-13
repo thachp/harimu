@@ -18,3 +18,9 @@ Before/after pixels confirm the nested registry/map is removed and all instituti
 Validation: lint, TypeScript, 72 SQLite regression tests and all 18 JavaScript regression scripts. Interaction checks include repeated selection, institution actions, browser history, inspector focus, textarea Escape and keyboard camera movement. Existing accounts were not enrolled, charged or traded during visual QA; backend settlement and isolation behavior are covered by regression tests. This is a targeted browser/keyboard audit, not a complete screen-reader or WCAG certification. No schema, service, credential or audience changes are included.
 
 Tracked implementation issue: https://github.com/thachp/harimu/issues/1.
+
+## World selection simplification
+
+Patrick's subsequent direction keeps exactly two selection surfaces: clickable globe labels and the bottom nation strip. The sidebar nation list, globe chooser overlay and institutions select were removed. Selected-nation facts and citizenship/inspection actions remain; repeated instructions, motto headings and the unrelated seeded regional noticeboard were removed from World. Simulation and verification limits remain available under Rules and limits; institution details still expose their specific restrictions. Paid contributions remain available in a compact disclosure.
+
+Fresh desktop selected/collapsed/institution frames and a 390×844 mobile full-page frame confirm the concise layout. Native button keyboard activation changes the selected nation through both retained surfaces; browser Back restores it. The mobile document measures 390px client/scroll width and has no extra picker. Targeted institution/navigation/camera tests, all eighteen JavaScript regression scripts, lint and TypeScript pass. Economy SQL and schema are unchanged from the fully tested v19 release. Aurelle feature expansion is paused for this UI priority.

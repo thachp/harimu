@@ -56,3 +56,5 @@ body:has(.harimu-game){overflow:auto}
 .game-inspector-body .daily-loop>button{margin:6px 6px 6px 0}
 .game-notice{top:calc(var(--hud-height) + 90px)}
 @media(max-width:760px){.game-notice{top:210px}}
+.viewport-world-label:focus-visible{outline:2px solid #80d8ce;outline-offset:3px}
+@media(max-width:760px){.viewport-world-label{min-height:44px}}

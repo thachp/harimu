@@ -1257,17 +1257,12 @@ export default function Home() {
   </section>;
 
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
-    {!citizenNation && <p><strong>You are joining as a citizen.</strong> All government offices are AI/SI controlled. Current government is a deterministic simulation, with no live AI model connected.</p>}
-    <p>Fictional globe geography · nation rules are fixed. Square ownership and cross-border trade are not simulated yet.</p>
-    <div className="game-nation-choices">{worldNations.map(nation => <button key={nation.id} type="button" aria-pressed={selected.id===nation.id} onClick={()=>selectNation(nation.id)}>{nation.shortName}</button>)}</div>
-    <h2>{selected.name}</h2><p>{selected.motto}</p>
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
-    <p>Counted petitions require Tier 1 phone verification, which is not available yet. Ordinary play and chat remain available.</p>
-    <p><strong>Playable support:</strong> {selected.id === 'kindle' ? 'Paid work, wages, goods, merchant trades, citizen listings, household meals and government previews.' : selected.id === 'korund' ? 'Assigned work, Labor Note wages, game-week ration coupons, state food redemption, household meals and deterministic government previews. Labor Note spending, job preferences, production drives and gray markets are planned.' : selected.id === 'aurelle' ? 'Citizenship, city chat and deterministic government previews. Paid work and local economies are planned.' : 'Citizenship and city chat. Local jobs, economies and civic actions are planned.'}</p>
+    <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : 'Chat · Government preview; economy planned'}</p>
+    <details><summary>Rules and limits</summary><p>Fixed nation rules; all offices use deterministic AI/SI simulation. Phone verification is unavailable, so counted petitions are closed. Territory ownership and foreign trade are planned.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" onClick={()=>beginEnrollment(selected.id)}>Enroll in {selected.shortName}</button>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
-    <SceneNews events={worldEvents} title="Regional notices" />
   </section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='square' ? <>
     {dailyLoop}

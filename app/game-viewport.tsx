@@ -184,7 +184,7 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
         if (key === 'Home') controls.current?.reset();
         if (key === 'Enter' && mode === 'city') callback.current(locationSelection(selectedLocation || 'square', nationId));
       }} />
-    {fallback && <p className="viewport-fallback">3D rendering is unavailable on this device. Choose a location below to continue your citizen day.</p>}
+    {fallback && <p className="viewport-fallback">3D unavailable. Use the bottom strip to continue.</p>}
     <div className="viewport-controls" aria-label="Camera controls">
       <button type="button" onClick={() => controls.current?.zoom(.15)} aria-label="Zoom in">+</button>
       <span aria-live="polite">{cameraLabel}</span>
@@ -195,7 +195,7 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
       <button type="button" onClick={() => controls.current?.pan(mode === 'world' ? 0 : -1, mode === 'world' ? -.15 : -1)} aria-label={mode === 'world' ? 'Rotate globe up' : 'Pan up'}>↑</button>
       <button type="button" onClick={() => controls.current?.pan(mode === 'world' ? 0 : 1, mode === 'world' ? .15 : 1)} aria-label={mode === 'world' ? 'Rotate globe down' : 'Pan down'}>↓</button>
     </div>
-    {mode === 'world' && <details className="viewport-locations" aria-label="Nation selection"><summary>Choose a nation</summary><div>{nations?.map(nation => <button type="button" key={nation.id} onClick={() => callback.current({ kind: 'nation', nationId: nation.id, label: nation.name || nation.id, detail: 'Explore this fictional Harimu nation. Globe geography is illustrative, not authoritative territory.' })}>{nation.name || nation.id}</button>)}</div></details>}
+
 
   </div>;
 }

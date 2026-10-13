@@ -36,16 +36,17 @@ const nations=Array.from({length:10},(_,index)=>({id:['kindle','korund','aurelle
   population:'Seeded 1m',treasury:'Seeded 100m',stability:70,motto:`Motto ${index}`,tradeStatus:'Illustrative corridor'}));
 const noAction=()=>{throw new Error('Inspection must not invoke a citizen command during rendering.');};
 const jobs=[{id:'harvest',name:'Harvest fixture',detail:'Recorded contribution',cost:4,nationId:'kindle'}];
-const props={nations,capacity:18,workOrders:jobs,workPending:false,onSelectNation:noAction,onWorldView:noAction,
+const props={capacity:18,workOrders:jobs,workPending:false,onWorldView:noAction,
   onHousehold:noAction,onWorkplace:noAction,onCommitWork:noAction};
 
-test('compact institutions renders every inspected nation with an accessible selector and coherent headings',()=>{
+test('compact institutions renders every inspected nation without a duplicate picker and with coherent headings',()=>{
   for (const nation of nations) {
     const html=renderToStaticMarkup(React.createElement(NationInstitutions,{...props,nation,citizenNation:nations[1]}));
-    assert.equal((html.match(/<option /g)??[]).length,10);
-    assert.ok(html.includes(`<option value="${nation.id}" selected="">`));
-    assert.ok(html.includes(`<h2>${nation.name}</h2>`));assert.ok(html.includes(`<h3>${nation.capital}</h3>`));
-    assert.match(html,/for="inspected-nation"/);assert.match(html,/role="group" aria-label="Institution systems"/);
+    assert.ok(!html.includes('<select'));assert.ok(!html.includes('<option'));
+    assert.ok(html.includes(`aria-label="${nation.name} institutions"`));
+    assert.ok(!html.includes('<h2>Institutions</h2>'));assert.ok(html.includes(`<h3>${nation.capital}</h3>`));
+    assert.ok(html.includes(nation.government));assert.ok(html.includes(nation.economy));assert.ok(html.includes(nation.religion));
+    assert.match(html,/role="group" aria-label="Institution systems"/);
     assert.equal((html.match(/aria-pressed="true"/g)??[]).length,1);
     assert.match(html,/Illustrative starting figures, not measured live conditions/);
     assert.match(html,/no live AI model connected/);

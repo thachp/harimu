@@ -46,7 +46,7 @@ export function GameShell({ worldClock, view, nation, citizenNation, nations, ca
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
   useEffect(() => { const tick = () => setNow(Date.now()); tick(); const id = setInterval(tick, 1000); return () => clearInterval(id); }, []);
-  const sceneTitle = nation.id === 'korund' && view === 'market' ? 'State ration store' : nation.id === 'korund' && view === 'workplace' ? 'Assignment board' : titles[view];
+  const sceneTitle = view === 'world' ? nation.name : nation.id === 'korund' && view === 'market' ? 'State ration store' : nation.id === 'korund' && view === 'workplace' ? 'Assignment board' : titles[view];
   const resourceNation = citizenNation ?? nation;
   const inspecting = view === 'world' || view === 'nation';
   const hasPanel = !collapsed;
@@ -78,7 +78,7 @@ export function GameShell({ worldClock, view, nation, citizenNation, nations, ca
       </div>
       <div className="game-account"><span className="game-clock" title={worldClock ? `Server snapshot · 12× world time · ${worldClock.pendingTicks} ticks pending · advances on visits` : 'Real UTC time'}>{worldClock ? `Day ${worldClock.gameDay} · 12×` : now ? clockLabel(now) : '--:--'} <small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : 'UTC · REAL TIME'}</small></span>{accountControls}</div>
     </header>
-    <div className="game-location-banner"><Compass size={18} /><div><strong>{view === 'world' ? 'Harimu · Living world' : (nation.capital ?? `${nation.name} · City district`)}</strong><span>{view === 'world' ? 'Fictional nations · Drag to rotate · Select to inspect' : 'Select a building to enter · Drag to explore'}</span></div></div>
+    <div className="game-location-banner"><Compass size={18} /><div><strong>{view === 'world' ? 'Harimu' : (nation.capital ?? `${nation.name} · City district`)}</strong><span>{view === 'world' ? 'Drag to rotate' : 'Select a building to enter · Drag to explore'}</span></div></div>
     {shiftSummary && <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong><span>{remaining === null ? 'Active shift' : remaining === 0 ? 'Ready to claim' : `${remaining} min remaining`}</span><CaretRight /></button>}
     {notice && notice !== dismissedNotice && <div className="game-notice" role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setDismissedNotice(notice)}><X size={16} /></button></div>}
     {hasPanel ? <aside id="game-details" className="game-inspector" aria-label={sceneTitle}><header className="game-inspector-title"><div><small>{nation.name} / {inspecting ? 'NATION INSPECTION' : 'CITIZEN LIFE'}</small><h1 id="game-panel-title" tabIndex={-1}>{sceneTitle}</h1></div><button type="button" aria-label="Collapse details" aria-expanded="true" aria-controls="game-details" onClick={close}><CaretRight size={20} /></button></header><div className="game-inspector-body">
