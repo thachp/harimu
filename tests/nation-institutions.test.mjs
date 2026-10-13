@@ -49,7 +49,7 @@ test('compact institutions renders every inspected nation without a duplicate pi
     assert.match(html,/role="group" aria-label="Institution systems"/);
     assert.equal((html.match(/aria-pressed="true"/g)??[]).length,1);
     assert.match(html,/Illustrative starting figures, not measured live conditions/);
-    assert.match(html,/no live AI model connected/);
+    assert.match(html,/no live AI model (?:is )?connected/);
     assert.ok(!html.includes('<main'));assert.ok(!html.includes('<canvas'));assert.ok(!html.includes('Day 42'));
   }
 });
