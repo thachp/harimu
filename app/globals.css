@@ -2211,3 +2211,13 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 .player-market input, .player-market select { min-width: 65px; max-width: 120px; padding: 8px; color: #f3ecd8; background: #18363a; border: 1px solid #72c7b9; }
 .player-market article { padding: 12px 0; border-bottom: 1px solid #526560; }
 .player-market h4 { margin: 18px 0 8px; }
+
+.ai-badge, .ai-text-tag { display: inline-block; color: #b6e0d5; background: #234a48; border: 1px solid #49706a; border-radius: 3px; padding: 2px 5px; font-size: 11px; line-height: 1.4; }
+.ai-badge { vertical-align: middle; }
+.leader-panel { border-block: 1px solid #34505b; padding-block: 16px; margin-block: 12px; }
+.leader-identity { display: flex; gap: 12px; align-items: flex-start; }
+.leader-identity svg { flex: 0 0 80px; }
+.leader-identity h3 { margin-top: 0; }
+.leader-panel details { margin-top: 12px; }
+.leader-panel summary { cursor: pointer; }
+@media (max-width: 480px) { .leader-identity { flex-wrap: wrap; } }

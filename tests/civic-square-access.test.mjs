@@ -11,9 +11,12 @@ const require=createRequire(import.meta.url);
 async function component(file,name) {
   const source=await readFile(new URL(`../app/${file}`,import.meta.url),'utf8');
   const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
-  const GameTimer=file==='government-panel.tsx'?await component('game-timer.tsx','GameTimer'):null;
+  const GameTimer=['government-panel.tsx','leader-panel.tsx'].includes(file)?await component('game-timer.tsx','GameTimer'):null;
+  const LeaderPanel=file==='government-panel.tsx'?await component('leader-panel.tsx','LeaderPanel'):null;
+  const AiBadge=file!=='ai-disclosure.tsx'?await component('ai-disclosure.tsx','AiBadge'):null;
+  const AiTextTag=file!=='ai-disclosure.tsx'?await component('ai-disclosure.tsx','AiTextTag'):null;
   const exports={};
-  new Function('exports','require',compiled)(exports,name=>name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:name==='./game-timer'?{GameTimer}:name==='../lib/government-disclosure'?require('../lib/government-disclosure.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):require(name));
+  new Function('exports','require',compiled)(exports,name=>name==='./leader-panel'?{LeaderPanel}:name==='./ai-disclosure'?{AiBadge,AiTextTag}:name==='../lib/leader-personas'?require('../lib/leader-personas.ts'):name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:name==='./game-timer'?{GameTimer}:name==='../lib/government-disclosure'?require('../lib/government-disclosure.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):require(name));
   return exports[name];
 }
 const SquareChat=await component('square-chat.tsx','SquareChat');
@@ -69,6 +72,16 @@ test('closed nation Civic local previews use official disclosures without intern
   const html=render(GovernmentPanel,{snapshot,nationId,localDemo:true,pending:false,onPetition(){}});
   assert.match(html,nationId==='korund'?/Chairman&#x27;s official statement/:/Royal decree/);
   assert.match(html,/Why\?/);assert.match(html,/Simulated statement/);
-  assert.doesNotMatch(html,/35\/100|safety threshold/);
+  assert.doesNotMatch(html,/35\/100|below the 40-point/);
+ }
+});
+
+test('all MVP leaders have portraits, SI badges, programme status and lawful disclosure',()=>{
+ for(const nationId of ['kindle','korund','aurelle']) {
+  const snapshot=simulateGovernment({nationId,availableBudgetMinor:1000,foodSecurity:35,petitionCounts:{}});
+  const html=render(GovernmentPanel,{snapshot,nationId,localDemo:true,pending:false,onPetition(){}});
+  assert.match(html,/Stylized portrait/);assert.match(html,/Authored preview persona/);assert.match(html,/Current pledges and programme/);assert.match(html,/Enforced by rules/);assert.match(html,/Proposed/);
+  assert.match(html,/class="ai-badge"/);assert.doesNotMatch(html,/AI-generated/);
+  assert.equal((html.match(/Why\?/g)||[]).length,1);
  }
 });
