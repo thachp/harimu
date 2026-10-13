@@ -47,3 +47,16 @@ test('loaded Civic shows actual policy and disabled petitions when verification 
   assert.match(html,/Petition for/);
   assert.doesNotMatch(html,/Government preview unavailable|Civic play coming soon/);
 });
+
+test('City chat distinguishes nationwide messages from opt-in city presence',()=>{
+  const html=render(SquareChat,{enabled:true,nationId:'kindle',cityId:'kindle-capital',session:'ready'});
+  assert.match(html,/Conversation is nation-wide/);
+  assert.match(html,/Presence counts only citizens in your current city/);
+  assert.match(html,/sharing turns off when you travel/);
+  assert.match(html,/Share my presence while this city is visible/);
+  assert.doesNotMatch(html,/<input[^>]*checked|this square/);
+});
+test('City presence remains disabled when the current city is unavailable',()=>{
+  const html=render(SquareChat,{enabled:true,nationId:'kindle',session:'ready'});
+  assert.match(html,/<input[^>]*disabled/);
+});

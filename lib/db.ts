@@ -1,3 +1,4 @@
+import { cityLocationSchema } from './city-location';
 import { aurelleSchemas } from './aurelle';
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
@@ -169,6 +170,7 @@ async function initialize(database: D1Database) {
   await database.batch([
     database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_government_petitions_nation_period ON government_petitions(nation_id, period_start)'),
+    database.prepare(cityLocationSchema),
     ...squareSchema.map(sql => database.prepare(sql)),
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),

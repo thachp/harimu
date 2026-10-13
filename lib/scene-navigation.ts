@@ -1,4 +1,4 @@
-export const viewModes = ['world', 'square', 'household', 'workplace', 'market', 'government', 'nation'] as const;
+export const viewModes = ['world', 'country', 'square', 'household', 'workplace', 'market', 'government', 'nation'] as const;
 export type SceneView = typeof viewModes[number];
 export const sceneHistoryKey = 'harimuScenePath';
 /** Keep router scroll/snapshot metadata when adding a local game scene entry. */
@@ -11,18 +11,19 @@ export function isSceneTraversal(state: unknown, pathname: string): boolean {
 }
 export function sceneFromSearch(search: string): SceneView {
   const requested = new URLSearchParams(search).get('view');
-  const view = requested === 'home' || requested === 'planning' ? 'household' : requested;
+  const view = requested === 'city' ? 'square' : requested === 'home' || requested === 'planning' ? 'household' : requested;
   return viewModes.includes(view as SceneView) ? view as SceneView : 'square';
 }
 export function nationFromSearch(search: string, validNationIds: readonly string[], fallbackId: string): string {
   const requested = new URLSearchParams(search).get('nation');
   return requested && validNationIds.includes(requested) ? requested : fallbackId;
 }
-export function sceneUrl(href: string, scene: SceneView, nationId?: string): string {
+export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string): string {
   const url = new URL(href);
   url.searchParams.set('view', scene);
-  if (scene === 'nation' || scene === 'world') {
+  if (scene === 'nation' || scene === 'world' || scene === 'country' || Boolean(cityId)) {
     if (nationId) url.searchParams.set('nation', nationId);
   } else url.searchParams.delete('nation');
+  if (cityId) url.searchParams.set('city', cityId);
   return url.href;
 }

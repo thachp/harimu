@@ -33,6 +33,7 @@ export async function localRuntime() {
   const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
   const path = join(directory, 'fixture.sqlite');
   const modules = [
+    'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'app/api/city/route.ts',
     'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
     'lib/government-state.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
@@ -100,6 +101,7 @@ export async function readVerification(userId) {
   const { getDatabase } = await import(pathToFileURL(join(directory, 'lib/db.mjs')).href);
   const citizen = await import(pathToFileURL(join(directory, 'app/api/citizen/route.mjs')).href);
   const square = await import(pathToFileURL(join(directory, 'app/api/square/route.mjs')).href);
+  const city = await import(pathToFileURL(join(directory, 'app/api/city/route.mjs')).href);
   const world = await import(pathToFileURL(join(directory, 'app/api/world/route.mjs')).href);
   const simulation = await import(pathToFileURL(join(directory, 'lib/world-simulation.mjs')).href);
   await getDatabase(); // Real additive schema bootstrap and seed initialization.
@@ -112,7 +114,7 @@ export async function readVerification(userId) {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (user) identify(request, user);
-    const handlers = endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : square;
+    const handlers = endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
     const response = await handlers[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };

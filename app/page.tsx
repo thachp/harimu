@@ -6,6 +6,9 @@ import type { SimulationState } from '@/lib/world-simulation';
 import { GuestDemo, type GuestDemoView } from './guest-demo';
 import { FirstVisitGuide, type FirstVisitStage } from './first-visit-guide';
 import { GlobeTour } from './globe-tour';
+import { CountryScene } from './country-scene';
+import { capitalCityForNation, cityForNation } from '@/lib/cities';
+import type { CityLocation } from '@/lib/city-location';
 import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
@@ -605,6 +608,29 @@ export default function Home() {
   const citizenIdentity = useRef<string | null>(null);
   const citizenEpoch = useRef(0);
   const [citizenSessionKey, setCitizenSessionKey] = useState(0);
+  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[]}} | null>(null);
+  const [cityError, setCityError] = useState('');
+  const [cityRetry, setCityRetry] = useState(0);
+  const [cityTravelPending, setCityTravelPending] = useState(false);
+  const cityTravelLock = useRef(false);
+  useEffect(() => {
+    if (!clerkConfigured || citizenSessionStatus !== 'ready' || !citizenNationId) return;
+    const controller = new AbortController();
+    const epoch = citizenEpoch.current;
+    const loadCity = async () => {
+      try {
+        const response = await fetch('/api/city', {cache:'no-store',signal:controller.signal});
+        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];error?:string};
+        if (controller.signal.aborted || epoch !== citizenEpoch.current) return;
+        if (!response.ok || value.nationId !== citizenNationId || !cityForNation(value.nationId,value.currentCityId)) throw Error(value.error ?? 'City account unavailable.');
+        setCityAccount({key:citizenSessionKey,value}); setCityError('');
+      } catch (error) { if (!controller.signal.aborted && epoch === citizenEpoch.current) setCityError(error instanceof Error ? error.message : 'City account unavailable.'); }
+    };
+    void loadCity();
+    const timer = viewMode === 'country' ? setInterval(() => { if (!document.hidden) void loadCity(); },15000) : undefined;
+    return () => { controller.abort(); if (timer) clearInterval(timer); };
+  }, [citizenSessionStatus,citizenNationId,citizenSessionKey,cityRetry,viewMode]);
+  const currentCityAccount = cityAccount?.key === citizenSessionKey && cityAccount.value.nationId === citizenNationId ? cityAccount.value : null;
   const persistIntents = useCallback(() => {
     if (!clerkConfigured || !citizenIdentity.current) return;
     try { writeCitizenIntents(window.sessionStorage, citizenIdentity.current, {
@@ -623,6 +649,7 @@ export default function Home() {
     setGuestState(createGuestDemo());
     citizenEpoch.current++;
     setCitizenSessionKey(value => value + 1);
+    cityTravelLock.current = false; setCityTravelPending(false); setCityAccount(null); setCityError('');
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
     setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
@@ -1004,8 +1031,11 @@ export default function Home() {
   const startAurelleAction = (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void runAurelleCommand({ action, shiftId, quantity, requestId: crypto.randomUUID() });
   function changeView(nextView: ViewMode) {
     if (nextView !== 'world') stopTour();
-    setSelectedId(selected.id);
-    const href = sceneUrl(window.location.href, nextView, selected.id);
+    const nextNation = nextView === 'country' && !['world','country','nation'].includes(viewMode) && citizenNation ? citizenNation.id : selected.id;
+    setSelectedId(nextNation);
+    const visitingCity = new URLSearchParams(window.location.search).get('city');
+    const cityId = citizenNation ? currentCityAccount?.currentCityId : visitingCity && cityForNation(nextNation,visitingCity) ? visitingCity : undefined;
+    const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
   }
@@ -1015,10 +1045,33 @@ export default function Home() {
     stopTour();
     setSelectedId(nationId);
     setNationFocusRevision(value => value + 1);
-    if (viewMode !== 'nation' && viewMode !== 'world') return;
+    if (!['nation','world','country'].includes(viewMode)) return;
     const href = sceneUrl(window.location.href, viewMode, nationId);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
+  }
+
+  async function travelCity(cityId:string) {
+    if (cityTravelLock.current || !cityForNation(selected.id,cityId)) return;
+    if (!clerkConfigured || (!citizenNation && citizenSessionStatus === 'anonymous')) {
+      const href=sceneUrl(window.location.href,'square',selected.id,cityId);
+      window.history.pushState(sceneHistoryState(window.history.state,window.location.pathname),'',href);
+      window.dispatchEvent(new Event('harimu-scenechange')); return;
+    }
+    if (citizenSessionStatus !== 'ready' || citizenNation?.id !== selected.id || !currentCityAccount) return;
+    const epoch=citizenEpoch.current;
+    cityTravelLock.current=true;setCityTravelPending(true);setCityError('');
+    try {
+      const response=await fetch('/api/city',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'travel',cityId})});
+      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];error?:string};
+      if(epoch!==citizenEpoch.current)return;
+      if(!response.ok || value.nationId!==citizenNation.id || value.currentCityId!==cityId)throw Error(value.error ?? 'Travel could not be confirmed. Refresh your city account before retrying.');
+      setCityAccount({key:citizenSessionKey,value});
+      const href=sceneUrl(window.location.href,'square',citizenNation.id,value.currentCityId);
+      window.history.pushState(sceneHistoryState(window.history.state,window.location.pathname),'',href);
+      window.dispatchEvent(new Event('harimu-scenechange'));
+    } catch(error){if(epoch===citizenEpoch.current)setCityError(error instanceof Error?error.message:'Travel could not be confirmed.');}
+    finally{if(epoch===citizenEpoch.current){cityTravelLock.current=false;setCityTravelPending(false);}}
   }
 
   function togglePlan(id: string) {
@@ -1456,11 +1509,21 @@ export default function Home() {
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" disabled={clerkConfigured && ['loading','error'].includes(citizenSessionStatus)} onClick={()=>beginEnrollment(selected.id)}>Choose citizenship · {selected.shortName}</button>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
   </section>;
-  const gamePanel = viewMode==='world' ? worldPanel : viewMode==='square' ? <>
+  const countryNation = selected;
+  const requestedPreviewCity = new URLSearchParams(locationSearch).get('city');
+  const previewCity = requestedPreviewCity ? cityForNation(selected.id,requestedPreviewCity) : undefined;
+  const activeCity = clerkConfigured && citizenNation ? currentCityAccount ? cityForNation(citizenNation.id,currentCityAccount.currentCityId) : capitalCityForNation(citizenNation.id) : previewCity ?? capitalCityForNation(selected.id);
+  const countryOwnNation = clerkConfigured && citizenNation?.id === countryNation.id;
+  const countryCityId = countryOwnNation ? currentCityAccount?.currentCityId ?? capitalCityForNation(countryNation.id)?.id ?? null : previewCity?.id ?? capitalCityForNation(countryNation.id)?.id ?? null;
+  const countryHomeId = countryOwnNation ? currentCityAccount?.homeCityId ?? capitalCityForNation(countryNation.id)?.id ?? null : capitalCityForNation(countryNation.id)?.id ?? null;
+  const canCityTravel = !clerkConfigured || citizenSessionStatus === 'anonymous' || Boolean(countryOwnNation && currentCityAccount && citizenSessionStatus === 'ready');
+  const countryMap = <CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !citizenNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} />;
+  const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
+  const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : viewMode==='square' ? <>
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {firstLoopHint}{dailyLoop}
-    <p>{citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
-    <SquareChat key={`${citizenSessionKey}:${citizenNationId}`} configured={clerkConfigured} session={citizenSessionStatus} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
+    <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
+    <SquareChat key={`${citizenSessionKey}:${citizenNationId}:${activeCity?.id}`} cityId={citizenNation ? currentCityAccount?.currentCityId : undefined} configured={clerkConfigured} session={citizenSessionStatus==='ready' && citizenNationId && !currentCityAccount ? 'loading' : citizenSessionStatus} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId) && Boolean(currentCityAccount)} nationId={citizenNationId} />
     <SceneNews events={worldEvents} title="City noticeboard" />
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
     <NationInstitutions nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
@@ -1470,7 +1533,7 @@ export default function Home() {
       workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} /> : citizenScene;
   const activeShift = priorNationShift ?? (citizenNation?.id === 'aurelle' ? aurellePlan?.shifts ?? [] : citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
   const contextItems: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[] =
-    citizenNation?.id === 'aurelle' && ['household','workplace','market'].includes(viewMode) ? [
+    viewMode === 'country' ? [{id:'current-city',label:'Open City',detail:countryOwnNation ? activeCity?.name ?? 'Loading your city' : cityForNation(selected.id,countryCityId ?? '')?.name ?? 'City preview',onSelect:()=>changeView('square')}] : citizenNation?.id === 'aurelle' && ['household','workplace','market'].includes(viewMode) ? [
       {id:'aurelle-service',label:'Chartered service',detail:'4 WC · 8 CRN · 2 Favor',onSelect:()=>changeView('workplace')},
       {id:'aurelle-food',label:'Chartered food',detail:`${aurellePlan?.publicFoodRemaining ?? 0} at estate · 1.50 CRN each`,onSelect:()=>changeView('market')},
       {id:'aurelle-household',label:'Household',detail:`${aurellePlan?.foodQuantity ?? 0} food · ${aurellePlan?.favor ?? 0} Favor`,onSelect:()=>changeView('household')},
@@ -1502,13 +1565,13 @@ export default function Home() {
       ] : [];
   const contextTitle = citizenNation?.id === 'korund' && viewMode === 'market' ? 'State rations' : citizenNation?.id === 'korund' && viewMode === 'workplace' ? 'Assigned work' : viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
-      : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Household';
+      : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? 'Country travel' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
-      localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
+      localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onNavigate={navigateGame} onSelectNation={selectNation}
       accountControls={<ClerkAccountControl />} />

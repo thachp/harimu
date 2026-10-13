@@ -6,7 +6,7 @@ for (const view of viewModes) {
   const url = sceneUrl('https://harimu.com/?preview=1&nation=kindle', view, 'korund');
   assert.equal(sceneFromSearch(new URL(url).search), view);
   assert.equal(new URL(url).searchParams.get('preview'), '1');
-  assert.equal(new URL(url).searchParams.get('nation'), ['world','nation'].includes(view) ? 'korund' : null);
+  assert.equal(new URL(url).searchParams.get('nation'), ['world','nation','country'].includes(view) ? 'korund' : null);
 }
 // Browser history restores views entirely from URLs, without a stale component override.
 const history = ['https://harimu.com/'];
@@ -44,3 +44,8 @@ assert.equal(nationFromSearch('?view=nation&nation=',nationIds,citizenNation),'k
 assert.equal(nationFromSearch('?view=world',nationIds,'aurelle'),'aurelle');
 assert.equal(new URL(sceneUrl(nationHistory.at(-1),'household',citizenNation)).searchParams.get('nation'),null);
 assert.equal(citizenNation,'kindle');
+
+assert.equal(sceneFromSearch('?view=city'),'square','City alias retains legacy square route');
+const cityVisit=sceneUrl('https://harimu.com/?view=country&nation=korund','square','korund','farim-rice');
+assert.equal(new URL(cityVisit).searchParams.get('city'),'farim-rice');
+assert.equal(new URL(cityVisit).searchParams.get('nation'),'korund','Sample city refresh retains its exploration nation');

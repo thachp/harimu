@@ -330,3 +330,5 @@ export const aurelleMeals = sqliteTable('aurelle_meals', {
   id:text('id').primaryKey().references(()=>aurelleReceipts.id),clerkUserId:text('clerk_user_id').notNull().references(()=>citizens.clerkUserId),
   quantity:integer('quantity').notNull(),occurredAt:integer('occurred_at').notNull(),
 },t=>[check('aurelle_meal_quantity',sql`${t.quantity}=2`)]);
+
+export const citizenCityLocations = sqliteTable('citizen_city_locations', {userId:text('user_id').primaryKey().references(()=>citizens.clerkUserId,{onDelete:'cascade'}),nationId:text('nation_id').notNull(),homeCityId:text('home_city_id').notNull(),currentCityId:text('current_city_id').notNull(),updatedAt:integer('updated_at').notNull()});

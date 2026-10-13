@@ -1,3 +1,4 @@
+import {readCityLocation} from '@/lib/city-location';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { postSquareSql, readSquare, uuidPattern, validSquareText } from '@/lib/square-chat';
@@ -27,7 +28,10 @@ export async function POST(request:Request) {
   const {db,userId,nationId,now}=ctx;
   if(body.action==='presence') {
     if(typeof body.active!=='boolean')return privateResponse({error:'Invalid presence choice.'},400);
-    if(body.active)await db.prepare(`INSERT INTO square_presence(user_id,nation_id,expires_at) SELECT clerk_user_id,nation_id,? FROM citizens WHERE clerk_user_id=? AND nation_id IS NOT NULL ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,expires_at=excluded.expires_at`).bind(now+90,userId).run();
+    const location=await readCityLocation(db,userId,nationId,now);
+    if((body.expectedCityId!==undefined&&body.expectedCityId!==location.currentCityId)||(body.cityId!==undefined&&body.cityId!==location.currentCityId))return privateResponse({error:'City changed. Refresh your current city before sharing presence.'},409);
+    if(body.active){const refreshed=await db.prepare(`INSERT INTO square_presence(user_id,nation_id,expires_at) SELECT clerk_user_id,nation_id,? FROM citizens WHERE clerk_user_id=? AND nation_id=? AND EXISTS(SELECT 1 FROM citizen_city_locations WHERE user_id=? AND nation_id=? AND current_city_id=?) ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,expires_at=excluded.expires_at`).bind(now+90,userId,nationId,userId,nationId,location.currentCityId).run();
+    if(!refreshed.meta.changes)return privateResponse({error:'City changed. Refresh your current city before sharing presence.'},409);}
     else await db.prepare('DELETE FROM square_presence WHERE user_id=?').bind(userId).run();
   } else if(body.action==='delete') {
     if(typeof body.id!=='string'||!uuidPattern.test(body.id))return privateResponse({error:'Invalid message.'},400);

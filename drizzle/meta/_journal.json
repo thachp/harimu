@@ -50,6 +50,13 @@
       "when": 1791898644824,
       "tag": "0006_aurelle_charter",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791913550481,
+      "tag": "0007_city_locations",
+      "breakpoints": true
     }
   ]
 }
