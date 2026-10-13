@@ -200,3 +200,15 @@ test('previous-day legacy review remains historical and cannot drive current gov
   assert.equal((await r.call('citizen', 'alice')).data.government.review.active, false);
   assert.equal((await r.db.prepare('SELECT snapshot_json FROM government_reviews').first()).snapshot_json, JSON.stringify(historical));
 });
+
+test('world work offers disclose authoritative real and 12x game durations after reopen',async t=>{
+ const r=await fixture(t);
+ for(let attempt=0;attempt<2;attempt++) {
+  const world=await r.call('world',null);
+  for(const [id,hours] of [['harvest',2],['freight',4],['archive',3]]) {
+   const order=world.data.workOrders.find(order=>order.id===id);
+   assert.ok(order.detail.includes(`resolves in ${hours}h real · ${hours*12}h game`));
+  }
+  r.reopen();
+ }
+});

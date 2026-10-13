@@ -1,3 +1,4 @@
+import { shiftRules } from '@/lib/work-shifts';
 import { advanceWorld } from '@/lib/world-simulation';
 import { getDatabase } from '@/lib/db';
 
@@ -103,7 +104,7 @@ export async function GET() {
         id: order.id,
         nationId: order.nation_id,
         name: order.name,
-        detail: order.detail,
+        detail: shiftRules[order.id] ? order.detail.replace(/resolves in \d+(?:\.\d+)?h(?: real · [^·]+game(?: days?)?)?/, `resolves in ${shiftRules[order.id].hours}h real · ${shiftRules[order.id].hours * 12}h game`) : order.detail,
         cost: order.capacity_cost,
       })),
       planningTasks: planningTaskResult.results.map((task) => ({
