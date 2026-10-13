@@ -1,4 +1,4 @@
-export const viewModes = ['world', 'square', 'home', 'workplace', 'market', 'government', 'nation', 'planning'] as const;
+export const viewModes = ['world', 'square', 'household', 'workplace', 'market', 'government', 'nation'] as const;
 export type SceneView = typeof viewModes[number];
 export const sceneHistoryKey = 'harimuScenePath';
 /** Keep router scroll/snapshot metadata when adding a local game scene entry. */
@@ -10,7 +10,8 @@ export function isSceneTraversal(state: unknown, pathname: string): boolean {
     && (state as Record<string, unknown>)[sceneHistoryKey] === pathname);
 }
 export function sceneFromSearch(search: string): SceneView {
-  const view = new URLSearchParams(search).get('view');
+  const requested = new URLSearchParams(search).get('view');
+  const view = requested === 'home' || requested === 'planning' ? 'household' : requested;
   return viewModes.includes(view as SceneView) ? view as SceneView : 'square';
 }
 export function sceneUrl(href: string, scene: SceneView, nationId?: string): string {

@@ -10,8 +10,8 @@ for (const view of viewModes) {
 }
 // Browser history restores views entirely from URLs, without a stale component override.
 const history = ['https://harimu.com/'];
-for (const scene of ['home', 'workplace', 'market', 'home']) history.push(sceneUrl(history.at(-1), scene));
-assert.deepEqual(history.map(url => sceneFromSearch(new URL(url).search)), ['square', 'home', 'workplace', 'market', 'home']);
+for (const scene of ['household', 'workplace', 'market', 'household']) history.push(sceneUrl(history.at(-1), scene));
+assert.deepEqual(history.map(url => sceneFromSearch(new URL(url).search)), ['square', 'household', 'workplace', 'market', 'household']);
 assert.equal(sceneFromSearch(new URL(history[2]).search), 'workplace');
 const routerState = { __vinext_scrollY: 42, snapshot: { route: '/' } };
 const sceneState = sceneHistoryState(routerState, '/');
@@ -23,3 +23,7 @@ assert.equal(isSceneTraversal(routerState, '/'), false);
 assert.equal(isSceneTraversal(null, '/'), false);
 assert.equal(isSceneTraversal(sceneHistoryState(null, '/'), '/'), true);
 console.log('Scene navigation: default, deep links, retained parameters, history restoration passed');
+
+assert.equal(sceneFromSearch('?view=home'), 'household');
+assert.equal(sceneFromSearch('?view=planning'), 'household');
+assert.equal(new URL(sceneUrl('https://harimu.com/?view=planning', 'household')).searchParams.get('view'), 'household');

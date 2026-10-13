@@ -2,7 +2,7 @@ export type LocationId = 'square' | 'home' | 'workplace' | 'market' | 'governmen
 export type ViewportSelection = { kind: 'tile' | 'building' | 'nation'; label: string; detail: string; location?: LocationId; nationId?: string };
 export const cityLocations: { id: LocationId; label: string; detail: string; x: number; z: number }[] = [
   { id: 'square', label: 'City square', detail: 'Meet your neighbours and read the local notices.', x: 0, z: 0 },
-  { id: 'home', label: 'Your home', detail: 'Food, belongings and recovery.', x: -4, z: 2 },
+  { id: 'home', label: 'Your household', detail: 'Food, belongings and recovery.', x: -4, z: 2 },
   { id: 'workplace', label: 'Workplace', detail: 'Choose a shift and collect earned wages.', x: 4, z: 2 },
   { id: 'market', label: 'Market', detail: 'Visit merchant stalls and citizen listings.', x: -4, z: -3 },
   { id: 'government', label: 'Government district', detail: 'Review officials’ decisions and submit a petition.', x: 4, z: -3 },

@@ -207,7 +207,7 @@ paid services or external infrastructure were provisioned for these features.
 
 ## Shared game shell
 
-World, city square, home, workplace, market and government share a full-width
+World, city square, Household, workplace, market and government share a full-width
 resource/status bar and location navigation. The 3D square terrain occupies the
 left side; the persistent right sidebar contains the current scene's context
 and actions, extending to the bottom. A separate strip beneath the terrain shows
@@ -218,8 +218,8 @@ sidebar action. Mobile stacks terrain, a horizontally scrollable context strip,
 and the action panel without covering controls.
 
 Scene history preserves framework metadata and handles marked same-path
-Back/Forward entries without restoring stale RSC snapshots. Closing a panel
-keeps the current scene and its camera; selecting a location or reopening restores
+Back/Forward entries without restoring stale RSC snapshots. Collapsing a panel reclaims its space while
+keeping the current scene and camera; selecting a location or reopening restores
 its actions. Keyboard terrain controls: arrows to pan, +/− to zoom, Home to
 centre, Enter to select, Escape to close details. World/city camera geometry
 persists through scene transitions in memory; it carries no citizen identity.
@@ -229,3 +229,27 @@ The additional parser tests run with `node --experimental-strip-types
 tests/command-request.test.mjs`. SQL tests validate chat, petition reviews and
 account isolation; full authenticated multi-browser Clerk/D1 coverage remains
 necessary beyond the browser-local demo checks.
+
+
+## Globe, Household and interface refinement
+
+World is a rotatable fictional globe with procedural Earth-like land, ocean and
+polar ice. It uses no third-party map assets or real-country boundaries. Drag
+or use arrow controls to rotate; scroll or use +/− to zoom. The expandable nation
+menu provides a keyboard alternative for all ten nations, including those behind
+the globe. The 3D city remains unchanged.
+
+The dark contextual sidebar collapses completely and returns its width to the
+scene and bottom strip. Its reopen button receives keyboard focus; Escape closes
+scene details while authentication overlays retain their own behavior.
+
+Household replaces Home. Legacy `?view=home` and `?view=planning` links resolve to
+Household. The former Citizen Plan scene and header CTA have been removed. Private
+notes, horizon/task drafts, and existing one-time civic commitment outcomes are
+preserved in Household's expandable notes section. Draft editing is locked during
+saves, and commitments require sufficient capacity. Government remains explicitly
+a deterministic simulation; no model integration or new credentials were added.
+
+Clerk's neutral, input, menu and modal theme now uses readable light text on dark
+surfaces. Account controls are compact, and focus/hover states are scoped to Clerk
+components so authentication behavior and security settings stay intact.

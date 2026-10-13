@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
@@ -20,7 +19,6 @@ import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/e
 import {
   Show,
   SignInButton,
-  SignUpButton,
   UserButton,
   useUser,
 } from '@clerk/nextjs';
@@ -28,26 +26,14 @@ import {
   ArrowLeft,
   ArrowRight,
   Bank,
-  Buildings,
-  CalendarDots,
-  Check,
   ClockCountdown,
   Coins,
-  Drop,
-  FirstAidKit,
-  Info,
-  Leaf,
   MapPin,
-  Notebook,
-  Pulse,
   Scales,
   ShieldCheck,
-  Storefront,
-  Student,
   Train,
   UsersThree,
   Warehouse,
-  Waves,
 } from '@phosphor-icons/react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { clerkConfigured } from './providers';
@@ -382,86 +368,6 @@ const fallbackWorldEvents: WorldEvent[] = [
   { id: 3, occurredAt: 'Day 45 · 18:00', headline: 'Trade corridor vote', kind: 'Ballot', detail: 'Citizens decide the Kindle-Confluence corridor mandate.', location: 'Kindle Assembly' },
 ];
 
-const townInfrastructure = [
-  {
-    id: 'council',
-    name: 'Ward Council',
-    kind: 'Civic administration',
-    status: 'Assembly in session',
-    detail: 'Five delegates are reviewing the eastern waterworks allocation.',
-    x: '19%',
-    y: '20%',
-    icon: Bank,
-  },
-  {
-    id: 'cooperative',
-    name: 'East Ward Growers',
-    kind: 'Food & employment',
-    status: 'Shift needs 6 WC',
-    detail: 'Savanna crews can secure tomorrow’s harvest before the evening storm.',
-    x: '71%',
-    y: '22%',
-    icon: Warehouse,
-  },
-  {
-    id: 'market',
-    name: 'Lantern Market',
-    kind: 'Trade & household supply',
-    status: 'Open until 22:00',
-    detail: 'Staple prices are steady; repair parts are moving quickly.',
-    x: '43%',
-    y: '46%',
-    icon: Storefront,
-  },
-  {
-    id: 'clinic',
-    name: 'Public Clinic',
-    kind: 'Health & care',
-    status: 'Normal capacity',
-    detail: 'The ward clinic has medicine and two evening appointments remaining.',
-    x: '18%',
-    y: '68%',
-    icon: FirstAidKit,
-  },
-  {
-    id: 'school',
-    name: 'Forge Street School',
-    kind: 'Education',
-    status: 'Classes resume Day 43',
-    detail: 'Apprentice placements will be announced after the district forum.',
-    x: '47%',
-    y: '72%',
-    icon: Student,
-  },
-  {
-    id: 'waterworks',
-    name: 'Eastern Waterworks',
-    kind: 'Water security',
-    status: 'Decision required',
-    detail: 'One intake is offline. The ward must choose between repair and reserve storage.',
-    x: '79%',
-    y: '50%',
-    icon: Waves,
-  },
-  {
-    id: 'depot',
-    name: 'Eastline Freight Depot',
-    kind: 'Trade & transport',
-    status: 'Freight due 06:40',
-    detail: 'The Confluence materials convoy is expected before first shift.',
-    x: '75%',
-    y: '78%',
-    icon: Train,
-  },
-] as const;
-
-const householdPortraits = {
-  citizen: '/assets/household/leora-vale.webp',
-  partner: '/assets/household/toma-vale.webp',
-  apprentice: '/assets/household/mika-vale.webp',
-  child: '/assets/household/niko-vale.webp',
-};
-
 function subscribeToLocation(onStoreChange: () => void) {
   const pathname = window.location.pathname;
   // These query-only entries belong to the game, not the framework's RSC router.
@@ -631,7 +537,7 @@ function NationDashboard({
           ))}
         </div>
         <button className="nation-back-button" onClick={onWorldView} type="button">
-          <ArrowLeft aria-hidden="true" size={15} /> World atlas
+          <ArrowLeft aria-hidden="true" size={15} /> World globe
         </button>
       </aside>
 
@@ -762,49 +668,18 @@ function NationDashboard({
           <UsersThree aria-hidden="true" size={21} weight="duotone" />
           <div>
             <span>{isCitizenNation ? 'Your citizen layer' : 'Citizen planning'}</span>
-            <strong>{isCitizenNation ? `Plan life in ${nation.shortName}` : `You are viewing ${nation.shortName}`}</strong>
-            <p>{isCitizenNation ? 'Translate national conditions into household choices.' : 'Private planning opens in your own nation.'}</p>
+            <strong>{isCitizenNation ? `Household in ${nation.shortName}` : `You are viewing ${nation.shortName}`}</strong>
+            <p>{isCitizenNation ? 'Translate national conditions into household choices.' : 'Your household belongs to your own nation.'}</p>
           </div>
-          <button onClick={onPlanningView} type="button">Open planning <ArrowRight aria-hidden="true" size={15} /></button>
+          <button onClick={onPlanningView} type="button">Open household <ArrowRight aria-hidden="true" size={15} /></button>
         </section>
       </aside>
     </section>
   );
 }
 
-type PlanningDashboardProps = {
-  citizenName: string;
-  nation: Nation;
-  capacity: number;
-  influence: number;
-  waterSecurity: number;
-  wardStability: number;
-  horizon: PlanHorizon;
-  completedPlanIds: string[];
-  planSaved: boolean;
-  planningItems: PlanningTask[];
-  worldEvents: WorldEvent[];
-  note: string;
-  nationCount: number;
-  committedDecision: CitizenDecision | null;
-  decisionError: string | null;
-  decisionPending: boolean;
-  preview?: boolean;
-  onHorizonChange: (horizon: PlanHorizon) => void;
-  onTogglePlan: (id: string) => void;
-  onNoteChange: (note: string) => void;
-  onCommitDecision: (input: DecisionCommitInput) => void | Promise<void>;
-  onWorldView: () => void;
-};
-
-function ClerkAccountControl({ onOpenPlanning }: { onOpenPlanning: () => void }) {
-  if (!clerkConfigured) {
-    return (
-      <button className="account-setup-button" onClick={onOpenPlanning} type="button">
-        Connect Clerk
-      </button>
-    );
-  }
+function ClerkAccountControl() {
+  if (!clerkConfigured) return <span className="account-demo-label">Local demo</span>;
 
   return (
     <div className="account-control">
@@ -817,377 +692,12 @@ function ClerkAccountControl({ onOpenPlanning }: { onOpenPlanning: () => void })
         <UserButton
           appearance={{
             elements: {
-              avatarBox: { width: '36px', height: '36px' },
+              avatarBox: { width: '28px', height: '28px' },
             },
           }}
         />
       </Show>
     </div>
-  );
-}
-
-function PlanningDashboard({
-  citizenName,
-  nation,
-  capacity,
-  influence,
-  waterSecurity,
-  wardStability,
-  horizon,
-  completedPlanIds,
-  planSaved,
-  planningItems,
-  worldEvents,
-  note,
-  nationCount,
-  committedDecision,
-  decisionError,
-  decisionPending,
-  preview = false,
-  onHorizonChange,
-  onTogglePlan,
-  onNoteChange,
-  onCommitDecision,
-  onWorldView,
-}: PlanningDashboardProps) {
-  const [selectedInfrastructure, setSelectedInfrastructure] = useState(
-    committedDecision?.infrastructureId ?? 'waterworks',
-  );
-  const [selectedHouseholdMember, setSelectedHouseholdMember] = useState(
-    committedDecision?.householdMemberId ?? 'citizen',
-  );
-  const activeInfrastructure = townInfrastructure.find((place) => place.id === selectedInfrastructure) ?? townInfrastructure[0];
-  const ActivePlaceIcon = activeInfrastructure.icon;
-  const decisionIcons = [Leaf, UsersThree, Scales];
-  const household = [
-    {
-      id: 'citizen',
-      name: citizenName,
-      relation: 'You · citizen planner',
-      role: 'Cooperative coordinator',
-      wellbeing: 86,
-      state: 'Ready',
-      image: householdPortraits.citizen,
-      connection: 'You control the household Work Capacity committed by this plan.',
-    },
-    {
-      id: 'partner',
-      name: 'Toma Vale',
-      relation: 'Partner · 37',
-      role: 'Waterworks mechanic',
-      wellbeing: 78,
-      state: 'Concerned',
-      image: householdPortraits.partner,
-      connection: 'Toma maintains the eastern intake and can verify the pump repair.',
-    },
-    {
-      id: 'apprentice',
-      name: 'Mika Vale',
-      relation: 'Daughter · 16',
-      role: 'Engineering apprentice',
-      wellbeing: 82,
-      state: 'Focused',
-      image: householdPortraits.apprentice,
-      connection: 'Mika gains practical engineering experience if repairs move forward.',
-    },
-    {
-      id: 'child',
-      name: 'Niko Vale',
-      relation: 'Son · 10',
-      role: 'Forge Street School pupil',
-      wellbeing: 73,
-      state: 'Tired',
-      image: householdPortraits.child,
-      connection: 'Niko’s next school day depends on reliable ward water service.',
-    },
-  ];
-  const selectedPerson = household.find((person) => person.id === selectedHouseholdMember) ?? household[0];
-  const selectedOption = planningItems.find((item) => completedPlanIds.includes(item.id)) ?? null;
-  const showingActiveDecision = activeInfrastructure.id === 'waterworks';
-
-  return (
-    <section className="planning-view planning-command" aria-label="Citizen planning view">
-      {preview && (
-        <div className="clerk-setup-notice" role="status">
-          <span>Clerk setup preview</span>
-          <p>Add your Clerk keys to activate sign-in and give every citizen a private planning desk.</p>
-          <code>.env.local</code>
-        </div>
-      )}
-      <div className="civic-command">
-        <header className="civic-command-bar">
-          <div className="civic-place">
-            <MapPin aria-hidden="true" size={21} weight="duotone" />
-            <div>
-              <span>Day 42 · Forgehaven East · {nationCount} nation world</span>
-              <strong>{nation.capital}, {nation.shortName}</strong>
-            </div>
-          </div>
-
-          <div className="civic-horizon-tabs" role="group" aria-label="Planning horizon">
-            {(['today', 'week', 'season'] as PlanHorizon[]).map((item) => (
-              <button
-                aria-pressed={horizon === item}
-                key={item}
-                onClick={() => onHorizonChange(item)}
-                type="button"
-              >
-                {item === 'week' ? '7 days' : item[0].toUpperCase() + item.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          <div className="civic-metrics" aria-label="Citizen resources">
-            <div><ClockCountdown aria-hidden="true" size={18} /><span>Capacity<strong>{capacity} WC</strong></span></div>
-            <div><Coins aria-hidden="true" size={18} /><span>Influence<strong>{influence.toLocaleString()}</strong></span></div>
-            <div><Drop aria-hidden="true" size={18} /><span>Water security<strong>{waterSecurity}%</strong></span></div>
-            <div><ShieldCheck aria-hidden="true" size={18} /><span>Ward stability<strong>{wardStability}%</strong></span></div>
-          </div>
-
-          <button className="civic-world-button" onClick={onWorldView} type="button">
-            <ArrowLeft aria-hidden="true" size={15} />
-            World view
-          </button>
-        </header>
-
-        <div className="civic-command-grid">
-          <section className="town-and-household">
-            <section className="town-map" aria-label="Forgehaven East infrastructure map">
-              <div className="town-map-heading">
-                <span><Buildings aria-hidden="true" size={15} /> Town plan · infrastructure</span>
-                <strong>Forgehaven East</strong>
-                <small>Select a place to inspect its role in your plan.</small>
-              </div>
-
-              <div className="town-weather-card">
-                <span>21:30</span>
-                <div><Leaf aria-hidden="true" size={19} /><strong>Evening storm</strong><small>Savanna crews have 2h remaining</small></div>
-              </div>
-
-              {townInfrastructure.map((place) => {
-                const PlaceIcon = place.icon;
-                const active = place.id === selectedInfrastructure;
-                return (
-                  <button
-                    aria-label={`${place.name}, ${place.status}`}
-                    aria-pressed={active}
-                    className={`infrastructure-marker ${active ? 'is-active' : ''}`}
-                    key={place.id}
-                    onClick={() => setSelectedInfrastructure(place.id)}
-                    style={{ '--marker-x': place.x, '--marker-y': place.y } as CSSProperties}
-                    type="button"
-                  >
-                    <span><PlaceIcon aria-hidden="true" size={19} weight={active ? 'fill' : 'duotone'} /></span>
-                    <em>{place.name}</em>
-                  </button>
-                );
-              })}
-
-              <article className="town-place-card" aria-live="polite">
-                <div className="town-place-icon"><ActivePlaceIcon aria-hidden="true" size={22} weight="duotone" /></div>
-                <div>
-                  <span>{activeInfrastructure.kind}</span>
-                  <strong>{activeInfrastructure.name}</strong>
-                  <p>{activeInfrastructure.detail}</p>
-                </div>
-                <small>{activeInfrastructure.status}</small>
-              </article>
-
-              <div className="town-map-legend" aria-label="Map legend">
-                <span><i className="legend-ready" /> Stable service</span>
-                <span><i className="legend-watch" /> Needs attention</span>
-                <span><i className="legend-decision" /> Decision point</span>
-              </div>
-            </section>
-
-            <section className="household-strip" aria-label="Citizen household">
-              <div className="household-intro">
-                <UsersThree aria-hidden="true" size={22} weight="duotone" />
-                <span>Planning together</span>
-                <strong>The Vale household</strong>
-                <p>Select a family member to keep their work, care, and schooling visible while you decide.</p>
-              </div>
-              <div className="household-list">
-                {household.map((person) => (
-                  <button
-                    aria-pressed={selectedHouseholdMember === person.id}
-                    className={`household-card ${selectedHouseholdMember === person.id ? 'is-focused' : ''}`}
-                    key={person.id}
-                    onClick={() => setSelectedHouseholdMember(person.id)}
-                    type="button"
-                  >
-                    <Image
-                      alt={`Portrait of ${person.name}`}
-                      height={320}
-                      sizes="(max-width: 700px) 21vw, 10vw"
-                      src={person.image}
-                      width={320}
-                    />
-                    <span className="household-copy">
-                      <strong>{person.name}</strong>
-                      <small>{person.relation}</small>
-                      <em>{person.role}</em>
-                      <span className="household-state"><Pulse aria-hidden="true" size={12} /> {person.state} · {person.wellbeing}%</span>
-                      <span className="trust-meter" aria-label={`${person.wellbeing}% wellbeing`}><i style={{ width: `${person.wellbeing}%` }} /></span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          </section>
-
-          <aside className="decision-panel" aria-label="Citizen decision point">
-            <div className="decision-panel-heading">
-              <div>
-                <span className="eyebrow">{showingActiveDecision ? 'Decision point' : activeInfrastructure.kind}</span>
-                <h2>{showingActiveDecision ? 'Eastern waterworks allocation' : activeInfrastructure.name}</h2>
-              </div>
-              <span className="decision-deadline"><CalendarDots aria-hidden="true" size={14} /> {showingActiveDecision ? '2h 18m' : activeInfrastructure.status}</span>
-            </div>
-
-            <article className="community-brief">
-              <span className="community-avatar">{showingActiveDecision
-                ? <Notebook aria-hidden="true" size={19} />
-                : <ActivePlaceIcon aria-hidden="true" size={19} />}</span>
-              <div>
-                <strong>{showingActiveDecision ? 'Ward steward · verified brief' : `${activeInfrastructure.name} · town record`}</strong>
-                <small>{showingActiveDecision ? (worldEvents[1]?.occurredAt ?? 'Today · 21:30') : activeInfrastructure.status}</small>
-                <p>{showingActiveDecision
-                  ? `${worldEvents[1]?.detail ?? 'The eastern waterworks proposal enters public debate.'} Your household’s water access is secure tonight, but the reserve will fall below target tomorrow.`
-                  : activeInfrastructure.detail}</p>
-              </div>
-            </article>
-
-            <div className="decision-context">
-              <span>{showingActiveDecision
-                ? <Drop aria-hidden="true" size={16} weight="fill" />
-                : <ActivePlaceIcon aria-hidden="true" size={16} weight="fill" />}</span>
-              <div>
-                <small>{showingActiveDecision ? 'Infrastructure at risk' : activeInfrastructure.kind}</small>
-                <strong>{showingActiveDecision ? `Eastern intake · ${waterSecurity}% reserve` : activeInfrastructure.status}</strong>
-              </div>
-              {showingActiveDecision ? <ArrowRight aria-hidden="true" size={18} /> : <Check aria-hidden="true" size={18} />}
-            </div>
-
-            <div className="household-impact" aria-live="polite">
-              <Image alt="" aria-hidden="true" height={48} src={selectedPerson.image} width={48} />
-              <div>
-                <span>Household focus · {selectedPerson.role}</span>
-                <strong>{selectedPerson.name}</strong>
-                <p>{selectedPerson.connection}</p>
-              </div>
-            </div>
-
-            {showingActiveDecision ? (
-              <>
-                <div className="decision-options" role="group" aria-label="Choose a civic plan">
-                  {planningItems.map((item, index) => {
-                    const selected = completedPlanIds.includes(item.id);
-                    const DecisionIcon = decisionIcons[index] ?? Check;
-                    return (
-                      <button
-                        aria-pressed={selected}
-                        className={selected ? 'is-selected' : ''}
-                        disabled={Boolean(committedDecision)}
-                        key={item.id}
-                        onClick={() => onTogglePlan(item.id)}
-                        type="button"
-                      >
-                        <span className="decision-option-icon"><DecisionIcon aria-hidden="true" size={20} weight="duotone" /></span>
-                        <span>
-                          <strong>{item.title}</strong>
-                          <small>{item.detail}</small>
-                          <em>{item.meta} · Water +{item.effects.water} · Stability +{item.effects.stability}</em>
-                        </span>
-                        {selected ? <Check aria-hidden="true" size={18} weight="bold" /> : <ArrowRight aria-hidden="true" size={18} />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {selectedOption && (
-                  <section className="decision-preview" aria-live="polite">
-                    <div className="decision-preview-heading">
-                      <span>{committedDecision ? 'Recorded outcome' : 'Expected consequence'}</span>
-                      <strong>{selectedOption.title}</strong>
-                    </div>
-                    <div className="decision-deltas">
-                      <span><small>Capacity</small><strong>{selectedOption.effects.capacity > 0 ? '+' : ''}{selectedOption.effects.capacity} WC</strong></span>
-                      <span><small>Influence</small><strong>+{selectedOption.effects.influence}</strong></span>
-                      <span><small>Water</small><strong>+{selectedOption.effects.water}%</strong></span>
-                      <span><small>Stability</small><strong>+{selectedOption.effects.stability}%</strong></span>
-                    </div>
-                    <p>{committedDecision?.outcome ?? selectedOption.outcome}</p>
-                  </section>
-                )}
-
-                <div className="decision-evidence">
-                  <section>
-                    <h3><Check aria-hidden="true" size={14} /> What we know</h3>
-                    <ul>
-                      <li>The eastern intake is operating on one pump.</li>
-                      <li>Harvest crews need six Work Capacity tonight.</li>
-                      <li>The household reserve covers one full day.</li>
-                    </ul>
-                  </section>
-                  <section>
-                    <h3><Info aria-hidden="true" size={14} /> What we assume</h3>
-                    <ul>
-                      <li>The evening storm will refill district reservoirs.</li>
-                      <li>The Confluence parts convoy arrives before first shift.</li>
-                      <li>Forum delegates keep the emergency fund open.</li>
-                    </ul>
-                  </section>
-                </div>
-
-                <div className="decision-note">
-                  <label htmlFor="citizen-note">Private household note</label>
-                  <textarea
-                    id="citizen-note"
-                    onChange={(event) => onNoteChange(event.target.value)}
-                    rows={2}
-                    value={note}
-                  />
-                </div>
-
-                {decisionError && <p className="decision-error" role="alert">{decisionError}</p>}
-                <div className="decision-actions">
-                  <p>{committedDecision
-                    ? `Added to the world record ${new Date(committedDecision.committedAt).toLocaleDateString()}.`
-                    : planSaved
-                      ? 'Your saved draft is ready to commit.'
-                      : 'Only your household can see this draft.'}</p>
-                  <button
-                    disabled={completedPlanIds.length === 0 || decisionPending || Boolean(committedDecision)}
-                    onClick={() => selectedOption && onCommitDecision({
-                      optionId: selectedOption.id,
-                      infrastructureId: activeInfrastructure.id,
-                      householdMemberId: selectedHouseholdMember,
-                    })}
-                    type="button"
-                  >
-                    {committedDecision
-                      ? <><Check aria-hidden="true" size={15} /> Decision recorded</>
-                      : decisionPending
-                        ? 'Recording…'
-                        : 'Commit this decision'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <section className="place-brief">
-                <span>No immediate household decision</span>
-                <h3>{activeInfrastructure.name} is being monitored.</h3>
-                <p>The active civic choice remains at Eastern Waterworks. This place still contributes context to that decision.</p>
-                <button onClick={() => setSelectedInfrastructure('waterworks')} type="button">
-                  Return to active decision <ArrowRight aria-hidden="true" size={16} />
-                </button>
-              </section>
-            )}
-          </aside>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -1265,42 +775,6 @@ function ClerkCitizenSession({
   return null;
 }
 
-function SignedInPlanningDashboard(props: Omit<PlanningDashboardProps, 'citizenName' | 'preview'>) {
-  const { user } = useUser();
-  const citizenName = user?.firstName || user?.fullName || 'Harimu citizen';
-
-  return (
-    <PlanningDashboard
-      {...props}
-      citizenName={citizenName}
-      key={props.committedDecision?.committedAt ?? 'draft'}
-    />
-  );
-}
-
-function PlanningSignInGate() {
-  return (
-    <section className="planning-access" aria-labelledby="planning-access-title">
-      <div className="access-map" aria-hidden="true" />
-      <div className="access-card">
-        <span className="access-seal" aria-hidden="true">H</span>
-        <span className="eyebrow">Private citizen space</span>
-        <h1 id="planning-access-title">Your world is public.<br />Your plan is yours.</h1>
-        <p>Sign in to prepare work, civic commitments, and ballots before they enter the permanent world record.</p>
-        <div className="access-actions">
-          <SignInButton mode="modal">
-            <button className="access-primary" type="button">Sign in to plan</button>
-          </SignInButton>
-          <SignUpButton mode="modal">
-            <button className="access-secondary" type="button">Create a citizen account</button>
-          </SignUpButton>
-        </div>
-        <small>Identity and session security powered by Clerk.</small>
-      </div>
-    </section>
-  );
-}
-
 export default function Home() {
   const [worldNations, setWorldNations] = useState<Nation[]>(fallbackNations);
   const [availableWorkOrders, setAvailableWorkOrders] = useState<WorkOrder[]>(fallbackWorkOrders);
@@ -1317,8 +791,6 @@ export default function Home() {
     });
     return () => cancelAnimationFrame(frame);
   }, [locationSearch]);
-  const designPreview = process.env.NODE_ENV !== 'production'
-    && new URLSearchParams(locationSearch).get('preview') === '1';
   const [selectedId, setSelectedId] = useState('kindle');
   const [citizenNationId, setCitizenNationId] = useState<string | null>(null);
   const [citizenshipStatus, setCitizenshipStatus] = useState<CitizenshipStatus | null>(null);
@@ -1401,7 +873,6 @@ export default function Home() {
   }) : null, [citizenNation, economy, demoGovernment]);
   const government = clerkConfigured ? governmentSnapshot : demoGovernmentSnapshot;
   const pendingNation = worldNations.find((nation) => nation.id === pendingEnrollment);
-  const planningNation = citizenNation ?? selected;
   const isCitizenshipChange = Boolean(
     citizenNation && pendingNation && citizenNation.id !== pendingNation.id,
   );
@@ -1640,7 +1111,7 @@ export default function Home() {
   function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
   const workStatus = <section className="scene-daily-links" aria-label="Citizen daily loop">
     <p>Your daily life continues across the city.</p>
-    <button type="button" onClick={() => changeView('home')}>Home · briefing and food</button>
+    <button type="button" onClick={() => changeView('household')}>Household · briefing and food</button>
     <button type="button" onClick={() => changeView('workplace')}>Workplace · shifts and earnings</button>
     <button type="button" onClick={() => changeView('market')}>Market · goods and listings</button>
     <button type="button" onClick={() => changeView('government')}>Government · policies and petitions</button>
@@ -1666,6 +1137,22 @@ export default function Home() {
     setCompletedPlanIds((current) => (current.includes(id) ? [] : [id]));
     setPlanSaved(false);
     setDecisionError(null);
+  }
+
+  async function saveHouseholdPlan() {
+    if (decisionPending || (clerkConfigured && citizenSessionStatus !== 'ready')) return;
+    if (!clerkConfigured) { setPlanSaved(true); return; }
+    const epoch = citizenEpoch.current;
+    setDecisionPending(true); setDecisionError(null);
+    try {
+      const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save-plan', horizon, note: planNote, completedIds: completedPlanIds }) });
+      const result = await response.json() as { error?: string; ok?: boolean };
+      if (epoch !== citizenEpoch.current) return;
+      if (!response.ok || !result.ok) { setDecisionError(result.error ?? 'Household draft could not be saved.'); return; }
+      setPlanSaved(true);
+    } catch { if (epoch === citizenEpoch.current) setDecisionError('Connection interrupted. Your draft is still here; try saving again.'); }
+    finally { if (epoch === citizenEpoch.current) setDecisionPending(false); }
   }
 
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
@@ -1740,10 +1227,12 @@ export default function Home() {
     waterSecurity, wardStability, horizon, planNote, completedPlanIds, committedDecision]);
 
   async function commitDecision(input: DecisionCommitInput) {
+    if (decisionPending) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
     const selectedOption = availablePlanningItems.find((item) => item.id === input.optionId);
     if (!selectedOption || committedDecision) return;
+    if (capacity + selectedOption.effects.capacity < 0) { setDecisionError('Not enough Work Capacity for this commitment.'); return; }
     setDecisionPending(true);
     setDecisionError(null);
 
@@ -1906,7 +1395,7 @@ export default function Home() {
       <button type="button" onClick={() => changeView('world')}>Explore nations and enroll</button>
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
-      {viewMode === 'home' && <>
+      {viewMode === 'household' && <>
         <DailyBriefing economy={economy} shifts={workShifts} capacity={capacity} market={market} government={government}
           citizenNationName={citizenNation.shortName} localDemo={!clerkConfigured} onRefresh={() => void runWork('refresh-work')}
           onOpenWork={() => changeView('workplace')} onOpenMarket={() => changeView('market')} />
@@ -1919,6 +1408,27 @@ export default function Home() {
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
         {!market?.available && <p>Household meals are currently supported for Kindle citizens. Other national economies are planned.</p>}
+        <details className="household-planning"><summary>Household notes and commitments</summary>
+          <p>Keep a private draft for household choices. Recording a civic commitment applies its effects and ends the citizenship grace period.</p>
+          <label htmlFor="household-horizon">Planning horizon</label>
+          <select id="household-horizon" disabled={decisionPending} value={horizon} onChange={event => { setHorizon(event.target.value as PlanHorizon); setPlanSaved(false); }}>
+            <option value="today">Today</option><option value="week">This week</option><option value="season">This season</option>
+          </select>
+          <label htmlFor="household-note">Private household note</label>
+          <textarea id="household-note" disabled={decisionPending} rows={3} maxLength={2000} value={planNote} onChange={event => { setPlanNote(event.target.value); setPlanSaved(false); }} />
+          <button type="button" disabled={decisionPending} onClick={() => void saveHouseholdPlan()}>{decisionPending ? 'Saving…' : planSaved ? 'Draft saved' : 'Save household draft'}</button>
+          {committedDecision ? <p>Recorded commitment: {committedDecision.outcome} · {new Date(committedDecision.committedAt).toLocaleDateString()}</p> : <>
+            <p>Prototype civic choices · distinct from paid workplace shifts.</p>
+            {availablePlanningItems.map(task => <button key={task.id} type="button" disabled={decisionPending} aria-pressed={completedPlanIds.includes(task.id)} onClick={() => togglePlan(task.id)}>
+              <strong>{task.title}</strong><span>{task.detail} · Capacity {task.effects.capacity >= 0 ? '+' : ''}{task.effects.capacity} · Influence +{task.effects.influence}</span>
+            </button>)}
+            <button type="button" disabled={decisionPending || !completedPlanIds.length} onClick={() => {
+              const task = availablePlanningItems.find(item => completedPlanIds.includes(item.id));
+              if (task) void commitDecision({ optionId: task.id, infrastructureId: task.infrastructureId, householdMemberId: task.householdMemberId });
+            }}>Record selected civic commitment</button>
+          </>}
+          {decisionError && <p role="alert">{decisionError}</p>}
+        </details>
       </>}
       {viewMode === 'workplace' && <>
         <WorkShiftBoard shifts={workShifts} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
@@ -1937,7 +1447,7 @@ export default function Home() {
         <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand)} uncertain={Boolean(playerCommand)}
           onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />
         {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
-        <button type="button" onClick={() => changeView('home')}>Bring food home</button>
+        <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
       {viewMode === 'government' && <>
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. All government offices are AI/SI controlled in this release.</p>
@@ -1948,37 +1458,8 @@ export default function Home() {
     </>}
   </section>;
 
-  const planningProps = {
-    nation: planningNation,
-    capacity,
-    influence,
-    waterSecurity,
-    wardStability,
-    horizon,
-    completedPlanIds,
-    planSaved,
-    planningItems: availablePlanningItems,
-    worldEvents,
-    note: planNote,
-    nationCount: worldNations.length,
-    committedDecision,
-    decisionError,
-    decisionPending,
-    onHorizonChange: (nextHorizon: PlanHorizon) => {
-      setHorizon(nextHorizon);
-      setPlanSaved(false);
-    },
-    onTogglePlan: togglePlan,
-    onNoteChange: (note: string) => {
-      setPlanNote(note);
-      setPlanSaved(false);
-    },
-    onCommitDecision: commitDecision,
-    onWorldView: () => changeView('world'),
-  };
-
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
-    <p>Prototype region geography · nation rules are fixed. Square ownership and cross-border trade are not simulated yet.</p>
+    <p>Fictional globe geography · nation rules are fixed. Square ownership and cross-border trade are not simulated yet.</p>
     <div className="game-nation-choices">{worldNations.map(nation => <button key={nation.id} type="button" aria-pressed={selected.id===nation.id} onClick={()=>setSelectedId(nation.id)}>{nation.shortName}</button>)}</div>
     <h2>{selected.name}</h2><p>{selected.motto}</p>
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
@@ -1991,18 +1472,15 @@ export default function Home() {
     <p>{citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     <SquareChat key={`${citizenEpoch.current}:${citizenNationId}`} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
     <SceneNews events={worldEvents} title="City noticeboard" />
-  </> : ['home','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
+  </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
     <NationDashboard capacity={capacity} citizenNation={citizenNation} key={selected.id} nation={selected} nations={worldNations}
       workPending={workPending||hasActiveShift} workStatus={workStatus} onCommitWork={commitWork}
-      onPlanningView={()=>changeView('planning')} onSelectNation={selectNation} onWorldView={()=>changeView('world')}
-      workOrders={availableWorkOrders} worldEvents={worldEvents} /> : designPreview ?
-    <PlanningDashboard {...planningProps} citizenName="Leora Vale" /> : clerkConfigured ? <>
-      <Show when="signed-out"><PlanningSignInGate /></Show><Show when="signed-in"><SignedInPlanningDashboard {...planningProps} /></Show>
-    </> : <PlanningDashboard {...planningProps} citizenName="Citizen 042" preview />;
+      onPlanningView={()=>changeView('household')} onSelectNation={selectNation} onWorldView={()=>changeView('world')}
+      workOrders={availableWorkOrders} worldEvents={worldEvents} /> : citizenScene;
   const activeShift = workShifts.find(shift=>!shift.claimedAt);
   const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
   const contextItems: { id: string; label: string; detail: string; onSelect?: () => void }[] =
-    viewMode === 'home' ? (economy?.inventory ?? []).map(entry => ({
+    viewMode === 'household' ? (economy?.inventory ?? []).map(entry => ({
       id: entry.item, label: entry.item[0].toUpperCase() + entry.item.slice(1), detail: `${entry.quantity} available`,
     })) : viewMode === 'workplace' ? availableWorkOrders
       .filter(order => Boolean(citizenNation) && (!order.nationId || order.nationId === citizenNation?.id))
@@ -2018,14 +1496,14 @@ export default function Home() {
       })) : viewMode === 'world' || viewMode === 'nation' ? worldNations.map(nation => ({
         id: nation.id, label: nation.shortName, detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
       })) : viewMode === 'square' ? [
-        { id: 'home', label: 'Home', detail: 'Belongings and recovery', onSelect: () => changeView('home') },
+        { id: 'household', label: 'Household', detail: 'Belongings and recovery', onSelect: () => changeView('household') },
         { id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings', onSelect: () => changeView('workplace') },
         { id: 'market', label: 'Market', detail: 'Goods and citizen listings', onSelect: () => changeView('market') },
         { id: 'government', label: 'Government', detail: 'Policy and petitions', onSelect: () => changeView('government') },
       ] : [];
-  const contextTitle = viewMode === 'home' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
+  const contextTitle = viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
-      : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Citizen plan';
+      : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
     <GameShell view={viewMode} nation={citizenNation ?? selected} nations={worldNations} capacity={capacity}
@@ -2034,7 +1512,7 @@ export default function Home() {
       localDemo={!clerkConfigured} notice={workError ?? governmentError ?? recentAction ?? undefined} panel={gamePanel}
       contextItems={contextItems} contextTitle={contextTitle}
       onNavigate={changeView} onSelectNation={id=>setSelectedId(id)}
-      accountControls={<><button type="button" onClick={()=>changeView('planning')}>Citizen plan</button><ClerkAccountControl onOpenPlanning={()=>changeView('planning')} /></>} />
+      accountControls={<ClerkAccountControl />} />
       {pendingNation && (
         <div className="dialog-backdrop" onMouseDown={() => setPendingEnrollment(null)} role="presentation">
           <section

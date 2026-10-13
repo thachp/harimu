@@ -1,0 +1,59 @@
+/* Clerk portals live outside the game shell. Scope these rules to Clerk's
+   appearance classes so game buttons and native authentication behavior stay intact. */
+.harimu-auth-card,
+.harimu-auth-popover,
+.harimu-auth-modal {
+  color-scheme: dark;
+  color: #f3ecd8;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.harimu-auth-popover {
+  width: min(320px, calc(100vw - 24px));
+  border: 1px solid #38514f;
+  background: #0c1a1e;
+  box-shadow: 0 14px 40px #0008;
+}
+.harimu-auth-menu-action {
+  min-height: 44px;
+  color: #f3ecd8;
+  font-size: 13px;
+}
+.harimu-auth-menu-icon { color: #b8d5ce; }
+.harimu-auth-menu-action:hover { background: #203b3c; }
+.harimu-auth-menu-action:focus-visible,
+.harimu-auth-trigger:focus-visible,
+.harimu-auth-card :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #72c7b9;
+  outline-offset: 3px;
+}
+.game-account .harimu-auth-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 3px;
+  background: transparent;
+  border: 1px solid #38514f;
+  border-radius: 6px;
+  color: #f3ecd8;
+}
+.game-account .harimu-auth-trigger:hover { background: #203b3c; }
+.harimu-auth-modal {
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.harimu-auth-card .cl-formFieldInput::placeholder { color: #93aaa4; opacity: 1; }
+.harimu-auth-card .cl-socialButtonsBlockButton {
+  color: #f3ecd8;
+  background: #15272b;
+  border-color: #38514f;
+}
+.harimu-auth-card .cl-socialButtonsBlockButton:hover { background: #203b3c; }
+@media (max-width: 480px) {
+  .harimu-auth-card .cl-card { padding: 24px 20px; }
+  .harimu-auth-card .cl-navbar { max-width: 100%; }
+}
+.harimu-auth-card .cl-badge{color:#c4ddd7;background:#29484a}.harimu-auth-card .cl-menuButton{color:#b8d5ce}

@@ -81,7 +81,7 @@ export function createCityWorld(nationId: string): WorldArt {
     for (const x of [-1.4, 1.4]) { box(g, x, 0.26, 0, 0.24, 0.13, 0.8, 0x765540); box(g, x, 0.12, -0.27, 0.13, 0.25, 0.13, p.stone); box(g, x, 0.12, 0.27, 0.13, 0.25, 0.13, p.stone); }
     box(g, -1.4, 0.85, -1.2, 0.08, 1.7, 0.08, p.trim); box(g, -1.4, 1.2, -1.2, 0.9, 0.55, 0.12, 0x66513b);
   });
-  addBuilding('home', 'Your home', -4.4, 3.7, g => {
+  addBuilding('home', 'Your household', -4.4, 3.7, g => {
     facade(g, p, 2.3, 1.5, 1.8); roof(g, 2.65, 2.1, 0.85, 1.62, p.roof);
     box(g, 0.65, 2.1, -0.4, 0.32, 0.9, 0.35, p.stone);
     box(g, -0.8, 0.24, 1.15, 0.7, 0.3, 0.35, 0x6d8354);
@@ -131,25 +131,67 @@ export function createCityWorld(nationId: string): WorldArt {
   return { group, selectables, buildings, bounds: 14 };
 }
 
-export function createRegionWorld(nations: readonly { id: string; name?: string }[] = [{ id: 'kindle', name: 'Kindle' }, { id: 'korund', name: 'Korund' }, { id: 'aurelle', name: 'Aurelle' }]): WorldArt {
-  materials.clear();
-  const group = new THREE.Group(); const selectables: THREE.Object3D[] = [];
-  for (let x = -16; x < 16; x++) for (let z = -12; z < 12; z++) {
-    const land = Math.sin(x * 0.25) * 2 + 8 > Math.abs(z) && Math.abs(x) < 14;
-    box(group, x + 0.5, land ? -0.12 : -0.3, z + 0.5, 0.99, land ? 0.3 : 0.1, 0.99, land ? ((x + z) % 3 ? 0x7b8961 : 0x959169) : 0x527f85);
+// Procedural fictional geography: no external map assets or real-country boundaries.
+export function globeNationCoordinates(index: number, count: number): { latitude: number; longitude: number } {
+  const rows = Math.ceil(count / 5);
+  return { latitude: rows === 1 ? 15 : 38 - Math.floor(index / 5) * 62, longitude: -145 + (index % 5) * 72 };
+}
+export function globePoint(latitude: number, longitude: number, radius = 7): THREE.Vector3 {
+  const lat = THREE.MathUtils.degToRad(latitude), lon = THREE.MathUtils.degToRad(longitude);
+  return new THREE.Vector3(radius * Math.cos(lat) * Math.sin(lon), radius * Math.sin(lat), radius * Math.cos(lat) * Math.cos(lon));
+}
+export function createRegionWorld(nations: readonly { id: string; name?: string; color?: string }[] = []): WorldArt {
+  const group = new THREE.Group();
+  const geometry = new THREE.SphereGeometry(7, 144, 96);
+  const landSeeds = nations.map((_, i) => globePoint(globeNationCoordinates(i, nations.length).latitude, globeNationCoordinates(i, nations.length).longitude, 1));
+  // Preserve the same fictional continental lobes, sampled independently of mesh vertices.
+  [[60,-120],[22,-105],[-15,-80],[-48,-70],[52,8],[20,25],[-18,35],[48,70],[28,100],[-30,135]].forEach(([lat, lon]) => landSeeds.push(globePoint(lat, lon, 1)));
+  const width = 2048, height = 1024;
+  const pixels = new Uint8Array(width * height * 4);
+  const blend = (value: number, start: number, end: number) => {
+    const t = THREE.MathUtils.clamp((value - start) / (end - start), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+  for (let y = 0; y < height; y++) {
+    const lat = ((y + .5) / height - .5) * Math.PI;
+    const cosLat = Math.cos(lat), py = Math.sin(lat);
+    for (let x = 0; x < width; x++) {
+      // SphereGeometry starts its UV seam at the negative X axis.
+      const lon = (x + .5) / width * Math.PI * 2 - Math.PI / 2;
+      const px = cosLat * Math.sin(lon), pz = cosLat * Math.cos(lon);
+      let proximity = -1;
+      for (const seed of landSeeds) proximity = Math.max(proximity, px * seed.x + py * seed.y + pz * seed.z);
+      const ripple = .05 * Math.sin(lon * 13 + lat * 7) + .025 * Math.sin(lon * 29 - lat * 17);
+      const coastDistance = proximity - .91 - ripple;
+      const land = blend(coastDistance, -.0015, .0015);
+      const inland = blend(coastDistance, .003, .025);
+      const polar = blend(Math.abs(py), .925, .955);
+      const variation = Math.sin(lon * 41 + lat * 31) * Math.sin(lat * 53 - lon * 17) * 3;
+      const oceanDepth = blend(-coastDistance, .005, .12);
+      const ocean = [40 - oceanDepth * 13, 104 - oceanDepth * 24, 134 - oceanDepth * 24];
+      const ground = [164 - inland * 86 + variation, 177 - inland * 53 + variation, 118 - inland * 34 + variation];
+      const ice = [217, 232, 229];
+      const offset = (y * width + x) * 4;
+      for (let channel = 0; channel < 3; channel++) pixels[offset + channel] = Math.round((ocean[channel] * (1 - land) + ground[channel] * land) * (1 - polar) + ice[channel] * polar);
+      pixels[offset + 3] = 255;
+    }
   }
-  nations.forEach((nation, i) => {
-    const columns = nations.length <= 3 ? 3 : 4;
-    const x = nations.length <= 3 ? -9 + i * 9 : -10.5 + (i % columns) * 7;
-    const z = nations.length <= 3 ? (i % 2 ? -3 : 2) : -5 + Math.floor(i / columns) * 5; const p = palettes[nation.id.toLowerCase()] ?? palettes.kindle;
-    const capital = new THREE.Group(); capital.position.set(x, 0, z);
-    box(capital, 0, 0.14, 0, 4.5, 0.24, 4.5, p.stone);
-    for (const dx of [-1, 1]) for (const dz of [-1, 1]) { box(capital, dx, 0.55, dz, 0.8, 0.9, 0.8, p.wall); cylinder(capital, dx, 1.2, dz, 0, 0.65, 0.6, p.roof, 4); }
-    box(capital, 0, 1, 0, 1.2, 2, 1.2, p.wall); cylinder(capital, 0, 2.5, 0, 0, 0.9, 1, p.trim, 4);
-    capital.traverse(child => { child.userData = { kind: 'nation', nationId: nation.id, label: nation.name ?? nation.id, detail: 'Explore the capital district' }; });
-    group.add(capital); selectables.push(capital);
-    if (i > 0) { for (let n = 0; n < 8; n++) box(group, x - 8.5 + n, 0.06, z + (i % 2 ? 5 : -5) * (1 - n / 8), 0.45, 0.04, 0.45, 0xc6b585); }
+  const texture = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.minFilter = THREE.LinearMipmapLinearFilter; texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true; texture.needsUpdate = true;
+  const planet = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map: texture, roughness: .84 }));
+  group.add(planet);
+  const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(7.13, 64, 48), new THREE.MeshBasicMaterial({ color: '#78bfdc', transparent: true, opacity: .09, side: THREE.BackSide, depthWrite: false }));
+  group.add(atmosphere);
+  const selectables: THREE.Object3D[] = [];
+  nations.forEach((nation, index) => {
+    const coordinates = globeNationCoordinates(index, nations.length);
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(.19, 16, 12), new THREE.MeshStandardMaterial({ color: nation.color || '#f4cc79', emissive: '#665023', emissiveIntensity: .45, roughness: .45 }));
+    marker.position.copy(globePoint(coordinates.latitude, coordinates.longitude, 7.22));
+    marker.userData = { kind: 'nation', nationId: nation.id, label: nation.name || nation.id, detail: 'A fictional Harimu nation. Select it to explore its city and citizen life.' };
+    group.add(marker); selectables.push(marker);
   });
-  for (let i = 0; i < 12; i++) cylinder(group, -13 + i * 1.8, 0.7, -7 + Math.sin(i) * 0.8, 0, 0.8, 1.6 + (i % 3) * 0.6, 0x879187, 4);
-  return { group, selectables, buildings: [], bounds: 18 };
+  return { group, selectables, buildings: [], bounds: Math.PI };
 }
