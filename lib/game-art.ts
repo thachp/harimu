@@ -140,6 +140,14 @@ export function globePoint(latitude: number, longitude: number, radius = 7): THR
   const lat = THREE.MathUtils.degToRad(latitude), lon = THREE.MathUtils.degToRad(longitude);
   return new THREE.Vector3(radius * Math.cos(lat) * Math.sin(lon), radius * Math.sin(lat), radius * Math.cos(lat) * Math.cos(lon));
 }
+// Euler XYZ rotation that brings a spherical anchor to the camera-facing centre.
+export function globeFocusRotation(point: THREE.Vector3): { x: number; y: number } {
+  return { x: Math.atan2(point.y, Math.hypot(point.x, point.z)), y: -Math.atan2(point.x, point.z) };
+}
+export function globeAnchorVisible(point: THREE.Vector3): boolean {
+  // Hide the back hemisphere and the limb where labels would overlap the globe edge.
+  return point.z / point.length() > .16;
+}
 export function createRegionWorld(nations: readonly { id: string; name?: string; color?: string }[] = []): WorldArt {
   const group = new THREE.Group();
   const geometry = new THREE.SphereGeometry(7, 144, 96);

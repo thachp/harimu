@@ -1,0 +1,17 @@
+.session { margin: 16px 0; color: #cbd7d1; font-size: 12px; line-height: 1.5; }
+.session button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 11px 18px;
+  border: 1px solid #d3aa5b;
+  border-radius: 3px;
+  background: #d3aa5b;
+  color: #09191d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.session button:hover { background: #e2bd75; }
+.session button:focus-visible { outline: 3px solid #72c7b9; outline-offset: 3px; }

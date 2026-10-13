@@ -3,6 +3,9 @@
 import type { VerificationState } from '@/lib/verification';
 import type { SimulationState } from '@/lib/world-simulation';
 
+import { GuestDemo, type GuestDemoView } from './guest-demo';
+import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
+import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
@@ -532,11 +535,15 @@ export default function Home() {
     return () => cancelAnimationFrame(frame);
   }, [locationSearch]);
   const [selectedId, setSelectedId] = useState('kindle');
+  const [nationFocusRevision, setNationFocusRevision] = useState(0);
+  const [guestMode, setGuestMode] = useState(false);
+  const [guestState, setGuestState] = useState(createGuestDemo);
   const [citizenNationId, setCitizenNationId] = useState<string | null>(null);
   const [citizenshipStatus, setCitizenshipStatus] = useState<CitizenshipStatus | null>(null);
   const [enrollmentExpectedNation, setEnrollmentExpectedNation] = useState<string | null>(null);
   const enrollmentLock = useRef(false);
   const [sessionRetry, setSessionRetry] = useState(0);
+  const [reviewStorageKey, setReviewStorageKey] = useState(() => enrollmentReviewKey(null));
   const [guideNow, setGuideNow] = useState(0);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
@@ -594,6 +601,9 @@ export default function Home() {
     writeEnrollmentReview(null, null);
     if (userId && review) writeEnrollmentReview(userId, review);
     citizenIdentity.current = userId;
+    setReviewStorageKey(enrollmentReviewKey(userId));
+    setGuestMode(false);
+    setGuestState(createGuestDemo());
     citizenEpoch.current++;
     setCitizenSessionKey(value => value + 1);
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
@@ -658,6 +668,7 @@ export default function Home() {
   const government = clerkConfigured ? governmentSnapshot : demoGovernmentSnapshot;
   const pendingNation = worldNations.find((nation) => nation.id === pendingEnrollment);
   useEffect(() => {
+    if (!canReadSharedWorld(clerkConfigured, citizenSessionStatus)) return;
     const controller = new AbortController();
 
     async function loadWorld() {
@@ -679,7 +690,7 @@ export default function Home() {
 
     void loadWorld().catch(() => { /* Keep the existing public snapshot when unavailable. */ });
     return () => controller.abort();
-  }, []);
+  }, [citizenSessionStatus]);
 
   async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string) {
     if (enrollmentLock.current) return;
@@ -982,6 +993,7 @@ export default function Home() {
   function selectNation(nationId: string) {
     if (!worldNations.some(nation => nation.id === nationId)) return;
     setSelectedId(nationId);
+    setNationFocusRevision(value => value + 1);
     if (viewMode !== 'nation' && viewMode !== 'world') return;
     const href = sceneUrl(window.location.href, viewMode, nationId);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
@@ -1302,8 +1314,23 @@ export default function Home() {
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
+  const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
+  const guestActive = guestAllowed && guestMode;
+  function startGuestDemo() {
+    if (!guestAllowed) return;
+    setGuestState(createGuestDemo()); setGuestMode(true); closeEnrollmentReview(); changeView('workplace');
+  }
+  function leaveGuestDemo() { setGuestMode(false); setGuestState(createGuestDemo()); changeView('world'); }
+  function navigateGame(view: SceneView) {
+    if (guestActive && !['household','workplace','market'].includes(view)) {
+      setGuestMode(false); setGuestState(createGuestDemo());
+    }
+    changeView(view);
+  }
+  function actInGuestDemo(action: GuestDemoAction) { setGuestState(current => guestDemoAction(current, action)); }
+  const guestEntry = guestAllowed && <button type="button" className="primary-action" onClick={startGuestDemo}>Try a day in the life</button>;
   const citizenScene = <section className={`citizen-scene scene-${viewMode}`} aria-label="Citizen location actions">
-    {!citizenNation ? <div className="scene-access"><p>{clerkConfigured && citizenSessionStatus === 'loading' ? 'Loading your citizen…' : 'Explore a nation, then choose citizenship to begin.'}</p>
+    {!citizenNation ? <div className="scene-access">{guestEntry}<p>{clerkConfigured && citizenSessionStatus === 'loading' ? 'Loading your citizen…' : 'Explore a nation, then choose citizenship to begin.'}</p>
       {citizenSessionStatus==='error' ? <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button> : <button type="button" onClick={() => changeView('world')}>Explore nations</button>}
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
@@ -1374,6 +1401,7 @@ export default function Home() {
 
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
     <p className="eyebrow">Exploring · {selected.shortName}</p>
+    {guestEntry}
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Chat · Government preview; economy planned'}</p>
@@ -1430,18 +1458,18 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell worldClock={simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell guestDemo={guestActive} nationFocusRevision={nationFocusRevision} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
-      localDemo={!clerkConfigured} notice={workError ?? governmentError ?? recentAction ?? undefined} panel={gamePanel}
-      contextItems={contextItems} contextTitle={contextTitle}
-      onNavigate={changeView} onSelectNation={selectNation}
+      localDemo={!clerkConfigured} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} panel={guestActive ? <GuestDemo view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
+      contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
+      onNavigate={navigateGame} onSelectNation={selectNation}
       accountControls={<ClerkAccountControl />} />
-      {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
+      {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}
         onConfirm={() => void confirmEnrollment(pendingNation)}
-        signInControl={<SignInButton mode="modal"><button type="button">Sign in to continue</button></SignInButton>} />}
+        signInControl={<><SignInButton mode="modal"><button type="button">Sign in to continue</button></SignInButton>{guestEntry}</>} />}
 
   </>;
 }

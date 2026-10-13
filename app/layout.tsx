@@ -4,6 +4,7 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://harimu-world.thachp.chatgpt.site'),
+  icons: { icon: '/favicon.svg' },
   title: 'Harimu — The World Continues',
   description:
     'A persistent political strategy world where every player lives as one citizen of one nation.',

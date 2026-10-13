@@ -34,3 +34,26 @@ assert.ok(new Set(surface.image.data).size > 100);
 assert.equal(surface.image.data[3], 255);
 assert.equal(surface.generateMipmaps, true);
 console.log('Procedural spherical world, fictional nation markers and surface colors passed');
+
+// Every nation can be brought forward, including anchors initially behind the Earth.
+const THREE = await import('three');
+const { globeFocusRotation, globeAnchorVisible } = await import('../lib/game-art.ts');
+const realIds = ['kindle', 'aurelle', 'ilmar', 'fulmara', 'confluence', 'meridian', 'korund', 'hoarvale', 'varkand', 'veldwood'];
+const anchors = realIds.map((id, index) => ({ id, point: globePoint(...Object.values(globeNationCoordinates(index, 10)), 7.22) }));
+assert.equal(new Set(anchors.map(({ point }) => point.toArray().join(','))).size, 10);
+assert.ok(anchors.some(({ point }) => !globeAnchorVisible(point)));
+for (const { id, point } of anchors) {
+  const rotation = globeFocusRotation(point);
+  const rotated = point.clone().applyEuler(new THREE.Euler(rotation.x, rotation.y, 0, 'XYZ'));
+  assert.ok(globeAnchorVisible(rotated), `${id} must be visible when selected`);
+  assert.ok(Math.abs(rotated.x) < 1e-10 && Math.abs(rotated.y) < 1e-10, `${id} must face camera centre`);
+  assert.ok(rotated.z > 7);
+  const camera = new THREE.OrthographicCamera(-12, 12, 9.3, -9.3, .1, 120);
+  camera.position.set(0, 0, 25); camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
+  const projected = rotated.clone().project(camera);
+  assert.ok(Math.abs(projected.x) < .98 && Math.abs(projected.y) < .98);
+}
+assert.equal(globeAnchorVisible(new THREE.Vector3(0, 0, -7.22)), false);
+assert.equal(globeAnchorVisible(new THREE.Vector3(7.22, 0, 0)), false);
+assert.equal(globeAnchorVisible(new THREE.Vector3(0, 0, 7.22)), true);
+console.log('All ten anchors, front/back visibility, selection rotation and camera projection passed');

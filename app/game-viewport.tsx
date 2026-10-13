@@ -2,19 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { createCityWorld, createRegionWorld } from '../lib/game-art';
+import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
   nations?: readonly { id: string; name?: string; color?: string }[];
+  selectedNationId?: string | null;
+  nationFocusRevision?: number;
   selectedLocation?: LocationId | null;
   onSelect: (selection: ViewportSelection) => void;
   className?: string;
 };
-type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void };
+type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string) => void };
 
-export function GameViewport({ mode, nationId, nations, selectedLocation, onSelect, className = '' }: GameViewportProps) {
+export function GameViewport({ mode, nationId, nations, selectedNationId, nationFocusRevision, selectedLocation, onSelect, className = '' }: GameViewportProps) {
   const host = useRef<HTMLDivElement>(null);
   const callback = useRef(onSelect);
   const controls = useRef<CameraControls | null>(null);
@@ -89,7 +91,7 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
       labels.forEach(({ object, button }) => {
         const box = new THREE.Box3().setFromObject(object);
         const point = box.getCenter(new THREE.Vector3()); point.y = box.max.y + .3; point.project(camera);
-        const globeVisible = mode !== 'world' || object.getWorldPosition(new THREE.Vector3()).z > 1.2;
+        const globeVisible = mode !== 'world' || globeAnchorVisible(object.getWorldPosition(new THREE.Vector3()));
         button.hidden = !globeVisible || point.z < -1 || point.z > 1 || Math.abs(point.x) > .98 || Math.abs(point.y) > .98;
         button.style.left = `${(point.x + 1) * w / 2}px`;
         button.style.top = `${(1 - point.y) * h / 2}px`;
@@ -108,7 +110,19 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
       if (!building) return;
       highlight.setFromObject(building.object); highlight.visible = true; render();
     };
-    controls.current = { zoom: changeZoom, pan, reset: () => { target.set(0, 0, 0); zoom = 1; setCameraLabel('100%'); highlight.visible = false; render(); }, focus };
+    const focusNation = (id: string) => {
+      const anchor = anchors.find(anchor => anchor.selection.kind === 'nation' && anchor.selection.nationId === id);
+      if (!anchor || mode !== 'world') return;
+      const rotation = globeFocusRotation(anchor.object.position);
+      target.set(rotation.y, 0, rotation.x);
+      labels.forEach(({ selection, button }) => {
+        const active = selection.kind === 'nation' && selection.nationId === id;
+        button.setAttribute('aria-pressed', String(active));
+        button.style.outline = active ? '2px solid #f7d080' : '';
+      });
+      highlight.setFromObject(anchor.object); highlight.visible = true; render();
+    };
+    controls.current = { zoom: changeZoom, pan, reset: () => { target.set(0, 0, 0); zoom = 1; setCameraLabel('100%'); highlight.visible = false; render(); }, focus, focusNation };
     const resize = () => { renderer.setSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight), false); render(); };
     const observer = new ResizeObserver(resize); observer.observe(container); resize();
     const raycaster = new THREE.Raycaster();
@@ -130,10 +144,10 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
       if (!dragging) return;
       const wasDrag = dragging.total > 6; dragging = null;
       if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
-      if (wasDrag) return;
+      if (wasDrag || mode === 'world') return; // Nation selection belongs to labels and the bottom strip.
       const rect = renderer.domElement.getBoundingClientRect();
       raycaster.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), camera);
-      const hit = raycaster.intersectObjects(mode === 'world' ? world.group.children.filter(child => !(child as THREE.Mesh).material || !((child as THREE.Mesh).material as THREE.Material).transparent) : world.selectables, true)[0];
+      const hit = raycaster.intersectObjects(world.selectables, true)[0];
       if (!hit) return;
       let object: THREE.Object3D | null = hit.object;
       while (object && !object.userData.kind) object = object.parent;
@@ -167,6 +181,7 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
       sun.shadow.map?.dispose(); renderer.dispose(); labelLayer.remove(); canvas.remove();
     };
   }, [mode, nationId, nationSignature]);
+  useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, nationSignature]);
   useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId]);
   return <div className={`game-viewport ${className}`} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360 }}>
     <div ref={host} className="viewport-canvas" role="region" aria-label={`${mode === 'city' ? 'City terrain. Drag to pan' : 'Fictional Harimu globe. Drag to rotate'}; scroll to zoom. Arrow keys move the view. Use the location buttons to select with a keyboard.`} tabIndex={0}
