@@ -1,3 +1,4 @@
+import { aurelleSchemas } from './aurelle';
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
@@ -20,6 +21,7 @@ const nationSeeds = [
 ] as const;
 
 const workOrderSeeds = [
+  ['aurelle-food-estate', 'aurelle', 'Chartered food-estate service', '+4 public food · 8 CRN wage · 2 Favor · resolves in 2h', 4, 'open', 5],
   ['korund-food-production', 'korund', 'State food-production brigade', '+4 public food · 8 LN wage · resolves in 2h', 4, 'open', 4],
   ['harvest', 'kindle', 'Support the savanna harvest', '+480 food · resolves in 2h', 4, 'open', 1],
   ['freight', 'kindle', 'Move a foundry convoy', '+210 materials · resolves in 4h', 6, 'open', 2],
@@ -190,6 +192,8 @@ async function initialize(database: D1Database) {
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('player-market-v1')"),
     ]);
   }
+  await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));
+  await database.prepare("INSERT OR IGNORE INTO aurelle_resources(id,initial_food,initial_minor) VALUES ('estate',40,100000)").run();
   await database.prepare("INSERT OR IGNORE INTO world_supply (id,initial_food,unit_minor) VALUES ('kindle-food-supplier',40,100)").run();
   await database.prepare("INSERT OR IGNORE INTO korund_resources(id,initial_food,initial_minor) VALUES ('state',40,100000)").run();
   const governmentStockInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id='government-stock-v1'").first();

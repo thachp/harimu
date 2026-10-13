@@ -1,3 +1,4 @@
+import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { advanceWorld } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
@@ -140,6 +141,7 @@ export async function GET(request: Request) {
   ]);
 
   return privateJson({
+    aurellePlan: await readAurelle(database,userId),
     korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
     simulation,
     verification: await readVerification(userId),
@@ -178,12 +180,19 @@ export async function POST(request: Request) {
   }
   const now = new Date().toISOString();
 
+  if (typeof body.action === 'string' && body.action.startsWith('aurelle-')) {
+    if (!validAurelleCommand(body)) return privateJson({error:'Use a valid request identifier, shift identifier and food quantity of 1 or 2.'},{status:400});
+    const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000));
+    const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
+    return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
+  }
+
   if (typeof body.action === 'string' && body.action.startsWith('korund-')) {
     if (!validKorundCommand(body)) return privateJson({error:'Use a valid work or request identifier.'},{status:400});
     const seconds=Math.floor(Date.parse(now)/1000);
     const result=await executeKorund(database,userId,body,seconds);
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),korundPlan:await readKorund(database,userId,seconds),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,seconds),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (body.action === 'government-petition') {
@@ -220,7 +229,7 @@ export async function POST(request: Request) {
     if (!validPlayerCommand(body)) return privateJson({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: typeof body.listingId === 'string' ? body.listingId.toLowerCase() : undefined };
     const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000));
-    return privateJson({ ...result, economy: await readEconomy(database, userId, interval),
+    return privateJson({ ...result, aurellePlan:await readAurelle(database,userId), economy: await readEconomy(database, userId, interval),
       playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
   }
 
@@ -229,7 +238,7 @@ export async function POST(request: Request) {
     const command = { ...body, requestId: body.requestId.toLowerCase() };
     const result = await executeMarketCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), interval);
     const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ capacity: number }>();
-    return privateJson({ ...result, economy: await readEconomy(database, userId, interval),
+    return privateJson({ ...result, aurellePlan:await readAurelle(database,userId), economy: await readEconomy(database, userId, interval),
       market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
@@ -255,6 +264,7 @@ export async function POST(request: Request) {
       return privateJson({
         ok: true,
         nationId,
+        aurellePlan: await readAurelle(database,userId),
         korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
         economy: await readEconomy(database, userId, interval),
         market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
@@ -272,6 +282,7 @@ export async function POST(request: Request) {
       return privateJson({
         ok: true,
         nationId,
+        aurellePlan: await readAurelle(database,userId),
         korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
         citizenship: serializeCitizenship(current, politicalActionTaken),
         economy: await readEconomy(database, userId, interval),
@@ -315,6 +326,7 @@ export async function POST(request: Request) {
     return privateJson({
       ok: true,
       nationId,
+      aurellePlan: await readAurelle(database,userId),
       korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
       economy: await readEconomy(database, userId, interval),
       market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
@@ -499,14 +511,15 @@ export async function POST(request: Request) {
       return privateJson({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
     }
-    return privateJson({ ok: true, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelle(database,userId), shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   if (body.action === 'claim-work') {
     const shiftId = typeof body.shiftId === 'string' ? body.shiftId : '';
-    const shift = await database.prepare('SELECT claimed_at, completes_at FROM work_shifts WHERE id = ? AND clerk_user_id = ?')
-      .bind(shiftId, userId).first<{ claimed_at: string | null; completes_at: string }>();
+    const shift = await database.prepare('SELECT claimed_at, completes_at, work_order_id FROM work_shifts WHERE id = ? AND clerk_user_id = ?')
+      .bind(shiftId, userId).first<{ claimed_at: string | null; completes_at: string; work_order_id: string }>();
     if (!shift) return privateJson({ error: 'Shift unavailable.' }, { status: 404 });
+    if (shift.work_order_id === 'aurelle-food-estate') return privateJson({ error: 'Collect this charter shift with aurelle-claim-work; the reward stays in Crowns.', aurellePlan:await readAurelle(database,userId) }, { status:409 });
     if (shift.completes_at > now) {
       return privateJson({ error: 'Your shift is still underway.' }, { status: 409 });
     }
@@ -522,7 +535,7 @@ export async function POST(request: Request) {
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return privateJson({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
-    return privateJson({ ok: true, shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelle(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   return privateJson({ error: 'Unknown action.' }, { status: 400 });

@@ -10,7 +10,7 @@ export type WorkShift = {
   orderName: string;
   output: string;
   capacitySpent: number;
-  currency?: 'SPK' | 'LN';
+  currency?: 'SPK' | 'LN' | 'CRN';
   wageMinor?: number;
   rewardItem?: string;
   rewardQuantity?: number;
@@ -61,7 +61,7 @@ export async function readShifts(database: D1Database, userId: string): Promise<
     id: row.id, orderName: row.order_name, output: row.output,
     capacitySpent: row.capacity_spent, startedAt: row.started_at,
     completesAt: row.completes_at, claimedAt: row.claimed_at,
-    currency: row.work_order_id==='korund-food-production'?'LN':'SPK',
-    wageMinor: row.work_order_id==='korund-food-production'?800:row.wage_minor ?? undefined, rewardItem: row.item ?? undefined, rewardQuantity: row.quantity ?? undefined,
+    currency: row.work_order_id==='aurelle-food-estate'?'CRN':row.work_order_id==='korund-food-production'?'LN':'SPK',
+    wageMinor: ['aurelle-food-estate','korund-food-production'].includes(row.work_order_id)?800:row.wage_minor ?? undefined, rewardItem: row.item ?? undefined, rewardQuantity: row.quantity ?? undefined,
   }));
 }

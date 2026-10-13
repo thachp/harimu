@@ -11,6 +11,7 @@ import { GameShell } from './game-shell';
 import { NationInstitutions } from './nation-institutions';
 import { SquareChat } from './square-chat';
 import { DailyLoop } from './daily-loop';
+import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
 import { GovernmentPanel } from './government-panel';
 import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
@@ -433,6 +434,7 @@ type CitizenSnapshot = {
   government?: GovernmentSnapshot | null;
   verification?: VerificationState;
   simulation?: SimulationState;
+  aurellePlan?: AurellePlanView | null;
   korundPlan?: KorundPlanView | null;
   demoGovernment?: { period: number; counts: Record<string, number> };
   demoReceipts?: string[];
@@ -492,6 +494,9 @@ function ClerkCitizenSession({
 
 export default function Home() {
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
+  const [aurellePlan, setAurellePlan] = useState<AurellePlanView | null>(null);
+  const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
+  const aurelleIntent = useRef<AurelleCommand | null>(null);
   const [korundPlan, setKorundPlan] = useState<KorundPlanView | null>(null);
   const [korundCommand, setKorundCommand] = useState<KorundCommand | null>(null);
   const korundIntent = useRef<KorundCommand | null>(null);
@@ -570,6 +575,7 @@ export default function Home() {
     setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
     setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setVerification(null); setWorkShifts([]);
+    setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
     setKorundPlan(null); korundIntent.current = null; setKorundCommand(null);
     setPlanNote(''); setCompletedPlanIds([]); setPlanSaved(false); setHorizon('week'); setCommittedDecision(null);
     setRecentAction(null); setWorkError(null); setGovernmentError(null); setDecisionError(null); setEnrollmentError(null);
@@ -586,6 +592,15 @@ export default function Home() {
         && typeof command.requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(command.requestId)
         && (command.action !== 'korund-claim-work' || typeof command.shiftId === 'string')) {
         korundIntent.current = command; setKorundCommand(command);
+      }
+    } catch { /* Storage recovery is best-effort. */ }
+    try {
+      const raw = userId ? window.sessionStorage.getItem(`harimu-aurelle-intent-v1:${userId}`) : null;
+      const command = raw ? JSON.parse(raw) : null;
+      if (command && ['aurelle-start-work', 'aurelle-claim-work', 'aurelle-buy-food', 'aurelle-household-meal'].includes(command.action)
+        && typeof command.requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(command.requestId)
+        && (command.action !== 'aurelle-claim-work' || typeof command.shiftId === 'string')) {
+        aurelleIntent.current = command; setAurelleCommand(command);
       }
     } catch { /* Storage recovery is best-effort. */ }
   }, []);
@@ -643,7 +658,7 @@ export default function Home() {
     const epoch = citizenEpoch.current;
     if (workLock.current || !citizenNation) return;
     if (action === 'commit-work' && citizenNation.id !== 'kindle') return;
-    if (action !== 'refresh-work' && (korundIntent.current || marketIntent.current || playerIntent.current)) return;
+    if (action !== 'refresh-work' && (korundIntent.current || aurelleIntent.current || marketIntent.current || playerIntent.current)) return;
     if (action === 'commit-work' && (!order || hasActiveShift || capacity < order.cost)) return;
     workLock.current = true;
     setWorkPending(true);
@@ -654,10 +669,11 @@ export default function Home() {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
           body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
         });
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; profile?: CitizenSnapshot['profile'] };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; profile?: CitizenSnapshot['profile'] };
       if (epoch !== citizenEpoch.current) return;
         if (result.simulation) setSimulation(result.simulation);
         if ('korundPlan' in result) setKorundPlan(result.korundPlan ?? null);
+        if ('aurellePlan' in result) setAurellePlan(result.aurellePlan ?? null);
         if (result.shifts) setWorkShifts(result.shifts);
         if (result.economy) setEconomy(result.economy);
         if (result.market) setMarket(result.market);
@@ -716,7 +732,7 @@ export default function Home() {
   async function runMarket(command: MarketCommand) {
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
-    if (workLock.current || korundIntent.current || citizenNation?.id !== 'kindle' || !economy || !market) return;
+    if (workLock.current || korundIntent.current || aurelleIntent.current || citizenNation?.id !== 'kindle' || !economy || !market) return;
     if (playerIntent.current || !validMarketCommand(command) || (marketIntent.current && marketIntent.current.requestId !== command.requestId)) return;
     marketIntent.current = command; persistIntents();
     workLock.current = true;
@@ -783,7 +799,7 @@ export default function Home() {
   }
 
   async function runPlayerCommand(command: PlayerCommand) {
-    if (korundIntent.current) return;
+    if (korundIntent.current || aurelleIntent.current) return;
     if (citizenNation?.id !== 'kindle') return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
@@ -814,7 +830,7 @@ export default function Home() {
     if (clerkConfigured && !verification?.countedActionsEligible) { setGovernmentError(verification?.reason ?? 'Checking civic eligibility.'); return; }
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
-    if (workLock.current || !citizenNation || !government || marketIntent.current || playerIntent.current || korundIntent.current) return;
+    if (workLock.current || !citizenNation || !government || marketIntent.current || playerIntent.current || korundIntent.current || aurelleIntent.current) return;
     if (governmentIntent.current && governmentIntent.current.topic !== topic) {
       setGovernmentError(`Retry the previous ${governmentIntent.current.topic} petition before choosing another topic.`); return;
     }
@@ -851,7 +867,7 @@ export default function Home() {
 
   async function runKorundCommand(command: KorundCommand) {
     const originalKorundClaim = command.action === 'korund-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'LN');
-    if (marketIntent.current || playerIntent.current) return;
+    if (marketIntent.current || playerIntent.current || aurelleIntent.current) return;
     if (!clerkConfigured || citizenSessionStatus !== 'ready' || (citizenNation?.id !== 'korund' && !originalKorundClaim) || workLock.current) return;
     if (korundIntent.current && korundIntent.current.requestId !== command.requestId) return;
     const epoch = citizenEpoch.current;
@@ -888,6 +904,45 @@ export default function Home() {
   }
 
   const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand({ action, shiftId, requestId: crypto.randomUUID() });
+  async function runAurelleCommand(command: AurelleCommand) {
+    const originalAurelleClaim = command.action === 'aurelle-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'CRN');
+    if (marketIntent.current || playerIntent.current || korundIntent.current) return;
+    if (!clerkConfigured || citizenSessionStatus !== 'ready' || (citizenNation?.id !== 'aurelle' && !originalAurelleClaim) || workLock.current) return;
+    if (aurelleIntent.current && aurelleIntent.current.requestId !== command.requestId) return;
+    const epoch = citizenEpoch.current;
+    const userId = citizenIdentity.current;
+    workLock.current = true; setWorkPending(true); setWorkError(null);
+    aurelleIntent.current = command; setAurelleCommand(command);
+    const persist = (value: AurelleCommand | null) => {
+      if (!userId) return;
+      try {
+        const key = `harimu-aurelle-intent-v1:${userId}`;
+        if (value) window.sessionStorage.setItem(key, JSON.stringify(value));
+        else window.sessionStorage.removeItem(key);
+      } catch { /* Preserve same-request recovery in memory. */ }
+    };
+    persist(command);
+    try {
+      const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
+      const result = await response.json() as { error?: string; ok?: boolean; aurellePlan?: AurellePlanView; capacity?: number; shifts?: WorkShift[] };
+      if (epoch !== citizenEpoch.current) return;
+      if (response.status >= 500 || (response.ok && (!result.aurellePlan || typeof result.capacity !== 'number'))) throw new Error('Action needs confirmation.');
+      if (result.aurellePlan) setAurellePlan(result.aurellePlan);
+      if (result.shifts) setWorkShifts(result.shifts);
+      if (typeof result.capacity === 'number') setCapacity(result.capacity);
+      aurelleIntent.current = null; setAurelleCommand(null); persist(null);
+      if (!response.ok) { setWorkError(result.error ?? 'Aurelle action refused; refresh your charter account.'); return; }
+      setRecentAction(command.action === 'aurelle-start-work' ? 'Chartered service started; work continues while you are away.'
+        : command.action === 'aurelle-claim-work' ? 'Crown wages and Favor collected; estate food recorded.'
+          : command.action === 'aurelle-buy-food' ? 'Chartered food purchased.' : 'Household meal recorded; capacity updated.');
+    } catch {
+      if (epoch === citizenEpoch.current) setWorkError('Connection interrupted. Confirm the previous Aurelle action to recover its saved result.');
+    } finally {
+      if (epoch === citizenEpoch.current) { workLock.current = false; setWorkPending(false); }
+    }
+  }
+
+  const startAurelleAction = (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void runAurelleCommand({ action, shiftId, quantity, requestId: crypto.randomUUID() });
   function changeView(nextView: ViewMode) {
     setSelectedId(selected.id);
     const href = sceneUrl(window.location.href, nextView, selected.id);
@@ -928,6 +983,7 @@ export default function Home() {
 
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
     setKorundPlan(snapshot.korundPlan ?? null);
+    setAurellePlan(snapshot.aurellePlan ?? null);
     if (snapshot.simulation) setSimulation(snapshot.simulation);
     setVerification(snapshot.verification ?? null);
     setWorkShifts(snapshot.shifts ?? []);
@@ -1081,7 +1137,7 @@ export default function Home() {
 
   async function confirmEnrollment(nation: Nation) {
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
-    if (workLock.current || marketIntent.current || playerIntent.current || korundIntent.current) { setEnrollmentError('Confirm your pending economic action before changing citizenship.'); return; }
+    if (workLock.current || marketIntent.current || playerIntent.current || korundIntent.current || aurelleIntent.current) { setEnrollmentError('Confirm your pending economic action before changing citizenship.'); return; }
     const epoch = citizenEpoch.current;
     setEnrollmentPending(true);
     setEnrollmentError(null);
@@ -1136,7 +1192,8 @@ export default function Home() {
         economy?: Economy;
         market?: MarketState;
         playerMarket?: PlayerMarketState;
-        korundPlan?: KorundPlanView | null;
+        aurellePlan?: AurellePlanView | null;
+  korundPlan?: KorundPlanView | null;
       };
       if (epoch !== citizenEpoch.current) return;
       if (!response.ok || !result.nationId) {
@@ -1148,6 +1205,7 @@ export default function Home() {
       setCitizenNationId(result.nationId);
       setSelectedId(result.nationId);
       setKorundPlan(result.korundPlan ?? null);
+      setAurellePlan(result.aurellePlan ?? null);
       if (result.citizenship) setCitizenshipStatus(result.citizenship);
       if (result.economy) setEconomy(result.economy);
       if (result.market) setMarket(result.market);
@@ -1167,18 +1225,22 @@ export default function Home() {
     setPendingEnrollment(nationId);
   }
 
-  const priorNationShift = workShifts.find(shift => !shift.claimedAt && ((shift.currency === 'LN') !== (citizenNation?.id === 'korund')));
+  const priorNationShift = workShifts.find(shift => !shift.claimedAt && ((shift.currency ?? 'SPK') !== (citizenNation?.id === 'korund' ? 'LN' : citizenNation?.id === 'aurelle' ? 'CRN' : 'SPK')));
   const priorShiftPanel = priorNationShift && <PriorNationShift shift={priorNationShift}
-    currency={priorNationShift.currency === 'LN' ? 'LN' : 'SPK'} pending={workPending} uncertain={Boolean(korundCommand || marketCommand || playerCommand)}
+    currency={priorNationShift.currency ?? 'SPK'} pending={workPending} uncertain={Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
     onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current);
-      else if (marketIntent.current) void runMarket(marketIntent.current); else if (playerIntent.current) void runPlayerCommand(playerIntent.current); }}
+      else if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); else if (marketIntent.current) void runMarket(marketIntent.current); else if (playerIntent.current) void runPlayerCommand(playerIntent.current); }}
     onClaim={() => { if (priorNationShift.currency === 'LN') startKorundAction('korund-claim-work', priorNationShift.id);
+      else if (priorNationShift.currency === 'CRN') startAurelleAction('aurelle-claim-work', priorNationShift.id);
       else void runWork('claim-work', undefined, priorNationShift.id); }} />;
   const korundPanel = <KorundPlanPanel plan={korundPlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
     uncertain={Boolean(korundCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
     onCommand={startKorundAction} onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}
     onRefresh={() => void runWork('refresh-work')} />;
-  const dailyLoop = citizenNation?.id === 'korund' ? <>{priorShiftPanel}{korundPanel}</> : priorNationShift ? priorShiftPanel : citizenNation && <DailyLoop nationName={citizenNation.shortName} supported={citizenNation.id === 'kindle'}
+  const aurellePanel = <AurellePlanPanel plan={aurellePlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
+    uncertain={Boolean(aurelleCommand || korundCommand || marketCommand || playerCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
+    onCommand={startAurelleAction} onRetry={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }} onRefresh={() => void runWork('refresh-work')} />;
+  const dailyLoop = citizenNation?.id === 'aurelle' ? <>{priorShiftPanel}{aurellePanel}</> : citizenNation?.id === 'korund' ? <>{priorShiftPanel}{korundPanel}</> : priorNationShift ? priorShiftPanel : citizenNation && <DailyLoop nationName={citizenNation.shortName} supported={citizenNation.id === 'kindle'}
     localDemo={!clerkConfigured} view={viewMode} economy={economy} market={market} shifts={workShifts} capacity={capacity}
     jobs={availableWorkOrders.filter(order => !order.nationId || order.nationId === citizenNation.id)}
     busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)} onNavigate={changeView}
@@ -1192,10 +1254,11 @@ export default function Home() {
       <button type="button" onClick={() => changeView('world')}>Explore nations and enroll</button>
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
+      {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><button type="button" disabled={workPending} onClick={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</button></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><button type="button" disabled={workPending} onClick={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</button></div>}
       {viewMode !== 'government' && dailyLoop}
       {viewMode === 'household' && <>
-        {citizenNation.id !== 'korund' && <>
+        {!['korund','aurelle'].includes(citizenNation.id) && <>
         <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
           <ul>{economy?.inventory.map((entry) => <li key={entry.item}>{entry.item}: {entry.quantity} available</li>)}</ul>
           <p>Listed goods remain reserved at the market. Capacity recovers while you are away.</p>
@@ -1228,8 +1291,8 @@ export default function Home() {
           {decisionError && <p role="alert">{decisionError}</p>}
         </details>
       </>}
-      {viewMode === 'workplace' && citizenNation.id !== 'korund' && <>
-        <WorkShiftBoard shifts={workShifts.filter(shift => shift.currency !== 'LN')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
+      {viewMode === 'workplace' && !['korund','aurelle'].includes(citizenNation.id) && <>
+        <WorkShiftBoard shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
           onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
         <section className="scene-work-orders"><h2>Available contributions</h2>
           {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <button key={order.id} type="button"
@@ -1238,7 +1301,7 @@ export default function Home() {
         {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length === 0 && <p>No shifts are available for this nation yet. Kindle has the first supported work and wage programme; other national workplaces are planned.</p>}
         </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
       </>}
-      {viewMode === 'market' && citizenNation.id !== 'korund' && <>
+      {viewMode === 'market' && !['korund','aurelle'].includes(citizenNation.id) && <>
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
@@ -1258,7 +1321,7 @@ export default function Home() {
 
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
-    <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : 'Chat · Government preview; economy planned'}</p>
+    <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Chat · Government preview; economy planned'}</p>
     <details><summary>Rules and limits</summary><p>Fixed nation rules; all offices use deterministic AI/SI simulation. Phone verification is unavailable, so counted petitions are closed. Territory ownership and foreign trade are planned.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" onClick={()=>beginEnrollment(selected.id)}>Enroll in {selected.shortName}</button>}
@@ -1271,14 +1334,18 @@ export default function Home() {
     <SceneNews events={worldEvents} title="City noticeboard" />
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
     <NationInstitutions nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
-      workPending={workPending || hasActiveShift || Boolean(korundCommand || marketCommand || playerCommand)}
+      workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
       workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} /> : citizenScene;
-  const activeShift = priorNationShift ?? (citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
+  const activeShift = priorNationShift ?? (citizenNation?.id === 'aurelle' ? aurellePlan?.shifts ?? [] : citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
   const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
   const contextItems: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[] =
-    citizenNation?.id === 'korund' && ['household', 'workplace', 'market'].includes(viewMode) ? [
+    citizenNation?.id === 'aurelle' && ['household','workplace','market'].includes(viewMode) ? [
+      {id:'aurelle-service',label:'Chartered service',detail:'4 WC · 8 CRN · 2 Favor',onSelect:()=>changeView('workplace')},
+      {id:'aurelle-food',label:'Chartered food',detail:`${aurellePlan?.publicFoodRemaining ?? 0} at estate · 1.50 CRN each`,onSelect:()=>changeView('market')},
+      {id:'aurelle-household',label:'Household',detail:`${aurellePlan?.foodQuantity ?? 0} food · ${aurellePlan?.favor ?? 0} Favor`,onSelect:()=>changeView('household')},
+    ] : citizenNation?.id === 'korund' && ['household', 'workplace', 'market'].includes(viewMode) ? [
       { id: 'korund-assignment', label: korundPlan?.assignment.name ?? 'Assigned work', detail: korundPlan ? `${korundPlan.assignment.capacityCost} WC · ${(korundPlan.assignment.wageMinor / 100).toFixed(2)} LN · ${korundPlan.assignment.hours} hours` : 'Refresh to load your assignment', onSelect: () => changeView('workplace') },
       { id: 'korund-coupons', label: 'Ration book', detail: korundPlan ? `Game week ${korundPlan.gameWeek} · ${korundPlan.couponFoodRemaining} food coupons` : 'Refresh to load your ration book', onSelect: () => changeView('market') },
       { id: 'korund-food', label: 'Household rations', detail: `${korundPlan?.foodQuantity ?? 0} food`, onSelect: () => changeView('household') },
@@ -1310,7 +1377,7 @@ export default function Home() {
   return <>
     {clerkConfigured && <ClerkCitizenSession onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
     <GameShell worldClock={simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
-      currencyCode={citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
+      currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
       localDemo={!clerkConfigured} notice={workError ?? governmentError ?? recentAction ?? undefined} panel={gamePanel}
       contextItems={contextItems} contextTitle={contextTitle}

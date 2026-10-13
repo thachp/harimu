@@ -16,7 +16,7 @@ export type GameShellProps = {
   citizenNation?: GameNation;
   nations: readonly GameNation[];
   capacity: number;
-  currencyCode?: 'SPK' | 'LN';
+  currencyCode?: 'SPK' | 'LN' | 'CRN';
   walletMinor?: number;
   inventory?: { food: number; materials: number; knowledge: number };
   shiftSummary?: { title: string; endsAt?: number };
