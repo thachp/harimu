@@ -1,4 +1,6 @@
-# Direct Cloudflare migration
+# Direct Cloudflare migration (historical provisioning / future production)
+
+**Current direction:** all development deploys to the fresh isolated preview.harimu.com world. Production is deferred until a good proof of concept. Use [Cloudflare development](CLOUDFLARE_DEVELOPMENT.md) as the current workflow; production export/cutover requirements below do not block development.
 
 Status: isolated remote preview serves public routes/assets; authenticated acceptance and production cutover remain blocked. See the latest verification below. Current UI/gameplay and docs hosting are unchanged. Source baseline is c6729c4b23094f79e995c1d3a287f4a8240627d1 (Sites v22). Earlier v21 baseline: e8e7b89d2ab0803220df2495717ab6415643bdd4.
 
@@ -13,7 +15,7 @@ Status: isolated remote preview serves public routes/assets; authenticated accep
 
 ## Portable preview
 
-`npm run build` retains the existing Sites path. `npm run build:cloudflare` excludes the Sites plugin and uses wrangler.jsonc with the same Vinext entry point and D1 `DB` binding. The current all-zero D1 ID is local-only; `npm run deploy:cloudflare` refuses it and refuses custom routes or an unexpected account/Worker. No production deploy command is supplied until migration evidence is complete.
+The initial preparation retained a Sites build path. Current user direction supersedes that: `npm run build` and `npm run build:cloudflare` both build direct Cloudflare development, with Sites integration removed and the same Vinext entry point and D1 `DB` binding. The current all-zero D1 ID is local-only; `npm run deploy:cloudflare` refuses it and refuses custom routes or an unexpected account/Worker. No production deploy command is supplied until migration evidence is complete.
 
 After user-authenticated CLI access is available:
 

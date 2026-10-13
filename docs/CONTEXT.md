@@ -1,5 +1,8 @@
 # Harimu Domain Context
 
+Deployment direction (Patrick, 2026-10-13): all development uses the fresh isolated Cloudflare world at preview.harimu.com. ProductionSites/data and Vercel docs remain intact. Production launch follows a good proof of concept and a separate decision. Use [the guarded development workflow](CLOUDFLARE_DEVELOPMENT.md); no Sites development publishing.
+
+
 Canonical source: [official Harimu documentation, GDD v0.7](https://docs.harimu.com/), designated by Patrick on October 13, 2026. It supersedes the older PDF when they differ. This file remains a historical v0.6 summary; use the [alignment review](OFFICIAL_DOCS_ALIGNMENT.md) and direct user requirements before subsequent implementation.
 
 Implementation override: [requirements after v0.6](REQUIREMENT_CHANGES.md) takes precedence for explicitly changed requirements, including AI/SI control of all government roles in the first release. Historical references to deferred player office must be reconciled with v0.7, which restricts humans to citizen roles.

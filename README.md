@@ -1,9 +1,8 @@
-# Harimu local development
+# Harimu Cloudflare development
 
 Canonical design source: [official Harimu documentation, GDD v0.7](https://docs.harimu.com/). Patrick designated this site as the source of truth; it supersedes the older PDF when they differ. Preserve direct user requirements and review [documented gaps/conflicts](docs/OFFICIAL_DOCS_ALIGNMENT.md) before subsequent implementation.
 
-This checkout is the existing Harimu Site. Preserve `.openai/hosting.json` and
-its project identity when publishing. Dependencies are already installed.
+All development deploys to **https://preview.harimu.com**, a fresh isolated Cloudflare world. Production at harimu.com remains on Sites until a good proof of concept and a separate launch decision. Docs remains on Vercel. See [Cloudflare development](docs/CLOUDFLARE_DEVELOPMENT.md) for the default guarded workflow. Preserve `.openai/hosting.json` as historical production identity; do not publish development through Sites.
 
 From this directory:
 
@@ -21,10 +20,11 @@ From this directory:
 - `node --experimental-strip-types tests/government-rules.test.mjs`: regime and proposal rules.
 - `node --experimental-strip-types tests/daily-briefing-rules.test.mjs`: daily priority rules.
 - `node --experimental-strip-types tests/scene-navigation.test.mjs`: scene URLs and history restoration.
-- `npm run build`: production compilation.
+- `npm run build`: direct Cloudflare development compilation.
+- `npm run check`: full Node/SQL suites, lint and types.
+- `npm run deploy`: checks, build and guarded development deployment.
 
-Use the supported Sites source workflow for synchronization, packaging, and
-deployment. Do not upload `.env*`, local database state, or authentication tokens.
+Commit/push source through Git and use the guarded Cloudflare deploy command. Do not upload `.env*`, local database state, or authentication tokens. Development must not deploy to Sites, apex/www, or docs.
 
 ## Timed citizen work milestone
 
@@ -281,4 +281,4 @@ semantics, browser account switching, or authenticated multi-browser concurrency
 
 ## Direct Cloudflare hosting
 
-See [the migration runbook](docs/CLOUDFLARE_MIGRATION.md) for the isolated Workers preview, complete production-data transfer, docs-hosting constraints, and rollback. `npm run build:cloudflare` builds without the Sites plugin; `npm run deploy:cloudflare` refuses an unconfigured database or custom-domain routes. Production cutover remains gated on a complete verified data export and a tested preview.
+See [the migration runbook](docs/CLOUDFLARE_MIGRATION.md) for the isolated Workers preview, complete production-data transfer, docs-hosting constraints, and rollback. `npm run build:cloudflare` builds without the Sites plugin; `npm run deploy` is the default tested development deployment. Its guard pins the preview Worker and isolated D1 and rejects production routes. Production launch is deferred; its future data-export requirements do not block the fresh development world.

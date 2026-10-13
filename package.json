@@ -6,15 +6,17 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
-    "build": "vinext build",
+    "dev": "node scripts/build-development.mjs --dev",
+    "build": "node scripts/build-development.mjs",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "build:cloudflare": "HARIMU_DEPLOY_TARGET=cloudflare vinext build",
+    "build:cloudflare": "npm run build",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "test:sql": "python3 scripts/test-sql.py"
+    "test:sql": "python3 scripts/test-sql.py",
+    "deploy": "npm run check && npm run build && npm run deploy:cloudflare",
+    "check": "npm test && npm run test:sql && npm run lint && tsc --noEmit"
   },
   "dependencies": {
     "@clerk/backend": "^3.19.0",

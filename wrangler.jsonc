@@ -8,7 +8,10 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": true,
-  "vars": { "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaGFyaW11LmNvbSQ" },
+  "vars": {
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaGFyaW11LmNvbSQ",
+    "NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW": "true"
+  },
   // Isolated preview only; never bind this resource as migrated production.
   "d1_databases": [{
     "binding": "DB",

@@ -1,17 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { assertDevelopmentConfig, readDevelopmentConfig } from './development-config.mjs';
 
-// Deploy only the generated direct build: the Sites build is not portable.
-const config = JSON.parse(readFileSync('dist/server/wrangler.json', 'utf8'));
-if (config.name !== 'harimu-preview' || config.account_id !== '143bccf1a31c2161142c43845a8fc65d') {
-  throw new Error('Build the direct Cloudflare preview for the approved account first.');
-}
-if (config.routes?.length || config.d1_databases?.length !== 1 ||
-    config.d1_databases[0].binding !== 'DB' ||
-    !/^[0-9a-f-]{36}$/i.test(config.d1_databases[0].database_id ?? '') ||
-    config.d1_databases[0].database_id === '00000000-0000-4000-8000-000000000000') {
-  throw new Error('Preview requires an explicit isolated D1 database ID and no custom routes.');
-}
+// Validate both input and built output; never upload a stale Sites/production bundle.
+readDevelopmentConfig();
+const config = assertDevelopmentConfig(JSON.parse(readFileSync('dist/server/wrangler.json', 'utf8')));
+if (config.main !== 'index.js' || !config.assets?.directory) throw new Error('Build the Cloudflare preview first.');
 // Sites applied Drizzle migrations automatically; direct Workers must verify them.
 const schemaCheck = spawnSync('node_modules/.bin/wrangler', [
   'd1', 'execute', 'harimu-preview', '--remote', '--config', 'dist/server/wrangler.json', '--json',
