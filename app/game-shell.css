@@ -59,6 +59,8 @@ body:has(.harimu-game){overflow:auto}
 .viewport-world-label:focus-visible{outline:2px solid #80d8ce;outline-offset:3px}
 @media(max-width:760px){.viewport-world-label{min-height:44px}}
 /* Compact help supports hover, keyboard focus and touch. */
+.game-hud{z-index:6}
+.game-hud-tip{top:calc(100% + 7px)}
 .game-hud-help{position:relative;min-width:0}.game-hud-help>summary{list-style:none;cursor:pointer}.game-hud-help>summary::-webkit-details-marker{display:none}.game-hud-help>summary:focus-visible{outline:2px solid #80d8ce;outline-offset:2px}
 .game-resources>.game-hud-help{border-left:1px solid #263d46}.game-resources>.game-hud-help:last-child{border-right:1px solid #263d46}.game-resources>.game-hud-help>summary{display:grid;grid-template-columns:19px auto;column-gap:8px;align-content:center;align-items:center;min-width:82px;height:100%;padding:8px 12px}.game-resources>.game-hud-help>summary>span:only-child{grid-column:1/-1;font-size:10px;letter-spacing:0;text-transform:none;line-height:1.4;margin:0}
 .game-hud-tip{display:none;position:absolute;z-index:20;top:calc(100% + 7px);left:0;width:250px;max-width:80vw;padding:12px;background:#102934;border:1px solid #598c94;border-radius:3px;color:#dce7e8;font-size:12px;line-height:1.5;box-shadow:0 5px 15px #0005}.game-hud-help[open]>.game-hud-tip,.game-hud-help:hover>.game-hud-tip,.game-hud-help:focus-within>.game-hud-tip{display:block}.game-account .game-hud-tip{left:auto;right:0}
@@ -69,3 +71,5 @@ body:has(.harimu-game){overflow:auto}
 #game-panel-title:focus{outline:none}
 /* Chromium's native details content also needs visibility when help is hovered. */
 .game-hud-help:hover::details-content,.game-hud-help:focus-within::details-content{content-visibility:visible}
+.game-hud-help:not([open]):not(:hover)>.game-hud-tip{display:none}
+@media(max-width:760px){.game-hud-tip{position:fixed;top:140px;left:12px}.game-account .game-hud-tip{right:12px;left:auto}}

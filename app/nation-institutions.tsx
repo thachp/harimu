@@ -18,7 +18,7 @@ export function NationInstitutions({ nation, citizenNation, capacity, workOrders
 }) {
   const [selectedSystemId, setSelectedSystemId] = useState('capital');
   const systems = [
-    { id: 'capital', label: 'Capital', title: nation.capital, detail: 'AI/SI offices follow deterministic rules, with no live AI model connected.' },
+    { id: 'capital', label: 'Capital', title: nation.capital, detail: 'Computer-controlled leaders follow fixed game rules. AI/SI means artificial or simulated intelligence; no live AI model is connected.' },
     { id: 'currency', label: 'Currency', title: nation.currency.split(' · ')[0], detail: `${nation.currency}. ${nation.id === 'korund' ? 'Labor Notes stay in Korund’s separate ledger. Coupon rations replace legal private-market food purchases; LN spending is planned.' : 'This is the nation’s designed currency regime. International exchange and conversion are planned.'}` },
     { id: 'corridor', label: 'Trade', title: 'Trade corridor', detail: `${nation.tradeStatus}. Cross-border settlement, transport and corridor controls are design context; they are not simulated here yet.` },
     { id: 'commons', label: 'Civic life', title: 'Civic institutions', detail: 'Counted petitions require Tier 1 phone verification, which is not available yet. Elections, protests and public-opinion systems are planned.' },
@@ -29,7 +29,7 @@ export function NationInstitutions({ nation, citizenNation, capacity, workOrders
   const jobs = nation.id === 'kindle' ? workOrders.filter(order => !order.nationId || order.nationId === 'kindle') : [];
   return <section className="nation-inspector" aria-label={`${nation.name} institutions`}>
     <dl><dt>Government</dt><dd>{nation.government}</dd><dt>Economy</dt><dd>{nation.economy}</dd><dt>Official faith stance</dt><dd>{nation.religion}</dd></dl>
-    <details><summary>Seeded nation profile</summary><p>Illustrative starting figures, not measured live conditions.</p>
+    <details><summary>Example nation profile</summary><p>Illustrative starting figures, not measured live conditions.</p>
       <dl><dt>Population</dt><dd>{nation.population}</dd><dt>Treasury</dt><dd>{nation.treasury}</dd><dt>Stability</dt><dd>{nation.stability} / 100</dd></dl>
     </details>
     <div className="nation-inspector-systems" role="group" aria-label="Institution systems">
