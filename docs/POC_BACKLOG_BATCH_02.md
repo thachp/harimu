@@ -13,4 +13,6 @@ Fresh backlog: #13's apparent 0→22 meal gain partly follows the same stale enr
 
 Previous batch issues #2/#3/#4/#8 were closed as completed after the user-requested GitHub connector retry succeeded. No comments, labels, or unrelated issue metadata were changed.
 
-Full checks and deployed acceptance results will be recorded after integration.
+Verified deployment: source commit `2fa9d1b6a95cae45c4856c75c00d67fe7c4bd7c9`, Worker `harimu-preview` version `523527ce-6a72-4067-a738-f318f5d46ce5`, https://preview.harimu.com. 83 Node tests, 77 SQL tests, lint, types and Cloudflare build pass. API/client integration covers first enrollment, exact replay, stale refusal, nation changes, lost responses and account isolation with authoritative capacity.
+
+Browser acceptance: Fulmara inspection renders Arcport square/work/market and Grand Council, Civic is active, and its procedural layout visibly differs from Kindle. Signed-out HUD shows no fake resources; native resource/clock disclosures open by keyboard and expose aria-describedby. Clock help is fully readable above navigation at desktop and 390×844 after correcting its stacking/mobile placement. Official glossary returns HTTP 200. Existing signed-in citizen still shows 18 WC and zero wallet/inventory; the original harvest remains underway with collection disabled. No new citizen, shift or economic transaction was submitted for acceptance. Fresh credential/enrollment interaction was not performed; #12 is verified through actual API and client integration tests rather than a new live account.
