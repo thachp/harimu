@@ -2221,3 +2221,4 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 .leader-panel details { margin-top: 12px; }
 .leader-panel summary { cursor: pointer; }
 @media (max-width: 480px) { .leader-identity { flex-wrap: wrap; } }
+.citizen-market .ai-badge, .citizen-market .ai-text-tag { display: inline-block; margin: 0; width: auto; font-size: 11px; }
