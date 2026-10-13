@@ -95,10 +95,12 @@ export async function readPlayerMarket(db: D1Database, userId: string): Promise<
     db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>(),
     db.prepare(`${columns} WHERE l.seller_id = ? ORDER BY (status = 'open') DESC, l.created_at DESC, l.id DESC LIMIT 20`).bind(userId).all<Row>(),
     db.prepare(`${columns} WHERE l.seller_id != ? AND l.id IN (SELECT id FROM player_open_lots)
+      AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id = ? AND nation_id = 'kindle')
       AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id = l.seller_id AND nation_id = 'kindle')
-      ORDER BY l.created_at DESC, l.id DESC LIMIT 40`).bind(userId).all<Row>(),
+      ORDER BY l.created_at DESC, l.id DESC LIMIT 40`).bind(userId,userId).all<Row>(),
   ]);
   const serialize = (r: Row, owned: boolean): PlayerLot => ({ id: r.id, item: r.item, quantity: r.quantity,
     unitMinor: r.unit_minor, createdAt: new Date(r.created_at * 1000).toISOString(), status: r.status, mine: owned });
-  return { available: citizen?.nation_id === 'kindle', listings: [...mine.results.map((r) => serialize(r, true)), ...others.results.map((r) => serialize(r, false))] };
+  const available=citizen?.nation_id === 'kindle';
+  return { available, listings: [...mine.results.map((r) => serialize(r, true)), ...(available ? others.results.map((r) => serialize(r, false)) : [])] };
 }
