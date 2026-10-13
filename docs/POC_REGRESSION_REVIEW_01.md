@@ -12,7 +12,7 @@ On the deployed first-session guide, clicking About government removed the focus
 
 An isolated local actual-API/SQLite probe verified foreign claims are rejected with 404, premature claims with 409, exact maturity grants 800 minor SPK plus 4 food, and repeated claims/database reopening retain exactly one receipt and unchanged balances. Eight existing isolation/receipt tests passed. No live data or timers were modified by these tests.
 
-The protected original live harvest still had zero receipts before maturity at `2026-10-13T17:19:04.992Z`; another citizen's shift at `17:41:26.820Z` remained separate and unclaimed. Normal original UI claim acceptance will be recorded after actual maturity.
+The protected original live harvest still had zero receipts before maturity at `2026-10-13T17:19:04.992Z`; another citizen's shift at `17:41:26.820Z` remained separate and unclaimed. At actual maturity the original claim became enabled. A normal UI double-click recorded the claim at `2026-10-13T17:19:35.727Z`: exactly one receipt, 800 minor SPK and 4 food. The UI changed from 0 SPK/0 food to 8 SPK/4 food, retained 18 WC, removed the completed claim controls, and displayed the recorded harvest. The second citizen remained unclaimed with zero receipts. Reload persistence was checked afterward.
 
 ## Next confirmed navigation defect
 
