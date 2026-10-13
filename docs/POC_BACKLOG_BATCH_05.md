@@ -1,0 +1,12 @@
+# POC backlog batch 5: introduction and nation discovery
+
+Owner-authored issues #9/#10/#13/#16 were re-read before this batch. Official GDD v0.7 onboarding 19.1 was fetched again. The user’s existing strip/globe-only nation selection rule takes precedence over the issue's proposed duplicate family cards.
+
+- An optional three-stage introduction appears in the signed-out World inspector: arrival context, accurate fixed-rule government disclosure, and exploration/guest-preview instructions. Every stage has immediate close/skip; restarting remounts at the beginning. Starting guest play or opening citizenship review closes the introduction. No account, D1, network, or persistence logic lives in the guide. Citizenship remains the existing explicit review/oath flow.
+- Four family filters and Money/Faith ordering operate on the same bottom strip. Filtering never selects a nation or changes citizenship. Selected nations outside a filter remain selected with a clear hint; All nations restores all ten. Actual nation buttons and globe labels remain the only nation-selection controls. Seven unfinished economies have Preview badges; a one-tap read-only comparison uses current metadata.
+- Actual client/API local fixtures cover the reported meal regression: first meal 18→22 WC and 2→0 food, no false in-flight recovery, exact request-ID replay after lost committed response without duplicate consumption/recovery, and the cooldown boundary. These fixtures use temporary SQLite only. The live citizen’s next-day meal cooldown is preserved; no live meal result is claimed.
+- Local browser acceptance uses the actual GameShell and 3D city with fixture notice props, without any game API. The success notice expires naturally after its eight-second timer and does not overlap the work-yard label; recovery errors persist. This exposed and fixed a mobile implicit-grid-column bug: notices and inspector now remain one column, with notices preceding details and full-width city rendering.
+
+#9 remains partial: a timed cinematic, per-nation introductory lines, questionnaire/shortlist and nation-specific civic vignettes are not implemented. The existing disposable economic sample must not be described as those full planned vignettes. No live transport error was forced, no protected timer changed, and no live game command was submitted for these checks.
+
+Full checks and deployed acceptance will be recorded after integration.

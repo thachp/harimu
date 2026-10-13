@@ -4,6 +4,8 @@ import type { VerificationState } from '@/lib/verification';
 import type { SimulationState } from '@/lib/world-simulation';
 
 import { GuestDemo, type GuestDemoView } from './guest-demo';
+import { FirstVisitGuide } from './first-visit-guide';
+import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
@@ -545,6 +547,7 @@ export default function Home() {
   const enrollmentLock = useRef(false);
   const [sessionRetry, setSessionRetry] = useState(0);
   const [reviewStorageKey, setReviewStorageKey] = useState(() => enrollmentReviewKey(null));
+  const [firstVisitGuideOpen, setFirstVisitGuideOpen] = useState(true);
   const [guideNow, setGuideNow] = useState(0);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
@@ -1293,6 +1296,7 @@ export default function Home() {
   function beginEnrollment(nationId: string) {
     if (enrollmentLock.current) return;
     if (!worldNations.some(nation => nation.id === nationId)) return;
+    setFirstVisitGuideOpen(false);
     writeEnrollmentReview(citizenIdentity.current, { nationId, expectedNationId: citizenNation?.id ?? null });
     setEnrollmentExpectedNation(citizenNation?.id ?? null);
     setEnrollmentError(null);
@@ -1333,6 +1337,7 @@ export default function Home() {
   const guestActive = guestAllowed && guestMode;
   function startGuestDemo() {
     if (!guestAllowed) return;
+    setFirstVisitGuideOpen(false);
     setGuestState(createGuestDemo()); setGuestMode(true); closeEnrollmentReview(); changeView('workplace');
   }
   function leaveGuestDemo() { setGuestMode(false); setGuestState(createGuestDemo()); changeView('world'); }
@@ -1414,8 +1419,12 @@ export default function Home() {
   </section>;
 
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
+    {guestAllowed && (firstVisitGuideOpen
+      ? <FirstVisitGuide onTryGuest={startGuestDemo} onDismiss={() => setFirstVisitGuideOpen(false)} />
+      : <button type="button" className="secondary-action" onClick={() => setFirstVisitGuideOpen(true)}>Restart first-visit guide</button>)}
     <p className="eyebrow">Exploring · {selected.shortName}</p>
     {guestEntry}
+    <NationComparison nations={worldNations} />
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>

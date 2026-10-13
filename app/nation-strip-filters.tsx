@@ -1,0 +1,9 @@
+'use client';
+import { nationFamilies, type NationFamily, type NationLens, type DiscoveryNation, nationIsPreview } from '@/lib/nation-discovery';
+import styles from './nation-strip-filters.module.css';
+export function NationStripFilters({family,lens,onFamily,onLens,hiddenSelection}:{family:NationFamily;lens:NationLens;onFamily:(value:NationFamily)=>void;onLens:(value:NationLens)=>void;hiddenSelection?:string}){
+  return <div className={styles.filters}><div className={styles.controls} role="group" aria-label="Filter nations by power">{nationFamilies.map(group=><button type="button" key={group.id} aria-pressed={family===group.id} onClick={()=>onFamily(group.id)}>{group.label}</button>)}</div><div className={styles.controls} role="group" aria-label="Sort nation strip">{(['power','money','faith'] as const).map(value=><button type="button" key={value} aria-pressed={lens===value} onClick={()=>onLens(value)}>{value==='power'?'Default order':value==='money'?'Money':'Faith'}</button>)}</div>{hiddenSelection&&<small role="status">{hiddenSelection} remains selected outside this filter. All nations shows it again.</small>}</div>;
+}
+export function NationComparison({nations}:{nations:readonly DiscoveryNation[]}){
+  return <details className={styles.comparison}><summary>Compare all ten nations</summary><div><table><caption>Read-only comparison · government roles are AI/SI controlled</caption><thead><tr><th scope="col">Nation</th><th scope="col">Power</th><th scope="col">Money</th><th scope="col">Faith</th><th scope="col">Playable economy</th></tr></thead><tbody>{nations.map(nation=><tr key={nation.id}><th scope="row">{nation.name}</th><td>{nation.government}</td><td>{nation.currency}<br />{nation.economy}</td><td>{nation.religion}</td><td>{nationIsPreview(nation.id)?'Preview':'Available'}</td></tr>)}</tbody></table></div></details>;
+}

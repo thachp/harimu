@@ -3,12 +3,13 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
+import * as discovery from '../lib/nation-discovery.ts';
 const require = createRequire(import.meta.url);
 const source = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText;
 const exports = {};
 let effects = [];
-new Function('exports','require',compiled)(exports,name=>name==='react'?{useEffect(fn){effects.push(fn);},useState(initial){return [initial,()=>{}];}}:name==='@phosphor-icons/react'?new Proxy({},{get:(_,key)=>String(key)}):name.endsWith('.css')?{}:name==='./game-viewport'?{default:()=>null}:require(name));
+new Function('exports','require',compiled)(exports,name=>name==='react'?{useEffect(fn){effects.push(fn);},useState(initial){return [initial,()=>{}];}}:name==='./nation-strip-filters'?{NationStripFilters:()=>null}:name==='@/lib/nation-discovery'?discovery:name==='@phosphor-icons/react'?new Proxy({},{get:(_,key)=>String(key)}):name.endsWith('.css')?{}:name==='./game-viewport'?{default:()=>null}:require(name));
 const props={view:'square',nation:{id:'kindle',name:'Kindle'},nations:[],capacity:18,localDemo:false,panel:null,onNavigate(){}};
 function nodes(node){if(!node || typeof node!=='object')return [node]; if(typeof node.type==='function' && node.type.name==='HudHelp')return nodes(node.type(node.props));return [node,...[node.props?.children].flat(Infinity).flatMap(nodes)];}
 const render=extra=>nodes(exports.GameShell({...props,...extra}));

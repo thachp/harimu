@@ -17,6 +17,7 @@ async function componentModule(path) {
   for (const match of [...output.matchAll(/from (['"])([^'"]+)\1/g)]) {
     const specifier=match[2];let url;
     if (specifier==='./game-viewport') url=viewportStub;
+    else if (specifier.endsWith('.css')) url='data:text/javascript,export default new Proxy({}, {get:(_,key)=>String(key)})';
     else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
       const base=specifier.startsWith('@/')?resolve(root,specifier.slice(2)):resolve(dirname(path),specifier);
       let child;
