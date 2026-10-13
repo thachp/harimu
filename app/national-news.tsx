@@ -1,4 +1,5 @@
 'use client';
+import {WeeklyAddresses} from './weekly-addresses';
 import {useDisplayTimestamp} from './display-preferences';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
@@ -37,6 +38,6 @@ function NewsDialog({nationId,session,configured,onClose}:{nationId:string|null;
  const blocked=!configured?'Local samples do not publish national news. Use the connected preview with citizenship.':session==='loading'?'Loading your citizen before reading national news…':session==='error'?'Your citizen account could not be loaded. Retry loading your citizen.':session==='anonymous'?'Sign in and choose citizenship to read your nation’s news.':!nationId?'Choose citizenship to read your nation’s news.':null;
  return <dialog ref={dialog} className="national-news-dialog" aria-labelledby="national-news-title" onClose={onClose} onCancel={event=>{event.preventDefault();event.stopPropagation();close();}} onKeyDown={event=>event.stopPropagation()} onClick={event=>{if(event.target===event.currentTarget){const bounds=event.currentTarget.getBoundingClientRect();if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)close();}}}>
   <header><h1 id="national-news-title">National news</h1><button type="button" onClick={close}>Close news</button></header>
-  {blocked?<p role="status">{blocked}</p>:<>{loading&&<p role="status">Loading national news…</p>}{error&&<p role="alert">{error}</p>}{news&&news.nationId===nationId&&<NewsEdition news={news}/>}<button type="button" disabled={loading} aria-describedby={loading?'news-refresh-reason':undefined} onClick={()=>{setLoading(true);setRefresh(value=>value+1);}}>Refresh national news</button>{loading&&<small id="news-refresh-reason">The national feed is being loaded. Please wait before refreshing again.</small>}</>}
+  {blocked?<p role="status">{blocked}</p>:<>{loading&&<p role="status">Loading national news…</p>}{error&&<p role="alert">{error}</p>}{news&&news.nationId===nationId&&<><NewsEdition news={news}/><WeeklyAddresses key={nationId} nationId={nationId!}/></>}<button type="button" disabled={loading} aria-describedby={loading?'news-refresh-reason':undefined} onClick={()=>{setLoading(true);setRefresh(value=>value+1);}}>Refresh national news</button>{loading&&<small id="news-refresh-reason">The national feed is being loaded. Please wait before refreshing again.</small>}</>}
  </dialog>;
 }

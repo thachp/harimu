@@ -33,6 +33,7 @@ export async function localRuntime({ballotPrivacyReady=false}={}) {
   const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
   const path = join(directory, 'fixture.sqlite');
   const modules = [
+    'lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'app/api/city/route.ts',
     'lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','app/api/petitions/route.ts',
@@ -110,7 +111,9 @@ export async function readVerification(userId) {
   const election = await import(pathToFileURL(join(directory, 'app/api/election/route.mjs')).href);
   const petitions = await import(pathToFileURL(join(directory, 'app/api/petitions/route.mjs')).href);
   const news = await import(pathToFileURL(join(directory, 'app/api/news/route.mjs')).href);
+  const addresses = await import(pathToFileURL(join(directory,'app/api/addresses/route.mjs')).href);
   const world = await import(pathToFileURL(join(directory, 'app/api/world/route.mjs')).href);
+  const collective = await import(pathToFileURL(join(directory,'lib/collective-petitions.mjs')).href);
   const government = await import(pathToFileURL(join(directory, 'lib/government-state.mjs')).href);
   const simulation = await import(pathToFileURL(join(directory, 'lib/world-simulation.mjs')).href);
   await getDatabase(); // Real additive schema bootstrap and seed initialization.
@@ -123,12 +126,12 @@ export async function readVerification(userId) {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (user) identify(request, user);
-    const handlers = endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
+    const handlers = endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
     const response = await handlers[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
   return {
-    call, readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
+    call, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
     reopen() { env.DB.close(); env.DB = new LocalD1(path); },
     async close() { env.DB.close(); await rm(directory, { recursive: true, force: true }); },
   };

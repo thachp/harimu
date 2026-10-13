@@ -33,3 +33,18 @@ export async function readCollectivePetitions(db:D1Database,userId:string,now:nu
  EXISTS(SELECT 1 FROM civic_petition_signatures s WHERE s.petition_id=p.id AND s.clerk_user_id=?) AS signed FROM civic_petitions p WHERE p.nation_id='kindle' ORDER BY p.created_at DESC,p.id LIMIT 50`).bind(userId).all<{id:string;creator_id:string;title:string;demand:string;created_at:number;expires_at:number;weekly_humans:number;threshold:number;signatures:number;signed:number;reached_at:number|null;response_text:string|null;response_at:number|null}>();
  return {nationId:'kindle',asOf:now,weeklyHumans:await weeklyHumans(db,now),petitions:rows.results.map(p=>({id:p.id,title:p.title,demand:p.demand,createdAt:p.created_at,expiresAt:p.expires_at,weeklyHumans:p.weekly_humans,threshold:p.threshold,signatures:p.signatures,signed:Boolean(p.signed),mine:p.creator_id===userId,status:p.response_text!==null?'responded':p.reached_at!==null?'awaiting-response':now>=p.expires_at?'expired':'collecting',reachedAt:p.reached_at,response:p.response_text!==null&&p.response_at!==null?{text:p.response_text,at:p.response_at}:null}))};
 }
+
+/** Internal foundation only: no public route invokes this publisher.
+ * The caller must supply an actually recorded Cabinet session, not a client time
+ * or an invented daily Council Hour. Authored PoC replies never claim live AI.
+ */
+export async function recordAuthoredCabinetResponse(db:D1Database,input:{petitionId:string;sessionAt:number;transcript:string},now:number){
+ if(!validPetitionId(input.petitionId)||!Number.isSafeInteger(now)||now<0||!Number.isSafeInteger(input.sessionAt)||input.sessionAt<0||input.sessionAt>now||!validPetitionText(input.transcript,10,2000))return {status:'unavailable' as const};
+ const id=input.petitionId.toLowerCase(),text=`Authored PoC Cabinet response: ${input.transcript}`;
+ const saved=await db.prepare(`UPDATE civic_petitions SET response_text=?,response_at=?
+ WHERE id=? AND nation_id='kindle' AND reached_at IS NOT NULL AND reached_at<expires_at
+ AND reached_at<=? AND response_text IS NULL AND response_at IS NULL`).bind(text,input.sessionAt,id,input.sessionAt).run();
+ if(saved.meta.changes)return {status:'recorded' as const};
+ const prior=await db.prepare('SELECT response_text FROM civic_petitions WHERE id=? AND nation_id=\'kindle\'').bind(id).first<{response_text:string|null}>();
+ return {status:prior?.response_text!==null&&prior?.response_text!==undefined?'already-recorded' as const:'unavailable' as const};
+}

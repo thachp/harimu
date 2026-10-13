@@ -1,3 +1,4 @@
+import {addressSchemas} from './weekly-addresses';
 import {electionSchemas} from './elections';
 import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
@@ -170,6 +171,7 @@ async function initialize(database: D1Database) {
   await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
   await database.batch([
+    ...addressSchemas.map(sql=>database.prepare(sql)),
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),
     database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema),
