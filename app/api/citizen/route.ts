@@ -319,6 +319,7 @@ export async function POST(request: Request) {
         decision: serializeDecision(existingDecision),
       });
     }
+    if (profile.nation_id !== 'kindle') return privateJson({ error: 'Personal commitments are currently supported only in Kindle.' }, { status: 409 });
     if (profile.capacity + effect.capacity_delta < 0) {
       return privateJson({ error: 'Not enough Work Capacity for this decision.' }, { status: 409 });
     }
@@ -336,38 +337,43 @@ export async function POST(request: Request) {
       committed_at: now,
     };
 
-    await database.batch([
-      database.prepare(`UPDATE citizens SET capacity = capacity + ?, influence = influence + ?, updated_at = ?
-        WHERE clerk_user_id = ?`)
-        .bind(effect.capacity_delta, effect.influence_delta, now, userId),
-      database.prepare(`INSERT INTO citizen_decisions (
+    // Insert the immutable receipt only while nation and capacity still qualify.
+    // The immediately following UPDATE applies only this transaction's new row.
+    const committed = await database.batch([
+      database.prepare(`INSERT OR IGNORE INTO citizen_decisions (
         clerk_user_id, decision_id, task_id, infrastructure_id, household_member_id,
         capacity_delta, influence_delta, water_delta, stability_delta, outcome, committed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
-        userId,
-        decisionRow.decision_id,
-        decisionRow.task_id,
-        decisionRow.infrastructure_id,
-        decisionRow.household_member_id,
-        decisionRow.capacity_delta,
-        decisionRow.influence_delta,
-        decisionRow.water_delta,
-        decisionRow.stability_delta,
-        decisionRow.outcome,
-        decisionRow.committed_at,
+      ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM citizens
+        WHERE clerk_user_id=? AND nation_id='kindle' AND capacity+?>=0`).bind(
+        userId, decisionRow.decision_id, decisionRow.task_id, decisionRow.infrastructure_id,
+        decisionRow.household_member_id, decisionRow.capacity_delta, decisionRow.influence_delta,
+        decisionRow.water_delta, decisionRow.stability_delta, decisionRow.outcome, decisionRow.committed_at,
+        userId, effect.capacity_delta,
       ),
+      database.prepare(`UPDATE citizens SET capacity=capacity+?, influence=influence+?, updated_at=?
+        WHERE clerk_user_id=? AND changes()=1`).bind(effect.capacity_delta,effect.influence_delta,now,userId),
       database.prepare(`INSERT INTO citizen_plans (clerk_user_id, horizon, private_note, saved_at)
-        VALUES (?, ?, ?, ?)
+        SELECT ?, ?, ?, ? WHERE changes()=1
         ON CONFLICT(clerk_user_id) DO UPDATE SET
           horizon = excluded.horizon,
           private_note = excluded.private_note,
           saved_at = excluded.saved_at`)
         .bind(userId, horizon, note, now),
-      database.prepare('DELETE FROM citizen_plan_items WHERE clerk_user_id = ?').bind(userId),
       database.prepare(`INSERT INTO citizen_plan_items (
         clerk_user_id, task_id, completed, updated_at
-      ) VALUES (?, ?, 1, ?)`).bind(userId, optionId, now),
+      ) SELECT ?, ?, 1, ? WHERE changes()=1
+        ON CONFLICT(clerk_user_id,task_id) DO UPDATE SET completed=1,updated_at=excluded.updated_at`).bind(userId, optionId, now),
+      // Delete other selections only when the saved decision and its selected
+      // draft item match. A losing concurrent retry cannot replace that draft.
+      database.prepare(`DELETE FROM citizen_plan_items WHERE clerk_user_id=? AND task_id!=?
+        AND EXISTS(SELECT 1 FROM citizen_decisions WHERE clerk_user_id=? AND decision_id=? AND task_id=? AND committed_at=?)
+        AND EXISTS(SELECT 1 FROM citizen_plan_items WHERE clerk_user_id=? AND task_id=? AND updated_at=?)`)
+        .bind(userId,optionId,userId,activeDecisionId,optionId,now,userId,optionId,now),
     ]);
+    const savedDecision=await database.prepare(`SELECT decision_id,task_id,infrastructure_id,household_member_id,
+      capacity_delta,influence_delta,water_delta,stability_delta,outcome,committed_at
+      FROM citizen_decisions WHERE clerk_user_id=? AND decision_id=?`).bind(userId,activeDecisionId).first<CitizenDecisionRow>();
+    if(!savedDecision)return privateJson({error:'Commitment unavailable: citizenship or Work Capacity changed. Refresh your citizen.'},{status:409});
 
     const updatedProfile = await database.prepare(`SELECT clerk_user_id, nation_id, nation_changes,
       display_name, capacity, influence, standing, created_at FROM citizens WHERE clerk_user_id = ?`)
@@ -376,8 +382,9 @@ export async function POST(request: Request) {
 
     return privateJson({
       ok: true,
-      profile: updatedProfile ? serializeProfile(updatedProfile, decisionRow, true) : null,
-      decision: serializeDecision(decisionRow),
+      alreadyCommitted: !committed[0].meta.changes,
+      profile: updatedProfile ? serializeProfile(updatedProfile, savedDecision, true) : null,
+      decision: serializeDecision(savedDecision),
     });
   }
 
