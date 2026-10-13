@@ -9,4 +9,10 @@ Owner-authored issues #9/#10/#13/#16 were re-read before this batch. Official GD
 
 #9 remains partial: a timed cinematic, per-nation introductory lines, questionnaire/shortlist and nation-specific civic vignettes are not implemented. The existing disposable economic sample must not be described as those full planned vignettes. No live transport error was forced, no protected timer changed, and no live game command was submitted for these checks.
 
-Full checks and deployed acceptance will be recorded after integration.
+Verified runtime commit `1b8858af2202df2a8513ae842d98d6e198e9d220`, Worker `harimu-preview` version `82c24adf-edab-4932-b105-46d43c3226b1`, https://preview.harimu.com. Full checks: 102 Node tests, 77 SQL tests, lint, types and Cloudflare build pass. Git remote main was verified after push.
+
+Live signed-out browser acceptance: each family returns exactly its documented nations; All nations restores ten. Money/Faith reorder the same ten. Filtering Power blocs while Kindle is selected leaves Kindle selected with the outside-filter hint; choosing Fulmara's existing strip button centers and highlights its globe label. Comparison opens ten rows; seven Preview badges are present. At 390×844, filters, selected nation and globe remain usable and the inspector follows the strip without horizontal page overflow.
+
+Guide acceptance: Arrival→government→exploration works; skip closes it; restart begins at Arrival; sample-day entry reaches the existing guest Work example without signing in. Guide and filter actions submit no citizen/economic commands. Official docs still return HTTP 200 with Vercel hosting and the same current ETag/Last-Modified as the preceding checks.
+
+#10 meets the exact acceptance through the user-approved existing-strip filters. #13 is verified with actual local client/API fixtures; its live next-day meal limit remains explicit. #16 is verified with the actual local UI, natural success expiry and persistent recovery error on desktop/mobile. #9 stays open for the remaining cinematic, shortlist and nation-specific vignette requirements.
