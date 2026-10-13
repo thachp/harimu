@@ -55,8 +55,12 @@ services, change credentials, delete data, or deploy unrelated changes.
    Aurelle experiences, eight job types and their different economic regimes.
    [Economy](https://docs.harimu.com/economy/economy-currency/) describes production,
    allocation, currencies and clearing. Current work/trade is three Kindle shifts,
-   a finite fixed-price merchant and whole-lot player listings. Korund rations,
-   Aurelle charters/Favor, order-book matching and currency systems are unimplemented.
+   a finite fixed-price merchant and whole-lot player listings. Korund now has a
+   bounded server-assigned food-production job, a separate finite Labor Note wage
+   fund, non-transferable game-week ration coupons, state food supply and household
+   meals; see [Korund milestone scope](KORUND_MILESTONE.md). Full Korund plans/quotas,
+   Aurelle charters/Favor, order-book matching and wider currency systems remain
+   unimplemented.
 
 5. **Onboarding and social scope.**
    [Onboarding](https://docs.harimu.com/systems/onboarding/) specifies AI disclosure,

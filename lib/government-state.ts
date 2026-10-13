@@ -46,7 +46,7 @@ export const petitionResolutionSql = `INSERT INTO government_petition_resolution
 export async function readGovernment(db: D1Database, nationId: string, now: number, userId?: string) {
   const [budget, needs, days] = await Promise.all([
     db.prepare("SELECT initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number }>(),
-    db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN COALESCE(i.quantity,0) >= 2 THEN 1 ELSE 0 END) AS supplied
+    db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN CASE WHEN c.nation_id='korund' THEN COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=c.clerk_user_id),0) ELSE COALESCE(i.quantity,0) END >= 2 THEN 1 ELSE 0 END) AS supplied
       FROM citizens c LEFT JOIN citizen_inventory_balances i ON i.clerk_user_id=c.clerk_user_id AND i.item='food'
       WHERE c.nation_id=?`).bind(nationId).first<{ households: number; supplied: number }>(),
     db.prepare(`SELECT DISTINCT p.period_start FROM government_petitions p JOIN government_petition_eligibility e ON e.request_id=p.request_id AND e.clerk_user_id=p.clerk_user_id

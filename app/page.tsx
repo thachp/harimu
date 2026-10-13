@@ -10,6 +10,7 @@ import { SceneNews } from './world-scene';
 import { GameShell } from './game-shell';
 import { SquareChat } from './square-chat';
 import { DailyLoop } from './daily-loop';
+import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
 import { GovernmentPanel } from './government-panel';
 import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
 import { PlayerMarket } from './player-market';
@@ -724,6 +725,7 @@ type CitizenSnapshot = {
   government?: GovernmentSnapshot | null;
   verification?: VerificationState;
   simulation?: SimulationState;
+  korundPlan?: KorundPlanView | null;
   demoGovernment?: { period: number; counts: Record<string, number> };
   demoReceipts?: string[];
   demoStarterGranted?: boolean;
@@ -782,6 +784,9 @@ function ClerkCitizenSession({
 
 export default function Home() {
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
+  const [korundPlan, setKorundPlan] = useState<KorundPlanView | null>(null);
+  const [korundCommand, setKorundCommand] = useState<KorundCommand | null>(null);
+  const korundIntent = useRef<KorundCommand | null>(null);
   const [worldNations, setWorldNations] = useState<Nation[]>(fallbackNations);
   const [availableWorkOrders, setAvailableWorkOrders] = useState<WorkOrder[]>(fallbackWorkOrders);
   const [availablePlanningItems, setAvailablePlanningItems] = useState<PlanningTask[]>(fallbackPlanningItems);
@@ -856,6 +861,7 @@ export default function Home() {
     setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
     setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setVerification(null); setWorkShifts([]);
+    setKorundPlan(null); korundIntent.current = null; setKorundCommand(null);
     setPlanNote(''); setCompletedPlanIds([]); setPlanSaved(false); setHorizon('week'); setCommittedDecision(null);
     setRecentAction(null); setWorkError(null); setGovernmentError(null); setDecisionError(null); setEnrollmentError(null);
     setWorkPending(false); setGovernmentPending(false); setDecisionPending(false); setEnrollmentPending(false);
@@ -864,6 +870,15 @@ export default function Home() {
     marketIntent.current = saved?.market ?? null; playerIntent.current = saved?.player ?? null;
     governmentIntent.current = saved?.government ?? null;
     setMarketCommand(marketIntent.current); setPlayerCommand(playerIntent.current);
+    try {
+      const raw = userId ? window.sessionStorage.getItem(`harimu-korund-intent-v1:${userId}`) : null;
+      const command = raw ? JSON.parse(raw) : null;
+      if (command && ['korund-start-work', 'korund-claim-work', 'korund-redeem-ration', 'korund-household-meal'].includes(command.action)
+        && typeof command.requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(command.requestId)
+        && (command.action !== 'korund-claim-work' || typeof command.shiftId === 'string')) {
+        korundIntent.current = command; setKorundCommand(command);
+      }
+    } catch { /* Storage recovery is best-effort. */ }
   }, []);
 
   const selected = useMemo(
@@ -920,6 +935,8 @@ export default function Home() {
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
     if (workLock.current || !citizenNation) return;
+    if (action === 'commit-work' && citizenNation.id !== 'kindle') return;
+    if (action !== 'refresh-work' && (korundIntent.current || marketIntent.current || playerIntent.current)) return;
     if (action === 'commit-work' && (!order || hasActiveShift || capacity < order.cost)) return;
     workLock.current = true;
     setWorkPending(true);
@@ -930,9 +947,10 @@ export default function Home() {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
           body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
         });
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; profile?: CitizenSnapshot['profile'] };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; profile?: CitizenSnapshot['profile'] };
       if (epoch !== citizenEpoch.current) return;
         if (result.simulation) setSimulation(result.simulation);
+        if ('korundPlan' in result) setKorundPlan(result.korundPlan ?? null);
         if (result.shifts) setWorkShifts(result.shifts);
         if (result.economy) setEconomy(result.economy);
         if (result.market) setMarket(result.market);
@@ -991,7 +1009,7 @@ export default function Home() {
   async function runMarket(command: MarketCommand) {
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
-    if (workLock.current || citizenNation?.id !== 'kindle' || !economy || !market) return;
+    if (workLock.current || korundIntent.current || citizenNation?.id !== 'kindle' || !economy || !market) return;
     if (playerIntent.current || !validMarketCommand(command) || (marketIntent.current && marketIntent.current.requestId !== command.requestId)) return;
     marketIntent.current = command; persistIntents();
     workLock.current = true;
@@ -1058,6 +1076,8 @@ export default function Home() {
   }
 
   async function runPlayerCommand(command: PlayerCommand) {
+    if (korundIntent.current) return;
+    if (citizenNation?.id !== 'kindle') return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
     if (!clerkConfigured || workLock.current || !citizenNation || !validPlayerCommand(command)
@@ -1087,7 +1107,7 @@ export default function Home() {
     if (clerkConfigured && !verification?.countedActionsEligible) { setGovernmentError(verification?.reason ?? 'Checking civic eligibility.'); return; }
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
-    if (workLock.current || !citizenNation || !government || marketIntent.current || playerIntent.current) return;
+    if (workLock.current || !citizenNation || !government || marketIntent.current || playerIntent.current || korundIntent.current) return;
     if (governmentIntent.current && governmentIntent.current.topic !== topic) {
       setGovernmentError(`Retry the previous ${governmentIntent.current.topic} petition before choosing another topic.`); return;
     }
@@ -1121,6 +1141,46 @@ export default function Home() {
   }
 
   function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
+
+  async function runKorundCommand(command: KorundCommand) {
+    const originalKorundClaim = command.action === 'korund-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'LN');
+    if (marketIntent.current || playerIntent.current) return;
+    if (!clerkConfigured || citizenSessionStatus !== 'ready' || (citizenNation?.id !== 'korund' && !originalKorundClaim) || workLock.current) return;
+    if (korundIntent.current && korundIntent.current.requestId !== command.requestId) return;
+    const epoch = citizenEpoch.current;
+    const userId = citizenIdentity.current;
+    workLock.current = true; setWorkPending(true); setWorkError(null);
+    korundIntent.current = command; setKorundCommand(command);
+    const persist = (value: KorundCommand | null) => {
+      if (!userId) return;
+      try {
+        const key = `harimu-korund-intent-v1:${userId}`;
+        if (value) window.sessionStorage.setItem(key, JSON.stringify(value));
+        else window.sessionStorage.removeItem(key);
+      } catch { /* Preserve same-request recovery in memory. */ }
+    };
+    persist(command);
+    try {
+      const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
+      const result = await response.json() as { error?: string; ok?: boolean; korundPlan?: KorundPlanView; capacity?: number; shifts?: WorkShift[] };
+      if (epoch !== citizenEpoch.current) return;
+      if (response.status >= 500 || (response.ok && (!result.korundPlan || typeof result.capacity !== 'number'))) throw new Error('Action needs confirmation.');
+      if (result.korundPlan) setKorundPlan(result.korundPlan);
+      if (result.shifts) setWorkShifts(result.shifts);
+      if (typeof result.capacity === 'number') setCapacity(result.capacity);
+      korundIntent.current = null; setKorundCommand(null); persist(null);
+      if (!response.ok) { setWorkError(result.error ?? 'Korund action refused; refresh your assignment and ration book.'); return; }
+      setRecentAction(command.action === 'korund-start-work' ? 'Assigned shift started; work continues while you are away.'
+        : command.action === 'korund-claim-work' ? 'Assigned-shift wages collected in Labor Notes; output added to the state food pool.'
+          : command.action === 'korund-redeem-ration' ? 'Ration coupons redeemed for household food.' : 'Household ration meal recorded; capacity updated.');
+    } catch {
+      if (epoch === citizenEpoch.current) setWorkError('Connection interrupted. Confirm the previous Korund action to recover its saved result.');
+    } finally {
+      if (epoch === citizenEpoch.current) { workLock.current = false; setWorkPending(false); }
+    }
+  }
+
+  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand({ action, shiftId, requestId: crypto.randomUUID() });
   const workStatus = <section className="scene-daily-links" aria-label="Citizen daily loop">
     <p>Your daily life continues across the city.</p>
     <button type="button" onClick={() => changeView('household')}>Household · briefing and food</button>
@@ -1168,6 +1228,7 @@ export default function Home() {
   }
 
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
+    setKorundPlan(snapshot.korundPlan ?? null);
     if (snapshot.simulation) setSimulation(snapshot.simulation);
     setVerification(snapshot.verification ?? null);
     setWorkShifts(snapshot.shifts ?? []);
@@ -1321,6 +1382,7 @@ export default function Home() {
 
   async function confirmEnrollment(nation: Nation) {
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
+    if (workLock.current || marketIntent.current || playerIntent.current || korundIntent.current) { setEnrollmentError('Confirm your pending economic action before changing citizenship.'); return; }
     const epoch = citizenEpoch.current;
     setEnrollmentPending(true);
     setEnrollmentError(null);
@@ -1375,6 +1437,7 @@ export default function Home() {
         economy?: Economy;
         market?: MarketState;
         playerMarket?: PlayerMarketState;
+        korundPlan?: KorundPlanView | null;
       };
       if (epoch !== citizenEpoch.current) return;
       if (!response.ok || !result.nationId) {
@@ -1385,6 +1448,7 @@ export default function Home() {
 
       setCitizenNationId(result.nationId);
       setSelectedId(result.nationId);
+      setKorundPlan(result.korundPlan ?? null);
       if (result.citizenship) setCitizenshipStatus(result.citizenship);
       if (result.economy) setEconomy(result.economy);
       if (result.market) setMarket(result.market);
@@ -1404,10 +1468,21 @@ export default function Home() {
     setPendingEnrollment(nationId);
   }
 
-  const dailyLoop = citizenNation && <DailyLoop nationName={citizenNation.shortName} supported={citizenNation.id === 'kindle'}
+  const priorNationShift = workShifts.find(shift => !shift.claimedAt && ((shift.currency === 'LN') !== (citizenNation?.id === 'korund')));
+  const priorShiftPanel = priorNationShift && <PriorNationShift shift={priorNationShift}
+    currency={priorNationShift.currency === 'LN' ? 'LN' : 'SPK'} pending={workPending} uncertain={Boolean(korundCommand || marketCommand || playerCommand)}
+    onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current);
+      else if (marketIntent.current) void runMarket(marketIntent.current); else if (playerIntent.current) void runPlayerCommand(playerIntent.current); }}
+    onClaim={() => { if (priorNationShift.currency === 'LN') startKorundAction('korund-claim-work', priorNationShift.id);
+      else void runWork('claim-work', undefined, priorNationShift.id); }} />;
+  const korundPanel = <KorundPlanPanel plan={korundPlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
+    uncertain={Boolean(korundCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
+    onCommand={startKorundAction} onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}
+    onRefresh={() => void runWork('refresh-work')} />;
+  const dailyLoop = citizenNation?.id === 'korund' ? <>{priorShiftPanel}{korundPanel}</> : priorNationShift ? priorShiftPanel : citizenNation && <DailyLoop nationName={citizenNation.shortName} supported={citizenNation.id === 'kindle'}
     localDemo={!clerkConfigured} view={viewMode} economy={economy} market={market} shifts={workShifts} capacity={capacity}
     jobs={availableWorkOrders.filter(order => !order.nationId || order.nationId === citizenNation.id)}
-    busy={workPending || Boolean(playerCommand)} uncertain={Boolean(marketCommand)} onNavigate={changeView}
+    busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)} onNavigate={changeView}
     onStart={id => { const order = availableWorkOrders.find(item => item.id === id); if (order) void commitWork(order); }}
     onClaim={id => void runWork('claim-work', undefined, id)} onRefresh={() => void runWork('refresh-work')}
     onBuyFood={quantity => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side: 'buy', item: 'food', quantity })}
@@ -1418,17 +1493,20 @@ export default function Home() {
       <button type="button" onClick={() => changeView('world')}>Explore nations and enroll</button>
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
+      {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><button type="button" disabled={workPending} onClick={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</button></div>}
       {viewMode !== 'government' && dailyLoop}
       {viewMode === 'household' && <>
+        {citizenNation.id !== 'korund' && <>
         <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
           <ul>{economy?.inventory.map((entry) => <li key={entry.item}>{entry.item}: {entry.quantity} available</li>)}</ul>
           <p>Listed goods remain reserved at the market. Capacity recovers while you are away.</p>
           {economy?.nextRecoveryAt && <p>Next recovery: {new Date(economy.nextRecoveryAt).toLocaleString()}</p>}
         </section>
-        <CitizenMarket showTrading={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand)} uncertain={Boolean(marketCommand)}
+        <CitizenMarket showTrading={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
         {!market?.available && <p>Household meals are currently supported for Kindle citizens. Other national economies are planned.</p>}
+        </>}
         <details className="household-planning"><summary>Household notes and commitments</summary>
           <p>Keep a private draft for household choices. Recording a personal prototype commitment applies its effects and ends the citizenship grace period. These choices do not count as votes, petition signatures or policy input.</p>
           <label htmlFor="household-horizon">Planning horizon</label>
@@ -1439,11 +1517,11 @@ export default function Home() {
           <textarea id="household-note" disabled={decisionPending} rows={3} maxLength={2000} value={planNote} onChange={event => { setPlanNote(event.target.value); setPlanSaved(false); }} />
           <button type="button" disabled={decisionPending} onClick={() => void saveHouseholdPlan()}>{decisionPending ? 'Saving…' : planSaved ? 'Draft saved' : 'Save household draft'}</button>
           {committedDecision ? <p>Recorded commitment: {committedDecision.outcome} · {new Date(committedDecision.committedAt).toLocaleDateString()}</p> : <>
-            <p>Prototype civic choices · distinct from paid workplace shifts.</p>
-            {availablePlanningItems.map(task => <button key={task.id} type="button" disabled={decisionPending} aria-pressed={completedPlanIds.includes(task.id)} onClick={() => togglePlan(task.id)}>
+            <p>Prototype civic choices · distinct from paid workplace shifts; these legacy choices are currently available only in Kindle.</p>
+            {citizenNation.id === 'kindle' && availablePlanningItems.map(task => <button key={task.id} type="button" disabled={decisionPending} aria-pressed={completedPlanIds.includes(task.id)} onClick={() => togglePlan(task.id)}>
               <strong>{task.title}</strong><span>{task.detail} · Capacity {task.effects.capacity >= 0 ? '+' : ''}{task.effects.capacity} · Influence +{task.effects.influence}</span>
             </button>)}
-            <button type="button" disabled={decisionPending || !completedPlanIds.length} onClick={() => {
+            <button type="button" disabled={decisionPending || !completedPlanIds.length || citizenNation.id !== 'kindle'} onClick={() => {
               const task = availablePlanningItems.find(item => completedPlanIds.includes(item.id));
               if (task) void commitDecision({ optionId: task.id, infrastructureId: task.infrastructureId, householdMemberId: task.householdMemberId });
             }}>Record personal commitment</button>
@@ -1451,21 +1529,21 @@ export default function Home() {
           {decisionError && <p role="alert">{decisionError}</p>}
         </details>
       </>}
-      {viewMode === 'workplace' && <>
-        <WorkShiftBoard shifts={workShifts} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
+      {viewMode === 'workplace' && citizenNation.id !== 'korund' && <>
+        <WorkShiftBoard shifts={workShifts.filter(shift => shift.currency !== 'LN')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
           onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
         <section className="scene-work-orders"><h2>Available contributions</h2>
           {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <button key={order.id} type="button"
-            disabled={workPending || hasActiveShift || capacity < order.cost} onClick={() => void commitWork(order)}>
+            disabled={workPending || Boolean(korundCommand) || hasActiveShift || capacity < order.cost} onClick={() => void commitWork(order)}>
             <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></button>)}
         {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length === 0 && <p>No shifts are available for this nation yet. Kindle has the first supported work and wage programme; other national workplaces are planned.</p>}
         </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
       </>}
-      {viewMode === 'market' && <>
-        <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand)} uncertain={Boolean(marketCommand)}
+      {viewMode === 'market' && citizenNation.id !== 'korund' && <>
+        <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
-        <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand)} uncertain={Boolean(playerCommand)}
+        <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
           onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />
         {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
@@ -1486,7 +1564,7 @@ export default function Home() {
     <h2>{selected.name}</h2><p>{selected.motto}</p>
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
     <p>Counted petitions require Tier 1 phone verification, which is not available yet. Ordinary play and chat remain available.</p>
-    <p><strong>Playable support:</strong> {selected.id === 'kindle' ? 'Paid work, wages, goods, merchant trades, citizen listings, household meals and government previews.' : ['korund', 'aurelle'].includes(selected.id) ? 'Citizenship, city chat and deterministic government previews. Paid work and local economies are planned.' : 'Citizenship and city chat. Local jobs, economies and civic actions are planned.'}</p>
+    <p><strong>Playable support:</strong> {selected.id === 'kindle' ? 'Paid work, wages, goods, merchant trades, citizen listings, household meals and government previews.' : selected.id === 'korund' ? 'Assigned work, Labor Note wages, game-week ration coupons, state food redemption, household meals and deterministic government previews. Labor Note spending, job preferences, production drives and gray markets are planned.' : selected.id === 'aurelle' ? 'Citizenship, city chat and deterministic government previews. Paid work and local economies are planned.' : 'Citizenship and city chat. Local jobs, economies and civic actions are planned.'}</p>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" onClick={()=>beginEnrollment(selected.id)}>Enroll in {selected.shortName}</button>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
@@ -1501,10 +1579,15 @@ export default function Home() {
     <NationDashboard capacity={capacity} citizenNation={citizenNation} key={selected.id} nation={selected} nations={worldNations}
       workPending={workPending||hasActiveShift} workStatus={workStatus} onCommitWork={commitWork}
       onPlanningView={()=>changeView('household')} onSelectNation={selectNation} onWorldView={()=>changeView('world')}
-      workOrders={availableWorkOrders} worldEvents={worldEvents} /> : citizenScene;
-  const activeShift = workShifts.find(shift=>!shift.claimedAt);
+      workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} worldEvents={worldEvents} /> : citizenScene;
+  const activeShift = priorNationShift ?? (citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
   const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
   const contextItems: { id: string; label: string; detail: string; onSelect?: () => void }[] =
+    citizenNation?.id === 'korund' && ['household', 'workplace', 'market'].includes(viewMode) ? [
+      { id: 'korund-assignment', label: korundPlan?.assignment.name ?? 'Assigned work', detail: korundPlan ? `${korundPlan.assignment.capacityCost} WC · ${(korundPlan.assignment.wageMinor / 100).toFixed(2)} LN · ${korundPlan.assignment.hours} hours` : 'Refresh to load your assignment', onSelect: () => changeView('workplace') },
+      { id: 'korund-coupons', label: 'Ration book', detail: korundPlan ? `Game week ${korundPlan.gameWeek} · ${korundPlan.couponFoodRemaining} food coupons` : 'Refresh to load your ration book', onSelect: () => changeView('market') },
+      { id: 'korund-food', label: 'Household rations', detail: `${korundPlan?.foodQuantity ?? 0} food`, onSelect: () => changeView('household') },
+    ] :
     viewMode === 'household' ? (economy?.inventory ?? []).map(entry => ({
       id: entry.item, label: entry.item[0].toUpperCase() + entry.item.slice(1), detail: `${entry.quantity} available`,
     })) : viewMode === 'workplace' ? availableWorkOrders
@@ -1523,16 +1606,16 @@ export default function Home() {
       })) : viewMode === 'square' ? [
         { id: 'household', label: 'Household', detail: 'Belongings and recovery', onSelect: () => changeView('household') },
         { id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings', onSelect: () => changeView('workplace') },
-        { id: 'market', label: 'Market', detail: 'Goods and citizen listings', onSelect: () => changeView('market') },
+        { id: 'market', label: citizenNation?.id === 'korund' ? 'State store' : 'Market', detail: citizenNation?.id === 'korund' ? 'Ration coupons and state food' : 'Goods and citizen listings', onSelect: () => changeView('market') },
         { id: 'government', label: 'Government', detail: 'Policy and petitions', onSelect: () => changeView('government') },
       ] : [];
-  const contextTitle = viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
+  const contextTitle = citizenNation?.id === 'korund' && viewMode === 'market' ? 'State rations' : citizenNation?.id === 'korund' && viewMode === 'workplace' ? 'Assigned work' : viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
     <GameShell worldClock={simulation?.clock} view={viewMode} nation={citizenNation ?? selected} nations={worldNations} capacity={capacity}
-      walletMinor={economy?.walletMinor} inventory={economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
+      currencyCode={citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
       localDemo={!clerkConfigured} notice={workError ?? governmentError ?? recentAction ?? undefined} panel={gamePanel}
       contextItems={contextItems} contextTitle={contextTitle}

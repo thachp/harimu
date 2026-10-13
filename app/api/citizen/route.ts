@@ -1,3 +1,4 @@
+import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { advanceWorld } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment } from '@/lib/government-state';
@@ -139,6 +140,7 @@ export async function GET(request: Request) {
   ]);
 
   return privateJson({
+    korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
     simulation,
     verification: await readVerification(userId),
     economy: await readEconomy(database, userId, interval),
@@ -175,6 +177,14 @@ export async function POST(request: Request) {
     return privateJson({ error: 'Expected valid JSON.' }, { status: 400 });
   }
   const now = new Date().toISOString();
+
+  if (typeof body.action === 'string' && body.action.startsWith('korund-')) {
+    if (!validKorundCommand(body)) return privateJson({error:'Use a valid work or request identifier.'},{status:400});
+    const seconds=Math.floor(Date.parse(now)/1000);
+    const result=await executeKorund(database,userId,body,seconds);
+    const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
+    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),korundPlan:await readKorund(database,userId,seconds),capacity:citizen?.capacity??0},{status:result.status});
+  }
 
   if (body.action === 'government-petition') {
     const requestId = typeof body.requestId === 'string' ? body.requestId.toLowerCase() : '';
@@ -245,6 +255,7 @@ export async function POST(request: Request) {
       return privateJson({
         ok: true,
         nationId,
+        korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
         economy: await readEconomy(database, userId, interval),
         market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
         citizenship: created ? serializeCitizenship(created, false) : null,
@@ -261,6 +272,7 @@ export async function POST(request: Request) {
       return privateJson({
         ok: true,
         nationId,
+        korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
         citizenship: serializeCitizenship(current, politicalActionTaken),
         economy: await readEconomy(database, userId, interval),
         market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
@@ -303,6 +315,7 @@ export async function POST(request: Request) {
     return privateJson({
       ok: true,
       nationId,
+      korundPlan: await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
       economy: await readEconomy(database, userId, interval),
       market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId),
       citizenship: updated ? serializeCitizenship(updated, politicalActionTaken) : null,

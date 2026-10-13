@@ -4,6 +4,8 @@ assert.equal(clampCamera(40), 10); assert.equal(clampCamera(-40), -10); assert.e
 assert.equal(clampZoom(9), 2.8); assert.equal(clampZoom(-1), .65); assert.equal(clampZoom(NaN), 1);
 assert.equal(new Set(cityLocations.map(p => p.id)).size, 5);
 for (const place of cityLocations) assert.equal(locationSelection(place.id).location, place.id);
+assert.equal(locationSelection('market', 'korund').label, 'State ration store');
+assert.equal(locationSelection('workplace', 'korund').label, 'Assignment board');
 console.log('Viewport camera bounds and location mapping passed');
 
 saveCameraSnapshot('city:kindle', { x: 4, z: -3, zoom: 1.7 }, 14);

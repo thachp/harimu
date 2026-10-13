@@ -20,6 +20,7 @@ const nationSeeds = [
 ] as const;
 
 const workOrderSeeds = [
+  ['korund-food-production', 'korund', 'State food-production brigade', '+4 public food · 8 LN wage · resolves in 2h', 4, 'open', 4],
   ['harvest', 'kindle', 'Support the savanna harvest', '+480 food · resolves in 2h', 4, 'open', 1],
   ['freight', 'kindle', 'Move a foundry convoy', '+210 materials · resolves in 4h', 6, 'open', 2],
   ['archive', 'kindle', 'Catalogue the civic archive', '+95 knowledge · resolves in 3h', 3, 'open', 3],
@@ -190,6 +191,7 @@ async function initialize(database: D1Database) {
     ]);
   }
   await database.prepare("INSERT OR IGNORE INTO world_supply (id,initial_food,unit_minor) VALUES ('kindle-food-supplier',40,100)").run();
+  await database.prepare("INSERT OR IGNORE INTO korund_resources(id,initial_food,initial_minor) VALUES ('state',40,100000)").run();
   const governmentStockInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id='government-stock-v1'").first();
   if (!governmentStockInstalled) {
     await database.batch([

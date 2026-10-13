@@ -38,6 +38,7 @@ export async function localRuntime() {
     'lib/government-state.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/world-simulation.ts',
+    'lib/korund.ts',
     'app/api/citizen/route.ts', 'app/api/square/route.ts', 'app/api/world/route.ts',
   ];
   const epoch = Date.UTC(2026, 0, 15, 12); // Fixed UTC day prevents midnight flakiness.
@@ -89,6 +90,7 @@ export async function readVerification(userId) {
   // Apply the real additive world migration before the production bootstrap,
   // just as deployed D1 does; this is an isolated consumer-local database.
   env.DB.sqlite.exec(await readFile(join(root, 'drizzle/0004_boring_exiles.sql'), 'utf8'));
+  env.DB.sqlite.exec(await readFile(join(root, 'drizzle/0005_gray_brood.sql'), 'utf8'));
   const { identify } = await import(pathToFileURL(authPath).href);
   const { setVerification } = await import(pathToFileURL(verificationPath).href);
   const clock = await import(pathToFileURL(clockPath).href);

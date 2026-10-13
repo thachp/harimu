@@ -64,7 +64,7 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
     Object.assign(labelLayer.style, { position: 'absolute', inset: '0', pointerEvents: 'none', overflow: 'hidden' });
     container.appendChild(labelLayer);
     const anchors = mode === 'city'
-      ? world.buildings.map(building => ({ object: building.object, label: building.label, selection: locationSelection(building.location) }))
+      ? world.buildings.map(building => ({ object: building.object, label: nationId === 'korund' && ['market','workplace'].includes(building.location) ? locationSelection(building.location, nationId).label : building.label, selection: locationSelection(building.location, nationId) }))
       : world.selectables.filter(object => object.userData.kind === 'nation').map(object => ({ object, label: String(object.userData.label), selection: { kind: 'nation' as const, label: String(object.userData.label), detail: String(object.userData.detail), nationId: String(object.userData.nationId) } }));
     const labels = anchors.map(anchor => {
       const button = document.createElement('button');
@@ -141,6 +141,7 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
       const data = object.userData;
       const selectedBuilding = data.location ? world.buildings.find(b => b.location === data.location) : null;
       highlight.setFromObject(selectedBuilding?.object || object); highlight.visible = true; render();
+      if (mode === 'city' && data.location) { callback.current(locationSelection(data.location, nationId)); return; }
       callback.current({ kind: data.kind, label: data.label || `Square ${data.x ?? ''}, ${data.z ?? ''}`, detail: data.detail || 'Prototype terrain square. Citizen ownership and construction are not yet available.', location: data.location, nationId: data.nationId });
     };
     const cancel = () => { dragging = null; };
@@ -181,7 +182,7 @@ export function GameViewport({ mode, nationId, nations, selectedLocation, onSele
         if (key === '+' || key === '=') controls.current?.zoom(.15);
         if (key === '-') controls.current?.zoom(-.15);
         if (key === 'Home') controls.current?.reset();
-        if (key === 'Enter' && mode === 'city') callback.current(locationSelection(selectedLocation || 'square'));
+        if (key === 'Enter' && mode === 'city') callback.current(locationSelection(selectedLocation || 'square', nationId));
       }} />
     {fallback && <p className="viewport-fallback">3D rendering is unavailable on this device. Choose a location below to continue your citizen day.</p>}
     <div className="viewport-controls" aria-label="Camera controls">

@@ -9,8 +9,10 @@ export const cityLocations: { id: LocationId; label: string; detail: string; x: 
 ];
 export function clampCamera(value: number, limit = 10) { return Math.max(-limit, Math.min(limit, Number.isFinite(value) ? value : 0)); }
 export function clampZoom(value: number) { return Math.max(0.65, Math.min(2.8, Number.isFinite(value) ? value : 1)); }
-export function locationSelection(id: LocationId): ViewportSelection {
+export function locationSelection(id: LocationId, nationId?: string): ViewportSelection {
   const place = cityLocations.find((entry) => entry.id === id)!;
+  if (nationId === 'korund' && id === 'market') return { kind: 'building', label: 'State ration store', detail: 'Redeem your non-transferable ration coupons while supply lasts.', location: id };
+  if (nationId === 'korund' && id === 'workplace') return { kind: 'building', label: 'Assignment board', detail: 'Complete your assigned brigade shift and collect Labor Notes.', location: id };
   return { kind: 'building', label: place.label, detail: place.detail, location: id };
 }
 
