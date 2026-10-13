@@ -170,3 +170,19 @@ test('enrollment returns authoritative capacity for first citizenship, replay, c
   const stale=await r.call('citizen','capacity-new',enroll('aurelle','kindle'));
   assert.equal(stale.status,409);assert.equal(stale.data.capacity,7);
 });
+
+test('first enrollment and grace change hydrate the current government and trusted verification immediately',async t=>{
+  const r=await fixture(t);
+  for(const nationId of ['kindle','korund','aurelle']){
+    const enrolled=await r.call('citizen',`civic-${nationId}`,enroll(nationId));
+    assert.equal(enrolled.status,200);
+    assert.equal(enrolled.data.government.nationId,nationId);
+    assert.equal(enrolled.data.verification.countedActionsEligible,false);
+    assert.equal(enrolled.data.verification.status,'unavailable');
+    assert.ok(enrolled.data.simulation);
+  }
+  const changed=await r.call('citizen','civic-kindle',enroll('korund','kindle'));
+  assert.equal(changed.data.government.nationId,'korund');
+  const replay=await r.call('citizen','civic-kindle',enroll('korund','kindle'));
+  assert.equal(replay.data.government.nationId,'korund');
+});

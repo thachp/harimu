@@ -7,7 +7,7 @@ const enrollment=page.slice(page.indexOf("body: JSON.stringify({ action: 'enroll
 const apply=enrollment.slice(enrollment.indexOf("      if (typeof result.capacity"),enrollment.indexOf('    } catch'));
 function confirm(result){
   const calls=[];
-  const setters=['setEnrollmentError','setCapacity','setCitizenNationId','setSelectedId','setKorundPlan','setAurellePlan','setCitizenshipStatus','setEconomy','setMarket','setPlayerMarket','closeEnrollmentReview','changeView'];
+  const setters=['setGovernment','setVerification','setSimulation','setEnrollmentError','setCapacity','setCitizenNationId','setSelectedId','setKorundPlan','setAurellePlan','setCitizenshipStatus','setEconomy','setMarket','setPlayerMarket','closeEnrollmentReview','changeView'];
   new Function('result',...setters,apply)(result,...setters.map(name=>value=>calls.push([name,value])));
   return calls;
 }

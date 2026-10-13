@@ -14,7 +14,7 @@ function client(fetch){
   const bindings={clerkConfigured:true,citizenSessionStatus:'ready',citizenNation:{id:'kindle'},citizenNationId:'kindle',
     enrollmentPending:false,enrollmentLock:ref(false),enrollmentExpectedNation:'kindle',workLock:ref(false),marketIntent:ref(null),playerIntent:ref(null),korundIntent:ref(null),aurelleIntent:ref(null),
     citizenEpoch:ref(1),fetch,changeView:view=>{state.Scene=view;},closeEnrollmentReview:()=>{state.PendingEnrollment=null;}};
-  for(const name of ['Capacity','EnrollmentError','EnrollmentPending','CitizenNationId','SelectedId','KorundPlan','AurellePlan',
+  for(const name of ['Government','Verification','Simulation','Capacity','EnrollmentError','EnrollmentPending','CitizenNationId','SelectedId','KorundPlan','AurellePlan',
     'CitizenshipStatus','Economy','Market','PlayerMarket','PendingEnrollment'])bindings[`set${name}`]=value=>{state[name]=value;};
   return {state,bindings,confirm:new Function(...Object.keys(bindings),`${js};return confirmEnrollment;`)(...Object.values(bindings))};
 }
@@ -36,6 +36,7 @@ test('lost enrollment response retries original expected citizenship and records
   await c.confirm({id:'korund'});
   assert.equal(attempts,2);assert.deepEqual(sent[0],sent[1]);assert.equal(c.state.CitizenNationId,'korund');
   assert.equal(c.state.PendingEnrollment,null);assert.equal(c.state.Capacity,7);
+  assert.equal(c.state.Government.nationId,'korund');assert.equal(c.state.Verification.status,'unavailable');assert.ok(c.state.Simulation);
   assert.equal(c.state.Scene,'workplace');assert.equal(c.bindings.enrollmentLock.current,false);
   r.reopen();
   const row=await r.db.prepare('SELECT nation_id,nation_changes FROM citizens WHERE clerk_user_id=?').bind('alice').first();

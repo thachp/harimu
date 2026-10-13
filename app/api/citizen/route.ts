@@ -150,7 +150,7 @@ export async function POST(request: Request) {
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
-  await advanceWorld(database);
+  const simulation = await advanceWorld(database);
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   await recoverCapacity(database, userId, new Date().toISOString(), interval);
   let body: Record<string, unknown>;
@@ -234,6 +234,8 @@ export async function POST(request: Request) {
       SELECT 1 FROM citizen_decisions WHERE clerk_user_id=? UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id=? LIMIT 1
     ) AS taken`).bind(userId,userId).first<{taken:number}>())?.taken);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
+      simulation,verification:await readVerification(userId),
+      government:profile?.nation_id?await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId):null,
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
       economy:await readEconomy(database,userId,interval),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),

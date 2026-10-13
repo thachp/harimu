@@ -1,0 +1,49 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import {test} from 'node:test';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import ts from 'typescript';
+import {simulateGovernment} from '../lib/government.ts';
+const require=createRequire(import.meta.url);
+async function component(file,name) {
+  const source=await readFile(new URL(`../app/${file}`,import.meta.url),'utf8');
+  const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
+  const exports={};
+  new Function('exports','require',compiled)(exports,name=>name.endsWith('.css')?{}:require(name));
+  return exports[name];
+}
+const SquareChat=await component('square-chat.tsx','SquareChat');
+const GovernmentPanel=await component('government-panel.tsx','GovernmentPanel');
+const render=(Component,props)=>renderToStaticMarkup(React.createElement(Component,props));
+test('Square identifies signed-in unenrolled citizens without requesting sign-in or enabling chat',()=>{
+  const html=render(SquareChat,{enabled:false,nationId:null,configured:true,session:'ready'});
+  assert.match(html,/You are signed in\. Choose a nation/);
+  assert.doesNotMatch(html,/Sign in|Local demo|<textarea|Send message/);
+});
+test('Square distinguishes anonymous, loading, account error and local demo',()=>{
+  for(const [props,expected] of [
+    [{configured:true,session:'anonymous'},/Sign in, then choose citizenship/],
+    [{configured:true,session:'loading'},/Loading your citizen account/],
+    [{configured:true,session:'error'},/could not be loaded/],
+    [{configured:false,session:'ready'},/Local demo has no chat/],
+  ]) assert.match(render(SquareChat,{enabled:false,nationId:null,...props}),expected);
+});
+test('supported Civic missing data offers retry rather than claiming implementation is planned',()=>{
+  for(const nationId of ['kindle','korund','aurelle']) {
+    const html=render(GovernmentPanel,{snapshot:null,nationId,onRetry(){}});
+    assert.match(html,/saved decisions have not loaded/);
+    assert.match(html,/Retry government preview/);
+    assert.doesNotMatch(html,/coming soon|not built yet|Petition for/);
+  }
+  assert.match(render(GovernmentPanel,{snapshot:null,nationId:'fulmara'}),/Civic play coming soon/);
+});
+test('loaded Civic shows actual policy and disabled petitions when verification is unavailable',()=>{
+  const snapshot=simulateGovernment({nationId:'kindle',availableBudgetMinor:9000,foodSecurity:80,petitionCounts:{}});
+  const html=render(GovernmentPanel,{snapshot,nationId:'kindle',verification:{countedActionsEligible:false,reason:'Phone verification is not available yet.'},localDemo:false,pending:false,error:null,onPetition(){}});
+  assert.match(html,/Food security reserve/);
+  assert.equal((html.match(/<button[^>]*disabled/g)||[]).length,3);
+  assert.match(html,/Petition for/);
+  assert.doesNotMatch(html,/Government preview unavailable|Civic play coming soon/);
+});

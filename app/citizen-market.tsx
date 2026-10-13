@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import type { Economy } from '@/lib/economy';
 import type { MarketState } from '@/lib/market';
 
-export function CitizenMarket({ market, economy, capacity, busy, uncertain, onTrade, onMeal, onRetry, showMeal = true, showTrading = true }: {
+export function CitizenMarket({ market, economy, capacity, busy, uncertain, pendingAction, onTrade, onMeal, onRetry, showMeal = true, showTrading = true }: {
   market: MarketState | null; economy: Economy | null; capacity: number;
-  busy: boolean; uncertain: boolean; showMeal?: boolean; showTrading?: boolean;
+  busy: boolean; uncertain: boolean; pendingAction?: 'household-meal' | 'market-trade'; showMeal?: boolean; showTrading?: boolean;
   onTrade: (side: 'buy' | 'sell', item: string, quantity: number) => void;
   onMeal: () => void; onRetry: () => void;
 }) {
@@ -26,8 +26,10 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, onTr
     {showTrading && <><h3>Kindle starter market</h3>
     <p>Simulated merchant · fixed prototype prices and finite stock. Small trades only; this is not a player order book.</p>
     </>}
-    {uncertain && <div role="alert"><p>Connection interrupted. Confirm the previous transaction before starting another.</p>
-      <button disabled={busy} type="button" onClick={onRetry}>Retry previous transaction</button></div>}
+    {uncertain && !busy && <div role="alert"><p>{pendingAction === 'household-meal'
+      ? 'Connection interrupted. Confirm the previous household meal before preparing another.'
+      : 'Connection interrupted. Confirm the previous transaction before starting another.'}</p>
+      <button disabled={busy} type="button" onClick={onRetry}>{pendingAction === 'household-meal' ? 'Retry household meal' : 'Retry previous transaction'}</button></div>}
     {showTrading && <><label>Goods per trade <input aria-label="Goods per trade" type="number" min={1} max={10} step={1}
       value={Number.isNaN(quantity) ? '' : quantity} disabled={busy || uncertain}
       onChange={(event) => setQuantity(event.target.valueAsNumber)} /></label>

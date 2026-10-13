@@ -24,6 +24,7 @@ export type GameShellProps = {
   guestDemo?: boolean;
   nationFocusRevision?: number;
   notice?: string;
+  noticeKind?: 'success' | 'error';
   panel: ReactNode;
   contextTitle?: string;
   contextItems?: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[];
@@ -45,11 +46,16 @@ function HudHelp({ label, children, help }: { label: string; children: ReactNode
   return <details className="game-hud-help"><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ worldClock, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, notice, panel, onNavigate, onSelectNation, accountControls, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ worldClock, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, notice, noticeKind = 'success', panel, onNavigate, onSelectNation, accountControls, contextTitle, contextItems = [] }: GameShellProps) {
   const [now, setNow] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
+  useEffect(() => {
+    if (!notice || noticeKind === 'error') return;
+    const timer = setTimeout(() => setDismissedNotice(notice), 8000);
+    return () => clearTimeout(timer);
+  }, [notice, noticeKind]);
   useEffect(() => { const tick = () => setNow(Date.now()); tick(); const id = setInterval(tick, 1000); return () => clearInterval(id); }, []);
   const sceneTitle = view === 'world' ? nation.name : nation.id === 'korund' && view === 'market' ? 'State ration store' : nation.id === 'korund' && view === 'workplace' ? 'Assignment board' : titles[view];
   const resourceNation = citizenNation ?? nation;
@@ -86,7 +92,7 @@ export function GameShell({ worldClock, view, nation, citizenNation, nations, ca
     </header>
     <div className="game-location-banner"><Compass size={18} /><div><strong>{view === 'world' ? 'Harimu' : (nation.capital ?? `${nation.name} · City district`)}</strong><span>{view === 'world' ? 'Drag to rotate' : 'Select a building to enter · Drag to explore'}</span></div></div>
     {shiftSummary && <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong><span>{remaining === null ? 'Active shift' : remaining === 0 ? 'Ready to claim' : `${remaining} min remaining`}</span><CaretRight /></button>}
-    {notice && notice !== dismissedNotice && <div className="game-notice" role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setDismissedNotice(notice)}><X size={16} /></button></div>}
+    {notice && notice !== dismissedNotice && <div className="game-notice" role={noticeKind === 'error' ? 'alert' : 'status'}><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setDismissedNotice(notice)}><X size={16} /></button></div>}
     {hasPanel ? <aside id="game-details" className="game-inspector" aria-label={sceneTitle}><header className="game-inspector-title"><div><small>{nation.name} / {inspecting ? 'NATION INSPECTION' : 'CITIZEN LIFE'}</small><h1 id="game-panel-title" tabIndex={-1}>{sceneTitle}</h1></div><button type="button" aria-label="Collapse details" aria-expanded="true" aria-controls="game-details" onClick={close}><CaretRight size={20} /></button></header><div className="game-inspector-body">
       {selection?.kind === 'tile' && <section className="game-selection"><small>SELECTED SQUARE</small><h2>{selection.label}</h2><p>{selection.detail}</p></section>}{panel}
     </div></aside> : <button id="game-reopen" className="game-reopen-panel" type="button" aria-expanded="false" aria-controls="game-details" onClick={() => { setCollapsed(false); requestAnimationFrame(() => document.getElementById('game-panel-title')?.focus()); }}><Compass size={18} /><span>Show {sceneTitle} details</span><CaretRight size={16} /></button>}

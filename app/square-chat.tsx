@@ -2,8 +2,9 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import './square-chat.css';
 type SquareState={nationId:string;messages:{id:string;handle:string;body:string;postedAt:number;mine:boolean}[];present:number};
-export function SquareChat(props:{enabled:boolean;nationId:string|null}) { return <SquareChatSession key={`${props.enabled}:${props.nationId}`} {...props}/>; }
-function SquareChatSession({enabled,nationId}:{enabled:boolean;nationId:string|null}) {
+type SquareAccess={enabled:boolean;nationId:string|null;configured?:boolean;session?:'anonymous'|'loading'|'error'|'ready'};
+export function SquareChat(props:SquareAccess) { return <SquareChatSession key={`${props.enabled}:${props.nationId}`} {...props}/>; }
+function SquareChatSession({enabled,nationId,configured=true,session='anonymous'}:SquareAccess) {
   const [state,setState]=useState<SquareState|null>(null),[text,setText]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[presence,setPresence]=useState(false),[uncertain,setUncertain]=useState(false);
   const [muted,setMuted]=useState<string[]>([]);
   const intent=useRef<{id:string;text:string}|null>(null);
@@ -27,7 +28,7 @@ function SquareChatSession({enabled,nationId}:{enabled:boolean;nationId:string|n
     catch(e){if(current===generation.current)setError(e instanceof Error?e.message:'Connection uncertain. Retry the same message.');}finally{if(current===generation.current)setBusy(false);}
   }
   return <section className="square-chat" aria-labelledby="square-chat-title"><h3 id="square-chat-title">Citizen conversation</h3><p>Nation-only, plain-text messages. Last 50 shown; visible for 7 days; expired messages are deleted on the next square access. One message per 10 seconds, 20 per hour. Use your random citizen handle; avoid personal details. You can remove your own messages.</p>
-    {!enabled?<p>Sign in and enroll to join real citizens. Local demo has no chat or presence.</p>:<>
+    {!enabled?<p role={session === 'loading' ? 'status' : undefined}>{!configured ? 'Local demo has no chat or presence. Use the connected preview to join other citizens.' : session === 'loading' ? 'Loading your citizen account before opening the conversation…' : session === 'error' ? 'Your citizen account could not be loaded. Retry loading your citizen before joining the conversation.' : session === 'ready' ? 'You are signed in. Choose a nation and confirm citizenship to join its conversation.' : 'Sign in, then choose citizenship to join your nation’s conversation.'}</p>:<>
       <label><input type="checkbox" checked={presence} onChange={e=>setPresence(e.target.checked)}/> Share my presence while this square is visible</label><p>{state?.present??0} citizens sharing presence recently · expires within 90 seconds.</p>
       <button type="button" onClick={()=>void refresh()}>Refresh conversation</button>
       {muted.length>0&&<div><p>Muted in this square session only. Messages remain visible to other citizens.</p>{muted.map(handle=><button key={handle} type="button" onClick={()=>setMuted(handles=>handles.filter(value=>value!==handle))}>Unmute {handle}</button>)}</div>}

@@ -12,6 +12,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      localization={{ userButton: { action__openUserMenu: 'Account menu', action__closeUserMenu: 'Close account menu' } }}
       appearance={{
         variables: {
           colorPrimary: '#72c7b9',

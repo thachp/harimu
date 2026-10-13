@@ -4,7 +4,9 @@ import type { SimulationState } from '@/lib/world-simulation';
 import type { VerificationState } from '@/lib/verification';
 import type { GovernmentSnapshot, PetitionTopic } from '@/lib/government';
 
-export function GovernmentPanel({ simulation, verification, snapshot, localDemo, pending, error, onPetition }: {
+export function GovernmentPanel({ simulation, verification, snapshot, localDemo, pending, error, onPetition, nationId, onRetry }: {
+  nationId?: string;
+  onRetry?: () => void;
   simulation?: SimulationState;
   verification: VerificationState | null;
   snapshot: GovernmentSnapshot | null;
@@ -13,12 +15,12 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
   error: string | null;
   onPetition: (topic: PetitionTopic) => void;
 }) {
-  if (!snapshot) return null;
+  if (!snapshot) return <section className="citizen-market" aria-label="Government preview status">{['kindle','korund','aurelle'].includes(nationId ?? '') ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>}</section>;
   return <section className="citizen-market" aria-label="Government decisions and citizen petitions" aria-busy={pending}>
     <h3>Government and citizen voice</h3>
     <p>Computer-controlled leaders hold all government offices. AI/SI means artificial or simulated intelligence. Here they follow fixed game rules: the same situation produces the same decision. No live AI model is connected.</p>
     {localDemo && <p>Local demo · petitions and decisions stay in this browser.</p>}
-    {!localDemo && <section aria-label="Civic verification"><h4>Phone verification for petitions</h4><p>Petitions need a verified phone number to help protect each citizen’s voice. Phone verification is not available yet, so you can read government decisions but cannot submit a counted petition.</p><p role="status">{verification?.reason ?? 'Checking whether your petitions can count…'}</p></section>}
+    {!localDemo && <section aria-label="Civic verification"><h4>Phone verification for petitions</h4><p>Petitions need a verified phone number to help protect each citizen’s voice. You can read policy previews while petition submission is unavailable.</p><p role="status">{verification?.reason ?? 'Checking whether your petitions can count…'}</p></section>}
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> · {role.controller}</li>)}</ul>
     {!localDemo && simulation && <section aria-label="Durable world simulation">
       <h4>World day {simulation.clock.gameDay} · 12× time</h4>

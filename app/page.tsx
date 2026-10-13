@@ -403,7 +403,8 @@ function ClerkAccountControl() {
         <UserButton
           appearance={{
             elements: {
-              avatarBox: { width: '28px', height: '28px' },
+              avatarBox: { display: 'none' },
+              userButtonTrigger: 'harimu-auth-trigger account-menu-trigger',
             },
           }}
         />
@@ -830,7 +831,9 @@ export default function Home() {
         ? 'Household fed: 2 food consumed, up to 4 Work Capacity restored.' : `Market ${command.side}: ${command.quantity} ${command.item} settled.`);
     } catch {
       if (epoch !== citizenEpoch.current) return;
-      setWorkError('Connection interrupted. Retry the previous transaction to confirm its saved result.');
+      setWorkError(command.action === 'household-meal'
+        ? 'Connection interrupted. Retry the household meal to confirm its saved result.'
+        : 'Connection interrupted. Retry the previous transaction to confirm its saved result.');
     } finally {
       if (epoch !== citizenEpoch.current) return;
       workLock.current = false;
@@ -1243,6 +1246,9 @@ export default function Home() {
         error?: string;
         nationId?: string;
         capacity?: number | null;
+        government?: GovernmentSnapshot | null;
+        verification?: VerificationState;
+        simulation?: SimulationState;
         citizenship?: CitizenshipStatus | null;
         economy?: Economy;
         market?: MarketState;
@@ -1262,6 +1268,9 @@ export default function Home() {
         return;
       }
       setCapacity(result.capacity);
+      if ('government' in result) setGovernment(result.government ?? null);
+      if (result.verification) setVerification(result.verification);
+      if (result.simulation) setSimulation(result.simulation);
       setCitizenNationId(result.nationId);
       setSelectedId(result.nationId);
       setKorundPlan(result.korundPlan ?? null);
@@ -1350,7 +1359,7 @@ export default function Home() {
           <p>Listed goods remain reserved at the market. Capacity recovers while you are away.</p>
           {economy?.nextRecoveryAt && <p>Next recovery: {new Date(economy.nextRecoveryAt).toLocaleString()}</p>}
         </section>
-        <CitizenMarket showTrading={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)}
+        <CitizenMarket showTrading={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
         {!market?.available && <p>Household meals are currently supported for Kindle citizens. Other national economies are planned.</p>}
@@ -1388,7 +1397,7 @@ export default function Home() {
         </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
       </>}
       {viewMode === 'market' && !['korund','aurelle'].includes(citizenNation.id) && <>
-        <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)}
+        <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
         <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
@@ -1398,8 +1407,7 @@ export default function Home() {
       </>}
       {viewMode === 'government' && <>
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
-        <GovernmentPanel simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
-        {!government && <p>Kindle, Korund and Aurelle have government policy previews. Other nations’ civic play is unfinished. A missing preview here may still be loading; it does not mean your nation has no government. Petitions need a verified phone number before they can count, and phone verification is not available yet.</p>}
+        <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
         <p>Elections, protests and public opinion systems are planned and will follow each nation’s rules. No election or protest is currently open here.</p>
       </>}
     </>}
@@ -1419,7 +1427,7 @@ export default function Home() {
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='square' ? <>
     {firstLoopHint}{dailyLoop}
     <p>{citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
-    <SquareChat key={`${citizenSessionKey}:${citizenNationId}`} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
+    <SquareChat key={`${citizenSessionKey}:${citizenNationId}`} configured={clerkConfigured} session={citizenSessionStatus} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
     <SceneNews events={worldEvents} title="City noticeboard" />
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
     <NationInstitutions nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
@@ -1467,7 +1475,7 @@ export default function Home() {
     <GameShell guestDemo={guestActive} nationFocusRevision={nationFocusRevision} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
-      localDemo={!clerkConfigured} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} panel={guestActive ? <GuestDemo view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
+      localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} panel={guestActive ? <GuestDemo view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onNavigate={navigateGame} onSelectNation={selectNation}
       accountControls={<ClerkAccountControl />} />
