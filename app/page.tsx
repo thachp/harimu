@@ -12,6 +12,7 @@ import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { SceneNews } from './world-scene';
 import { firstLoopStep } from '@/lib/first-loop';
 import { CitizenshipDialog } from './citizenship-dialog';
@@ -387,10 +388,6 @@ function getLocationSearch() {
   return window.location.search;
 }
 
-function getServerLocationSearch() {
-  return '';
-}
-
 function ClerkAccountControl() {
   if (!clerkConfigured) return <span className="account-demo-label">Local demo</span>;
 
@@ -527,7 +524,11 @@ export default function Home() {
   const [availableWorkOrders, setAvailableWorkOrders] = useState<WorkOrder[]>(fallbackWorkOrders);
   const [availablePlanningItems, setAvailablePlanningItems] = useState<PlanningTask[]>(fallbackPlanningItems);
   const [worldEvents, setWorldEvents] = useState<WorldEvent[]>(fallbackWorldEvents);
-  const locationSearch = useSyncExternalStore(subscribeToLocation, getLocationSearch, getServerLocationSearch);
+  // Vinext supplies the request query during SSR and the matching hydration snapshot.
+  // Our own store still owns query-only scene history after hydration.
+  const frameworkSearch = useSearchParams()?.toString() ?? '';
+  const getInitialSearch = useCallback(() => frameworkSearch ? `?${frameworkSearch}` : '', [frameworkSearch]);
+  const locationSearch = useSyncExternalStore(subscribeToLocation, getLocationSearch, getInitialSearch);
   const viewMode = sceneFromSearch(locationSearch);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -538,7 +539,7 @@ export default function Home() {
     });
     return () => cancelAnimationFrame(frame);
   }, [locationSearch]);
-  const [selectedId, setSelectedId] = useState('kindle');
+  const [selectedId, setSelectedId] = useState(() => nationFromSearch(locationSearch, fallbackNations.map(nation => nation.id), 'kindle'));
   const [nationFocusRevision, setNationFocusRevision] = useState(0);
   const [guestMode, setGuestMode] = useState(false);
   const [guestState, setGuestState] = useState(createGuestDemo);
