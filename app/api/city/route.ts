@@ -20,10 +20,11 @@ export async function POST(request:Request){
  let body:Record<string,unknown>;try{body=await readCommandObject(request);}catch{return json({error:'Invalid request.'},400);}
  if(body.action!=='travel'||typeof body.cityId!=='string'||!cityForNation(ctx.nationId,body.cityId))return json({error:'Choose a city in your current nation.'},400);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- await ctx.db.batch([
- ctx.db.prepare(`DELETE FROM square_presence WHERE user_id=? AND EXISTS(SELECT 1 FROM citizen_city_locations WHERE user_id=? AND nation_id=? AND current_city_id!=?)`).bind(ctx.userId,ctx.userId,ctx.nationId,body.cityId),
+ const results=await ctx.db.batch([
+ ctx.db.prepare(`DELETE FROM square_presence WHERE user_id=? AND EXISTS(SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id=?) AND EXISTS(SELECT 1 FROM citizen_city_locations WHERE user_id=? AND nation_id=? AND current_city_id!=?)`).bind(ctx.userId,ctx.userId,ctx.nationId,ctx.userId,ctx.nationId,body.cityId),
  ctx.db.prepare(`UPDATE citizen_city_locations SET current_city_id=?,updated_at=? WHERE user_id=? AND nation_id=? AND EXISTS(SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id=?)`).bind(body.cityId,ctx.now,ctx.userId,ctx.nationId,ctx.userId,ctx.nationId),
  ]);
+ if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  return json({...current,homeCityId:location.homeCityId,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now)});
 }

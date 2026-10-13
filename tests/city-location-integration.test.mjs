@@ -52,3 +52,21 @@ test('recorded additive city migration is idempotent and preserves an existing a
  assert.deepEqual(after.profile,before.profile);assert.deepEqual(after.economy,before.economy);assert.deepEqual(after.shifts,before.shifts);
  assert.equal((await r.call('city','alice')).data.currentCityId,capitalCityForNation('kindle').id);
 });
+
+test('travel refuses citizenship changes between context read and the atomic location write',async t=>{
+ const r=await fixture(t),destination=citiesForNation('kindle').find(city=>!city.capital);
+ await r.call('city','alice');
+ await r.db.prepare('INSERT INTO square_presence VALUES (?,?,?)').bind('alice','kindle',Math.floor(r.now/1000)+90).run();
+ const originalBatch=r.db.batch.bind(r.db);let changed=false;
+ r.db.batch=async statements=>{
+  if(statements.some(s=>s.sql.startsWith('UPDATE citizen_city_locations'))){
+   changed=true;await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'").run();
+  }
+  return originalBatch(statements);
+ };
+ const result=await r.call('city','alice',{action:'travel',cityId:destination.id});
+ assert.equal(changed,true);assert.equal(result.status,409);assert.match(result.data.error,/Citizenship changed/);
+ assert.equal(result.cache,'private, no-store');
+ assert.equal((await r.db.prepare("SELECT current_city_id FROM citizen_city_locations WHERE user_id='alice'").first()).current_city_id,capitalCityForNation('kindle').id);
+ assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM square_presence WHERE user_id='alice'").first()).n,1);
+});
