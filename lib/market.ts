@@ -79,7 +79,7 @@ export const tradeSql = `INSERT INTO citizen_economy_events
   FROM citizens c JOIN merchant_inventory_balances m ON m.item = ?
   JOIN citizen_wallet_balances w ON w.clerk_user_id = c.clerk_user_id
   WHERE c.clerk_user_id = ? AND c.nation_id = 'kindle'
-    AND ? BETWEEN 1 AND 10 AND typeof(?) = 'integer'
+    AND ? BETWEEN 1 AND 10 AND ? = CAST(? AS INTEGER)
     AND NOT EXISTS (SELECT 1 FROM citizen_economy_events WHERE id = ?)
     AND ((? = 'buy' AND w.balance >= m.buy_minor * ? AND m.stock >= ?)
       OR (? = 'sell' AND COALESCE((SELECT quantity FROM citizen_inventory_balances
@@ -123,7 +123,7 @@ export async function executeMarketCommand(db: D1Database, userId: string, comma
   } else {
     const { side, quantity, item, requestId } = command;
     await db.prepare(tradeSql).bind(requestId, side, side, quantity, quantity, side, quantity, quantity, now,
-      item, userId, quantity, quantity, requestId, side, quantity, quantity, side, quantity, quantity).run();
+      item, userId, quantity, quantity, quantity, requestId, side, quantity, quantity, side, quantity, quantity).run();
   }
   const completed = await receipt();
   return matches(completed) ? { status: 200 } : { status: 409, error: command.action === 'household-meal'

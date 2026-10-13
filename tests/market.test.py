@@ -40,7 +40,7 @@ class MarketTests(unittest.TestCase):
         row=self.db.execute("SELECT quantity FROM citizen_inventory_balances WHERE clerk_user_id=? AND item='food'",(user,)).fetchone()
         return row[0] if row else 0
     def trade_params(self, id, side='buy', quantity=1, user='alice', item='food'):
-        return (id,side,side,quantity,quantity,side,quantity,quantity,1000,item,user,quantity,quantity,id,side,quantity,quantity,side,quantity,quantity)
+        return (id,side,side,quantity,quantity,side,quantity,quantity,1000,item,user,quantity,quantity,quantity,id,side,quantity,quantity,side,quantity,quantity)
     def trade(self,side='buy',quantity=1,user='alice',id=None,item='food'):
         with self.db:
             return self.db.execute(sql('tradeSql'),self.trade_params(id or str(uuid.uuid4()),side,quantity,user,item)).rowcount
@@ -62,6 +62,11 @@ class MarketTests(unittest.TestCase):
         stock=self.db.execute("SELECT stock FROM merchant_inventory_balances WHERE item='food'").fetchone()[0]
         self.assertEqual(self.balance()+self.balance('bob')+cash,14000)
         self.assertEqual(self.food()+self.food('bob')+stock,112)
+
+    def test_integral_real_parameters_trade_and_fractional_parameters_fail_closed(self):
+        self.assertEqual(self.trade(quantity=1.0),1)
+        self.assertEqual(self.trade(quantity=1.5),0)
+        self.assertEqual((self.balance(),self.food()),(1850,7))
 
     def test_insufficient_wallet_and_stock(self):
         self.db.execute("UPDATE market_items SET buy_minor=100000");self.db.commit()
