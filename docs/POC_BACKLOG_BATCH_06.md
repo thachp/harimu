@@ -10,4 +10,8 @@ Issue #9 was re-read and its author verified as repository owner thachp. It is t
 
 Model-driven AI, named AI populations, full character creation, tutorial quests and live population-balanced recommendations remain future game systems, not claims of this proof of concept. Protected harvests and next-day meal cooldown remain unchanged.
 
-Full checks and deployed journey acceptance will be recorded after integration.
+Verification: `npm run check` passed 113 Node tests, 77 SQL tests, lint and TypeScript; `npm run build` passed. Runtime source `b5e1a2074f43df1d00b45c4267caa0751b4e3dd6` was pushed to main and deployed as Cloudflare Worker version `cc91594a-7927-4c7e-9504-3ddf2688c991` at https://preview.harimu.com and https://harimu-preview.thachp.workers.dev.
+
+Live desktop acceptance covered all ten manual tour stops, Pause/Back, camera interruption, Skip/Finish, unchanged nation selection, neutral shortlist (Kindle/Korund/Aurelle), existing-strip selection, Korund two-choice outcomes/Back/Reset and return to exploration. Mobile 390×844 acceptance covered preference selection and keyboard Enter, democracy shortlist (Kindle/Hoarvale/Veldwood), readable wrapping controls, nation review → oath → Clerk modal → cancel, retaining Korund without enrollment. Restart clears suggestions; refresh retains selected Korund and returns to arrival without autoplay. Component tests cover timer cleanup and reduced-motion defaults/changes; no OS preference was modified.
+
+At 17:06 UTC docs.harimu.com returned HTTP 200 from Vercel with unchanged ETag `d60cc35ef82a3d9bd4e6f890b8c96744` and last-modified 15:44:44 UTC. No production cutover, DNS/docs change, live economic/civic action or credential submission occurred in this acceptance. Issue #9 was re-read with verified owner author before state-only closure; no comment was posted.
