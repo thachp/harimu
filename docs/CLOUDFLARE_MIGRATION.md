@@ -95,3 +95,14 @@ Public authoritative DNS checks currently return no CNAME for clerk.harimu.com, 
 The missing Clerk records were verified directly against both prior Google authoritative nameservers (ns-cloud-e1/e2.googledomains.com): `clerk.harimu.com CNAME frontend-api.clerk.services`, `accounts.harimu.com CNAME accounts.clerk.services`, TTL 14400. New Cloudflare authoritative DNS returns NXDOMAIN for clerk.harimu.com; a fresh Clerk public script fetch cannot resolve it. Browser success therefore relies on existing cached/loaded Clerk resources and does not establish fresh login readiness.
 
 Automatic approval review rejected the attempted no-overwrite restoration of these two DNS-only CNAMEs, stating that the user restricted DNS changes and had not approved these authentication records. No records were created. Explicit user approval to restore these exact existing records is required; do not retry via Wrangler, browser or another API as a workaround. Apex/www/docs were not changed by the preview attachment. Full production-data export remains a separate blocker.
+
+### Approved Clerk DNS restoration verified
+
+User explicitly approved restoring both original Clerk records after the earlier rejection. One retry performed conflict/idempotency checks and created only the approved DNS-only TTL-14400 CNAMEs:
+
+- clerk.harimu.com → frontend-api.clerk.services, record ID `00cfaa22939430e72207e4db46d059de`.
+- accounts.harimu.com → accounts.clerk.services, record ID `196e1759ab63399e0f6de38e03107e12`.
+
+Authoritative henry/rafe and public resolver 1.1.1.1 return the expected targets. Local DNS initially retained a negative cache; public script TLS was verified against the exact CNAME target (without insecure certificate flags), following its version redirect to a 200 response. A separate Codex in-app browser context then initialized Clerk with no errors and rendered the fresh “Sign in to Harimu” email/Continue form on https://preview.harimu.com . No email, credential, code or account creation was entered; the user can personally authenticate there. Existing Chrome session recognition was verified earlier. Complete fresh login/sign-out and gameplay mutation tests are still not claimed.
+
+Preview world remains 200, anonymous citizen 401. Apex/www HTTP 200 and their exact Sites DNS records are unchanged. Docs DNS record is unchanged and HTTP content retains SHA256 bc36de8fb2a3f0e68c1a0b07e9ef9bbd9cdd6795fab8526a6ced1f82b23902a6. No Clerk security settings or OAuth scopes changed. The earlier missing-Clerk-DNS blocker is resolved. Consistent full Sites production export/import and single-writer cutover remain outstanding; seeded preview is not migrated production data.
