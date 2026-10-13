@@ -8,6 +8,15 @@ test('inbox includes only reached, unclaimed valid deadlines and deduplicates na
  const items=civicInbox([shift,shift,{...shift,id:'claimed',claimedAt:end},{...shift,id:'invalid',completesAt:'invalid'}],null,'kindle',now);
  assert.equal(items.length,1);assert.equal(items[0].view,'workplace');assert.match(items[0].text,/does not claim rewards/);assert.equal(shift.claimedAt,null);
 });
+test('collective alerts derive from recorded near thresholds and followed responses, never foreign data or expired windows',()=>{
+ const p={id:'collective-fixture',title:'Waterworks audit',createdAt:now/1000-20,expiresAt:now/1000+100,weeklyHumans:100,threshold:3,signatures:2,signed:false,mine:false,status:'collecting',reachedAt:null,response:null};
+ const snapshot={nationId:'kindle',asOf:now/1000,weeklyHumans:100,petitions:[p]};
+ assert.match(civicInbox([],null,'kindle',now,snapshot)[0].title,/nearing/);
+ assert.equal(civicInbox([],null,'korund',now,snapshot).length,0);
+ assert.equal(civicInbox([],null,'kindle',now,{...snapshot,petitions:[{...p,expiresAt:now/1000}]}).length,0);
+ assert.equal(civicInbox([],null,'kindle',now,{...snapshot,petitions:[{...p,status:'awaiting-response',reachedAt:now/1000-1}]}).length,0);
+ const followed={...snapshot,petitions:[{...p,status:'awaiting-response',signed:true,reachedAt:now/1000-1}]};const item=civicInbox([],null,'kindle',now,followed)[0];assert.match(item.title,/awaiting/);assert.equal(item.view,'government');assert.match(item.text,/2 \/ 3 verified/);
+});
 test('petitions come only from the citizen nation; anonymous and unknown clocks show no entries',()=>{
  assert.equal(civicInbox([],government,'kindle',now).length,1);
  assert.deepEqual(civicInbox([],government,'korund',now),[]);assert.deepEqual(civicInbox([shift],government,null,now),[]);

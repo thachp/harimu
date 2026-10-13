@@ -1,0 +1,11 @@
+# Development preview: display settings
+
+Runtime commit: `c312f83`. Preview Worker version: `958295ce-8b2c-445e-b118-8ecd463ac4a2`, verified serving 100% of preview traffic on 2026-10-13.
+
+A persistent HUD settings entry provides Low/Standard graphics and 12/24-hour timestamps. Low rendering disables shadows and anti-aliasing and caps render density at one pixel per CSS pixel. Graphics changes dispose the previous scene and preserve camera state. Dated work, recovery, meal, government, citizenship, chat, news and inbox records use the selected time format in UTC; countdown durations and authoritative deadlines are unchanged. Preferences are browser-local, contain no citizen identifiers, synchronize between tabs, and have deterministic server/initial hydration defaults. Blocked or corrupt storage reports its limitation while preferences remain usable for the current visit. Audio and language availability are explicit: this preview has no sound playback and supports English only.
+
+Validation: 204 Node tests, 88 SQL tests, lint, TypeScript and build passed. Fixtures cover preference validation, UTC/midnight/12-hour formatting, renderer quality bounds, hydration, persistence, storage failure and cross-tab updates. Background desktop acceptance verified changes, reload persistence, focus restoration, and one canvas after graphics changes. Local 390- and 320-pixel screenshots caught and resolved title/clock overlap. The dialog fits both widths. Live preview acceptance verified settings changes and persistence without signing in or issuing gameplay commands. Issue #35 remains open for audio and additional-language functionality.
+
+Issue #38 investigation: application source has no explicit `readPixels`, render-target readback, canvas export, or preserved drawing buffer. Background live transitions through City, Household, Work, Market and World retained one canvas and produced no captured ReadPixels warnings, without taking screenshots during those transitions. This does not establish the reported warning's cause or resolve it; #38 remains open. No warning suppression or speculative performance fix was added.
+
+No preview data reset, presence opt-in, live chat submission, shift claim, production route change, or credential change occurred.

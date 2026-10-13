@@ -42,26 +42,27 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     <h4>{snapshot.decision.title}</h4>
     <p>Spending proposal: {snapshot.decision.proposedSpendMinor} minor units from {snapshot.availableBudgetMinor} available. This proposal itself does not spend funds; executed Kindle allocations are recorded separately above.</p>
     <p>{snapshot.influenceSummary}</p>
-    <p>Ask your government to prioritize a need. Completed UTC days receive one recorded review on the next government visit. The selected topic sets the following UTC day’s policy proposal; other topics are deferred. Food safety emergencies can override that priority. Petitions do not guarantee spending.</p>
-    <p>One petition per UTC day. A petition is a political act and ends your citizenship grace period.</p>
+    <h4>Daily priority requests</h4>
+    <p>Ask your government to prioritize a need. Completed UTC days receive one recorded review on the next government visit. The selected topic sets the following UTC day’s policy proposal; other topics are deferred. Food safety emergencies can override that priority. Priority requests do not guarantee spending.</p>
+    <p>One priority request per UTC day. A request is a political act and ends your citizenship grace period.</p>
     <p>Kindle proposals and executed allocations use the remaining work-programme budget; other prototype nations have no automatic policy-appropriation fund.</p>
-    {!localDemo && snapshot.review && <p>Last recorded review: {formatTime(snapshot.review.reviewedAt*1000)} · {snapshot.review.petitionCount} petitions. {snapshot.review.active ? `Priority active until ${formatTime(snapshot.review.expiresAt*1000)}.` : 'Priority expired; the current proposal uses live needs.'} Review inputs and reasons are saved permanently; live proposal funds are recalculated. No model is called.</p>}
+    {!localDemo && snapshot.review && <p>Last recorded review: {formatTime(snapshot.review.reviewedAt*1000)} · {snapshot.review.petitionCount} priority requests. {snapshot.review.active ? `Priority active until ${formatTime(snapshot.review.expiresAt*1000)}.` : 'Priority expired; the current proposal uses live needs.'} Review inputs and reasons are saved permanently; live proposal funds are recalculated. No model is called.</p>}
     {!localDemo && snapshot.review?.active && <GameTimer endsAt={snapshot.review.expiresAt * 1000} label="Policy priority expires" />}
-    {!localDemo && <section aria-label="Your petition history">
-      <h4>Your petitions</h4>
-      {!snapshot.petitions?.length && <p>No petitions recorded for your current nation.</p>}
+    {!localDemo && <section aria-label="Your priority request history">
+      <h4>Your priority requests</h4>
+      {!snapshot.petitions?.length && <p>No priority requests recorded for your current nation.</p>}
       <ul>{snapshot.petitions?.map(petition=><li key={petition.requestId}>
         <strong>{petition.topic} · {petition.status}</strong> · {formatTime(petition.submittedAt*1000)}
         <p>{petition.reason}</p>
       </li>)}</ul>
     </section>}
-    {localDemo && <p>The local demo previews priorities only; recorded daily review and petition history require a signed-in citizen.</p>}
-    <p id="petition-action-reason" role="status">{pending ? 'An action is being saved. Please wait before submitting a petition.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : ''}</p>
+    {localDemo && <p>The local demo previews priorities only; recorded daily review and priority request history require a signed-in citizen.</p>}
+    <p id="petition-action-reason" role="status">{pending ? 'An action is being saved. Please wait before submitting a priority request.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : ''}</p>
     <div className="market-quotes">{(['food', 'infrastructure', 'work'] as const).map((topic) =>
       <button key={topic} type="button" disabled={pending || (!localDemo && !verification?.countedActionsEligible)} aria-describedby={pending || (!localDemo && !verification?.countedActionsEligible) ? "petition-action-reason" : undefined} onClick={() => onPetition(topic)}>
-        {localDemo ? 'Preview priority for' : 'Petition for'} {topic === 'work' ? 'workplace support' : topic}
+        {localDemo ? 'Preview priority for' : 'Request priority for'} {topic === 'work' ? 'workplace support' : topic}
       </button>)}</div>
-    {pending && <p role="status">Submitting your petition…</p>}
+    {pending && <p role="status">Submitting your priority request…</p>}
     {error && <p role="alert">{error}</p>}
   </div></NationDocument>;
 }

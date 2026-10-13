@@ -20,6 +20,8 @@ import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch,
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
+import {CollectivePetitionsPanel} from './collective-petitions';
+import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
 import { SceneNews } from './world-scene';
 import { firstLoopStep } from '@/lib/first-loop';
@@ -426,6 +428,7 @@ type CitizenSnapshot = {
   market?: MarketState;
   playerMarket?: PlayerMarketState;
   government?: GovernmentSnapshot | null;
+  collectivePetitions?:CollectivePetitions|null;
   verification?: VerificationState;
   simulation?: SimulationState;
   aurellePlan?: AurellePlanView | null;
@@ -563,6 +566,7 @@ export default function Home() {
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
   const [capacity, setCapacity] = useState(18);
   const [verification, setVerification] = useState<VerificationState | null>(null);
+  const [collectivePetitions,setCollectivePetitions]=useState<CollectivePetitions|null>(null);
   const [governmentSnapshot, setGovernment] = useState<GovernmentSnapshot | null>(null);
   const [governmentError, setGovernmentError] = useState<string | null>(null);
   const [governmentPending, setGovernmentPending] = useState(false);
@@ -646,7 +650,7 @@ export default function Home() {
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
     setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
-    setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setVerification(null); setWorkShifts([]);
+    setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null); setVerification(null); setWorkShifts([]);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
     setKorundPlan(null); korundIntent.current = null; setKorundCommand(null);
     setPlanNote(''); setCompletedPlanIds([]); setPlanSaved(false); setHorizon('week'); setCommittedDecision(null);
@@ -1098,6 +1102,7 @@ export default function Home() {
     setWorkShifts(snapshot.shifts ?? []);
     if (snapshot.market) setMarket(snapshot.market);
     if (snapshot.playerMarket) setPlayerMarket(snapshot.playerMarket);
+    if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
@@ -1312,6 +1317,7 @@ export default function Home() {
         nationId?: string;
         capacity?: number | null;
         government?: GovernmentSnapshot | null;
+  collectivePetitions?:CollectivePetitions|null;
         verification?: VerificationState;
         simulation?: SimulationState;
         citizenship?: CitizenshipStatus | null;
@@ -1484,6 +1490,7 @@ export default function Home() {
       {viewMode === 'government' && <>
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
+        {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={citizenSessionKey} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
         <p>Elections, protests and public opinion systems are planned and will follow each nation’s rules. No election or protest is currently open here.</p>
       </>}
     </>}
@@ -1577,7 +1584,7 @@ export default function Home() {
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onNavigate={navigateGame} onSelectNation={selectNation}
-      socialDock={<CitizenDock key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} onNavigate={navigateGame} />}
+      socialDock={<CitizenDock key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} collectivePetitions={collectivePetitions} onNavigate={navigateGame} />}
       accountControls={<ClerkAccountControl />} />
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}

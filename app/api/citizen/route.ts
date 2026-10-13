@@ -9,6 +9,7 @@ import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/li
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
+import {readCollectivePetitions,recordVerifiedHumanVisit} from '@/lib/collective-petitions';
 import { authenticatedUserId } from '@/lib/auth';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { env } from 'cloudflare:workers';
@@ -118,15 +119,19 @@ export async function GET(request: Request) {
       .first<CitizenDecisionRow>(),
     database.prepare(`SELECT EXISTS(
       SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ?
-      UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id = ? LIMIT 1
-    ) AS political_action_taken`).bind(userId, userId).first<{ political_action_taken: number }>(),
+      UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id = ? UNION ALL SELECT 1 FROM civic_petition_signatures WHERE clerk_user_id = ? LIMIT 1
+    ) AS political_action_taken`).bind(userId, userId, userId).first<{ political_action_taken: number }>(),
   ]);
 
+  const verification=await readVerification(userId);
+  const civicNow=Math.floor(Date.now()/1000);
+  if(profile?.nation_id==='kindle'&&verification.countedActionsEligible)await recordVerifiedHumanVisit(database,userId,civicNow);
   return privateJson({
     aurellePlan: await readAurelle(database,userId),
+    collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow):null,
     korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
     simulation,
-    verification: await readVerification(userId),
+    verification,
     economy: await readEconomy(database, userId, interval),
     market: await readMarket(database, userId, interval),
     playerMarket: await readPlayerMarket(database, userId),
@@ -232,8 +237,8 @@ export async function POST(request: Request) {
     const readCurrent=()=>database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at
       FROM citizens WHERE clerk_user_id=?`).bind(userId).first<CitizenProfileRow>();
     const readPolitical=async()=>Boolean((await database.prepare(`SELECT EXISTS(
-      SELECT 1 FROM citizen_decisions WHERE clerk_user_id=? UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id=? LIMIT 1
-    ) AS taken`).bind(userId,userId).first<{taken:number}>())?.taken);
+      SELECT 1 FROM citizen_decisions WHERE clerk_user_id=? UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id=? UNION ALL SELECT 1 FROM civic_petition_signatures WHERE clerk_user_id=? LIMIT 1
+    ) AS taken`).bind(userId,userId,userId).first<{taken:number}>())?.taken);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
       simulation,verification:await readVerification(userId),
       government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId)):null,
@@ -251,7 +256,7 @@ export async function POST(request: Request) {
         database.prepare(enrollmentFirstSql).bind(nationId,now,now,userId),
       ]);
     } else {
-      await database.prepare(enrollmentChangeSql).bind(nationId,now,userId,body.expectedNationId,nationId,now,now,userId,userId).run();
+      await database.prepare(enrollmentChangeSql).bind(nationId,now,userId,body.expectedNationId,nationId,now,now,userId,userId,userId).run();
     }
     const updated=await readCurrent();
     if (updated?.nation_id===nationId) return response(updated,true);

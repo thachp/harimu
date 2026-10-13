@@ -41,7 +41,7 @@ test('supported Civic missing data offers retry rather than claiming implementat
     const html=render(GovernmentPanel,{snapshot:null,nationId,onRetry(){}});
     assert.match(html,/saved decisions have not loaded/);
     assert.match(html,/Retry government preview/);
-    assert.doesNotMatch(html,/coming soon|not built yet|Petition for/);
+    assert.doesNotMatch(html,/coming soon|not built yet|Request priority for/);
   }
   assert.match(render(GovernmentPanel,{snapshot:null,nationId:'fulmara'}),/Civic play coming soon/);
 });
@@ -50,7 +50,7 @@ test('loaded Civic shows actual policy and disabled petitions when verification 
   const html=render(GovernmentPanel,{snapshot,nationId:'kindle',verification:{countedActionsEligible:false,reason:'Phone verification is not available yet.'},localDemo:false,pending:false,error:null,onPetition(){}});
   assert.match(html,/Food security reserve/);
   assert.equal((html.match(/<button[^>]*disabled/g)||[]).length,3);
-  assert.match(html,/Petition for/);
+  assert.match(html,/Request priority for/);
   assert.doesNotMatch(html,/Government preview unavailable|Civic play coming soon/);
 });
 

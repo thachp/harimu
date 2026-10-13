@@ -4,6 +4,7 @@ import {Bell} from '@phosphor-icons/react';
 import {createPortal} from 'react-dom';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import type {WorkShift} from '../lib/work-shifts';
+import type {CollectivePetitions} from '../lib/collective-petitions';
 import type {GovernmentSnapshot} from '../lib/government';
 import type {SceneView} from '../lib/scene-navigation';
 import {civicInbox,markInboxRead,unreadInbox,type InboxItem} from '../lib/civic-inbox';
@@ -12,16 +13,16 @@ import {SquareChat} from './square-chat';
 
 export function CivicInboxView({items,onNavigate,onRead}:{items:readonly InboxItem[];onNavigate:(view:SceneView)=>void;onRead:()=>void}){
  const formatTime=useDisplayTimestamp();
- return <section aria-label="Your civic inbox"><p>Work deadlines and your petition records. No ballot is open in this preview; petition-threshold alerts are not available yet.</p>
+ return <section aria-label="Your civic inbox"><p>Work deadlines and your petition records. No ballot is open in this preview. Collective-petition alerts use recorded Kindle thresholds.</p>
   {!items.length?<p>No work deadline or petition record needs your attention.</p>:<><button type="button" onClick={onRead}>Mark inbox read for this session</button><ul className="civic-inbox-items">{items.map(item=><li key={item.id}><h2>{item.title}</h2><p>{item.text}</p><time dateTime={new Date(item.at).toISOString()}>{formatTime(item.at)}</time><button type="button" onClick={()=>onNavigate(item.view)}>{item.view==='workplace'?'Open Work to check':'Read in Civic'}</button></li>)}</ul></>}
  </section>;
 }
-export function CitizenDock({nationId,cityId,cityVisible,session,configured,shifts,government,onNavigate}:{nationId:string|null;cityId?:string;cityVisible:boolean;session:'anonymous'|'loading'|'ready'|'error';configured:boolean;shifts:readonly WorkShift[];government:GovernmentSnapshot|null;onNavigate:(view:SceneView)=>void}){
+export function CitizenDock({nationId,cityId,cityVisible,session,configured,shifts,government,collectivePetitions,onNavigate}:{nationId:string|null;cityId?:string;cityVisible:boolean;session:'anonymous'|'loading'|'ready'|'error';configured:boolean;shifts:readonly WorkShift[];government:GovernmentSnapshot|null;collectivePetitions?:CollectivePetitions|null;onNavigate:(view:SceneView)=>void}){
  const [tab,setTab]=useState<'chat'|'inbox'|null>(null),[now,setNow]=useState(0),[readIds,setReadIds]=useState<string[]>([]),[header,setHeader]=useState<HTMLElement|null>(null);
  const launcher=useRef<HTMLElement|null>(null);
  useEffect(()=>{const frame=requestAnimationFrame(()=>setHeader(document.getElementById('game-notification-slot')));const tick=()=>setNow(Date.now());tick();const timer=setInterval(tick,1000);return()=>{cancelAnimationFrame(frame);clearInterval(timer);};},[]);
  const enabled=configured&&session==='ready'&&Boolean(nationId);
- const items=enabled?civicInbox(shifts,government,nationId,now):[],unread=unreadInbox(items,readIds);
+ const items=enabled?civicInbox(shifts,government,nationId,now,collectivePetitions):[],unread=unreadInbox(items,readIds);
  const read=()=>setReadIds(current=>markInboxRead(items,current));
  const open=(next:'chat'|'inbox',element:HTMLElement)=>{launcher.current=element;if(next==='inbox')read();setTab(next);};
  const close=()=>{setTab(null);if(launcher.current?.isConnected)launcher.current.focus();};
