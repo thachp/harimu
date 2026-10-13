@@ -18,7 +18,7 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
   return <section className={styles.country} aria-labelledby="country-scene-title">
     <h2 id="country-scene-title">Country map</h2>
     <p>{preview ? 'Sample visit · no citizen changes. ' : ''}Free, instant travel within this nation · home city unchanged.</p>
-    <p>Current city: <strong>{current?.name ?? 'Not yet set'}</strong> · Home city: <strong>{home?.name ?? 'Not yet set'}</strong></p>
+    <p>Current city: <strong>{current?.name ?? 'Not visiting'}</strong> · Home city: <strong>{home?.name ?? 'None in this nation'}</strong></p>
     <div className={styles.map} aria-label="Illustrative country map">
       <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M14 20 38 9 62 15 88 30 83 58 92 77 68 90 45 82 23 89 9 62 18 42Z"/><path className={styles.routes} d="M26 64 50 40 76 64"/></svg>
       {cities.map((city, index) => {
