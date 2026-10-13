@@ -1,4 +1,5 @@
 'use client';
+import { GameTimer } from './game-timer';
 import { useEffect, useState } from 'react';
 import type { Economy } from '@/lib/economy';
 import type { MarketState } from '@/lib/market';
@@ -22,6 +23,10 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
   const ready = !market.mealReadyAt || (now > 0 && Date.parse(market.mealReadyAt) <= now);
   const mealInterval = market.mealIntervalSeconds >= 3600 ? `${market.mealIntervalSeconds / 3600} hours` : `${market.mealIntervalSeconds / 60} minutes`;
   const validQuantity = Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= 10;
+  const quantityError = validQuantity ? null : 'Enter a whole number from 1 to 10.';
+  const tradeCommonReason = busy ? 'An action is being saved. Please wait.' : uncertain ? 'Confirm your previous transaction first.' : quantityError;
+  const tradeCommonId = quantityError ? 'trade-quantity-error' : 'trade-action-reason';
+  const mealReason = busy ? 'An action is being saved. Please wait.' : uncertain ? 'Confirm your previous action first.' : capacity >= 24 ? 'Capacity is full. Save your food for later.' : count('food') < market.mealFood ? `You need ${market.mealFood} food. Harvest or buy food at the market.` : !ready ? 'Wait until the next meal time shown above.' : null;
   return <section id="citizen-simulated-market" className="citizen-market" aria-label={showTrading ? 'Kindle simulated merchant' : 'Household food and recovery'}>
     {showTrading && <><h3>Kindle starter market</h3>
     <p>Simulated merchant · fixed prototype prices and finite stock. Small trades only; this is not a player order book.</p>
@@ -31,22 +36,32 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
       : 'Connection interrupted. Confirm the previous transaction before starting another.'}</p>
       <button disabled={busy} type="button" onClick={onRetry}>{pendingAction === 'household-meal' ? 'Retry household meal' : 'Retry previous transaction'}</button></div>}
     {showTrading && <><label>Goods per trade <input aria-label="Goods per trade" type="number" min={1} max={10} step={1}
+      aria-invalid={!validQuantity} aria-describedby={quantityError ? 'trade-quantity-error' : undefined}
       value={Number.isNaN(quantity) ? '' : quantity} disabled={busy || uncertain}
       onChange={(event) => setQuantity(event.target.valueAsNumber)} /></label>
+    {quantityError && <p id="trade-quantity-error" role="alert">{quantityError}</p>}
+    {tradeCommonReason && !quantityError && <p id="trade-action-reason" role="status">{tradeCommonReason}</p>}
     <div className="market-quotes">
-      {market.quotes.map((quote) => <article key={quote.item}>
-        <strong>{quote.label}</strong><small>{quote.stock} at merchant · {count(quote.item)} owned</small>
-        <div>
-          <button type="button" disabled={busy || uncertain || !validQuantity || quote.stock < quantity || economy.walletMinor < quote.buyMinor * quantity}
-            onClick={() => onTrade('buy', quote.item, quantity)}>
-            Buy {validQuantity ? quantity : ''} · {((quote.buyMinor * (validQuantity ? quantity : 1)) / 100).toFixed(2)} SPK
-          </button>
-          <button type="button" disabled={busy || uncertain || !validQuantity || count(quote.item) < quantity || market.merchantCashMinor < quote.sellMinor * quantity}
-            onClick={() => onTrade('sell', quote.item, quantity)}>
-            Sell {validQuantity ? quantity : ''} · {((quote.sellMinor * (validQuantity ? quantity : 1)) / 100).toFixed(2)} SPK
-          </button>
-        </div>
-      </article>)}
+      {market.quotes.map((quote) => {
+        const buyReason = tradeCommonReason ?? (quote.stock < quantity ? 'The merchant does not have enough stock.' : economy.walletMinor < quote.buyMinor * quantity ? 'You do not have enough SPK for this quantity.' : null);
+        const sellReason = tradeCommonReason ?? (count(quote.item) < quantity ? 'You do not own enough goods for this quantity.' : market.merchantCashMinor < quote.sellMinor * quantity ? 'The merchant cannot afford this quantity.' : null);
+        const buyId = `trade-${quote.item}-buy-reason`, sellId = `trade-${quote.item}-sell-reason`;
+        return <article key={quote.item}>
+          <strong>{quote.label}</strong><small>{quote.stock} at merchant · {count(quote.item)} owned</small>
+          <div>
+            <button type="button" disabled={Boolean(buyReason)} aria-describedby={buyReason ? tradeCommonReason ? tradeCommonId : buyId : undefined}
+              onClick={() => { if (!buyReason) onTrade('buy', quote.item, quantity); }}>
+              {validQuantity ? `Buy ${quantity} · ${((quote.buyMinor * quantity) / 100).toFixed(2)} SPK` : 'Buy · choose 1–10 goods'}
+            </button>
+            {buyReason && !tradeCommonReason && <small id={buyId}>{buyReason}</small>}
+            <button type="button" disabled={Boolean(sellReason)} aria-describedby={sellReason ? tradeCommonReason ? tradeCommonId : sellId : undefined}
+              onClick={() => { if (!sellReason) onTrade('sell', quote.item, quantity); }}>
+              {validQuantity ? `Sell ${quantity} · ${((quote.sellMinor * quantity) / 100).toFixed(2)} SPK` : 'Sell · choose 1–10 goods'}
+            </button>
+            {sellReason && !tradeCommonReason && <small id={sellId}>{sellReason}</small>}
+          </div>
+        </article>;
+      })}
     </div>
     </>}
     {showMeal && <><h3>Household meal</h3>
@@ -54,9 +69,11 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
     <p>{!ready ? `Next meal: ${new Date(market.mealReadyAt!).toLocaleString()}`
       : capacity >= 24 ? 'Capacity full · save your food for later.'
         : count('food') < market.mealFood ? 'Not enough food · harvest or buy food at the market.' : 'Meal available · feed your household to recover capacity.'}</p>
-    <button type="button" disabled={busy || uncertain || !ready || capacity >= 24 || count('food') < market.mealFood}
-      onClick={onMeal}>Prepare household meal · {market.mealFood} food</button>
-    <small>Two starter food are granted once per Kindle account. Meals and prices are prototype assumptions.</small>
+    {market.mealReadyAt && <GameTimer endsAt={market.mealReadyAt} label="Next meal" />}
+    <button type="button" disabled={Boolean(mealReason)} aria-describedby={mealReason ? 'household-meal-reason' : undefined}
+      onClick={() => { if (!mealReason) onMeal(); }}>Prepare household meal · {market.mealFood} food</button>
+    {mealReason && <small id="household-meal-reason">{mealReason}</small>}
+    <small>Starter food is granted only once; your inventory reflects food already used. Meals and prices are prototype assumptions.</small>
     </>}
   </section>;
 }

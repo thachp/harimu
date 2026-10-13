@@ -16,7 +16,8 @@ async function componentModule(path) {
   let output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   for (const match of [...output.matchAll(/from (['"])([^'"]+)\1/g)]) {
     const specifier=match[2];let url;
-    if (specifier==='./game-viewport') url=viewportStub;
+    if (specifier.endsWith('.css')) url='data:text/javascript,export default {}';
+    else if (specifier==='./game-viewport') url=viewportStub;
     else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
       const base=specifier.startsWith('@/')?resolve(root,specifier.slice(2)):resolve(dirname(path),specifier);
       let child;

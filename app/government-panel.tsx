@@ -48,8 +48,9 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
       </li>)}</ul>
     </section>}
     {localDemo && <p>The local demo previews priorities only; recorded daily review and petition history require a signed-in citizen.</p>}
+    <p id="petition-action-reason" role="status">{pending ? 'An action is being saved. Please wait before submitting a petition.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : ''}</p>
     <div className="market-quotes">{(['food', 'infrastructure', 'work'] as const).map((topic) =>
-      <button key={topic} type="button" disabled={pending || (!localDemo && !verification?.countedActionsEligible)} onClick={() => onPetition(topic)}>
+      <button key={topic} type="button" disabled={pending || (!localDemo && !verification?.countedActionsEligible)} aria-describedby={pending || (!localDemo && !verification?.countedActionsEligible) ? "petition-action-reason" : undefined} onClick={() => onPetition(topic)}>
         {localDemo ? 'Preview priority for' : 'Petition for'} {topic === 'work' ? 'workplace support' : topic}
       </button>)}</div>
     {pending && <p role="status">Submitting your petition…</p>}

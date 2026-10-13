@@ -1,0 +1,5 @@
+.timer { display: inline-flex; flex-direction: column; gap: 3px; max-width: 100%; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.timer strong { font-weight: 600; }
+.timer small { font-size: .8em; }
+.compact { font-size: .85em; }
+@media (max-width: 440px) { .timer { line-height: 1.5; } }

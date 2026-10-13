@@ -6,6 +6,9 @@ import type { SimulationState } from '@/lib/world-simulation';
 import { GuestDemo, type GuestDemoView } from './guest-demo';
 import { FirstVisitGuide, type FirstVisitStage } from './first-visit-guide';
 import { GlobeTour } from './globe-tour';
+import { GameTimer } from './game-timer';
+import { ActionButton } from './action-button';
+import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import { CountryScene } from './country-scene';
 import { capitalCityForNation, cityForNation } from '@/lib/cities';
 import type { CityLocation } from '@/lib/city-location';
@@ -20,6 +23,7 @@ import { SceneNews } from './world-scene';
 import { firstLoopStep } from '@/lib/first-loop';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
+import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { SquareChat } from './square-chat';
 import { DailyLoop } from './daily-loop';
@@ -37,7 +41,6 @@ import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/e
 import {
   Show,
   SignInButton,
-  UserButton,
   useUser,
 } from '@clerk/nextjs';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
@@ -403,14 +406,7 @@ function ClerkAccountControl() {
         </SignInButton>
       </Show>
       <Show when="signed-in">
-        <UserButton
-          appearance={{
-            elements: {
-              avatarBox: { display: 'none' },
-              userButtonTrigger: 'harimu-auth-trigger account-menu-trigger',
-            },
-          }}
-        />
+        <AccountMenu />
       </Show>
     </div>
   );
@@ -1432,13 +1428,12 @@ export default function Home() {
     </div> : <>
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><button type="button" disabled={workPending} onClick={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</button></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><button type="button" disabled={workPending} onClick={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</button></div>}
-      {viewMode !== 'government' && <>{firstLoopHint}{dailyLoop}</>}
       {viewMode === 'household' && <>
+        {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
         <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
           <ul>{economy?.inventory.map((entry) => <li key={entry.item}>{entry.item}: {entry.quantity} available</li>)}</ul>
           <p>Listed goods remain reserved at the market. Capacity recovers while you are away.</p>
-          {economy?.nextRecoveryAt && <p>Next recovery: {new Date(economy.nextRecoveryAt).toLocaleString()}</p>}
         </section>
         <CitizenMarket showTrading={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
@@ -1468,12 +1463,12 @@ export default function Home() {
         </details>
       </>}
       {viewMode === 'workplace' && !['korund','aurelle'].includes(citizenNation.id) && <>
-        <WorkShiftBoard shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
+        <WorkShiftBoard onNavigate={changeView} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
           onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
         <section className="scene-work-orders"><h2>Available contributions</h2>
-          {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <button key={order.id} type="button"
-            disabled={workPending || Boolean(korundCommand) || hasActiveShift || capacity < order.cost} onClick={() => void commitWork(order)}>
-            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></button>)}
+          {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <ActionButton key={order.id} type="button"
+            reason={pendingActionReason(workPending, Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)) ?? firstActionReason([hasActiveShift, 'Finish and collect your active shift first.'], [capacity < order.cost, `You need ${order.cost} WC. Prepare a meal or wait for recovery.`])} onClick={() => void commitWork(order)}>
+            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></ActionButton>)}
         {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length === 0 && <p>No shifts are available for this nation yet. Kindle has the first supported work and wage programme; other national workplaces are planned.</p>}
         </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
       </>}
@@ -1532,6 +1527,14 @@ export default function Home() {
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
       workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} /> : citizenScene;
   const activeShift = priorNationShift ?? (citizenNation?.id === 'aurelle' ? aurellePlan?.shifts ?? [] : citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
+  const nextDeadlineCandidates = [
+    activeShift ? {label:'Work',endsAt:activeShift.completesAt} : null,
+    citizenNation?.id === 'aurelle' ? aurellePlan?.mealReadyAt ? {label:'Meal',endsAt:aurellePlan.mealReadyAt} : null
+      : citizenNation?.id === 'korund' ? korundPlan?.mealReadyAt ? {label:'Meal',endsAt:korundPlan.mealReadyAt} : null
+      : market?.mealReadyAt ? {label:'Meal',endsAt:market.mealReadyAt} : null,
+    capacity < 24 && economy?.nextRecoveryAt ? {label:'Recovery',endsAt:economy.nextRecoveryAt} : null,
+  ].filter((event):event is {label:string;endsAt:string} => Boolean(event && Number.isFinite(Date.parse(event.endsAt))));
+  const nextDeadline = activeShift ? {label:'Work',endsAt:activeShift.completesAt} : nextDeadlineCandidates.filter(event=>Date.parse(event.endsAt)>guideNow).sort((a,b)=>Date.parse(a.endsAt)-Date.parse(b.endsAt))[0];
   const contextItems: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[] =
     viewMode === 'country' ? [{id:'current-city',label:'Open City',detail:countryOwnNation ? activeCity?.name ?? 'Loading your city' : cityForNation(selected.id,countryCityId ?? '')?.name ?? 'City preview',onSelect:()=>changeView('square')}] : citizenNation?.id === 'aurelle' && ['household','workplace','market'].includes(viewMode) ? [
       {id:'aurelle-service',label:'Chartered service',detail:'4 WC · 8 CRN · 2 Favor',onSelect:()=>changeView('workplace')},
@@ -1568,7 +1571,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? 'Country travel' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}

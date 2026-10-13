@@ -1,10 +1,13 @@
 'use client';
+import { GameTimer } from './game-timer';
 
 import { useEffect, useState } from 'react';
 import type { Economy } from '@/lib/economy';
 import type { WorkShift } from '@/lib/work-shifts';
+import type { SceneView } from '@/lib/scene-navigation';
 
-export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onRefresh, onClaim }: {
+export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onRefresh, onClaim, onNavigate }: {
+  onNavigate?: (view: SceneView) => void;
   shifts: WorkShift[];
   economy: Economy | null;
   onRefresh: () => void;
@@ -24,6 +27,8 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
   const completed = shifts.filter((shift) => shift.claimedAt).slice(0, 3);
   const remaining = active ? Math.max(0, Date.parse(active.completesAt) - now) : 0;
 
+  const claimReason = pending ? 'An action is being saved. Please wait.' : !now ? 'Checking the shift timer…' : remaining > 0 ? 'Your shift is underway. Return when it finishes to collect.' : null;
+
   return (
     <section id="citizen-work-shifts" className="work-shift-status" aria-label="Your work shifts">
       <strong>Your work shifts</strong>
@@ -31,9 +36,10 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
       {economy && <div aria-label="Citizen wallet and inventory">
         <p><strong>Wallet: {(economy.walletMinor / 100).toFixed(2)} SPK</strong></p>
         <p>{economy.inventory.length ? economy.inventory.map((item) => `${item.quantity} ${item.item}`).join(' · ') : 'Inventory empty · finish work to earn goods'}</p>
-        <small>Capacity recovers up to 24 WC at {new Date(economy.nextRecoveryAt).toLocaleString()}</small>
+        <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />
       </div>}
-      <button type="button" disabled={pending} onClick={onRefresh}>Refresh citizen account</button>
+      <button type="button" disabled={pending} aria-describedby={pending ? "work-pending-reason" : undefined} onClick={onRefresh}>Refresh citizen account</button>
+      {pending && <small id="work-pending-reason">An action is being saved. Please wait.</small>}
       <p>One shift at a time. Work continues while you are away.</p>
       {error && <p role="alert">{error}</p>}
       {active ? (
@@ -42,10 +48,21 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
           {active.wageMinor !== undefined && <p>On completion: {(active.wageMinor / 100).toFixed(2)} SPK + {active.rewardQuantity} {active.rewardItem}</p>}
           <p>Public contribution target: {active.output} · {active.capacitySpent} WC committed</p>
           <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>
-          <small>Finishes {new Date(active.completesAt).toLocaleString()}</small>
-          <button disabled={pending || remaining > 0 || !now} onClick={() => onClaim(active.id)} type="button">
+          <GameTimer endsAt={active.completesAt} label="Shift ready" />
+          <button disabled={Boolean(claimReason)} aria-describedby={claimReason ? "work-claim-reason" : undefined} onClick={() => onClaim(active.id)} type="button">
             {pending ? 'Recording…' : 'Collect wages and goods'}
           </button>
+          {claimReason && <small id="work-claim-reason">{claimReason}</small>}
+          {now > 0 && remaining > 0 && onNavigate && <details>
+            <summary>Things to do while your shift runs</summary>
+            <p>Your shift continues while you visit other scenes or close the game. Ready to collect: <time dateTime={active.completesAt}>{new Date(active.completesAt).toLocaleString(undefined, {timeZoneName: 'short'})}</time>.</p>
+            <nav aria-label="Optional activities while waiting">
+              <button type="button" onClick={() => onNavigate('government')}>Read Civic decisions</button>
+              <button type="button" onClick={() => onNavigate('square')}>Visit citizen chat</button>
+              <button type="button" onClick={() => onNavigate('household')}>Write a private household note</button>
+            </nav>
+            <p>Reading decisions and private notes do not count as political actions. Petitions require phone verification and can end your citizenship change window.</p>
+          </details>}
         </div>
       ) : <p>Choose a contribution to start your next shift.</p>}
       {completed.map((shift) => (
