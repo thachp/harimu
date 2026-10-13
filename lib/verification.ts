@@ -22,13 +22,13 @@ export function trustedVerificationProvider(): VerificationProvider | undefined 
 
 export async function readVerification(userId: string, provider = trustedVerificationProvider(), now = Date.now()): Promise<VerificationState> {
   const denied = (status: 'unavailable' | 'required', reason: string): VerificationState => ({ tier: 0, countedActionsEligible: false, status, reason });
-  if (!provider) return denied('unavailable', 'Phone verification is not available yet, so petitions cannot count toward government decisions. Work, trade, chat and private planning remain available.');
+  if (!provider) return denied('unavailable', 'Phone verification is not available yet, so counted civic actions (petitions and voting) are unavailable. Work, trade, chat and private planning remain available.');
   try {
     const evidence = await provider.read(userId);
     if (!evidence || evidence.userId !== userId || evidence.emailVerified !== true || evidence.phoneVerified !== true || evidence.phoneUnique !== true || evidence.revoked !== false ||
       !Number.isFinite(evidence.checkedAt) || !Number.isFinite(evidence.expiresAt) || evidence.checkedAt > now || now - evidence.checkedAt > 60_000 || evidence.expiresAt <= now) {
-      return denied('required', 'Verify your email and a phone number used only by your account before submitting petitions that count toward government decisions.');
+      return denied('required', 'Verify your email and a phone number used only by your account before submitting counted civic actions.');
     }
-    return { tier: 1, countedActionsEligible: true, status: 'eligible', reason: 'Your account is verified. Your petitions can count toward government decisions.' };
-  } catch { return denied('unavailable', 'Account verification could not be checked. Petitions are temporarily unavailable; try again later.'); }
+    return { tier: 1, countedActionsEligible: true, status: 'eligible', reason: 'Your account is verified. Your civic actions can count.' };
+  } catch { return denied('unavailable', 'Account verification could not be checked. Counted civic actions are temporarily unavailable; try again later.'); }
 }

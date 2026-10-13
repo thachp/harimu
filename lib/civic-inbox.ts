@@ -1,9 +1,10 @@
+import type {ElectionSnapshot} from './elections';
 import type {CollectivePetitions} from './collective-petitions';
 import type { WorkShift } from './work-shifts';
 import type { GovernmentSnapshot } from './government';
 export type InboxItem={id:string;title:string;text:string;at:number;view:'workplace'|'government'};
 /** Read-only guidance. Reaching a displayed deadline never claims or grants a reward. */
-export function civicInbox(shifts:readonly WorkShift[],government:GovernmentSnapshot|null,nationId:string|null,now:number,collective?:CollectivePetitions|null):InboxItem[]{
+export function civicInbox(shifts:readonly WorkShift[],government:GovernmentSnapshot|null,nationId:string|null,now:number,collective?:CollectivePetitions|null,election?:ElectionSnapshot|null):InboxItem[]{
  if(!nationId||!Number.isFinite(now)||now<=0)return[];
  const entries=new Map<string,InboxItem>();
  for(const shift of shifts){const at=Date.parse(shift.completesAt);if(shift.claimedAt!==null||!Number.isFinite(at)||at>now)continue;
@@ -19,6 +20,9 @@ export function civicInbox(shifts:readonly WorkShift[],government:GovernmentSnap
   const id=`collective:${petition.id}:${petition.status}:${near?petition.signatures:''}`;
   const at=(petition.response?.at??petition.reachedAt??petition.createdAt)*1000;if(!Number.isFinite(at)||at>now)continue;
   entries.set(id,{id,title:near?'Petition nearing its response threshold':petition.status==='responded'?'Cabinet response recorded':'Petition awaiting Cabinet response',text:`${petition.title} · ${petition.signatures} / ${petition.threshold} verified human signatures. Open Civic to read the authoritative record.`,at,view:'government'});
+ }
+ if(nationId==='kindle'&&election?.nationId===nationId&&election.privacyReady&&election.status==='open'&&!election.voted&&election.closesAt!==null&&election.closesAt*1000>now&&election.opensAt!==null&&election.opensAt*1000<=now){
+  const id=`ballot:${election.id}`;entries.set(id,{id,title:'Kindle ranked ballot is open',text:'Open Civic to check your verified voting eligibility and the recorded closing deadline. Voting is optional; this alert submits nothing.',at:election.opensAt*1000,view:'government'});
  }
  return [...entries.values()].sort((a,b)=>b.at-a.at);
 }

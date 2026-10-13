@@ -23,7 +23,6 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
   const formatTime=useDisplayTimestamp();
   if (!snapshot) return <section className="citizen-market" aria-label="Government preview status">{['kindle','korund','aurelle'].includes(nationId ?? '') ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>}</section>;
   return <NationDocument nationId={snapshot.nationId} className="citizen-market government-document" label="Government decisions and citizen petitions"><div aria-busy={pending}>
-    {snapshot.nationId==='kindle' && <section className="kindle-ballot-status" aria-label="Kindle ballot status"><h4>Ballot status</h4><p>Elections are not implemented in this preview. There is no ballot to submit; you can read policy and check petition eligibility below.</p></section>}
     <LeaderPanel snapshot={snapshot} simulation={localDemo ? undefined : simulation} />
     <h3>Government and citizen voice</h3>
     <p>Computer-controlled leaders hold all government offices. AI/SI means artificial or simulated intelligence. Here they follow fixed game rules: the same situation produces the same decision. No live AI model is connected.</p>

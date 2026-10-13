@@ -43,7 +43,7 @@ test('government themes follow authoritative snapshot nation rather than inspect
   assert.match(html,new RegExp(`data-nation-theme="${nationId}"`));assert.match(html,new RegExp(nationThemes[nationId].motif));
   assert.doesNotMatch(html,/data-nation-theme="foreign"/);
   assert.equal((html.match(/<button[^>]*disabled/g)||[]).length,3);
-  if(nationId==='kindle'){assert.match(html,/There is no ballot to submit/);assert.doesNotMatch(html,/type="radio"|Cast vote/);}
+  if(nationId==='kindle'){assert.doesNotMatch(html,/type="radio"|Cast vote/);}
   else assert.doesNotMatch(html,/35\/100|below the 40-point/);
  }
 });

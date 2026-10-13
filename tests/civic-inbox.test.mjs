@@ -17,6 +17,12 @@ test('collective alerts derive from recorded near thresholds and followed respon
  assert.equal(civicInbox([],null,'kindle',now,{...snapshot,petitions:[{...p,status:'awaiting-response',reachedAt:now/1000-1}]}).length,0);
  const followed={...snapshot,petitions:[{...p,status:'awaiting-response',signed:true,reachedAt:now/1000-1}]};const item=civicInbox([],null,'kindle',now,followed)[0];assert.match(item.title,/awaiting/);assert.equal(item.view,'government');assert.match(item.text,/2 \/ 3 verified/);
 });
+test('ballot alerts require a real open window, reviewed privacy and an uncast ballot in the citizen nation',()=>{
+ const election={nationId:'kindle',id:'fixture-election',status:'open',privacyReady:true,voted:false,opensAt:now/1000-10,closesAt:now/1000+10};
+ assert.match(civicInbox([],null,'kindle',now,null,election)[0].title,/ballot is open/);
+ for(const override of [{privacyReady:false},{status:'waiting'},{status:'closed'},{voted:true},{closesAt:now/1000},{opensAt:now/1000+1}])assert.equal(civicInbox([],null,'kindle',now,null,{...election,...override}).length,0);
+ assert.equal(civicInbox([],null,'aurelle',now,null,election).length,0);
+});
 test('petitions come only from the citizen nation; anonymous and unknown clocks show no entries',()=>{
  assert.equal(civicInbox([],government,'kindle',now).length,1);
  assert.deepEqual(civicInbox([],government,'korund',now),[]);assert.deepEqual(civicInbox([shift],government,null,now),[]);

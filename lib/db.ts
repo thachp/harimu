@@ -1,3 +1,4 @@
+import {electionSchemas} from './elections';
 import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
 import { aurelleSchemas } from './aurelle';
@@ -169,6 +170,7 @@ async function initialize(database: D1Database) {
   await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
   await database.batch([
+    ...electionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),
     database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_government_petitions_nation_period ON government_petitions(nation_id, period_start)'),

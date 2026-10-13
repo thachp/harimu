@@ -28,12 +28,13 @@ class LocalD1 {
   close() { this.sqlite.close(); }
 }
 
-export async function localRuntime() {
+export async function localRuntime({ballotPrivacyReady=false}={}) {
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
   const path = join(directory, 'fixture.sqlite');
   const modules = [
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'app/api/city/route.ts',
+    'lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','app/api/petitions/route.ts',
     'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
@@ -63,6 +64,8 @@ export async function localRuntime() {
 export function identify(request, identity) { identities.set(request, identity); }
 export async function authenticatedUserId(request) { return identities.get(request) ?? null; }
 `);
+  const privacyPath=join(directory,'lib/fixture-ballot-privacy.mjs');
+  await writeFile(privacyPath,`export function trustedBallotPrivacyReady(){return ${ballotPrivacyReady===true};} export const ballotPrivacyReason='Fixture privacy review is not available.';`);
   const verificationPath = join(directory, 'lib/fixture-verification.mjs');
   await writeFile(verificationPath, `import { readVerification as validate } from './verification.mjs';
 import { Date } from '../fixture-clock.mjs';
@@ -78,6 +81,7 @@ export async function readVerification(userId) {
     source = source.replace(/from (['"])([^'"]+)\1/g, (match, quote, specifier) => {
       let target;
       if (specifier === 'cloudflare:workers') target = envPath;
+      else if (specifier === '@/lib/ballot-privacy'||specifier === './ballot-privacy') target=privacyPath;
       else if (specifier === '@/lib/verification') target = verificationPath;
       else if (specifier.startsWith('@/')) target = join(directory, `${specifier.slice(2)}.mjs`);
       else if (specifier.startsWith('.')) target = resolve(directory, dirname(sourcePath), `${specifier}.mjs`);
@@ -103,6 +107,7 @@ export async function readVerification(userId) {
   const citizen = await import(pathToFileURL(join(directory, 'app/api/citizen/route.mjs')).href);
   const square = await import(pathToFileURL(join(directory, 'app/api/square/route.mjs')).href);
   const city = await import(pathToFileURL(join(directory, 'app/api/city/route.mjs')).href);
+  const election = await import(pathToFileURL(join(directory, 'app/api/election/route.mjs')).href);
   const petitions = await import(pathToFileURL(join(directory, 'app/api/petitions/route.mjs')).href);
   const news = await import(pathToFileURL(join(directory, 'app/api/news/route.mjs')).href);
   const world = await import(pathToFileURL(join(directory, 'app/api/world/route.mjs')).href);
@@ -118,7 +123,7 @@ export async function readVerification(userId) {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (user) identify(request, user);
-    const handlers = endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
+    const handlers = endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
     const response = await handlers[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
