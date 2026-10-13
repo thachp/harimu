@@ -1,4 +1,5 @@
 'use client';
+import { NationDocument } from './nation-document';
 import { GameTimer } from './game-timer';
 import { formatDuration, gameTimeCompression } from '../lib/game-time';
 
@@ -27,7 +28,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
   const ready = Boolean(active && now > 0 && Date.parse(active.completesAt) <= now);
   const couponsCurrent = now > 0 && Date.parse(plan.couponExpiresAt) > now;
   const mealReady = now > 0 && (!plan.mealReadyAt || Date.parse(plan.mealReadyAt) <= now);
-  return <section className="citizen-market korund-plan" aria-label="Korund assignment and ration account">
+  return <NationDocument nationId="korund" className="citizen-market korund-plan" label="Korund assignment and ration account">
     <h3>{scene === 'workplace' ? 'Labor Bureau assignment' : scene === 'market' ? 'State ration counter' : 'Korund household account'}</h3>
     <p>Bounded state planning · AI/SI roles follow deterministic rules. Labor Notes are non-convertible; Korund has no legal private market.</p>
     <p>Labor Note wages are recorded in a separate ledger. Spending Labor Notes is planned; food currently comes from coupons rather than LN purchases.</p>
@@ -45,6 +46,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       {otherShiftActive && <p>Collect your earlier nation’s shift before beginning another assignment.</p>}
       <button type="button" onClick={() => onNavigate('market')}>Visit the ration counter</button>
     </> : scene === 'market' ? <>
+      <p><strong>Queue status:</strong> Not recorded in this preview. Coupon redemption checks the available state food directly.</p>
       <p>Coupons are non-transferable and expire each game week (14 real hours / 7 game days at 12× time). Redemption costs no Labor Notes. Rations come from actual plan output; available state food: {plan.publicFoodRemaining}.</p>
       {!couponsCurrent && <p>Ration book expired or timing is loading. Refresh for this game week’s allocation.</p>}
       {couponsCurrent && plan.couponFoodRemaining > plan.publicFoodRemaining && <p>State food shortage · available output cannot cover this ration. Assigned work replenishes the pool when collected.</p>}
@@ -59,7 +61,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       <p>Daily loop: complete the assigned shift, collect Labor Notes, redeem game-week food coupons at the state counter, then prepare a household meal.</p>
       <button type="button" onClick={() => onNavigate(active ? 'workplace' : plan.foodQuantity < 2 && plan.couponFoodRemaining > 0 ? 'market' : 'workplace')}>{active ? 'Check assigned shift' : plan.foodQuantity < 2 && plan.couponFoodRemaining > 0 ? 'Redeem ration coupons' : 'Open assigned work'}</button>
     </>}
-  </section>;
+  </NationDocument>;
 }
 
 export function PriorNationShift({ shift, currency, pending, uncertain, onClaim, onRetry }: {

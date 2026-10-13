@@ -1,4 +1,5 @@
 'use client';
+import { NationDocument } from './nation-document';
 import type { GovernmentSnapshot } from '../lib/government';
 import { leaderPersonas, leaderProgramme } from '../lib/leader-personas';
 import { governmentDisclosure } from '../lib/government-disclosure';
@@ -22,7 +23,7 @@ export function LeaderPanel({snapshot,simulation}:{snapshot:GovernmentSnapshot;s
       <div><h3>{persona.office} · {persona.name} <AiBadge /></h3><p>{persona.affiliation}</p><p>{persona.biography}</p><small>Authored preview persona · fixed-rule leadership</small></div>
     </div>
     <details><summary>Current pledges and programme</summary><ul>{leaderProgramme(snapshot).map(pledge=><li key={pledge.title}><strong>{pledge.title}</strong> · {pledge.status}</li>)}</ul></details>
-    <details><summary>Why? · {disclosure.title}</summary><p><AiTextTag provenance={disclosure.provenance}/></p><p>{disclosure.text}</p>{disclosure.kind==='brief' && <><p><strong>Goal:</strong> {snapshot.decision.title}.</p><p><strong>Other priorities:</strong> Food, infrastructure and workplace support compete for this proposal. Food safety takes precedence; otherwise recorded petition counts rank them, with ties favoring food, then infrastructure.</p></>}</details>
+    <NationDocument nationId={snapshot.nationId} label={disclosure.title} className="leader-statement"><details><summary>Why? · {disclosure.title}</summary><p><AiTextTag provenance={disclosure.provenance}/></p><p>{disclosure.text}</p>{disclosure.kind==='brief' && <><p><strong>Goal:</strong> {snapshot.decision.title}.</p><p><strong>Other priorities:</strong> Food, infrastructure and workplace support compete for this proposal. Food safety takes precedence; otherwise recorded petition counts rank them, with ties favoring food, then infrastructure.</p></>}</details></NationDocument>
     {simulation && <details><summary>Upcoming routine review</summary><GameTimer endsAt={(simulation.clock.epochSeconds+(simulation.clock.latestTick+1)*simulation.clock.cadenceSeconds)*1000} label="Next policy settlement"/><p>Processed on a server visit after the deadline. No election or major AI decision is scheduled in this preview.</p></details>}
   </section>;
 }

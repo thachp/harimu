@@ -15,8 +15,9 @@ async function component(file,name) {
   const LeaderPanel=file==='government-panel.tsx'?await component('leader-panel.tsx','LeaderPanel'):null;
   const AiBadge=file!=='ai-disclosure.tsx'?await component('ai-disclosure.tsx','AiBadge'):null;
   const AiTextTag=file!=='ai-disclosure.tsx'?await component('ai-disclosure.tsx','AiTextTag'):null;
+  const NationDocument=['government-panel.tsx','leader-panel.tsx'].includes(file)?await component('nation-document.tsx','NationDocument'):null;
   const exports={};
-  new Function('exports','require',compiled)(exports,name=>name==='./leader-panel'?{LeaderPanel}:name==='./ai-disclosure'?{AiBadge,AiTextTag}:name==='../lib/leader-personas'?require('../lib/leader-personas.ts'):name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:name==='./game-timer'?{GameTimer}:name==='../lib/government-disclosure'?require('../lib/government-disclosure.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):require(name));
+  new Function('exports','require',compiled)(exports,name=>name==='./nation-document'?{NationDocument}:name==='../lib/nation-themes'?require('../lib/nation-themes.ts'):name==='./leader-panel'?{LeaderPanel}:name==='./ai-disclosure'?{AiBadge,AiTextTag}:name==='../lib/leader-personas'?require('../lib/leader-personas.ts'):name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:name==='./game-timer'?{GameTimer}:name==='../lib/government-disclosure'?require('../lib/government-disclosure.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):require(name));
   return exports[name];
 }
 const SquareChat=await component('square-chat.tsx','SquareChat');

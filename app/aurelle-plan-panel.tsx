@@ -1,4 +1,5 @@
 'use client';
+import { NationDocument } from './nation-document';
 import { GameTimer } from './game-timer';
 import { formatDuration, gameTimeCompression } from '../lib/game-time';
 
@@ -43,7 +44,7 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
   const active = plan.shifts.find(shift => !shift.claimedAt);
   const ready = Boolean(active && now && Date.parse(active.completesAt) <= now);
   const mealReady = now > 0 && (!plan.mealReadyAt || Date.parse(plan.mealReadyAt) <= now);
-  return <section className="citizen-market aurelle-plan" aria-label="Aurelle charter account" aria-busy={pending}>
+  return <NationDocument nationId="aurelle" className="citizen-market aurelle-plan" label="Aurelle charter account"><div aria-busy={pending}>
     <h3>{scene === 'workplace' ? 'Chartered service' : scene === 'market' ? 'Chartered food counter' : scene === 'household' ? 'Aurelle household' : 'Your Aurelle next step'}</h3>
     <dl><dt>Crowns</dt><dd>{(plan.walletMinor / 100).toFixed(2)} CRN</dd><dt>Food</dt><dd>{plan.foodQuantity}</dd><dt>Royal Favor</dt><dd>{plan.favor} / 100</dd></dl>
     {uncertain && <div role="alert"><p>Confirm your previous action before starting another.</p><ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending)} onClick={onRetry}>Confirm previous action</ActionButton></div>}
@@ -65,5 +66,5 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
       {scene !== 'square' && <ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending)} onClick={onRefresh}>Refresh account</ActionButton>}
     </div>
     <details><summary>Prototype rules</summary><p>This seeded charter is a prototype entitlement, not royal charter issuance. Service contributes 4 food to finite public stock. Prices and rewards are prototype tuning; currency backing, mint redemption, charter grants and revocation are not simulated.</p><p>Favor is social standing, not currency. Service grants up to the 100 cap; decay, spending, ranks and estates are planned. Meals have a two-real-hour cooldown. Government uses deterministic rules; no live AI model is connected.</p></details>
-  </section>;
+  </div></NationDocument>;
 }
