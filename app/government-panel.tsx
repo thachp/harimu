@@ -1,4 +1,5 @@
 'use client';
+import { GameTimer } from './game-timer';
 
 import type { SimulationState } from '@/lib/world-simulation';
 import type { VerificationState } from '@/lib/verification';
@@ -24,7 +25,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> · {role.controller}</li>)}</ul>
     {!localDemo && simulation && <section aria-label="Durable world simulation">
       <h4>World day {simulation.clock.gameDay} · 12× time</h4>
-      <p>Saved tick {simulation.clock.latestTick}. Routine decisions run every two real hours; server visits process up to three overdue ticks. {simulation.clock.pendingTicks ? `${simulation.clock.pendingTicks} ticks remain to process on later visits.` : 'The saved simulation is caught up.'} There is no background scheduler or connected AI model.</p>
+      <p>Saved tick {simulation.clock.latestTick}. Routine decisions run every two real hours (one game day); server visits process up to three overdue ticks. {simulation.clock.pendingTicks ? `${simulation.clock.pendingTicks} ticks remain to process on later visits.` : 'The saved simulation is caught up.'} There is no background scheduler or connected AI model.</p>
       {snapshot.nationId === 'kindle' && <p>Kindle’s food programme can restock the starter market from a finite public supplier when food stock is below 20. Each allocation moves at most 10 food, costs 1 SPK per food, and shares the finite work-programme budget with wages. At most two allocations per real UTC day. No goods or money are created by this transfer.</p>}
       {snapshot.nationId === 'kindle' ? <>
         <p>Supplier reserve: {simulation.supplierFoodRemaining} food. Supplier receipts: {(simulation.supplierCashMinor / 100).toFixed(2)} SPK.</p>
@@ -39,6 +40,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     <p>One petition per UTC day. A petition is a political act and ends your citizenship grace period.</p>
     <p>Kindle proposals and executed allocations use the remaining work-programme budget; other prototype nations have no automatic policy-appropriation fund.</p>
     {!localDemo && snapshot.review && <p>Last recorded review: {new Date(snapshot.review.reviewedAt*1000).toUTCString()} · {snapshot.review.petitionCount} petitions. {snapshot.review.active ? `Priority active until ${new Date(snapshot.review.expiresAt*1000).toUTCString()}.` : 'Priority expired; the current proposal uses live needs.'} Review inputs and reasons are saved permanently; live proposal funds are recalculated. No model is called.</p>}
+    {!localDemo && snapshot.review?.active && <GameTimer endsAt={snapshot.review.expiresAt * 1000} label="Policy priority expires" />}
     {!localDemo && <section aria-label="Your petition history">
       <h4>Your petitions</h4>
       {!snapshot.petitions?.length && <p>No petitions recorded for your current nation.</p>}

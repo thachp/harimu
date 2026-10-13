@@ -1,5 +1,6 @@
 'use client';
 import { GameTimer } from './game-timer';
+import { formatDuration, gameTimeCompression } from '../lib/game-time';
 
 import { useEffect, useState } from 'react';
 import { ActionButton } from './action-button';
@@ -49,7 +50,7 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
     {error && <p role="alert">{error}</p>}
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {scene === 'workplace' ? <>
-        <p style={{ width: '100%' }}>{plan.charter.name} · {plan.charter.active ? 'Active' : 'Inactive'}<br />4 WC · 2 real hours · 8 CRN and 2 Favor on collection.</p>
+        <p style={{ width: '100%' }}>{plan.charter.name} · {plan.charter.active ? 'Active' : 'Inactive'}<br />4 WC · {formatDuration(7200000)} real / {formatDuration(7200000 * gameTimeCompression)} game · 8 CRN and 2 Favor on collection.</p>
         {active ? <><GameTimer endsAt={active.completesAt} label="Shift ready" /><p style={{ width: '100%' }}>{active.orderName} · {ready ? 'Ready to collect' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} min remaining` : 'Checking timer…'}</p><ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!now, 'Checking the service timer…'], [!ready, 'Service is underway. Collect after it finishes.'])} onClick={() => onCommand('aurelle-claim-work', active.id)}>Collect service reward</ActionButton></> : <ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([otherShiftActive, 'Collect your earlier nation’s shift first.'], [!plan.charter.active, 'An active charter is required for service.'], [capacity < 4, 'You need 4 WC. Prepare a meal or wait for capacity recovery.'], [plan.publicFundMinor < 800, 'The service fund cannot cover another reward yet.'])} onClick={() => onCommand('aurelle-start-work')}>Begin chartered service · 4 WC</ActionButton>}
         {otherShiftActive && <p style={{ width: '100%' }}>Collect your earlier nation’s shift first.</p>}
         {!active && plan.publicFundMinor < 800 && <p style={{ width: '100%' }}>The finite service fund cannot cover another reward yet.</p>}

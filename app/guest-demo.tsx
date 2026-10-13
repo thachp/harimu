@@ -39,17 +39,17 @@ export function GuestDemo({ view, onView, onExit, state, onAction, nationId = 'k
     </div>
     {view === 'workplace' && <article><h3>Try a work shift</h3>
       <p>Spend 4 sample capacity to earn 8 sample coins. This demonstration finishes instantly; citizen shifts continue in real time.</p>
-      <button type="button" disabled={state.worked} onClick={() => act('work')}>{state.worked ? 'Example shift complete' : 'Try example work'}</button>
+      <button type="button" disabled={state.worked} aria-describedby={state.worked ? "guest-work-reason" : undefined} onClick={() => act('work')}>{state.worked ? 'Example shift complete' : 'Try example work'}</button>{state.worked && <small id="guest-work-reason">This example shift is already complete. Reset examples to try it again.</small>}
     </article>}
     {view === 'market' && <article><h3>Try buying food</h3>
       <p>Exchange 4 sample coins for 2 sample food. These are demonstration prices and goods.</p>
-      <button type="button" disabled={state.coins < 4} onClick={() => act('buy-food')}>Try buying 2 food · 4 sample coins</button>
-      {state.coins < 4 && <p>Try Work to earn sample coins first.</p>}
+      <button type="button" disabled={state.coins < 4} aria-describedby={state.coins < 4 ? "guest-buy-reason" : undefined} onClick={() => act('buy-food')}>Try buying 2 food · 4 sample coins</button>
+      {state.coins < 4 && <p id="guest-buy-reason">Try Work to earn sample coins first.</p>}
     </article>}
     {view === 'household' && <article><h3>Try a household meal</h3>
       <p>Use 2 sample food to recover up to 4 sample capacity. Citizen meals have their own recovery timer.</p>
-      <button type="button" disabled={state.food < 2 || state.capacity >= 24} onClick={() => act('meal')}>Try preparing a meal · 2 sample food</button>
-      {state.food < 2 && <p>Try Work and Market to bring food home.</p>}
+      <button type="button" disabled={state.food < 2 || state.capacity >= 24} aria-describedby={state.food < 2 || state.capacity >= 24 ? "guest-meal-reason" : undefined} onClick={() => act('meal')}>Try preparing a meal · 2 sample food</button>
+      {(state.food < 2 || state.capacity >= 24) && <p id="guest-meal-reason">{state.capacity >= 24 ? 'Sample capacity is full. Save food or reset examples.' : 'Try Work and Market to bring food home.'}</p>}
     </article>}
     <p role="status">{notice}</p>
     <footer><button type="button" onClick={() => act('reset')}>Reset examples</button>

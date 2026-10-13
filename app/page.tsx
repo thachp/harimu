@@ -328,9 +328,9 @@ function citizenshipRuleLabel(status: CitizenshipStatus | null) {
 }
 
 const fallbackWorkOrders: WorkOrder[] = [
-  { id: 'harvest', nationId: 'kindle', name: 'Support the savanna harvest', detail: '+480 food · resolves in 2h', cost: 4 },
-  { id: 'freight', nationId: 'kindle', name: 'Move a foundry convoy', detail: '+210 materials · resolves in 4h', cost: 6 },
-  { id: 'archive', nationId: 'kindle', name: 'Catalogue the civic archive', detail: '+95 knowledge · resolves in 3h', cost: 3 },
+  { id: 'harvest', nationId: 'kindle', name: 'Support the savanna harvest', detail: '+480 food · resolves in 2h real · 1 game day', cost: 4 },
+  { id: 'freight', nationId: 'kindle', name: 'Move a foundry convoy', detail: '+210 materials · resolves in 4h real · 2 game days', cost: 6 },
+  { id: 'archive', nationId: 'kindle', name: 'Catalogue the civic archive', detail: '+95 knowledge · resolves in 3h real · 1.5 game days', cost: 3 },
 ];
 
 const fallbackPlanningItems: PlanningTask[] = [
@@ -1427,8 +1427,8 @@ export default function Home() {
       {citizenSessionStatus==='error' ? <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button> : <button type="button" onClick={() => changeView('world')}>Explore nations</button>}
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
-      {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><button type="button" disabled={workPending} onClick={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</button></div>}
-      {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><button type="button" disabled={workPending} onClick={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</button></div>}
+      {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</ActionButton></div>}
+      {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</ActionButton></div>}
       {viewMode === 'household' && <>
         {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
@@ -1504,7 +1504,7 @@ export default function Home() {
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>
     <details><summary>Rules and limits</summary><p>Each nation keeps its own rules. Computer-controlled leaders (AI/SI) follow fixed game rules: the same situation produces the same decision. No live AI model is connected. Petitions require a verified phone number to count, but phone verification has not been set up yet, so petition submission is unavailable. Territory ownership and foreign trade are not built yet.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus)}</p>
-      {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <button type="button" disabled={clerkConfigured && ['loading','error'].includes(citizenSessionStatus)} onClick={()=>beginEnrollment(selected.id)}>Choose citizenship · {selected.shortName}</button>}
+      {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <ActionButton type="button" reason={firstActionReason([clerkConfigured && citizenSessionStatus === 'loading', 'Your citizen account is loading. Please wait before choosing citizenship.'], [clerkConfigured && citizenSessionStatus === 'error', 'Your citizen account could not load. Retry loading it before choosing citizenship.'])} onClick={()=>{if (!clerkConfigured || !['loading','error'].includes(citizenSessionStatus)) beginEnrollment(selected.id);}}>Choose citizenship · {selected.shortName}</ActionButton>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
   </section>;
   const countryNation = selected;
@@ -1544,7 +1544,7 @@ export default function Home() {
       {id:'aurelle-food',label:'Chartered food',detail:`${aurellePlan?.publicFoodRemaining ?? 0} at estate · 1.50 CRN each`,onSelect:()=>changeView('market')},
       {id:'aurelle-household',label:'Household',detail:`${aurellePlan?.foodQuantity ?? 0} food · ${aurellePlan?.favor ?? 0} Favor`,onSelect:()=>changeView('household')},
     ] : citizenNation?.id === 'korund' && ['household', 'workplace', 'market'].includes(viewMode) ? [
-      { id: 'korund-assignment', label: korundPlan?.assignment.name ?? 'Assigned work', detail: korundPlan ? `${korundPlan.assignment.capacityCost} WC · ${(korundPlan.assignment.wageMinor / 100).toFixed(2)} LN · ${korundPlan.assignment.hours} hours` : 'Refresh to load your assignment', onSelect: () => changeView('workplace') },
+      { id: 'korund-assignment', label: korundPlan?.assignment.name ?? 'Assigned work', detail: korundPlan ? `${korundPlan.assignment.capacityCost} WC · ${(korundPlan.assignment.wageMinor / 100).toFixed(2)} LN · ${korundPlan.assignment.hours} real hours · ${korundPlan.assignment.hours * 12} game hours` : 'Refresh to load your assignment', onSelect: () => changeView('workplace') },
       { id: 'korund-coupons', label: 'Ration book', detail: korundPlan ? `Game week ${korundPlan.gameWeek} · ${korundPlan.couponFoodRemaining} food coupons` : 'Refresh to load your ration book', onSelect: () => changeView('market') },
       { id: 'korund-food', label: 'Household rations', detail: `${korundPlan?.foodQuantity ?? 0} food`, onSelect: () => changeView('household') },
     ] :

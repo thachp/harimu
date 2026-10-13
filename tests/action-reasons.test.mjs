@@ -9,7 +9,7 @@ import ts from 'typescript';
 import {firstActionReason,pendingActionReason} from '../lib/action-reasons.ts';
 const root=fileURLToPath(new URL('../',import.meta.url));
 async function load(path){
- let output=ts.transpileModule(await readFile(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+ let output=ts.transpileModule((await readFile(path,'utf8')).replace(/import\s+['"][^'"]+\.css['"];?/g,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  for(const match of [...output.matchAll(/from (['"])([^'"]+)\1/g)]){
   const specifier=match[2];let url;
   if(specifier.endsWith('.css'))url='data:text/javascript,export default {}';
@@ -25,6 +25,8 @@ async function load(path){
 const {ActionButton}=await import(await load(resolve(root,'app/action-button.tsx')));
 const {AurellePlanPanel}=await import(await load(resolve(root,'app/aurelle-plan-panel.tsx')));
 const {KorundPlanPanel}=await import(await load(resolve(root,'app/korund-plan-panel.tsx')));
+const {GuestDemo}=await import(await load(resolve(root,'app/guest-demo.tsx')));
+const {NationInstitutions}=await import(await load(resolve(root,'app/nation-institutions.tsx')));
 const {PlayerMarket}=await import(await load(resolve(root,'app/player-market.tsx')));
 const render=(Component,props)=>renderToStaticMarkup(React.createElement(Component,props));
 const common={capacity:18,pending:false,uncertain:false,localDemo:false,error:null,onCommand(){},onRetry(){},onRefresh(){},onNavigate(){}};
@@ -66,4 +68,22 @@ test('player market explains unavailable goods, affordability and confirmation',
  assert.match(render(PlayerMarket,props),/not have enough available goods/);
  assert.match(render(PlayerMarket,{...props,uncertain:true}),/Confirm your previous action first/);
  assert.match(render(PlayerMarket,{...props,state:{available:true,listings:[{id:'example',mine:false,status:'open',item:'food',quantity:2,unitMinor:100}]}}),/not have enough Sparks/);
+});
+
+test('guest examples explain completed work and blocked food or meal without real progress',()=>{
+ const props={onView(){},onExit(){},onAction(){},state:{capacity:24,coins:0,food:0,worked:true,meals:0}};
+ assert.match(render(GuestDemo,{...props,view:'workplace'}),/example shift is already complete/);
+ assert.match(render(GuestDemo,{...props,view:'market'}),/id="guest-buy-reason"/);
+ assert.match(render(GuestDemo,{...props,view:'household'}),/Sample capacity is full/);
+});
+test('institution work explains pending and capacity constraints',()=>{
+ const nation={id:'kindle',name:'Kindle',shortName:'Kindle',currency:'SPK',government:'Republic',economy:'Market'};
+ const props={nation,citizenNation:nation,capacity:0,workOrders:[{id:'harvest',name:'Harvest',cost:4}],workPending:false,onWorldView(){},onHousehold(){},onWorkplace(){},onCommitWork(){}};
+ assert.match(render(NationInstitutions,props),/You need 4 WC/);
+ assert.match(render(NationInstitutions,{...props,workPending:true}),/An action is being saved/);
+});
+test('player listing fields describe why editing is frozen',()=>{
+ const html=render(PlayerMarket,{state:{available:true,listings:[]},economy:{inventory:[],walletMinor:0},demo:false,busy:false,uncertain:true,onCommand(){},onRetry(){}});
+ assert.equal((html.match(/aria-describedby="listing-edit-reason"/g)||[]).length,3);
+ assert.match(html,/id="listing-edit-reason"/);
 });

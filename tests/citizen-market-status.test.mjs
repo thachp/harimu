@@ -28,3 +28,18 @@ test('uncertain merchant trade retains transaction recovery language',()=>{
   const nodes=flatten(exports.CitizenMarket({...props,busy:false,uncertain:true,pendingAction:'market-trade'}));
   assert.ok(nodes.includes('Connection interrupted. Confirm the previous transaction before starting another.'));
 });
+
+test('merchant quantity editing has the saving or confirmation description',()=>{
+ for(const flags of [{busy:true,uncertain:false},{busy:false,uncertain:true}]){
+  const nodes=flatten(exports.CitizenMarket({...props,showTrading:true,...flags}));
+  const input=nodes.find(node=>node?.type==='input');assert.equal(input.props.disabled,true);
+  assert.equal(input.props['aria-describedby'],'trade-action-reason');assert.ok(nodes.some(node=>node?.props?.id==='trade-action-reason'));
+ }
+});
+
+test('household cooldown copy names real and twelve-times game units',()=>{
+  const nodes=flatten(exports.CitizenMarket({...props,busy:false,uncertain:false}));
+  assert.ok(nodes.includes('24 real hours · 288 game hours'));
+  const minutes=flatten(exports.CitizenMarket({...props,market:{...props.market,mealIntervalSeconds:600},busy:false,uncertain:false}));
+  assert.ok(minutes.includes('10 real minutes · 120 game minutes'));
+});

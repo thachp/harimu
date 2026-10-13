@@ -26,19 +26,20 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
         const knownCount = Number.isInteger(count) && count! >= 0;
         return <button type="button" key={city.id} className={styles.pin}
         style={{left:`${pins[index].x}%`,top:`${pins[index].y}%`}} aria-pressed={destination?.id === city.id}
-        onClick={() => setDestinationId(city.id)} disabled={pending}>
+        onClick={() => { if (!pending) setDestinationId(city.id); }} disabled={pending} aria-describedby={pending ? "city-travel-pending-reason" : undefined}>
         <span>{city.name}</span><small>{[city.capital ? 'Capital' : '',city.id === currentCityId ? 'Current' : '',city.id === homeCityId ? 'Home' : ''].filter(Boolean).join(' · ')}</small>
         <small>{knownCount ? `${count} sharing presence` : 'Online count unavailable'}</small>
       </button>; })}
     </div>
+    {pending && <p id="city-travel-pending-reason" role="status">Your travel is being confirmed. Please wait before changing the destination.</p>}
     <small>Static lore and illustrative geography · jobs and markets are shared. Presence is opt-in (90-second expiry, refreshed every 15 seconds, may include you).</small>
     {destination && <section className={styles.destination} aria-label="Travel destination" aria-live="polite">
       <h3>{destination.name}</h3><p>{destination.description}</p>
       {destination.id === currentCityId ? <p>You are already in this city.</p> : <><p>Travel confirmation: 0 cost · instant arrival · home city unchanged.</p>
-        <button type="button" disabled={pending || !travelEnabled} onClick={() => onTravel(destination.id)}>{pending ? 'Travelling…' : `Travel to ${destination.name}`}</button></>}
-      <button type="button" disabled={pending} onClick={() => setDestinationId(null)}>Cancel</button>
+        <button type="button" disabled={pending || !travelEnabled} aria-describedby={pending ? "city-travel-pending-reason" : !travelEnabled ? "city-travel-access-reason" : undefined} onClick={() => { if (!pending && travelEnabled) onTravel(destination.id); }}>{pending ? 'Travelling…' : `Travel to ${destination.name}`}</button></>}
+      <button type="button" disabled={pending} aria-describedby={pending ? "city-travel-pending-reason" : undefined} onClick={() => { if (!pending) setDestinationId(null); }}>Cancel</button>
     </section>}
-    {!travelEnabled && <p>Travel requires your citizen’s own nation and a loaded city account.</p>}
+    {!travelEnabled && <p id="city-travel-access-reason">Travel requires your citizen’s own nation and a loaded city account.</p>}
     {!cities.length && <p>City travel is unavailable for this nation.</p>}
   </section>;
 }

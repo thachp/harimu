@@ -32,7 +32,7 @@ export function GlobeTour({ onFocus, onClose }: { onFocus: (id: string | null) =
     <div role="status" aria-live="polite" aria-atomic="true"><small>Globe tour · {step + 1} / {globeTourStops.length}</small><strong>{stop.name}</strong><p>{stop.introduction}</p></div>
     <small>Design overview · your nation choice stays unchanged. {reducedMotion ? 'Manual steps respect your reduced-motion preference.' : automatic ? 'About 2 minutes · 12 seconds per nation.' : 'Paused · explore at your own pace.'}</small>
     <nav aria-label="Globe tour controls">
-      <button type="button" disabled={step === 0} onClick={() => setStep(Math.max(0, step - 1))}>Back</button>
+      <button type="button" disabled={step === 0} aria-describedby={step === 0 ? "globe-tour-back-reason" : undefined} onClick={() => setStep(Math.max(0, step - 1))}>Back</button>{step === 0 && <small id="globe-tour-back-reason">This is the first tour stop.</small>}
       <button type="button" onClick={next}>{step === globeTourStops.length - 1 ? 'Finish tour' : 'Next'}</button>
       {!reducedMotion && <button type="button" onClick={() => setAutomatic(!automatic)}>{automatic ? 'Pause' : 'Play automatically'}</button>}
       <button type="button" onClick={close}>Stop tour</button>

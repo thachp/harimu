@@ -68,7 +68,7 @@ test('foreign nation inspection cannot expose paid shift commands; own shifts re
     {...props,nation:nations[0],citizenNation,capacity,workPending}));
   const foreign=render(nations[1]);assert.ok(!foreign.includes('Start shift'));assert.match(foreign,/Your citizenship remains N1/);
   assert.match(render(nations[0]),/Start shift/);
-  for (const html of [render(nations[0],3),render(nations[0],18,true)]) assert.match(html,/<button type="button" disabled="">Start shift/);
+  for (const html of [render(nations[0],3),render(nations[0],18,true)]) assert.match(html,/<button type="button" disabled=""[^>]*>Start shift/);
 });
 
 test('shell inspection and terrain use selected nation while resources preserve citizen nation and currency',()=>{

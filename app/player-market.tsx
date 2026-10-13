@@ -26,14 +26,15 @@ export function PlayerMarket({ state, economy, demo, busy, uncertain, onCommand,
       {!state?.available && <p>Kindle citizenship is required to list or buy. You can still cancel your own open listings.</p>}
       {uncertain && <div role="alert"><p>Confirm the previous listing action before starting another.</p>
         <ActionButton type="button" reason={pendingActionReason(busy)} onClick={onRetry}>Retry previous listing action</ActionButton></div>}
+      {waiting && <p id="listing-edit-reason" role="status">{waiting}</p>}
       <form onSubmit={(event) => { event.preventDefault(); if (!waiting && state?.available && valid && quantity <= owned && mine.filter((lot) => lot.status === 'open').length < 5) onCommand({ action: 'create-listing', item, quantity, unitMinor: unitMinor! }); }}>
-        <label>Good to list <select aria-label="Good to list" value={item} onChange={(event) => setItem(event.target.value)} disabled={busy || uncertain}>
+        <label>Good to list <select aria-label="Good to list" value={item} onChange={(event) => { if (!waiting) setItem(event.target.value); }} disabled={busy || uncertain} aria-describedby={waiting ? "listing-edit-reason" : undefined}>
           <option value="food">Food</option><option value="materials">Materials</option><option value="knowledge">Knowledge</option>
         </select></label>
         <label>Lot quantity <input aria-label="Lot quantity" type="number" min={1} max={10} step={1}
-          value={Number.isNaN(quantity) ? '' : quantity} onChange={(event) => setQuantity(event.target.valueAsNumber)} disabled={busy || uncertain} /></label>
+          value={Number.isNaN(quantity) ? '' : quantity} onChange={(event) => { if (!waiting) setQuantity(event.target.valueAsNumber); }} disabled={busy || uncertain} aria-describedby={waiting ? "listing-edit-reason" : undefined} /></label>
         <label>Price per good (SPK) <input aria-label="Price per good (SPK)" inputMode="decimal" value={price}
-          onChange={(event) => setPrice(event.target.value)} disabled={busy || uncertain} /></label>
+          onChange={(event) => { if (!waiting) setPrice(event.target.value); }} disabled={busy || uncertain} aria-describedby={waiting ? "listing-edit-reason" : undefined} /></label>
         <small>{owned} available · 0.01–10.00 SPK per good · at most five open lots</small>
         <ActionButton type="submit" reason={waiting ?? firstActionReason([!state?.available, 'Kindle citizenship is required to list goods.'], [!valid, 'Enter 1–10 whole goods and a price from 0.01 to 10.00 SPK.'], [quantity > owned, 'You do not have enough available goods for this lot.'], [mine.filter((lot) => lot.status === 'open').length >= 5, 'Five lots are already open. Sell or cancel one first.'])}>
           Reserve goods and list{valid ? ` · ${((unitMinor! * quantity) / 100).toFixed(2)} SPK total` : ''}

@@ -12,3 +12,12 @@ test('current city cannot retravel and pending requests disable all travel contr
 test('only passed valid online counts render, unknown count is honest and foreign destinations stay hidden',()=>{const h=harness();assert.ok(h.all(h.render()).includes('Online count unavailable'));h.props.presence=[{cityId:'forgehaven',present:2},{cityId:'kolt-savanna',present:-1}];assert.ok(h.all(h.render()).includes('2 sharing presence'));h.pin('Tarrek Foundry').props.onClick();h.props.nationId='fulmara';assert.equal(h.button('Travel to Tarrek Foundry'),undefined);assert.ok(h.pin('Arcport'));});
 
 test('foreign inspection never marks a false current city or home and cannot confirm travel',()=>{const h=harness();h.props.nationId='fulmara';h.props.currentCityId=null;h.props.homeCityId=null;h.props.travelEnabled=false;h.props.preview=true;assert.ok(h.all(h.render()).includes('Not visiting'));assert.ok(h.all(h.render()).includes('None in this nation'));h.pin('Vendezzo').props.onClick();assert.equal(h.button('Travel to Vendezzo').props.disabled,true);assert.deepEqual(h.travel,[]);});
+
+test('travel constraints have linked visible explanations and direct callbacks cannot bypass them',()=>{
+ const h=harness();h.pin('Tarrek Foundry').props.onClick();h.props.pending=true;
+ const blocked=h.button('Travelling…');assert.equal(blocked.props['aria-describedby'],'city-travel-pending-reason');
+ blocked.props.onClick();h.button('Cancel').props.onClick();assert.deepEqual(h.travel,[]);
+ assert.ok(h.all(h.render()).some(n=>n?.props?.id==='city-travel-pending-reason'));
+ h.props.pending=false;h.props.travelEnabled=false;
+ const unavailable=h.button('Travel to Tarrek Foundry');assert.equal(unavailable.props['aria-describedby'],'city-travel-access-reason');unavailable.props.onClick();assert.deepEqual(h.travel,[]);
+});

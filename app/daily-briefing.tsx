@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { GameTimer } from './game-timer';
 import type { Economy } from '@/lib/economy';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { MarketState } from '@/lib/market';
@@ -8,14 +9,6 @@ import type { GovernmentSnapshot } from '@/lib/government';
 import { dailyPriority } from '@/lib/daily-briefing';
 
 const sparks = (minor: number) => `${(minor / 100).toFixed(2)} SPK`;
-const readableTime = (value: string, now: number) => {
-  const time = Date.parse(value);
-  if (!Number.isFinite(time)) return 'Refresh to check timing';
-  if (now === 0) return 'Checking timing…';
-  if (time <= now) return 'Ready · refresh to update';
-  const minutes = Math.ceil((time - now) / 60000);
-  return minutes >= 60 ? `In ${Math.floor(minutes / 60)}h ${minutes % 60}m` : `In ${minutes}m`;
-};
 
 export function DailyBriefing({ economy, shifts, capacity, market, government, citizenNationName,
   localDemo, onRefresh, onOpenWork, onOpenMarket }: {
@@ -62,19 +55,19 @@ export function DailyBriefing({ economy, shifts, capacity, market, government, c
     <dl>
       <dt>Work capacity</dt><dd>{capacity} / 24 WC</dd>
       <dt>Next capacity recovery</dt><dd>{capacity >= 24 ? 'Full · spend capacity on a shift when ready'
-        : economy ? `${readableTime(economy.nextRecoveryAt, now)} · refresh to apply recovery` : 'Loading citizen economy…'}</dd>
+        : economy ? <><GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" /> · refresh to apply recovery</> : 'Loading citizen economy…'}</dd>
       <dt>Wallet</dt><dd>{economy ? sparks(economy.walletMinor) : 'Loading…'}</dd>
       <dt>Household food</dt><dd>{economy ? `${food} food` : 'Loading…'}{market?.available && ` · ${mealFood} per meal`}</dd>
       <dt>Other available goods</dt><dd>{economy ? economy.inventory.filter((entry) => entry.item !== 'food' && entry.quantity > 0)
         .map((entry) => `${entry.quantity} ${entry.item}`).join(', ') || 'None yet' : 'Loading…'}</dd>
-      <dt>Current shift</dt><dd>{activeShift ? <>{activeShift.orderName} · {readableTime(activeShift.completesAt, now)}
+      <dt>Current shift</dt><dd>{activeShift ? <>{activeShift.orderName} · <GameTimer endsAt={activeShift.completesAt} label="Shift ready" />
         {activeShift.wageMinor !== undefined && ` · ${sparks(activeShift.wageMinor)} on collection`}
         {activeShift.rewardItem && ` + ${activeShift.rewardQuantity ?? 0} ${activeShift.rewardItem}`}</> : 'No active shift'}</dd>
       <dt>Household meal</dt><dd>{!market?.available ? 'Kindle household meals are not available in this nation yet'
         : !economy ? 'Loading household…' : capacity >= 24 ? 'Capacity full · save your food'
           : food < mealFood ? `Need ${mealFood - food} more food`
             : market.mealReadyAt && (now === 0 || Date.parse(market.mealReadyAt) > now)
-              ? readableTime(market.mealReadyAt, now) : `Available · restores up to ${market.mealCapacity} WC`}</dd>
+              ? <GameTimer endsAt={market.mealReadyAt} label="Next meal" /> : `Available · restores up to ${market.mealCapacity} WC`}</dd>
     </dl>
     <small>Displayed balances are a snapshot. Refresh after returning; the server checks every authenticated action again.</small>
     {government && <div>

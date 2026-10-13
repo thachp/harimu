@@ -21,11 +21,11 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
   if (!market?.available || !economy) return null;
   const count = (item: string) => economy.inventory.find((entry) => entry.item === item)?.quantity ?? 0;
   const ready = !market.mealReadyAt || (now > 0 && Date.parse(market.mealReadyAt) <= now);
-  const mealInterval = market.mealIntervalSeconds >= 3600 ? `${market.mealIntervalSeconds / 3600} hours` : `${market.mealIntervalSeconds / 60} minutes`;
+  const mealInterval = market.mealIntervalSeconds >= 3600 ? `${market.mealIntervalSeconds / 3600} real hours · ${market.mealIntervalSeconds / 300} game hours` : `${market.mealIntervalSeconds / 60} real minutes · ${market.mealIntervalSeconds / 5} game minutes`;
   const validQuantity = Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= 10;
   const quantityError = validQuantity ? null : 'Enter a whole number from 1 to 10.';
   const tradeCommonReason = busy ? 'An action is being saved. Please wait.' : uncertain ? 'Confirm your previous transaction first.' : quantityError;
-  const tradeCommonId = quantityError ? 'trade-quantity-error' : 'trade-action-reason';
+  const tradeCommonId = busy || uncertain ? 'trade-action-reason' : 'trade-quantity-error';
   const mealReason = busy ? 'An action is being saved. Please wait.' : uncertain ? 'Confirm your previous action first.' : capacity >= 24 ? 'Capacity is full. Save your food for later.' : count('food') < market.mealFood ? `You need ${market.mealFood} food. Harvest or buy food at the market.` : !ready ? 'Wait until the next meal time shown above.' : null;
   return <section id="citizen-simulated-market" className="citizen-market" aria-label={showTrading ? 'Kindle simulated merchant' : 'Household food and recovery'}>
     {showTrading && <><h3>Kindle starter market</h3>
@@ -34,13 +34,13 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
     {uncertain && !busy && <div role="alert"><p>{pendingAction === 'household-meal'
       ? 'Connection interrupted. Confirm the previous household meal before preparing another.'
       : 'Connection interrupted. Confirm the previous transaction before starting another.'}</p>
-      <button disabled={busy} type="button" onClick={onRetry}>{pendingAction === 'household-meal' ? 'Retry household meal' : 'Retry previous transaction'}</button></div>}
+      <button type="button" onClick={() => { if (!busy) onRetry(); }}>{pendingAction === 'household-meal' ? 'Retry household meal' : 'Retry previous transaction'}</button></div>}
     {showTrading && <><label>Goods per trade <input aria-label="Goods per trade" type="number" min={1} max={10} step={1}
-      aria-invalid={!validQuantity} aria-describedby={quantityError ? 'trade-quantity-error' : undefined}
+      aria-invalid={!validQuantity} aria-describedby={tradeCommonReason ? tradeCommonId : undefined}
       value={Number.isNaN(quantity) ? '' : quantity} disabled={busy || uncertain}
-      onChange={(event) => setQuantity(event.target.valueAsNumber)} /></label>
+      onChange={(event) => { if (!busy && !uncertain) setQuantity(event.target.valueAsNumber); }} /></label>
     {quantityError && <p id="trade-quantity-error" role="alert">{quantityError}</p>}
-    {tradeCommonReason && !quantityError && <p id="trade-action-reason" role="status">{tradeCommonReason}</p>}
+    {tradeCommonReason && (busy || uncertain) && <p id="trade-action-reason" role="status">{tradeCommonReason}</p>}
     <div className="market-quotes">
       {market.quotes.map((quote) => {
         const buyReason = tradeCommonReason ?? (quote.stock < quantity ? 'The merchant does not have enough stock.' : economy.walletMinor < quote.buyMinor * quantity ? 'You do not have enough SPK for this quantity.' : null);

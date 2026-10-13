@@ -25,7 +25,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
   }, []);
   const active = shifts.find(shift => !shift.claimedAt);
   const shiftHours = active ? (Date.parse(active.completesAt) - Date.parse(active.startedAt)) / 3600000 : NaN;
-  const shiftDuration = Number.isFinite(shiftHours) && shiftHours > 0 ? `${Number(shiftHours.toFixed(2))} real hours` : 'real time';
+  const shiftDuration = Number.isFinite(shiftHours) && shiftHours > 0 ? `${Number(shiftHours.toFixed(2))} real hours · ${Number((shiftHours * 12).toFixed(2))} game hours` : 'real time';
   const collected = shifts.some(shift => Boolean(shift.claimedAt));
   const food = economy?.inventory.find(item => item.item === 'food')?.quantity ?? 0;
   const mealFood = market?.mealFood ?? 2;
@@ -73,6 +73,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
       detail = `Capacity ${capacity} / 24. Next recovery: ${new Date(economy.nextRecoveryAt).toLocaleString()}. Refresh after that time.`;
     }
   }
+  const actionReason = busy ? 'An action is being saved. Please wait.' : uncertain ? 'Confirm your pending transaction in its panel before starting another action.' : null;
   return <section className="citizen-market daily-loop" aria-label="Your next daily action">
     <h3>Your daily loop · {nationName}</h3>
     {localDemo && <p>Browser-local demo · these actions and balances do not affect the shared world.</p>}
@@ -93,8 +94,9 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
         <p>Reading decisions and writing a private note do not count as political actions. Counted petitions require phone verification and may end your citizenship change window.</p>
       </aside>}
       {uncertain && <p role="status">Confirm your pending market transaction in its panel before starting another action.</p>}
-      <button type="button" disabled={busy || uncertain} onClick={action}>{busy ? 'Saving action…' : label}</button>
-      {label !== 'Refresh citizen' && <button type="button" disabled={busy} onClick={onRefresh}>Refresh balances</button>}
+      <button type="button" disabled={Boolean(actionReason)} aria-describedby={actionReason ? "daily-loop-action-reason" : undefined} onClick={() => { if (!actionReason) action(); }}>{busy ? 'Saving action…' : label}</button>
+      {actionReason && <small id="daily-loop-action-reason">{actionReason}</small>}
+      {label !== 'Refresh citizen' && <button type="button" disabled={busy} aria-describedby={busy ? "daily-loop-action-reason" : undefined} onClick={() => { if (!busy) onRefresh(); }}>Refresh balances</button>}
     </>}
     <details><summary>What comes after the daily loop?</summary><p>Read decisions in Civic or chat with neighbours in City. Petitions require phone verification; counted civic actions can end your citizenship change window. Officials currently follow fixed rules; no live AI model is connected.</p></details>
   </section>;

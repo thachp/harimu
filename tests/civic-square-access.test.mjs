@@ -11,8 +11,9 @@ const require=createRequire(import.meta.url);
 async function component(file,name) {
   const source=await readFile(new URL(`../app/${file}`,import.meta.url),'utf8');
   const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
+  const GameTimer=file==='government-panel.tsx'?await component('game-timer.tsx','GameTimer'):null;
   const exports={};
-  new Function('exports','require',compiled)(exports,name=>name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:require(name));
+  new Function('exports','require',compiled)(exports,name=>name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:name==='./game-timer'?{GameTimer}:name==='../lib/game-time'?require('../lib/game-time.ts'):require(name));
   return exports[name];
 }
 const SquareChat=await component('square-chat.tsx','SquareChat');
