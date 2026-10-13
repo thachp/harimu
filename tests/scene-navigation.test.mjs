@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, viewModes } from '../lib/scene-navigation.ts';
+import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, nationFromSearch, viewModes } from '../lib/scene-navigation.ts';
 assert.equal(sceneFromSearch(''), 'square');
 assert.equal(sceneFromSearch('?view=unknown'), 'square');
 for (const view of viewModes) {
   const url = sceneUrl('https://harimu.com/?preview=1&nation=kindle', view, 'korund');
   assert.equal(sceneFromSearch(new URL(url).search), view);
   assert.equal(new URL(url).searchParams.get('preview'), '1');
-  assert.equal(new URL(url).searchParams.get('nation'), view === 'nation' ? 'korund' : null);
+  assert.equal(new URL(url).searchParams.get('nation'), ['world','nation'].includes(view) ? 'korund' : null);
 }
 // Browser history restores views entirely from URLs, without a stale component override.
 const history = ['https://harimu.com/'];
@@ -27,3 +27,20 @@ console.log('Scene navigation: default, deep links, retained parameters, history
 assert.equal(sceneFromSearch('?view=home'), 'household');
 assert.equal(sceneFromSearch('?view=planning'), 'household');
 assert.equal(new URL(sceneUrl('https://harimu.com/?view=planning', 'household')).searchParams.get('view'), 'household');
+
+// Inspecting foreign institutions must never alter the citizen's realm.
+const citizenNation = 'kindle', nationIds = ['kindle','korund','aurelle'];
+const nationHistory = ['https://harimu.com/?view=world&nation=kindle&source=fixture'];
+nationHistory.push(sceneUrl(nationHistory.at(-1),'world','korund'));
+nationHistory.push(sceneUrl(nationHistory.at(-1),'nation','korund'));
+nationHistory.push(sceneUrl(nationHistory.at(-1),'nation','aurelle'));
+assert.deepEqual(nationHistory.map(url => nationFromSearch(new URL(url).search,nationIds,citizenNation)),
+  ['kindle','korund','korund','aurelle']);
+assert.equal(nationFromSearch(new URL(nationHistory[2]).search,nationIds,citizenNation),'korund','Back restores inspected Korund');
+assert.equal(nationFromSearch(new URL(nationHistory[3]).search,nationIds,citizenNation),'aurelle','Forward restores inspected Aurelle');
+for (const url of nationHistory) assert.equal(new URL(url).searchParams.get('source'),'fixture');
+assert.equal(nationFromSearch('?view=nation&nation=unknown',nationIds,citizenNation),'kindle');
+assert.equal(nationFromSearch('?view=nation&nation=',nationIds,citizenNation),'kindle');
+assert.equal(nationFromSearch('?view=world',nationIds,'aurelle'),'aurelle');
+assert.equal(new URL(sceneUrl(nationHistory.at(-1),'household',citizenNation)).searchParams.get('nation'),null);
+assert.equal(citizenNation,'kindle');

@@ -1,0 +1,12 @@
+.nation-inspector{display:flex;flex-direction:column;gap:12px;min-width:0}
+.nation-inspector h2,.nation-inspector h3,.nation-inspector h4,.nation-inspector p{margin:0}
+.nation-inspector h2{font-size:22px}.nation-inspector h3{font-size:17px}.nation-inspector h4{font-size:14px}
+.nation-inspector p,.nation-inspector dd{overflow-wrap:anywhere;line-height:1.5}
+.nation-inspector label{font-size:12px;font-weight:700}.nation-inspector select{width:100%;min-width:0;min-height:44px;padding:8px;border:1px solid #3e606c;border-radius:3px;background:#071a23;color:#e0eded;font:inherit}
+.nation-inspector dl{display:grid;grid-template-columns:minmax(70px,.8fr) minmax(0,1.6fr);gap:8px 12px;margin:0;font-size:13px}
+.nation-inspector dt{color:#94b0ba}.nation-inspector dd{margin:0}
+.nation-inspector details{padding:10px;border:1px solid #34535d;border-radius:3px;font-size:12px}.nation-inspector summary{cursor:pointer}.nation-inspector details[open] summary{margin-bottom:8px}.nation-inspector details p{margin-bottom:8px}
+.nation-inspector-systems,.nation-inspector-links{display:flex;flex-wrap:wrap;gap:7px}
+.nation-inspector-systems button{flex:1 1 85px}.nation-inspector button{min-height:44px;white-space:normal;text-align:left;padding:9px 12px;border:1px solid #3b6670;border-radius:3px;background:#1a4650;color:#e1f2ef;font:inherit;font-size:12px;cursor:pointer}
+.nation-inspector button[aria-pressed=true]{border-color:#8bd2c5;background:#245b61}.nation-inspector button:disabled{opacity:.45;cursor:default}.nation-inspector button:focus-visible,.nation-inspector select:focus-visible,.nation-inspector summary:focus-visible{outline:2px solid #80d8ce;outline-offset:3px}
+.nation-inspector article{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid #34535d;border-radius:3px;background:#15303b}.nation-inspector section[aria-label="Kindle paid contributions"]{display:flex;flex-direction:column;gap:10px}.nation-inspector-motto{font-style:italic;color:#a8c0c7}

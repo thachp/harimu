@@ -14,10 +14,15 @@ export function sceneFromSearch(search: string): SceneView {
   const view = requested === 'home' || requested === 'planning' ? 'household' : requested;
   return viewModes.includes(view as SceneView) ? view as SceneView : 'square';
 }
+export function nationFromSearch(search: string, validNationIds: readonly string[], fallbackId: string): string {
+  const requested = new URLSearchParams(search).get('nation');
+  return requested && validNationIds.includes(requested) ? requested : fallbackId;
+}
 export function sceneUrl(href: string, scene: SceneView, nationId?: string): string {
   const url = new URL(href);
   url.searchParams.set('view', scene);
-  if (scene === 'nation' && nationId) url.searchParams.set('nation', nationId);
-  else url.searchParams.delete('nation');
+  if (scene === 'nation' || scene === 'world') {
+    if (nationId) url.searchParams.set('nation', nationId);
+  } else url.searchParams.delete('nation');
   return url.href;
 }

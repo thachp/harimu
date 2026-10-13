@@ -4,10 +4,11 @@ import type { VerificationState } from '@/lib/verification';
 import type { SimulationState } from '@/lib/world-simulation';
 
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
-import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
+import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { SceneNews } from './world-scene';
 import { GameShell } from './game-shell';
+import { NationInstitutions } from './nation-institutions';
 import { SquareChat } from './square-chat';
 import { DailyLoop } from './daily-loop';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
@@ -27,17 +28,8 @@ import {
   useUser,
 } from '@clerk/nextjs';
 import {
-  ArrowLeft,
-  ArrowRight,
-  Bank,
   ClockCountdown,
-  Coins,
-  MapPin,
-  Scales,
   ShieldCheck,
-  Train,
-  UsersThree,
-  Warehouse,
 } from '@phosphor-icons/react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { clerkConfigured } from './providers';
@@ -398,290 +390,6 @@ function getServerLocationSearch() {
   return '';
 }
 
-type NationDashboardProps = {
-  nation: Nation;
-  nations: Nation[];
-  citizenNation: Nation | undefined;
-  capacity: number;
-  workOrders: WorkOrder[];
-  worldEvents: WorldEvent[];
-  onSelectNation: (nationId: string) => void;
-  onWorldView: () => void;
-  onPlanningView: () => void;
-  workPending: boolean;
-  workStatus: React.ReactNode;
-  onCommitWork: (order: WorkOrder) => void | Promise<void>;
-};
-
-function NationDashboard({
-  nation,
-  nations,
-  citizenNation,
-  capacity,
-  workOrders,
-  worldEvents,
-  onSelectNation,
-  onWorldView,
-  onPlanningView,
-  onCommitWork,
-  workPending,
-  workStatus,
-}: NationDashboardProps) {
-  const nationalSystems = useMemo(() => {
-    const base = nation.stability;
-    const currencyName = nation.currency.split(' · ')[0];
-
-    return [
-      {
-        id: 'capital',
-        name: `${nation.capital} District`,
-        kind: 'Seat of government',
-        status: 'Institutions operating normally',
-        detail: `${nation.government} is administered from the capital district, where the current national session is in progress.`,
-        health: Math.min(96, base + 5),
-        x: '47%',
-        y: '34%',
-        icon: Bank,
-      },
-      {
-        id: 'currency',
-        name: `${currencyName} Reserve`,
-        kind: 'Currency & settlement',
-        status: base >= 80 ? 'Confidence above target' : 'Confidence under review',
-        detail: `${nation.currency} anchors domestic exchange in ${nation.shortName}; cross-border access is currently ${nation.tradeStatus.toLowerCase()}.`,
-        health: Math.min(94, base + 2),
-        x: '70%',
-        y: '25%',
-        icon: Coins,
-      },
-      {
-        id: 'corridor',
-        name: 'National Trade Corridor',
-        kind: 'Freight & foreign exchange',
-        status: nation.tradeStatus,
-        detail: `${nation.tradeStatus} governs the road, sea, rail, and market crossings connecting the nation to the wider Harimu economy.`,
-        health: Math.max(54, base - 7),
-        x: '76%',
-        y: '67%',
-        icon: Train,
-      },
-      {
-        id: 'commons',
-        name: 'Civic Commons',
-        kind: 'Citizen services & assemblies',
-        status: 'Public session active',
-        detail: `Local councils translate the national mandate into health, education, and household services across ${nation.shortName}.`,
-        health: Math.max(58, base - 2),
-        x: '26%',
-        y: '58%',
-        icon: UsersThree,
-      },
-      {
-        id: 'works',
-        name: 'Strategic Works Reserve',
-        kind: 'Materials & emergency capacity',
-        status: 'Mobilization ready',
-        detail: `National stores hold equipment and materials for public works, disaster response, and regional maintenance.`,
-        health: Math.max(50, base - 10),
-        x: '36%',
-        y: '78%',
-        icon: Warehouse,
-      },
-    ];
-  }, [nation]);
-  const [selectedSystemId, setSelectedSystemId] = useState('capital');
-  const [selectedAgendaIndex, setSelectedAgendaIndex] = useState(0);
-  const selectedSystem = nationalSystems.find((system) => system.id === selectedSystemId) ?? nationalSystems[0];
-  const SelectedSystemIcon = selectedSystem.icon;
-  const nationalWork = workOrders.filter((order) => !order.nationId || order.nationId === nation.id);
-  const agenda = nationalWork.length > 0
-    ? nationalWork.slice(0, 3).map((order, index) => ({
-        id: order.id,
-        label: index === 0 ? 'Active national program' : 'Open public work',
-        title: order.name,
-        detail: order.detail,
-        source: `${order.cost} WC requested`,
-        order,
-      }))
-    : worldEvents.slice(0, 3).map((event) => ({
-        id: String(event.id),
-        label: event.kind,
-        title: event.headline,
-        detail: event.detail,
-        source: event.location ?? 'World record',
-        order: null,
-      }));
-  const selectedAgenda = agenda[selectedAgendaIndex] ?? agenda[0];
-  const isCitizenNation = citizenNation?.id === nation.id;
-
-  return (
-    <section
-      className="nation-command-view"
-      aria-label={`${nation.name} nation view`}
-      style={{ '--nation': nation.color, '--nation-soft': nation.softColor } as CSSProperties}
-    >
-      <aside className="nation-command-rail" aria-label="Choose a nation">
-        <div className="nation-rail-title">
-          <span>National registry</span>
-          <strong>{nations.length} sovereign nations</strong>
-        </div>
-        <div className="nation-command-list">
-          {nations.map((item) => (
-            <button
-              aria-pressed={item.id === nation.id}
-              key={item.id}
-              onClick={() => onSelectNation(item.id)}
-              style={{ '--item-color': item.color } as CSSProperties}
-              type="button"
-            >
-              <span aria-hidden="true">{nationMark(item)}</span>
-              <span><strong>{item.shortName}</strong><small>{item.capital}</small></span>
-              <em>{item.stability}%</em>
-            </button>
-          ))}
-        </div>
-        <button className="nation-back-button" onClick={onWorldView} type="button">
-          <ArrowLeft aria-hidden="true" size={15} /> World globe
-        </button>
-      </aside>
-
-      <section className="nation-command-main">
-        <header className="nation-command-heading">
-          <div className="nation-command-identity">
-            <span className="nation-command-sigil" aria-hidden="true">{nationMark(nation)}</span>
-            <div>
-              <span className="eyebrow">National command · {nation.currency}</span>
-              <h1>{nation.name}</h1>
-              <p>“{nation.motto}”</p>
-            </div>
-          </div>
-          <dl className="nation-command-metrics">
-            <div><dt>Citizens</dt><dd>{nation.population}</dd></div>
-            <div><dt>Treasury</dt><dd>{nation.treasury}</dd></div>
-            <div><dt>Stability</dt><dd>{nation.stability}%</dd></div>
-            <div><dt>Trade</dt><dd>{nation.tradeStatus}</dd></div>
-          </dl>
-        </header>
-
-        <section className="national-map" aria-label={`${nation.shortName} systems map`}>
-          <div className="national-map-shade" aria-hidden="true" />
-          <div className="national-map-label">
-            <span><MapPin aria-hidden="true" size={14} /> Territorial systems · live</span>
-            <strong>{nation.capital} and national regions</strong>
-            <small>Select infrastructure to inspect readiness.</small>
-          </div>
-
-          {nationalSystems.map((system) => {
-            const SystemIcon = system.icon;
-            const active = system.id === selectedSystem.id;
-            return (
-              <button
-                aria-label={`${system.name}, ${system.status}`}
-                aria-pressed={active}
-                className={`national-system-marker ${active ? 'is-active' : ''}`}
-                key={system.id}
-                onClick={() => setSelectedSystemId(system.id)}
-                style={{ '--system-x': system.x, '--system-y': system.y } as CSSProperties}
-                type="button"
-              >
-                <span><SystemIcon aria-hidden="true" size={18} weight={active ? 'fill' : 'duotone'} /></span>
-                <em>{system.name}</em>
-              </button>
-            );
-          })}
-
-          <article className="national-system-brief" aria-live="polite">
-            <span><SelectedSystemIcon aria-hidden="true" size={22} weight="duotone" /></span>
-            <div>
-              <small>{selectedSystem.kind}</small>
-              <strong>{selectedSystem.name}</strong>
-              <p>{selectedSystem.detail}</p>
-            </div>
-            <div className="system-health">
-              <b>{selectedSystem.health}%</b>
-              <span><i style={{ width: `${selectedSystem.health}%` }} /></span>
-              <small>{selectedSystem.status}</small>
-            </div>
-          </article>
-        </section>
-
-        <section className="national-systems-strip" aria-label="National system health">
-          {nationalSystems.slice(1).map((system) => {
-            const SystemIcon = system.icon;
-            return (
-              <button key={system.id} onClick={() => setSelectedSystemId(system.id)} type="button">
-                <SystemIcon aria-hidden="true" size={18} weight="duotone" />
-                <span><small>{system.kind}</small><strong>{system.health}% · {system.name}</strong></span>
-              </button>
-            );
-          })}
-        </section>
-      </section>
-
-      <aside className="national-agenda" aria-label="National agenda">
-        <div className="national-agenda-heading">
-          <div><span className="eyebrow">Day 42 · national agenda</span><h2>What the nation is deciding</h2></div>
-          <span className="agenda-live"><i /> Live</span>
-        </div>
-
-        <section className="national-institutions">
-          <div><Bank aria-hidden="true" size={17} /><span><small>Constitutional order</small><strong>{nation.government}</strong></span></div>
-          <div><Scales aria-hidden="true" size={17} /><span><small>Economic model</small><strong>{nation.economy}</strong></span></div>
-        </section>
-
-        <div className="national-agenda-list" role="group" aria-label="National priorities">
-          {agenda.map((item, index) => (
-            <button
-              aria-pressed={index === selectedAgendaIndex}
-              key={item.id}
-              onClick={() => setSelectedAgendaIndex(index)}
-              type="button"
-            >
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <span><small>{item.label}</small><strong>{item.title}</strong><em>{item.source}</em></span>
-              <ArrowRight aria-hidden="true" size={16} />
-            </button>
-          ))}
-        </div>
-
-        {selectedAgenda && (
-          <article className="national-priority-brief" aria-live="polite">
-            <span>Priority brief</span>
-            <h3>{selectedAgenda.title}</h3>
-            <p>{selectedAgenda.detail}</p>
-            {selectedAgenda.order && rewards[selectedAgenda.order.id] && <p>
-              Shift reward: {(rewards[selectedAgenda.order.id].wageMinor / 100).toFixed(2)} SPK + {rewards[selectedAgenda.order.id].quantity} {rewards[selectedAgenda.order.id].item}
-            </p>}
-            {selectedAgenda.order && isCitizenNation ? (
-              <button
-                disabled={workPending || capacity < selectedAgenda.order.cost}
-                onClick={() => void onCommitWork(selectedAgenda.order as WorkOrder)}
-                type="button"
-              >
-                Start shift · {selectedAgenda.order.cost} Work Capacity
-                <ArrowRight aria-hidden="true" size={16} />
-              </button>
-            ) : (
-              <small>{isCitizenNation ? 'Public record · no citizen action required' : `Observed from ${nation.shortName}`}</small>
-            )}
-          </article>
-        )}
-
-        {isCitizenNation && workStatus}
-        <section className="nation-citizen-link">
-          <UsersThree aria-hidden="true" size={21} weight="duotone" />
-          <div>
-            <span>{isCitizenNation ? 'Your citizen layer' : 'Citizen planning'}</span>
-            <strong>{isCitizenNation ? `Household in ${nation.shortName}` : `You are viewing ${nation.shortName}`}</strong>
-            <p>{isCitizenNation ? 'Translate national conditions into household choices.' : 'Your household belongs to your own nation.'}</p>
-          </div>
-          <button onClick={onPlanningView} type="button">Open household <ArrowRight aria-hidden="true" size={15} /></button>
-        </section>
-      </aside>
-    </section>
-  );
-}
-
 function ClerkAccountControl() {
   if (!clerkConfigured) return <span className="account-demo-label">Local demo</span>;
 
@@ -792,7 +500,6 @@ export default function Home() {
   const [availablePlanningItems, setAvailablePlanningItems] = useState<PlanningTask[]>(fallbackPlanningItems);
   const [worldEvents, setWorldEvents] = useState<WorldEvent[]>(fallbackWorldEvents);
   const locationSearch = useSyncExternalStore(subscribeToLocation, getLocationSearch, getServerLocationSearch);
-  const requestedNationId = new URLSearchParams(locationSearch).get('nation');
   const viewMode = sceneFromSearch(locationSearch);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -847,6 +554,7 @@ export default function Home() {
 
   const citizenIdentity = useRef<string | null>(null);
   const citizenEpoch = useRef(0);
+  const [citizenSessionKey, setCitizenSessionKey] = useState(0);
   const persistIntents = useCallback(() => {
     if (!clerkConfigured || !citizenIdentity.current) return;
     try { writeCitizenIntents(window.sessionStorage, citizenIdentity.current, {
@@ -857,6 +565,7 @@ export default function Home() {
     if (citizenIdentity.current === userId) return;
     citizenIdentity.current = userId;
     citizenEpoch.current++;
+    setCitizenSessionKey(value => value + 1);
     workLock.current = false;
     setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
@@ -882,10 +591,8 @@ export default function Home() {
   }, []);
 
   const selected = useMemo(
-    () => worldNations.find((nation) => nation.id === (requestedNationId
-      ? requestedNationId
-      : selectedId)) ?? worldNations[0],
-    [requestedNationId, selectedId, worldNations],
+    () => worldNations.find(nation => nation.id === nationFromSearch(locationSearch, worldNations.map(item => item.id), selectedId)) ?? worldNations[0],
+    [locationSearch, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
   const demoGovernmentSnapshot = useMemo(() => citizenNation ? simulateGovernment({
@@ -1181,27 +888,19 @@ export default function Home() {
   }
 
   const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand({ action, shiftId, requestId: crypto.randomUUID() });
-  const workStatus = <section className="scene-daily-links" aria-label="Citizen daily loop">
-    <p>Your daily life continues across the city.</p>
-    <button type="button" onClick={() => changeView('household')}>Household · briefing and food</button>
-    <button type="button" onClick={() => changeView('workplace')}>Workplace · shifts and earnings</button>
-    <button type="button" onClick={() => changeView('market')}>Market · goods and listings</button>
-    <button type="button" onClick={() => changeView('government')}>Government · policies and petitions</button>
-  </section>;
-
   function changeView(nextView: ViewMode) {
+    setSelectedId(selected.id);
     const href = sceneUrl(window.location.href, nextView, selected.id);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
   }
 
   function selectNation(nationId: string) {
+    if (!worldNations.some(nation => nation.id === nationId)) return;
     setSelectedId(nationId);
-    if (viewMode !== 'nation') return;
-    const url = new URL(window.location.href);
-    url.searchParams.set('view', 'nation');
-    url.searchParams.set('nation', nationId);
-    if (url.href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', url);
+    if (viewMode !== 'nation' && viewMode !== 'world') return;
+    const href = sceneUrl(window.location.href, viewMode, nationId);
+    if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
   }
 
@@ -1560,7 +1259,7 @@ export default function Home() {
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
     {!citizenNation && <p><strong>You are joining as a citizen.</strong> All government offices are AI/SI controlled. Current government is a deterministic simulation, with no live AI model connected.</p>}
     <p>Fictional globe geography · nation rules are fixed. Square ownership and cross-border trade are not simulated yet.</p>
-    <div className="game-nation-choices">{worldNations.map(nation => <button key={nation.id} type="button" aria-pressed={selected.id===nation.id} onClick={()=>setSelectedId(nation.id)}>{nation.shortName}</button>)}</div>
+    <div className="game-nation-choices">{worldNations.map(nation => <button key={nation.id} type="button" aria-pressed={selected.id===nation.id} onClick={()=>selectNation(nation.id)}>{nation.shortName}</button>)}</div>
     <h2>{selected.name}</h2><p>{selected.motto}</p>
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
     <p>Counted petitions require Tier 1 phone verification, which is not available yet. Ordinary play and chat remain available.</p>
@@ -1573,16 +1272,17 @@ export default function Home() {
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='square' ? <>
     {dailyLoop}
     <p>{citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
-    <SquareChat key={`${citizenEpoch.current}:${citizenNationId}`} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
+    <SquareChat key={`${citizenSessionKey}:${citizenNationId}`} enabled={clerkConfigured && citizenSessionStatus==='ready' && Boolean(citizenNationId)} nationId={citizenNationId} />
     <SceneNews events={worldEvents} title="City noticeboard" />
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
-    <NationDashboard capacity={capacity} citizenNation={citizenNation} key={selected.id} nation={selected} nations={worldNations}
-      workPending={workPending||hasActiveShift} workStatus={workStatus} onCommitWork={commitWork}
-      onPlanningView={()=>changeView('household')} onSelectNation={selectNation} onWorldView={()=>changeView('world')}
-      workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} worldEvents={worldEvents} /> : citizenScene;
+    <NationInstitutions nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
+      workPending={workPending || hasActiveShift || Boolean(korundCommand || marketCommand || playerCommand)}
+      onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
+      onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
+      workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} /> : citizenScene;
   const activeShift = priorNationShift ?? (citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
   const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
-  const contextItems: { id: string; label: string; detail: string; onSelect?: () => void }[] =
+  const contextItems: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[] =
     citizenNation?.id === 'korund' && ['household', 'workplace', 'market'].includes(viewMode) ? [
       { id: 'korund-assignment', label: korundPlan?.assignment.name ?? 'Assigned work', detail: korundPlan ? `${korundPlan.assignment.capacityCost} WC · ${(korundPlan.assignment.wageMinor / 100).toFixed(2)} LN · ${korundPlan.assignment.hours} hours` : 'Refresh to load your assignment', onSelect: () => changeView('workplace') },
       { id: 'korund-coupons', label: 'Ration book', detail: korundPlan ? `Game week ${korundPlan.gameWeek} · ${korundPlan.couponFoodRemaining} food coupons` : 'Refresh to load your ration book', onSelect: () => changeView('market') },
@@ -1602,7 +1302,7 @@ export default function Home() {
       ] : viewMode === 'government' ? (government?.roles ?? []).map(role => ({
         id: role.name, label: role.name, detail: role.controller,
       })) : viewMode === 'world' || viewMode === 'nation' ? worldNations.map(nation => ({
-        id: nation.id, label: nation.shortName, detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
+        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
       })) : viewMode === 'square' ? [
         { id: 'household', label: 'Household', detail: 'Belongings and recovery', onSelect: () => changeView('household') },
         { id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings', onSelect: () => changeView('workplace') },
@@ -1614,12 +1314,12 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell worldClock={simulation?.clock} view={viewMode} nation={citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell worldClock={simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
       localDemo={!clerkConfigured} notice={workError ?? governmentError ?? recentAction ?? undefined} panel={gamePanel}
       contextItems={contextItems} contextTitle={contextTitle}
-      onNavigate={changeView} onSelectNation={id=>setSelectedId(id)}
+      onNavigate={changeView} onSelectNation={selectNation}
       accountControls={<ClerkAccountControl />} />
       {pendingNation && (
         <div className="dialog-backdrop" onMouseDown={() => setPendingEnrollment(null)} role="presentation">
