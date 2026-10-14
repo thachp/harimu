@@ -1,5 +1,5 @@
 import type {GameDatabase} from './database-contract';
-import {reserveAiCabinetSequence,markAiReservationSent,releaseAiReservation,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiGatewayOptions,type AiBudgetConfig,type AiModel} from './ai-budget';
+import {reserveAiCabinetSequence,markAiReservationSent,releaseAiReservation,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiGatewayOptions,type AiBudgetConfig,type AiModel,type AiMeteredCall} from './ai-budget';
 import {inferenceText,supportedNewsDraft,newsVerificationResponseFormat,type NewsAiBinding} from './ai-news';
 import {validPetitionText} from './collective-petitions';
 /** Issue #20: the mandatory public Cabinet response to a petition that reached 3%.
@@ -27,7 +27,7 @@ export async function prepareAiCabinetResponse(db:GameDatabase,now:number,bindin
  const reservation=`cabinet:${p.id}:${day}`;
  if(!await reserveAiCabinetSequence(db,reservation,now,budget))return {status:'budget-unavailable' as const};
  const petition={title:p.title,demand:p.demand};
- const answered:AiModel[]=[]; // #169: calls the gateway answered, metered on a known rejection
+ const answered:AiMeteredCall[]=[]; // #169/#170: calls the gateway answered, metered on a known rejection
  let reached=false; // #92: true once a request is handed to the gateway (persisted as 'uncertain' first)
  const call=async(target:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],format?:typeof cabinetResponseFormat|typeof newsVerificationResponseFormat)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>maxInputBytes)throw Error('Inference input exceeded the public-petition bound.');
@@ -37,7 +37,7 @@ export async function prepareAiCabinetResponse(db:GameDatabase,now:number,bindin
   try{result=await Promise.race([binding.run(target,{messages,max_tokens:256,temperature:0,stream:false,...(format?{response_format:format as never}:{})},aiGatewayOptions(budget)),new Promise<never>((_r,reject)=>{timeout=setTimeout(()=>reject(Error('Inference timed out.')),timeoutMs);})]);}
   catch{throw Object.assign(Error('uncertain'),{uncertain:true});}
   finally{if(timeout!==undefined)clearTimeout(timeout);}
-  answered.push(target); // the provider returned: this call is metered even if its content is rejected below
+  answered.push({model:target,usage:result&&typeof result==='object'?(result as {usage?:unknown}).usage:undefined}); // the provider returned: metered (per token when usage is valid, #170) even if its content is rejected below
   try{return inferenceText(result,Boolean(format));}catch{throw Object.assign(Error('rejected'),{uncertain:false});}
  };
  try{

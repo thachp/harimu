@@ -76,3 +76,79 @@ export const korundFaithCopy={
 } as const;
 
 export function faithFestivals(id:FaithId){return faithCopy[id].festivals.map(f=>f.name);}
+
+/* ---- Issue #251: clergy roles, congregation actions and Devotion tiers for the 3 MVP faiths, plus Korund underground
+ * copy. Content only: mechanics are #224. Role names come from §14.1; services restate §14.4 (clergy lead services,
+ * festivals, weddings and funerals, run charity and counsel members). Devotion copy names only social rewards
+ * (festival roles, morale, standing in the congregation) and never a production or combat benefit (§14.4 design rule).
+ * Korund copy follows §14.6 low-key rules: quiet, abstract discovery, no arrest, violence or desecration, no believer
+ * named, never tutorial, store or marketing copy. All wording below is new, so `proposal: true`. */
+
+export type MvpFaithId='kinward-rite'|'fair-wind-vow'|'open-hand';
+export const MVP_FAITHS:readonly MvpFaithId[]=['kinward-rite','fair-wind-vow','open-hand'];
+export type ClergyRoleCopy={title:string;description:string;proposal:true};
+export type CongregationActionKind='service'|'rite'|'charity'|'festival';
+export type CongregationActionCopy={kind:CongregationActionKind;name:string;line:string;proposal:true};
+export type DevotionTierCopy={min:number;max:number;label:string;line:string;proposal:true};
+
+export const CLERGY_TITLE_MAX=32;
+export const CLERGY_DESCRIPTION_MAX=200;
+export const ACTION_NAME_MAX=32;
+
+const role=(title:string,description:string):ClergyRoleCopy=>({title,description,proposal:true});
+const act=(kind:CongregationActionKind,name:string,line:string):CongregationActionCopy=>({kind,name,line,proposal:true});
+const tier=(min:number,max:number,label:string,line:string):DevotionTierCopy=>({min,max,label,line,proposal:true});
+
+export const clergyRoleCopy:Readonly<Record<MvpFaithId,readonly ClergyRoleCopy[]>>={
+ 'kinward-rite':[
+  role('Hearth-Keeper','Keeps the congregation\'s hearth and leads its rites of birth, marriage, death and oath-taking. Counsels members.'),
+  role('Name-Reader','Reads the names on the name-stones at rites and remembrance, so that no name is forgotten.')],
+ 'fair-wind-vow':[
+  role('Harbor Chaplain','Leads services in the port chapel and hears vows before voyages and deals. Counsels members.'),
+  role('Pilot','Guides travelers and traders through their vows of Honest Measure, Safe Return and Good Fortune.')],
+ 'open-hand':[
+  role('Almoner','Runs the bread hall and gives alms to those in need. Leads services and counsels members.'),
+  role('Steward','Keeps what the congregation holds in trust for those in need, and speaks for the poor.')],
+};
+
+export const congregationActionCopy:Readonly<Record<MvpFaithId,readonly CongregationActionCopy[]>>={
+ 'kinward-rite':[
+  act('service','Hearth Gathering','Gather at the household hearth and its name-stones.'),
+  act('rite','Oath-Taking','Speak an oath before the hearth and keep it.'),
+  act('charity','Tend the Name-Stones','Help a household keep its hearth and name-stones.'),
+  act('festival','Night of Names Reader','Read names aloud on the Night of Names.')],
+ 'fair-wind-vow':[
+  act('service','Chapel Service','Attend a service in the port chapel.'),
+  act('rite','Vow Before a Voyage','Make a vow before a voyage or a deal.'),
+  act('charity','Votive Ship Model','Leave a votive ship model in the chapel.'),
+  act('festival','Launching Crew','Take a part in the Launching at the start of sailing season.')],
+ 'open-hand':[
+  act('service','Open Hand Service','Attend a service with the congregation.'),
+  act('rite','Give Alms','Give alms to someone in need.'),
+  act('charity','Bread Hall Shift','Serve a shift in the bread hall.'),
+  act('festival','Bread Day Server','Serve bread to all comers on Bread Day.')],
+};
+
+/** Four tiers over Devotion 0-100. Shared across the three faiths; social rewards only. */
+export const devotionTierCopy:readonly DevotionTierCopy[]=[
+ tier(0,24,'Newcomer','You are welcome at services. Devotion grows with worship, festivals, charity and service.'),
+ tier(25,49,'Member','The congregation knows your face. You can take small festival roles.'),
+ tier(50,74,'Devoted','Your standing in the congregation is high. You may be asked to serve.'),
+ tier(75,100,'Pillar','The congregation looks to you. Devotion slowly fades if you step away.'),
+];
+export function devotionTier(devotion:number){const d=Math.min(100,Math.max(0,Math.round(devotion)));return devotionTierCopy.find(t=>d>=t.min&&d<=t.max)!;}
+
+/** Korund underground copy (§14.6). Quiet and abstract; no believer is ever named. */
+export const korundUndergroundCopy={
+ hiddenShrine:{name:'Hidden Shrine',description:'A small home shrine, kept out of sight. It lets you practice privately and meet with others in secret.',proposal:true},
+ congregationLines:[
+  {text:'A few people meet quietly. Nothing is written down.',proposal:true},
+  {text:'The meeting ends early. Everyone leaves one at a time.',proposal:true},
+  {text:'A quiet word is shared, then the room is empty again.',proposal:true},
+  {text:'No one speaks of it at work the next day.',proposal:true},
+ ],
+ discovery:{
+  first:{text:'An inspection found a shrine. Suspicion was recorded.',proposal:true},
+  repeat:{text:'An inspection found a shrine again. Correction Duty may follow, for up to 7 days.',proposal:true},
+ },
+} as const;
