@@ -2,20 +2,22 @@
 import { useEffect, useState } from 'react';
 import { globeTourNext, globeTourStepMs, globeTourStops } from '../lib/globe-tour';
 import styles from './globe-tour.module.css';
+import {useDisplayPreferences} from './display-preferences';
 
 /** Mounted only after an explicit start. Camera sightseeing never selects citizenship. */
 export function GlobeTour({ onFocus, onClose }: { onFocus: (id: string | null) => void; onClose: () => void }) {
+  const {preferences}=useDisplayPreferences();
   const [step, setStep] = useState(0);
   const [automatic, setAutomatic] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(true);
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const apply = () => { setReducedMotion(preference.matches); if (preference.matches) setAutomatic(false); };
+    const apply = () => { setReducedMotion(preference.matches||preferences.motion==='reduce'); if (preference.matches||preferences.motion==='reduce') setAutomatic(false); };
     let cancelled = false;
-    queueMicrotask(() => { if (!cancelled) { apply(); setAutomatic(!preference.matches); } });
+    queueMicrotask(() => { if (!cancelled) { apply(); setAutomatic(!preference.matches&&preferences.motion!=='reduce'); } });
     preference.addEventListener('change', apply);
     return () => { cancelled = true; preference.removeEventListener('change', apply); };
-  }, []);
+  }, [preferences.motion]);
   useEffect(() => { onFocus(globeTourStops[step].id); }, [step, onFocus]);
   useEffect(() => {
     if (!automatic || reducedMotion) return;

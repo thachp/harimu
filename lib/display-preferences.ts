@@ -1,8 +1,8 @@
-export type DisplayPreferences = {graphics:'standard'|'low';timeFormat:'24'|'12'};
-export const defaultDisplayPreferences:DisplayPreferences={graphics:'standard',timeFormat:'24'};
+export type DisplayPreferences = {graphics:'standard'|'low';timeFormat:'24'|'12';motion?:'system'|'reduce'};
+export const defaultDisplayPreferences:DisplayPreferences={graphics:'standard',timeFormat:'24',motion:'system'};
 export function displayPreferences(value:unknown):DisplayPreferences{
  const source=value&&typeof value==='object'?value as Record<string,unknown>:{};
- return {graphics:source.graphics==='low'?'low':'standard',timeFormat:source.timeFormat==='12'?'12':'24'};
+ return {graphics:source.graphics==='low'?'low':'standard',timeFormat:source.timeFormat==='12'?'12':'24',motion:source.motion==='reduce'?'reduce':'system'};
 }
 export function graphicsOptions(graphics:DisplayPreferences['graphics'],deviceRatio:number){
  return {antialias:graphics!=='low',shadows:graphics!=='low',pixelRatio:graphics==='low'?1:Math.min(Number.isFinite(deviceRatio)&&deviceRatio>0?deviceRatio:1,2)};
