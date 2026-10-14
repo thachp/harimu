@@ -1,3 +1,5 @@
+import { finalizeDueElection } from './elections';
+import { accountElectionDatabase } from './preview-election';
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
@@ -42,6 +44,8 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
 export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000)): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
+  // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
+  for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(() => {});
   await db.prepare("INSERT OR IGNORE INTO world_clock (id,epoch_seconds) VALUES ('main',?)")
     .bind(Math.floor(now/tickSeconds)*tickSeconds).run();
   const epoch = (await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>())!.epoch_seconds;

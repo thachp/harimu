@@ -37,15 +37,26 @@ async function countedResult(db:GameDatabase){
   if(receipts?.count!==result.humanBallots)throw Error('Election count could not be confirmed. No result published.');
  return result;
 }
-async function finalizedResult(db:GameDatabase,now:number){
+/** Closes a due election and records its count. Write paths only: POST /api/election and the world tick (#221). */
+export async function finalizeDueElection(db:GameDatabase,now:number){
  await db.prepare('UPDATE civic_elections SET closed_at=? WHERE id=? AND closed_at IS NULL AND closes_at<=?').bind(now,electionId,now).run();
  const election=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(electionId).first<{result_json:string|null}>();
- if(!election)return null;
- if(!election.result_json){
+ if(election&&!election.result_json){
   const result=await countedResult(db);
   await db.prepare('UPDATE civic_elections SET result_json=? WHERE id=? AND closed_at IS NOT NULL AND result_json IS NULL').bind(JSON.stringify(result),electionId).run();
  }
- const saved=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(electionId).first<{result_json:string}>();
+}
+async function finalizedResult(db:GameDatabase,now:number,readOnly=false){
+ let saved:{result_json:string}|null;
+ if(readOnly){
+  // #221: the same close + count the write path records, computed without writing. Ballots are frozen once closes_at passes.
+  const row=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND (closed_at IS NOT NULL OR closes_at<=?)').bind(electionId,now).first<{result_json:string|null}>();
+  if(!row)return null;
+  saved={result_json:row.result_json??JSON.stringify(await countedResult(db))};
+ }else{
+  await finalizeDueElection(db,now);
+  saved=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(electionId).first<{result_json:string}>();
+ }
  if(!saved?.result_json)return null;
  const result=JSON.parse(saved.result_json) as RunoffResult;
  if(result.weightScale!==4||!Number.isSafeInteger(result.humanBallots)||result.humanBallots<0||result.simulatedPublicUnits!==result.humanBallots||!Array.isArray(result.rounds)||result.rounds.length>candidateIds.length||result.winner!==null&&!candidateIds.some(id=>id===result.winner))throw Error('Saved election count could not be verified.');
@@ -60,14 +71,15 @@ async function finalizedResult(db:GameDatabase,now:number){
  return projected;
 }
 
-export async function readElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady()):Promise<ElectionSnapshot>{
+export async function readElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),projectOpen=false,readOnly=false):Promise<ElectionSnapshot>{
  const election=await db.prepare('SELECT candidates_json,opens_at,closes_at,closed_at FROM civic_elections WHERE id=?').bind(electionId).first<{candidates_json:string;opens_at:number;closes_at:number;closed_at:number|null}>();
  const base={nationId:'kindle' as const,id:electionId,candidates:electionCandidates,voted:false,result:null,privacyReady,privacyReason:privacyReady?'Account-level preview privacy: operators may correlate submissions.':ballotPrivacyReason};
- if(!election)return {...base,status:'waiting',opensAt:null,closesAt:null};
+ // #205: a read-only caller that would have opened the election shows it as openPreviewElection would create it.
+ if(!election)return projectOpen&&privacyReady?{...base,status:'open',opensAt:now,closesAt:now+259200}:{...base,status:'waiting',opensAt:null,closesAt:null};
  const slate=JSON.parse(election.candidates_json) as {id:string;name:string;platform:string}[];
  if(!Array.isArray(slate)||slate.length!==candidateIds.length||slate.some((candidate,index)=>candidate.id!==candidateIds[index]||typeof candidate.name!=='string'||typeof candidate.platform!=='string'))throw Error('Saved candidate slate could not be confirmed.');
  const candidates=slate.map(({id,name,platform})=>({id,name,platform}));
  const own=await db.prepare('SELECT ballot_written FROM civic_voter_receipts WHERE election_id=? AND clerk_user_id=?').bind(electionId,userId).first<{ballot_written:number}>();
  const closed=election.closed_at!==null||now>=election.closes_at;
- return {...base,candidates,status:closed?'closed':'open',opensAt:election.opens_at,closesAt:election.closes_at,voted:own?.ballot_written===1,result:closed?await finalizedResult(db,now):null};
+ return {...base,candidates,status:closed?'closed':'open',opensAt:election.opens_at,closesAt:election.closes_at,voted:own?.ballot_written===1,result:closed?await finalizedResult(db,now,readOnly):null};
 }
