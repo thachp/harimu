@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {randomUUID,createHash} from 'node:crypto';
 import {localRuntime} from './helpers/local-runtime.mjs';
 import {reserveAiSequence} from '../lib/ai-budget.ts';
-import {notableProfile,validNotableCommand,notableDailyLimit} from '../lib/notable-profiles.ts';
+import {notableProfile,validNotableCommand,notableDailyLimit,notableTopics} from '../lib/notable-profiles.ts';
 const command=(nation='kindle')=>({requestId:randomUUID(),notableId:notableProfile(nation).id,topic:'news'});
 const draft={title:'Public record',summary:'The public ledger records settled work.',claims:['completedShifts']};
 const binding=()=>{const calls=[];return {calls,async run(model,input){calls.push({model,input});return {response:[JSON.stringify(draft),'supported','safe'][(calls.length-1)%3]};}};};
@@ -40,7 +40,7 @@ test('atomic equal account quota and another account isolation use the same rese
  assert.equal(await reserveAiSequence(r.db,prefix+randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'},{ownerPrefix:prefix,dailyLimit:21}),false);
 });
 test('unsafe, truncated, unknown moderation and provider failures never expose responses or refund reservations',async t=>{
- const r=await localRuntime();t.after(()=>r.close());for(const response of [{response:'unsafe'},{response:'safe',finish_reason:'length'},{response:'perhaps safe'}]){let n=0;const fake={async run(){return n++===0?{response:JSON.stringify(draft)}:n===2?{response:'supported'}:response;}};const result=await r.answerNotable('alice',command(),fake,options(r));assert.equal(result.status,503);assert.equal(result.reply,undefined);}
+ const r=await localRuntime();t.after(()=>r.close());for(const response of [{response:'unsafe'},{response:'safe',finish_reason:'length'},{response:'perhaps safe'}]){let n=0;const fake={async run(){return n++===0?{response:JSON.stringify(draft)}:n===2?{response:'supported'}:response;}};const result=await r.answerNotable('alice',command(),fake,options(r));assert.equal(result.status,200);assert.equal(result.source,'authored');assert.equal(result.reply,notableTopics.news.authored);} // #139 fallback; model text never exposed
  const c=command();const result=await r.answerNotable('alice',c,{async run(){throw {code:5016,message:'private provider detail'};}},options(r));assert.equal(result.status,503);assert.equal(result.failureCode,'model-terms-5016:@cf/meta/llama-3.2-3b-instruct');assert.doesNotMatch(JSON.stringify(result),/private provider/);
  assert.equal((await r.db.prepare('SELECT SUM(reserved_micro) AS n FROM harimu_ai_reservations').first()).n,289600);
 });
@@ -56,5 +56,6 @@ test('Notable launcher mounts in the actual City branch rather than another loca
 });
 
 test('fulfilled invalid Notable response settles to the answered call cost (#141) and is a known failure rather than transport uncertainty',async t=>{
- const r=await localRuntime();t.after(()=>r.close());const result=await r.answerNotable('alice',command(),{async run(){return {response:42};}},options(r));assert.equal(result.status,503);assert.equal(result.reply,undefined);const row=await r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations').first();assert.equal(row.reserved_micro,4200);assert.equal(row.status,'finished');
+ const r=await localRuntime();t.after(()=>r.close());const result=await r.answerNotable('alice',command(),{async run(){return {response:42};}},options(r));assert.equal(result.status,200);assert.equal(result.source,'authored');assert.equal(result.reply,notableTopics.news.authored); // #139 fallback
+ const row=await r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations').first();assert.equal(row.reserved_micro,4200);assert.equal(row.status,'finished');
 });

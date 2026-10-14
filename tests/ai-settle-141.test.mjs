@@ -12,7 +12,7 @@ const row=r=>r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservati
 test('#141 a Notable question failing draft validation settles to the answered calls and releases the rest',async t=>{
  const r=await localRuntime();t.after(()=>r.close());const answers=['safe',{title:'x'}];let calls=0;
  const result=await r.answerNotable('alice',ask(r),{async run(){calls++;return {response:answers.shift()};}},{enabled:true,budget});
- assert.equal(result.status,503);assert.equal(calls,2);
+ assert.equal(result.source,'authored');assert.equal(calls,2);
  const settled=await row(r);assert.equal(settled.status,'finished');assert.equal(settled.reserved_micro,guard+small);assert.ok(settled.reserved_micro<aiNotableQuestionReservation);
 });
 
