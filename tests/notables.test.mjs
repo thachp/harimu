@@ -7,7 +7,7 @@ import {notableProfile,validNotableCommand,notableDailyLimit} from '../lib/notab
 const command=(nation='kindle')=>({requestId:randomUUID(),notableId:notableProfile(nation).id,topic:'news'});
 const draft={title:'Public record',summary:'The public ledger records settled work.',claims:['completedShifts']};
 const binding=()=>{const calls=[];return {calls,async run(model,input){calls.push({model,input});return {response:[JSON.stringify(draft),'supported','safe'][(calls.length-1)%3]};}};};
-const options=r=>({enabled:true,priceReviewedUntil:Math.floor(r.now/1000)+3600});
+const options=()=>({enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}});
 test('Notable routes authorize own nation and disabled POST causes no reservation or model call',async t=>{
  const r=await localRuntime();t.after(()=>r.close());const fake=binding();r.setFixtureAiBinding(fake);assert.equal((await r.call('notables',null)).status,401);
  const own=await r.call('notables','alice',undefined,undefined,'?nation=aurelle');assert.equal(own.data.profile.id,'kindle-journalist');assert.equal(own.data.source,'authored');assert.equal(own.data.enabled,false);assert.equal(own.cache,'private, no-store');assert.equal(own.data.dailyLimit,20);
@@ -30,14 +30,14 @@ test('one global reservation covers generation verification moderation; owner-bo
  assert.equal((await r.answerNotable('alice',command('korund'),fake,options(r))).status,403);assert.equal(fake.calls.length,6);
 });
 test('shared news budget exhaustion stops the entire Notable sequence before first inference',async t=>{
- const r=await localRuntime();t.after(()=>r.close());const now=Math.floor(r.now/1000);for(let i=0;i<13;i++)assert.equal(await reserveAiSequence(r.db,randomUUID(),now,now+3600),true);
+ const r=await localRuntime();t.after(()=>r.close());const now=Math.floor(r.now/1000);for(let i=0;i<13;i++)assert.equal(await reserveAiSequence(r.db,randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'}),true);
  const fake=binding();assert.equal((await r.answerNotable('alice',command(),fake,options(r))).status,429);assert.equal(fake.calls.length,0);
 });
 test('atomic equal account quota and another account isolation use the same reservation ledger',async t=>{
  const r=await localRuntime();t.after(()=>r.close());const now=Math.floor(r.now/1000),prefix='notable:'+createHash('sha256').update('alice').digest('hex')+':';
- const results=await Promise.all(Array.from({length:3},()=>reserveAiSequence(r.db,prefix+randomUUID(),now,now+3600,{ownerPrefix:prefix,dailyLimit:2})));assert.equal(results.filter(Boolean).length,2);
- const other='notable:'+createHash('sha256').update('bob').digest('hex')+':';assert.equal(await reserveAiSequence(r.db,other+randomUUID(),now,now+3600,{ownerPrefix:other,dailyLimit:2}),true);
- assert.equal(await reserveAiSequence(r.db,prefix+randomUUID(),now,now+3600,{ownerPrefix:prefix,dailyLimit:21}),false);
+ const results=await Promise.all(Array.from({length:3},()=>reserveAiSequence(r.db,prefix+randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'},{ownerPrefix:prefix,dailyLimit:2})));assert.equal(results.filter(Boolean).length,2);
+ const other='notable:'+createHash('sha256').update('bob').digest('hex')+':';assert.equal(await reserveAiSequence(r.db,other+randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'},{ownerPrefix:other,dailyLimit:2}),true);
+ assert.equal(await reserveAiSequence(r.db,prefix+randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'},{ownerPrefix:prefix,dailyLimit:21}),false);
 });
 test('unsafe, truncated, unknown moderation and provider failures never expose responses or refund reservations',async t=>{
  const r=await localRuntime();t.after(()=>r.close());for(const response of [{response:'unsafe'},{response:'safe',finish_reason:'length'},{response:'perhaps safe'}]){let n=0;const fake={async run(){return n++===0?{response:JSON.stringify(draft)}:n===2?{response:'supported'}:response;}};const result=await r.answerNotable('alice',command(),fake,options(r));assert.equal(result.status,503);assert.equal(result.reply,undefined);}

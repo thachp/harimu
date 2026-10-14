@@ -49,3 +49,13 @@ assert.equal(sceneFromSearch('?view=city'),'square','City alias retains legacy s
 const cityVisit=sceneUrl('https://harimu.com/?view=country&nation=korund','square','korund','farim-rice');
 assert.equal(new URL(cityVisit).searchParams.get('city'),'farim-rice');
 assert.equal(new URL(cityVisit).searchParams.get('nation'),'korund','Sample city refresh retains its exploration nation');
+
+// #55: switching nations must not carry the previous nation's city forward.
+{
+  const stale = 'https://harimu.com/?view=square&nation=kindle&city=forgehaven';
+  assert.equal(new URL(sceneUrl(stale, 'country', 'confluence')).searchParams.get('city'), null);
+  assert.equal(new URL(sceneUrl(stale, 'government', 'confluence')).searchParams.get('city'), null);
+  const kept = new URL(sceneUrl(stale, 'square', 'confluence', 'meetwater'));
+  assert.equal(kept.searchParams.get('city'), 'meetwater');
+  assert.equal(kept.searchParams.get('nation'), 'confluence');
+}

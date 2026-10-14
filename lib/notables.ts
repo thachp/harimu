@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import {publicNewsFacts,validatedNewsDraft,newsDraftText,inferenceText,newsDraftResponseFormat,newsVerificationResponseFormat,supportedNewsDraft,type NewsAiBinding} from './ai-news';
-import {reserveAiSequence,type AiModel} from './ai-budget';
+import {reserveAiSequence,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 import {readNationalNews} from './national-news';
 import {notableProfile,notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 export {notableProfile,notableTopics,notableDailyLimit,validNotableCommand} from './notable-profiles';
@@ -8,21 +8,21 @@ export const notablesEnabled=true; // Explicit preview approval; independent run
 async function ownerPrefix(userId:string){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(userId));return 'notable:'+Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')+':';}
 
 /** No conversation history, household drafts, account IDs or private chat enter a model prompt. */
-export async function answerNotable(db:GameDatabase,userId:string,command:NotableCommand,now:number,binding:NewsAiBinding|undefined,{enabled=false,priceReviewedUntil=0}={}){
+export async function answerNotable(db:GameDatabase,userId:string,command:NotableCommand,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null}={}){
  const fail=(status:number,error:string)=>({status,error});
  if(!validNotableCommand(command))return fail(400,'Choose a listed public topic and a valid request.');
  const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();const profile=notableProfile(citizen?.nation_id??null);
  if(!profile||profile.id!==command.notableId)return fail(403,'Only your nation’s Notable is available.');
- if(!enabled||!binding)return fail(503,'AI conversations are disabled. Authored topic examples remain available.');
+ if(!enabled||!binding||!budget)return fail(503,'AI conversations are disabled. Authored topic examples remain available.');
  const prefix=await ownerPrefix(userId),id=prefix+command.requestId.toLowerCase();
  if(await db.prepare('SELECT request_id FROM harimu_ai_reservations WHERE request_id=?').bind(id).first())return fail(409,'This request was already attempted. Repeating it makes no further inference call.');
  const news=await readNationalNews(db,citizen!.nation_id,now*1000);if(!news)return fail(503,'Public context is unavailable.');const facts=publicNewsFacts(news);
- if(!await reserveAiSequence(db,id,now,priceReviewedUntil,{ownerPrefix:prefix,dailyLimit:notableDailyLimit},command.question!==undefined))return fail(429,'The equal daily limit or shared inference budget is unavailable.');
+ if(!await reserveAiSequence(db,id,now,budget,{ownerPrefix:prefix,dailyLimit:notableDailyLimit},command.question!==undefined))return fail(429,'The equal daily limit or shared inference budget is unavailable.');
  let uncertain=false,failureCode='validation';
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error();
   let timer:ReturnType<typeof setTimeout>|undefined;let result:unknown;
-  try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})}),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error()),30000);})]);}
+  try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},aiGatewayOptions(budget)),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error()),30000);})]);}
   catch(error){uncertain=true;failureCode=error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain';throw Error();}
   finally{if(timer!==undefined)clearTimeout(timer);}
   // A fulfilled provider call is terminal even when its content is invalid.

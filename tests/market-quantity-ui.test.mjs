@@ -30,3 +30,13 @@ test('Household food records distinguish saved meals, missing grants and local s
  assert.match(h.text(h.render()),/Last household meal recorded:/);
  assert.doesNotMatch(h.text(h.render()),/No meal cooldown has started/);
 });
+test('issue 32: an active meal cooldown names the recorded meal that consumed the starter food',()=>{
+ const h=harness();h.props.showTrading=false;h.props.economy.inventory=[];
+ h.props.market.mealReadyAt='2026-01-16T12:00:00.000Z';
+ h.props.market.householdRecord={starterFoodGranted:2,lastMealAt:'2026-01-15T12:00:00.000Z'};
+ const text=h.text(h.render());
+ assert.match(text,/Your household ate on .*one-time 2 starter food.*started the cooldown/);
+ assert.match(text,/Next meal:/);
+ h.props.market.mealReadyAt=null;h.props.market.householdRecord={starterFoodGranted:2,lastMealAt:null};
+ assert.doesNotMatch(h.text(h.render()),/Your household ate on|Next meal:/);
+});

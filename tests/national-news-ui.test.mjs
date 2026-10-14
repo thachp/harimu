@@ -23,6 +23,14 @@ test('all national editions show truthful statistics and distinguish system, SI 
   assert.match(renderToStaticMarkup(React.createElement(real.NewsEdition,{news})),/AI-generated/);
  }
 });
+test('each edition is labeled for its system: State Media templates with truthful widget, court decrees, free press',()=>{
+ const render=news=>renderToStaticMarkup(React.createElement(real.NewsEdition,{news}));
+ const korund=edition('korund');korund.items.push({id:'t',title:'Brigades deliver',text:'1 shift',source:'deterministic',kind:'template',occurredAt:1768489200000});
+ const k=render(korund);assert.match(k,/System statistics · truthful/);assert.match(k,/cannot change these numbers/);assert.match(k,/State Media template/);assert.match(k,/Propaganda Directorate/);
+ const aurelle=edition('aurelle');aurelle.items.push({id:'d',title:'By order of the Crown: Royal decree',text:'x',source:'deterministic',kind:'decree',occurredAt:1768489200000});
+ const a=render(aurelle);assert.match(a,/Court gazette · decree/);assert.match(a,/Herald/);assert.doesNotMatch(a,/System statistics · truthful/);
+ assert.match(render(edition('kindle')),/Free press/);
+});
 function harness(){
  let cursor=0,effects=[],slots=[],requests=[],closeOrder=[];
  const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useRef(){const i=cursor++;if(!(i in slots))slots[i]={current:{showModal(){},close(){closeOrder.push('native-close');},focus(){}}};return slots[i];},useEffect(fn){effects.push(fn);}};

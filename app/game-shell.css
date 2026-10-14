@@ -149,3 +149,5 @@ html[data-harimu-motion="reduce"] *,html[data-harimu-motion="reduce"] *::before,
 .wallet-credit { color: #9fd59a; }
 .wallet-debit { color: #e59a8a; }
 .game-resources>.game-wallet-button{display:grid;grid-template-columns:19px auto;column-gap:8px;align-items:center;min-width:82px;height:100%;padding:8px 12px;border-left:1px solid #263d46}
+.notable-transcript{list-style:none;padding:0;margin:0.5rem 0;display:grid;gap:0.5rem;max-height:40vh;overflow-y:auto}
+.notable-transcript li{border-left:3px solid currentColor;padding-left:0.5rem;overflow-wrap:anywhere}

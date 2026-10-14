@@ -6,7 +6,7 @@ import {validNotableCommand,validNotableQuestion} from '../lib/notable-profiles.
 import {aiNotableQuestionReservation,reserveAiSequence} from '../lib/ai-budget.ts';
 const command=question=>({requestId:randomUUID(),notableId:'kindle-journalist',topic:'news',question});
 const draft={title:'Public record',summary:'The public record does not establish that claim.',claims:['completedShifts']};
-const options=r=>({enabled:true,priceReviewedUntil:Math.floor(r.now/1000)+3600});
+const options=()=>({enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}});
 const provider=(answers=['safe',JSON.stringify(draft),'supported','safe'])=>{const calls=[];return{calls,async run(model,input){calls.push({model,input});const value=answers[calls.length-1];if(value instanceof Error)throw value;return typeof value==='string'?{response:value}:value;}};};
 test('explicit questions are bounded and unknown private-context fields are rejected',()=>{
  for(const q of ['', 'tiny', ' xxxxx ', 'x'.repeat(601), '😃'.repeat(450), 'hello\u0000world', null])assert.equal(validNotableQuestion(q),false);
@@ -37,10 +37,10 @@ test('unsafe and malformed output moderation discard a supported draft',async t=
  const r=await localRuntime();t.after(()=>r.close());for(const answer of ['unsafe','safe extra',{response:'safe',finish_reason:'length'},{response:42},new Error('private output error')]){const fake=provider(['safe',JSON.stringify(draft),'supported',answer]);const result=await r.answerNotable('alice',command('What does the public record establish?'),fake,options(r));assert.equal(result.status,503);assert.equal(result.reply,undefined);assert.equal(fake.calls.length,4);}
 });
 test('full four-call cost is reserved atomically before input moderation, sharing the news ceiling',async t=>{
- const r=await localRuntime();t.after(()=>r.close());const now=Math.floor(r.now/1000);for(let i=0;i<12;i++)assert.equal(await reserveAiSequence(r.db,randomUUID(),now,now+3600),true);
+ const r=await localRuntime();t.after(()=>r.close());const now=Math.floor(r.now/1000);for(let i=0;i<12;i++)assert.equal(await reserveAiSequence(r.db,randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'}),true);
  const fake=provider();assert.equal((await r.answerNotable('alice',command('What is in the public ledger?'),fake,options(r))).status,429);assert.equal(fake.calls.length,0);
 });
 
 test('concurrent freeform reservations charge four-call cost and respect the equal owner cap',async t=>{
- const r=await localRuntime();t.after(()=>r.close());const now=Math.floor(r.now/1000),prefix='notable:'+'a'.repeat(64)+':';const results=await Promise.all(Array.from({length:4},()=>reserveAiSequence(r.db,prefix+randomUUID(),now,now+3600,{ownerPrefix:prefix,dailyLimit:2},true)));assert.equal(results.filter(Boolean).length,2);assert.equal((await r.db.prepare('SELECT SUM(reserved_micro) AS n FROM harimu_ai_reservations').first()).n,aiNotableQuestionReservation*2);
+ const r=await localRuntime();t.after(()=>r.close());const now=Math.floor(r.now/1000),prefix='notable:'+'a'.repeat(64)+':';const results=await Promise.all(Array.from({length:4},()=>reserveAiSequence(r.db,prefix+randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'},{ownerPrefix:prefix,dailyLimit:2},true)));assert.equal(results.filter(Boolean).length,2);assert.equal((await r.db.prepare('SELECT SUM(reserved_micro) AS n FROM harimu_ai_reservations').first()).n,aiNotableQuestionReservation*2);
 });

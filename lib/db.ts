@@ -1,5 +1,6 @@
 import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
 import {reconcileAiAcceptanceCharges,prebookNewsAcceptance} from './ai-acceptance-charges';
+import {aiBudgetConfig} from './ai-budget';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
 import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
@@ -337,7 +338,7 @@ async function initialize(database: GameDatabase) {
 }
 
 export async function getDatabase():Promise<GameDatabase> {
-  const bindings=env as unknown as {HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_PRICE_REVIEWED_UNTIL?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
+  const bindings=env as unknown as {HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
   const journalRetentionApproved=bindings.HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED==='true';
   const selected=selectStorageBackend({backend:bindings.HARIMU_STORAGE_BACKEND,implementationEnabled:postgresRuntimeEnabled,developmentPreview:bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,maintenance:bindings.HARIMU_STORAGE_MAINTENANCE,cutoverReady:bindings.HARIMU_POSTGRES_CUTOVER_READY,hyperdriveConfigured:Boolean(bindings.HYPERDRIVE),journalRetentionApproved});
   if(selected==='postgres'){
@@ -354,7 +355,7 @@ export async function getDatabase():Promise<GameDatabase> {
       const schema=await database.prepare("SELECT COUNT(*) AS count FROM pg_tables WHERE schemaname='public' AND tablename IN ('poc_elections','poc_voter_receipts','poc_anonymous_ballots')").first<{count:number}>();
       if(schema?.count!==3){if(bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED!=='true')throw Error('Approved preview election migration required.');const {initializeAccountElectionSchema}=await import('./postgres/driver');await initializeAccountElectionSchema(bindings.HYPERDRIVE!.connectionString);}
     }
-    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true'){await reconcileAiAcceptanceCharges(database);await prebookNewsAcceptance(database,Math.floor(Date.now()/1000),Math.floor(Date.parse(bindings.HARIMU_AI_PRICE_REVIEWED_UNTIL??'')/1000));}
+    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true'){await reconcileAiAcceptanceCharges(database);await prebookNewsAcceptance(database,Math.floor(Date.now()/1000),aiBudgetConfig(bindings));}
     return database;
   }
   const database = databaseBinding();

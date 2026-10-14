@@ -68,10 +68,11 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
     </>}
     {showMeal && <><h3>Household meal</h3>
     <p>{market.mealFood} food → up to {market.mealCapacity} WC, capped at 24. Once every {mealInterval}; your normal capacity recovery continues while away.</p>
+    {!ready && market.householdRecord?.lastMealAt && <p>{`Your household ate on ${formatTime(market.householdRecord.lastMealAt)}${market.householdRecord.starterFoodGranted > 0 && count('food') < market.mealFood ? `, using food that included your one-time ${market.householdRecord.starterFoodGranted} starter food` : ''}. That meal started the cooldown below.`}</p>}
     <p>{!ready ? `Next meal: ${formatTime(market.mealReadyAt!)}`
       : capacity >= 24 ? 'Capacity full · save your food for later.'
         : count('food') < market.mealFood ? 'Not enough food · harvest or buy food at the market.' : 'Meal available · feed your household to recover capacity.'}</p>
-    {market.mealReadyAt && <GameTimer endsAt={market.mealReadyAt} label="Next meal" />}
+    {!ready && market.mealReadyAt && <GameTimer endsAt={market.mealReadyAt} label="Next meal" />}
     <button type="button" disabled={Boolean(mealReason)} aria-describedby={mealReason ? 'household-meal-reason' : undefined}
       onClick={() => { if (!mealReason) onMeal(); }}>Prepare household meal · {market.mealFood} food</button>
     {mealReason && <small id="household-meal-reason">{mealReason}</small>}
