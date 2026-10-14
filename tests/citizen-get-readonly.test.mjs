@@ -84,3 +84,28 @@ test('first-week latch hooks: square POST and election POST latch their goals', 
   assert.notEqual((await r.call('square', 'alice', { action: 'post', expectedNationId: 'kindle', id: 'bad', text: '' })).status, 200);
   assert.equal((await goals()).length, before);
 });
+
+test('a petition filed on a past day is reviewed on GET without writes; the next POST latches the same review (QA1 on #217)', async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  r.setVerification('alice', tierOne(r, 'alice'));
+  const filed = await r.call('citizen', 'alice', { action: 'government-petition', topic: 'infrastructure', requestId: randomUUID() });
+  assert.equal(filed.status, 200, JSON.stringify(filed.data));
+  r.setNow(Math.floor(r.now / 86400000) * 86400000 + 86400000 + 3600000); // next UTC day
+  r.setVerification('alice', tierOne(r, 'alice'));
+  const probe = recordWrites(r);
+  const get = await r.call('citizen', 'alice');
+  probe.restore();
+  assert.equal(get.status, 200); assert.deepEqual(probe.writes, [], `GET wrote ${JSON.stringify(probe.writes)}`);
+  const reviews = async () => Number((await r.db.prepare('SELECT COUNT(*) AS n FROM government_reviews').first()).n);
+  const resolutions = async () => Number((await r.db.prepare('SELECT COUNT(*) AS n FROM government_petition_resolutions').first()).n);
+  assert.equal(await reviews(), 0); assert.equal(await resolutions(), 0);
+  const projected = get.data.government;
+  assert.equal(projected.petitions[0].status, 'accepted'); assert.ok(projected.review, 'projected review is shown');
+  // A write path latches the review; GET then shows the same decision from the persisted row.
+  assert.equal((await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'harvest' })).status, 200);
+  assert.equal(await reviews(), 1); assert.equal(await resolutions(), 1);
+  const after = (await r.call('citizen', 'alice')).data.government;
+  assert.equal(after.petitions[0].status, projected.petitions[0].status);
+  assert.equal(after.decision?.topic, projected.decision?.topic);
+  assert.equal(after.review.periodStart, projected.review.periodStart); assert.equal(after.review.petitionCount, projected.review.petitionCount);
+});
