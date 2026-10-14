@@ -2184,14 +2184,17 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
   .national-agenda::before { top: 0; }
 }
 
-/* Reduced motion (#83): the OS setting, or Settings > Motion = Reduce, stops toast, panel and dialog
-   transitions and animations everywhere, including Clerk portals and native dialogs outside the game shell. */
+/* Reduced motion (#83, #120): one source of truth. DisplayPreferencesProvider sets
+   html[data-harimu-reduced-motion] when Settings > Motion = Reduce OR the OS asks for reduced motion
+   (effectiveReducedMotion). It stops transitions and animations everywhere, including Clerk portals
+   (.cl-*), native dialogs and their ::backdrop. Separate rules keep one unsupported pseudo from
+   dropping the others. */
+html[data-harimu-reduced-motion] * { scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+html[data-harimu-reduced-motion] *::before, html[data-harimu-reduced-motion] *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+/* Fallback only until the provider hydrates and sets the attribute. */
 @media (prefers-reduced-motion: reduce) {
-  html:not([data-harimu-motion="reduce"]) *, html:not([data-harimu-motion="reduce"]) *::before, html:not([data-harimu-motion="reduce"]) *::after,
-  html:not([data-harimu-motion="reduce"]) ::backdrop {
-    scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important;
-    animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important;
-  }
+  html:not([data-harimu-motion]) * { scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
 }
 
 /* Focus-visible baseline (#83): every keyboard-reachable control in the top bar, dock, panels and dialogs
