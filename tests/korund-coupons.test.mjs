@@ -63,7 +63,22 @@ test('quota bar and coupon book render',async()=>{
  const text=t=>t.filter(n=>typeof n==='string'||typeof n==='number').join(' ');
  const bar=nodes(exports.QuotaBar({quota:{workUnit:'Brigade',targetFood:40,unitFood:10,ownFood:4,weekStartsAt:'',weekEndsAt:''}}));
  const pb=bar.find(n=>n?.props?.role==='progressbar');assert.equal(pb.props['aria-valuenow'],10);assert.match(text(bar),/25\s*%/);
- let redeemed;const book=nodes(exports.CouponBook({coupons:buildCoupons(false,new Set(),'2026-01-01T00:00:00.000Z'),walletMinor:800,clothing:0,goods:0,reason:null,onRedeem:k=>{redeemed=k;},onFood(){}}));
+ let redeemed;const book=nodes(exports.CouponBook({now:Date.parse('2025-12-31T00:00:00.000Z'),coupons:buildCoupons(false,new Set(),'2026-01-01T00:00:00.000Z'),walletMinor:800,clothing:0,goods:0,reason:null,onRedeem:k=>{redeemed=k;},onFood(){}}));
  assert.match(text(book),/cannot be traded or sent/);assert.match(text(book),/2\.00\s*LN fixed price/);
  const buttons=book.filter(n=>typeof n?.props?.onClick==='function'&&n.props.reason!==undefined);buttons[1].props.onClick();assert.equal(redeemed,'goods');
+});
+
+test('review fix: an expired coupon book cannot spend the new week (UI disabled, server checks week)',async t=>{
+ const js=ts.transpileModule(await readFile(new URL('../app/korund-plan-panel.tsx',import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
+ const exports={};new Function('exports','require',js)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>String}:name==='./game-timer'?{GameTimer:()=>null}:name==='./nation-document'?{NationDocument:()=>null}:name==='./action-button'?{ActionButton:()=>null}:name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='@/lib/korund-coupons'?require('../lib/korund-coupons.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):name==='react'?{useState:i=>[i,()=>{}],useEffect(){}}:require(name));
+ const nodes=n=>!n||typeof n!=='object'?[n]:[n,...[n.props?.children].flat(Infinity).flatMap(nodes)];
+ const book=nodes(exports.CouponBook({now:Date.parse('2026-01-01T00:00:01.000Z'),coupons:buildCoupons(false,new Set(),'2026-01-01T00:00:00.000Z'),walletMinor:800,clothing:0,goods:0,reason:null,onRedeem(){},onFood(){}}));
+ const reasons=book.filter(n=>n?.props?.reason!==undefined&&typeof n.props.onClick==='function').map(n=>n.props.reason);
+ assert.equal(reasons.length,2);for(const r of reasons)assert.match(r,/expired at the weekly reset/);
+ const r=await fixture(t);const first=(await r.call('citizen','alice')).data;const epoch=first.simulation.clock.epochSeconds;
+ await work(r,'alice');r.setNow((epoch+50400)*1000);
+ const stale=await r.call('citizen','alice',coupon('clothing',randomUUID(),{gameWeek:1}));assert.equal(stale.status,409);assert.match(stale.data.error,/expired/);
+ assert.equal(stale.data.korundPlan.walletMinor,800);assert.equal(stale.data.korundPlan.coupons.find(c=>c.kind==='clothing').used,false);
+ assert.equal((await r.call('citizen','alice',coupon('clothing',randomUUID(),{gameWeek:2}))).status,200);
+ assert.equal((await r.call('citizen','alice',coupon('goods',randomUUID(),{gameWeek:0}))).status,400);
 });

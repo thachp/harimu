@@ -40,11 +40,11 @@ export type KorundPlan = { available:boolean; mode:'bounded state planning'; ass
  walletMinor:number;foodQuantity:number;publicFoodRemaining:number;publicFundMinor:number;
  gameWeek:number;couponFoodRemaining:number;couponExpiresAt:string;mealReadyAt:string|null;shifts:WorkShift[];queue?:RationQueue;
  coupons?:KorundCoupon[];quota?:KorundQuota;clothingQuantity?:number;goodsQuantity?:number };
-export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'|'korund-join-ration-queue'|'korund-cancel-ration-queue'|'korund-redeem-coupon'; requestId?:string;shiftId?:string;queueId?:string;coupon?:'clothing'|'goods'};
+export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'|'korund-join-ration-queue'|'korund-cancel-ration-queue'|'korund-redeem-coupon'; requestId?:string;shiftId?:string;queueId?:string;coupon?:'clothing'|'goods';gameWeek?:number};
 const uuid=(v:unknown):v is string=>typeof v==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export function validKorundCommand(body:Record<string,unknown>):body is Record<string,unknown>&KorundCommand {
  if(body.action==='korund-cancel-ration-queue')return uuid(body.requestId)&&uuid(body.queueId);
- if(body.action==='korund-redeem-coupon')return uuid(body.requestId)&&(body.coupon==='clothing'||body.coupon==='goods')&&Object.keys(body).every(k=>['action','requestId','coupon'].includes(k));
+ if(body.action==='korund-redeem-coupon')return uuid(body.requestId)&&(body.coupon==='clothing'||body.coupon==='goods')&&(body.gameWeek===undefined||(Number.isInteger(body.gameWeek)&&Number(body.gameWeek)>=1))&&Object.keys(body).every(k=>['action','requestId','coupon','gameWeek'].includes(k));
  return body.action==='korund-claim-work' ? uuid(body.shiftId)&&(body.requestId===undefined||uuid(body.requestId)) : ['korund-start-work','korund-redeem-ration','korund-household-meal','korund-join-ration-queue'].includes(String(body.action)) && uuid(body.requestId);
 }
 async function week(db:GameDatabase,now:number) {
@@ -81,7 +81,7 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  const iso=new Date(now*1000).toISOString();
  const id=(command.action==='korund-claim-work'?command.shiftId!:command.requestId!).toLowerCase();
  if(command.action==='korund-join-ration-queue'||command.action==='korund-cancel-ration-queue'){const w=await week(db,now);return executeRationQueue(db,userId,command.action,id,command.queueId?.toLowerCase(),w.number,now,Date.parse(w.expiresAt)/1000);}
- if(command.action==='korund-redeem-coupon')return redeemCoupon(db,userId,id,command.coupon!,now);
+ if(command.action==='korund-redeem-coupon')return redeemCoupon(db,userId,id,command.coupon!,now,command.gameWeek);
  if(await queueIdentifierUsed(db,id))return {status:409,error:'Request identifier already used for a ration queue action.'};
  if(command.action==='korund-start-work') {
  const conflicting=await db.prepare('SELECT id FROM korund_rations WHERE id=? UNION ALL SELECT id FROM korund_meals WHERE id=?').bind(id,id).first();
@@ -120,11 +120,13 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  return receipt?{status:200}:{status:409,error:command.action==='korund-redeem-ration'?'Ration unavailable: this game-week coupon was used or public food is exhausted or an earlier FIFO request must collect first.':'Meal unavailable: check household food, Work Capacity and the two-hour meal timer.'};
 }
 
-async function redeemCoupon(db:GameDatabase,userId:string,id:string,coupon:'clothing'|'goods',now:number){
+async function redeemCoupon(db:GameDatabase,userId:string,id:string,coupon:'clothing'|'goods',now:number,shownWeek?:number){
  const existing=await db.prepare('SELECT clerk_user_id,coupon FROM korund_coupon_redemptions WHERE id=?').bind(id).first<{clerk_user_id:string;coupon:string}>();
  if(existing)return existing.clerk_user_id===userId&&existing.coupon===coupon?{status:200,replayed:true}:{status:409,error:'Request identifier already used.'};
  if(await queueIdentifierUsed(db,id)||await db.prepare('SELECT id FROM korund_rations WHERE id=? UNION ALL SELECT id FROM korund_meals WHERE id=? UNION ALL SELECT id FROM work_shifts WHERE id=?').bind(id,id,id).first())return {status:409,error:'Request identifier already used for another action.'};
  const w=await week(db,now);const good=korundCouponGoods[coupon];
+ // The client sends the week it displayed; an expired book must never spend the new week's coupon.
+ if(shownWeek!==undefined&&shownWeek!==w.number)return {status:409,error:'Your coupon book expired at the weekly reset. Refresh to see this week’s coupons.'};
  await db.prepare(korundCouponRedeemSql).bind(id,w.number,coupon,good.item,good.priceMinor,now,userId,userId,w.number,coupon,good.priceMinor,userId,userId).run();
  const receipt=await db.prepare('SELECT id FROM korund_coupon_redemptions WHERE id=? AND clerk_user_id=?').bind(id,userId).first();
  return receipt?{status:200}:{status:409,error:`${good.label} unavailable: it was already used this game week or you need ${(good.priceMinor/100).toFixed(2)} LN.`};

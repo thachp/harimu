@@ -14,7 +14,7 @@ import { quotaPercent } from '@/lib/korund-coupons';
 
 export type KorundPlanView = KorundPlan;
 export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal' | 'korund-join-ration-queue' | 'korund-cancel-ration-queue' | 'korund-redeem-coupon';
-export type KorundCommand = { action: KorundAction; requestId: string; shiftId?: string; queueId?:string; coupon?:'clothing'|'goods' };
+export type KorundCommand = { action: KorundAction; requestId: string; shiftId?: string; queueId?:string; coupon?:'clothing'|'goods'; gameWeek?: number };
 
 export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, onCommand, onRetry, onRefresh, onNavigate }: {
   plan: KorundPlanView | null; scene: SceneView; capacity: number; pending: boolean; uncertain: boolean;
@@ -59,7 +59,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!couponsCurrent, 'Refresh for the current game week’s ration book.'], [plan.couponFoodRemaining <= 0, 'This game week’s food coupons have been used.'], [!queue,'Refresh to load the current queue.'], [Boolean(queue&&queue.waiting>0&&queue.position!==1),queue?.requestId?'Wait for earlier requests to collect or cancel. Your place is retained.':'Join the queue and wait for earlier requests to collect or cancel.'], [plan.publicFoodRemaining < plan.couponFoodRemaining, 'State food cannot cover this ration. Collected assignments replenish it.'])} onClick={() => onCommand('korund-redeem-ration')}>Redeem this week’s food coupons · {plan.couponFoodRemaining} food</ActionButton>
       <button type="button" onClick={() => onNavigate('household')}>Take rations to your household</button>
     </> : scene === 'household' ? <>
-      {plan.coupons && <CouponBook coupons={plan.coupons} walletMinor={plan.walletMinor} clothing={plan.clothingQuantity ?? 0} goods={plan.goodsQuantity ?? 0} reason={pendingActionReason(pending, uncertain)} onRedeem={(kind) => onCommand('korund-redeem-coupon', kind)} onFood={() => onNavigate('market')} />}
+      {plan.coupons && <CouponBook now={now} coupons={plan.coupons} walletMinor={plan.walletMinor} clothing={plan.clothingQuantity ?? 0} goods={plan.goodsQuantity ?? 0} reason={pendingActionReason(pending, uncertain)} onRedeem={(kind) => onCommand('korund-redeem-coupon', kind)} onFood={() => onNavigate('market')} />}
       <p>A household meal uses 2 food and restores up to 4 WC, capped at 24. Meals have a two-real-hour (one game day) cooldown; normal capacity recovery continues.</p>
       <p>{capacity >= 24 ? 'Capacity is full; save your rations.' : plan.foodQuantity < 2 ? 'Redeem your ration coupons for food.' : !mealReady ? `Next meal: ${plan.mealReadyAt ? formatTime(plan.mealReadyAt) : 'checking timing…'}` : 'Household meal available.'}</p>
       <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([capacity >= 24, 'Capacity is full. Save your rations.'], [plan.foodQuantity < 2, 'You need 2 food. Redeem ration coupons at the counter.'], [!mealReady, now ? 'Wait until the next meal time shown above.' : 'Checking the meal timer…'])} onClick={() => onCommand('korund-household-meal')}>Prepare ration meal · 2 food</ActionButton>{plan.mealReadyAt && <GameTimer endsAt={plan.mealReadyAt} label="Next meal" />}
@@ -102,8 +102,8 @@ export function QuotaBar({ quota }: { quota: NonNullable<KorundPlanView['quota']
   </section>;
 }
 
-export function CouponBook({ coupons, walletMinor, clothing, goods, reason, onRedeem, onFood }: {
-  coupons: NonNullable<KorundPlanView['coupons']>; walletMinor: number; clothing: number; goods: number; reason: string | null;
+export function CouponBook({ now, coupons, walletMinor, clothing, goods, reason, onRedeem, onFood }: {
+  now: number; coupons: NonNullable<KorundPlanView['coupons']>; walletMinor: number; clothing: number; goods: number; reason: string | null;
   onRedeem: (kind: 'clothing' | 'goods') => void; onFood: () => void;
 }) {
   const expiresAt = coupons[0]?.expiresAt;
@@ -114,7 +114,7 @@ export function CouponBook({ coupons, walletMinor, clothing, goods, reason, onRe
     <ul>{coupons.map((coupon) => <li key={coupon.kind}>
       <strong>{coupon.label}</strong> · {coupon.quantity} {coupon.item} · {coupon.priceMinor === 0 ? 'no LN charge' : `${(coupon.priceMinor / 100).toFixed(2)} LN fixed price`} · {coupon.used ? 'used this week' : 'available'}
       {coupon.kind === 'food' ? (!coupon.used && <button type="button" onClick={onFood}>Redeem at the ration counter</button>)
-        : <ActionButton type="button" reason={reason ?? firstActionReason([coupon.used, 'This coupon was already used this week.'], [walletMinor < coupon.priceMinor, `You need ${(coupon.priceMinor / 100).toFixed(2)} LN. Complete an assigned shift first.`])} onClick={() => onRedeem(coupon.kind as 'clothing' | 'goods')}>Redeem {coupon.label.toLowerCase()}</ActionButton>}
+        : <ActionButton type="button" reason={reason ?? firstActionReason([!now, 'Checking the coupon expiry…'], [now >= Date.parse(coupon.expiresAt), 'This coupon book expired at the weekly reset. Refresh for this week’s coupons.'], [coupon.used, 'This coupon was already used this week.'], [walletMinor < coupon.priceMinor, `You need ${(coupon.priceMinor / 100).toFixed(2)} LN. Complete an assigned shift first.`])} onClick={() => onRedeem(coupon.kind as 'clothing' | 'goods')}>Redeem {coupon.label.toLowerCase()}</ActionButton>}
     </li>)}</ul>
     <p>Household stores: {clothing} clothing · {goods} goods bundles.</p>
   </section>;

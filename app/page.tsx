@@ -992,7 +992,7 @@ export default function Home() {
     }
   }
 
-  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand(action === 'korund-redeem-coupon' ? { action, coupon: shiftId === 'goods' ? 'goods' : 'clothing', requestId: crypto.randomUUID() } : { action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
+  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand(action === 'korund-redeem-coupon' ? { action, coupon: shiftId === 'goods' ? 'goods' : 'clothing', gameWeek: korundPlan?.gameWeek, requestId: crypto.randomUUID() } : { action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
   async function runAurelleCommand(command: AurelleCommand) {
     const originalAurelleClaim = command.action === 'aurelle-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'CRN');
     if (marketIntent.current || playerIntent.current || korundIntent.current) return;
