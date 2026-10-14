@@ -37,3 +37,22 @@ export function sceneUrl(href: string, scene: SceneView, nationId?: string, city
 export function isGamePopstate(mountedPathname: string, currentPathname: string): boolean {
   return currentPathname === mountedPathname;
 }
+const legacyViews = ['city', 'home', 'planning'];
+/**
+ * Drop unknown, stale or mismatched deep-link params (#90) so an old bookmark
+ * falls back to a valid scene instead of crashing. Returns a `?query` string
+ * ('' when nothing remains). Unrelated params are kept.
+ */
+export function normalizeSceneSearch(search: string, nationIds: readonly string[], cityInNation: (nationId: string, cityId: string) => boolean): string {
+  let params: URLSearchParams;
+  try { params = new URLSearchParams(search); } catch { return ''; }
+  const view = params.get('view');
+  if (view !== null && !viewModes.includes(view as SceneView) && !legacyViews.includes(view)) params.delete('view');
+  const nation = params.get('nation');
+  if (nation !== null && !nationIds.includes(nation)) params.delete('nation');
+  const city = params.get('city');
+  const validNation = params.get('nation');
+  if (city !== null && (validNation ? !cityInNation(validNation, city) : !nationIds.some(id => cityInNation(id, city)))) params.delete('city');
+  const out = params.toString();
+  return out ? `?${out}` : '';
+}
