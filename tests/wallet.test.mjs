@@ -66,7 +66,7 @@ test('wallet panel shows SPK and TSR balances, the quote and each transaction',a
 
 test('review fixes: history comes from the balance snapshot, demo hides the wallet, Tab stays in the dialog',async()=>{
  const economy=await readFile(new URL('../lib/economy.ts',import.meta.url),'utf8');
- assert.match(economy,/AS history_json/);assert.doesNotMatch(economy,/prepare\(walletHistorySql\)/);
+ assert.match(economy,/AS history_json/);assert.match(economy,/prepare\(economyWalletSnapshotSql\)/);assert.doesNotMatch(economy.match(/export const economySnapshotSql = `[^`]+`/)[0],/\$\{/,'snapshot SQL literal has no interpolation');assert.doesNotMatch(economy,/prepare\(walletHistorySql\)/);
  const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
  assert.match(page,/onOpenWallet=\{clerkConfigured && !guestActive/);
  const exports={};new Function('exports','require',await compile('../app/wallet-panel.tsx'))(exports,name=>name==='@phosphor-icons/react'?{X:()=>null}:name==='@/lib/wallet'?require('../lib/wallet.ts'):require(name));

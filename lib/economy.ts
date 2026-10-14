@@ -79,15 +79,18 @@ export const economySnapshotSql = `SELECT
   (SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id = ?) AS wallet_minor,
   (SELECT json_group_array(json_object('item', item, 'quantity', quantity)) FROM
     (SELECT item, quantity FROM citizen_inventory_balances WHERE clerk_user_id = ? AND quantity > 0 ORDER BY item)) AS inventory_json,
-  (SELECT recovered_at FROM capacity_clocks WHERE clerk_user_id = ?) AS recovered_at,
+  (SELECT recovered_at FROM capacity_clocks WHERE clerk_user_id = ?) AS recovered_at`;
+// economySnapshotSql stays a plain literal (tests/economy.test.py extracts it). The wallet read appends the
+// history as one more column of the same statement, so balance and history share one snapshot (#49 review).
+export const economyWalletSnapshotSql = economySnapshotSql + `,
   (SELECT json_group_array(json_object('id', id, 'kind', kind, 'amount_minor', amount_minor, 'item', item, 'quantity', quantity, 'occurred_at', occurred_at))
-    FROM (${walletHistorySql})) AS history_json`;
+    FROM (` + walletHistorySql + `)) AS history_json`;
 
 export async function readEconomy(db: GameDatabase, userId: string, interval: number): Promise<Economy> {
   await db.prepare(starterGrantSql).bind(userId).run();
   // One SQLite read snapshot keeps wallet and goods consistent during another tab's claim.
   // Wallet history is read in the same statement so the balance and the listed movements always agree (#49 review).
-  const row = await db.prepare(economySnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId).first<{
+  const row = await db.prepare(economyWalletSnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId).first<{
     wallet_minor: number; inventory_json: string; recovered_at: number | null; history_json: string | null;
   }>();
   const history = sortHistory(JSON.parse(row?.history_json ?? '[]') as WalletHistoryRow[]);
