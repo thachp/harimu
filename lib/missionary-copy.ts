@@ -57,3 +57,21 @@ export const hostPermissionNotices:Readonly<Record<HostNationId,readonly Line[]>
   L('In Aurelle, leaving the Kinward Rite costs Royal Favor.')],
  korund:[L('Preaching is banned in Korund. This missionary cannot preach here.')],
 };
+
+/** Accept step (ARC #268): a Kinward member in Aurelle sees the Royal Favor cost before accepting another faith (§14.2). */
+export const acceptStepWarnings={
+ aurelleLeavingKinward:{host:'aurelle',currentFaith:'kinward-rite',
+  ...L('Accepting means leaving the Kinward Rite. In Aurelle, that costs Royal Favor.')},
+} as const;
+export function acceptStepLines(host:HostNationId,currentFaith:string|null,invitingFaith:MissionFaithId):readonly Line[]{
+ const w=acceptStepWarnings.aurelleLeavingKinward;
+ return host===w.host&&currentFaith===w.currentFaith&&invitingFaith!==w.currentFaith?[{text:w.text,proposal:true}]:[];
+}
+
+/** Cooldown display (ARC #268): while a cooldown is active, show only the notice, never a disabled invitation card. */
+export type InvitationDisplay={kind:'card';copy:InvitationCopy}|{kind:'notice';notice:Line};
+export function invitationDisplay(faithId:MissionFaithId,cooldown:'none'|'invitation-recent'|'faith-change-locked'):InvitationDisplay{
+ if(cooldown==='invitation-recent')return {kind:'notice',notice:cooldownNotices.invitationRecent};
+ if(cooldown==='faith-change-locked')return {kind:'notice',notice:cooldownNotices.faithChangeLocked};
+ return {kind:'card',copy:invitationCopy[faithId]};
+}

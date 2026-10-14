@@ -54,3 +54,22 @@ test('unwired: nothing in app/ or components/ imports missionary-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/missionary-copy/, f);
 });
+import { acceptStepLines, acceptStepWarnings, invitationDisplay } from '../lib/missionary-copy.ts';
+test('ARC #268: Royal Favor cost on Accept for Kinward members in Aurelle only', () => {
+  const [l]=acceptStepLines('aurelle','kinward-rite','open-hand'); assert.ok(l); assert.match(l.text,/Royal Favor/); assert.match(l.text,/leaving the Kinward Rite/);
+  assert.equal(l.proposal,true); assert.ok(l.text.length<=MISSION_LINE_MAX);
+  assert.deepEqual(acceptStepLines('kindle','kinward-rite','open-hand'),[]);
+  assert.deepEqual(acceptStepLines('aurelle','open-hand','fair-wind-vow'),[]);
+  assert.deepEqual(acceptStepLines('aurelle',null,'open-hand'),[]);
+  assert.deepEqual(acceptStepLines('aurelle','kinward-rite','kinward-rite'),[]);
+  assert.doesNotMatch(acceptStepWarnings.aurelleLeavingKinward.text,/\b(must|forced?|required|should)\b/i);
+});
+test('ARC #268: unmute keeps the 14-day limit; cooldown shows only the notice', () => {
+  assert.match(muteCopy.unmuted.text,/14 days/);
+  for (const f of MISSION_FAITHS) {
+    assert.deepEqual(invitationDisplay(f,'invitation-recent'),{kind:'notice',notice:cooldownNotices.invitationRecent});
+    assert.deepEqual(invitationDisplay(f,'faith-change-locked'),{kind:'notice',notice:cooldownNotices.faithChangeLocked});
+    const c=invitationDisplay(f,'none'); assert.equal(c.kind,'card'); assert.equal(c.copy,invitationCopy[f]);
+    for (const d of [invitationDisplay(f,'invitation-recent'),invitationDisplay(f,'faith-change-locked')]) assert.ok(!('copy' in d), 'no disabled card');
+  }
+});
