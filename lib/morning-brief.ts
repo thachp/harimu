@@ -14,6 +14,13 @@ export function requestOpenNews(id: string, target: Pick<Window, 'dispatchEvent'
   target?.dispatchEvent(new CustomEvent(openNewsEvent, { detail: { id } }));
 }
 
+/** #73: brief headlines keep the /api/news provenance so model-written items carry the same label as the News panel (AiTextTag). */
+export type MorningBriefHeadline = { id: string; title: string; source?: string; kind?: string };
+export const AI_GENERATED_LABEL = 'AI-generated';
+export function headlineDetail(h: Pick<MorningBriefHeadline, 'source'>): string {
+  return h.source === 'model' ? `${AI_GENERATED_LABEL} · Read in the news feed` : 'Read in the news feed';
+}
+
 export type MorningBriefItem = { id: string; label: string; detail: string; target: SceneView; newsId?: string };
 export type MorningBriefSection = { id: 'news' | 'leader' | 'needs' | 'notifications'; title: string; items: MorningBriefItem[] };
 
@@ -24,7 +31,7 @@ export type MorningBriefInput = {
   shift?: { title: string; endsAt: number } | null;
   now: number;
   leaderOrder?: { title: string; reason: string } | null;
-  headlines?: { id: string; title: string }[];
+  headlines?: MorningBriefHeadline[];
   petitions?: { id: string; title: string }[];
   ballots?: { id: string; title: string }[];
 };
@@ -42,7 +49,7 @@ export function shouldAutoOpenBrief(lastSeenDay: string | null, now: number): bo
 export function morningBriefSections(input: MorningBriefInput, sources: { news: boolean; petitions: boolean; ballots: boolean } = morningBriefSources): MorningBriefSection[] {
   const sections: MorningBriefSection[] = [];
   const headlines = sources.news ? (input.headlines ?? []).slice(0, 3) : [];
-  if (headlines.length) sections.push({ id: 'news', title: 'Headlines', items: headlines.map(h => ({ id: `news:${h.id}`, label: h.title, detail: 'Read in the news feed', target: 'square' as SceneView, newsId: h.id })) });
+  if (headlines.length) sections.push({ id: 'news', title: 'Headlines', items: headlines.map(h => ({ id: `news:${h.id}`, label: h.title, detail: headlineDetail(h), target: 'square' as SceneView, newsId: h.id })) });
   if (input.leaderOrder) sections.push({ id: 'leader', title: "Leader's latest order", items: [{ id: 'leader', label: input.leaderOrder.title, detail: input.leaderOrder.reason, target: 'government' }] });
   const needs: MorningBriefItem[] = [];
   if (input.food !== undefined) needs.push({ id: 'food', label: `${input.food} food`, detail: 'Household food · buy or eat at the market', target: 'market' });

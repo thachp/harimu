@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { briefDayKey, morningBriefSections, shouldAutoOpenBrief, morningBriefSources, openNewsEvent, requestOpenNews } from '../lib/morning-brief.ts';
+import { briefDayKey, morningBriefSections, shouldAutoOpenBrief, morningBriefSources, openNewsEvent, requestOpenNews, AI_GENERATED_LABEL, headlineDetail } from '../lib/morning-brief.ts';
 
 const now = new Date(2026, 9, 14, 8, 0).getTime();
 test('brief auto-opens once per real day', () => {
@@ -37,4 +37,18 @@ test('sections with data render; empty ones are hidden; headlines capped at 3', 
   assert.equal(s[0].items.length, 3);
   assert.equal(s[1].items[0].target, 'government');
   assert.deepEqual(morningBriefSections({ capacity: 5, now }, on).map(x => x.id), ['needs']);
+});
+test('#73 model-written headlines carry the AI-generated label the News panel uses; others do not', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const disclosure = await readFile(new URL('../app/ai-disclosure.tsx', import.meta.url), 'utf8');
+  assert.match(disclosure, new RegExp(`provenance==='model'\\?'${AI_GENERATED_LABEL}'`), 'same text as AiTextTag');
+  const news = morningBriefSections({ capacity: 24, now, headlines: [
+    { id: 'kindle:ai:1', title: 'Model story', source: 'model', kind: 'report' },
+    { id: 'kindle:work:1', title: 'Rule story', source: 'rules', kind: 'template' },
+    { id: 'kindle:sys:1', title: 'System story', source: 'system' },
+  ] }).find(x => x.id === 'news');
+  assert.match(news.items[0].detail, /^AI-generated · /);
+  assert.doesNotMatch(news.items[1].detail, /AI-generated/);
+  assert.doesNotMatch(news.items[2].detail, /AI-generated/);
+  assert.equal(headlineDetail({}), 'Read in the news feed');
 });
