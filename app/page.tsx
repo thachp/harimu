@@ -53,8 +53,9 @@ import {
   SignInButton,
   useUser,
 } from '@clerk/nextjs';
-import { MorningBrief } from './morning-brief';
-import { briefDayKey, morningBriefSections, shouldAutoOpenBrief } from '@/lib/morning-brief';
+import { MORNING_BRIEF_TRIGGER_ID, MorningBrief } from './morning-brief';
+import { Newspaper } from '@phosphor-icons/react';
+import { briefDayKey, claimDailyBrief, morningBriefSections } from '@/lib/morning-brief';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { clerkConfigured } from './providers';
 
@@ -1435,9 +1436,9 @@ export default function Home() {
   useEffect(() => {const tick=()=>setGuideNow(Date.now());tick();const timer=setInterval(tick,60000);return()=>clearInterval(timer);},[citizenNationId]);
   useEffect(() => {
     if (!citizenNationId) return;
-    let lastSeen: string | null = null;
-    try { lastSeen = window.localStorage.getItem(`harimu:morning-brief:${citizenNationId}`); } catch {}
-    if (!shouldAutoOpenBrief(lastSeen, Date.now())) return;
+    let storage: Storage | null = null;
+    try { storage = window.localStorage; } catch {}
+    if (!claimDailyBrief(storage, `harimu:morning-brief:${citizenNationId}`, Date.now())) return;
     let active = true;
     queueMicrotask(() => { if (active) setMorningBriefOpen(true); });
     return () => { active = false; };
@@ -1650,7 +1651,7 @@ export default function Home() {
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onNavigate={navigateGame} onSelectNation={selectNation}
       socialDock={<CitizenDock key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} collectivePetitions={collectivePetitions} election={election} korund={korundPlan} onNavigate={navigateGame} />}
-      accountControls={<>{citizenNation && !guestActive && <button type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief"><span>Brief</span></button>}<ClerkAccountControl /></>} />
+      accountControls={<>{citizenNation && !guestActive && <button id={MORNING_BRIEF_TRIGGER_ID} type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief" aria-haspopup="dialog" aria-expanded={morningBriefOpen} aria-controls={morningBriefOpen ? 'morning-brief' : undefined}><Newspaper size={17} aria-hidden="true" /><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
