@@ -50,3 +50,13 @@ export function morningBriefSections(input: MorningBriefInput, sources: { news: 
   if (notices.length) sections.push({ id: 'notifications', title: 'Notifications', items: notices });
   return sections;
 }
+
+/** Auto-open at most once per real day: the day is recorded when the brief is shown, not only when dismissed,
+ *  so reloading the page does not re-open it. Storage failures fail closed (no auto-open loop). */
+export function claimDailyBrief(storage: Pick<Storage, 'getItem' | 'setItem'> | null | undefined, key: string, now: number): boolean {
+  try {
+    if (!storage || !shouldAutoOpenBrief(storage.getItem(key), now)) return false;
+    storage.setItem(key, briefDayKey(now));
+    return true;
+  } catch { return false; }
+}
