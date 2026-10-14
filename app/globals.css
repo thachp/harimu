@@ -2252,3 +2252,11 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 
 :is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]) :is(table,thead,tbody,tr,th,td){color:var(--nation-ink)}
 .ranked-ballot table{width:100%;border-collapse:collapse;font-size:12px}.ranked-ballot :is(th,td){padding:8px 4px;text-align:left;border-bottom:1px solid var(--nation-edge)}
+
+/* Korund quota bar and coupon book (issue #41) */
+.korund-quota-track { position: relative; height: 8px; overflow: hidden; background: rgba(255, 255, 255, .08); }
+.korund-quota-track span { position: absolute; inset: 0 auto 0 0; height: 100%; }
+.korund-quota-unit { background: #8a7a5c; }
+.korund-quota-own { background: var(--gold, #efd69c); }
+.korund-coupons ul { margin: 6px 0; padding-left: 18px; }
+.korund-coupons li { margin: 4px 0; }

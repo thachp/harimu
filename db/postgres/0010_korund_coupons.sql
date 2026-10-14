@@ -1,0 +1,2 @@
+-- Issue #41: additive weekly Korund clothing/goods coupon redemptions. Existing data is preserved.
+CREATE TABLE IF NOT EXISTS korund_coupon_redemptions(id TEXT COLLATE "C" PRIMARY KEY,clerk_user_id TEXT COLLATE "C" NOT NULL REFERENCES citizens(clerk_user_id),game_week BIGINT NOT NULL CHECK(game_week>=1),coupon TEXT COLLATE "C" NOT NULL CHECK(coupon IN('clothing','goods')),item TEXT COLLATE "C" NOT NULL,quantity BIGINT NOT NULL CHECK(quantity=1),price_minor BIGINT NOT NULL CHECK(price_minor>0),occurred_at BIGINT NOT NULL,UNIQUE(clerk_user_id,game_week,coupon));
