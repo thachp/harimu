@@ -1,5 +1,5 @@
-// Staged preparation only. Flip in a reviewed cutover after real validation.
-export const postgresRuntimeEnabled=false;
+// Preview cutover validated against the protected D1 backup; production stays gated.
+export const postgresRuntimeEnabled=true;
 export function selectStorageBackend(input:{backend?:string;developmentPreview?:string;maintenance?:string;cutoverReady?:string;hyperdriveConfigured:boolean;implementationEnabled?:boolean;journalRetentionApproved?:boolean}){
  if(input.maintenance==='true')throw Error('Storage is paused for migration validation.');
  if(input.backend===undefined||input.backend==='d1')return 'd1' as const;

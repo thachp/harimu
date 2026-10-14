@@ -7,7 +7,7 @@
   "compatibility_date": "2026-05-22",
   "compatibility_flags": ["nodejs_compat"],
   "placement": { "region": "gcp:us-central1" },
-  // Prepared preview connection; runtime PostgreSQL activation remains disabled.
+  // Prepared preview connection; preview only; D1 remains available for rollback.
   "hyperdrive": [{
     "binding": "HYPERDRIVE",
     "id": "a1f662c88f3b485190c402d9548ae360"
@@ -16,7 +16,12 @@
   "preview_urls": true,
   "vars": {
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaGFyaW11LmNvbSQ",
-    "NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW": "true"
+    "NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW": "true",
+    "HARIMU_STORAGE_MAINTENANCE": "false",
+    "HARIMU_STORAGE_BACKEND": "postgres",
+    "HARIMU_POSTGRES_CUTOVER_READY": "true",
+    "HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED": "true",
+    "HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED": "true"
   },
   // Isolated preview only; never bind this resource as migrated production.
   "d1_databases": [{
