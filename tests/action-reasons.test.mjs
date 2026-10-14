@@ -8,8 +8,8 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import ts from 'typescript';
 import {firstActionReason,pendingActionReason} from '../lib/action-reasons.ts';
 const root=fileURLToPath(new URL('../',import.meta.url));
-async function load(path){
- let output=ts.transpileModule((await readFile(path,'utf8')).replace(/import\s+['"][^'"]+\.css['"];?/g,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
+async function load(path,clock){
+ let output=ts.transpileModule((await readFile(path,'utf8')).replace('useState(0)',clock?`useState(${clock})`:'useState(0)').replace(/import\s+['"][^'"]+\.css['"];?/g,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  for(const match of [...output.matchAll(/from (['"])([^'"]+)\1/g)]){
   const specifier=match[2];let url;
   if(specifier.endsWith('.css'))url='data:text/javascript,export default {}';
@@ -86,4 +86,23 @@ test('player listing fields describe why editing is frozen',()=>{
  const html=render(PlayerMarket,{state:{available:true,listings:[]},economy:{inventory:[],walletMinor:0},demo:false,busy:false,uncertain:true,onCommand(){},onRetry(){}});
  assert.equal((html.match(/aria-describedby="listing-edit-reason"/g)||[]).length,3);
  assert.match(html,/id="listing-edit-reason"/);
+});
+
+test('Korund unavailable book keeps uncertain same-request confirmation available',()=>{
+ const html=render(KorundPlanPanel,{...common,scene:'market',plan:null,uncertain:true,error:'Network interrupted.'});
+ assert.match(html,/Confirm previous action/);assert.match(html,/Retry uses the same request/);
+ assert.doesNotMatch(html,/<button[^>]*disabled[^>]*>Confirm previous action/);
+ const saving=render(KorundPlanPanel,{...common,scene:'market',plan:null,uncertain:true,pending:true});
+ assert.match(saving,/<button[^>]*disabled[^>]*>Confirm previous action/);
+});
+
+test('Korund queue waiting reason distinguishes an existing request from joining',async()=>{
+ const {KorundPlanPanel:ClockedPanel}=await import(await load(resolve(root,'app/korund-plan-panel.tsx'),Date.parse('2050-01-01T00:00:00Z')));
+ const queued=render(ClockedPanel,{...common,scene:'market',plan:{...korund,queue:{waiting:3,position:2,requestId:'fixture-request'}}});
+ assert.match(queued,/Wait for earlier requests to collect or cancel. Your place is retained./);
+ assert.doesNotMatch(queued,/Join the queue and wait/);
+ const outsider=render(ClockedPanel,{...common,scene:'market',plan:{...korund,queue:{waiting:3,position:null,requestId:null}}});
+ assert.match(outsider,/Join the queue and wait for earlier requests/);
+ const head=render(ClockedPanel,{...common,scene:'market',plan:{...korund,queue:{waiting:3,position:1,requestId:'fixture-request'}}});
+ assert.doesNotMatch(head,/<button[^>]*disabled[^>]*>Redeem/);
 });

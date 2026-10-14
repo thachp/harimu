@@ -35,3 +35,12 @@ test('unread acknowledgement changes only local read ids; a later petition statu
  assert.equal(unreadInbox(civicInbox([shift],updated,'kindle',now),read),1);assert.deepEqual(markInboxRead(items,read),read);
  assert.equal(markInboxRead([],Array.from({length:200},(_,i)=>String(i))).length,128);
 });
+test('Korund counter guidance requires own current head request and sufficient recorded stock',()=>{
+ const plan={available:true,gameWeek:4,couponFoodRemaining:2,couponExpiresAt:new Date(now+3600000).toISOString(),publicFoodRemaining:2,queue:{waiting:3,position:1,requestId:'fixture-ration'}};
+ const inbox=(p=plan,nation='korund',clock=now)=>civicInbox([],null,nation,clock,null,null,p);
+ const items=inbox();assert.equal(items.length,1);assert.equal(items[0].view,'market');assert.equal(items[0].atLabel,'Coupon week began');assert.match(items[0].text,/does not reserve stock or redeem coupons/);
+ assert.equal(inbox(plan,'kindle').length,0);assert.equal(inbox({...plan,available:false}).length,0);
+ for(const override of [{couponFoodRemaining:0},{couponExpiresAt:new Date(now).toISOString()},{couponExpiresAt:'invalid'},{publicFoodRemaining:1},{queue:undefined},{queue:{waiting:3,position:2,requestId:'fixture-ration'}},{queue:{waiting:0,position:null,requestId:null}}])assert.equal(inbox({...plan,...override}).length,0);
+ const read=markInboxRead(items,[]);assert.equal(unreadInbox(inbox(plan,'korund',now+1000),read),0);
+ assert.equal(unreadInbox(inbox({...plan,gameWeek:5,queue:{...plan.queue,requestId:'new-fixture'}}),read),1);
+});

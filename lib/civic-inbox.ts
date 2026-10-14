@@ -1,10 +1,11 @@
+import type {KorundPlan} from './korund';
 import type {ElectionSnapshot} from './elections';
 import type {CollectivePetitions} from './collective-petitions';
 import type { WorkShift } from './work-shifts';
 import type { GovernmentSnapshot } from './government';
-export type InboxItem={id:string;title:string;text:string;at:number;view:'workplace'|'government'};
+export type InboxItem={id:string;title:string;text:string;at:number;atLabel?:string;view:'workplace'|'government'|'market'};
 /** Read-only guidance. Reaching a displayed deadline never claims or grants a reward. */
-export function civicInbox(shifts:readonly WorkShift[],government:GovernmentSnapshot|null,nationId:string|null,now:number,collective?:CollectivePetitions|null,election?:ElectionSnapshot|null):InboxItem[]{
+export function civicInbox(shifts:readonly WorkShift[],government:GovernmentSnapshot|null,nationId:string|null,now:number,collective?:CollectivePetitions|null,election?:ElectionSnapshot|null,korund?:KorundPlan|null):InboxItem[]{
  if(!nationId||!Number.isFinite(now)||now<=0)return[];
  const entries=new Map<string,InboxItem>();
  for(const shift of shifts){const at=Date.parse(shift.completesAt);if(shift.claimedAt!==null||!Number.isFinite(at)||at>now)continue;
@@ -23,6 +24,11 @@ export function civicInbox(shifts:readonly WorkShift[],government:GovernmentSnap
  }
  if(nationId==='kindle'&&election?.nationId===nationId&&election.privacyReady&&election.status==='open'&&!election.voted&&election.closesAt!==null&&election.closesAt*1000>now&&election.opensAt!==null&&election.opensAt*1000<=now){
   const id=`ballot:${election.id}`;entries.set(id,{id,title:'Kindle ranked ballot is open',text:'Open Civic to check your verified voting eligibility and the recorded closing deadline. Voting is optional; this alert submits nothing.',at:election.opensAt*1000,view:'government'});
+ }
+ const rationExpiry=korund?Date.parse(korund.couponExpiresAt):NaN;
+ if(nationId==='korund'&&korund?.available&&Number.isFinite(rationExpiry)&&rationExpiry>now&&korund.couponFoodRemaining>0&&korund.publicFoodRemaining>=korund.couponFoodRemaining&&korund.queue?.requestId&&korund.queue.position===1&&korund.queue.waiting>0){
+  const id=`ration:${korund.gameWeek}:${korund.queue.requestId}`;
+  entries.set(id,{id,title:'Check the state ration counter',text:'Your recorded request is at the front and state food covers your ration. Open Market and refresh to confirm with the server. This notice does not reserve stock or redeem coupons.',at:Math.min(now,rationExpiry-50400000),atLabel:'Coupon week began',view:'market'});
  }
  return [...entries.values()].sort((a,b)=>b.at-a.at);
 }
