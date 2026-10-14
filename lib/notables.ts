@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import {publicNewsFacts,validatedNewsDraft,newsDraftText,inferenceText,newsDraftResponseFormat,newsVerificationResponseFormat,supportedNewsDraft,type NewsAiBinding} from './ai-news';
-import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,meteredAiCost,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
+import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 import {readNationalNews} from './national-news';
 import {notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 import {nationNotables} from './notable-choice';
@@ -49,7 +49,7 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
   // #139: a request that reached the gateway but failed validation/moderation stays charged for its answered calls; publish the authored
   // topic example as a deterministic fallback instead of a 503, so the player still gets something readable.
   // #141: a known rejection settles to the metered cost of the answered calls and releases the rest.
-   if(uncertain)await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=?").bind(id).run();else await settleAiReservation(db,id,meteredAiCost(answered));
+   if(uncertain)await markAiReservationUncertain(db,id);else await settleAiReservation(db,id,meteredAiCost(answered));
    if(!uncertain&&stage==='output')return {status:200,reply:notableTopics[command.topic].authored,source:'authored' as const,failureCode};
   return {...fail(503,'No response was published. The attempted calls remain charged; it will not be retried automatically.'),failureCode};}
 }
