@@ -10,7 +10,7 @@ const binding=()=>{const calls=[];return {calls,async run(model,input){calls.pus
 const options=()=>({enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}});
 test('Notable routes authorize own nation and disabled POST causes no reservation or model call',async t=>{
  const r=await localRuntime();t.after(()=>r.close());const fake=binding();r.setFixtureAiBinding(fake);assert.equal((await r.call('notables',null)).status,401);
- const own=await r.call('notables','alice',undefined,undefined,'?nation=aurelle');assert.equal(own.data.profile.id,'kindle-journalist');assert.equal(own.data.source,'authored');assert.equal(own.data.enabled,false);assert.equal(own.cache,'private, no-store');assert.equal(own.data.dailyLimit,20);
+ const own=await r.call('notables','alice',undefined,undefined,'?nation=aurelle');assert.ok(['kindle-journalist','kindle-union-organizer','kindle-emberball-owner','kindle-cartoonist'].includes(own.data.profile.id),'#151: one of Kindle\'s Notables');assert.equal(own.data.source,'authored');assert.equal(own.data.enabled,false);assert.equal(own.cache,'private, no-store');assert.equal(own.data.dailyLimit,20);
  assert.equal((await r.call('notables','alice',command('aurelle'))).status,403);
  assert.equal((await r.call('notables','alice',command())).status,503);assert.equal(fake.calls.length,0);
  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM harimu_ai_reservations').first()).n,0);
