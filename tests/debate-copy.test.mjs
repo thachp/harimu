@@ -1,7 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { moderatorCopy, questionIntakeCopy, factCheckCopy, fallbackLines, fallbackNotice, fallbackFor, DEBATE_PLACEHOLDERS, DEBATE_NAME_MAX, DEBATE_LABEL_MAX, DEBATE_BODY_MAX } from '../lib/debate-copy.ts';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import ts from 'typescript';
+// lib/debate-copy.ts re-exports the shared name cap from './palace-coup-copy' (extensionless for tsc/Next). Node's
+// type stripping cannot resolve that, so load it the way tests/helpers/local-runtime.mjs does: rewrite the specifier and transpile.
+const src=readFileSync('lib/debate-copy.ts','utf8').replace("from './palace-coup-copy'",`from ${JSON.stringify(pathToFileURL(resolve('lib/palace-coup-copy.ts')).href)}`);
+const out=join(mkdtempSync(join(tmpdir(),'debate-copy-')),'debate-copy.mjs');
+writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
+const { moderatorCopy, questionIntakeCopy, factCheckCopy, fallbackLines, fallbackNotice, fallbackFor, DEBATE_PLACEHOLDERS, DEBATE_NAME_MAX, DEBATE_LABEL_MAX, DEBATE_BODY_MAX } = await import(pathToFileURL(out).href);
+import { COUP_NAME_MAX } from '../lib/palace-coup-copy.ts';
 import { kindleCandidatePlatforms, pledge } from '../lib/kindle-parties.ts';
 
 const q=questionIntakeCopy;
@@ -17,7 +28,7 @@ test('shape: 2-3 moderator variants each, every line proposal, required labels',
   assert.deepEqual(factCheckCopy.labels,{claim:'Claim',systemFigure:'System figure',matches:'Matches',differs:'Differs'});
 });
 test('length limits, raw and filled at the 24-char name cap', () => {
-  assert.equal(DEBATE_NAME_MAX,24);
+  assert.equal(DEBATE_NAME_MAX,COUP_NAME_MAX); assert.equal(DEBATE_NAME_MAX,24);
   for (const t of labels()) assert.ok(fill(t).length<=DEBATE_LABEL_MAX, t);
   for (const l of lines()) assert.ok(fill(l.text).length<=DEBATE_BODY_MAX, l.text);
 });

@@ -8,13 +8,13 @@
  * Rules: no figures (the question count, length cap and vote rules stay in #282; "Tier-1" is the docs' tier name).
  * Fallback lines name only pledges on that candidate's platform card (lib/kindle-parties.ts, #257/#262) and quote
  * the card text exactly. No endorsing body is named. Candidates are AI; "Notable" is not used. Runtime names are
- * placeholders capped at DEBATE_NAME_MAX (#282 to enforce). All wording is new: `proposal: true`. */
+ * placeholders capped at DEBATE_NAME_MAX, which re-exports COUP_NAME_MAX (one shared name cap). All wording is new: `proposal: true`. */
 
 
 
 export const DEBATE_PLACEHOLDERS=['{candidate}'] as const;
-/** Worst-case length of a filled runtime name (same 24-character cap ARC set on #288). #282 should enforce it. */
-export const DEBATE_NAME_MAX=24;
+/** Worst-case length of a filled runtime name: the single shared name cap from #288 (ARC #296 ruling). */
+export { COUP_NAME_MAX as DEBATE_NAME_MAX } from './palace-coup-copy';
 export const DEBATE_LABEL_MAX=40;
 export const DEBATE_BODY_MAX=140;
 
