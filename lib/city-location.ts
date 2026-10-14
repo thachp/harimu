@@ -33,8 +33,8 @@ export const coResidentHumanLimit=12,coResidentAiSample=3;
 const aiCast=(nationId:string):readonly {id:string;name:string}[]=>nationNotables(nationId);
 const hash=(text:string)=>{let h=2166136261;for(const ch of text){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}return h;};
 /** Deterministic AI sample per city. AI working/idle is cosmetic: a hash that rotates hourly, not a simulation. */
-export function aiCoResidents(nationId:string,cityId:string,now:number):CoResident[]{
- const cast=[...aiCast(nationId)].sort((a,b)=>hash(cityId+a.id)-hash(cityId+b.id)).slice(0,coResidentAiSample);
+export function aiCoResidents(nationId:string,cityId:string,now:number,roster:readonly {id:string;name:string}[]=aiCast(nationId)):CoResident[]{
+ const cast=[...roster].sort((a,b)=>hash(cityId+a.id)-hash(cityId+b.id)).slice(0,coResidentAiSample);
  const hour=Math.floor(now/3600);
  return cast.map(ai=>({key:`ai:${ai.id}`,name:ai.name,nationId,kind:'ai',status:hash(`${ai.id}:${cityId}:${hour}`)%2?'working':'idle',you:false}));
 }
