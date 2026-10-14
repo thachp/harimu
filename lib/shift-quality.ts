@@ -23,14 +23,19 @@ export const qualityGrades: Record<QualityGrade, { label: string; multiplierPct:
 };
 export const gradeByScore: readonly QualityGrade[] = ['poor', 'fair', 'good', 'excellent'];
 
-export type QualityInput = { answers: number[] } | { skip: true };
+/** What the step component returns; the page adds the server-issued ticket (#252). */
+export type QualityChoice = { answers: number[] } | { skip: true };
+/** commit-work body: answers are indices into the per-shift option order the ticket was issued with. */
+export type QualityInput = { answers: number[]; ticket: string } | { skip: true };
+/** Server-issued step for one future shift: a signed ticket and the questions in that shift's option order. */
+export type QualityTicket = { ticket: string; questions: QualityQuestion[] };
 export type QualityResult = { grade: QualityGrade | null; multiplierPct: number; correct: number | null };
 
 export function validQualityInput(value: unknown): value is QualityInput {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
   if (v.skip === true) return Object.keys(v).length === 1;
-  return Array.isArray(v.answers) && Object.keys(v).length === 1 && v.answers.length === harvestQuestions.length
+  return Array.isArray(v.answers) && typeof v.ticket === 'string' && v.ticket.length <= 128 && Object.keys(v).length === 2 && v.answers.length === harvestQuestions.length
     && v.answers.every((a, i) => Number.isInteger(a) && a >= 0 && a < harvestQuestions[i].options.length);
 }
 
