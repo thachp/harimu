@@ -55,16 +55,25 @@ const leavesKinward = (nationId: string | null | undefined, from: string, to: st
 
 export const gameDayOf = (now: number) => Math.floor(now / gameDaySeconds);
 /** Devotion from a sorted list of worship game days, evaluated at `today` (pure). */
-export function devotionFrom(days: number[], today: number) {
+export function devotionFrom(days: number[], today: number) { return devotionFromEvents(days.map(day => ({ day, amount: devotionPerWorship })), today); }
+/** #224: Devotion from dated gains (worship, Officiant service), +amount on each day and -1 per game day without any gain. */
+export function devotionFromEvents(events: { day: number; amount: number }[], today: number) {
+  const byDay = new Map<number, number>();
+  for (const e of events) if (e.day <= today) byDay.set(e.day, (byDay.get(e.day) ?? 0) + e.amount);
   let devotion = 0; let last: number | null = null;
-  for (const day of days) {
-    if (day > today) break;
+  for (const day of [...byDay.keys()].sort((a, b) => a - b)) {
     if (last !== null) devotion = Math.max(0, devotion - devotionDecayPerGameDay * Math.max(0, day - last - 1));
-    devotion = Math.min(devotionMax, devotion + devotionPerWorship); last = day;
+    devotion = Math.min(devotionMax, devotion + byDay.get(day)!); last = day;
   }
   if (last !== null) devotion = Math.max(0, devotion - devotionDecayPerGameDay * Math.max(0, today - last));
   return devotion;
 }
+/** #224: Officiant service days for the current faith (table from migration 0026; absent before it is applied). */
+export async function serviceDays(db: GameDatabase, userId: string, faithId: string, since: number): Promise<number[]> {
+  try { return (await db.prepare('SELECT game_day FROM officiant_service WHERE user_id=? AND faith_id=? AND served_at>=? ORDER BY game_day').bind(userId, faithId, since).all<{ game_day: number }>()).results.map(r => Number(r.game_day)); }
+  catch { return []; }
+}
+export const devotionPerService = 2;
 
 type FaithRow = { faith_id: FaithChoice; hidden_faith_id: WorshipFaithId | null; chosen_at: number; changed_at: number | null; request_id: string };
 const label = (id: FaithChoice) => id === 'unaffiliated' ? unaffiliatedCopy.name : faithCopy[id].name;
@@ -81,7 +90,8 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const worshipFaith: WorshipFaithId | null = faith !== 'unaffiliated' ? faith : null; // Korund hidden faiths have no public worship in the PoC
   const today = gameDayOf(now);
   const days = worshipFaith ? (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, worshipFaith, row?.chosen_at ?? 0).all<{ game_day: number }>()).results.map(r => Number(r.game_day)) : [];
-  const devotion = devotionFrom(days, today);
+  const service = worshipFaith ? await serviceDays(db, userId, worshipFaith, row?.chosen_at ?? 0) : [];
+  const devotion = devotionFromEvents([...days.map(day => ({ day, amount: devotionPerWorship })), ...service.map(day => ({ day, amount: devotionPerService }))], today);
   // A first pick (including Unaffiliated) is free and starts no cooldown; only a later change does (changed_at).
   const changeAvailableAt = row?.changed_at != null ? Number(row.changed_at) + faithChangeCooldownSeconds : null;
   const changeBlockedReason = !enabled ? 'Faith is not open yet.' : changeAvailableAt !== null && now < changeAvailableAt
