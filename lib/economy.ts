@@ -11,6 +11,11 @@ export const rewards: Record<string, { wageMinor: number; item: string; quantity
   harvest: { wageMinor: 800, item: 'food', quantity: 4 },
   freight: { wageMinor: 1200, item: 'materials', quantity: 2 },
   archive: { wageMinor: 600, item: 'knowledge', quantity: 1 },
+  // #196 Market MVP raw goods (Kindle). Base output; the same terms apply to any worker (no per-citizen multiplier yet).
+  // [ASSUMPTION] wages/quantities tuned so 1 WC earns about the same Spark as the existing jobs.
+  orchard: { wageMinor: 700, item: 'fruit', quantity: 3 },
+  herding: { wageMinor: 900, item: 'meat', quantity: 2 },
+  logging: { wageMinor: 1000, item: 'wood', quantity: 3 },
 };
 export type Economy = {
   walletMinor: number;

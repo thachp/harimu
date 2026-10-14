@@ -352,6 +352,9 @@ const fallbackWorkOrders: WorkOrder[] = [
   { id: 'harvest', nationId: 'kindle', name: 'Support the savanna harvest', detail: '+480 food · resolves in 2h real · 1 game day', cost: 4 },
   { id: 'freight', nationId: 'kindle', name: 'Move a foundry convoy', detail: '+210 materials · resolves in 4h real · 2 game days', cost: 6 },
   { id: 'archive', nationId: 'kindle', name: 'Catalogue the civic archive', detail: '+95 knowledge · resolves in 3h real · 1.5 game days', cost: 3 },
+  { id: 'orchard', nationId: 'kindle', name: 'Pick the savanna orchards', detail: '+3 fruit · resolves in 2h real · 1 game day', cost: 4 },
+  { id: 'herding', nationId: 'kindle', name: 'Drive the grassland herds', detail: '+2 meat · resolves in 3h real · 1.5 game days', cost: 5 },
+  { id: 'logging', nationId: 'kindle', name: 'Cut timber for the city', detail: '+3 wood · resolves in 4h real · 2 game days', cost: 6 },
 ];
 
 const fallbackPlanningItems: PlanningTask[] = [

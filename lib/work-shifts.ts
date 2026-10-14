@@ -4,6 +4,9 @@ export const shiftRules: Record<string, { hours: number; output: string }> = {
   harvest: { hours: 2, output: '480 food contributed to the savanna harvest' },
   freight: { hours: 4, output: '210 materials delivered by the foundry convoy' },
   archive: { hours: 3, output: '95 knowledge contributed to the civic archive' },
+  orchard: { hours: 2, output: 'Fruit picked in the savanna orchards' },
+  herding: { hours: 3, output: 'Meat brought in from the grassland herds' },
+  logging: { hours: 4, output: 'Wood cut and stacked at the timber yard' },
 };
 
 export type WorkShift = {
