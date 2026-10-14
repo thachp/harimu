@@ -15,11 +15,11 @@ const dryRun = isDryRun(process.argv, process.env);
   writeFileSync('dist/server/wrangler.json', JSON.stringify(withoutLegacyEnv(built)));
 }
 
-// Branch flow (#127): preview (harimu-preview) deploys from `dev`; production deploys only from `main`
+// Branch flow (#177): preview (harimu-preview) deploys from `release`; production deploys only from `main`
 // via a separate release workflow. See CONTRIBUTING.md.
 {
   const branch = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).stdout?.trim();
-  if (branch && branch !== 'dev') console.warn(`Warning: preview deploys come from "dev"; current branch is "${branch}".`);
+  if (branch && branch !== 'release' && branch !== 'HEAD') console.warn(`Warning: preview deploys come from "release"; current branch is "${branch}".`);
 }
 // Validate both input and built output; never upload a stale Sites/production bundle.
 readDevelopmentConfig();

@@ -22,8 +22,12 @@ test('#75 co-residents: player listed, city-scoped, refreshed on travel, public 
  const shift=(await r.call('citizen','alice')).data.shifts[0];r.setNow(Date.parse(shift.completesAt)+1000);
  assert.equal((await r.call('city','alice')).data.coResidents.find(x=>x.you).status,'idle');
  // AI sample: only the live Notable, never #148's inactive roster.
- const {notableProfiles}=await import('../lib/notable-profiles.ts');
- assert.deepEqual((await r.call('city','alice')).data.coResidents.filter(x=>x.kind==='ai').map(x=>x.name),[notableProfiles.kindle.name]);
+ const {notableProfiles}=await import('../lib/notable-profiles.ts');const {additionalNotableProfiles}=await import('../lib/notable-roster.ts');
+ // #165: the AI sample is drawn from Kindle's full Notable list (primary + roster), coResidentAiSample of them, stable across calls.
+ const kindle=new Set([notableProfiles.kindle,...additionalNotableProfiles.kindle].map(p=>p.name));
+ const ai=(await r.call('city','alice')).data.coResidents.filter(x=>x.kind==='ai').map(x=>x.name);
+ assert.equal(ai.length,3);assert.equal(new Set(ai).size,3);for(const name of ai)assert.ok(kindle.has(name),name);
+ assert.deepEqual((await r.call('city','alice')).data.coResidents.filter(x=>x.kind==='ai').map(x=>x.name),ai,'deterministic per city');
  // Travel refreshes the list for the new city.
  const moved=(await r.call('city','alice',{action:'travel',cityId:other.id})).data;
  assert.deepEqual(moved.coResidents.filter(x=>x.kind==='human').map(x=>x.you),[true]);
