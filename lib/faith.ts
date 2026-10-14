@@ -9,6 +9,8 @@
 import type { GameDatabase } from './database-contract';
 import { worshipCopy, type WorshipFaithId } from './worship-copy';
 import { devotionTier, faithCopy, unaffiliatedCopy } from './faith-copy';
+import { devotionPerFestival, festivalCalendar, festivalJoins, festivalSchemas } from './festivals';
+import { mvpFestival } from './mvp-festival-copy';
 
 // ---- PoC constants, one place ----
 export const gameDaySeconds = 7200; // 12x clock: a game day is 2 real hours (lib/world-simulation.ts)
@@ -39,6 +41,7 @@ export const faithSchemas = [
  request_id TEXT NOT NULL UNIQUE,
  PRIMARY KEY(user_id, game_day)
 )`,
+  ...festivalSchemas, // #68
 ];
 
 /** What each MVP nation lets a citizen hold publicly (14.2). Korund may also hold a hidden faith (14.6). */
@@ -91,7 +94,10 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const today = gameDayOf(now);
   const days = worshipFaith ? (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, worshipFaith, row?.chosen_at ?? 0).all<{ game_day: number }>()).results.map(r => Number(r.game_day)) : [];
   const service = worshipFaith ? await serviceDays(db, userId, worshipFaith, row?.chosen_at ?? 0) : [];
-  const devotion = devotionFromEvents([...days.map(day => ({ day, amount: devotionPerWorship })), ...service.map(day => ({ day, amount: devotionPerService }))], today);
+  const joins = supported ? await festivalJoins(db, userId) : [];
+  const festivalDays = worshipFaith ? joins.filter(j => j.faith_id === worshipFaith && Number(j.joined_at) >= Number(row?.chosen_at ?? 0)).map(j => Number(j.game_day)) : [];
+  const devotion = devotionFromEvents([...days.map(day => ({ day, amount: devotionPerWorship })), ...service.map(day => ({ day, amount: devotionPerService })), ...festivalDays.map(day => ({ day, amount: devotionPerFestival }))], today);
+  const calendar = supported ? festivalCalendar(nationId!, worshipFaith, today, gameDaySeconds, new Set(joins.map(j => `${j.festival_id}:${Number(j.occurrence)}`)), enabled) : null;
   // A first pick (including Unaffiliated) is free and starts no cooldown; only a later change does (changed_at).
   const changeAvailableAt = row?.changed_at != null ? Number(row.changed_at) + faithChangeCooldownSeconds : null;
   const changeBlockedReason = !enabled ? 'Faith is not open yet.' : changeAvailableAt !== null && now < changeAvailableAt
@@ -107,6 +113,7 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
     devotion: { value: devotion, max: devotionMax, tier: worshipFaith ? devotionTier(devotion) : null, explanation: 'Devotion gives social standing only. It never changes wages, production, prices or combat.' },
     worship: worshipFaith ? { ...worshipCopy[worshipFaith], gameDay: today, worshippedToday, nextAt: worshippedToday ? (today + 1) * gameDaySeconds : null } : null,
     worshipBlockedReason, changeAvailableAt, changeBlockedReason,
+    festivals: calendar?.festivals ?? [], holiday: calendar?.holiday ?? null, banEvents: calendar?.banEvents ?? [], // #68
     leaveBlockedReason: leavesKinward(nationId, faith, 'unaffiliated') ? kinwardLeaveBlockedReason : null,
   };
 }
@@ -114,6 +121,7 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
 const requestOk = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(v);
 export function parseFaithCommand(body: Record<string, unknown>) {
   if (!requestOk(body.requestId)) return null;
+  if (body.action === 'join-festival' && typeof body.festivalId === 'string' && /^[a-z-]{3,40}$/.test(body.festivalId)) return { action: 'join-festival' as const, requestId: body.requestId, festivalId: body.festivalId };
   if (body.action === 'attend-worship') return { action: 'attend-worship' as const, requestId: body.requestId };
   if (body.action === 'choose-faith' && typeof body.faithId === 'string' && (body.hiddenFaithId === undefined || body.hiddenFaithId === null || typeof body.hiddenFaithId === 'string'))
     return { action: 'choose-faith' as const, requestId: body.requestId, faithId: body.faithId, hiddenFaithId: (body.hiddenFaithId as string | null | undefined) ?? null };
@@ -167,4 +175,27 @@ export async function attendWorship(db: GameDatabase, userId: string, requestId:
   const saved = await db.prepare('SELECT user_id FROM citizen_worship WHERE request_id=?').bind(requestId).first<{ user_id: string }>();
   if (!saved) return fail(409, 'already_worshipped', 'You have already attended worship this game day. Come back tomorrow.');
   return { ok: true as const, completion: worshipCopy[state.worship.faithId].completion, state: await readFaith(db, userId, now, enabled) };
+}
+
+/** #68: join an active festival of your faith, once per festival occurrence (+Devotion). Not in a banning nation. */
+export async function joinFestival(db: GameDatabase, userId: string, command: { requestId: string; festivalId: string }, now: number, enabled: boolean) {
+  if (!enabled) return fail(403, 'disabled', 'Faith is not open yet.');
+  const prior = await db.prepare('SELECT user_id,festival_id FROM citizen_festival_joins WHERE request_id=?').bind(command.requestId).first<{ user_id: string; festival_id: string }>();
+  if (prior) return prior.user_id === userId && prior.festival_id === command.festivalId ? { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) } : fail(409, 'request_reused', 'That request id was already used.');
+  const copy = mvpFestival(command.festivalId);
+  if (!copy) return fail(400, 'unknown_festival', 'That festival does not exist.');
+  const state = await readFaith(db, userId, now, enabled);
+  if (!state.supported) return fail(403, 'unsupported_nation', 'Festivals are held in Kindle, Korund and Aurelle for now.');
+  const festival = state.festivals.find(f => f.id === copy.id)!;
+  if (festival.joinBlockedReason) return fail(409, festival.stance === 'banned' ? 'banned' : festival.joined ? 'already_joined' : !festival.active ? 'not_active' : 'not_adherent', festival.joinBlockedReason);
+  const statements = [];
+  // Aurelle's default Kinward Rite needs no explicit choice; record it so Devotion has a stable start (as attend-worship does).
+  if (!state.faith.chosen) statements.push(db.prepare(`INSERT INTO citizen_faith (user_id,nation_id,faith_id,hidden_faith_id,chosen_at,request_id)
+    SELECT clerk_user_id,nation_id,?,NULL,0,? FROM citizens WHERE clerk_user_id=? AND nation_id=? ON CONFLICT DO NOTHING`).bind(state.faith.id, `default-${command.requestId}`, userId, state.nationId));
+  statements.push(db.prepare(`INSERT INTO citizen_festival_joins (user_id,festival_id,occurrence,faith_id,game_day,joined_at,request_id)
+    SELECT f.user_id,?,?,f.faith_id,?,?,? FROM citizen_faith f WHERE f.user_id=? AND f.faith_id=? ON CONFLICT DO NOTHING`).bind(copy.id, festival.occurrence, festival.gameDay, now, command.requestId, userId, copy.faithId));
+  await db.batch(statements);
+  const saved = await db.prepare('SELECT user_id FROM citizen_festival_joins WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
+  if (!saved) return fail(409, 'already_joined', `You already joined ${copy.name}.`);
+  return { ok: true as const, completion: copy.joinToast, state: await readFaith(db, userId, now, enabled) };
 }
