@@ -16,7 +16,7 @@
  * Founding Period; everything else is a runtime placeholder. The peace-treaty lock length is a docs [ASSUMPTION] and is
  * not written in. Blocked declarations give reasons, never threats. Nothing glorifies war or names a real country,
  * leader or conflict, and no line threatens a named player. No armies, battles, casualties or loot; no "Notable".
- * Placeholders ({attacker}, {defender}, {casusBelli}, {endsAt}, {start}, {end}) are runtime values capped by the shared
+ * Placeholders ({attacker}, {defender}, {casusBelli}, {endsAt}, {start}, {end}, {peaceLockEnds}) are runtime values capped by the shared
  * name cap, which this module re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts). Lines that speak for the Crown
  * are AI-badged. All wording is new: `proposal: true`. */
 
@@ -76,6 +76,37 @@ export const declarationNotices:readonly WarNationNotices[]=[
    'Court Gazette: {attacker} declares war on {defender}, for {casusBelli}. Mobilizing: 48 real hours.',
    'The Court Gazette reports that {attacker} has declared war on {defender}. Mobilization runs 48 real hours.')}},
 ];
+
+/** Mobilization-ended news (#334, companion to #309): one notice per side in each nation's voice, with the same bylines as the
+ * declaration notices. Placeholders: {attacker}, {defender} only. Aurelle "Be it known" lines speak for the Crown and are AI-badged;
+ * Kindle, Korund and Gazette-report lines are not. The assault line repeats §15.3 ("cities and forts", only inside the defender's window). */
+export type MobilizationEndedNotice={id:string;headline:string;body:string;aiBadge:boolean;proposal:true};
+export type MobilizationEndedNotices={nationId:WarNation;byline:{name:string;proposal:boolean};notices:Readonly<Record<DeclarationSide,MobilizationEndedNotice>>;proposal:true};
+const m=(id:string,headline:string,body:string,aiBadge=false):MobilizationEndedNotice=>({id,headline,body,aiBadge,proposal:true});
+export const mobilizationEndedNotices:readonly MobilizationEndedNotices[]=[
+ {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
+  ours:m('kindle-end-ours','Mobilization is over','The 48 real hours are up. The war on {defender} is active. Officials must say what comes next.'),
+  'against-us':m('kindle-end-against-us','The war on the Republic is active','{attacker}\'s 48 real hours are up. The war is active. Assaults on cities and forts resolve only in our defense window.'),
+  world:m('kindle-end-world','A war is now active','{attacker} and {defender} have finished mobilizing. The war is active.')}},
+ {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
+  ours:m('korund-end-ours','Mobilization is complete','Korund State Media reports: mobilization against {defender} is complete. The war is active. One hammer, one heart.'),
+  'against-us':m('korund-end-against-us','The war on Korund is active','Korund State Media reports: {attacker}\'s mobilization is over. The war is active. Brigades hold the plan.'),
+  world:m('korund-end-world','War is active abroad','Korund State Media reports: {attacker} and {defender} have finished mobilizing. The war is active.')}},
+ {nationId:'aurelle',byline:{name:'Court Gazette',proposal:false},proposal:true,notices:{
+  ours:m('aurelle-end-ours','Mobilization is ended','Be it known: mobilization is ended. The realm is at war with {defender}. Every thread in its place.',true),
+  'against-us':m('aurelle-end-against-us','The war upon the realm is active','Be it known: {attacker}\'s mobilization is ended. The war upon the realm is active.',true),
+  world:m('aurelle-end-world','War is active beyond the realm','The Court Gazette reports that {attacker} and {defender} have ended mobilization. The war is active.')}},
+];
+export function endedNoticesFor(nationId:WarNation){return mobilizationEndedNotices.find(x=>x.nationId===nationId);}
+
+/** War banner on both nations' Country view (#309). The countdown value comes from the runtime timer; the copy only frames it.
+ * `header.ours` is for the nation that declared, `header.againstUs` for the nation declared upon; each names the other nation. */
+export const warBanner={
+ header:{ours:'At war with {defender}',againstUs:'At war with {attacker}'},
+ countdownLabel:'Mobilized by {endsAt}',
+ countdownCaption:L('Mobilization ends {endsAt}. No attack can begin before then.'),
+ proposal:true,
+} as const;
 
 export const mobilizationStatus={
  mobilizing:[
