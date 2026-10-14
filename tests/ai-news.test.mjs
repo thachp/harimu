@@ -7,13 +7,13 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace('30000','5');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {prepareAiNews,publicNewsFacts,validatedNewsDraft,newsDraftText,aiNewsEnabled}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const {prepareAiNews,publicNewsFacts,validatedNewsDraft,newsDraftText,aiNewsEnabled,inferenceText,supportedNewsDraft}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const model='@cf/meta/llama-3.2-3b-instruct';
 const now=Math.floor(Date.now()/1000),until=now+3600;
 const news={nationId:'kindle',title:'Kindle Press',style:'press',fetchedAt:now*1000,statistics:{citizens:2,completedShifts:3,food:12},items:[],privateDraft:'never transmit',accountId:'private'};
 const draft={title:'National ledger record',summary:'Recorded work contributes to household food.',claims:['citizens','completedShifts','food']};
 test('only public numeric facts enter inference; numerical claims are rendered from authoritative values',()=>{
- assert.equal(aiNewsEnabled,false);assert.deepEqual(publicNewsFacts(news),{nationId:'kindle',citizens:2,completedShifts:3,food:12});
+ assert.equal(aiNewsEnabled,true);assert.deepEqual(publicNewsFacts(news),{nationId:'kindle',citizens:2,completedShifts:3,food:12});
  assert.match(newsDraftText(validatedNewsDraft(draft),publicNewsFacts(news)),/12 food earned/);
  for(const invalid of [{...draft,title:'Output rose 99%'},{...draft,summary:'A hundred citizens joined.'},{...draft,claims:['budget']},{...draft,claims:['food','food']}])assert.equal(validatedNewsDraft(invalid),null);
  assert.throws(()=>publicNewsFacts({...news,statistics:{...news.statistics,food:NaN}}));
@@ -70,4 +70,13 @@ test('whole news sequence is reserved before generation, so insufficient moderat
 test('truncated moderation never approves an otherwise safe-looking classification',async t=>{
  const r=await localRuntime();t.after(()=>r.close());let call=0;const binding={async run(){const response=[JSON.stringify(draft),'supported','safe'][call++];return call===3?{response,finish_reason:'length',usage:{completion_tokens:256}}:{response};}};
  await prepareAiNews(r.db,news,now,binding,{enabled:true,priceReviewedUntil:until});assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM ai_news_articles').first()).n,0);
+});
+
+test('documented structured responses are accepted only for schema-mode drafts; truncation stays rejected',()=>{
+ assert.equal(inferenceText({response:draft,choices:[{finish_reason:'stop'}]},true),JSON.stringify(draft));
+ assert.throws(()=>inferenceText({response:draft}));assert.throws(()=>inferenceText({response:draft,choices:[{finish_reason:'length'}]},true));assert.throws(()=>inferenceText({response:'safe',usage:{completion_tokens:256}}));assert.throws(()=>inferenceText({response:42},true));
+});
+
+test('structured fact checking accepts only explicit support and refuses false or malformed decisions',()=>{
+ assert.equal(supportedNewsDraft('{"supported":true}'),true);for(const raw of ['{"supported":false}','{"supported":"true"}','{"supported":true,"override":true}','safe','[true]','null'])assert.equal(Boolean(supportedNewsDraft(raw)),false);
 });

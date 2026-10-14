@@ -12,6 +12,7 @@
     "binding": "HYPERDRIVE",
     "id": "a1f662c88f3b485190c402d9548ae360"
   }],
+  "ai": { "binding": "AI" },
   "workers_dev": true,
   "preview_urls": true,
   "vars": {
@@ -22,7 +23,9 @@
     "HARIMU_POSTGRES_CUTOVER_READY": "true",
     "HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED": "true",
     "HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED": "true",
-    "HARIMU_AI_NEWS_ENABLED": "false"
+    "HARIMU_AI_NEWS_ENABLED": "false",
+    "HARIMU_NOTABLES_ENABLED": "false",
+    "HARIMU_AI_PRICE_REVIEWED_UNTIL": "2026-10-15T08:06:58.000Z"
   },
   // Isolated preview only; never bind this resource as migrated production.
   "d1_databases": [{
