@@ -1,9 +1,11 @@
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
-import { stabilityStatements, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
+import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
 export const tickSeconds = 7200;
 export const maximumCatchupTicks = 3;
+/** #159: how many ticks before the catch-up window are re-checked for missing scores (12 = one real day). */
+const scoreRepairTicks=12;
 // These schema exports are for local SQL fixtures; production uses additive Drizzle migrations.
 export const worldClockSchema = `CREATE TABLE world_clock (id TEXT PRIMARY KEY CHECK(id='main'), epoch_seconds INTEGER NOT NULL)`;
 export const worldTickSchema = `CREATE TABLE world_ticks (tick INTEGER PRIMARY KEY CHECK(tick>0), scheduled_at INTEGER NOT NULL, processed_at INTEGER NOT NULL, proposals_json TEXT NOT NULL)`;
@@ -54,11 +56,16 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
         .bind(tick,scheduledAt,now,JSON.stringify(proposals)),
       db.prepare(policyExecutionSql).bind(now,tick),
     ]);
-    // Hotfix for #95: scores are written in their own batch after the tick commits, so a missing
-    // nation_stability_scores table (migration 0012 not applied) can't abort the tick. Other errors still throw.
-    try { await db.batch(await stabilityStatements(db,tick,scheduledAt,now)); }
-    catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Tick', tick, 'recorded without scores.'); }
   }
+  // #95 hotfix / #159: scores are written after the ticks commit, so a missing nation_stability_scores table
+  // can't abort a tick. Each pass (re)writes scores for every recent tick that lacks them, so a transient
+  // failure is repaired on the next request instead of leaving a permanent gap. INSERT OR IGNORE keeps it idempotent.
+  try {
+    const missing = await db.prepare(`SELECT t.tick,t.scheduled_at FROM world_ticks t WHERE t.tick>(SELECT COALESCE(MAX(tick),0) FROM world_ticks)-?
+      AND (SELECT COUNT(*) FROM nation_stability_scores s WHERE s.tick=t.tick)<${stabilityNations.length} ORDER BY t.tick`)
+      .bind(maximumCatchupTicks+scoreRepairTicks).all<{tick:number;scheduled_at:number}>();
+    for (const row of missing.results) await db.batch(await stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now));
+  } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
   const [latest,execution,supply,stability] = await Promise.all([
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')

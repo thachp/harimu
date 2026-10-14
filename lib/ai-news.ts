@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import type {NationalNews,NewsItem} from './national-news';
-import {reserveAiSequence,releaseAiReservation,markAiReservationSent,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
+import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,meteredAiCost,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 export const aiNewsEnabled=true; // Preview activation approved 2026-10-14; runtime flags and pricing expiry still gate inference.
 export const aiNewsSchemas=[aiBudgetSchema,
  `CREATE TABLE IF NOT EXISTS ai_news_jobs(id TEXT PRIMARY KEY,nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),utc_day TEXT NOT NULL,started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('running','published','failed')),failure_code TEXT)`,
@@ -40,6 +40,8 @@ export function inferenceText(value:unknown,json=false){
 }
 /** A 'running' news lease older than this died mid-run (a sequence is at most three 30s calls). */
 export const aiNewsStaleLeaseSeconds=600;
+/** #160: a job that failed before the gateway is retried at most once per this many seconds, not on every page load. */
+export const aiNewsRetrySeconds=300;
 export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null}={}){
  if(!enabled||!Number.isSafeInteger(now))return;
  // #140: flag on but no binding/budget used to return silently; say why so preview checks can see it.
@@ -49,16 +51,23 @@ export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number
  // #140: the daily lease used to be final, so a job that failed before any gateway call (budget unavailable, not
  // sent) or a run that died mid-flight blocked news for the rest of the UTC day with zero gateway calls.
  // Re-take it atomically in exactly those cases; a job that reached the gateway is never retried.
- if(lease.meta.changes!==1){const retake=await db.prepare("UPDATE ai_news_jobs SET status='running',failure_code=NULL,started_at=? WHERE id=? AND ((status='failed' AND failure_code IN ('budget-unavailable','not-sent')) OR (status='running' AND started_at<=?))").bind(now,id,now-aiNewsStaleLeaseSeconds).run();if(retake.meta.changes!==1)return;}
- const reservation=crypto.randomUUID();
+ // #160: (1) pre-gateway failures retry at most every aiNewsRetrySeconds, so a blocked budget doesn't rewrite the
+ // job on every page load. (2) Reservations are named ai-news:<job>:<attempt>, and a stale running lease is NOT
+ // retaken if any attempt for this job already reached the gateway (non-pending row): a crash after the call
+ // must not charge the budget a second time. A crashed attempt's unsent (pending) row is released on retake.
+ const attempts=`ai-news:${id}:%`;
+ if(lease.meta.changes!==1){const retake=await db.prepare("UPDATE ai_news_jobs SET status='running',failure_code=NULL,started_at=? WHERE id=? AND ((status='failed' AND failure_code IN ('budget-unavailable','not-sent') AND started_at<=?) OR (status='running' AND started_at<=? AND NOT EXISTS(SELECT 1 FROM harimu_ai_reservations WHERE request_id LIKE ? AND status<>'pending')))").bind(now,id,now-aiNewsRetrySeconds,now-aiNewsStaleLeaseSeconds,attempts).run();if(retake.meta.changes!==1)return;
+  await db.prepare("DELETE FROM harimu_ai_reservations WHERE request_id LIKE ? AND status='pending'").bind(attempts).run();}
+ const reservation=`ai-news:${id}:${now}`;
  if(!await reserveAiSequence(db,reservation,now,budget)){await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code='budget-unavailable' WHERE id=?").bind(id).run();return;}
- let reached=false; // #92: true once any request is handed to the gateway
+ let reached=false;const answered:AiModel[]=[]; // #92: true once any request is handed to the gateway
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error('Inference input exceeded the public-facts bound.');
   let timeout:ReturnType<typeof setTimeout>|undefined;let result:unknown;if(!reached){reached=true;await markAiReservationSent(db,reservation);}
   try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},aiGatewayOptions(budget)),new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>reject(Error('Inference timed out.')),30000);})]);}catch(error){throw new AiNewsFailure(error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain');}finally{if(timeout!==undefined)clearTimeout(timeout);}
+  answered.push(model); // #141: the gateway answered, so this call is metered
   // The provider has returned: malformed content is a known rejected attempt,
-  // not an unresolved transport. Its complete reservation remains charged.
+  // not an unresolved transport. It settles to the metered cost of the answered calls (#141).
   return inferenceText(result,Boolean(json));
  };
  try{
@@ -67,7 +76,9 @@ export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number
   const supported=await call('@cf/meta/llama-3.2-3b-instruct',[{role:'system',content:'Check only this draft prose against the provided public facts. The claims array contains allowlisted fact keys; the server renders their exact ledger values, including zero. They are not invented statements or supplied quantities. General advice to read public records is supported. Reject invented policy, prices, outcomes, identities or quantities in prose. Return JSON with a supported boolean; true only when the prose is supported.'},{role:'user',content:JSON.stringify({facts,draft})}],'verification');if(!supportedNewsDraft(supported))throw Error('Unsupported draft.');
   const safe=await call('@cf/meta/llama-guard-3-8b',[{role:'user',content:'Provide a neutral national record from these public facts: '+JSON.stringify(facts)},{role:'assistant',content:JSON.stringify(draft)}]);if(safe.trim()!=='safe')throw Error('Unsafe draft.');
   await db.batch([db.prepare('INSERT OR IGNORE INTO ai_news_articles(id,nation_id,title,body,created_at,model,facts_json) VALUES (?,?,?,?,?,?,?)').bind(id,facts.nationId,draft.title,newsDraftText(draft,facts),now,'@cf/meta/llama-3.2-3b-instruct',JSON.stringify(facts)),db.prepare("UPDATE ai_news_jobs SET status='published' WHERE id=?").bind(id),db.prepare("UPDATE harimu_ai_reservations SET status='finished' WHERE request_id=?").bind(reservation)]);
- }catch(error){if(!reached){await releaseAiReservation(db,reservation);await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code='not-sent' WHERE id=?").bind(id).run();return;}const code=error instanceof AiNewsFailure?error.code:'validation';await db.batch([db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code=? WHERE id=?").bind(code,id),db.prepare('UPDATE harimu_ai_reservations SET status=? WHERE request_id=?').bind(error instanceof AiNewsFailure?'uncertain':'finished',reservation)]);}
+ }catch(error){if(!reached){await releaseAiReservation(db,reservation);await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code='not-sent' WHERE id=?").bind(id).run();return;}const code=error instanceof AiNewsFailure?error.code:'validation';await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code=? WHERE id=?").bind(code,id).run();
+  // #141: an unresolved transport keeps the full reservation; a known rejection settles to the metered cost.
+  if(error instanceof AiNewsFailure)await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=?").bind(reservation).run();else await settleAiReservation(db,reservation,meteredAiCost(answered));}
 }
 export async function readAiNews(db:GameDatabase,nationId:string):Promise<NewsItem[]>{
  const result=await db.prepare('SELECT id,title,body,created_at FROM ai_news_articles WHERE nation_id=? ORDER BY created_at DESC LIMIT 6').bind(nationId).all<{id:string;title:string;body:string;created_at:number}>();

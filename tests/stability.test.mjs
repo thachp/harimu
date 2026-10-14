@@ -146,3 +146,22 @@ test('hotfix #95: only a missing-table error is swallowed',()=>{
  assert.equal(isMissingStabilityTable(Object.assign(Error('wrapped'),{cause:{code:'42P01'}})),true);
  for(const e of [Error('relation "citizens" does not exist'),{code:'23505',message:'duplicate key'},Error('connection reset'),null,'42P01'])assert.equal(isMissingStabilityTable(e),false);
 });
+test('#159 a tick whose score write failed is repaired on the next pass, without duplicates',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const epoch=(await r.call('world',null)).data.simulation.clock.epochSeconds;
+ r.setNow((epoch+3*tickSeconds+5)*1000);await r.call('world',null);
+ const count=async()=>(await r.db.prepare('SELECT COUNT(*) AS n FROM nation_stability_scores').first()).n;
+ assert.equal(await count(),9,'3 ticks × 3 nations');
+ // Simulate a transient failure that left tick 2 without scores.
+ await r.db.prepare('DELETE FROM nation_stability_scores WHERE tick=2').run();assert.equal(await count(),6);
+ r.setNow((epoch+4*tickSeconds+5)*1000);await r.call('world',null);
+ assert.equal(await count(),12,'tick 2 repaired and tick 4 written');
+ assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM nation_stability_scores WHERE tick=2').first()).n,3);
+ await r.call('world',null);assert.equal(await count(),12,'idempotent: a repeat pass adds nothing');
+});
+test('#159 a named missing relation must be nation_stability_scores',()=>{
+ assert.equal(isMissingStabilityTable({code:'42P01',message:'relation "citizens" does not exist'}),false);
+ assert.equal(isMissingStabilityTable({code:'42P01',message:'relation "public.nation_stability_scores" does not exist'}),true);
+ assert.equal(isMissingStabilityTable({code:'42P01',message:'relation "nation_stability_scores_old" does not exist'}),false);
+ assert.equal(isMissingStabilityTable(Error('no such table: world_ticks')),false);
+ assert.equal(isMissingStabilityTable({code:'42P01'}),true,'no name to check: still treated as missing');
+});

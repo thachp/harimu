@@ -303,7 +303,7 @@ Postgres (Hyperdrive) never bootstraps schema, so numbered `db/postgres/NNNN_*.s
 
 ## Preview auto-deploy (#128)
 
-`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** when CI succeeds on a push to `dev`. It never runs for `main` or for PRs, and only the newest commit deploys. It applies pending Postgres migrations first (any failure means no deploy), then runs `npm run deploy`, which uses the pinned wrangler with `--keep-vars` and the #119 guard. The commit SHA and the Cloudflare version ID go to the job summary. `workflow_dispatch` on `dev` can run the migration step alone. Production stays manual.
+`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** when CI succeeds on a push to `dev`. It never runs for `main` or for PRs, and runs queue (never cancelled mid-migration) and only the newest pending commit deploys; only CI runs from this repository can trigger it. It applies pending Postgres migrations first (any failure means no deploy), then runs `npm run deploy`, which uses the pinned wrangler with `--keep-vars` and the #119 guard. The commit SHA and the Cloudflare version ID go to the job summary. `workflow_dispatch` on `dev` can run the migration step alone. Production stays manual.
 
 Repository secrets (environment `preview`):
 
@@ -312,3 +312,19 @@ Repository secrets (environment `preview`):
 | `CLOUDFLARE_API_TOKEN` | Account: Workers Scripts Edit, D1 Edit (for the schema check query), Account Settings Read. Zone: Workers Routes Edit, if preview uses routes. Scope it to the one account. |
 | `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account that owns harimu-preview. |
 | `PREVIEW_DATABASE_ADMIN_URL` | Postgres admin connection string for the preview database. |
+## QA tooling (#138)
+
+**Build identity:** `GET /api/version` returns `{ "sha": "<commit>", "builtAt": "<ISO time>" }` and nothing else.
+The values are stamped at build time (`scripts/build-info.mjs`, in this order: `GITHUB_SHA`, `HARIMU_BUILD_SHA`, Workers Builds' commit SHA, `git rev-parse HEAD`).
+They are `"unknown"`/`null` if no SHA is available.
+
+**Korund (or any playable nation) test citizen on preview:**
+1. Sign in on preview with the QA account and enroll in any nation.
+2. PM sets two Worker variables on **harimu-preview only** (Cloudflare dashboard; deploys keep them with `--keep-vars`):
+   `HARIMU_QA_TEST_CITIZENS=true` and `HARIMU_QA_TEST_CITIZEN_IDS=<comma-separated Clerk user ids of QA accounts>`.
+   These are account ids, not credentials. Never commit them.
+3. From the signed-in preview tab:
+   `fetch('/api/citizen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'qa-test-nation',nationId:'korund'})})`.
+   This moves only that citizen to the chosen nation (the city resets to its capital) and does not spend the free citizenship change.
+
+The action returns 404 unless both flags are on **and** `NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW=true` **and** the caller is on the allowlist, so it is inert in production.
