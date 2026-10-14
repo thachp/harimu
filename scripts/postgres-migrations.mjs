@@ -33,11 +33,14 @@ function splitTopLevel(body) {
 }
 /** Columns and indexes a migration creates: { columns: [[table, column]], indexes: [name] }. */
 export function createdObjects(sql) {
-  const code = stripComments(sql), columns = [], indexes = [];
+  const code = stripComments(sql), columns = [], indexes = [], checks = [];
   for (const m of code.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([a-z_][a-z_0-9]*)[`"]?\s*\(/gi)) {
     let depth = 1, i = m.index + m[0].length; const start = i;
     while (i < code.length && depth) { if (code[i] === '(') depth++; if (code[i] === ')') depth--; i++; }
-    for (const part of splitTopLevel(code.slice(start, i - 1))) {
+    const body = code.slice(start, i - 1);
+    const checkCount = (body.match(/\bCHECK\s*\(/gi) ?? []).length;
+    if (checkCount) checks.push([m[1].toLowerCase(), checkCount]);
+    for (const part of splitTopLevel(body)) {
       const word = part.trim().match(/^["`]?([a-z_][a-z_0-9]*)/i)?.[1].toLowerCase();
       if (word && !constraintWords.has(word)) columns.push([m[1].toLowerCase(), word]);
     }
@@ -46,7 +49,7 @@ export function createdObjects(sql) {
     if (!constraintWords.has(m[2].toLowerCase())) columns.push([m[1].toLowerCase(), m[2].toLowerCase()]);
   }
   for (const m of code.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([a-z_][a-z_0-9]*)/gi)) indexes.push(m[1].toLowerCase());
-  return { columns, indexes };
+  return { columns, indexes, checks };
 }
 export const checksum = sql => createHash('sha256').update(sql).digest('hex');
 
@@ -70,13 +73,16 @@ async function liveSchema(db) {
   const tables = await publicTables(db);
   const columns = new Set((await db.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public'")).rows.map(r => `${String(r.table_name).toLowerCase()}.${String(r.column_name).toLowerCase()}`));
   const indexes = new Set((await db.query("SELECT indexname FROM pg_indexes WHERE schemaname='public'")).rows.map(r => String(r.indexname).toLowerCase()));
-  return { tables, columns, indexes };
+  const checks = new Map((await db.query("SELECT c.relname AS table_name, COUNT(*)::int AS n FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace s ON s.oid=c.relnamespace WHERE s.nspname='public' AND k.contype='c' GROUP BY c.relname")).rows.map(r => [String(r.table_name).toLowerCase(), Number(r.n)]));
+  return { tables, columns, indexes, checks };
 }
 /** Everything a migration should have created that the live schema lacks. */
 export function missingObjects(m, live) {
   return [...(m.tables ?? []).filter(t => !live.tables.has(t)).map(t => `table ${t}`),
     ...(m.columns ?? []).filter(([t, c]) => live.tables.has(t) && !live.columns.has(`${t}.${c}`)).map(([t, c]) => `column ${t}.${c}`),
-    ...(m.indexes ?? []).filter(i => !live.indexes.has(i)).map(i => `index ${i}`)];
+    ...(m.indexes ?? []).filter(i => !live.indexes.has(i)).map(i => `index ${i}`),
+    // #152: CHECK constraints: the live table must have at least as many as the migration declares.
+    ...(live.checks ? (m.checks ?? []).filter(([t, n]) => live.tables.has(t) && (live.checks.get(t) ?? 0) < n).map(([t, n]) => `CHECK constraints on ${t} (${live.checks.get(t) ?? 0} of ${n})`) : [])];
 }
 const recorded = async db => {
   const tables = await publicTables(db);
@@ -166,6 +172,29 @@ export function postgresClientConfig(connectionString, timeoutMs = connectTimeou
   return config;
 }
 const redact = connectionString => { try { const u = new URL(connectionString); return `${u.hostname}${u.port ? `:${u.port}` : ''}`; } catch { return 'the database'; } };
+/**
+ * #152: bootstrap an EMPTY database (local dev, new preview, disaster recovery). Refuses unless
+ * schema public has no tables. Applies compatibility.sql + schema.sql + schema_migrations in one
+ * transaction, then runs every numbered migration as a normal pending migration (all idempotent),
+ * so each is recorded with backfilled=false. Finally verifies with the deploy guard.
+ */
+export async function bootstrapEmptyPostgres(db, { dir = 'db/postgres', log = () => {} } = {}) {
+  await db.query('SELECT pg_advisory_lock($1)', [lockKey]);
+  try {
+    const tables = await publicTables(db);
+    if (tables.size) throw new Error(`--bootstrap-empty refuses: schema public already has ${tables.size} table(s). Use the normal migrate command.`);
+    const base = ['compatibility.sql', 'schema.sql'].map(f => readFileSync(join(dir, f), 'utf8'));
+    await db.exec('BEGIN');
+    try { for (const sql of base) await db.exec(sql); await db.exec(schemaMigrationsTable); await db.exec('COMMIT'); }
+    catch (error) { await db.exec('ROLLBACK'); throw new Error(`Bootstrap rolled back: ${error.message}`); }
+    log('Applied compatibility.sql and schema.sql.');
+  } finally { await db.query('SELECT pg_advisory_unlock($1)', [lockKey]); }
+  const migrations = postgresMigrations(dir);
+  const result = await applyPostgresMigrations(db, migrations, { log });
+  await assertPostgresMigrationsApplied(db, migrations);
+  return result;
+}
+
 /** node-postgres adapter (deploy machine / CI only). Fails within timeoutMs, never hangs. */
 export async function connectPostgres(connectionString, { timeoutMs = connectTimeoutMs } = {}) {
   const { Client } = await import('pg');
