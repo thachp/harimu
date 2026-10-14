@@ -141,7 +141,7 @@ export async function GET(request: Request) {
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
   return privateJson({
     aurellePlan: await readAurelle(database,userId),
-    election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible),...(accountLevel?{id:accountElectionId}:{})}:null,
+    election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true),...(accountLevel?{id:accountElectionId}:{})}:null,
     collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
     korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
     firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
