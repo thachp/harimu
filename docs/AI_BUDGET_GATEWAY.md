@@ -26,4 +26,23 @@ To re-verify: check Workers AI pricing, update the amounts if needed, bump the v
   READ COMMITTED pushed the day over the cap, the over-cap pending row is withdrawn before any inference (ties fail closed).
   PostgreSQL writes also serialize on the adapter's transaction advisory lock.
 - A pending/uncertain reservation from an earlier UTC day blocks new reservations for `aiUncertainBlockTtlSeconds` (1h)
-  after it started. After that it stops blocking, but its full charge is never refunded and still counts for its day(s).
+  after it started. After that it stops blocking. An `uncertain` row (the request was handed to the gateway and the
+  outcome is unknown) keeps its full charge.
+
+## Reservation lifecycle (#92)
+- **No reservation without inference.** Only an enabled feature with a valid budget *and* gateway id reserves. Database
+  readiness never writes `harimu_ai_reservations` (the old preview acceptance ledger/prebook was removed).
+- **Not sent = not charged.** If a sequence fails before any request is handed to the gateway, its `pending` row is deleted.
+- **Stale pending expires.** A `pending` row older than `aiPendingExpirySeconds` (1h) has no evidence of a gateway call:
+  it stops counting immediately and is deleted on the next reservation.
+
+## Preview cleanup (PM step, #92)
+Preview readiness used to insert hard-coded `acceptance:2026-10-14:*` rows (959,000 micro-USD on Oct 14 and Oct 15)
+that never went through `harimu-preview`. After deploying #92, PM runs, against the **preview** database only:
+
+```
+psql "$PREVIEW_DATABASE_URL" -c "SELECT request_id,status,reserved_micro FROM harimu_ai_reservations WHERE request_id LIKE 'acceptance:%'"   # dry run
+psql "$PREVIEW_DATABASE_URL" -1 -f db/postgres/maintenance/092_release_unspent_ai_reservations.sql
+```
+It is idempotent (a second run deletes nothing) and leaves real reservations alone. Confirm with `GET /api/notables`
+(`budget.remainingMicroUsd` should be back near the daily budget). Deploy #92 first, or old readiness re-inserts the rows.

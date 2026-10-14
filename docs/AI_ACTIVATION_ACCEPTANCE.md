@@ -1,5 +1,7 @@
 # Preview AI activation acceptance — 2026-10-14
 
+> **Superseded by #92.** The `lib/ai-acceptance-charges.ts` ledger and its readiness reconciliation/prebook were removed: they wrote 959,000 micro-USD of reservations into preview that never went through the `harimu-preview` AI Gateway and blocked all AI. See docs/AI_BUDGET_GATEWAY.md › Preview cleanup.
+
 The owner explicitly approved the exact Workers AI binding and preview news/Notable activation on 2026-10-14 at 08:06:58 UTC, with public facts plus explicitly submitted questions, the reviewed Llama 3.2 3B and Llama Guard 3 8B models, and a US$1/day ceiling. No new credentials, subscription upgrades or model terms were accepted.
 
 ## Result: binding prepared, runtime services OFF

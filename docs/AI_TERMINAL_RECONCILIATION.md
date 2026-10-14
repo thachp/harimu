@@ -1,5 +1,7 @@
 # Approved terminal-failure reconciliation — 2026-10-14
 
+> **Superseded by #92.** The `lib/ai-acceptance-charges.ts` ledger and its readiness reconciliation/prebook were removed: they wrote 959,000 micro-USD of reservations into preview that never went through the `harimu-preview` AI Gateway and blocked all AI. See docs/AI_BUDGET_GATEWAY.md › Preview cleanup.
+
 Scope: correct only `acceptance:2026-10-14:notable-1`, `notable-2` and `notable-5` from uncertain transport to a known completed **failed** attempt. No successful model acceptance is asserted. Each retains US$0.1364, its exact model, original start, October 14/15 monetary windows and identity. No inference is made. Both services remain OFF.
 
 ## Exact evidence
