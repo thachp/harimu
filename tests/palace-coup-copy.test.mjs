@@ -61,7 +61,7 @@ test('no violence glorified, no human penalties, no real-world references, no No
   assert.doesNotMatch(t,/\b(players?|citizens?|soldiers?)\b/i);
   assert.doesNotMatch(t,/\b(Earth|Saudi|Thailand|England|France|Europe|London|Paris)\b/); assert.doesNotMatch(t,/Notable/);
 });
-test('unwired: nothing in app/ or components/ imports palace-coup-copy', () => {
+test('wired by #281 only: the Aurelle Rising panel is the one UI importer of palace-coup-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/palace-coup-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/aurelle-rising.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/palace-coup-copy/, f);
 });

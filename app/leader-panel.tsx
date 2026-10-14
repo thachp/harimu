@@ -9,8 +9,8 @@ import { AiBadge, AiTextTag } from './ai-disclosure';
 
 export function LeaderPanel({snapshot,simulation}:{snapshot:GovernmentSnapshot;simulation?:SimulationState}) {
   const authored=leaderPersonas[snapshot.nationId as keyof typeof leaderPersonas];
-  // #71: a successful Rising crowns the claimant; the new AI royal house replaces the authored monarch.
-  const crowned=snapshot.crown&&authored?{...authored,name:snapshot.crown.name,affiliation:`${snapshot.crown.house} · crowned by a popular Rising`,color:snapshot.crown.color,biography:`Took the Sky Throne after a Rising of the commons. Motto: “${snapshot.crown.motto}”`}:authored;
+  // #71/#281: a successful Rising or palace coup crowns a new AI royal house; the new AI royal house replaces the authored monarch.
+  const crowned=snapshot.crown&&authored?{...authored,name:snapshot.crown.name,affiliation:`${snapshot.crown.house} · ${snapshot.crown.how==='coup'?'installed by a palace coup':'crowned by a popular Rising'}`,color:snapshot.crown.color,biography:snapshot.crown.how==='coup'?`${snapshot.crown.name} of ${snapshot.crown.house} now holds the Sky Throne after a palace coup. Motto: “${snapshot.crown.motto}”`:`Took the Sky Throne after a Rising of the commons. Motto: “${snapshot.crown.motto}”`}:authored;
   // #70: after a purge the Chosen Comrade replaces the authored Chairman.
   const persona=snapshot.presidium&&crowned&&snapshot.presidium.chairman.name!==crowned.name?{...crowned,name:snapshot.presidium.chairman.name,biography:'Confirmed as Chairman by the Presidium after an emergency session. Citizens receive official statements; council deliberation stays private.'}:crowned;
   if(!persona)return null;
