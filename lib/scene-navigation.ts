@@ -24,6 +24,7 @@ export function sceneUrl(href: string, scene: SceneView, nationId?: string, city
   if (scene === 'nation' || scene === 'world' || scene === 'country' || Boolean(cityId)) {
     if (nationId) url.searchParams.set('nation', nationId);
   } else url.searchParams.delete('nation');
-  if (cityId) url.searchParams.set('city', cityId);
+  // A city belongs to one nation; never carry a previous nation's city forward (#55).
+  if (cityId) url.searchParams.set('city', cityId); else url.searchParams.delete('city');
   return url.href;
 }

@@ -1037,7 +1037,7 @@ export default function Home() {
     const nextNation = nextView === 'country' && !['world','country','nation'].includes(viewMode) && citizenNation ? citizenNation.id : selected.id;
     setSelectedId(nextNation);
     const visitingCity = new URLSearchParams(window.location.search).get('city');
-    const cityId = citizenNation ? currentCityAccount?.currentCityId : visitingCity && cityForNation(nextNation,visitingCity) ? visitingCity : undefined;
+    const cityId = citizenNation?.id === nextNation ? currentCityAccount?.currentCityId : visitingCity && cityForNation(nextNation,visitingCity) ? visitingCity : undefined;
     const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
@@ -1049,7 +1049,8 @@ export default function Home() {
     setSelectedId(nationId);
     setNationFocusRevision(value => value + 1);
     if (!['nation','world','country'].includes(viewMode)) return;
-    const href = sceneUrl(window.location.href, viewMode, nationId);
+    const currentCity = new URLSearchParams(window.location.search).get('city');
+    const href = sceneUrl(window.location.href, viewMode, nationId, currentCity && cityForNation(nationId, currentCity) ? currentCity : undefined);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
   }
