@@ -91,7 +91,8 @@ test(`#71 ${backend}: a Rising opens once at the thresholds, resolves exactly on
   assert.equal(rising.claimant_id, 'larkspire'); assert.equal(Number(rising.closes_at) - Number(rising.opened_at), risingConfig.windowSeconds);
   const view = await r.call('aurelle/rising', 'bob');
   assert.equal(view.data.rising.status, 'open'); assert.equal(view.data.rising.closesAt, Number(rising.closes_at), 'banner countdown deadline');
-  assert.equal((await gazette()).length, 1); assert.match((await gazette())[0], /A Rising has begun behind Aubert Larkspire/);
+  assert.equal((await gazette()).length, 1); assert.match((await gazette())[0], /the Crown calls the realm to loyalty/);
+  assert.match(JSON.stringify((await r.db.prepare("SELECT detail FROM world_events WHERE kind='court-gazette'").all()).results), /Lord Aubert of House Larkspire calls the commons to rise/, 'Content #269 copy, placeholders filled');
   at((Number(rising.closes_at) - 60) * 1000); await r.call('world', null);
   assert.equal((await risings())[0].resolved_at, null, 'still open before the window closes');
   at((Number(rising.closes_at) + 1) * 1000);
@@ -99,9 +100,9 @@ test(`#71 ${backend}: a Rising opens once at the thresholds, resolves exactly on
   await r.call('world', null); await r.call('world', null); await r.call('world', null);
   const done = (await risings())[0];
   assert.equal(done.outcome, 'succeeded'); assert.equal((await risings()).length, 1);
-  assert.equal((await gazette()).length, 2, 'resolution logged exactly once'); assert.ok((await gazette()).some(h => /takes the Sky Throne/.test(h)), 'newest entry first');
+  assert.equal((await gazette()).length, 2, 'resolution logged exactly once'); assert.equal((await gazette())[0], 'Be it known: Lord Aubert of House Larkspire takes the Sky Throne. The Crown endures.', 'newest entry first, #269 copy');
   const government = await r.readGovernment('aurelle', 'bob');
-  assert.equal(government.crown.name, 'Aubert Larkspire'); assert.equal(government.crown.house, 'House Larkspire');
+  assert.equal(government.crown.name, 'Lord Aubert'); assert.equal(government.crown.house, 'House Larkspire');
   const after = await r.call('aurelle/rising', 'bob');
   assert.equal(after.data.crown.claimantId, 'larkspire'); assert.equal(after.data.claimants.find(c => c.id === 'larkspire').crowned, true);
   assert.equal((await pledge('carol', 'larkspire')).status, 409, 'the crowned claimant is no longer a claimant');
@@ -136,7 +137,7 @@ test(`#71 ${backend}: a Rising fails when Stability holds; the crown stays; GET 
   assert.equal((await off.risings()).length, 0, 'flag off: world tick opens nothing');
 });
 
-test('#71 migration 0023 matches the runtime schema, is additive, and passes the guard', async t => {
+test('#71 migration 0023 matches the runtime schema, is additive, and passes the guard', async () => {
   const { aurelleRisingSchemas } = await import('../lib/aurelle-rising.ts').catch(() => ({}));
   const d1 = await readFile('drizzle/0023_aurelle_rising.sql', 'utf8'); const pg = await readFile('db/postgres/0023_aurelle_rising.sql', 'utf8');
   if (aurelleRisingSchemas) for (const s of aurelleRisingSchemas) assert.ok(d1.includes(s.replace(/\s*\n\s*/g, ' ').trim()), s.slice(0, 50));
@@ -145,4 +146,35 @@ test('#71 migration 0023 matches the runtime schema, is additive, and passes the
   assert.equal(postgresMigrations().filter(x => x.number === '0023').length, 1);
   assert.equal(postgresMigrations().filter(x => x.number === '0022').length, 0, '0022 is held for #86');
   assert.ok(!isDestructive(pg) && !isDestructive(d1)); assert.equal(transactionProblem(pg), null);
+});
+
+test('#71 claimant persona data fits Content #269 limits and fills every placeholder', async () => {
+  const copy = await import('../lib/claimant-copy.ts');
+  const fill = (text, c) => text.replaceAll('{claimant}', c.name).replaceAll('{house}', c.house).replaceAll('{motto}', c.motto);
+  for (const c of claimants) {
+    const label = fill(copy.pledgeCard.nameLine.text, c);
+    assert.ok(label.length <= copy.CLAIMANT_LABEL_MAX, label);
+    for (const s of copy.risingStageCopy) for (const k of ['notice', 'crownGazette', 'claimantVoice']) { const t = fill(s[k], c); assert.ok(!/\{(claimant|house|motto)\}/.test(t)); assert.ok(t.length <= copy.CLAIMANT_BODY_MAX, t); }
+    assert.ok(`${c.grievance} ${c.programme}`.length <= copy.CLAIMANT_BODY_MAX);
+  }
+});
+
+test('#71 UI: greyed-out pledge shows why; open Rising shows a banner with real and game countdown', async () => {
+  const React = (await import('react')).default; const { renderToStaticMarkup } = await import('react-dom/server'); const ts = (await import('typescript')).default;
+  const { createRequire } = await import('node:module'); const require = createRequire(import.meta.url);
+  const compiled = ts.transpileModule(await readFile(new URL('../app/aurelle-rising.tsx', import.meta.url), 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText;
+  const exports = {};
+  const fill = (text, c) => text.replaceAll('{claimant}', c.name).replaceAll('{house}', c.house).replaceAll('{motto}', c.motto);
+  new Function('exports', 'require', compiled)(exports, name => name === '../lib/claimant-copy' ? require('../lib/claimant-copy.ts') : name === '../lib/aurelle-rising' ? { fillClaimantCopy: fill }
+    : name === '../lib/action-reasons' ? require('../lib/action-reasons.ts') : name === './game-timer' ? { GameTimer: ({ endsAt, label }) => React.createElement('span', { role: 'timer' }, `${label} ${endsAt} real · game`) }
+    : name === './ai-disclosure' ? { AiBadge: () => React.createElement('span', null, 'AI') } : require(name));
+  const base = { enabled: true, asOf: 1, crown: null, claimants: claimants.map(c => ({ ...c, pledges: 0, crowned: false })), weeklyHumans: 3, threshold: 1, unrest: 70, unrestSustainedSeconds: 3600,
+    myPledge: null, pledge: { allowed: false, reason: 'Only Tier-1 verified citizens can pledge.' }, rising: null, config: risingConfig };
+  const greyed = renderToStaticMarkup(React.createElement(exports.AurelleRisingView, { state: base, busy: false, error: '', onPledge: () => {} }));
+  assert.match(greyed, /Only Tier-1 verified citizens can pledge\./); assert.match(greyed, /aria-disabled="true"|disabled=""/); assert.match(greyed, /aria-describedby="aurelle-pledge-reason"/);
+  assert.match(greyed, /Lady Ysolde, claimant of House Vaelcourt/);
+  const open = renderToStaticMarkup(React.createElement(exports.AurelleRisingView, { state: { ...base, pledge: { allowed: true, reason: null },
+    rising: { id: 'r', claimantId: 'larkspire', claimantName: 'Lord Aubert', house: 'House Larkspire', openedAt: 1, closesAt: 200, status: 'open', resolvedAt: null } }, busy: false, error: '', onPledge: () => {} }));
+  assert.match(open, /A Rising has begun\. The Crisis Window is open\./); assert.match(open, /role="timer"[^>]*>Crisis Window closes 200000 real · game/);
+  assert.match(open, /Lord Aubert of House Larkspire calls the commons to rise\./);
 });

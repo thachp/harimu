@@ -2,12 +2,13 @@
  *  Canon: docs ai-leadership §8.12 and coups-transitions §10.3 (Aurelle row). Thresholds are config [ASSUMPTION] values. */
 export type ClaimantId = 'vaelcourt' | 'brightvane' | 'larkspire';
 export type Claimant = { id: ClaimantId; name: string; house: string; motto: string; grievance: string; programme: string; color: string };
-/** Placeholder personas until Content #269 (lib/claimant-copy.ts) lands and names the rival houses; the house names reuse
- *  existing Aurelle family names from lib/citizen-names.ts. Rule-bound personas: no live AI model is connected. */
+/** Persona data that fills Content #269's {claimant}/{house}/{motto} placeholders (lib/claimant-copy.ts names no house).
+ *  House names reuse existing Aurelle family names from lib/citizen-names.ts; proposal data for Content review.
+ *  Rule-bound personas: no live AI model is connected. Stay within CLAIMANT_LABEL_MAX / CLAIMANT_BODY_MAX (tested). */
 export const claimants: readonly Claimant[] = [
-  { id: 'vaelcourt', name: 'Ysolde Vaelcourt', house: 'House Vaelcourt', motto: 'Bread before banners.', grievance: 'The royal store feeds the court before the commons.', programme: 'Open the estate granaries to every household.', color: '#9f6f8f' },
-  { id: 'brightvane', name: 'Corin Brightvane', house: 'House Brightvane', motto: 'Every thread its due wage.', grievance: 'Charter wages buy less each season.', programme: 'Restore full-weight Crowns for charter work.', color: '#6f8fa8' },
-  { id: 'larkspire', name: 'Aubert Larkspire', house: 'House Larkspire', motto: 'An open court for an open realm.', grievance: 'Petitions die in the royal council.', programme: 'Hear household petitions in an open court.', color: '#8fa86f' },
+  { id: 'vaelcourt', name: 'Lady Ysolde', house: 'House Vaelcourt', motto: 'Bread before banners.', grievance: 'The royal store feeds the court before the commons.', programme: 'Open the estate granaries to every household.', color: '#9f6f8f' },
+  { id: 'brightvane', name: 'Lord Corin', house: 'House Brightvane', motto: 'Every thread its due wage.', grievance: 'Charter wages buy less each season.', programme: 'Restore full-weight Crowns for charter work.', color: '#6f8fa8' },
+  { id: 'larkspire', name: 'Lord Aubert', house: 'House Larkspire', motto: 'An open court for an open realm.', grievance: 'Petitions die in the royal council.', programme: 'Hear household petitions in an open court.', color: '#8fa86f' },
 ];
 export const isClaimantId = (value: unknown): value is ClaimantId => claimants.some(c => c.id === value);
 export const claimant = (id: string) => claimants.find(c => c.id === id) ?? null;

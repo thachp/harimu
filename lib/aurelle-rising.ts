@@ -1,6 +1,14 @@
 import type { GameDatabase } from './database-contract';
 import { claimant, claimants, pledgeThreshold, risingConfig, risingReady, risingSucceeds, unrestSustainedSeconds, type ClaimantId } from './aurelle-rising-rules';
+import { pledgeToasts, risingStage, type RisingStage } from './claimant-copy';
 export * from './aurelle-rising-rules';
+
+/** Fill Content #269 placeholders ({claimant}, {house}, {motto}) from the claimant persona. */
+export const fillClaimantCopy = (text: string, c: { name: string; house: string; motto: string }) =>
+  text.replaceAll('{claimant}', c.name).replaceAll('{house}', c.house).replaceAll('{motto}', c.motto);
+const stage = (s: RisingStage, c: { name: string; house: string; motto: string }) => {
+  const copy = risingStage(s)!; return { notice: fillClaimantCopy(copy.notice, c), gazette: fillClaimantCopy(copy.crownGazette, c), voice: fillClaimantCopy(copy.claimantVoice, c) };
+};
 
 const claimantCheck = `CHECK(claimant_id IN (${claimants.map(c => `'${c.id}'`).join(',')}))`;
 /** #71. One current pledge per Tier-1 Aurelle citizen (private; only aggregates leave the server) and one row per Rising. */
@@ -89,7 +97,7 @@ export async function readAurelleRising(db: GameDatabase, userId: string | null,
     : !userId ? 'Sign in as an Aurelle citizen to pledge.'
     : citizen?.nation_id !== 'aurelle' ? 'Only citizens of Aurelle can pledge to an Aurelle claimant.'
     : !eligibility.tier1 ? `Only Tier-1 verified citizens can pledge. ${eligibility.reason}`
-    : mine && now < changeableAt ? 'You changed your pledge recently. You can change it again once the waiting period ends.'
+    : mine && now < changeableAt ? pledgeToasts.cooldown.text
     : null;
   return {
     enabled, asOf: now, crown,
@@ -121,7 +129,7 @@ export async function pledge(db: GameDatabase, userId: string, command: { reques
   await db.prepare(pledgeSql).bind(command.claimantId, command.requestId, now, userId).run().catch(() => undefined);
   const after = await db.prepare('SELECT claimant_id, request_id FROM aurelle_pledges WHERE clerk_user_id = ?').bind(userId).first<{ claimant_id: string; request_id: string }>();
   if (after?.request_id === command.requestId) return { status: 200 };
-  return { status: 409, error: 'You changed your pledge recently. You can change it again once the waiting period ends.' };
+  return { status: 409, error: pledgeToasts.cooldown.text };
 }
 
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
@@ -143,9 +151,8 @@ export async function runAurelleRising(db: GameDatabase, now: number) {
     const [byClaimant, weekly] = await Promise.all([counts(db), weeklyAurelleHumans(db, now)]);
     const pledges = byClaimant.get(c.id) ?? 0, stability = scores[0]?.stability ?? 100;
     const outcome = risingSucceeds({ pledges, weeklyHumans: weekly, stability }) ? 'succeeded' : 'failed';
-    const [headline, detail] = outcome === 'succeeded'
-      ? [`Be it known: ${c.name} of ${c.house} takes the Sky Throne.`, `The Rising succeeded. ${c.house} is the new royal house. The Crown endures.`]
-      : [`Be it known: the Crown holds, and order returns to the realm.`, `The Rising behind ${c.name} of ${c.house} failed. The Grievance remains.`];
+    const copy = stage(outcome === 'succeeded' ? 'rising-succeeded' : 'rising-failed', c);
+    const [headline, detail] = [copy.gazette, `${copy.notice} ${copy.voice}`];
     await db.batch([
       db.prepare(`UPDATE aurelle_risings SET resolved_at = ?, outcome = ?, pledges_at_close = ?, weekly_humans_at_close = ?, stability_at_close = ?
         WHERE id = ? AND resolved_at IS NULL`).bind(now, outcome, pledges, weekly, stability, open.id),
@@ -166,7 +173,7 @@ export async function runAurelleRising(db: GameDatabase, now: number) {
     db.prepare(`INSERT OR IGNORE INTO aurelle_risings (id, claimant_id, opened_at, closes_at, pledges_at_open, weekly_humans_at_open, unrest_at_open)
       SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM aurelle_risings WHERE resolved_at IS NULL)`)
       .bind(id, leader.c.id, now, now + risingConfig.windowSeconds, leader.n, weekly, scores[0].unrest),
-    db.prepare(`${gazette(`A Rising has begun behind ${leader.c.name} of ${leader.c.house}.`, 'The Crisis Window is open. The Crown calls the realm to loyalty while the Guard keeps order.')}
+    db.prepare(`${gazette(stage('crisis-window-open', leader.c).gazette, `${stage('crisis-window-open', leader.c).notice} ${stage('crisis-window-open', leader.c).voice}`)}
       WHERE EXISTS (SELECT 1 FROM aurelle_risings WHERE id = ?) AND NOT EXISTS (SELECT 1 FROM world_events WHERE kind = 'court-gazette' AND occurred_at = ?)`)
       .bind(iso(now), -now, id, iso(now)),
   ]);
