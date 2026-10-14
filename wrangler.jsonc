@@ -35,6 +35,7 @@
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "false",
+    "HARIMU_AURELLE_RISING_ENABLED": "false",
     "HARIMU_TRAVEL_ENABLED": "false",
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
     "HARIMU_FAITH_ENABLED": "false",

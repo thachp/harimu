@@ -8,7 +8,9 @@ import { GameTimer } from './game-timer';
 import { AiBadge, AiTextTag } from './ai-disclosure';
 
 export function LeaderPanel({snapshot,simulation}:{snapshot:GovernmentSnapshot;simulation?:SimulationState}) {
-  const persona=leaderPersonas[snapshot.nationId as keyof typeof leaderPersonas];
+  const authored=leaderPersonas[snapshot.nationId as keyof typeof leaderPersonas];
+  // #71: a successful Rising crowns the claimant; the new AI royal house replaces the authored monarch.
+  const persona=snapshot.crown&&authored?{...authored,name:snapshot.crown.name,affiliation:`${snapshot.crown.house} · crowned by a popular Rising`,color:snapshot.crown.color,biography:`Took the Sky Throne after a Rising of the commons. Motto: “${snapshot.crown.motto}”`}:authored;
   if(!persona)return null;
   const disclosure=governmentDisclosure(snapshot);
   return <section className="leader-panel" aria-label={`${persona.office} of ${snapshot.nationId}`}>
