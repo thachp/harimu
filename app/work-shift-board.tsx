@@ -56,7 +56,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
           {active.wageMinor !== undefined && <p>On completion: {(active.wageMinor / 100).toFixed(2)} SPK + {active.rewardQuantity} {active.rewardItem}{qualityText(active)}</p>}
           <p>Public contribution target: {active.output} · {active.capacitySpent} WC committed</p>
           <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>
-          <GameTimer endsAt={active.completesAt} label="Shift ready" />
+          <GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" />
           <button {...disabledReasonProps(claimReason, "work-claim-reason")} onClick={() => { if (!claimReason) onClaim(active.id); }} type="button">
             {pending ? 'Recording…' : 'Collect wages and goods'}
           </button>

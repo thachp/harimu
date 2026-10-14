@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {localRuntime} from './helpers/local-runtime.mjs';
-import {computeStability,foodTerms,workTerms,promiseTerms,petitionTerms,publicStability,unrestAtOrAbove,stabilityStatements,korundApprovedStability} from '../lib/stability.ts';
+import {computeStability,foodTerms,workTerms,promiseTerms,petitionTerms,publicStability,unrestAtOrAbove,stabilityStatements,readStabilityInputs,readPublicStability,isMissingStabilityTable,tickSeconds,korundApprovedStability} from '../lib/stability.ts';
 
 const sum=terms=>terms.reduce((t,x)=>t+x.points,0);
 test('each input is bounded and monotonic',()=>{
@@ -102,4 +102,47 @@ test('Korund entries in /api/citizen and /api/world carry no true score fields a
  for(const key of keysDeep(korundWorld))assert.ok(!forbidden.includes(key),`/api/world Korund view leaks ${key}`);
  assert.doesNotMatch(JSON.stringify(korundWorld),/"(stability|unrest|breakdown|inputs)"/);
  assert.ok(!JSON.stringify(korundWorld).includes(`"${truth.unrest}"`));
+});
+
+test('#142 missing ticks break the sustained run instead of counting as high Unrest',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const start=Date.UTC(2026,0,1)/1000;
+ const put=(tick,unrest)=>r.db.prepare("INSERT INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES ('aurelle',?,?,?,?,?,'{}','{}')").bind(tick,start+tick*tickSeconds,start+tick*tickSeconds,100-unrest,unrest).run();
+ // Two qualifying scores 40h apart (ticks 1 and 21) used to report ~42h.
+ await put(1,80);await put(21,80);const now=start+22*tickSeconds;
+ assert.equal((await unrestAtOrAbove(r.db,'aurelle',60,now,7)).sustainedSeconds,tickSeconds,'only the latest score counts after a gap');
+ for(let tick=22;tick<=45;tick++)await put(tick,80);
+ assert.equal((await unrestAtOrAbove(r.db,'aurelle',60,start+46*tickSeconds,7)).sustainedSeconds,25*tickSeconds,'25 consecutive ticks (21..45) = 50h');
+ await r.db.prepare("DELETE FROM nation_stability_scores WHERE tick=30").run();
+ const gapped=(await unrestAtOrAbove(r.db,'aurelle',60,start+46*tickSeconds,7)).sustainedSeconds;
+ assert.equal(gapped,15*tickSeconds,'a missing tick 30 restarts the run at 31');assert.ok(gapped<48*3600,'a 48h rule cannot fire across a gap');
+});
+test('#142 catch-up reads that day\'s petition backlog, not today\'s',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const epoch=(await r.call('world',null)).data.simulation.clock.epochSeconds;
+ await r.call('citizen','bob');const nation=(await r.db.prepare("SELECT nation_id FROM citizens WHERE clerk_user_id='bob'").first()).nation_id;
+ await r.db.prepare("INSERT INTO government_petitions (request_id,clerk_user_id,nation_id,topic,period_start,occurred_at) VALUES ('p1','bob',?,'food',?,?)").bind(nation,epoch,epoch+60).run();
+ // Resolved later, at tick 3. A catch-up of tick 1 must still see it as backlog that day.
+ await r.db.prepare("INSERT INTO government_reviews (nation_id,period_start,reviewed_at,selected_topic,petition_count,snapshot_json) VALUES (?,?,?,'food',1,'{}')").bind(nation,epoch,epoch+3*tickSeconds).run();
+ await r.db.prepare("INSERT INTO government_petition_resolutions (request_id,nation_id,period_start,status) VALUES ('p1',?,?,'accepted')").bind(nation,epoch).run();
+ assert.equal((await readStabilityInputs(r.db,nation,epoch+tickSeconds)).petitionBacklog,1,'unresolved as of tick 1');
+ assert.equal((await readStabilityInputs(r.db,nation,epoch+3*tickSeconds)).petitionBacklog,0,'resolved as of tick 3');
+ r.setNow((epoch+3*tickSeconds+5)*1000);await r.call('world',null);
+ const row=await r.db.prepare('SELECT inputs_json FROM nation_stability_scores WHERE nation_id=? AND tick=1').bind(nation).first();
+ assert.equal(JSON.parse(row.inputs_json).petitionBacklog,1,'catch-up tick 1 recorded that day\'s backlog');
+});
+test('hotfix #95: missing nation_stability_scores table: read returns [], ticks still commit',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const epoch=(await r.call('world',null)).data.simulation.clock.epochSeconds;
+ r.db.sqlite.exec('DROP TABLE nation_stability_scores'); // as in city-location-integration (DDL via the fixture)
+const warn=t.mock.method(console,'warn',()=>{});
+ assert.deepEqual(await readPublicStability(r.db),[]);
+ r.setNow((epoch+3*7200+5)*1000);const world=await r.call('world',null);
+ assert.equal(world.status,200);assert.deepEqual(world.data.simulation.stability,[]);
+ assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM world_ticks').first()).n,3,'all due ticks committed without scores');
+ assert.ok(warn.mock.callCount()>=1);
+});
+test('hotfix #95: only a missing-table error is swallowed',()=>{
+ assert.equal(isMissingStabilityTable({code:'42P01',message:'x'}),true);
+ assert.equal(isMissingStabilityTable(Error('relation "nation_stability_scores" does not exist')),true);
+ assert.equal(isMissingStabilityTable(Error('no such table: nation_stability_scores')),true);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (42P01).')),true);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (23505).')),false);
+ assert.equal(isMissingStabilityTable(Object.assign(Error('wrapped'),{cause:{code:'42P01'}})),true);
+ for(const e of [Error('relation "citizens" does not exist'),{code:'23505',message:'duplicate key'},Error('connection reset'),null,'42P01'])assert.equal(isMissingStabilityTable(e),false);
 });

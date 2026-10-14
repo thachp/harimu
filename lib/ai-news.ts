@@ -38,10 +38,18 @@ export function inferenceText(value:unknown,json=false){
  if(json&&r.response&&typeof r.response==='object'&&!Array.isArray(r.response))return JSON.stringify(r.response);
  throw Error('Invalid inference response.');
 }
+/** A 'running' news lease older than this died mid-run (a sequence is at most three 30s calls). */
+export const aiNewsStaleLeaseSeconds=600;
 export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null}={}){
- if(!enabled||!binding||!budget||!Number.isSafeInteger(now))return;
+ if(!enabled||!Number.isSafeInteger(now))return;
+ // #140: flag on but no binding/budget used to return silently; say why so preview checks can see it.
+ if(!binding||!budget){console.warn(`[ai-news] enabled but skipped: ${!binding?'no AI binding':'invalid HARIMU_AI_DAILY_BUDGET_MICRO/HARIMU_AI_GATEWAY_ID'}`);return;}
  const facts=publicNewsFacts(news),id=`${facts.nationId}:${new Date(now*1000).toISOString().slice(0,10)}`;
- const lease=await db.prepare("INSERT OR IGNORE INTO ai_news_jobs(id,nation_id,utc_day,started_at,status) VALUES (?,?,?,?,'running')").bind(id,facts.nationId,id.slice(id.indexOf(':')+1),now).run();if(lease.meta.changes!==1)return;
+ const lease=await db.prepare("INSERT OR IGNORE INTO ai_news_jobs(id,nation_id,utc_day,started_at,status) VALUES (?,?,?,?,'running')").bind(id,facts.nationId,id.slice(id.indexOf(':')+1),now).run();
+ // #140: the daily lease used to be final, so a job that failed before any gateway call (budget unavailable, not
+ // sent) or a run that died mid-flight blocked news for the rest of the UTC day with zero gateway calls.
+ // Re-take it atomically in exactly those cases; a job that reached the gateway is never retried.
+ if(lease.meta.changes!==1){const retake=await db.prepare("UPDATE ai_news_jobs SET status='running',failure_code=NULL,started_at=? WHERE id=? AND ((status='failed' AND failure_code IN ('budget-unavailable','not-sent')) OR (status='running' AND started_at<=?))").bind(now,id,now-aiNewsStaleLeaseSeconds).run();if(retake.meta.changes!==1)return;}
  const reservation=crypto.randomUUID();
  if(!await reserveAiSequence(db,reservation,now,budget)){await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code='budget-unavailable' WHERE id=?").bind(id).run();return;}
  let reached=false; // #92: true once any request is handed to the gateway

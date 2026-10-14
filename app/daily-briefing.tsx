@@ -61,7 +61,7 @@ export function DailyBriefing({ economy, shifts, capacity, market, government, c
       <dt>Household food</dt><dd>{economy ? `${food} food` : 'Loading…'}{market?.available && ` · ${mealFood} per meal`}</dd>
       <dt>Other available goods</dt><dd>{economy ? economy.inventory.filter((entry) => entry.item !== 'food' && entry.quantity > 0)
         .map((entry) => `${entry.quantity} ${entry.item}`).join(', ') || 'None yet' : 'Loading…'}</dd>
-      <dt>Current shift</dt><dd>{activeShift ? <>{activeShift.orderName} · <GameTimer endsAt={activeShift.completesAt} label="Shift ready" />
+      <dt>Current shift</dt><dd>{activeShift ? <>{activeShift.orderName} · <GameTimer endsAt={activeShift.completesAt} label="Shift ends in" readyLabel="Shift ready" />
         {activeShift.wageMinor !== undefined && ` · ${sparks(activeShift.wageMinor)} on collection`}
         {activeShift.rewardItem && ` + ${activeShift.rewardQuantity ?? 0} ${activeShift.rewardItem}`}</> : 'No active shift'}</dd>
       <dt>Household meal</dt><dd>{!market?.available ? 'Kindle household meals are not available in this nation yet'
