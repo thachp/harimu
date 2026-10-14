@@ -16,6 +16,11 @@ test('every pack: nation id, outlet, 8-12 templates, unique ids, proposal', () =
     for (const x of p.templates) { assert.equal(x.proposal,true); assert.ok(x.id.startsWith(`${id}-`)); assert.ok(x.body.length>=1&&x.body.length<=2, x.id); } }
   assert.equal(pressPack('varkand'),undefined);
 });
+test('every pack has an in-world wire byline', () => {
+  for (const p of packs) { assert.ok(p.byline && p.byline.name.trim().length>0 && p.byline.name.length<=PRESS_HEADLINE_MAX, p.nationId);
+    assert.equal(typeof p.byline.proposal,'boolean'); assert.doesNotMatch(p.byline.name,/sample|template|filler|demo/i); }
+  assert.deepEqual(kindlePress.byline,{name:'Republic Wire Service',proposal:true});
+});
 test('length limits', () => {
   for (const p of packs) for (const x of p.templates) { assert.ok(x.headline.length<=PRESS_HEADLINE_MAX, `${x.headline.length}: ${x.headline}`);
     for (const b of x.body) assert.ok(b.length<=PRESS_PARAGRAPH_MAX, `${b.length}: ${b}`); }

@@ -3,13 +3,17 @@
  * (ledger-driven headlines), these are fixed sample stories: headline plus 1-2 short paragraphs, with no figures, so no
  * number can ever be invented (harimu-docs social-news-media §18.2: system stats stay truthful). Canon: nation pages,
  * social-news-media §18.2, culture bible. All prose is new wording, so `proposal: true`. Authored copy, not AI output,
- * so no AI-text flag. No people named, no "Notable", no real-world references. */
+ * so no AI-text flag. No people named, no "Notable", no real-world references.
+ * FILLER ONLY (ARC): a pack is shown only when no player paper has published in that nation. Not labeled as samples;
+ * each pack carries an in-world wire byline instead (visual treatment: UX issue). */
 
 export type PressNation='kindle'|'korund'|'aurelle';
 /** Kindle: free press (player newspapers). Korund: State Media. Aurelle: Court Gazette. */
 export type PressOutlet='free-press'|'state-media'|'court-gazette';
 export type PressTemplate={id:string;topic:string;headline:string;body:readonly string[];proposal:true};
-export type PressPack={nationId:PressNation;outlet:PressOutlet;voice:string;templates:readonly PressTemplate[]};
+/** In-world wire service the stories run under. `proposal: true` when the name is new (a neutral service name), false when canon. */
+export type WireByline={name:string;proposal:boolean};
+export type PressPack={nationId:PressNation;outlet:PressOutlet;voice:string;byline:WireByline;templates:readonly PressTemplate[]};
 
 export const PRESS_HEADLINE_MAX=40;
 export const PRESS_PARAGRAPH_MAX=140;
@@ -19,6 +23,7 @@ export const PRESS_TEMPLATES_MAX=12;
 const t=(id:string,topic:string,headline:string,...body:string[]):PressTemplate=>({id,topic,headline,body,proposal:true});
 
 export const kindlePress:PressPack={nationId:'kindle',outlet:'free-press',
+ byline:{name:'Republic Wire Service',proposal:true},
  voice:'Independent, plain and argumentative: many voices on one plaza. Prices out loud; officials questioned, not quoted on faith.',
  templates:[
   t('kindle-assembly-vote','assembly','Assembly splits on the new tax bill',
