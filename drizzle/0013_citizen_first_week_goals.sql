@@ -1,0 +1,2 @@
+-- Issue #135: additive per-citizen first-week goal progress. Existing data is preserved.
+CREATE TABLE IF NOT EXISTS citizen_first_week_goals (clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,goal_id TEXT NOT NULL CHECK(length(goal_id) BETWEEN 1 AND 64),completed_at INTEGER NOT NULL,source TEXT NOT NULL CHECK(source IN ('client','ledger')),PRIMARY KEY(clerk_user_id,goal_id));

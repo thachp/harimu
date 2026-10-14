@@ -53,3 +53,14 @@ export function stubFirstWeekProgressStore(storage:KV|undefined=typeof localStor
   save(key,done){try{storage?.setItem(firstWeekStubKey(key),JSON.stringify([...new Set(done)]))}catch{/* storage full or blocked: progress stays in memory */}},
  };
 }
+
+/** #135: server-backed store. load() returns the ids the citizen GET already delivered (firstWeek.completed);
+ * save() records newly completed ids with POST /api/citizen {action:'first-week-complete'} (idempotent server-side).
+ * Network errors are swallowed: the next load re-derives event-backed goals from the ledgers. */
+export function serverFirstWeekProgressStore(completed:readonly string[]|null|undefined,post:(body:unknown)=>Promise<unknown>=body=>fetch('/api/citizen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})):FirstWeekProgressStore{
+ const known=new Set(completed??[]);
+ return {
+  load(){return [...known];},
+  save(_key,done){for(const goalId of new Set(done)){if(known.has(goalId))continue;known.add(goalId);void post({action:'first-week-complete',goalId,requestId:crypto.randomUUID()}).catch(()=>{});}},
+ };
+}
