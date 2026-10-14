@@ -345,7 +345,8 @@ async function initialize(database: GameDatabase) {
 
 type PostgresBindings={HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
 /** Readiness identity: a changed connection or trust flag must re-verify. */
-function readinessKey(bindings:PostgresBindings){return JSON.stringify([bindings.HYPERDRIVE?.connectionString,bindings.HARIMU_ACCOUNT_ELECTION_POC_ENABLED,bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED,bindings.HARIMU_AI_DAILY_BUDGET_MICRO,bindings.HARIMU_AI_GATEWAY_ID]);}
+/** SHA-256 so the connection string (a secret) never sits in memory as a map key. */
+async function readinessKey(bindings:PostgresBindings){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([bindings.HYPERDRIVE?.connectionString,bindings.HARIMU_ACCOUNT_ELECTION_POC_ENABLED,bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED,bindings.HARIMU_AI_DAILY_BUDGET_MICRO,bindings.HARIMU_AI_GATEWAY_ID])));return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');}
 // Fresh database and bindings are passed on every call; the memo never closes over a request's objects.
 const postgresReady=isolateOnce(async(database:GameDatabase,bindings:PostgresBindings)=>{
     const role=await database.prepare("SELECT has_schema_privilege(current_user,'public','CREATE') AS can_create_schema,has_any_column_privilege(current_user,'harimu_storage_migrations','UPDATE') AS can_change_marker,(SELECT rolsuper FROM pg_roles WHERE rolname=current_user) AS superuser").first<{can_create_schema:number;can_change_marker:number;superuser:number}>();
@@ -369,8 +370,9 @@ export async function getDatabase():Promise<GameDatabase> {
   if(selected==='postgres'){
     const {postgresConnection}=await import('./postgres/driver');
     const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved,accountElectionEnabled(bindings));
-    await postgresReady(readinessKey(bindings),database,bindings);
-    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true')await postgresAccounting(readinessKey(bindings),database,bindings);
+    const key=await readinessKey(bindings);
+    await postgresReady(key,database,bindings);
+    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true')await postgresAccounting(key,database,bindings);
     return database;
   }
   const database = databaseBinding();
