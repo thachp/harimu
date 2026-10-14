@@ -50,5 +50,9 @@ test('Aurelle beats from the issue and canon; no noble house named, no claimant 
   for (const t of [/oath/,/Royal Favor/,/Crown/,/Sky Throne/,/Kinward Rite/,/Highspire/,/Commoner/,/chartered market/,/court gazette/]) assert.match(text,t);
   assert.match(text,/Monarch and the lords are AI/); assert.match(text,/no jurisdiction/);
   assert.match(text,/debase/); assert.match(text,/lèse-majesté/); assert.match(text,/dissenters pay a levy/); assert.match(text,/Birth and favor/);
+  const [d1,,d3,d4]=aurelleFirstWeek.days;
+  assert.match(lines(d1).join(' '),/register/); assert.match(lines(d1).join(' '),/Immigrants .* take an oath/); assert.doesNotMatch(d1.objective,/oath/i);
+  assert.doesNotMatch(lines(d3).join(' '),/debase/); assert.match(lines(d3).join(' '),/chartered market/); assert.match(lines(d3).join(' '),/Crown/);
+  assert.equal(d4.kind,'optional-tip'); assert.match(d4.briefing.join(' '),/debases/);
   assert.doesNotMatch(text,/\bHouse of\b|of the \w+ House\b/); assert.doesNotMatch(text,/claimant|pretender|pledge|\bcoups?\b|usurp/i);
 });
