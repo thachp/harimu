@@ -27,7 +27,7 @@ From this directory:
 Commit/push source through Git and use the guarded Cloudflare deploy command. Do not upload `.env*`, local database state, or authentication tokens. Development must not deploy to Sites, apex/www, or docs.
 
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch flow: feature PRs go to `dev`, preview deploys from `dev`, and PM release PRs go from `dev` to `main`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch flow: feature PRs go to `dev`, PM cuts `release` from `dev` daily, preview deploys only from `release`, and PM release PRs go from `release` to `main`.
 
 ## Wrangler version (required)
 
@@ -301,9 +301,11 @@ Postgres (Hyperdrive) never bootstraps schema, so numbered `db/postgres/NNNN_*.s
 - `npm run db:postgres:migrate -- --dry-run` lists what would run. It needs `PREVIEW_DATABASE_ADMIN_URL` (admin role with CREATE on `public`), never the app role.
 - `npm run deploy` refuses to upload when storage is Postgres and any migration is unrecorded, edited, or missing tables (needs `HARIMU_POSTGRES_URL` or `PREVIEW_DATABASE_ADMIN_URL`).
 
-## Preview auto-deploy (#128)
+## Preview auto-deploy (#128, #177)
 
-`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** when CI succeeds on a push to `dev`. It never runs for `main` or for PRs, and runs queue (never cancelled mid-migration) and only the newest pending commit deploys; only CI runs from this repository can trigger it. It applies pending Postgres migrations first (any failure means no deploy), then runs `npm run deploy`, which uses the pinned wrangler with `--keep-vars` and the #119 guard. The commit SHA and the Cloudflare version ID go to the job summary. `workflow_dispatch` on `dev` can run the migration step alone. Production stays manual.
+Flow: **dev → release → main**. PRs merge into `dev`, which does **not** deploy. PM cuts `release` from `dev` daily; hotfixes land on `release` and are merged back into `dev`.
+
+`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** on a push to `release` in this repository (or a manual `workflow_dispatch` on `release`). It never runs for `dev`, `main` or PRs. Each run checks out that commit, runs `npm run check`, applies pending Postgres migrations (any failure means no deploy), then runs `npm run deploy` (pinned wrangler, `--keep-vars`, #119 guard). Because it is triggered by the push itself rather than by a CI `workflow_run`, a cancelled or superseded CI run cannot drop the newest release deploy. Runs queue (never cancelled mid-migration) and only the newest pending one runs next. The commit SHA and Cloudflare version ID go to the job summary. `workflow_dispatch` defaults to a full deploy; set `migrate_only` to only migrate. Production stays manual.
 
 Repository secrets (environment `preview`):
 

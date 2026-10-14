@@ -1,21 +1,24 @@
-# #128: deploy harimu-preview after CI passes on a push to dev. Never main, never PRs.
-# Production stays manual (see CONTRIBUTING.md / README "Preview auto-deploy").
+# #177: deploy harimu-preview from the `release` branch only (flow: dev -> release -> main).
+# PRs merge into dev, which no longer deploys. PM cuts `release` from dev daily; hotfixes land on
+# release and are merged back into dev. Never main, dev or PRs. Production stays manual.
 # Uses repository secret NAMES only: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, PREVIEW_DATABASE_ADMIN_URL.
+#
+# Triggered by the push itself (not by a CI completion event) and runs `npm run check` before migrating, so a
+# cancelled or superseded CI run can never silently drop the deploy for the newest release commit.
 name: Deploy preview
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [dev]
+  push:
+    branches: [release]
   workflow_dispatch:
     inputs:
       migrate_only:
         description: Apply pending Postgres migrations to preview without deploying
         type: boolean
-        default: true
+        default: false
 
-# Queue, never cancel: a run may be mid-migration. GitHub keeps only the newest pending run (#163).
+# Queue, never cancel: a run may be mid-migration. GitHub keeps the newest pending run, so the
+# newest release commit always gets a run once the current one finishes (#163).
 concurrency:
   group: deploy-preview
   cancel-in-progress: false
@@ -24,18 +27,16 @@ permissions:
   contents: read
 
 jobs:
+  # Same-repo guard (#168), adapted to release: only this repository's release branch, by push or dispatch.
   deploy:
     if: >-
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'dev' &&
-       github.event.workflow_run.head_repository.full_name == github.repository) ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
+      github.ref == 'refs/heads/release' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.event.repository.full_name == github.repository
     runs-on: ubuntu-latest
     environment: preview
     env:
-      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,6 +46,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Check before touching the database
+        id: check
+        run: npm run check
       - name: Apply pending Postgres migrations (fails closed)
         id: migrate
         env:
@@ -52,7 +56,7 @@ jobs:
         run: npm run db:postgres:migrate
       - name: Deploy with pinned wrangler (runs the #119 migration guard)
         # Never runs unless the migration step itself succeeded (not failed, not skipped).
-        if: success() && steps.migrate.outcome == 'success' && (github.event_name == 'workflow_run' || !inputs.migrate_only)
+        if: success() && steps.migrate.outcome == 'success' && (github.event_name == 'push' || !inputs.migrate_only)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
