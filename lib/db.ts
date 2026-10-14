@@ -1,3 +1,4 @@
+import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
 import {reconcileAiAcceptanceCharges,prebookNewsAcceptance} from './ai-acceptance-charges';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
@@ -180,6 +181,7 @@ async function initialize(database: GameDatabase) {
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...electionSchemas.map(sql=>database.prepare(sql)),
+    ...accountElectionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),
     database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_government_petitions_nation_period ON government_petitions(nation_id, period_start)'),
@@ -335,12 +337,12 @@ async function initialize(database: GameDatabase) {
 }
 
 export async function getDatabase():Promise<GameDatabase> {
-  const bindings=env as unknown as {HARIMU_AI_PRICE_REVIEWED_UNTIL?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
+  const bindings=env as unknown as {HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_PRICE_REVIEWED_UNTIL?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
   const journalRetentionApproved=bindings.HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED==='true';
   const selected=selectStorageBackend({backend:bindings.HARIMU_STORAGE_BACKEND,implementationEnabled:postgresRuntimeEnabled,developmentPreview:bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,maintenance:bindings.HARIMU_STORAGE_MAINTENANCE,cutoverReady:bindings.HARIMU_POSTGRES_CUTOVER_READY,hyperdriveConfigured:Boolean(bindings.HYPERDRIVE),journalRetentionApproved});
   if(selected==='postgres'){
     const {postgresConnection}=await import('./postgres/driver');
-    const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved);
+    const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved,accountElectionEnabled(bindings));
     const role=await database.prepare("SELECT has_schema_privilege(current_user,'public','CREATE') AS can_create_schema,has_any_column_privilege(current_user,'harimu_storage_migrations','UPDATE') AS can_change_marker,(SELECT rolsuper FROM pg_roles WHERE rolname=current_user) AS superuser").first<{can_create_schema:number;can_change_marker:number;superuser:number}>();
     if(!role)throw Error('PostgreSQL application role could not be verified.');
     assertPostgresApplicationRole({canCreateSchema:role.can_create_schema,canChangeMarker:role.can_change_marker,superuser:role.superuser},bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true'&&bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED==='true');
@@ -348,6 +350,10 @@ export async function getDatabase():Promise<GameDatabase> {
     // rewrite an imported world using the old SQLite compatibility migrations.
     const marker=await database.prepare("SELECT validated,backup_sha256 FROM harimu_storage_migrations WHERE id='d1-to-postgres-v1'").first<{validated:number;backup_sha256:string}>();
     if(marker?.validated!==1||!/^[a-f0-9]{64}$/.test(marker.backup_sha256))throw Error('PostgreSQL import has not been validated.');
+    if(accountElectionEnabled(bindings)){
+      const schema=await database.prepare("SELECT COUNT(*) AS count FROM pg_tables WHERE schemaname='public' AND tablename IN ('poc_elections','poc_voter_receipts','poc_anonymous_ballots')").first<{count:number}>();
+      if(schema?.count!==3){if(bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED!=='true')throw Error('Approved preview election migration required.');const {initializeAccountElectionSchema}=await import('./postgres/driver');await initializeAccountElectionSchema(bindings.HYPERDRIVE!.connectionString);}
+    }
     if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true'){await reconcileAiAcceptanceCharges(database);await prebookNewsAcceptance(database,Math.floor(Date.now()/1000),Math.floor(Date.parse(bindings.HARIMU_AI_PRICE_REVIEWED_UNTIL??'')/1000));}
     return database;
   }

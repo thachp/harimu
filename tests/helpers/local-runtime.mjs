@@ -28,14 +28,14 @@ class LocalD1 {
   close() { this.sqlite.close(); }
 }
 
-export async function localRuntime({ballotPrivacyReady=false,backend=process.env.HARIMU_TEST_STORAGE??'sqlite'}={}) {
+export async function localRuntime({accountElection=false,accountElectionBindings,ballotPrivacyReady=false,backend=process.env.HARIMU_TEST_STORAGE??'sqlite'}={}) {
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
   const path = join(directory, 'fixture.sqlite');
   const modules = [
     'lib/storage-selection.ts','lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'app/api/city/route.ts',
-    'lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
+    'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','app/api/petitions/route.ts',
     'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
@@ -58,7 +58,7 @@ export async function localRuntime({ballotPrivacyReady=false,backend=process.env
   const envPath = join(directory, 'fixture-env.mjs');
   const authPath = join(directory, 'lib/auth.mjs');
   await mkdir(dirname(authPath), { recursive: true });
-  await writeFile(envPath, 'export const env = {};\n');
+  await writeFile(envPath, `export const env = ${JSON.stringify(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))};\n`);
   // Each fixture identity belongs to one Request. This substitution exists only
   // in temporary compiled test copies; production authentication is untouched.
   await writeFile(authPath, `const identities = new WeakMap();
@@ -125,7 +125,7 @@ export async function readVerification(userId) {
     (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at)
     VALUES (?,'kindle',?,18,1240,'Good standing',?,?)`).bind(user, `Private ${user}`, now, now)));
   let postgres;
-  if(backend==='postgres'){const {postgresFixture}=await import('./postgres-runtime.mjs');postgres=await postgresFixture(env.DB.sqlite,path,directory);env.DB.close();env.DB=postgres.db;}
+  if(backend==='postgres'){const {postgresFixture}=await import('./postgres-runtime.mjs');postgres=await postgresFixture(env.DB.sqlite,path,directory,accountElection);env.DB.close();env.DB=postgres.db;}
   const call = async (endpoint, user, body, origin = 'https://fixture.invalid', query = '') => {
     const request = new Request(`https://fixture.invalid/api/${endpoint}${query}`, body === undefined ? undefined : {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),

@@ -2236,3 +2236,6 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 .nation-document.leader-statement[data-nation-theme]{padding:12px;margin-block:12px}.leader-statement>.nation-document-masthead{margin-bottom:6px;padding-bottom:7px}.leader-statement summary{font-weight:700}
 :is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]) .ai-badge,:is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]) .ai-text-tag{color:#cce9df;background:#234a48;border-color:#6c998d}
 @media(max-width:480px){:is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]){padding:12px}.nation-document-masthead{font-size:11px}}
+
+:is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]) :is(table,thead,tbody,tr,th,td){color:var(--nation-ink)}
+.ranked-ballot table{width:100%;border-collapse:collapse;font-size:12px}.ranked-ballot :is(th,td){padding:8px 4px;text-align:left;border-bottom:1px solid var(--nation-edge)}

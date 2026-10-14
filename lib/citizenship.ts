@@ -27,4 +27,5 @@ export const enrollmentChangeSql=`UPDATE citizens SET nation_id=?,nation_changes
  AND NOT EXISTS(SELECT 1 FROM citizen_decisions WHERE clerk_user_id=? LIMIT 1)
  AND NOT EXISTS(SELECT 1 FROM government_petitions WHERE clerk_user_id=? LIMIT 1)
  AND NOT EXISTS(SELECT 1 FROM civic_petition_signatures WHERE clerk_user_id=? LIMIT 1)
- AND NOT EXISTS(SELECT 1 FROM civic_voter_receipts WHERE clerk_user_id=? AND ballot_written=1 LIMIT 1)`;
+ AND NOT EXISTS(SELECT 1 FROM civic_voter_receipts WHERE clerk_user_id=? AND ballot_written=1 LIMIT 1)
+ AND NOT EXISTS(SELECT 1 FROM poc_voter_receipts WHERE clerk_user_id=? AND ballot_written=1 LIMIT 1)`;

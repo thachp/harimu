@@ -7,7 +7,7 @@ function targetsBallot(sql:string){
  const first=tokens[0]?.toUpperCase();let index=first==='INSERT'?tokens.findIndex(token=>token.toUpperCase()==='INTO')+1:first==='UPDATE'?1:first==='DELETE'?tokens.findIndex(token=>token.toUpperCase()==='FROM')+1:-1;
  if(index<0)return false;if(tokens[index]?.toUpperCase()==='ONLY')index++;
  if(tokens[index+1]==='.')index+=2;
- return /^civic_(anonymous_ballots|voter_receipts)$/i.test(tokens[index]?.replace(/^["`]|["`]$/g,'')??'');
+ return /^(civic|poc)_(anonymous_ballots|voter_receipts)$/i.test(tokens[index]?.replace(/^["`]|["`]$/g,'')??'');
 }
 function normalize(value:unknown):unknown{
  if(typeof value==='bigint'){const number=Number(value);if(!Number.isSafeInteger(number))throw Error('Database integer exceeds safe application range.');return number;}
@@ -27,12 +27,13 @@ class Statement implements DatabaseStatement{
  * No query caching/read replica may sit in front of authoritative gameplay reads.
  */
 export class PostgresDatabase implements GameDatabase{
- constructor(private readonly connect:()=>Promise<QueryConnection>,private readonly options:{allowBallotFixtureWrites?:boolean;journalRetentionApproved?:boolean}={}){ }
+ constructor(private readonly connect:()=>Promise<QueryConnection>,private readonly options:{allowBallotFixtureWrites?:boolean;allowAccountElectionWrites?:boolean;journalRetentionApproved?:boolean}={}){ }
  prepare(sql:string){return new Statement(this,sql);}
  async batch(statements:DatabaseStatement[]){if(statements.some(s=>!(s instanceof Statement)||s.owner!==this))throw Error('Foreign database statement.');return this.execute(statements as Statement[],true);}
  async execute(statements:Statement[],transaction:boolean){
   const ballot=statements.some(statement=>targetsBallot(statement.sql));
-  if(ballot&&!this.options.allowBallotFixtureWrites)throw Error('Ballot transitions remain disabled pending privacy review.');
+  if(ballot&&statements.some(statement=>!targetsBallot(statement.sql)))throw Error('Ballot writes require a dedicated transaction; unrelated writes must remain journaled.');
+  if(ballot&&!this.options.allowBallotFixtureWrites&&!(this.options.allowAccountElectionWrites&&statements.every(statement=>targetsBallot(statement.sql)&&/\bpoc_(anonymous_ballots|voter_receipts)\b/i.test(statement.sql)&&!/\bcivic_(anonymous_ballots|voter_receipts)\b/i.test(statement.sql))))throw Error('Ballot transitions remain disabled pending privacy review.');
   if(transaction&&this.options.journalRetentionApproved!==true)throw Error('Rollback journal retention is not approved.');
   let connection:QueryConnection;try{connection=await this.connect();}catch{throw Error('PostgreSQL connection unavailable.');}let begun=false;const results:DatabaseResult[]=[];let changes=0;
   try{
@@ -43,6 +44,8 @@ export class PostgresDatabase implements GameDatabase{
     if(mutates)changes=statementChanges;
     results.push({success:true,meta:{changes:statementChanges},results:normalize(result.rows) as Record<string,unknown>[]});
    }
+   // A ranking-free boundary makes journal-only rollback fail closed after a ballot.
+   if(transaction&&ballot&&results.some(result=>result.meta.changes>0))await connection.query('INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ($1)',[JSON.stringify([{ballotBoundary:'separated-ballots-v1'}])]);
    if(transaction&&!ballot&&results.some(result=>result.meta.changes>0))await connection.query('INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ($1)',[JSON.stringify(statements.filter(statement=>/^\s*(INSERT|UPDATE|DELETE)\b/i.test(statement.sql)).map(statement=>({sql:statement.sql,values:statement.values})))]);
    await connection.query('COMMIT');return results;
   }catch(error){if(begun)await connection.query('ROLLBACK').catch(()=>{});const code=error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?` (${error.code})`:'';throw Error(`PostgreSQL operation failed${code}.`);

@@ -67,6 +67,7 @@ export function replayJournalSqlite(db,entries){
    const hash=createHash('sha256').update(entry.statements_json).digest('hex');const prior=db.prepare('SELECT sha256 FROM harimu_rollback_journal_receipts WHERE id=?').get(id);
    if(prior){if(prior.sha256!==hash)throw Error('Journal identifier content changed.');continue;}
    const statements=JSON.parse(entry.statements_json);if(!Array.isArray(statements))throw Error('Invalid write journal.');
+   if(statements.some(statement=>statement.ballotBoundary))throw Error('Separated ballots require a verified private snapshot before rollback; journal-only replay refused.');
    db.prepare('UPDATE harimu_rollback_journal_receipts SET sha256=sha256 WHERE id=-1').run();
    for(const statement of statements){if(typeof statement.sql!=='string'||!Array.isArray(statement.values)||!/^\s*(SELECT|INSERT|UPDATE|DELETE)\b/i.test(statement.sql)||sqlTokens(statement.sql).some(token=>token===';'||token.startsWith('--')||token.startsWith('/*')))throw Error('Invalid journal statement.');db.prepare(statement.sql).run(...statement.values);}
    db.prepare('INSERT INTO harimu_rollback_journal_receipts VALUES (?,?)').run(id,hash);
@@ -85,6 +86,7 @@ export async function replayJournalD1(db,entries,{maintenanceConfirmed=false}={}
   const id=Number(entry.id);if(!Number.isSafeInteger(id)||id<=previous)throw Error('Invalid journal ordering.');previous=id;
   const statements=JSON.parse(entry.statements_json);
   if(!Array.isArray(statements)||!statements.length)throw Error('Invalid write journal.');
+  if(statements.some(statement=>statement.ballotBoundary))throw Error('Separated ballots require a verified private snapshot before rollback; journal-only replay refused.');
   for(const statement of statements){
    if(typeof statement.sql!=='string'||!Array.isArray(statement.values)||!/^\s*(INSERT|UPDATE|DELETE)\b/i.test(statement.sql)||sqlTokens(statement.sql).some(token=>token===';'||token.startsWith('--')||token.startsWith('/*'))||/\b(civic_voter_receipts|civic_anonymous_ballots)\b/i.test(statement.sql))throw Error('Invalid rollback statement.');
   }
