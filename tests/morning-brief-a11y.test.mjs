@@ -25,7 +25,7 @@ test('blocked storage never auto-opens in a loop', () => {
 const compiled = ts.transpileModule(await readFile(new URL('../app/morning-brief.tsx', import.meta.url), 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
 function harness(props) {
   const refs = []; const effects = []; let index = 0;
-  const react = { useRef: () => refs[index++] ?? (refs[index - 1] = { current: null }), useEffect: fn => effects.push(fn) };
+  const react = { useRef: (initial = null) => refs[index++] ?? (refs[index - 1] = { current: initial }), useEffect: fn => effects.push(fn) };
   const exports = {}; new Function('exports', 'require', compiled)(exports, name => name === 'react' ? react : require(name));
   const tree = exports.MorningBrief(props);
   const all = node => [node, ...[node?.props?.children].flat(Infinity).filter(n => n && typeof n === 'object').flatMap(all)];
@@ -56,4 +56,16 @@ test('Brief trigger keeps an accessible name and a visible icon when the label i
   assert.match(trigger, /aria-expanded=\{morningBriefOpen\}/);
   const css = await readFile(new URL('../app/game-shell.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /\.game-glossary svg\{[^}]*display:none/);
+});
+test('closing via an item link does not pull focus back to the Brief trigger', async () => {
+  const window = new Window(); globalThis.document = window.document; globalThis.requestAnimationFrame = fn => fn();
+  try {
+    window.document.body.innerHTML = '<button id="morning-brief-trigger">Brief</button><section id="card" tabindex="-1"></section><h1 id="scene" tabindex="-1">Market</h1>';
+    const h = harness({ nationName: 'Kindle', sections: [{ id: 'needs', title: 'Needs', items: [{ id: 'f', label: '3 food', detail: 'd', target: 'market' }] }], onNavigate() { window.document.getElementById('scene').focus(); }, onClose() {} });
+    h.refs[0].current = window.document.getElementById('card');
+    const cleanup = h.effects[0]();
+    h.nodes.find(n => n?.type === 'button' && n.props.onClick && n.props.children?.[0]?.type === 'strong').props.onClick();
+    cleanup();
+    assert.equal(window.document.activeElement.id, 'scene');
+  } finally { delete globalThis.document; delete globalThis.requestAnimationFrame; window.close(); }
 });
