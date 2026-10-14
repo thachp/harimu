@@ -196,12 +196,12 @@ test(`#281 ${backend}: flag off after an earlier coup: the crowned ruler still s
   assert.equal((await c.coups()).length, 1, 'no new plot after the cool-down while the flag is off'); assert.equal((await c.gazette()).length, gazetteBefore, 'no new gazette');
 });
 
-test('#281 migration 0029 is additive, matches the runtime schema, passes the guard', async () => {
-  const d1 = await readFile('drizzle/0029_aurelle_palace_coup.sql', 'utf8'), pg = await readFile('db/postgres/0029_aurelle_palace_coup.sql', 'utf8');
+test('#281 migration 0030 is additive, matches the runtime schema, passes the guard', async () => {
+  const d1 = await readFile('drizzle/0030_aurelle_palace_coup.sql', 'utf8'), pg = await readFile('db/postgres/0030_aurelle_palace_coup.sql', 'utf8');
   const src = await readFile('lib/aurelle-coup.ts', 'utf8');
   const schema = src.match(/export const aurelleCoupSchema = `([\s\S]*?)`;/)[1].replace(/\s*\n\s*/g, ' ').trim();
   assert.ok(d1.includes(schema), 'D1 migration matches the runtime schema'); assert.ok(d1.includes('idx_aurelle_coups_formed'));
-  const m = postgresMigrations().find(x => x.file === '0029_aurelle_palace_coup.sql'); assert.ok(m); assert.deepEqual([...m.tables], ['aurelle_coups']);
+  const m = postgresMigrations().find(x => x.file === '0030_aurelle_palace_coup.sql'); assert.ok(m); assert.deepEqual([...m.tables], ['aurelle_coups']);
   assert.ok(!isDestructive(pg) && !isDestructive(d1)); assert.equal(transactionProblem(pg), null);
   assert.match(pg, /length\(ruler_name\) BETWEEN 1 AND 24/); assert.match(pg, /length\(house\) BETWEEN 1 AND 24/);
 });
