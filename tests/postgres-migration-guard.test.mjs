@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
-import { createdTables, postgresMigrations, repoTables, isDestructive, migrationProblems, applyPostgresMigrations, assertPostgresMigrationsApplied, destructiveReviewedMarker, backfillThrough } from '../scripts/postgres-migrations.mjs';
+import { createdTables, postgresMigrations, repoTables, isDestructive, migrationProblems, createdObjects, hasReviewMarker, applyPostgresMigrations, assertPostgresMigrationsApplied, destructiveReviewedMarker, backfillThrough } from '../scripts/postgres-migrations.mjs';
 
 const adapter = pg => ({ query: (t, p) => pg.query(t, p), exec: t => pg.exec(t) });
 /** A database shaped like preview today: base schema plus every migration through 0010, no schema_migrations. */
@@ -37,7 +37,15 @@ test('destructive SQL is detected, comments ignored', () => {
   assert.ok(isDestructive('ALTER TABLE x DROP COLUMN y;'));
   assert.ok(isDestructive('drop table x;') && isDestructive('TRUNCATE x;') && isDestructive('DELETE FROM x;'));
   assert.ok(!isDestructive('-- DROP TABLE x\nCREATE TABLE IF NOT EXISTS x(a int);'));
+  for (const sql of ['DROP FUNCTION f();', 'drop sequence s;', 'DROP MATERIALIZED VIEW v;', 'DROP TRIGGER t ON x;', 'DROP POLICY p ON x;', 'ALTER INDEX i RENAME TO j;',
+    'ALTER TABLE IF EXISTS ONLY x DROP COLUMN y;', 'ALTER TABLE x RENAME COLUMN a TO b;', '/* note */ TRUNCATE x;', 'ALTER TABLE x ALTER COLUMN a SET DATA TYPE int;', 'DROP VIEW v;', 'DROP TYPE t;'])
+    assert.ok(isDestructive(sql), sql);
+  assert.ok(!isDestructive('/* DROP TABLE x */ CREATE INDEX IF NOT EXISTS i ON x(a);'));
+  assert.ok(hasReviewMarker(`${destructiveReviewedMarker}\nDROP TABLE x;`));
+  assert.ok(!hasReviewMarker(`CREATE TABLE a(x int); -- ${destructiveReviewedMarker}`), 'marker must be on its own line');
   for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql), `${m.file} must stay additive`);
+  assert.deepEqual(createdObjects('CREATE TABLE t(a int, "b" text, PRIMARY KEY(a), UNIQUE(a,b), CHECK(a>0)); ALTER TABLE t ADD COLUMN IF NOT EXISTS c int; CREATE UNIQUE INDEX IF NOT EXISTS i_t ON t(a);'),
+    { columns: [['t', 'a'], ['t', 'b'], ['t', 'c']], indexes: ['i_t'] });
 });
 test('first run on preview backfills through backfillThrough (0012) without re-running, then applies newer ones in order', async () => {
   const pg = await previewLike(); const db = adapter(pg);
@@ -60,6 +68,19 @@ test('backfill refuses when the tables it would vouch for are missing', async ()
   const pg = new PGlite(); await pg.waitReady;
   await assert.rejects(applyPostgresMigrations(adapter(pg)), /Cannot backfill.*korund_coupon_redemptions/);
   assert.equal((await rows(pg, "SELECT 1 FROM pg_tables WHERE tablename='schema_migrations'")).length, 0);
+  await pg.close();
+});
+test('backfill and guard fail closed on a partial schema (missing column or index)', async () => {
+  for (const damage of ['ALTER TABLE ai_news_articles DROP COLUMN nation_id', 'DROP INDEX idx_nation_stability_time']) {
+    const pg = await previewLike(); await pg.exec(damage); const db = adapter(pg);
+    await assert.rejects(applyPostgresMigrations(db), /Cannot backfill.*nothing recorded.*(column ai_news_articles\.nation_id|index idx_nation_stability_time)/);
+    assert.equal((await rows(pg, "SELECT 1 FROM pg_tables WHERE tablename='schema_migrations'")).length, 0, damage);
+    await assert.rejects(assertPostgresMigrationsApplied(db), /not applied/);
+    await pg.close();
+  }
+  const pg = await previewLike(); const db = adapter(pg);
+  await applyPostgresMigrations(db); await pg.exec('ALTER TABLE world_squares DROP COLUMN zone');
+  await assert.rejects(assertPostgresMigrationsApplied(db), /0011_world_squares\.sql \(missing column world_squares\.zone\)/);
   await pg.close();
 });
 test('a failing migration rolls back, stops later ones, and the guard keeps deploy closed', async () => {

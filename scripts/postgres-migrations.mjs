@@ -18,10 +18,35 @@ export const schemaMigrationsTable = `CREATE TABLE IF NOT EXISTS schema_migratio
 
 const tablePattern = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([a-z_][a-z_0-9]*)[`"]?/gi;
 export function createdTables(sql) { return [...new Set([...sql.matchAll(tablePattern)].map(m => m[1].toLowerCase()))]; }
-const destructivePattern = /\b(DROP\s+(TABLE|COLUMN|INDEX|SCHEMA|VIEW|TYPE)|TRUNCATE|DELETE\s+FROM|ALTER\s+TABLE\s+\S+\s+(DROP|RENAME)|ALTER\s+COLUMN\s+\S+\s+TYPE)\b/i;
-export function isDestructive(sql) {
-  const code = sql.split('\n').filter(line => !line.trim().startsWith('--')).join('\n');
-  return destructivePattern.test(code);
+// Block any DROP (table, column, function, sequence, view, trigger, policy, ...), any RENAME,
+// TRUNCATE, DELETE FROM (even with WHERE: over-broad, fails closed) and column type changes.
+const destructivePattern = /\b(DROP\s+[A-Z]|RENAME\b|TRUNCATE\b|DELETE\s+FROM\b|ALTER\s+COLUMN\s+\S+\s+(SET\s+DATA\s+)?TYPE\b)/i;
+const stripComments = sql => sql.replace(/\/\*[\s\S]*?\*\//g, ' /*c*/ ').split('\n').map(line => line.replace(/--.*$/, '')).join('\n');
+export function isDestructive(sql) { return destructivePattern.test(stripComments(sql)); }
+/** The review marker counts only on its own line within the first 5 lines. */
+export const hasReviewMarker = sql => sql.split('\n').slice(0, 5).some(line => line.trim() === destructiveReviewedMarker);
+const constraintWords = new Set(['primary', 'unique', 'check', 'foreign', 'constraint', 'exclude']);
+function splitTopLevel(body) {
+  const parts = []; let depth = 0, cur = '';
+  for (const ch of body) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; } else cur += ch; }
+  if (cur.trim()) parts.push(cur); return parts;
+}
+/** Columns and indexes a migration creates: { columns: [[table, column]], indexes: [name] }. */
+export function createdObjects(sql) {
+  const code = stripComments(sql), columns = [], indexes = [];
+  for (const m of code.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([a-z_][a-z_0-9]*)[`"]?\s*\(/gi)) {
+    let depth = 1, i = m.index + m[0].length; const start = i;
+    while (i < code.length && depth) { if (code[i] === '(') depth++; if (code[i] === ')') depth--; i++; }
+    for (const part of splitTopLevel(code.slice(start, i - 1))) {
+      const word = part.trim().match(/^["`]?([a-z_][a-z_0-9]*)/i)?.[1].toLowerCase();
+      if (word && !constraintWords.has(word)) columns.push([m[1].toLowerCase(), word]);
+    }
+  }
+  for (const m of code.matchAll(/ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?[`"]?([a-z_][a-z_0-9]*)[`"]?\s+ADD\s+(?:COLUMN\s+)?(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([a-z_][a-z_0-9]*)/gi)) {
+    if (!constraintWords.has(m[2].toLowerCase())) columns.push([m[1].toLowerCase(), m[2].toLowerCase()]);
+  }
+  for (const m of code.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([a-z_][a-z_0-9]*)/gi)) indexes.push(m[1].toLowerCase());
+  return { columns, indexes };
 }
 export const checksum = sql => createHash('sha256').update(sql).digest('hex');
 
@@ -29,7 +54,7 @@ export const checksum = sql => createHash('sha256').update(sql).digest('hex');
 export function postgresMigrations(dir = 'db/postgres') {
   return readdirSync(dir).filter(f => /^\d{4}_[a-z0-9_]+\.sql$/i.test(f)).sort().map(file => {
     const sql = readFileSync(join(dir, file), 'utf8');
-    return { id: file.replace(/\.sql$/, ''), file, number: file.slice(0, 4), sql, checksum: checksum(sql), tables: createdTables(sql) };
+    return { id: file.replace(/\.sql$/, ''), file, number: file.slice(0, 4), sql, checksum: checksum(sql), tables: createdTables(sql), ...createdObjects(sql) };
   });
 }
 /** Every table any repo migration creates, across D1 (drizzle/) and Postgres (db/postgres/). */
@@ -40,6 +65,19 @@ export function repoTables(dirs = ['drizzle', 'db/postgres']) {
 }
 
 const publicTables = async db => new Set((await db.query("SELECT tablename FROM pg_tables WHERE schemaname='public'")).rows.map(r => String(r.tablename).toLowerCase()));
+/** Live schema: tables, "table.column" and index names in public. */
+async function liveSchema(db) {
+  const tables = await publicTables(db);
+  const columns = new Set((await db.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public'")).rows.map(r => `${String(r.table_name).toLowerCase()}.${String(r.column_name).toLowerCase()}`));
+  const indexes = new Set((await db.query("SELECT indexname FROM pg_indexes WHERE schemaname='public'")).rows.map(r => String(r.indexname).toLowerCase()));
+  return { tables, columns, indexes };
+}
+/** Everything a migration should have created that the live schema lacks. */
+export function missingObjects(m, live) {
+  return [...(m.tables ?? []).filter(t => !live.tables.has(t)).map(t => `table ${t}`),
+    ...(m.columns ?? []).filter(([t, c]) => live.tables.has(t) && !live.columns.has(`${t}.${c}`)).map(([t, c]) => `column ${t}.${c}`),
+    ...(m.indexes ?? []).filter(i => !live.indexes.has(i)).map(i => `index ${i}`)];
+}
 const recorded = async db => {
   const tables = await publicTables(db);
   if (!tables.has('schema_migrations')) return null;
@@ -47,20 +85,21 @@ const recorded = async db => {
 };
 
 /** Pure check: which migrations are not recorded, changed after recording, or missing tables. */
-export function migrationProblems(migrations, recordedMap, tables) {
+export function migrationProblems(migrations, recordedMap, live) {
+  if (live instanceof Set) live = { tables: live, columns: new Set(), indexes: new Set() };
   const problems = [];
   for (const m of migrations) {
     const sum = recordedMap?.get(m.id);
     if (sum === undefined) problems.push({ file: m.file, reason: 'not applied' });
     else if (sum !== m.checksum) problems.push({ file: m.file, reason: 'changed after it was applied' });
-    const missing = m.tables.filter(t => !tables.has(t));
-    if (missing.length) problems.push({ file: m.file, reason: `missing table(s) ${missing.join(', ')}` });
+    const missing = live.columns.size || live.indexes.size ? missingObjects(m, live) : m.tables.filter(t => !live.tables.has(t)).map(t => `table ${t}`);
+    if (missing.length) problems.push({ file: m.file, reason: `missing ${missing.join(', ')}` });
   }
   return problems;
 }
 /** #119 deploy guard: throws, listing every problem, unless all migrations are applied. */
 export async function assertPostgresMigrationsApplied(db, migrations = postgresMigrations()) {
-  const problems = migrationProblems(migrations, await recorded(db), await publicTables(db));
+  const problems = migrationProblems(migrations, await recorded(db), await liveSchema(db));
   if (problems.length) throw new Error(`Postgres migrations are not applied: ${problems.map(p => `${p.file} (${p.reason})`).join('; ')}. Run "npm run db:postgres:migrate" with the admin URL; nothing was deployed.`);
 }
 
@@ -71,15 +110,15 @@ export async function assertPostgresMigrationsApplied(db, migrations = postgresM
  * `db` = { query(text, params?) -> {rows}, exec(text) }.
  */
 export async function applyPostgresMigrations(db, migrations = postgresMigrations(), { dryRun = false, log = () => {} } = {}) {
-  for (const m of migrations) if (isDestructive(m.sql) && !m.sql.includes(destructiveReviewedMarker)) throw new Error(`${m.file} looks destructive; add "${destructiveReviewedMarker}" after manual review.`);
+  for (const m of migrations) if (isDestructive(m.sql) && !hasReviewMarker(m.sql)) throw new Error(`${m.file} looks destructive; add "${destructiveReviewedMarker}" after manual review.`);
   await db.query('SELECT pg_advisory_lock($1)', [lockKey]);
   try {
     let done = await recorded(db);
-    const tables = await publicTables(db);
     if (done === null) {
+      const live = await liveSchema(db);
       const backfill = migrations.filter(m => m.number <= backfillThrough);
-      const missing = backfill.flatMap(m => m.tables.filter(t => !tables.has(t)).map(t => `${m.file}:${t}`));
-      if (missing.length) throw new Error(`Cannot backfill schema_migrations; expected existing tables are missing: ${missing.join(', ')}.`);
+      const missing = backfill.flatMap(m => missingObjects(m, live).map(x => `${m.file}: ${x}`));
+      if (missing.length) throw new Error(`Cannot backfill schema_migrations; nothing recorded. Expected schema is missing: ${missing.join(', ')}.`);
       if (dryRun) { log(`Would create schema_migrations and backfill ${backfill.map(m => m.file).join(', ') || 'nothing'}.`); done = new Map(backfill.map(m => [m.id, m.checksum])); }
       else {
         await db.exec('BEGIN');
