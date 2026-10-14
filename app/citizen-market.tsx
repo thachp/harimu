@@ -1,5 +1,6 @@
 'use client';
 import {useDisplayTimestamp} from './display-preferences';
+import { disabledReasonProps } from '@/lib/action-reasons';
 import { GameTimer } from './game-timer';
 import { useEffect, useState } from 'react';
 import type { Economy } from '@/lib/economy';
@@ -51,12 +52,12 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
         return <article key={quote.item}>
           <strong>{quote.label}</strong><small>{quote.stock} at merchant · {count(quote.item)} owned</small>
           <div>
-            <button type="button" disabled={Boolean(buyReason)} aria-describedby={buyReason ? tradeCommonReason ? tradeCommonId : buyId : undefined}
+            <button type="button" {...disabledReasonProps(buyReason, tradeCommonReason ? tradeCommonId : buyId)}
               onClick={() => { if (!buyReason) onTrade('buy', quote.item, quantity); }}>
               {validQuantity ? `Buy ${quantity} · ${((quote.buyMinor * quantity) / 100).toFixed(2)} SPK` : 'Buy · choose 1–10 goods'}
             </button>
             {buyReason && !tradeCommonReason && <small id={buyId}>{buyReason}</small>}
-            <button type="button" disabled={Boolean(sellReason)} aria-describedby={sellReason ? tradeCommonReason ? tradeCommonId : sellId : undefined}
+            <button type="button" {...disabledReasonProps(sellReason, tradeCommonReason ? tradeCommonId : sellId)}
               onClick={() => { if (!sellReason) onTrade('sell', quote.item, quantity); }}>
               {validQuantity ? `Sell ${quantity} · ${((quote.sellMinor * quantity) / 100).toFixed(2)} SPK` : 'Sell · choose 1–10 goods'}
             </button>
@@ -73,7 +74,7 @@ export function CitizenMarket({ market, economy, capacity, busy, uncertain, pend
       : capacity >= 24 ? 'Capacity full · save your food for later.'
         : count('food') < market.mealFood ? 'Not enough food · harvest or buy food at the market.' : 'Meal available · feed your household to recover capacity.'}</p>
     {!ready && market.mealReadyAt && <GameTimer endsAt={market.mealReadyAt} label="Next meal" />}
-    <button type="button" disabled={Boolean(mealReason)} aria-describedby={mealReason ? 'household-meal-reason' : undefined}
+    <button type="button" {...disabledReasonProps(mealReason, 'household-meal-reason')}
       onClick={() => { if (!mealReason) onMeal(); }}>Prepare household meal · {market.mealFood} food</button>
     {mealReason && <small id="household-meal-reason">{mealReason}</small>}
     <details><summary>Household food records</summary>

@@ -1,5 +1,6 @@
 'use client';
 import {useDisplayTimestamp} from './display-preferences';
+import { disabledReasonProps } from '@/lib/action-reasons';
 import { NationDocument } from './nation-document';
 import { LeaderPanel } from './leader-panel';
 import { AiBadge } from './ai-disclosure';
@@ -22,6 +23,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
 }) {
   const formatTime=useDisplayTimestamp();
   if (!snapshot) return <section className="citizen-market" aria-label="Government preview status">{['kindle','korund','aurelle'].includes(nationId ?? '') ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>}</section>;
+  const petitionReason = pending ? 'An action is being saved. Please wait before submitting a priority request.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : null;
   return <NationDocument nationId={snapshot.nationId} className="citizen-market government-document" label="Government decisions and citizen petitions"><div aria-busy={pending}>
     <LeaderPanel snapshot={snapshot} simulation={localDemo ? undefined : simulation} />
     <h3>Government and citizen voice</h3>
@@ -56,9 +58,9 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
       </li>)}</ul>
     </section>}
     {localDemo && <p>The local demo previews priorities only; recorded daily review and priority request history require a signed-in citizen.</p>}
-    <p id="petition-action-reason" role="status">{pending ? 'An action is being saved. Please wait before submitting a priority request.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : ''}</p>
+    <p id="petition-action-reason" role="status">{petitionReason ?? ''}</p>
     <div className="market-quotes">{(['food', 'infrastructure', 'work'] as const).map((topic) =>
-      <button key={topic} type="button" disabled={pending || (!localDemo && !verification?.countedActionsEligible)} aria-describedby={pending || (!localDemo && !verification?.countedActionsEligible) ? "petition-action-reason" : undefined} onClick={() => onPetition(topic)}>
+      <button key={topic} type="button" {...disabledReasonProps(petitionReason, "petition-action-reason")} onClick={() => { if (!petitionReason) onPetition(topic); }}>
         {localDemo ? 'Preview priority for' : 'Request priority for'} {topic === 'work' ? 'workplace support' : topic}
       </button>)}</div>
     {pending && <p role="status">Submitting your priority request…</p>}

@@ -16,7 +16,7 @@ function requestSnapshot(search) {
     useSyncExternalStore(subscribe,readClient,readServer) {snapshot=readServer();afterSnapshot=true;return snapshot;},
   };
   const exports={};
-  new Function('exports','require',compiled)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react'?react:name==='next/navigation'?{useSearchParams:()=>new URLSearchParams(search)}:name==='@/lib/scene-navigation'?require('../lib/scene-navigation.ts'):name==='react/jsx-runtime'?require(name):{});
+  new Function('exports','require',compiled)(exports,name=>name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react'?react:name==='next/navigation'?{useSearchParams:()=>new URLSearchParams(search)}:name==='@/lib/scene-navigation'?require('../lib/scene-navigation.ts'):name==='react/jsx-runtime'?require(name):{});
   assert.throws(()=>exports.default(),error=>error===stop);
   return {snapshot,selected,scene:sceneFromSearch(snapshot)};
 }
