@@ -27,6 +27,7 @@
     "HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED": "true",
     "HARIMU_AI_NEWS_ENABLED": "false",
     "HARIMU_NOTABLES_ENABLED": "false",
+    "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.

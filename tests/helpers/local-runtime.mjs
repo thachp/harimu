@@ -36,12 +36,12 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/storage-selection.ts','lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'lib/map-zones.ts', 'app/api/city/route.ts',
     'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
-    'lib/collective-petitions.ts','app/api/petitions/route.ts',
+    'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','app/api/petitions/route.ts',
     'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/wallet.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
     'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
-    'lib/world-simulation.ts',
+    'lib/world-simulation.ts','lib/stability.ts',
     'lib/notable-profiles.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
     'lib/citizenship.ts',
@@ -58,7 +58,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const envPath = join(directory, 'fixture-env.mjs');
   const authPath = join(directory, 'lib/auth.mjs');
   await mkdir(dirname(authPath), { recursive: true });
-  await writeFile(envPath, `export const env = ${JSON.stringify(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))};\n`);
+  await writeFile(envPath, `export const env = ${JSON.stringify(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))};\nexport function waitUntil(promise){(globalThis.__harimuBackground??=[]).push(Promise.resolve(promise));}\n`);
   // Each fixture identity belongs to one Request. This substitution exists only
   // in temporary compiled test copies; production authentication is untouched.
   await writeFile(authPath, `const identities = new WeakMap();
@@ -94,6 +94,7 @@ export async function readVerification(userId) {
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, `import { Date } from ${JSON.stringify(pathToFileURL(clockPath).href)};\n${output}`);
   }
+  const cabinetAi=await import(pathToFileURL(join(directory,'lib/cabinet-response-ai.mjs')).href);
   const notableService=await import(pathToFileURL(join(directory,'lib/notables.mjs')).href);
   const notables=await import(pathToFileURL(join(directory,'app/api/notables/route.mjs')).href);
   const { env } = await import(pathToFileURL(envPath).href);
@@ -135,7 +136,7 @@ export async function readVerification(userId) {
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
   return {
-    call,setFixtureAiFlags:flags=>{if('news' in flags)env.HARIMU_AI_NEWS_ENABLED=String(flags.news);if('notables' in flags)env.HARIMU_NOTABLES_ENABLED=String(flags.notables);}, setFixtureAiBinding:binding=>{env.AI=binding;env.HARIMU_AI_NEWS_ENABLED='true';env.HARIMU_AI_DAILY_BUDGET_MICRO='970000';env.HARIMU_AI_GATEWAY_ID='harimu-test';}, answerNotable:(user,command,binding,options)=>notableService.answerNotable(env.DB,user,command,Math.floor(clock.Date.now()/1000),binding,options), sqliteBackupPath:path, storageEngine:backend, get postgresSnapshot(){return postgres?.snapshot;}, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
+    call,setFixtureAiFlags:flags=>{if('news' in flags)env.HARIMU_AI_NEWS_ENABLED=String(flags.news);if('notables' in flags)env.HARIMU_NOTABLES_ENABLED=String(flags.notables);if('cabinet' in flags)env.HARIMU_AI_CABINET_RESPONSES_ENABLED=String(flags.cabinet);}, settleBackground:async()=>{const jobs=globalThis.__harimuBackground??[];globalThis.__harimuBackground=[];await Promise.all(jobs);}, setFixtureAiBinding:binding=>{env.AI=binding;env.HARIMU_AI_NEWS_ENABLED='true';env.HARIMU_AI_DAILY_BUDGET_MICRO='970000';env.HARIMU_AI_GATEWAY_ID='harimu-test';}, prepareAiCabinetResponse:(binding,options)=>cabinetAi.prepareAiCabinetResponse(env.DB,Math.floor(clock.Date.now()/1000),binding,options), answerNotable:(user,command,binding,options)=>notableService.answerNotable(env.DB,user,command,Math.floor(clock.Date.now()/1000),binding,options), sqliteBackupPath:path, storageEngine:backend, get postgresSnapshot(){return postgres?.snapshot;}, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
     reopen() { if(postgres){postgres.reopen();return;}env.DB.close(); env.DB = new LocalD1(path); },
     async close() { if(postgres)await postgres.close();else env.DB.close(); await rm(directory, { recursive: true, force: true }); },
   };
