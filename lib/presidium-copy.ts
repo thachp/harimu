@@ -6,14 +6,18 @@
  * confirmed or rejected by the AI Presidium; the Chairman controls State Media), the Korund page (Stonehearth Presidium
  * Hall, "One hammer, one heart."), social-news-media §18 and the #238/#244 State Media voice. Byline is canon.
  *
+ * Succession has two stages (ai-leadership: a designated 'Chosen Comrade' is confirmed or rejected by the AI Presidium):
+ * `successor-pending` says "Chosen Comrade" and never presumes the outcome or states the confirmation window; `chairman-replaced`
+ * says "{successor} is Chairman" once confirmed.
+ *
  * Rules: no figures or thresholds (Unrest and timing stay in #70); the opening stage is rumor, never announcement;
  * no line reveals deliberations, vote splits or who backed whom; removals use the State Media register ("stepped
- * aside", "left the Presidium"), with no violence and no human penalties. Faith-neutral. Lines speaking for the
+ * aside", "removed from the Presidium", #293's roster label), with no violence and no human penalties. Faith-neutral. Lines speaking for the
  * Presidium or Chairman are AI-badged. Names are placeholders ({chairman}, {successor}, {member}) capped by the shared
  * COUP_NAME_MAX (lib/palace-coup-copy.ts). All wording is new: `proposal: true`. */
 
 export const PRESIDIUM_PLACEHOLDERS=['{chairman}','{successor}','{member}'] as const;
-export type PresidiumStage='session-rumored'|'chairman-reaffirmed'|'chairman-replaced'|'member-removed';
+export type PresidiumStage='session-rumored'|'chairman-reaffirmed'|'successor-pending'|'chairman-replaced'|'member-removed';
 export type StateMediaItem={id:string;headline:string;body:string;aiBadge:boolean;proposal:true};
 export type PanelStatus={label:string;line:string;proposal:true};
 export type PresidiumStageCopy={stage:PresidiumStage;items:readonly StateMediaItem[];leaderPanel:PanelStatus;proposal:true};
@@ -21,7 +25,7 @@ export type PresidiumStageCopy={stage:PresidiumStage;items:readonly StateMediaIt
 export const PRESIDIUM_BYLINE={name:'Korund State Media',proposal:false} as const;
 export const PRESIDIUM_LABEL_MAX=40;
 export const PRESIDIUM_BODY_MAX=140;
-export const PRESIDIUM_STAGES:readonly PresidiumStage[]=['session-rumored','chairman-reaffirmed','chairman-replaced','member-removed'];
+export const PRESIDIUM_STAGES:readonly PresidiumStage[]=['session-rumored','chairman-reaffirmed','successor-pending','chairman-replaced','member-removed'];
 
 const i=(id:string,headline:string,body:string,aiBadge:boolean):StateMediaItem=>({id,headline,body,aiBadge,proposal:true});
 const panel=(label:string,line:string):PanelStatus=>({label,line,proposal:true});
@@ -42,8 +46,14 @@ export const presidiumCopy:readonly PresidiumStageCopy[]=[
   i('reaffirmed-plan','The Chairman leads the plan',
    'Chairman {chairman} remains at the head of the state. The Five-Year Plan continues. One hammer, one heart.',true),
   i('reaffirmed-review','Presidium promises a review',
-   'The Presidium has met and reaffirmed the Chairman. It promises to review the concerns of the brigades.',true),
+   'The Presidium has reaffirmed the Chairman. It promises a review of ration targets.',true),
  ],panel('Chairman reaffirmed','The Presidium has reaffirmed {chairman} as Chairman.')),
+ st('successor-pending',[
+  i('pending-chosen','Chosen Comrade: {successor}',
+   'The Presidium has named {successor} as Chosen Comrade. The Presidium will confirm or reject the choice.',true),
+  i('pending-awaits','A Chosen Comrade awaits the Presidium',
+   '{successor} is the Chosen Comrade. {chairman} remains Chairman until the Presidium confirms.',true),
+ ],panel('Chosen Comrade named','{successor} is the Chosen Comrade. {chairman} remains Chairman until the Presidium confirms.')),
  st('chairman-replaced',[
   i('replaced-confirmed','{successor} is Chairman',
    'The Presidium has confirmed the Chosen Comrade {successor} as Chairman. {chairman} has stepped aside.',true),
@@ -54,10 +64,10 @@ export const presidiumCopy:readonly PresidiumStageCopy[]=[
  ],panel('New Chairman','{successor} was confirmed as Chairman by the Presidium. {chairman} has stepped aside.')),
  st('member-removed',[
   i('removed-seat','A change in the Presidium',
-   'Korund State Media reports that {member} has left the Presidium. The Presidium continues its work.',true),
+   'Korund State Media reports that {member} has been removed from the Presidium. The Presidium continues its work.',true),
   i('removed-unity','The Presidium closes ranks',
-   'The Presidium announces that {member} no longer holds a seat. Its unity is unbroken.',true),
- ],panel('Presidium seat vacated','{member} has left the Presidium.')),
+   'The Presidium announces that {member} is removed from the Presidium. Its unity is unbroken.',true),
+ ],panel('Presidium seat vacated','{member} has been removed from the Presidium.')),
 ];
 
 /** Replacement for #293's hard-coded post-purge biography line in app/leader-panel.tsx. */

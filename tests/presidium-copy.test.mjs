@@ -9,7 +9,7 @@ const texts=s=>[...s.items.flatMap(i=>[i.headline,i.body]),s.leaderPanel.label,s
 const all=()=>[...presidiumCopy.flatMap(texts),successorBiography.text];
 const fill=t=>PRESIDIUM_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(COUP_NAME_MAX)),t);
 
-test('shape: four stages, 2-3 variants, every line proposal, canon byline reused', () => {
+test('shape: five stages, 2-3 variants, every line proposal, canon byline reused', () => {
   assert.deepEqual(presidiumCopy.map(s=>s.stage),[...PRESIDIUM_STAGES]);
   assert.deepEqual(PRESIDIUM_BYLINE,korundStateMedia.byline);
   const ids=new Set();
@@ -34,6 +34,22 @@ test('placeholders: known only, all used; rumor stage names no successor or memb
   for (const m of t.matchAll(/\{[^}]+\}/g)) assert.ok(PRESIDIUM_PLACEHOLDERS.includes(m[0]), m[0]);
   for (const x of texts(presidiumStage('session-rumored'))) assert.doesNotMatch(x,/\{successor\}|\{member\}/);
   assert.doesNotMatch(t,/Voss|Morrow|Holt|Kestrel|Brand/);
+});
+test('succession: pending says Chosen Comrade without presuming the outcome; confirmed says "is Chairman"', () => {
+  const pend=presidiumStage('successor-pending'), done=presidiumStage('chairman-replaced');
+  for (const i of pend.items) { const x=`${i.headline} ${i.body}`; assert.match(x,/Chosen Comrade/); assert.match(x,/\{successor\}/); assert.equal(i.aiBadge,true);
+    assert.doesNotMatch(x,/stepped aside|is Chairman|now leads|confirmed as Chairman|rejected as|new Chairman/i); }
+  assert.match(pend.leaderPanel.line,/Chosen Comrade/); assert.match(pend.leaderPanel.line,/until the Presidium confirms/); assert.doesNotMatch(pend.leaderPanel.line,/stepped aside/);
+  assert.ok(done.items.some(i=>i.headline==='{successor} is Chairman'));
+  for (const i of done.items) assert.doesNotMatch(`${i.headline} ${i.body}`,/pending|will confirm/i);
+  for (const s of presidiumCopy) for (const x of texts(s)) assert.doesNotMatch(x,/\d/, x);
+});
+test('removal says "removed from the Presidium" (#293 roster label); reaffirmed concession names ration targets', () => {
+  for (const x of texts(presidiumStage('member-removed')).join(' ').split('. ')) assert.doesNotMatch(x,/\bleft the Presidium/);
+  assert.ok(presidiumStage('member-removed').items.every(i=>/removed from the Presidium/.test(i.body)));
+  assert.match(presidiumStage('member-removed').leaderPanel.line,/removed from the Presidium/);
+  const r=presidiumStage('chairman-reaffirmed').items.filter(i=>/review/.test(`${i.headline} ${i.body}`));
+  assert.ok(r.length>0); for (const i of r) assert.match(i.body,/a review of ration targets/);
 });
 test('opening stage is rumor, not announcement, and not AI-badged as an official statement', () => {
   const r=presidiumStage('session-rumored');
