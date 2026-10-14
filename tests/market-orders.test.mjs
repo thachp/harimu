@@ -69,7 +69,8 @@ for (const backend of backends) {
 
 test('#195 migration 0016 matches the runtime schema, is additive on Postgres, and re-applies on D1', async t => {
   const d1 = await readFile('drizzle/0016_market_orders.sql', 'utf8'); const pg = await readFile('db/postgres/0016_market_orders.sql', 'utf8');
-  for (const s of [...marketSchemas, ...marketGoodsSeedSql]) assert.ok(d1.includes(one(s)), s.slice(0, 60));
+  // #199 (0021) adds market_spoilage and supersedes the open-orders view; 0016 keeps the #195 shapes.
+  for (const s of [...marketSchemas.filter(s => !s.includes('market_spoilage')), ...marketGoodsSeedSql]) assert.ok(d1.includes(one(s)), s.slice(0, 60));
   const m = postgresMigrations().find(x => x.file === '0016_market_orders.sql');
   assert.ok(m, 'numbered 0016'); assert.deepEqual([...m.tables].sort(), ['market_goods', 'market_order_cancellations', 'market_orders', 'market_trades']);
   assert.ok(!isDestructive(pg), 'Postgres 0016 has no DROP');
@@ -89,13 +90,13 @@ test('#195 0016 applies after 0017 is already recorded (out-of-order merge), and
   const { bootstrapEmptyPostgres, applyPostgresMigrations, assertPostgresMigrationsApplied } = await import('../scripts/postgres-migrations.mjs');
   const dir = mkdtempSync(join(tmpdir(), 'pg0016-'));
   for (const f of ['compatibility.sql', 'schema.sql']) copyFileSync(join('db/postgres', f), join(dir, f));
-  for (const m of postgresMigrations().filter(m => m.number !== '0016')) copyFileSync(join('db/postgres', m.file), join(dir, m.file));
+  for (const m of postgresMigrations().filter(m => m.number !== '0016' && m.number !== '0021')) copyFileSync(join('db/postgres', m.file), join(dir, m.file));
   const pg = new PGlite(); await pg.waitReady; t.after(() => pg.close());
   const db = { query: (q, p) => pg.query(q, p), exec: q => pg.exec(q) };
   await bootstrapEmptyPostgres(db, { dir });
   assert.ok((await pg.query("SELECT 1 FROM schema_migrations WHERE id LIKE '0017%'")).rows.length, '0017 recorded first');
   await assert.rejects(assertPostgresMigrationsApplied(db), /0016_market_orders\.sql \(not applied\)/);
-  assert.deepEqual((await applyPostgresMigrations(db)).applied, ['0016_market_orders.sql']);
+  assert.deepEqual((await applyPostgresMigrations(db)).applied, ['0016_market_orders.sql', '0021_market_spoilage.sql']);
   await assertPostgresMigrationsApplied(db);
   assert.equal((await pg.query('SELECT COUNT(*)::int AS n FROM market_goods')).rows[0].n, 3);
 });

@@ -63,13 +63,30 @@ export const marketIndexes = [
   'CREATE INDEX IF NOT EXISTS idx_market_trades_buy ON market_trades(buy_order_id)',
   'CREATE INDEX IF NOT EXISTS idx_market_trades_sell ON market_trades(sell_order_id)',
 ];
-/** Remaining qty per order: 0 once cancelled, otherwise qty minus fills. Only rows with remaining > 0 are open. */
+/** #199 spoilage ledger: one row per spoil event (kind is always 'spoil'). order_id NULL = spoiled from free inventory;
+ *  order_id set = spoiled out of an open sell order's escrow, which reduces that order's remaining. Only fruit and meat. */
+export const marketSpoilageSchema = `CREATE TABLE IF NOT EXISTS market_spoilage (
+  id TEXT PRIMARY KEY,
+  clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+  good TEXT NOT NULL REFERENCES market_goods(good) CHECK(good IN ('fruit','meat')),
+  order_id TEXT REFERENCES market_orders(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'spoil' CHECK(kind = 'spoil'),
+  qty INTEGER NOT NULL CHECK(typeof(qty) = 'integer' AND qty BETWEEN 1 AND 100000),
+  tick INTEGER NOT NULL CHECK(typeof(tick) = 'integer' AND tick >= 1),
+  spoiled_at INTEGER NOT NULL
+)`;
+export const marketSpoilageIndexes = [
+  'CREATE INDEX IF NOT EXISTS idx_market_spoilage_user_good ON market_spoilage(clerk_user_id, good, tick)',
+  'CREATE INDEX IF NOT EXISTS idx_market_spoilage_order ON market_spoilage(order_id)',
+];
+/** Remaining qty per order: 0 once cancelled, otherwise qty minus fills minus escrow spoilage (#199). Only rows with remaining > 0 are open. */
 export const marketOpenOrdersView = `CREATE VIEW IF NOT EXISTS market_open_orders AS
   SELECT * FROM (SELECT o.*, o.qty
     - COALESCE((SELECT SUM(t.qty) FROM market_trades t WHERE t.buy_order_id = o.id), 0)
-    - COALESCE((SELECT SUM(t.qty) FROM market_trades t WHERE t.sell_order_id = o.id), 0) AS remaining
+    - COALESCE((SELECT SUM(t.qty) FROM market_trades t WHERE t.sell_order_id = o.id), 0)
+    - COALESCE((SELECT SUM(s.qty) FROM market_spoilage s WHERE s.order_id = o.id), 0) AS remaining
   FROM market_orders o WHERE NOT EXISTS (SELECT 1 FROM market_order_cancellations x WHERE x.order_id = o.id)) r
   WHERE remaining > 0`;
-export const marketSchemas = [marketGoodsSchema, marketOrdersSchema, marketCancellationsSchema, marketTradesSchema, ...marketIndexes, marketOpenOrdersView];
+export const marketSchemas = [marketGoodsSchema, marketOrdersSchema, marketCancellationsSchema, marketTradesSchema, ...marketIndexes, marketSpoilageSchema, ...marketSpoilageIndexes, marketOpenOrdersView];
 export const marketGoodsSeedSql = marketGoods.map(g =>
   `INSERT OR IGNORE INTO market_goods (good, label, unit, perishable, shelf_life_days) VALUES ('${g.good}', '${g.label}', '${g.unit}', ${g.perishable ? 1 : 0}, ${g.shelfLifeDays ?? 'NULL'})`);
