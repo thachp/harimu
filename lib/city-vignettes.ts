@@ -47,7 +47,7 @@ export const capitalVignettes:readonly CityVignette[]=[
  v('mirrorhall','ilmar','Oracle Dome','The prism-cupola Oracle Dome rises over sandstone cloisters on the central salt flats. Clergy and endowment clerks keep its courts busy, and the Feast of First Light pours colored light across the city.'),
  v('rimehall','hoarvale','Moot Hall','A vaulted pale-timber Moot Hall stands at the head of the central fjord under aurora light. The Crown chapel keeps its name-stones beside it. At the Opening of the Moot, the whole city crowds the shore to watch.'),
  v('watchfast','varkand','Citadel of Commands','Concrete bastions and a parade boulevard rise out of the fog on the central moors. The Citadel of Commands gives the orders, and the Directorate Bastion\'s statues are recast after every coup. Muster Day and Rotation Day both begin here.'),
- v('ringhall','veldwood','Federal Ring','The open-air Federal Ring sits under old-growth canopy in the central forest, circled by the Ring of Groves. On Vote Days, citizens fill the ring and the ballots are counted in the open.'),
+ v('ringhall','veldwood','Ring of Groves','The Ring of Groves circles the open-air Federal Ring under old-growth canopy in the central forest. On Vote Days, citizens fill the ring and the ballots are counted in the open.'),
  v('arcport','fulmara','Arc Exchange','Rod-tower spires rise over canals under thunderheads in the central archipelago. At the Arc Exchange, the public share register is posted for anyone to read. The Exchange Bell opens the trading day.'),
 ];
 
