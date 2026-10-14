@@ -9,15 +9,19 @@
  * Voice: the State Media pack (#238) leaves the gray market out by rule and State Media would never speak of it, so this
  * copy uses a plain, private street voice; the whispers are low and unattributed. No State Media byline.
  *
- * Rules: no numbers (caps, durations and Suspicion amounts stay in #43). The rate appears only through {rate}, and
- * every line that shows it frames it as a rumor and approximate, never official or exact. No real-world currency, drug
+ * Rules: no numbers (caps, durations and Suspicion amounts stay in #43). The rumored rate appears only through {rate},
+ * and every line that shows it frames it as a rumor and approximate, never official or exact. An offer shows its own
+ * {askRate} (the asking rate) and {amount}, kept apart from the rumored rate. Suspicion, penalties and seizure are out of
+ * #43's PoC, so they live in GRAY_MARKET_WARNING_DEFERRED, not in the screen's PoC lines. No real-world currency, drug
  * or crime slang; no informer, player or person is named; no raids or smuggling careers (out of scope). Faith-neutral.
- * {rate} is a runtime value capped by the shared name cap, which this module re-exports (COUP_NAME_MAX from
+ * The runtime values are capped by the shared name cap, which this module re-exports (COUP_NAME_MAX from
  * lib/palace-coup-copy.ts). All wording is new: `proposal: true`. */
 
 export { COUP_NAME_MAX as GRAY_MARKET_NAME_MAX } from './palace-coup-copy';
 
-export const GRAY_MARKET_PLACEHOLDERS=['{rate}'] as const;
+/** {rate}: the rumored street rate (one rounded figure). {askRate}: the rate an offer's poster asked for. {amount}: the offer's amount.
+ * {askRate} is never the rumored rate and is always called the asking rate. */
+export const GRAY_MARKET_PLACEHOLDERS=['{rate}','{askRate}','{amount}'] as const;
 export const GRAY_MARKET_LABEL_MAX=40;
 export const GRAY_MARKET_BODY_MAX=140;
 
@@ -30,17 +34,35 @@ export const grayMarketEntry={
  proposal:true,
 } as const;
 
+/** The PoC warning (#43): illegal and optional only. Suspicion, penalties and seizure are not in #43's PoC. */
 export const riskWarning={
  title:'Before you trade',
  lines:[
-  L('The gray market is illegal in Korund. Every trade adds Suspicion.'),
-  L('Penalties are capped, but cash bundles can be seized at a checkpoint.'),
+  L('The gray market is illegal in Korund.'),
   L('It is optional. Trade only if you accept the risk.'),
  ],
  proposal:true,
 } as const;
 
-/** Every line shows the rate only as {rate} and as a rumor. */
+/** Deferred to the penalties follow-up (ARC #314): Suspicion, capped penalties and checkpoint seizure are out of #43's PoC,
+ * so none of this may be shown until those mechanics exist. */
+export const GRAY_MARKET_WARNING_DEFERRED={
+ lines:[
+  L('Every trade adds Suspicion.'),
+  L('Penalties are capped, but cash bundles can be seized at a checkpoint.'),
+ ],
+ offerPosted:[
+  L('Your offer is posted. If another player accepts it, the trade adds Suspicion.'),
+  L('Offer posted. Another player may accept it, and a trade adds Suspicion.'),
+ ],
+ offerAccepted:[
+  L('Your offer was accepted. The cash bundles have changed hands, and Suspicion has risen.'),
+  L('The deal is made. The trade is done, and it adds to your Suspicion.'),
+ ],
+ proposal:true,
+} as const;
+
+/** Every line shows the rumored rate only as {rate}, and only as a rumor. */
 export const rumoredRate={
  label:'Rumored street rate',
  lines:[
@@ -53,12 +75,12 @@ export const rumoredRate={
 
 export const offerLines={
  posted:[
-  L('Your offer is posted. If another player accepts it, the trade adds Suspicion.'),
-  L('Offer posted. Another player may accept it, and a trade adds Suspicion.'),
+  L('Your offer is posted: {amount} at an asking rate of {askRate}. Another player may accept it.'),
+  L('Offer posted: {amount}, asking rate {askRate}. Another player may accept it.'),
  ],
  accepted:[
-  L('Your offer was accepted. The cash bundles have changed hands, and Suspicion has risen.'),
-  L('The deal is made. The trade is done, and it adds to your Suspicion.'),
+  L('Your offer was accepted: {amount} at your asking rate of {askRate}. The cash bundles have changed hands.'),
+  L('The deal is made: {amount} at the asking rate of {askRate}. The trade is done.'),
  ],
  withdrawn:[
   L('You withdrew your offer. Nothing changed hands.'),

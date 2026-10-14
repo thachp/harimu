@@ -13,37 +13,52 @@ import { korundStateMedia } from '../lib/press-templates.ts';
 const src=readFileSync('lib/gray-market-copy.ts','utf8').replace("from './palace-coup-copy'",`from ${JSON.stringify(pathToFileURL(resolve('lib/palace-coup-copy.ts')).href)}`);
 const out=join(mkdtempSync(join(tmpdir(),'gray-market-copy-')),'gray-market-copy.mjs');
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
-const { grayMarketEntry:E, riskWarning:W, rumoredRate:R, offerLines:O, streetWhispers:S, GRAY_MARKET_PLACEHOLDERS, GRAY_MARKET_NAME_MAX, GRAY_MARKET_LABEL_MAX, GRAY_MARKET_BODY_MAX } = await import(pathToFileURL(out).href);
+const { grayMarketEntry:E, riskWarning:W, GRAY_MARKET_WARNING_DEFERRED:D, rumoredRate:R, offerLines:O, streetWhispers:S, GRAY_MARKET_PLACEHOLDERS, GRAY_MARKET_NAME_MAX, GRAY_MARKET_LABEL_MAX, GRAY_MARKET_BODY_MAX } = await import(pathToFileURL(out).href);
 
 const offers=()=>[...O.posted,...O.accepted,...O.withdrawn,...O.expired,...O.none];
-const lines=()=>[E.subtitle,...W.lines,...R.lines,...offers(),...S];
+const deferred=()=>[...D.lines,...D.offerPosted,...D.offerAccepted];
+const lines=()=>[E.subtitle,...W.lines,...deferred(),...R.lines,...offers(),...S];
 const labels=()=>[E.label,W.title,R.label];
 const all=()=>[...labels(),...lines().map(l=>l.text)];
 const fill=t=>GRAY_MARKET_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(GRAY_MARKET_NAME_MAX)),t);
 
-test('shape: variants per the issue, every line proposal', () => {
+test('shape: variants per the issue, every line proposal, deferred group present', () => {
+  assert.equal(D.proposal,true); assert.ok(D.lines.length>=1); assert.ok(D.offerPosted.length>=2&&D.offerAccepted.length>=2);
   assert.ok(R.lines.length>=2&&R.lines.length<=3);
   for (const k of ['posted','accepted','withdrawn','expired','none']) assert.ok(O[k].length>=2&&O[k].length<=3, k);
   assert.ok(S.length>=3&&S.length<=4);
   for (const l of lines()) assert.equal(l.proposal,true);
   for (const o of [E,W,R,O]) assert.equal(o.proposal,true);
 });
-test('re-exports the shared name cap; 40/140 hold with {rate} filled at it', () => {
+test('re-exports the shared name cap; 40/140 hold with every placeholder filled at it (all three, including the deferred group)', () => {
   assert.equal(GRAY_MARKET_NAME_MAX,COUP_NAME_MAX); assert.equal(GRAY_MARKET_NAME_MAX,24);
   for (const t of labels()) assert.ok(fill(t).length<=GRAY_MARKET_LABEL_MAX, t);
   for (const l of lines()) assert.ok(fill(l.text).length<=GRAY_MARKET_BODY_MAX, l.text);
 });
-test('the rate appears only through {rate}, and always as a rumor, never official or exact', () => {
+test('placeholders: only {rate}, {askRate}, {amount}; {rate} stays rumor-only and apart from {askRate}', () => {
+  assert.deepEqual([...GRAY_MARKET_PLACEHOLDERS],['{rate}','{askRate}','{amount}']);
   for (const t of all()) for (const m of t.matchAll(/\{[^}]+\}/g)) assert.ok(GRAY_MARKET_PLACEHOLDERS.includes(m[0]), m[0]);
-  for (const l of R.lines) { assert.ok(l.text.includes('{rate}')); assert.match(l.text,/rumou?r|word on the street|street talk/i); assert.match(l.text,/about|near|roughly|not exact|may be wrong|rarely exact/i); }
+  for (const l of R.lines) { assert.ok(l.text.includes('{rate}')); assert.match(l.text,/rumou?r|word on the street|street talk/i); assert.match(l.text,/about|near|roughly|not exact|may be wrong|rarely exact/i); assert.doesNotMatch(l.text,/\{askRate\}|\{amount\}|asking/); }
   for (const t of all()) assert.doesNotMatch(t,/official|exactly|guaranteed|fixed rate|the rate is \{rate\}/i, t);
-  for (const l of [...W.lines,...offers(),...S]) assert.doesNotMatch(l.text,/\{rate\}/);
+  for (const l of [...E.subtitle.text?[E.subtitle]:[],...W.lines,...deferred(),...O.withdrawn,...O.expired,...O.none,...S]) assert.doesNotMatch(l.text,/\{rate\}|\{askRate\}|\{amount\}/, l.text);
+  for (const l of [...O.posted,...O.accepted]) {
+    assert.ok(l.text.includes('{askRate}')&&l.text.includes('{amount}'), l.text);
+    assert.match(l.text,/asking rate/); assert.doesNotMatch(l.text,/\{rate\}|rumou?r|about|near|roughly|official/i, l.text);
+  }
   assert.match(R.label,/Rumored/);
 });
-test('warning: illegal, adds Suspicion, penalties capped, no numbers', () => {
+test('PoC warning: illegal and optional only; no Suspicion, penalties or seizure outside the deferred group', () => {
   const w=W.lines.map(l=>l.text).join(' ');
-  assert.match(w,/illegal in Korund/); assert.match(w,/adds Suspicion/); assert.match(w,/Penalties are capped/);
+  assert.match(w,/illegal in Korund/); assert.match(w,/optional/);
   assert.match(E.subtitle.text,/illegal/); assert.match(E.subtitle.text,/risky/);
+  const poc=[E.label,E.subtitle.text,W.title,...W.lines.map(l=>l.text),...R.lines.map(l=>l.text),...offers().map(l=>l.text),...S.map(l=>l.text)].join(' ');
+  assert.doesNotMatch(poc,/Suspicion|penalt|seiz|checkpoint|capped/i);
+});
+test('deferred group: Suspicion, capped penalties and checkpoint seizure live here only', () => {
+  const d=deferred().map(l=>l.text).join(' ');
+  assert.match(d,/adds Suspicion/); assert.match(d,/Penalties are capped/); assert.match(d,/seized at a checkpoint/);
+  assert.ok(D.offerPosted.every(l=>/Suspicion/.test(l.text))&&D.offerAccepted.every(l=>/Suspicion/.test(l.text)));
+  for (const l of deferred()) assert.equal(l.proposal,true);
 });
 test('no figures anywhere, and whispers hint movement without a number', () => {
   for (const t of all()) assert.doesNotMatch(t,/\d|%|percent|\b(one|two|three|four|five|six|seven|ten|hundred|dozen|double|half)\b|\bdays?\b|hours?/i, t);
