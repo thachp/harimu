@@ -60,3 +60,10 @@ test('reads seeded table rows (idempotent seed) and falls back to the seed witho
   assert.equal(read.source, 'table');
   assert.deepEqual(read.squares, seedWorldSquares());
 });
+test('committed D1 migration matches the generator and applies idempotently', async () => {
+  const { sqliteWorldSquaresMigration } = await import('../lib/map-zones.ts');
+  const file = await readFile(new URL('../drizzle/0010_world_squares.sql', import.meta.url), 'utf8');
+  assert.equal(file, sqliteWorldSquaresMigration());
+  const sqlite = new DatabaseSync(':memory:'); sqlite.exec(file); sqlite.exec(file);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM world_squares').get().n, mapWidth * mapHeight);
+});
