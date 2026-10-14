@@ -4,13 +4,15 @@
 import { faithCopy, unaffiliatedCopy, devotionTier } from '../lib/faith-copy.ts';
 import { worshipCopy } from '../lib/worship-copy.ts';
 import { mvpFestivalCopy, festivalStanceCopy } from '../lib/mvp-festival-copy.ts';
-export const kinwardLeaveBlockedReason = 'Leaving the Kinward Rite costs Royal Favor in Aurelle. Spending Royal Favor is not built yet, so this change is unavailable for now.';
+export const kinwardLeaveFavorCost = 10; // lib/faith.ts
+export const kinwardLeaveBlockedReason = balance => `Leaving the Kinward Rite costs ${kinwardLeaveFavorCost} Royal Favor in Aurelle. You have ${balance}. Serve the Crown to earn more.`;
 const publicOptions = { kindle: ['kinward-rite', 'fair-wind-vow', 'open-hand', 'unaffiliated'], aurelle: ['kinward-rite', 'fair-wind-vow', 'open-hand', 'unaffiliated'], korund: ['unaffiliated'] };
 const label = id => id === 'unaffiliated' ? unaffiliatedCopy.name : faithCopy[id].name;
 const festival = (id, extra) => { const c = mvpFestivalCopy.find(f => f.id === id); return { id, faithId: c.faithId, name: c.name, description: c.description, stance: 'tolerated', stanceLine: null, occurrence: 2, gameDay: 1000, gameYear: 2, dayOfYear: 280, startsAt: '2026-10-14T00:00:00.000Z', endsAt: '2026-10-14T02:00:00.000Z', active: false, publicHoliday: false, banner: null, joined: false, joinBlockedReason: `Only followers of this faith can join ${c.name}.`, ...extra }; };
 
 /** nation: kindle|aurelle|korund. Options: faith, devotion, chosen, worshippedToday, locked (cooldown), holiday (oath-day in Aurelle), festival (a joinable banner). */
-export function faithState({ nation = 'kindle', faith = nation === 'aurelle' ? 'kinward-rite' : nation === 'korund' ? 'unaffiliated' : 'fair-wind-vow', devotion = 34, chosen = true, worshippedToday = false, locked = false, holiday = false, festivalBanner = false } = {}) {
+export function faithState({ nation = 'kindle', faith = nation === 'aurelle' ? 'kinward-rite' : nation === 'korund' ? 'unaffiliated' : 'fair-wind-vow', devotion = 34, chosen = true, worshippedToday = false, locked = false, holiday = false, festivalBanner = false, royalFavor = 14 } = {}) {
+  const leaving = nation === 'aurelle' && faith === 'kinward-rite'; // lib/faith.ts leavesKinward
   const w = faith !== 'unaffiliated' ? worshipCopy[faith] : null;
   const festivals = [];
   if (holiday) { const line = festivalStanceCopy.aurelle.endorsed.text; festivals.push(festival('oath-day', { stance: 'endorsed', stanceLine: line, active: true, publicHoliday: true, banner: faith === 'kinward-rite' ? { text: mvpFestivalCopy.find(f => f.id === 'oath-day').active, joinButton: 'Join the festival' } : null, joinBlockedReason: faith === 'kinward-rite' ? null : 'Only followers of this faith can join Oath Day.' })); }
@@ -27,7 +29,8 @@ export function faithState({ nation = 'kindle', faith = nation === 'aurelle' ? '
     changeAvailableAt: locked ? lockedAt : null,
     changeBlockedReason: locked ? `You can change faith once every 60 real days. Next change: ${new Date(lockedAt * 1000).toISOString().slice(0, 10)}.` : null,
     festivals, holiday: holidayInfo, banEvents: [],
-    leaveBlockedReason: nation === 'aurelle' && faith === 'kinward-rite' ? kinwardLeaveBlockedReason : null,
+    leaveCost: leaving ? kinwardLeaveFavorCost : null, royalFavor: leaving ? royalFavor : null,
+    leaveBlockedReason: leaving && royalFavor < kinwardLeaveFavorCost ? kinwardLeaveBlockedReason(royalFavor) : null,
   };
 }
 

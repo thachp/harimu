@@ -84,13 +84,16 @@ export function HolidayBanner({ faith, busy, onJoin }: { faith: FaithState | nul
   </section>;
 }
 
-export function FaithPanel({ api }: { api: FaithApi }) {
+/** `initialPick` only seeds the radio (used by tests and the layout check to render the "picked away" state). */
+export function FaithPanel({ api, initialPick = null }: { api: FaithApi; initialPick?: string | null }) {
   const { faith, congregations, busy, message, error } = api;
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(initialPick);
   if (!faith) return null;
   const current = faith.faith.id, choice = picked ?? current, korund = faith.nationId === 'korund';
   const cooldown = faith.changeBlockedReason;
-  const leaving = faith.leaveBlockedReason && choice !== current ? faith.leaveBlockedReason : null;
+  const leaves = choice !== current; // picking away from the current faith
+  const leaving = leaves ? faith.leaveBlockedReason : null;
+  const leaveCost = leaves && faith.leaveCost != null ? faith.leaveCost : null; // #289/#311: Royal Favor cost of leaving the Kinward Rite in Aurelle
   const changeReason = busy ? 'Saving…' : cooldown ?? (choice === current ? 'Pick a different faith to change.' : leaving);
   const copy = copyFor(current), worship = faith.worship;
   const devotion = faith.devotion;
@@ -122,6 +125,7 @@ export function FaithPanel({ api }: { api: FaithApi }) {
       {faith.options.public.map(option => { const c = copyFor(option.id); return <label key={option.id}>
         <input type="radio" name="faith-choice" value={option.id} checked={choice === option.id} onChange={() => setPicked(option.id)} />
         <span><strong>{c.name}</strong>{option.id === current && <em> · current</em>}<small>{c.description}</small></span></label>; })}
+      {leaveCost !== null && <p className="faith-note faith-leave-cost" role="status">Leaving the Kinward Rite costs {leaveCost} Royal Favor.{faith.royalFavor != null && <> You have {faith.royalFavor}.</>}</p>}
       <ActionButton type="button" reason={changeReason} onClick={() => { void api.chooseFaith(choice).then(() => setPicked(null)); }}>Confirm faith</ActionButton>
       {cooldown && faith.changeAvailableAt && <p className="faith-note">Faith is locked until {isoDate(faith.changeAvailableAt)}.</p>}
     </fieldset>}

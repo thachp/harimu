@@ -42,6 +42,7 @@ test('layout fixtures have the same shape as the live /api/faith and /api/congre
   assert.deepEqual(keys(fx.holiday), keys(live.holiday));
   assert.deepEqual(keys(fx.faith), keys(live.faith)); assert.deepEqual(keys(fx.devotion), keys(live.devotion)); assert.deepEqual(keys(fx.worship), keys(live.worship));
   assert.deepEqual(keys(fx.devotion.tier), keys(live.devotion.tier)); assert.deepEqual(fx.options.public.map(o => o.id), live.options.public.map(o => o.id));
+  assert.equal(live.leaveCost, fx.leaveCost); assert.equal(live.royalFavor, 0); assert.equal(live.leaveBlockedReason, faithState({ nation: 'aurelle', royalFavor: 0 }).leaveBlockedReason, 'fixture wording matches the server');
   assert.equal(live.holiday.name, fx.holiday.name); assert.equal(live.holiday.line, fx.holiday.line);
   const kor = (await r.call('faith', 'kai')).data, kfx = faithState({ nation: 'korund' });
   assert.deepEqual(keys(kfx), keys(kor)); assert.deepEqual(kfx.options.public.map(o => o.id), kor.options.public.map(o => o.id)); assert.equal(kor.worship, null);
@@ -114,11 +115,31 @@ test('congregation: join, then leave and stand for Officiant, with the Officiant
   assert.match(blocked, /once per game day\. Come back tomorrow\./);
 });
 
-test('Aurelle Kinward Rite: leaving is explained by the server reason, never offered silently', () => {
-  const s = faithState({ nation: 'aurelle' });
-  assert.match(s.leaveBlockedReason, /Spending Royal Favor is not built yet/);
-  const html = renderToStaticMarkup(React.createElement(FaithPanel, { api: api(s) }));
-  assert.match(text(html), /Kinward Rite/); assert.equal((html.match(/type="radio"/g) ?? []).length, 4); // the API offers all three faiths and Unaffiliated in Aurelle
+let t;
+test('Aurelle Kinward Rite (#289/#311): picking away shows the Royal Favor cost and balance before Confirm; Confirm is disabled only when the server says it cannot be paid', () => {
+  const render = (s, pick) => renderToStaticMarkup(React.createElement(FaithPanel, { api: api(s), initialPick: pick }));
+  const confirmDisabled = html => /<button[^>]*disabled=""[^>]*>Confirm faith/.test(html);
+  // Not picked away: no cost line, and Confirm explains that a different faith must be picked.
+  let html = render(faithState({ nation: 'aurelle', royalFavor: 14 }), null);
+  assert.equal(html.includes('faith-leave-cost'), false); assert.match(text(html), /Pick a different faith to change\./); assert.ok(confirmDisabled(html));
+  // Picked away with enough Royal Favor: the cost and balance show before Confirm, and Confirm is enabled.
+  html = render(faithState({ nation: 'aurelle', royalFavor: 14 }), 'unaffiliated');
+  assert.match(text(html), /Leaving the Kinward Rite costs 10 Royal Favor\. You have 14\./);
+  assert.ok(html.indexOf('faith-leave-cost') < html.indexOf('>Confirm faith<'), 'cost is shown before the Confirm button');
+  assert.equal(confirmDisabled(html), false); assert.doesNotMatch(text(html), /Serve the Crown to earn more/);
+  // Exactly enough is enough.
+  assert.equal(confirmDisabled(render(faithState({ nation: 'aurelle', royalFavor: 10 }), 'open-hand')), false);
+  // Short: cost, balance and the server reason are all visible, and Confirm is disabled and described by the reason.
+  const short = faithState({ nation: 'aurelle', royalFavor: 4 }); assert.equal(short.leaveCost, 10); assert.equal(short.royalFavor, 4);
+  html = render(short, 'open-hand'); t = text(html);
+  assert.match(t, /costs 10 Royal Favor\. You have 4\./); assert.ok(t.includes(short.leaveBlockedReason)); assert.ok(confirmDisabled(html));
+  assert.match(html, /<button[^>]*disabled=""[^>]*aria-describedby="[^"]+"[^>]*>Confirm faith/);
+  // Cooldown and busy still disable Confirm even when the cost is paid; the cost line stays.
+  html = render(faithState({ nation: 'aurelle', royalFavor: 14, locked: true }), 'unaffiliated'); assert.ok(confirmDisabled(html)); assert.ok(text(html).includes(faithState({ locked: true }).changeBlockedReason));
+  html = renderToStaticMarkup(React.createElement(FaithPanel, { api: api(faithState({ nation: 'aurelle', royalFavor: 14 }), null, { busy: true }), initialPick: 'unaffiliated' })); assert.ok(confirmDisabled(html)); assert.match(text(html), /Saving…/);
+  // Nations where leaving is free show no cost line.
+  assert.equal(render(faithState({ nation: 'kindle' }), 'open-hand').includes('faith-leave-cost'), false);
+  assert.equal(confirmDisabled(render(faithState({ nation: 'kindle' }), 'open-hand')), false);
 });
 
 test('holiday banner: public holiday with the stance line, and a Join button for followers; others see only the holiday', () => {

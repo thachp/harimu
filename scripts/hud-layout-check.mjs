@@ -109,11 +109,12 @@ try {
   const faithScenes = [
     { name: 'Kindle · Fair-Wind Vow, not joined', slug: 'not-joined', nation, faith: faithState({ devotion: 34 }), cong: congregationState({}) },
     { name: 'Kindle · locked, joined, Officiant, festival', slug: 'locked-joined-officiant', nation, faith: faithState({ locked: true, worshippedToday: true, festivalBanner: true, devotion: 100 }), cong: congregationState({ member: true, opt: true, officiant: true, blocked: 'You can join or leave a congregation once per game day. Come back tomorrow.' }) },
-    { name: 'Aurelle · Oath Day holiday', slug: 'oath-day-holiday', nation: { id: 'aurelle', name: 'Aurelle', capital: 'Highspire' }, faith: faithState({ nation: 'aurelle', holiday: true, devotion: 62 }), cong: congregationState({ nation: 'aurelle', faith: 'kinward-rite', member: true }) },
+    { name: 'Aurelle · Oath Day holiday', slug: 'oath-day-holiday', nation: { id: 'aurelle', name: 'Aurelle', capital: 'Highspire' }, pick: 'open-hand', faith: faithState({ nation: 'aurelle', holiday: true, devotion: 62, royalFavor: 14 }), cong: congregationState({ nation: 'aurelle', faith: 'kinward-rite', member: true }) },
+    { name: 'Aurelle · leaving costs Royal Favor, short', slug: 'leave-cost-short', nation: { id: 'aurelle', name: 'Aurelle', capital: 'Highspire' }, pick: 'unaffiliated', faith: faithState({ nation: 'aurelle', devotion: 20, royalFavor: 4 }), cong: congregationState({ nation: 'aurelle', faith: 'kinward-rite' }) },
     { name: 'Korund · Unaffiliated', slug: 'unaffiliated', nation: { id: 'korund', name: 'Korund', capital: 'Stonehearth' }, faith: faithState({ nation: 'korund' }), cong: null },
   ];
   for (const sc of faithScenes) {
-    const panel = React.createElement(React.Fragment, null, React.createElement(HolidayBanner, { faith: sc.faith, busy: false, onJoin: noop }), React.createElement(FaithPanel, { api: api(sc.faith, sc.cong) }));
+    const panel = React.createElement(React.Fragment, null, React.createElement(HolidayBanner, { faith: sc.faith, busy: false, onJoin: noop }), React.createElement(FaithPanel, { api: api(sc.faith, sc.cong), initialPick: sc.pick ?? null }));
     const body = renderToStaticMarkup(React.createElement(GameShell, { view: 'household', nation: sc.nation, citizenNation: sc.nation, nations: [sc.nation], capacity: 18, localDemo: true, panel, onNavigate() {}, accountControls, worldClock: { gameDay: 12, latestTick: 140 }, holidayName: sc.faith.holiday?.name ?? null }));
     for (const [w, h] of [[1280, 800], [390, 844], [360, 740]]) for (const scale of [1, 1.25, 1.5]) {
       const page = await browser.newPage({ viewport: { width: w, height: h } });
