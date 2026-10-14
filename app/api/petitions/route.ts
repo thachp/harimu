@@ -19,7 +19,7 @@ export async function GET(request:Request){
  const bindings=env as unknown as {AI?:NewsAiBinding;HARIMU_AI_CABINET_RESPONSES_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string};
  const budget=aiBudgetConfig(bindings),cabinetResponses=bindings.HARIMU_AI_CABINET_RESPONSES_ENABLED==='true'&&Boolean(bindings.AI)&&budget!==null;
  // Mandatory response: a reached petition triggers the gated AI Cabinet reply in the background, never blocking this read.
- if(cabinetResponses)waitUntil(prepareAiCabinetResponse(db,now,bindings.AI,{enabled:true,budget}).catch(()=>undefined));
+ if(cabinetResponses)waitUntil(prepareAiCabinetResponse(db,now,bindings.AI,{enabled:true,budget}).catch(error=>{console.error('[petitions] AI Cabinet response job failed',{route:'/api/petitions',at:now,error:error instanceof Error?error.message:String(error)});}));
  return json({...await readCollectivePetitions(db,userId,now),verification,cabinetResponses});
 }
 export async function POST(request:Request){
