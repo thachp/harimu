@@ -62,3 +62,23 @@ test('collecting petitions below threshold are never answered',async t=>{
  const id=randomUUID();await r.call('petitions','alice',{action:'create',requestId:id,title:'Fixture pending petition',demand:'Please review this fixture request.'});
  const ai=scripted(good());on(r,ai);assert.equal((await find(r,id)).status,'collecting');assert.equal(ai.seen.length,0);
 });
+
+test('#92 a Cabinet failure before any gateway call releases the reservation (nothing charged)',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());await reached(r);const ai=scripted(good());
+ const out=await r.prepareAiCabinetResponse(ai,{enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'},maxInputBytes:10});
+ assert.equal(out.status,'not-sent');assert.equal(ai.seen.length,0);
+ assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM harimu_ai_reservations WHERE request_id LIKE 'cabinet:%'").first()).n,0);
+});
+test('#92 a Cabinet row is marked sent before the first call and still counts after 1h with no final status',async t=>{
+ const {expireStaleAiReservations,releaseAiReservation,readAiBudget,aiNewsSequenceReservation,aiPendingExpirySeconds}=await import('../lib/ai-budget.ts');
+ const r=await localRuntime();t.after(()=>r.close());await reached(r);let seen;
+ let unblock;const hang=new Promise(res=>{unblock=res;});
+ const evicted={async run(){seen=(await r.db.prepare("SELECT status FROM harimu_ai_reservations WHERE request_id LIKE 'cabinet:%'").first()).status;await hang;throw Error('evicted');}}; // hangs: Worker evicted mid-call, no final status
+ const job=r.prepareAiCabinetResponse(evicted,{enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'},timeoutMs:60000});
+ for(let i=0;i<50&&!seen;i++)await new Promise(res=>setTimeout(res,20));
+ assert.equal(seen,'uncertain');const row=await r.db.prepare("SELECT request_id FROM harimu_ai_reservations WHERE request_id LIKE 'cabinet:%'").first();
+ const later=Math.floor(r.now/1000)+aiPendingExpirySeconds+60;await expireStaleAiReservations(r.db,later);await releaseAiReservation(r.db,row.request_id);
+ const after=await r.db.prepare('SELECT status FROM harimu_ai_reservations WHERE request_id=?').bind(row.request_id).first();assert.equal(after.status,'uncertain');
+ assert.equal((await readAiBudget(r.db,later)).reservedMicroUsd,aiNewsSequenceReservation);
+ unblock();await job;
+});

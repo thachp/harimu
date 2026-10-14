@@ -1,5 +1,5 @@
 import type {GameDatabase} from './database-contract';
-import {reserveAiCabinetSequence,aiGatewayOptions,type AiBudgetConfig,type AiModel} from './ai-budget';
+import {reserveAiCabinetSequence,markAiReservationSent,releaseAiReservation,aiGatewayOptions,type AiBudgetConfig,type AiModel} from './ai-budget';
 import {inferenceText,supportedNewsDraft,newsVerificationResponseFormat,type NewsAiBinding} from './ai-news';
 import {validPetitionText} from './collective-petitions';
 /** Issue #20: the mandatory public Cabinet response to a petition that reached 3%.
@@ -17,7 +17,7 @@ export function validatedCabinetResponse(value:unknown){
  return text;
 }
 type Awaiting={id:string;title:string;demand:string;reached_at:number};
-export async function prepareAiCabinetResponse(db:GameDatabase,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,timeoutMs=30000}={}){
+export async function prepareAiCabinetResponse(db:GameDatabase,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,timeoutMs=30000,maxInputBytes=12000}={}){
  if(!enabled||!binding||!budget||!Number.isSafeInteger(now))return {status:'disabled' as const};
  const day=new Date(now*1000).toISOString().slice(0,10);
  // Skip petitions already attempted today so one failing petition cannot starve newer ones.
@@ -27,8 +27,11 @@ export async function prepareAiCabinetResponse(db:GameDatabase,now:number,bindin
  const reservation=`cabinet:${p.id}:${day}`;
  if(!await reserveAiCabinetSequence(db,reservation,now,budget))return {status:'budget-unavailable' as const};
  const petition={title:p.title,demand:p.demand};
+ let reached=false; // #92: true once a request is handed to the gateway (persisted as 'uncertain' first)
  const call=async(target:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],format?:typeof cabinetResponseFormat|typeof newsVerificationResponseFormat)=>{
+  if(new TextEncoder().encode(JSON.stringify(messages)).length>maxInputBytes)throw Error('Inference input exceeded the public-petition bound.');
   let timeout:ReturnType<typeof setTimeout>|undefined;
+  if(!reached){reached=true;await markAiReservationSent(db,reservation);}
   try{return inferenceText(await Promise.race([binding.run(target,{messages,max_tokens:256,temperature:0,stream:false,...(format?{response_format:format as never}:{})},aiGatewayOptions(budget)),new Promise<never>((_r,reject)=>{timeout=setTimeout(()=>reject(Error('Inference timed out.')),timeoutMs);})]),Boolean(format));}
   catch(error){throw Object.assign(Error('uncertain'),{uncertain:!(error instanceof Error&&/Invalid inference|Incomplete inference/.test(error.message))});}
   finally{if(timeout!==undefined)clearTimeout(timeout);}
@@ -43,6 +46,8 @@ export async function prepareAiCabinetResponse(db:GameDatabase,now:number,bindin
   const [saved]=await db.batch([db.prepare("UPDATE civic_petitions SET response_text=?,response_at=? WHERE id=? AND nation_id='kindle' AND reached_at IS NOT NULL AND reached_at<=? AND response_text IS NULL AND response_at IS NULL").bind(aiCabinetResponsePrefix+text,now,p.id,now),db.prepare("UPDATE harimu_ai_reservations SET status='finished' WHERE request_id=?").bind(reservation)]);
   return {status:saved.meta.changes?'recorded' as const:'already-recorded' as const,petitionId:p.id};
  }catch(error){
+  // #92: nothing reached the gateway, so nothing is charged. The petition is retried on a later run.
+  if(!reached){await releaseAiReservation(db,reservation);return {status:'not-sent' as const,petitionId:p.id};}
   await db.prepare('UPDATE harimu_ai_reservations SET status=? WHERE request_id=?').bind(error&&typeof error==='object'&&'uncertain' in error&&error.uncertain?'uncertain':'finished',reservation).run();
   return {status:'failed' as const,petitionId:p.id};
  }
