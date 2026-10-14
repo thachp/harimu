@@ -93,6 +93,19 @@ test('#152 bootstrap: empty database gets base schema plus every migration, reco
   await assert.rejects(bootstrapEmptyPostgres(db), /refuses: schema public already has/);
   await pg.close();
 });
+test('#152 bootstrap failing partway rolls back to an empty database and can be rerun', async () => {
+  const dir = dirWith({ '0950_bad.sql': 'CREATE TABLE IF NOT EXISTS zz_half (id int); SELECT * FROM no_such_table;' });
+  for (const f of ['compatibility.sql', 'schema.sql']) copyFileSync(join('db/postgres', f), join(dir, f));
+  const pg = new PGlite(); await pg.waitReady; const db = adapter(pg);
+  await assert.rejects(bootstrapEmptyPostgres(db, { dir }), /failed at 0950_bad\.sql and was rolled back.*safe to retry/);
+  assert.equal((await rows(pg, "SELECT COUNT(*)::int AS n FROM pg_tables WHERE schemaname='public'"))[0].n, 0, 'zero tables');
+  assert.equal((await rows(pg, "SELECT COUNT(*)::int AS n FROM pg_namespace WHERE nspname='harimu_compat'"))[0].n, 0, 'compat schema rolled back too');
+  const unlocked = await rows(pg, 'SELECT pg_try_advisory_lock(1191280) AS ok'); assert.equal(unlocked[0].ok, true, 'lock released'); await pg.query('SELECT pg_advisory_unlock(1191280)');
+  const result = await bootstrapEmptyPostgres(db);
+  assert.deepEqual(result.applied, postgresMigrations().map(m => m.file));
+  await assertPostgresMigrationsApplied(db);
+  await pg.close();
+});
 test('#152 bootstrap refuses a non-empty database and writes nothing', async () => {
   const pg = new PGlite(); await pg.waitReady; await pg.exec('CREATE TABLE stray(id int)');
   await assert.rejects(bootstrapEmptyPostgres(adapter(pg)), /refuses/);

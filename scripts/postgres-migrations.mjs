@@ -174,25 +174,38 @@ export function postgresClientConfig(connectionString, timeoutMs = connectTimeou
 const redact = connectionString => { try { const u = new URL(connectionString); return `${u.hostname}${u.port ? `:${u.port}` : ''}`; } catch { return 'the database'; } };
 /**
  * #152: bootstrap an EMPTY database (local dev, new preview, disaster recovery). Refuses unless
- * schema public has no tables. Applies compatibility.sql + schema.sql + schema_migrations in one
- * transaction, then runs every numbered migration as a normal pending migration (all idempotent),
- * so each is recorded with backfilled=false. Finally verifies with the deploy guard.
+ * schema public has no tables. Holds the migrator lock throughout and runs ONE transaction:
+ * compatibility.sql + schema.sql + schema_migrations + every numbered migration and its record,
+ * then verifies with the deploy guard before COMMIT. Any failure rolls everything back, leaving
+ * the database empty, so the bootstrap is safe to rerun.
  */
 export async function bootstrapEmptyPostgres(db, { dir = 'db/postgres', log = () => {} } = {}) {
+  const migrations = postgresMigrations(dir);
+  for (const m of migrations) if (isDestructive(m.sql) && !hasReviewMarker(m.sql)) throw new Error(`${m.file} looks destructive; add "${destructiveReviewedMarker}" after manual review.`);
+  const base = ['compatibility.sql', 'schema.sql'].map(f => ({ file: f, sql: readFileSync(join(dir, f), 'utf8') }));
   await db.query('SELECT pg_advisory_lock($1)', [lockKey]);
   try {
     const tables = await publicTables(db);
     if (tables.size) throw new Error(`--bootstrap-empty refuses: schema public already has ${tables.size} table(s). Use the normal migrate command.`);
-    const base = ['compatibility.sql', 'schema.sql'].map(f => readFileSync(join(dir, f), 'utf8'));
+    let step = 'BEGIN';
     await db.exec('BEGIN');
-    try { for (const sql of base) await db.exec(sql); await db.exec(schemaMigrationsTable); await db.exec('COMMIT'); }
-    catch (error) { await db.exec('ROLLBACK'); throw new Error(`Bootstrap rolled back: ${error.message}`); }
-    log('Applied compatibility.sql and schema.sql.');
+    try {
+      for (const b of base) { step = b.file; await db.exec(b.sql); }
+      step = 'schema_migrations'; await db.exec(schemaMigrationsTable);
+      for (const m of migrations) {
+        step = m.file;
+        await db.exec(m.sql);
+        await db.query('INSERT INTO schema_migrations (id, checksum) VALUES ($1, $2)', [m.id, m.checksum]);
+      }
+      step = 'verification'; await assertPostgresMigrationsApplied(db, migrations);
+      await db.exec('COMMIT');
+    } catch (error) {
+      await db.exec('ROLLBACK');
+      throw new Error(`Bootstrap failed at ${step} and was rolled back; the database is still empty and safe to retry: ${error.message}`);
+    }
+    log(`Bootstrapped: compatibility.sql, schema.sql and ${migrations.length} migration(s) applied and recorded.`);
+    return { applied: migrations.map(m => m.file), pending: [] };
   } finally { await db.query('SELECT pg_advisory_unlock($1)', [lockKey]); }
-  const migrations = postgresMigrations(dir);
-  const result = await applyPostgresMigrations(db, migrations, { log });
-  await assertPostgresMigrationsApplied(db, migrations);
-  return result;
 }
 
 /** node-postgres adapter (deploy machine / CI only). Fails within timeoutMs, never hangs. */
