@@ -49,3 +49,8 @@ test('citizenship changes during inference discard the old nation response',asyn
  const r=await localRuntime();t.after(()=>r.close());const fake=binding();const run=fake.run.bind(fake);fake.run=async(model,input)=>{const value=await run(model,input);if(fake.calls.length===1)await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'").run();return value;};
  const result=await r.answerNotable('alice',command(),fake,options(r));assert.equal(result.status,503);assert.equal(result.reply,undefined);
 });
+
+test('Notable launcher mounts in the actual City branch rather than another location panel',async()=>{
+ const {readFile}=await import('node:fs/promises');const {default:ts}=await import('typescript');const source=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');const tree=ts.createSourceFile('page.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);const mounts=[];
+ const visit=node=>{if(ts.isJsxSelfClosingElement(node)&&node.tagName.getText(tree)==='NotableControl')mounts.push(node);ts.forEachChild(node,visit);};visit(tree);assert.equal(mounts.length,1);let parent=mounts[0].parent;while(parent&&!ts.isConditionalExpression(parent))parent=parent.parent;assert.ok(parent);assert.equal(parent.condition.getText(tree),"viewMode==='square'");
+});

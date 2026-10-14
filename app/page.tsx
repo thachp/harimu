@@ -1440,7 +1440,6 @@ export default function Home() {
     </div> : <>
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</ActionButton></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</ActionButton></div>}
-      {viewMode === 'square' && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
       {viewMode === 'household' && <>
         {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
@@ -1534,6 +1533,7 @@ export default function Home() {
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : viewMode==='square' ? <>
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {firstLoopHint}{dailyLoop}
+    {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
 
     {(!clerkConfigured || !citizenNationId) && <SceneNews events={worldEvents} title="City noticeboard" />}
