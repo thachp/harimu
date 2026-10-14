@@ -82,3 +82,37 @@ test('review fix: an expired coupon book cannot spend the new week (UI disabled,
  assert.equal((await r.call('citizen','alice',coupon('clothing',randomUUID(),{gameWeek:2}))).status,200);
  assert.equal((await r.call('citizen','alice',coupon('goods',randomUUID(),{gameWeek:0}))).status,400);
 });
+
+// QA1 review (#58): concurrent LN redemptions must never drive the balance negative.
+async function fourLaborNotes(t){
+ const r=await fixture(t);const epoch=(await r.call('citizen','alice')).data.simulation.clock.epochSeconds;
+ await work(r,'alice'); // 8.00 LN
+ for(const week of [1,2])await r.db.prepare("INSERT INTO korund_coupon_redemptions(id,clerk_user_id,game_week,coupon,item,quantity,price_minor,occurred_at) VALUES (?,?,?,'clothing','state work clothing',1,200,?)").bind(randomUUID(),'alice',week,epoch).run();
+ r.setNow((epoch+2*50400+60)*1000); // game week 3, 4.00 LN left
+ assert.equal((await r.call('citizen','alice')).data.korundPlan.walletMinor,400);
+ return {r,epoch};
+}
+test('race: clothing + goods redeemed in parallel with 4.00 LN — exactly one succeeds, LN never negative',async t=>{
+ const {r}=await fourLaborNotes(t);
+ const results=await Promise.all([r.call('citizen','alice',coupon('clothing')),r.call('citizen','alice',coupon('goods'))]);
+ assert.equal(results.filter(x=>x.status===200).length,1);
+ const plan=(await r.call('citizen','alice')).data.korundPlan;assert.ok(plan.walletMinor>=0);assert.ok([100,200].includes(plan.walletMinor));
+});
+test('race: a rival redemption committed between the guard and the re-check is detected and withdrawn',async t=>{
+ const {r}=await fourLaborNotes(t);
+ const prepare=r.db.prepare.bind(r.db);let injected=false;
+ // Simulates READ COMMITTED: the rival goods row (3.00) commits after our INSERT guard passed but before our re-check.
+ r.db.prepare=sql=>{if(!injected&&/AS balance$/.test(sql.trim())){injected=true;r.db.prepare=prepare;prepare("INSERT INTO korund_coupon_redemptions(id,clerk_user_id,game_week,coupon,item,quantity,price_minor,occurred_at) VALUES (?,?,3,'goods','household goods bundle',1,300,0)").bind(randomUUID(),'alice').run();}return prepare(sql);};
+ const res=await r.call('citizen','alice',coupon('clothing'));
+ assert.equal(injected,true);assert.equal(res.status,409);
+ const plan=res.data.korundPlan;assert.equal(plan.walletMinor,100,'only the rival goods redemption remains');assert.equal(plan.coupons.find(c=>c.kind==='clothing').used,false);
+});
+// QA1 review: quota window is [weekStart, weekEnd) — a settlement exactly at the boundary belongs to the new week.
+test('quota week boundary: settlement at end-1s counts in week 1; at exactly end counts in week 2',async t=>{
+ const r=await fixture(t);const epoch=(await r.call('citizen','alice')).data.simulation.clock.epochSeconds;const end=epoch+50400;
+ const shiftAt=async(user,claimAt)=>{r.setNow((claimAt-7200)*1000);const id=randomUUID();assert.equal((await r.call('citizen',user,{action:'korund-start-work',requestId:id})).status,200);r.setNow(claimAt*1000);assert.equal((await r.call('citizen',user,{action:'korund-claim-work',shiftId:id,requestId:randomUUID()})).status,200);};
+ await shiftAt('alice',end-1);
+ let q=(await r.call('citizen','alice')).data.korundPlan.quota;assert.deepEqual([q.unitFood,q.ownFood],[4,4]);assert.equal(Date.parse(q.weekEndsAt)/1000,end);
+ await shiftAt('bob',end);
+ q=(await r.call('citizen','alice')).data.korundPlan.quota;assert.equal(Date.parse(q.weekStartsAt)/1000,end);assert.deepEqual([q.unitFood,q.ownFood],[4,0],'week 2 has only the settlement at exactly its start');
+});

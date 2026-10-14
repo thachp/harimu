@@ -58,7 +58,8 @@ export async function readKorund(db:GameDatabase,userId:string,now:number):Promi
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
- // Funds, public food, wallet, private food and coupon use share one SQLite read snapshot.
+ // Funds, public food, wallet, private food and food-coupon use share one read snapshot. Clothing/goods coupons and
+ // the quota bar are read afterwards by readCouponsAndQuota (a separate round-trip; display only, never a guard).
  db.prepare(`SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) AS public_food,
  initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0) AS funds,
  COALESCE((SELECT SUM(wage_minor) FROM korund_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(price_minor) FROM korund_coupon_redemptions WHERE clerk_user_id=?),0) AS wallet,
@@ -128,6 +129,19 @@ async function redeemCoupon(db:GameDatabase,userId:string,id:string,coupon:'clot
  // The client sends the week it displayed; an expired book must never spend the new week's coupon.
  if(shownWeek!==undefined&&shownWeek!==w.number)return {status:409,error:'Your coupon book expired at the weekly reset. Refresh to see this week’s coupons.'};
  await db.prepare(korundCouponRedeemSql).bind(id,w.number,coupon,good.item,good.priceMinor,now,userId,userId,w.number,coupon,good.priceMinor,userId,userId).run();
- const receipt=await db.prepare('SELECT id FROM korund_coupon_redemptions WHERE id=? AND clerk_user_id=?').bind(id,userId).first();
+ let receipt=await db.prepare('SELECT id FROM korund_coupon_redemptions WHERE id=? AND clerk_user_id=?').bind(id,userId).first();
+ // Committed re-check (pattern from #47 ai-budget). Under Postgres READ COMMITTED, concurrent clothing and goods
+ // redemptions can each pass the INSERT guard against the pre-insert balance. After commit, the later re-check
+ // of any racing pair sees both rows, so a negative LN balance is always detected and this row is withdrawn.
+ // Ties fail closed (both withdraw); no goods were handed out before this check.
+ if(receipt&&await korundLaborNoteBalance(db,userId)<0){
+  await db.prepare('DELETE FROM korund_coupon_redemptions WHERE id=? AND clerk_user_id=?').bind(id,userId).run();
+  receipt=null;
+ }
  return receipt?{status:200}:{status:409,error:`${good.label} unavailable: it was already used this game week or you need ${(good.priceMinor/100).toFixed(2)} LN.`};
+}
+
+export async function korundLaborNoteBalance(db:GameDatabase,userId:string){
+ const row=await db.prepare('SELECT COALESCE((SELECT SUM(wage_minor) FROM korund_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(price_minor) FROM korund_coupon_redemptions WHERE clerk_user_id=?),0) AS balance').bind(userId,userId).first<{balance:number}>();
+ return Number(row?.balance??0);
 }
