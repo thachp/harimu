@@ -1,4 +1,4 @@
-.session { margin: 16px 0; color: #cbd7d1; font-size: 12px; line-height: 1.5; }
+.session { margin: 16px 0; color: #cbd7d1; font-size: calc(12px * var(--text-scale, 1)); line-height: 1.5; }
 .session button {
   display: inline-flex;
   align-items: center;
