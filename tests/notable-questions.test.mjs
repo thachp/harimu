@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {localRuntime} from './helpers/local-runtime.mjs';
 import {validNotableCommand,validNotableQuestion} from '../lib/notable-profiles.ts';
-import {aiNotableQuestionReservation,reserveAiSequence} from '../lib/ai-budget.ts';
+import {aiModelReservations,aiNotableQuestionReservation,reserveAiSequence} from '../lib/ai-budget.ts';
 const command=question=>({requestId:randomUUID(),notableId:'kindle-journalist',topic:'news',question});
 const draft={title:'Public record',summary:'The public record does not establish that claim.',claims:['completedShifts']};
 const options=()=>({enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}});
@@ -31,7 +31,7 @@ test('unsafe, malformed, truncated and failed input moderation cannot reach gene
  for(const answer of ['unsafe','safe\nextra','perhaps safe',{response:'safe',finish_reason:'length'},new Error('private provider failure')]){
   const fake=provider([answer]),c=command('What public events are recorded?');const result=await r.answerNotable('alice',c,fake,options(r));assert.equal(result.status,503);assert.equal(result.reply,undefined);assert.equal(fake.calls.length,1);assert.doesNotMatch(JSON.stringify(result),/private provider failure/);assert.equal((await r.answerNotable('alice',c,fake,options(r))).status,409);assert.equal(fake.calls.length,1);
  }
- assert.equal((await r.db.prepare('SELECT SUM(reserved_micro) AS n FROM harimu_ai_reservations').first()).n,aiNotableQuestionReservation*5);
+ assert.equal((await r.db.prepare('SELECT SUM(reserved_micro) AS n FROM harimu_ai_reservations').first()).n,aiModelReservations['@cf/meta/llama-guard-3-8b']*4+aiNotableQuestionReservation); // #141: four answered guard calls settle; the provider failure stays fully charged
 });
 test('unsafe and malformed output moderation discard a supported draft',async t=>{
  const r=await localRuntime();t.after(()=>r.close());for(const answer of ['unsafe','safe extra',{response:'safe',finish_reason:'length'},{response:42},new Error('private output error')]){const fake=provider(['safe',JSON.stringify(draft),'supported',answer]);const result=await r.answerNotable('alice',command('What does the public record establish?'),fake,options(r));if(answer instanceof Error){assert.equal(result.status,503);assert.equal(result.reply,undefined);}else{assert.equal(result.status,200);assert.equal(result.source,'authored');assert.equal(result.reply,(await import('../lib/notable-profiles.ts')).notableTopics.news.authored);}assert.equal(fake.calls.length,4);}

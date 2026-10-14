@@ -85,8 +85,8 @@ test('captured heading-only news is not an explanatory introduction; supported s
  const captured={title:'National Status Report',summary:'National Ledger Facts',claims:['citizens','completedShifts','food']};assert.ok(validatedNewsDraft(captured));assert.equal(validatedNewsIntroduction(captured),null);assert.ok(validatedNewsIntroduction({...captured,summary:'The ledger records registered citizens and completed paid work.'}));
 });
 
-test('fulfilled malformed response is terminal failure, retains the full charge and does not create permanent uncertainty',async t=>{
- const r=await localRuntime();t.after(()=>r.close());await prepareAiNews(r.db,news,now,{async run(){return {response:42};}},{enabled:true,budget:until});const row=await r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations').first();assert.equal(row.reserved_micro,72400);assert.equal(row.status,'finished');assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM ai_news_articles').first()).n,0);assert.equal(await reserveAiCall(r.db,randomUUID(),model,now+86400,until),true);
+test('fulfilled malformed response is terminal failure, settles to the answered call (#141) and does not create permanent uncertainty',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());await prepareAiNews(r.db,news,now,{async run(){return {response:42};}},{enabled:true,budget:until});const row=await r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations').first();assert.equal(row.reserved_micro,4200);assert.equal(row.status,'finished');assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM ai_news_articles').first()).n,0);assert.equal(await reserveAiCall(r.db,randomUUID(),model,now+86400,until),true);
 });
 test('#45: env budget config fails closed, can only lower the hard ceiling, and routes inference through AI Gateway',async t=>{
  const {aiBudgetConfig,readAiBudget}=await import('../lib/ai-budget.ts');const {aiPricesStale,aiPricesVerifiedAt,isPricedAiModel}=await import('../lib/ai-budget.ts');
