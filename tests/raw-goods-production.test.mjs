@@ -11,7 +11,8 @@ const wallet = async (r, u) => Number((await r.db.prepare('SELECT balance FROM c
 
 test(`#196 ${backend}: each raw-goods job credits its good once; retried claims never double-credit`, async t => {
   const r = await localRuntime(); t.after(() => r.close());
-  await r.call('citizen', 'alice');
+  // #205: starter food is recorded on the first citizen POST, not on GET.
+  await r.call('citizen', 'alice', { action: 'save-plan', horizon: 'today', note: 'warm-up', completedIds: [] });
   const world = await r.call('world', null);
   for (const [id, item, qty, wage, hours] of jobs) {
     const order = world.data.workOrders.find(o => o.id === id);

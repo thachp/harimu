@@ -43,8 +43,14 @@ export const petitionResolutionSql = `INSERT INTO government_petition_resolution
   WHERE p.nation_id=? AND p.period_start=?
   ON CONFLICT(request_id) DO NOTHING`;
 
-/** Completed UTC days are reviewed once; this read may persist bounded, idempotent reviews. */
-export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string) {
+export async function latchGovernmentReviews(db: GameDatabase, nationId: string, now: number) {
+  await readGovernment(db, nationId, now);
+}
+
+type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;snapshot_json:string};
+/** Completed UTC days are reviewed once. By default this persists bounded, idempotent reviews (POST and world-tick paths).
+ *  With readOnly (#205, GET /api/citizen) the same reviews are projected in memory and nothing is written. */
+export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean } = {}) {
   const [budget, needs, days] = await Promise.all([
     db.prepare("SELECT initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number }>(),
     db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN CASE WHEN c.nation_id='korund' THEN COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=c.clerk_user_id),0) WHEN c.nation_id='aurelle' THEN COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=c.clerk_user_id),0) ELSE COALESCE(i.quantity,0) END >= 2 THEN 1 ELSE 0 END) AS supplied
@@ -59,20 +65,31 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
   ]);
   const inputs = { nationId, availableBudgetMinor: nationId === 'kindle' ? Math.max(0,budget?.balance ?? 0) : 0,
     foodSecurity: needs?.households ? Math.floor(100*(needs.supplied ?? 0)/needs.households) : 100 };
+  const projected = new Map<number, ReviewRow & { selected_topic: string }>();
   for (const day of days.results) {
     const counts = await db.prepare(`SELECT p.topic,COUNT(*) AS count FROM government_petitions p JOIN government_petition_eligibility e ON e.request_id=p.request_id AND e.clerk_user_id=p.clerk_user_id WHERE p.nation_id=? AND p.period_start=? GROUP BY p.topic`)
       .bind(nationId,day.period_start).all<{ topic: string; count: number }>();
     const snapshot = simulateGovernment({ ...inputs, petitionCounts: Object.fromEntries(counts.results.map(r=>[r.topic,r.count])) });
     if (!snapshot) return null;
+    const petitionCount = counts.results.reduce((sum,r)=>sum+r.count,0);
+    const snapshotJson = JSON.stringify({ ...snapshot, verificationPolicy: 'tier1-v1' });
+    if (options.readOnly) {
+      // Mirror ON CONFLICT DO NOTHING: an already persisted review for the day wins over a fresh computation.
+      const existing = await db.prepare('SELECT period_start,reviewed_at,petition_count,snapshot_json,selected_topic FROM government_reviews WHERE nation_id=? AND period_start=?')
+        .bind(nationId,day.period_start).first<ReviewRow & { selected_topic: string }>();
+      projected.set(day.period_start, existing ?? { period_start: day.period_start, reviewed_at: now, petition_count: petitionCount, snapshot_json: snapshotJson, selected_topic: snapshot.decision.topic });
+      continue;
+    }
     // Both statements use the winner's persisted review, even when concurrent readers disagree.
     await db.batch([
-      db.prepare(petitionReviewSql).bind(nationId,day.period_start,now,snapshot.decision.topic,
-        counts.results.reduce((sum,r)=>sum+r.count,0),JSON.stringify({ ...snapshot, verificationPolicy: 'tier1-v1' })),
+      db.prepare(petitionReviewSql).bind(nationId,day.period_start,now,snapshot.decision.topic,petitionCount,snapshotJson),
       db.prepare(petitionResolutionSql).bind(nationId,day.period_start),
     ]);
   }
-  const review = await db.prepare('SELECT period_start,reviewed_at,petition_count,snapshot_json FROM government_reviews WHERE nation_id=? ORDER BY period_start DESC LIMIT 1')
-    .bind(nationId).first<{period_start:number;reviewed_at:number;petition_count:number;snapshot_json:string}>();
+  const persisted = await db.prepare('SELECT period_start,reviewed_at,petition_count,snapshot_json FROM government_reviews WHERE nation_id=? ORDER BY period_start DESC LIMIT 1')
+    .bind(nationId).first<ReviewRow>();
+  const latestProjected = [...projected.values()].sort((a,b)=>b.period_start-a.period_start)[0];
+  const review = latestProjected && (!persisted || latestProjected.period_start > persisted.period_start) ? latestProjected : persisted;
   const reviewedSnapshot = review ? JSON.parse(review.snapshot_json) as import('./government').GovernmentSnapshot & { verificationPolicy?: string } : null;
   const verifiedReview = reviewedSnapshot?.verificationPolicy === 'tier1-v1';
   // Legacy snapshots remain history; only reviews made under the receipt policy can affect live priority.
@@ -93,11 +110,15 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       active,expiresAt:review.period_start+172800};
   }
   if (userId) {
-    const rows = await db.prepare(`SELECT p.request_id,p.topic,p.occurred_at,e.request_id AS eligibility_receipt,x.status,r.reviewed_at,r.snapshot_json
+    const rows = await db.prepare(`SELECT p.request_id,p.topic,p.occurred_at,p.period_start,e.request_id AS eligibility_receipt,x.status,r.reviewed_at,r.snapshot_json
       FROM government_petitions p LEFT JOIN government_petition_eligibility e ON e.request_id=p.request_id AND e.clerk_user_id=p.clerk_user_id LEFT JOIN government_petition_resolutions x ON x.request_id=p.request_id
       LEFT JOIN government_reviews r ON r.nation_id=x.nation_id AND r.period_start=x.period_start
       WHERE p.clerk_user_id=? AND p.nation_id=? ORDER BY p.occurred_at DESC LIMIT 14`)
-      .bind(userId,nationId).all<{request_id:string;eligibility_receipt:string|null;topic:import('./government').PetitionTopic;occurred_at:number;status:'accepted'|'deferred'|null;reviewed_at:number|null;snapshot_json:string|null}>();
+      .bind(userId,nationId).all<{request_id:string;period_start:number;eligibility_receipt:string|null;topic:import('./government').PetitionTopic;occurred_at:number;status:'accepted'|'deferred'|null;reviewed_at:number|null;snapshot_json:string|null}>();
+    for (const r of rows.results) {
+      const p = !r.status && r.eligibility_receipt ? projected.get(r.period_start) : undefined;
+      if (p) { r.status = r.topic === p.selected_topic ? 'accepted' : 'deferred'; r.reviewed_at = p.reviewed_at; r.snapshot_json = p.snapshot_json; }
+    }
     snapshot.petitions = rows.results.map(r=>({requestId:r.request_id,topic:r.topic,submittedAt:r.occurred_at,
       status:r.status ?? 'pending',reviewedAt:r.reviewed_at,
       reason:!r.eligibility_receipt ? 'Legacy prototype petition retained for your records; it has no Tier 1 receipt and is not counted in new reviews.' : r.snapshot_json ? `${r.status === 'accepted' ? 'Accepted as the reviewed policy priority.' : 'Deferred because another priority took precedence.'} ${JSON.parse(r.snapshot_json).decision.reason}`

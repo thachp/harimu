@@ -3,14 +3,14 @@ import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
-import { advanceWorld } from '@/lib/world-simulation';
+import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
-import { petitionSql, petitionEligibilitySql, readGovernment } from '@/lib/government-state';
+import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { applyQuality, validQualityInput, type QualityInput } from '@/lib/shift-quality';
 import { gradeShift } from '@/lib/shift-quality-key';
-import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
+import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
 import {readCollectivePetitions,recordVerifiedHumanVisit} from '@/lib/collective-petitions';
@@ -102,10 +102,13 @@ export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
+  // #205: GET is read-only. World ticks, capacity recovery, the starter food grant, the preview election and the
+  // verified-human visit are written by the write paths (POST); here they are projected so players see the same values.
   const database = await getDatabase();
-  const simulation = await advanceWorld(database, undefined, { npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true' });
+  const readNow = Math.floor(Date.now() / 1000);
+  const simulation = await readWorldSimulation(database, readNow);
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
-  await recoverCapacity(database, userId, new Date().toISOString(), interval);
+  const [capacity, starterFood] = await Promise.all([readCapacityProjection(database, userId, readNow, interval), pendingStarterFood(database, userId)]);
   const [profile, plan, itemResult, decision, politicalAction] = await Promise.all([
     database.prepare(`SELECT clerk_user_id, nation_id, nation_changes, display_name, capacity,
       influence, standing, created_at
@@ -133,20 +136,21 @@ export async function GET(request: Request) {
   const civicNow=Math.floor(Date.now()/1000);
   const accountLevel=accountElectionEnabled(env as unknown as {NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string});
   const electionDatabase=accountLevel?accountElectionDatabase(database):database;
-  if(accountLevel&&profile?.nation_id==='kindle')await openPreviewElection(electionDatabase,userId,civicNow,true);
-  if(profile?.nation_id==='kindle'&&verification.countedActionsEligible){await recordVerifiedHumanVisit(database,userId,civicNow);await openPreviewElection(database,userId,civicNow);}
+  if (profile && capacity) profile.capacity = capacity.capacity;
+  const market = await readMarket(database, userId, interval);
+  if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
   return privateJson({
     aurellePlan: await readAurelle(database,userId),
-    election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined),...(accountLevel?{id:accountElectionId}:{})}:null,
-    collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow):null,
+    election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible),...(accountLevel?{id:accountElectionId}:{})}:null,
+    collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
     korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
     firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
     simulation,
     verification,
-    economy: await readEconomy(database, userId, interval),
-    market: await readMarket(database, userId, interval),
+    economy: await readEconomy(database, userId, interval, { readOnly: true, now: readNow }),
+    market,
     playerMarket: await readPlayerMarket(database, userId),
-    government: profile?.nation_id ? publicGovernmentSnapshot(await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId)) : null,
+    government: profile?.nation_id ? publicGovernmentSnapshot(await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId, { readOnly: true })) : null,
     shifts: await readShifts(database, userId),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -169,8 +173,23 @@ export async function POST(request: Request) {
   if (!userId) return response;
   const database = await getDatabase();
   const nowSec = Math.floor(Date.now() / 1000);
+  // #205: side effects GET used to perform now happen on the write path (after enrolment too).
+  try { await recordCivicPresence(database, userId, nowSec); } catch (error) { console.warn('civic presence latch failed', error instanceof Error ? error.name : 'unknown'); /* best effort; never fails the write */ }
   const sellers = (await database.prepare('SELECT DISTINCT seller_id FROM player_fills WHERE buyer_id=? AND filled_at>=?').bind(userId, nowSec - 300).all<{ seller_id: string }>().catch(() => ({ results: [] as { seller_id: string }[] }))).results ?? [];
   return latchAfterWrite(database, response, [userId, ...sellers.map(r => r.seller_id)], nowSec);
+}
+
+/** #205: the preview-election opening, verified-human visit and starter grant/capacity clock that GET used to write. */
+async function recordCivicPresence(database: Awaited<ReturnType<typeof getDatabase>>, userId: string, now: number) {
+  const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
+  await recoverCapacity(database, userId, new Date(now * 1000).toISOString(), interval);
+  const citizen = await database.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
+  // The completed-day petition review latch that GET used to write (QA1 on #217); the world tick also latches it.
+  if (citizen?.nation_id) await latchGovernmentReviews(database, citizen.nation_id, now);
+  if (citizen?.nation_id !== 'kindle') return;
+  const accountLevel = accountElectionEnabled(env as unknown as { NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?: string; HARIMU_ACCOUNT_ELECTION_POC_ENABLED?: string });
+  if (accountLevel) await openPreviewElection(accountElectionDatabase(database), userId, now, true);
+  if ((await readVerification(userId)).countedActionsEligible) { await recordVerifiedHumanVisit(database, userId, now); await openPreviewElection(database, userId, now); }
 }
 
 async function handlePost(request: Request) {
