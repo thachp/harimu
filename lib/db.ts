@@ -11,6 +11,7 @@ import {electionSchemas} from './elections';
 import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
 import { worldSquaresSchema, worldSquaresSeedSql } from './map-zones';
+import { worldCitiesSchema } from './city-founding';
 import { aurelleSchemas } from './aurelle';
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
@@ -199,6 +200,7 @@ async function initialize(database: GameDatabase) {
     database.prepare(cityLocationSchema),
     database.prepare(worldSquaresSchema),
     ...worldSquaresSeedSql().map(sql => database.prepare(sql)),
+    database.prepare(worldCitiesSchema),
     ...squareSchema.map(sql => database.prepare(sql)),
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
