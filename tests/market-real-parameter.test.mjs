@@ -13,10 +13,10 @@ test('integer-valued REAL bindings trade through actual routes and preserve repl
  const total=async()=>r.db.prepare('SELECT (SELECT SUM(balance) FROM citizen_wallet_balances)+(SELECT balance FROM merchant_cash_balance)+(SELECT initial_minor FROM economy_funds WHERE id=\'kindle-employer\')-(SELECT COALESCE(SUM(wage_minor),0) FROM shift_settlements)-(SELECT COALESCE(SUM(spend_minor),0) FROM government_policy_executions) AS cash').first();
  const before=await total();
  const buy={action:'market-trade',requestId:randomUUID(),side:'buy',item:'food',quantity:1};
- const response=await r.call('citizen','alice',buy);assert.equal(response.status,200,response.data.error);assert.equal(response.data.economy.walletMinor,650);
+ const response=await r.call('citizen','alice',buy);assert.equal(response.status,200,response.data.error);assert.equal(response.data.economy.walletMinor,530);
  assert.equal((await r.call('citizen','alice',{...buy,requestId:randomUUID(),side:'sell'})).status,200);
  r.reopen();assert.equal((await r.call('citizen','alice',buy)).status,200);
- assert.equal((await r.call('citizen','alice')).data.economy.walletMinor,750);
+ assert.equal((await r.call('citizen','alice')).data.economy.walletMinor,630);
  assert.deepEqual(await total(),before);
  const denied=await r.call('citizen','alice',{...buy,requestId:randomUUID(),quantity:1.5});assert.equal(denied.status,400);assert.deepEqual(await total(),before);
 });

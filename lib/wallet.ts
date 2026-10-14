@@ -24,7 +24,7 @@ export const walletHistoryLimit = 25;
 // Every row that changes citizen_wallet_balances appears here, so the list
 // always reconciles with the server balance. Every market purchase is listed, including
 // food bought for meals; eating stored food moves no SPK (wallet_delta = 0) and adds no row.
-// Within the same second a wage sorts as older, since spending follows earning.
+// Within the same second a wage sorts as older (and its income tax just above it), since spending follows earning.
 export const walletHistorySql = `SELECT id, kind, amount_minor, item, quantity, occurred_at FROM (
   SELECT 'wage:' || s.shift_id AS id, 'wage' AS kind, s.wage_minor AS amount_minor, w.order_name AS item, s.quantity AS quantity,
     CAST(strftime('%s', s.settled_at) AS INTEGER) AS occurred_at
@@ -40,7 +40,7 @@ export const walletHistorySql = `SELECT id, kind, amount_minor, item, quantity, 
   SELECT 'fill-buy:' || request_id, 'citizen-buy', -amount_minor, item, quantity, filled_at FROM player_fills WHERE buyer_id = ?
   UNION ALL
   SELECT 'fill-sale:' || request_id, 'citizen-sale', amount_minor, item, quantity, filled_at FROM player_fills WHERE seller_id = ?
-) ORDER BY occurred_at DESC, CASE kind WHEN 'wage' THEN 1 ELSE 0 END, id DESC LIMIT ${walletHistoryLimit}`;
+) ORDER BY occurred_at DESC, CASE kind WHEN 'wage' THEN 2 WHEN 'income-tax' THEN 1 ELSE 0 END, id DESC LIMIT ${walletHistoryLimit}`;
 
 export type WalletHistoryRow = { id: string; kind: WalletTransaction['kind']; amount_minor: number; item: string | null; quantity: number | null; occurred_at: number | null };
 
@@ -76,8 +76,10 @@ export function formatMinor(minor: number, signed = false): string {
   return minor < 0 ? `−${text}` : signed && minor > 0 ? `+${text}` : text;
 }
 
+/** Within one second spending sorts newest, then the income tax, then the wage it was withheld from (#86). */
+const settleRank = (kind: WalletHistoryRow['kind']) => kind === 'wage' ? 2 : kind === 'income-tax' ? 1 : 0;
 /** Same order as walletHistorySql (newest first; within a second a wage sorts older), independent of JSON aggregation order. */
 export function sortHistory(rows: WalletHistoryRow[]): WalletHistoryRow[] {
   return [...rows].sort((a, b) => (b.occurred_at ?? 0) - (a.occurred_at ?? 0)
-    || Number(a.kind === 'wage') - Number(b.kind === 'wage') || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+    || settleRank(a.kind) - settleRank(b.kind) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
 }

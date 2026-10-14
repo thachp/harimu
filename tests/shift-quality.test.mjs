@@ -56,7 +56,7 @@ test('server grades, stores grade + multiplier with the shift, pays it, and show
   assert.equal(shift.qualityPending, undefined, 'claim() reads after completion');
   assert.equal(start.data.shifts[0].qualityPending, true);
   for (const hidden of ['qualityGrade', 'qualityMultiplierPct', 'wageMinor', 'rewardQuantity']) assert.equal(start.data.shifts[0][hidden], undefined, hidden + ' hidden while running');
-  assert.equal(done.status, 200); assert.equal(done.data.economy.walletMinor, 1200);
+  assert.equal(done.status, 200); assert.equal(done.data.economy.walletMinor, 1020) // #86: 15% income tax;
   const recorded = done.data.shifts.find(s => s.id === shift.id);
   assert.ok(recorded.claimedAt); assert.equal(recorded.qualityGrade, 'excellent'); assert.equal(recorded.qualityMultiplierPct, 150);
   const row = await r.db.prepare('SELECT grade,multiplier_pct,correct FROM shift_quality WHERE shift_id=?').bind(shift.id).first();
@@ -66,7 +66,7 @@ test('skipping (or an old client sending no quality) keeps the current base rewa
   const r = await localRuntime(); t.after(() => r.close());
   const skipped = await claim(r, 'alice', { quality: { skip: true } });
   assert.equal(skipped.shift.wageMinor, 800); assert.equal(skipped.shift.qualityGrade, null); assert.equal(skipped.shift.qualityMultiplierPct, 100);
-  assert.equal(skipped.done.data.economy.walletMinor, 800);
+  assert.equal(skipped.done.data.economy.walletMinor, 680);
   const legacy = await claim(r, 'bob', {});
   assert.equal(legacy.shift.wageMinor, 800); assert.equal(legacy.shift.qualityMultiplierPct, 100);
 });
@@ -124,7 +124,7 @@ test('grade is locked at shift start: a second submit or retry cannot change it'
   assert.deepEqual(rows, [{ shift_id: id, grade: 'poor', multiplier_pct: 100 }]);
   r.setNow(Date.parse(first.data.shifts[0].completesAt));
   const done = await r.call('citizen', 'alice', { action: 'claim-work', shiftId: id });
-  assert.equal(done.data.shifts.find(s => s.id === id).qualityGrade, 'poor'); assert.equal(done.data.economy.walletMinor, 800);
+  assert.equal(done.data.shifts.find(s => s.id === id).qualityGrade, 'poor'); assert.equal(done.data.economy.walletMinor, 680);
 });
 
 test('#252 the key varies per shift and is stable for the same shift', async () => {
@@ -159,5 +159,5 @@ test('#252 without the server secret the step fails closed: no ticket, no graded
   assert.equal((await r.call('citizen', 'alice', { action: 'quality-ticket', workOrderId: 'harvest' })).status, 503);
   assert.equal((await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'harvest', quality })).status, 503);
   assert.equal((await r.call('citizen', 'alice', { action: 'quality-ticket', workOrderId: 'freight' })).status, 404);
-  const skipped = await claim(r, 'alice', { quality: { skip: true } }); assert.equal(skipped.done.data.economy.walletMinor, 800);
+  const skipped = await claim(r, 'alice', { quality: { skip: true } }); assert.equal(skipped.done.data.economy.walletMinor, 680);
 });
