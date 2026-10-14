@@ -1,5 +1,5 @@
 import type { GameDatabase } from './database-contract';
-import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
+import { isMissingRelation, tolerate } from './db-errors';
 import { presidiumConfig, presidiumSeats, resolveSession, seat, sessionReady, unrestSustainedSeconds, type Seat, type SeatId } from './korund-presidium-rules';
 export * from './korund-presidium-rules';
 
