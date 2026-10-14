@@ -6,6 +6,12 @@
   // Pinned to the installed workerd runtime; advance after upgrading/testing Wrangler.
   "compatibility_date": "2026-05-22",
   "compatibility_flags": ["nodejs_compat"],
+  "placement": { "region": "gcp:us-central1" },
+  // Prepared preview connection; runtime PostgreSQL activation remains disabled.
+  "hyperdrive": [{
+    "binding": "HYPERDRIVE",
+    "id": "a1f662c88f3b485190c402d9548ae360"
+  }],
   "workers_dev": true,
   "preview_urls": true,
   "vars": {
