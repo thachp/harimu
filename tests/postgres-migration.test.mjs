@@ -6,6 +6,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {localRuntime} from './helpers/local-runtime.mjs';
 import {snapshotSqlite,snapshotManifest,orderedSchema,replayJournalSqlite,importSnapshot} from '../scripts/postgres-migration.mjs';
 import {postgresSql} from '../lib/postgres/sql.ts';
+import {repoTables} from '../scripts/postgres-migrations.mjs';
 import {assertPostgresApplicationRole,selectStorageBackend} from '../lib/storage-selection.ts';
 const identifier=name=>`"${name}"`;
 test('SQL literals and values stay separate; unsupported dialects fail closed',()=>{
@@ -20,7 +21,7 @@ test('storage activation requires preview, explicit cutover readiness and config
  assertPostgresApplicationRole({canCreateSchema:1,canChangeMarker:1,superuser:0},true);assert.throws(()=>assertPostgresApplicationRole({canCreateSchema:1,canChangeMarker:1,superuser:1},true));assertPostgresApplicationRole({canCreateSchema:0,canChangeMarker:0,superuser:0});for(const flag of ['canCreateSchema','canChangeMarker','superuser'])assert.throws(()=>assertPostgresApplicationRole({canCreateSchema:0,canChangeMarker:0,superuser:0,[flag]:1}));
 });
 test('a PostgreSQL fixture preserves its snapshot and journal restores subsequent writes to SQLite exactly once',async t=>{
-  const r=await localRuntime({backend:'postgres'});t.after(()=>r.close());assert.equal(r.postgresSnapshot.schema.filter(s=>s.type==='table').length,64); // +korund_coupon_redemptions (#41), +world_squares (#66), +nation_stability (#69), +shift_quality (#40)
+ const r=await localRuntime({backend:'postgres'});t.after(()=>r.close());const pgTables=r.postgresSnapshot.schema.filter(s=>s.type==='table').map(s=>s.name).sort();assert.deepEqual(pgTables,repoTables());assert.ok(pgTables.includes('nation_stability_scores'));assert.ok(pgTables.includes('shift_quality'));assert.equal(pgTables.length,64); // #119: derived from drizzle/ + db/postgres/ (incl. 0012 nation_stability #69, 0013 shift_quality #40)
  const source=new DatabaseSync(':memory:');t.after(()=>source.close());
  for(const entry of orderedSchema(r.postgresSnapshot))source.exec(entry.sql);
  for(const entry of orderedSchema(r.postgresSnapshot).filter(s=>s.type==='table'))for(const row of r.postgresSnapshot.data[entry.name]){const keys=Object.keys(row);source.prepare(`INSERT INTO ${identifier(entry.name)} (${keys.map(identifier).join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...keys.map(key=>row[key]));}
