@@ -1,6 +1,6 @@
 'use client';
 import {createContext,useContext,useEffect,useState,type ReactNode} from 'react';
-import {defaultDisplayPreferences,displayPreferences,displayTimestamp,type DisplayPreferences} from '../lib/display-preferences';
+import {defaultDisplayPreferences,displayPreferences,displayTimestamp,effectiveReducedMotion,type DisplayPreferences} from '../lib/display-preferences';
 const key='harimu:display-preferences:v1';
 const context=createContext<{preferences:DisplayPreferences;save:(value:DisplayPreferences)=>void;storageAvailable:boolean}>({preferences:defaultDisplayPreferences,save:()=>{},storageAvailable:true});
 export function DisplayPreferencesProvider({children}:{children:ReactNode}){
@@ -14,7 +14,13 @@ export function useDisplayTimestamp(){const {preferences}=useDisplayPreferences(
 
 function MotionPreference(){
  const {preferences}=useDisplayPreferences();
- useEffect(()=>{document.documentElement.dataset.harimuMotion=preferences.motion??'system';return()=>{delete document.documentElement.dataset.harimuMotion;};},[preferences.motion]);
+ useEffect(()=>{
+  const root=document.documentElement;root.dataset.harimuMotion=preferences.motion??'system';
+  const query=typeof window.matchMedia==='function'?window.matchMedia('(prefers-reduced-motion: reduce)'):null;
+  const apply=()=>{if(effectiveReducedMotion(preferences.motion,Boolean(query?.matches)))root.dataset.harimuReducedMotion='';else delete root.dataset.harimuReducedMotion;};
+  apply();query?.addEventListener?.('change',apply);
+  return()=>{query?.removeEventListener?.('change',apply);delete root.dataset.harimuMotion;delete root.dataset.harimuReducedMotion;};
+ },[preferences.motion]);
  return null;
 }
 
