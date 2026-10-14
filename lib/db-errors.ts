@@ -5,4 +5,4 @@ export const isMissingRelation = (error: unknown) => /no such table|does not exi
 /** A unique-constraint collision (SQLite "UNIQUE constraint failed", Postgres 23505): a concurrent identical write. */
 export const isUniqueViolation = (error: unknown) => /UNIQUE constraint|23505|duplicate key/i.test(describe(error));
 /** `.catch(tolerate(isMissingRelation, fallback))`: swallow only the matching error, rethrow everything else. */
-export const tolerate = <T>(matches: (error: unknown) => boolean, fallback: T) => (error: unknown): T => { if (matches(error)) return fallback; throw error; };
+export function tolerate<T>(matches: (error: unknown) => boolean, fallback: T) { return (error: unknown): T => { if (matches(error)) return fallback; throw error; }; }
