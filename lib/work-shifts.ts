@@ -65,7 +65,7 @@ export async function readShifts(database: GameDatabase, userId: string): Promis
       started_at: string; completes_at: string; claimed_at: string | null;
       wage_minor: number | null; item: string | null; quantity: number | null; grade: string | null; multiplier_pct: number | null;
     }>();
-  return rows.results.map((row) => ({
+  return rows.results.map((row): WorkShift => ({
     id: row.id, workOrderId: row.work_order_id, orderName: row.order_name, output: row.output,
     capacitySpent: row.capacity_spent, startedAt: row.started_at,
     completesAt: row.completes_at, claimedAt: row.claimed_at,
