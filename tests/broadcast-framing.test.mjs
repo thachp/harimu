@@ -44,3 +44,7 @@ test('each nation keeps its own voice', () => {
   assert.doesNotMatch(t('korund'),/Republic|Crown|Monarch/);
   assert.match(t('aurelle'),/Sky Throne/); assert.match(t('aurelle'),/royal archive/); assert.doesNotMatch(t('aurelle'),/State Media|Republic/);
 });
+test('Presidium venue is the Stonehearth Cities-table landmark (ARC #256)', () => {
+  const p=broadcastFraming('korund:presidium-announcement').intro.join(' ');
+  assert.match(p,/Mountain Hall in Stonehearth/); assert.doesNotMatch(p,/Presidium Hall/);
+});
