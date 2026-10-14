@@ -55,6 +55,6 @@ test('Notable launcher mounts in the actual City branch rather than another loca
  const visit=node=>{if(ts.isJsxSelfClosingElement(node)&&node.tagName.getText(tree)==='NotableControl')mounts.push(node);ts.forEachChild(node,visit);};visit(tree);assert.equal(mounts.length,1);let parent=mounts[0].parent;while(parent&&!ts.isConditionalExpression(parent))parent=parent.parent;assert.ok(parent);assert.equal(parent.condition.getText(tree),"viewMode==='square'");
 });
 
-test('fulfilled invalid Notable response remains charged but is a known failure rather than transport uncertainty',async t=>{
- const r=await localRuntime();t.after(()=>r.close());const result=await r.answerNotable('alice',command(),{async run(){return {response:42};}},options(r));assert.equal(result.status,503);assert.equal(result.reply,undefined);const row=await r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations').first();assert.equal(row.reserved_micro,72400);assert.equal(row.status,'finished');
+test('fulfilled invalid Notable response settles to the answered call cost (#141) and is a known failure rather than transport uncertainty',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const result=await r.answerNotable('alice',command(),{async run(){return {response:42};}},options(r));assert.equal(result.status,503);assert.equal(result.reply,undefined);const row=await r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations').first();assert.equal(row.reserved_micro,4200);assert.equal(row.status,'finished');
 });

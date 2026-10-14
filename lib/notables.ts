@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import {publicNewsFacts,validatedNewsDraft,newsDraftText,inferenceText,newsDraftResponseFormat,newsVerificationResponseFormat,supportedNewsDraft,type NewsAiBinding} from './ai-news';
-import {reserveAiSequence,releaseAiReservation,markAiReservationSent,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
+import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,meteredAiCost,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 import {readNationalNews} from './national-news';
 import {notableProfile,notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 export {notableProfile,notableTopics,notableDailyLimit,validNotableCommand} from './notable-profiles';
@@ -18,15 +18,16 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
  if(await db.prepare('SELECT request_id FROM harimu_ai_reservations WHERE request_id=?').bind(id).first())return fail(409,'This request was already attempted. Repeating it makes no further inference call.');
  const news=await readNationalNews(db,citizen!.nation_id,now*1000);if(!news)return fail(503,'Public context is unavailable.');const facts=publicNewsFacts(news);
  if(!await reserveAiSequence(db,id,now,budget,{ownerPrefix:prefix,dailyLimit:notableDailyLimit},command.question!==undefined))return fail(429,'The equal daily limit or shared inference budget is unavailable.');
- let uncertain=false,reached=false,failureCode='validation'; // #92: reached = a request was handed to the gateway
+ const answered:AiModel[]=[];let uncertain=false,reached=false,failureCode='validation'; // #92: reached = a request was handed to the gateway
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error();
   let timer:ReturnType<typeof setTimeout>|undefined;let result:unknown;if(!reached){reached=true;await markAiReservationSent(db,id);}
   try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},aiGatewayOptions(budget)),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error()),30000);})]);}
   catch(error){uncertain=true;failureCode=error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain';throw Error();}
   finally{if(timer!==undefined)clearTimeout(timer);}
+  answered.push(model); // #141: the gateway answered, so this call is metered
   // A fulfilled provider call is terminal even when its content is invalid.
-  // Validation failure publishes nothing and never refunds the reservation.
+  // Validation failure publishes nothing and settles to the metered cost of the answered calls (#141).
   return inferenceText(result,Boolean(json));
  };
  try{
@@ -38,5 +39,5 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
   const safe=await call('@cf/meta/llama-guard-3-8b',[{role:'user',content:JSON.stringify(context)},{role:'assistant',content:JSON.stringify(draft)}]);if(safe.trim()!=='safe')throw Error();
   const current=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();if(current?.nation_id!==citizen!.nation_id)throw Error();
   await db.prepare("UPDATE harimu_ai_reservations SET status='finished' WHERE request_id=?").bind(id).run();return {status:200,reply:newsDraftText(draft,facts),source:'model' as const};
- }catch{if(!reached){await releaseAiReservation(db,id);return {...fail(503,'No response was published. No inference was sent, so nothing was charged.'),failureCode:'not-sent'};}await db.prepare('UPDATE harimu_ai_reservations SET status=? WHERE request_id=?').bind(uncertain?'uncertain':'finished',id).run();return {...fail(503,'No response was published. The attempted request remains charged; it will not be retried automatically.'),failureCode};}
+ }catch{if(!reached){await releaseAiReservation(db,id);return {...fail(503,'No response was published. No inference was sent, so nothing was charged.'),failureCode:'not-sent'};}if(uncertain)await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=?").bind(id).run();else await settleAiReservation(db,id,meteredAiCost(answered));return {...fail(503,'No response was published. The attempted calls remain charged; it will not be retried automatically.'),failureCode};}
 }
