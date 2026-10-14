@@ -10,6 +10,7 @@ import { pledge, readAurelleRising, validPledgeCommand } from '@/lib/aurelle-ris
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const enabled = () => (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true';
+const faithOn = () => (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true'; // #291
 const orderBook = () => (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true';
 
 // #71: Aurelle claimants, private pledges and the popular Rising. Off unless HARIMU_AURELLE_RISING_ENABLED=true.
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   if (!verification.countedActionsEligible) return privateJson({ error: `Only Tier-1 verified citizens can pledge. ${verification.reason}`, verification }, 403);
   const db = await getDatabase();
   const now = Math.floor(Date.now() / 1000);
-  await advanceWorld(db, undefined, { npcSupply: orderBook(), aurelleRising: true });
+  await advanceWorld(db, undefined, { npcSupply: orderBook(), aurelleRising: true, faithFestivals: faithOn() });
   await recordVerifiedHumanVisit(db, userId, now, { aurelleRising: true }); // flag checked above
   const result = await pledge(db, userId, { requestId: body.requestId.toLowerCase(), claimantId: body.claimantId }, now);
   const state = await readAurelleRising(db, userId, now, { tier1: true, reason: verification.reason }, true);
