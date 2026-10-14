@@ -140,10 +140,10 @@ const warn=t.mock.method(console,'warn',()=>{});
  assert.ok(warn.mock.callCount()>=1);
 });
 test('hotfix #95: only a missing-table error is swallowed',()=>{
- assert.equal(isMissingStabilityTable({code:'42P01',message:'x'}),true);
+ assert.equal(isMissingStabilityTable({code:'42P01',message:'x'}),false);
  assert.equal(isMissingStabilityTable(Error('relation "nation_stability_scores" does not exist')),true);
- assert.equal(isMissingStabilityTable(Error('no such table: nation_stability_scores')),true);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (42P01).')),true);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (23505).')),false);
- assert.equal(isMissingStabilityTable(Object.assign(Error('wrapped'),{cause:{code:'42P01'}})),true);
+ assert.equal(isMissingStabilityTable(Error('no such table: nation_stability_scores')),true);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (42P01).')),false);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (42P01): relation "nation_stability_scores" does not exist.')),true);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (23505).')),false);
+ assert.equal(isMissingStabilityTable(Object.assign(Error('wrapped'),{cause:{code:'42P01'}})),false);assert.equal(isMissingStabilityTable(Object.assign(Error('wrapped'),{cause:{code:'42P01',message:'relation "nation_stability_scores" does not exist'}})),true);
  for(const e of [Error('relation "citizens" does not exist'),{code:'23505',message:'duplicate key'},Error('connection reset'),null,'42P01'])assert.equal(isMissingStabilityTable(e),false);
 });
 test('#159 a tick whose score write failed is repaired on the next pass, without duplicates',async t=>{
@@ -163,5 +163,12 @@ test('#159 a named missing relation must be nation_stability_scores',()=>{
  assert.equal(isMissingStabilityTable({code:'42P01',message:'relation "public.nation_stability_scores" does not exist'}),true);
  assert.equal(isMissingStabilityTable({code:'42P01',message:'relation "nation_stability_scores_old" does not exist'}),false);
  assert.equal(isMissingStabilityTable(Error('no such table: world_ticks')),false);
- assert.equal(isMissingStabilityTable({code:'42P01'}),true,'no name to check: still treated as missing');
+ assert.equal(isMissingStabilityTable({code:'42P01'}),false,'#179: no name to check, so rethrow');
+});
+test('#179 a bare 42P01 is rethrown when the stability table exists; a named one is swallowed',async()=>{
+ const failing=error=>({prepare(){return{bind(){return this;},async first(){throw error;},async all(){throw error;},async run(){throw error;}};}});
+ await assert.rejects(readPublicStability(failing(Error('PostgreSQL operation failed (42P01).'))),/42P01/);
+ await assert.rejects(readPublicStability(failing({code:'42P01'})));
+ await assert.rejects(readPublicStability(failing(Error('PostgreSQL operation failed (42P01): relation "world_ticks" does not exist.'))),/world_ticks/);
+ assert.deepEqual(await readPublicStability(failing(Error('PostgreSQL operation failed (42P01): relation "nation_stability_scores" does not exist.'))),[]);
 });
