@@ -8,7 +8,11 @@ import { localRuntime } from './helpers/local-runtime.mjs';
 const buy = (r, user, x, y, requestId = randomUUID()) => r.call('world/registry', user, { action: 'buy-square', x, y, requestId });
 const square = (r, x, y) => r.db.prepare('SELECT owner,zone FROM world_squares WHERE x=? AND y=?').bind(x, y).first();
 const tessera = async (r, user) => (await r.call('world/registry', user)).data.tesseraMinor;
-async function runtime(t) { const r = await localRuntime(); t.after(() => r.close()); r.setSquarePurchase(true); return r; }
+// #210: Tessera now comes only from the Clearing House kiosk. Registry tests seed kiosk purchases directly (spark_minor = 4 per TSR minor);
+// the kiosk route itself is covered in tessera-exchange-210.test.mjs.
+const fund = (r, user, tesseraMinor) => r.db.prepare("INSERT INTO citizen_tessera_exchanges(request_id,clerk_user_id,nation_id,spark_minor,tessera_minor,occurred_at) VALUES (?,?,'kindle',?,?,0)")
+  .bind(randomUUID(), user, tesseraMinor * 4, tesseraMinor).run();
+async function runtime(t) { const r = await localRuntime(); t.after(() => r.close()); r.setSquarePurchase(true); await fund(r, 'alice', 5000); return r; }
 
 test('happy path: buys a Wildlands square next to the nation\'s land; owner, zone and Tessera update; double-submit is idempotent', async t => {
   const r = await runtime(t);
@@ -18,7 +22,7 @@ test('happy path: buys a Wildlands square next to the nation\'s land; owner, zon
   assert.deepEqual(first.data.square, { x: 9, y: 8, owner: 'kindle', zone: 'frontier' });
   assert.equal(first.data.priceMinor, 2500);
   assert.deepEqual({ ...(await square(r, 9, 8)) }, { owner: 'kindle', zone: 'frontier' });
-  assert.equal(await tessera(r, 'alice'), 2500, '50.00 TSR starter grant minus one 25.00 TSR square');
+  assert.equal(await tessera(r, 'alice'), 2500, '50.00 TSR bought at the kiosk minus one 25.00 TSR square');
   const replay = await buy(r, 'alice', 9, 8, requestId); assert.equal(replay.data.replay, true);
   assert.equal(await tessera(r, 'alice'), 2500, 'no second debit');
   assert.equal(Number((await r.db.prepare("SELECT COUNT(*) AS n FROM citizen_tessera_ledger WHERE reason='square-purchase'").first()).n), 1);
@@ -79,15 +83,15 @@ test('pure site check and shipped default', async t => {
   assert.deepEqual([...cfg.matchAll(/"HARIMU_SQUARE_PURCHASE_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
 });
 
-test('#205 (QA1 on #208): a rejected first purchase pays out no starter grant', async t => {
-  const r = await runtime(t);
+test('#210: the temporary starter grant is gone: a new citizen holds 0 TSR, cannot buy, and no grant row is ever written', async t => {
+  const r = await localRuntime(); t.after(() => r.close()); r.setSquarePurchase(true);
   const grants = async () => Number((await r.db.prepare("SELECT COUNT(*) AS n FROM citizen_tessera_ledger WHERE reason='starter-grant'").first()).n);
-  for (const [x, y] of [[0, 0], [5, 5], [12, 6]]) assert.notEqual((await buy(r, 'alice', x, y)).status, 200);
-  assert.equal(await grants(), 0, 'no grant row after rejections');
-  assert.equal(await tessera(r, 'alice'), 5000, 'the pending grant is still shown as spendable');
-  assert.equal((await r.call('citizen', 'alice')).data.economy.tesseraMinor, 0, 'the ledger holds nothing yet');
-  assert.equal((await buy(r, 'alice', 9, 8)).status, 200);
-  assert.equal(await grants(), 1); assert.equal(await tessera(r, 'alice'), 2500);
+  assert.equal(await tessera(r, 'alice'), 0, 'no pending grant is shown as spendable');
+  const broke = await buy(r, 'alice', 9, 8); assert.equal(broke.data.reason, 'insufficient_tessera'); assert.match(broke.data.error, /you hold 0\.00 TSR/);
+  assert.equal(await grants(), 0); assert.equal((await square(r, 9, 8)).owner, null);
+  await fund(r, 'alice', 2500); assert.equal((await buy(r, 'alice', 9, 8)).status, 200);
+  assert.equal(await grants(), 0, 'a successful purchase writes no grant either'); assert.equal(await tessera(r, 'alice'), 0);
+  const m = await r.importModule('lib/world-registry.ts'); assert.equal(m.TEMP_STARTER_GRANT, undefined);
 });
 
 test('#205 (QA1 on #208): two concurrent purchases that together overdraw the balance: exactly one succeeds', async t => {
