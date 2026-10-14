@@ -20,3 +20,10 @@ To re-verify: check Workers AI pricing, update the amounts if needed, bump the v
 - Create AI Gateway `harimu-preview` (account of the preview Worker). Enable logging.
 - Add a rate limit (suggested: 60 requests / 1 minute, sliding) and, if available, a spend alert near US$1/day.
 - Only then set `HARIMU_AI_NEWS_ENABLED` / `HARIMU_NOTABLES_ENABLED` to `true`.
+
+## Concurrency and outages
+- Reserving is one atomic conditional `INSERT ... SELECT`, followed by a committed re-check. If a racing writer under
+  READ COMMITTED pushed the day over the cap, the over-cap pending row is withdrawn before any inference (ties fail closed).
+  PostgreSQL writes also serialize on the adapter's transaction advisory lock.
+- A pending/uncertain reservation from an earlier UTC day blocks new reservations for `aiUncertainBlockTtlSeconds` (1h)
+  after it started. After that it stops blocking, but its full charge is never refunded and still counts for its day(s).

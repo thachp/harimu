@@ -35,12 +35,12 @@ test('disabled news makes no calls; publication is daily idempotent, moderated, 
  const article=await r.db.prepare('SELECT body,facts_json FROM ai_news_articles').first();assert.match(article.body,/2 registered citizens/);assert.doesNotMatch(article.facts_json,/private/);
  assert.equal((await r.db.prepare('SELECT SUM(reserved_micro) AS n FROM harimu_ai_reservations').first()).n,72400);
 });
-test('unsafe output and uncertain calls never publish; reservations remain charged and block uncertain rollover',async t=>{
+test('unsafe output and uncertain calls never publish; reservations remain charged; uncertain rollover blocks only within the TTL',async t=>{
  const r=await localRuntime();t.after(()=>r.close());let calls=0;const unsafe={async run(){return {response:[JSON.stringify(draft),'supported','unsafe'][calls++]};}};
  await prepareAiNews(r.db,news,now,unsafe,{enabled:true,budget:until});assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM ai_news_articles').first()).n,0);
  const other={...news,nationId:'korund'};const fail={async run(){throw Error('Provider detail must not leak.');}};await prepareAiNews(r.db,other,now,fail,{enabled:true,budget:until});
  assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM harimu_ai_reservations WHERE status='uncertain'").first()).n,1);
- assert.equal(await reserveAiCall(r.db,randomUUID(),model,now+86400,until),false);
+ assert.equal(await reserveAiCall(r.db,randomUUID(),model,now+86400,until),true);assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM harimu_ai_reservations WHERE status='uncertain'").first()).n,1);
  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM ai_news_articles').first()).n,0);
 });
 
@@ -103,4 +103,36 @@ test('#45: env budget config fails closed, can only lower the hard ceiling, and 
  await prepareAiNews(r2.db,news,now,{async run(_m,_i,o){options.push(o);return {response:'safe'};}},{enabled:true,budget:until});
  assert.ok(options.length>0);for(const o of options)assert.deepEqual(o,{gateway:{id:'harimu-test'}});
  let calls=0;const r3=await localRuntime();t.after(()=>r3.close());await prepareAiNews(r3.db,news,now,{async run(){calls++;}},{enabled:true,budget:null});assert.equal(calls,0);
+});
+const cfg=micro=>({dailyBudgetMicro:micro,gatewayId:'harimu-test'});
+test('#45 QA: concurrent reservations at the cap never exceed it, and an exact-fit reservation succeeds',async t=>{
+ const {readAiBudget}=await import('../lib/ai-budget.ts');const r=await localRuntime();t.after(()=>r.close());
+ const exact=cfg(4200*5);const results=await Promise.all(Array.from({length:25},()=>reserveAiCall(r.db,randomUUID(),model,now,exact)));
+ assert.equal(results.filter(Boolean).length,5);const b=await readAiBudget(r.db,now,exact);assert.equal(b.reservedMicroUsd,21000);assert.equal(b.remainingMicroUsd,0);
+ assert.equal(await reserveAiCall(r.db,randomUUID(),model,now,exact),false);assert.equal(await reserveAiCall(r.db,randomUUID(),model,now,cfg(21000+4199)),false);assert.equal(await reserveAiCall(r.db,randomUUID(),model,now,cfg(21000+4200)),true);
+});
+test('#45 QA: the committed re-check withdraws a reservation that a racing writer pushed over the cap',async t=>{
+ const {reserveAiCall:reserve}=await import('../lib/ai-budget.ts');const r=await localRuntime();t.after(()=>r.close());
+ // Simulate a READ COMMITTED race: a rival row commits between this insert and its re-check.
+ const day=new Date(now*1000).toISOString().slice(0,10),next=new Date((now+86400)*1000).toISOString().slice(0,10);let injected=false;
+ const racing={prepare(sql){const st=r.db.prepare(sql);return {bind:(...v)=>{const b=st.bind(...v);return {...b,run:async()=>{const out=await b.run();if(!injected&&/^INSERT OR IGNORE/.test(sql)){injected=true;await r.db.prepare("INSERT INTO harimu_ai_reservations VALUES ('rival',?,?,?,4200,?,'pending')").bind(day,next,model,now).run();}return out;},first:()=>b.first(),all:()=>b.all()};}};},batch:s=>r.db.batch(s)};
+ assert.equal(await reserve(racing,'mine',model,now,cfg(4200)),false);
+ assert.deepEqual((await r.db.prepare('SELECT request_id FROM harimu_ai_reservations').all()).results.map(x=>x.request_id),['rival']);
+});
+test('#45 QA: an uncertain reservation from an outage blocks only until its TTL, and its charge is kept',async t=>{
+ const {readAiBudget,aiUncertainBlockTtlSeconds}=await import('../lib/ai-budget.ts');const r=await localRuntime();t.after(()=>r.close());
+ const late=Date.parse('2026-10-14T23:50:00Z')/1000,c=cfg(970000);assert.equal(aiUncertainBlockTtlSeconds,3600);
+ assert.equal(await reserveAiCall(r.db,'outage',model,late,c),true);await r.db.prepare("UPDATE harimu_ai_reservations SET status='uncertain'").run();
+ assert.equal((await readAiBudget(r.db,late+1200,c)).blocked,true);assert.equal(await reserveAiCall(r.db,randomUUID(),model,late+1200,c),false);
+ assert.equal(await reserveAiCall(r.db,randomUUID(),model,late+3599,c),false);
+ const after=late+3600;const b=await readAiBudget(r.db,after,c);assert.equal(b.blocked,false);assert.equal(b.reservedMicroUsd,4200);
+ assert.equal(await reserveAiCall(r.db,randomUUID(),model,after,c),true);assert.equal((await r.db.prepare("SELECT status FROM harimu_ai_reservations WHERE request_id='outage'").first()).status,'uncertain');
+});
+test('#45 QA: invalid, missing or gateway-less settings make no reservation and no inference',async t=>{
+ const {aiBudgetConfig}=await import('../lib/ai-budget.ts');const r=await localRuntime();t.after(()=>r.close());
+ for(const env of [{},{HARIMU_AI_DAILY_BUDGET_MICRO:'970000'},{HARIMU_AI_DAILY_BUDGET_MICRO:'970000',HARIMU_AI_GATEWAY_ID:''},{HARIMU_AI_DAILY_BUDGET_MICRO:'',HARIMU_AI_GATEWAY_ID:'g'},{HARIMU_AI_DAILY_BUDGET_MICRO:'-1',HARIMU_AI_GATEWAY_ID:'g'},{HARIMU_AI_DAILY_BUDGET_MICRO:'12.5',HARIMU_AI_GATEWAY_ID:'g'},{HARIMU_AI_DAILY_BUDGET_MICRO:' 970000',HARIMU_AI_GATEWAY_ID:'g'},{HARIMU_AI_DAILY_BUDGET_MICRO:'abc',HARIMU_AI_GATEWAY_ID:'g'}])assert.equal(aiBudgetConfig(env,now),null);
+ assert.equal(aiBudgetConfig({HARIMU_AI_DAILY_BUDGET_MICRO:'970000',HARIMU_AI_GATEWAY_ID:'g'},now)?.dailyBudgetMicro,970000);
+ for(const bad of [null,undefined,{dailyBudgetMicro:970000},{dailyBudgetMicro:970000,gatewayId:''},{dailyBudgetMicro:0,gatewayId:'g'},{dailyBudgetMicro:1.5,gatewayId:'g'},now+3600])assert.equal(await reserveAiCall(r.db,randomUUID(),model,now,bad),false);
+ let calls=0;await prepareAiNews(r.db,news,now,{async run(){calls++;}},{enabled:true,budget:aiBudgetConfig({HARIMU_AI_DAILY_BUDGET_MICRO:'970000'},now)});assert.equal(calls,0);
+ assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM harimu_ai_reservations').first()).n,0);
 });
