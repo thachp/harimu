@@ -34,6 +34,7 @@
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "false",
     "HARIMU_AURELLE_RISING_ENABLED": "false",
+    "HARIMU_TRAVEL_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

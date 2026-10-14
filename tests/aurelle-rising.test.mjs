@@ -79,7 +79,7 @@ test(`#71 ${backend}: a Rising opens once at the thresholds, resolves exactly on
   const { r, at, pledge, unrest, risings, gazette } = await setup(t);
   const now = Math.floor(r.now / 1000);
   // Three verified Aurelle humans this week; one pledge meets ceil(3 × 15%) = 1.
-  await r.call('aurelle/rising', 'bob'); for (const u of ['bob', 'carol']) await (await r.importModule('lib/collective-petitions.ts')).recordVerifiedHumanVisit(r.db, u, now);
+  await r.call('aurelle/rising', 'bob'); for (const u of ['bob', 'carol']) await (await r.importModule('lib/collective-petitions.ts')).recordVerifiedHumanVisit(r.db, u, now, { aurelleRising: true });
   assert.equal((await pledge('alice', 'larkspire')).status, 200);
   await unrest(now - 47 * H, now, 70);
   await r.call('world', null);
@@ -135,6 +135,20 @@ test(`#71 ${backend}: a Rising fails when Stability holds; the crown stays; GET 
   await off.r.db.prepare("INSERT INTO aurelle_pledges (clerk_user_id,claimant_id,request_id,pledged_at,policy) VALUES ('alice','vaelcourt','x',1,'tier1-human-v1')").run();
   await off.unrest(n - 50 * H, n, 90); await off.r.call('world', null);
   assert.equal((await off.risings()).length, 0, 'flag off: world tick opens nothing');
+});
+
+test(`#71 ${backend}: flag off records no Aurelle visits (citizen POST or direct); Kindle visits unchanged`, async t => {
+  const { r } = await setup(t, false);
+  const now = Math.floor(r.now / 1000);
+  const visits = async () => (await r.db.prepare('SELECT clerk_user_id FROM civic_human_activity ORDER BY clerk_user_id').all()).results.map(x => x.clerk_user_id);
+  const before = await visits();
+  await r.call('citizen', 'alice', { action: 'korund-transfer-coupon', requestId: randomUUID(), coupon: 'clothing', to: 'bob' });
+  await r.call('aurelle/rising', 'alice', { action: 'aurelle-pledge', requestId: randomUUID(), claimantId: 'vaelcourt' });
+  const lib = await r.importModule('lib/collective-petitions.ts');
+  for (const u of ['alice', 'bob', 'carol']) await lib.recordVerifiedHumanVisit(r.db, u, now);
+  assert.deepEqual((await visits()).filter(u => ['alice', 'bob', 'carol', 'dave'].includes(u)), before.filter(u => ['alice', 'bob', 'carol', 'dave'].includes(u)), 'no Aurelle visit writes while the flag is off');
+  await lib.recordVerifiedHumanVisit(r.db, 'kim', now);
+  assert.ok((await visits()).includes('kim'), 'Kindle visits still recorded');
 });
 
 test('#71 migration 0023 matches the runtime schema, is additive, and passes the guard', async () => {

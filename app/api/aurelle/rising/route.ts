@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const db = await getDatabase();
   const now = Math.floor(Date.now() / 1000);
   await advanceWorld(db, undefined, { npcSupply: orderBook(), aurelleRising: true });
-  await recordVerifiedHumanVisit(db, userId, now);
+  await recordVerifiedHumanVisit(db, userId, now, { aurelleRising: true }); // flag checked above
   const result = await pledge(db, userId, { requestId: body.requestId.toLowerCase(), claimantId: body.claimantId }, now);
   const state = await readAurelleRising(db, userId, now, { tier1: true, reason: verification.reason }, true);
   return privateJson({ ...result, ok: result.status === 200, ...state }, result.status);
