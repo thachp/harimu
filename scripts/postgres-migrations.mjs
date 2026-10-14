@@ -21,7 +21,22 @@ export function createdTables(sql) { return [...new Set([...sql.matchAll(tablePa
 // Block any DROP (table, column, function, sequence, view, trigger, policy, ...), any RENAME,
 // TRUNCATE, DELETE FROM (even with WHERE: over-broad, fails closed) and column type changes.
 const destructivePattern = /\b(DROP\s+[A-Z]|RENAME\b|TRUNCATE\b|DELETE\s+FROM\b|ALTER\s+COLUMN\s+\S+\s+(SET\s+DATA\s+)?TYPE\b)/i;
-const stripComments = sql => sql.replace(/\/\*[\s\S]*?\*\//g, ' /*c*/ ').split('\n').map(line => line.replace(/--.*$/, '')).join('\n');
+// Comments outside quotes are removed; '…' string literals (with '' escapes) and "…" identifiers are kept verbatim,
+// so a `--` or `/*` inside a literal can't hide the SQL after it (QA1 nit on #255). Keeping literal text fails closed.
+export function stripComments(sql) {
+  let out = '', i = 0;
+  while (i < sql.length) {
+    const c = sql[i], next = sql[i + 1];
+    if (c === "'" || c === '"') {
+      let j = i + 1;
+      while (j < sql.length) { if (sql[j] === c) { if (sql[j + 1] === c) { j += 2; continue; } break; } j++; }
+      out += sql.slice(i, j + 1); i = j + 1;
+    } else if (c === '-' && next === '-') { const end = sql.indexOf('\n', i); i = end === -1 ? sql.length : end; }
+    else if (c === '/' && next === '*') { const end = sql.indexOf('*/', i + 2); out += ' /*c*/ '; i = end === -1 ? sql.length : end + 2; }
+    else { out += c; i++; }
+  }
+  return out;
+}
 export function isDestructive(sql) { return destructivePattern.test(stripComments(sql)); }
 // #236: the runner wraps each migration in its own transaction. A file must not open, end or roll back a
 // transaction itself (that could record a half-applied migration), and CONCURRENTLY can't run inside one.
