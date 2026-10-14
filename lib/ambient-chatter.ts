@@ -77,13 +77,13 @@ const raw:readonly Raw[]=[
  {id:'aurelle-17',nation:'aurelle',text:'Windmill bread and highland lamb. A good supper.'},
  {id:'aurelle-18',nation:'aurelle',text:"Heir's Naming will fill the gorge with lanterns."},
  {id:'aurelle-19',nation:'aurelle',text:'Wear no higher than your rank. The guards notice.'},
- {id:'aurelle-20',nation:'aurelle',text:'The court hears petitions at dawn. Bring patience.'},
+ {id:'aurelle-20',nation:'aurelle',text:'New Crowns are stamped with the reigning Monarch. Check yours.'},
 ];
 
 const CONTEXT:Readonly<Record<string,ChatterContext>>={
  'kindle-02':'festival:Ballot Night','kindle-12':'day','kindle-20':'day',
  'korund-05':'festival:Plan Day','korund-09':'day','korund-11':'festival:Quota Rally','korund-16':'night','korund-19':'day',
- 'aurelle-01':'night','aurelle-05':'festival:Hearth Night','aurelle-09':'festival:Charter Fair','aurelle-17':'night','aurelle-18':'festival:Heir\'s Naming','aurelle-20':'day',
+ 'aurelle-01':'night','aurelle-05':'festival:Hearth Night','aurelle-09':'festival:Charter Fair','aurelle-17':'night','aurelle-18':'festival:Heir\'s Naming',
 };
 
 export const ambientChatterLines:readonly ChatterLine[]=raw.map(l=>({...l,...(CONTEXT[l.id]?{context:CONTEXT[l.id]}:{}),aiText:true,provenance:'deterministic',proposal:true}));
