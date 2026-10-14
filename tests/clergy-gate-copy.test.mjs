@@ -1,26 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { clergyGateHelp, CLERGY_GATE_LABEL_MAX, CLERGY_GATE_BODY_MAX, CLERGY_GATE_DEVOTION, CLERGY_GATE_TIER } from '../lib/clergy-gate-copy.ts';
-import { devotionTierCopy, devotionTier } from '../lib/faith-copy.ts';
+import { clergyGateHelp, CLERGY_GATE_LABEL_MAX, CLERGY_GATE_BODY_MAX } from '../lib/clergy-gate-copy.ts';
 
 test('shape and length', () => {
   assert.deepEqual(Object.keys(clergyGateHelp).sort(),['label','line','proposal']);
   assert.equal(clergyGateHelp.proposal,true);
   assert.ok(clergyGateHelp.label.length<=CLERGY_GATE_LABEL_MAX); assert.ok(clergyGateHelp.line.length<=CLERGY_GATE_BODY_MAX);
 });
-test('the only figure is ARC\'s 50 (#261), stated once', () => {
-  assert.equal(CLERGY_GATE_DEVOTION,50);
+test('number-free and tier-free: docs §14.4 give no cutoff and #286 sets no minimum (ARC #297)', () => {
   const t=`${clergyGateHelp.label} ${clergyGateHelp.line}`;
-  assert.deepEqual(t.match(/\d+/g),['50']);
-  assert.doesNotMatch(t,/%|percent|\b(one|two|three|four|five|ten|hundred|half)\b/i);
+  assert.doesNotMatch(t,/\d|%|percent|threshold|\b(one|two|three|four|five|ten|fifty|hundred|half)\b/i);
+  assert.doesNotMatch(t,/\b(Newcomer|Member tier|Devoted|Pillar|tier)\b/);
+  assert.match(t,/Officiant seat/);
 });
-test('consistent with the shared tiers: 50 starts Devoted; all tier names canon', () => {
-  assert.equal(devotionTier(CLERGY_GATE_DEVOTION).label,CLERGY_GATE_TIER);
-  assert.equal(devotionTierCopy.find(t=>t.label===CLERGY_GATE_TIER).min,CLERGY_GATE_DEVOTION);
-  assert.equal(devotionTier(CLERGY_GATE_DEVOTION-1).label,'Member');
-  assert.match(clergyGateHelp.line,new RegExp(`\\b${CLERGY_GATE_TIER}\\b`));
-  for (const n of ['Newcomer','Member','Devoted','Pillar']) assert.ok(devotionTierCopy.some(t=>t.label===n));
+test('module has no imports', () => {
+  assert.doesNotMatch(readFileSync('lib/clergy-gate-copy.ts','utf8'),/^\s*(import|export .* from)\b/m);
 });
 test('faith-neutral, social only, no real-world references', () => {
   const t=`${clergyGateHelp.label} ${clergyGateHelp.line}`;
