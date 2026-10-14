@@ -73,3 +73,32 @@ export function replayJournalSqlite(db,entries){
   }db.exec('COMMIT');
  }catch(error){db.exec('ROLLBACK');throw error;}
 }
+
+/** Operator-only rollback transport. D1 must remain frozen throughout replay.
+ * Each journal group and its receipt commit together through native D1.batch.
+ * Never expose this operation as an application route.
+ */
+export async function replayJournalD1(db,entries,{maintenanceConfirmed=false}={}){
+ if(!maintenanceConfirmed)throw Error('D1 rollback requires confirmed maintenance.');
+ let previous=0;
+ const groups=entries.map(entry=>{
+  const id=Number(entry.id);if(!Number.isSafeInteger(id)||id<=previous)throw Error('Invalid journal ordering.');previous=id;
+  const statements=JSON.parse(entry.statements_json);
+  if(!Array.isArray(statements)||!statements.length)throw Error('Invalid write journal.');
+  for(const statement of statements){
+   if(typeof statement.sql!=='string'||!Array.isArray(statement.values)||!/^\s*(INSERT|UPDATE|DELETE)\b/i.test(statement.sql)||sqlTokens(statement.sql).some(token=>token===';'||token.startsWith('--')||token.startsWith('/*'))||/\b(civic_voter_receipts|civic_anonymous_ballots)\b/i.test(statement.sql))throw Error('Invalid rollback statement.');
+  }
+  return {id,statements,sha256:createHash('sha256').update(entry.statements_json).digest('hex')};
+ });
+ await db.prepare('CREATE TABLE IF NOT EXISTS harimu_rollback_journal_receipts(id INTEGER PRIMARY KEY,sha256 TEXT NOT NULL)').run();
+ let applied=0,skipped=0;
+ for(const group of groups){
+  const prior=await db.prepare('SELECT sha256 FROM harimu_rollback_journal_receipts WHERE id=?').bind(group.id).first();
+  if(prior){if(prior.sha256!==group.sha256)throw Error('Journal identifier content changed.');skipped++;continue;}
+  const latest=await db.prepare('SELECT MAX(id) AS id FROM harimu_rollback_journal_receipts').first();
+  if(latest?.id>=group.id)throw Error('Invalid journal ordering.');
+  const statements=[db.prepare('UPDATE harimu_rollback_journal_receipts SET sha256=sha256 WHERE id=-1'),...group.statements.map(statement=>db.prepare(statement.sql).bind(...statement.values)),db.prepare('INSERT INTO harimu_rollback_journal_receipts VALUES (?,?)').bind(group.id,group.sha256)];
+  const results=await db.batch(statements);if(results.some(result=>!result.success))throw Error('D1 rollback group failed.');applied++;
+ }
+ return {applied,skipped};
+}

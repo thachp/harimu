@@ -27,13 +27,13 @@ class Statement implements DatabaseStatement{
  * No query caching/read replica may sit in front of authoritative gameplay reads.
  */
 export class PostgresDatabase implements GameDatabase{
- constructor(private readonly connect:()=>Promise<QueryConnection>,private readonly options:{allowBallotFixtureWrites?:boolean;journalUntilSeconds?:number}={}){ }
+ constructor(private readonly connect:()=>Promise<QueryConnection>,private readonly options:{allowBallotFixtureWrites?:boolean;journalRetentionApproved?:boolean}={}){ }
  prepare(sql:string){return new Statement(this,sql);}
  async batch(statements:DatabaseStatement[]){if(statements.some(s=>!(s instanceof Statement)||s.owner!==this))throw Error('Foreign database statement.');return this.execute(statements as Statement[],true);}
  async execute(statements:Statement[],transaction:boolean){
   const ballot=statements.some(statement=>targetsBallot(statement.sql));
   if(ballot&&!this.options.allowBallotFixtureWrites)throw Error('Ballot transitions remain disabled pending privacy review.');
-  if(transaction&&(!Number.isSafeInteger(this.options.journalUntilSeconds)||this.options.journalUntilSeconds!<=Math.floor(Date.now()/1000)))throw Error('Rollback journal window is not configured or has ended.');
+  if(transaction&&this.options.journalRetentionApproved!==true)throw Error('Rollback journal retention is not approved.');
   let connection:QueryConnection;try{connection=await this.connect();}catch{throw Error('PostgreSQL connection unavailable.');}let begun=false;const results:DatabaseResult[]=[];let changes=0;
   try{
    await connection.query(transaction?'BEGIN':'BEGIN READ ONLY');begun=true;await connection.query('SET LOCAL search_path TO public,pg_catalog');await connection.query("SET LOCAL TIME ZONE 'UTC'");
