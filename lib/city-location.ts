@@ -1,5 +1,5 @@
 import type {GameDatabase} from './database-contract';
-import {notableProfiles} from './notable-profiles';
+import {nationNotables} from './notable-choice';
 import { capitalCityForNation, citiesForNation, cityForNation } from './cities';
 export const cityLocationSchema=`CREATE TABLE IF NOT EXISTS citizen_city_locations (
  user_id TEXT PRIMARY KEY REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
@@ -29,12 +29,12 @@ export async function cityPresence(db:GameDatabase,nationId:string,now:number){
 /** #75: who else lives in this city. Humans appear once they have a city location row, i.e. after opening the city screen (GET /api/city). Public fields only: no user ids, wallets or coordinates. */
 export type CoResident={key:string;name:string;nationId:string;kind:'human'|'ai';status:'working'|'idle';you:boolean};
 export const coResidentHumanLimit=12,coResidentAiSample=3;
-// Live Notables only (notableProfiles); #148's roster is inactive and excluded.
-const aiCast:Record<string,readonly {id:string;name:string}[]>=Object.fromEntries(Object.entries(notableProfiles).map(([nation,profile])=>[nation,[profile]]));
+// #165: the AI cast is the nation's full Notable list (primary + #148 roster, active since #151), sampled per city below.
+const aiCast=(nationId:string):readonly {id:string;name:string}[]=>nationNotables(nationId);
 const hash=(text:string)=>{let h=2166136261;for(const ch of text){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}return h;};
 /** Deterministic AI sample per city. AI working/idle is cosmetic: a hash that rotates hourly, not a simulation. */
-export function aiCoResidents(nationId:string,cityId:string,now:number):CoResident[]{
- const cast=[...(aiCast[nationId]??[])].sort((a,b)=>hash(cityId+a.id)-hash(cityId+b.id)).slice(0,coResidentAiSample);
+export function aiCoResidents(nationId:string,cityId:string,now:number,roster:readonly {id:string;name:string}[]=aiCast(nationId)):CoResident[]{
+ const cast=[...roster].sort((a,b)=>hash(cityId+a.id)-hash(cityId+b.id)).slice(0,coResidentAiSample);
  const hour=Math.floor(now/3600);
  return cast.map(ai=>({key:`ai:${ai.id}`,name:ai.name,nationId,kind:'ai',status:hash(`${ai.id}:${cityId}:${hour}`)%2?'working':'idle',you:false}));
 }

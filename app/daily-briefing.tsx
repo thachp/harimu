@@ -11,7 +11,7 @@ import { dailyPriority } from '@/lib/daily-briefing';
 
 const sparks = (minor: number) => `${(minor / 100).toFixed(2)} SPK`;
 
-export function DailyBriefing({ economy, shifts, capacity, market, government, citizenNationName,
+export function DailyBriefing({ economy, shifts, capacity, market, government, citizenNationName, nationId,
   localDemo, onRefresh, onOpenWork, onOpenMarket }: {
   economy: Economy | null;
   shifts: WorkShift[];
@@ -19,6 +19,7 @@ export function DailyBriefing({ economy, shifts, capacity, market, government, c
   market: MarketState | null;
   government: GovernmentSnapshot | null;
   citizenNationName: string;
+  nationId?: string;
   localDemo: boolean;
   onRefresh: () => void;
   onOpenWork: () => void;
@@ -39,7 +40,7 @@ export function DailyBriefing({ economy, shifts, capacity, market, government, c
   const activeShift = shifts.find((shift) => !shift.claimedAt);
   const mealFood = market?.mealFood ?? 2;
   const priority = dailyPriority({ now, capacity, food, mealFood, mealReadyAt: market?.mealReadyAt ?? null,
-    marketAvailable: !!market?.available && !!economy, activeShift });
+    marketAvailable: !!market?.available && !!economy, activeShift, nationId });
   const action = priority.action === 'work' ? onOpenWork : priority.action === 'market' ? onOpenMarket : onRefresh;
   const actionLabel = priority.action === 'work' ? 'Open work board' : priority.action === 'market' ? 'Open food market' : 'Refresh citizen';
 

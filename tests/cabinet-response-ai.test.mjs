@@ -82,3 +82,23 @@ test('#92 a Cabinet row is marked sent before the first call and still counts af
  assert.equal((await readAiBudget(r.db,later)).reservedMicroUsd,aiNewsSequenceReservation);
  unblock();await job;
 });
+test('#169 a Cabinet validation failure books only the answered calls; transport failure stays fully charged',async t=>{
+ const {aiModelReservations,aiNewsSequenceReservation}=await import('../lib/ai-budget.ts');const small=aiModelReservations['@cf/meta/llama-3.2-3b-instruct'],guard=aiModelReservations['@cf/meta/llama-guard-3-8b'];
+ const row=r=>r.db.prepare("SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id LIKE 'cabinet:%'").first();
+ for(const [outputs,micro] of [[[JSON.stringify({response:'bad'})],small],[[JSON.stringify({response:reply}),JSON.stringify({supported:false})],small*2],[[JSON.stringify({response:reply}),JSON.stringify({supported:true}),'unsafe\nS1'],small*2+guard],[[42],small]]){
+  const r=await localRuntime();t.after(()=>r.close());await reached(r);const ai=scripted(outputs);
+  assert.equal((await r.prepareAiCabinetResponse(ai,{enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}})).status,'failed');
+  assert.deepEqual({...await row(r)},{reserved_micro:micro,status:'finished'});assert.ok(micro<=aiNewsSequenceReservation);
+ }
+ const r=await localRuntime();t.after(()=>r.close());await reached(r);
+ assert.equal((await r.prepareAiCabinetResponse(scripted([JSON.stringify({response:reply}),Error('network')]),{enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}})).status,'failed');
+ assert.deepEqual({...await row(r)},{reserved_micro:aiNewsSequenceReservation,status:'uncertain'});
+});
+test('#169 settle is a no-op on a finished row and settles an open one',async t=>{
+ const {settleAiReservation}=await import('../lib/ai-budget.ts');const r=await localRuntime();t.after(()=>r.close());
+ const insert=(id,status)=>r.db.prepare("INSERT INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,'2026-10-14','2026-10-15','x',72400,1,?)").bind(id,status).run();
+ await insert('done','finished');await insert('open','uncertain');
+ await settleAiReservation(r.db,'done',4200);await settleAiReservation(r.db,'open',4200);
+ const get=id=>r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id=?').bind(id).first();
+ assert.deepEqual({...await get('done')},{reserved_micro:72400,status:'finished'});assert.deepEqual({...await get('open')},{reserved_micro:4200,status:'finished'});
+});

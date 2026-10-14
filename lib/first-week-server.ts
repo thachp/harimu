@@ -1,0 +1,75 @@
+/** #135: server-side first-week progress, per citizen, surviving reloads and devices.
+ * Guidance only: recording a goal never grants rewards or changes game state.
+ * - Client-recorded goals: POST {action:'first-week-complete', goalId, requestId}. Accepted only for a goal
+ *   in lib/first-week.ts for the citizen's nation, visible (its `requires` are built), on the current or an
+ *   earlier arc day. Idempotent.
+ * - Event-backed goals: derived from existing ledgers on read and latched into the table. */
+import type {GameDatabase} from './database-contract';
+import {firstWeekArcs,visibleGoals,type GoalRequirement,type WeekGoal} from './first-week';
+
+export const firstWeekGoalsSchema=`CREATE TABLE IF NOT EXISTS citizen_first_week_goals (clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,goal_id TEXT NOT NULL CHECK(length(goal_id) BETWEEN 1 AND 64),completed_at INTEGER NOT NULL,source TEXT NOT NULL CHECK(source IN ('client','ledger')),PRIMARY KEY(clerk_user_id,goal_id))`;
+/** Features built today (same as the client's visibleGoals() default). Add a requirement here when it ships. */
+export const firstWeekAvailable:readonly GoalRequirement[]=[];
+const daySec=86400;
+
+type Placed={goal:WeekGoal;day:number};
+function arcGoals(nationId:string):Placed[]{
+ const arc=firstWeekArcs.find(a=>a.nationId===nationId);
+ return arc?arc.days.flatMap(d=>visibleGoals(d,firstWeekAvailable).map(goal=>({goal,day:d.day}))):[];
+}
+/** Arc day (1-based) for a citizen enrolled at `enrolledAt` (ISO), or null if not parseable / in the future. */
+export function arcDay(enrolledAt:string,now:number):number|null{
+ const enrolled=Date.parse(enrolledAt);if(!Number.isFinite(enrolled)||now*1000<enrolled)return null;
+ return Math.floor((now*1000-enrolled)/(daySec*1000))+1;
+}
+export type GoalCheck={ok:true;day:number}|{ok:false;status:400|403;error:string};
+export function checkFirstWeekGoal(nationId:string|null,enrolledAt:string,goalId:unknown,now:number):GoalCheck{
+ if(typeof goalId!=='string'||!/^[a-z0-9-]{1,64}$/.test(goalId))return {ok:false,status:400,error:'Unknown first-week goal.'};
+ if(!nationId)return {ok:false,status:403,error:'Enroll in a nation first.'};
+ const all=firstWeekArcs.find(a=>a.nationId===nationId)?.days.flatMap(d=>d.goals.map(goal=>({goal,day:d.day})))??[];
+ const found=all.find(p=>p.goal.id===goalId);
+ if(!found)return {ok:false,status:400,error:'That goal is not part of your nation\u2019s first week.'};
+ if(!arcGoals(nationId).some(p=>p.goal.id===goalId))return {ok:false,status:403,error:'That goal is not available yet.'};
+ const day=arcDay(enrolledAt,now);
+ if(day===null||found.day>day)return {ok:false,status:403,error:'That goal unlocks on a later day of your first week.'};
+ return {ok:true,day:found.day};
+}
+export async function completeFirstWeekGoal(db:GameDatabase,userId:string,goalId:string,now:number){
+ await db.prepare(`INSERT INTO citizen_first_week_goals(clerk_user_id,goal_id,completed_at,source) SELECT clerk_user_id,?,?,'client' FROM citizens WHERE clerk_user_id=? ON CONFLICT(clerk_user_id,goal_id) DO NOTHING`).bind(goalId,now,userId).run();
+}
+
+/** Event-backed derivations: goal id pattern -> SQL counting matching ledger rows in [start,end) seconds. */
+const iso=(sec:number)=>new Date(sec*1000).toISOString();
+type Probe={match:(g:WeekGoal)=>boolean;sql:string;bind:(u:string,s:number,e:number)=>unknown[]};
+const probes:Probe[]=[
+ {match:g=>g.id==='kindle-6-shift',sql:`SELECT COUNT(*) AS n FROM work_shifts WHERE clerk_user_id=? AND claimed_at>=? AND claimed_at<? AND (lower(order_name) LIKE '%freight%' OR lower(order_name) LIKE '%archive%')`,bind:(u,s,e)=>[u,iso(s),iso(e)]},
+ {match:g=>/^kindle-\d-shift$/.test(g.id)&&/second/i.test(g.signal),sql:`SELECT CASE WHEN (SELECT COUNT(*) FROM work_shifts WHERE clerk_user_id=? AND claimed_at IS NOT NULL AND claimed_at<?)>=2 THEN (SELECT COUNT(*) FROM work_shifts WHERE clerk_user_id=? AND claimed_at>=? AND claimed_at<?) ELSE 0 END AS n`,bind:(u,s,e)=>[u,iso(e),u,iso(s),iso(e)]},
+ {match:g=>/^kindle-\d-shift$/.test(g.id),sql:`SELECT COUNT(*) AS n FROM work_shifts WHERE clerk_user_id=? AND claimed_at>=? AND claimed_at<?`,bind:(u,s,e)=>[u,iso(s),iso(e)]},
+ {match:g=>g.id==='kindle-2-sell',sql:`SELECT COUNT(*) AS n FROM citizen_economy_events WHERE clerk_user_id=? AND kind='sell' AND occurred_at>=? AND occurred_at<?`,bind:(u,s,e)=>[u,s,e]},
+ {match:g=>g.id==='kindle-4-meal',sql:`SELECT COUNT(*) AS n FROM citizen_economy_events WHERE clerk_user_id=? AND kind='meal' AND occurred_at>=? AND occurred_at<?`,bind:(u,s,e)=>[u,s,e]},
+ {match:g=>/-square$/.test(g.id),sql:`SELECT COUNT(*) AS n FROM square_messages WHERE user_id=? AND posted_at>=? AND posted_at<?`,bind:(u,s,e)=>[u,s,e]},
+ {match:g=>g.id==='kindle-5-ballot',sql:`SELECT COUNT(*) AS n FROM civic_voter_receipts WHERE clerk_user_id=? AND ballot_written=1 AND checked_at>=? AND checked_at<?`,bind:(u,s,e)=>[u,s,e]},
+ {match:g=>g.id==='kindle-6-trade',sql:`SELECT COUNT(*) AS n FROM player_fills WHERE (buyer_id=? OR seller_id=?) AND filled_at>=? AND filled_at<?`,bind:(u,s,e)=>[u,u,s,e]},
+ {match:g=>g.id==='korund-3-queue',sql:`SELECT COUNT(*) AS n FROM korund_ration_queue WHERE clerk_user_id=? AND joined_at>=? AND joined_at<?`,bind:(u,s,e)=>[u,s,e]},
+ {match:g=>/^korund-\d-coupons$/.test(g.id),sql:`SELECT COUNT(*) AS n FROM korund_coupon_redemptions WHERE clerk_user_id=? AND occurred_at>=? AND occurred_at<?`,bind:(u,s,e)=>[u,s,e]},
+];
+export const derivableGoal=(goal:WeekGoal)=>probes.some(p=>p.match(goal));
+
+/** Completed goal ids for the citizen: stored rows plus newly derived ledger goals (latched). */
+export async function readFirstWeekProgress(db:GameDatabase,userId:string,nationId:string|null,enrolledAt:string,now:number):Promise<{completed:string[]}>{
+ const stored=new Set((await db.prepare('SELECT goal_id FROM citizen_first_week_goals WHERE clerk_user_id=?').bind(userId).all<{goal_id:string}>()).results.map(r=>r.goal_id));
+ const today=nationId?arcDay(enrolledAt,now):null;const enrolled=Math.floor(Date.parse(enrolledAt)/1000);
+ if(nationId&&today!==null){
+  for(const {goal,day} of arcGoals(nationId)){
+   if(stored.has(goal.id)||day>today)continue;
+   const probe=probes.find(p=>p.match(goal));if(!probe)continue;
+   const start=enrolled+(day-1)*daySec,end=start+daySec;
+   const row=await db.prepare(probe.sql).bind(...probe.bind(userId,start,end)).first<{n:number}>();
+   if(Number(row?.n??0)>0){
+    await db.prepare(`INSERT INTO citizen_first_week_goals(clerk_user_id,goal_id,completed_at,source) VALUES (?,?,?,'ledger') ON CONFLICT(clerk_user_id,goal_id) DO NOTHING`).bind(userId,goal.id,now).run();
+    stored.add(goal.id);
+   }
+  }
+ }
+ return {completed:[...stored].sort()};
+}

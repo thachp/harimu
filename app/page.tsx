@@ -19,7 +19,7 @@ import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/gu
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { FirstWeekTracker } from './first-week-tracker';
-import { firstWeekTracker, newlyDone, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
+import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null): WeekDay | null => day && {...day, goals: visibleGoals(day)};
 import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
@@ -434,6 +434,7 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
+  firstWeek?: { completed: string[] } | null;
   profile: {
     nationId: string | null;
     displayName: string | null;
@@ -596,6 +597,7 @@ export default function Home() {
   const [guideNow, setGuideNow] = useState(0);
   // First-week progress (#134): STUB store in this browser until server-side tracking (#135).
   const [weekDone, setWeekDone] = useState<{key:string;ids:string[]}>({key:'',ids:[]});
+  const [serverWeekIds, setServerWeekIds] = useState<string[] | null>(null);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -753,8 +755,9 @@ export default function Home() {
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
   const weekStoreKey = citizenNationId && citizenshipStatus?.enrolledAt ? `${citizenNationId}:${citizenshipStatus.enrolledAt}` : '';
-  // Load the stub progress when the citizen key changes (adjust-state-during-render; the key only exists client-side after the session loads).
-  if (weekStoreKey && weekDone.key !== weekStoreKey) setWeekDone({key:weekStoreKey,ids:stubFirstWeekProgressStore().load(weekStoreKey)});
+  // Load progress when the citizen key changes (adjust-state-during-render). Signed-in citizens use server progress (#135); the local demo keeps the browser stub.
+  const weekProgressStore = clerkConfigured ? serverFirstWeekProgressStore(serverWeekIds) : stubFirstWeekProgressStore();
+  if (weekStoreKey && weekDone.key !== weekStoreKey) setWeekDone({key:weekStoreKey,ids:weekProgressStore.load(weekStoreKey)});
   const demoGovernmentSnapshot = useMemo(() => citizenNation ? simulateGovernment({
     nationId: citizenNation.id, availableBudgetMinor: 100000,
     foodSecurity: (economy?.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) >= 2 ? 100 : 0,
@@ -1171,6 +1174,7 @@ export default function Home() {
     if ('election' in snapshot)setElection(snapshot.election??null);
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
+    if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
     setDemoStarterGranted(snapshot.demoStarterGranted ?? false);
@@ -1481,12 +1485,12 @@ export default function Home() {
   const weekKey = citizenNation ? weekStoreKey : '';
   const weekDayInfo = weekKey && citizenNation ? visibleWeekDay(firstWeekDay({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,firstLoopActive:Boolean(firstLoop)})) : null;
   const weekDayStart = weekDayInfo ? Date.parse(citizenshipStatus?.enrolledAt ?? '') + (weekDayInfo.day - 1) * 86400000 : 0;
-  const weekStored = weekDone.key===weekKey ? weekDone.ids : [];
+  const weekStored = weekDone.key===weekKey ? [...new Set([...weekDone.ids, ...(clerkConfigured ? serverWeekIds ?? [] : [])])] : [];
   const weekTrack = !firstLoop && weekDayInfo ? firstWeekTracker({day:weekDayInfo,done:weekStored,signals:{shifts:[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])],dayStart:weekDayStart,
     mealReadyAt:citizenNation?.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation?.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt}}) : null;
   const weekNew = newlyDone(weekTrack, weekStored);
-  // Latch detected completions in the stub store (#135 replaces it with server progress).
-  if (weekNew.length) { const ids = [...weekStored, ...weekNew]; setWeekDone({key:weekKey,ids}); stubFirstWeekProgressStore().save(weekKey, ids); }
+  // Latch detected completions (server progress for signed-in citizens, #135).
+  if (weekNew.length) { const ids = [...weekStored, ...weekNew]; setWeekDone({key:weekKey,ids}); weekProgressStore.save(weekKey, ids); }
   const weekTracker = weekTrack && <FirstWeekTracker tracker={weekTrack} onNavigate={screen=>navigateGame(screen)} />;
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';

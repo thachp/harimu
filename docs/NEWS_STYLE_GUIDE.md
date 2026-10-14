@@ -1,6 +1,6 @@
 # News voice and style guide
 
-Issue #110. One page per nation covering tone, sample lines and banned moves for every news surface: national news items, Morning brief headlines, weekly addresses and (when enabled) AI-generated articles. Source material is the culture bible (thachp/harimu-docs#3, `content/world/culture-bible.mdx`) and the moderation content policy (GDD §21, `content/systems/moderation-safety.mdx`). Live editions today: Kindle Press, Korund State Media and the Aurelle Court Gazette (`lib/national-news.ts`). Outlet names for the other seven nations are **proposals** until those nations open.
+Issue #110. One page per nation covering tone, sample lines and banned moves for every news surface: national news items, Morning brief headlines, weekly addresses and (when enabled) AI-generated articles. Source material is the culture bible (thachp/harimu-docs#3, `content/world/culture-bible.mdx`) and the moderation content policy (GDD §21, `content/systems/moderation-safety.mdx`). Live editions today: Kindle Press, Korund State Media and the Aurelle Court Gazette (`lib/national-news.ts`). Content for the other seven nations lives in `lib/news-editions.ts` (issue #108) and is not yet wired into the feed; outlet names marked **proposal** until those nations open.
 
 ## Provenance labels
 
