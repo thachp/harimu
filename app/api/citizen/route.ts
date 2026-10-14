@@ -16,6 +16,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
+import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, init?: ResponseInit) => Response.json(data, { ...init, headers: { ...init?.headers, 'Cache-Control': 'private, no-store' } });
@@ -235,6 +236,15 @@ export async function POST(request: Request) {
       market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
+  // #138: preview-only QA nation switch for allowlisted accounts; 404 everywhere else.
+  if (body.action === 'qa-test-nation') {
+    if (!qaTestCitizenAllowed(env as never, userId)) return privateJson({ error: 'Not found.' }, { status: 404 });
+    const nationId = typeof body.nationId === 'string' ? body.nationId : '';
+    if (!(qaTestNations as readonly string[]).includes(nationId)) return privateJson({ error: 'Choose kindle, korund or aurelle.' }, { status: 400 });
+    const result = await database.prepare(qaTestNationSql).bind(nationId, now, userId).run();
+    if (!result.meta.changes) return privateJson({ error: 'Enroll in any nation first.' }, { status: 409 });
+    return privateJson({ ok: true, nationId, qa: true });
+  }
   if (body.action === 'enroll') {
     if (!validEnrollmentExpectation(body)) return privateJson({error:'Confirm the current citizenship with expectedNationId (a nation identifier or null for first enrollment).'}, {status:400});
     const nationId = typeof body.nationId === 'string' ? body.nationId : '';

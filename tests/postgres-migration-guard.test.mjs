@@ -113,7 +113,7 @@ test('preview workflow deploys only dev after CI, migrates first, secret names o
   assert.match(wf, /workflow_run:[\s\S]*workflows: \[CI\][\s\S]*branches: \[dev\]/);
   assert.match(wf, /conclusion == 'success'/);
   assert.match(wf, /head_branch == 'dev'/);
-  assert.match(wf, /cancel-in-progress: true/);
+  assert.match(wf, /cancel-in-progress: false/); // #163: queue, never cancel mid-migration
   for (const name of ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'PREVIEW_DATABASE_ADMIN_URL']) assert.match(wf, new RegExp(`secrets\\.${name}`));
   assert.doesNotMatch(wf, /pull_request|postgres:\/\/|branches: \[main/);
   assert.ok(wf.indexOf('db:postgres:migrate') < wf.indexOf('npm run deploy'));
