@@ -47,6 +47,6 @@ for(const nationId of Object.keys(voice))test(`#118 ${nationId} weekly addresses
  const r=await fixture();t.after(()=>r.close());await r.db.prepare('UPDATE citizens SET nation_id=?').bind(nationId).run();
  const first=await read(r,'alice');r.setNow(first.data.nextAddressAt*1000);
  const seen=(await read(r,'alice')).data.addresses.map(a=>a.transcript);assert.equal(seen.length,2);assert.notEqual(seen[0],seen[1]);
- for(const text of seen){assert.match(text,voice[nationId]);assert.match(text,/\bno\b|\bnot\b/i);assert.doesNotMatch(text,/Notable|\d+%|guarantee/);}
+ for(const text of seen){assert.match(text,voice[nationId]);assert.match(text,/\bno\b|\bnot\b/i);assert.doesNotMatch(text,/Notable|\d+%|guarantee/);assert.match(text,/\bauthored\b|simulated leaders/,"every transcript keeps its authored or simulated-leaders disclaimer");}
  if(nationId!=='korund')assert.match(seen.join(' '),/simulated leaders/);
 });
