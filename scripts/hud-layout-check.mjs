@@ -107,10 +107,10 @@ try {
   const noop = () => {};
   const api = (faith, congregations) => ({ faith, congregations, busy: false, message: '', error: '', chooseFaith: noop, attendWorship: noop, joinFestival: noop, congregation: noop });
   const faithScenes = [
-    { name: 'Kindle · Fair-Wind Vow, not joined', nation, faith: faithState({ devotion: 34 }), cong: congregationState({}) },
-    { name: 'Kindle · locked, joined, Officiant, festival', nation, faith: faithState({ locked: true, worshippedToday: true, festivalBanner: true, devotion: 100 }), cong: congregationState({ member: true, opt: true, officiant: true, blocked: 'You can join or leave a congregation once per game day. Come back tomorrow.' }) },
-    { name: 'Aurelle · Oath Day holiday', nation: { id: 'aurelle', name: 'Aurelle', capital: 'Highspire' }, faith: faithState({ nation: 'aurelle', holiday: true, devotion: 62 }), cong: congregationState({ nation: 'aurelle', faith: 'kinward-rite', member: true }) },
-    { name: 'Korund · Unaffiliated', nation: { id: 'korund', name: 'Korund', capital: 'Stonehearth' }, faith: faithState({ nation: 'korund' }), cong: null },
+    { name: 'Kindle · Fair-Wind Vow, not joined', slug: 'not-joined', nation, faith: faithState({ devotion: 34 }), cong: congregationState({}) },
+    { name: 'Kindle · locked, joined, Officiant, festival', slug: 'locked-joined-officiant', nation, faith: faithState({ locked: true, worshippedToday: true, festivalBanner: true, devotion: 100 }), cong: congregationState({ member: true, opt: true, officiant: true, blocked: 'You can join or leave a congregation once per game day. Come back tomorrow.' }) },
+    { name: 'Aurelle · Oath Day holiday', slug: 'oath-day-holiday', nation: { id: 'aurelle', name: 'Aurelle', capital: 'Highspire' }, faith: faithState({ nation: 'aurelle', holiday: true, devotion: 62 }), cong: congregationState({ nation: 'aurelle', faith: 'kinward-rite', member: true }) },
+    { name: 'Korund · Unaffiliated', slug: 'unaffiliated', nation: { id: 'korund', name: 'Korund', capital: 'Stonehearth' }, faith: faithState({ nation: 'korund' }), cong: null },
   ];
   for (const sc of faithScenes) {
     const panel = React.createElement(React.Fragment, null, React.createElement(HolidayBanner, { faith: sc.faith, busy: false, onJoin: noop }), React.createElement(FaithPanel, { api: api(sc.faith, sc.cong) }));
@@ -141,6 +141,10 @@ try {
         let gap = null; if (clock && g && getComputedStyle(clock).display !== 'none') { const rg = document.createRange(); rg.selectNodeContents(clock); const rs = [...rg.getClientRects()].filter(x => x.width > 0); const gb = g.getBoundingClientRect(); const right = Math.max(...rs.map(x => x.right)); const vo = rs.some(x => x.top < gb.bottom && gb.top < x.bottom); gap = vo ? gb.left - right : null; }
         return { issues, cards: cards.length, gap, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, hudDock: Math.round(document.querySelector('.game-hud').getBoundingClientRect().bottom - document.querySelector('.game-dock').getBoundingClientRect().top) };
       });
+      if (process.env.LAYOUT_SHOTS_DIR && w !== 360 && (scale === 1 || scale === 1.5)) { // docs/screenshots/280: LAYOUT_SHOTS_DIR=docs/screenshots/280 npm run test:layout
+        if (w === 1280) await page.setViewportSize({ width: 1280, height: 1500 });
+        await page.screenshot({ path: `${process.env.LAYOUT_SHOTS_DIR}/${sc.name.split(' · ')[0].toLowerCase()}-${sc.slug}-${w}-${scale * 100}.png`, fullPage: w < 600 });
+      }
       const id = `${w}x${h} @${scale * 100}% faith "${sc.name}"`;
       rows.push(`${id}: ${r.cards} card(s), page ${r.sw}/${r.cw}${r.issues.length ? ' ✗ ' + r.issues.join('; ') : ''}`);
       if (!r.cards) failures.push(`${id}: faith card did not render`);
