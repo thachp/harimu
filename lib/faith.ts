@@ -83,7 +83,7 @@ export const devotionPerService = 2;
 
 type FaithRow = { faith_id: FaithChoice; hidden_faith_id: WorshipFaithId | null; chosen_at: number; changed_at: number | null; request_id: string };
 const label = (id: FaithChoice) => id === 'unaffiliated' ? unaffiliatedCopy.name : faithCopy[id].name;
-const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
+const fail = (status: 400 | 403 | 409 | 503, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 
 /** Pure read (GET). The hidden faith is returned only to its holder, labelled private. */
 export async function readFaith(db: GameDatabase, userId: string, now: number, enabled: boolean) {
@@ -152,7 +152,11 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   const currentFaith = sameNation ? current!.faith_id : defaultFaith(citizen!.nation_id!);
   if (sameNation && currentFaith === command.faithId && (current?.hidden_faith_id ?? null) === command.hiddenFaithId) return fail(409, 'unchanged', 'That is already your faith.');
   const leaving = leavesKinward(citizen!.nation_id, currentFaith, command.faithId);
-  if (leaving) { const balance = await royalFavorBalance(db, userId); if (balance < kinwardLeaveFavorCost) return fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance)); }
+  if (leaving) {
+    // citizen_faith.request_id only remembers the latest change, so an older leave id is found through its spend row: it may never debit (or leave) twice.
+    if (await spendRowFor(db, command.requestId)) return fail(409, 'request_reused', 'That request id was already used for a Royal Favor spend.');
+    const balance = await royalFavorBalance(db, userId); if (balance < kinwardLeaveFavorCost) return fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance));
+  }
   if (current?.changed_at != null && now < Number(current.changed_at) + faithChangeCooldownSeconds) return fail(409, 'cooldown', `You can change faith once every 60 real days. Next change: ${new Date((Number(current.changed_at) + faithChangeCooldownSeconds) * 1000).toISOString().slice(0, 10)}.`);
   // Guarded upsert: a concurrent change inside the cooldown cannot slip through. A first pick (no row, or Aurelle's recorded default) leaves changed_at NULL.
   // Leaving the Kinward Rite debits Royal Favor in the same transactional batch. The spend row is keyed by the request id (a retry cannot debit twice),
@@ -170,10 +174,20 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
         AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id='aurelle')
         AND NOT EXISTS (SELECT 1 FROM citizen_faith f WHERE f.user_id=? AND f.changed_at IS NOT NULL AND f.changed_at > ?)
       ON CONFLICT DO NOTHING`).bind(command.requestId, userId, kinwardLeaveFavorCost, now, userId, userId, kinwardLeaveFavorCost, userId, userId, now - faithChangeCooldownSeconds);
-    try { saved = (await db.batch([spend, upsert(true)]))[1]; }
-    catch { return fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(await royalFavorBalance(db, userId))); } // spend ledger unavailable (migration 0028 not applied): nothing was changed
-    if (!saved.meta.changes) {
-      await db.prepare('DELETE FROM aurelle_favor_spends WHERE request_id=? AND clerk_user_id=? AND NOT EXISTS (SELECT 1 FROM citizen_faith WHERE request_id=?)').bind(command.requestId, userId, command.requestId).run(); // never keep a debit without the change
+    let results;
+    try { results = await db.batch([spend, upsert(true)]); }
+    catch (error) {
+      if (!isMissingSpendLedger(error)) throw error; // any other failure is not a Favor problem: never report it as insufficient Favor
+      return fail(503, 'favor_ledger_unavailable', 'The Royal Favor ledger is not available yet. Nothing was spent. Try again later.'); // migration 0028 not applied: nothing was changed
+    }
+    const spent = results[0].meta.changes === 1; // only this call's own spend row may be refunded or may carry the change
+    saved = results[1];
+    if (!spent || saved.meta.changes !== 1) {
+      // Undo only a debit this call wrote (never an earlier call's, so a replayed id can't refund a spend that already landed).
+      if (spent) await db.prepare('DELETE FROM aurelle_favor_spends WHERE request_id=? AND clerk_user_id=? AND NOT EXISTS (SELECT 1 FROM citizen_faith WHERE request_id=?)').bind(command.requestId, userId, command.requestId).run();
+      const landed = await db.prepare('SELECT user_id FROM citizen_faith WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
+      if (!spent && landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) }; // a concurrent call with this id already did it
+      if (!spent && await spendRowFor(db, command.requestId)) return fail(409, 'request_reused', 'That request id was already used for a Royal Favor spend.');
       const balance = await royalFavorBalance(db, userId);
       return balance < kinwardLeaveFavorCost ? fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance)) : fail(409, 'cooldown', 'You can change faith once every 60 real days.');
     }
@@ -182,6 +196,18 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
     if (!saved.meta.changes) return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
   }
   return { ok: true as const, state: await readFaith(db, userId, now, enabled) };
+}
+
+/** The spend row for a request id (any citizen), or null when there is none or the ledger table does not exist yet. */
+async function spendRowFor(db: GameDatabase, requestId: string) {
+  try { return await db.prepare('SELECT clerk_user_id FROM aurelle_favor_spends WHERE request_id=?').bind(requestId).first<{ clerk_user_id: string }>(); }
+  catch (error) { if (isMissingSpendLedger(error)) return null; throw error; }
+}
+/** True only when the error is the missing aurelle_favor_spends table (SQLite "no such table", Postgres "relation ... does not exist"). */
+export function isMissingSpendLedger(error: unknown): boolean {
+  const text = (e: unknown) => String((e as { message?: unknown } | null)?.message ?? e);
+  const message = `${text(error)} ${text((error as { cause?: unknown } | null)?.cause ?? '')}`;
+  return /aurelle_favor_spends/.test(message) && /no such table|does not exist/i.test(message);
 }
 
 export async function attendWorship(db: GameDatabase, userId: string, requestId: string, now: number, enabled: boolean) {

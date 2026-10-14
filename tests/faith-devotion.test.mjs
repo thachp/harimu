@@ -177,6 +177,69 @@ test('Aurelle: a citizen who moves in with a non-Kinward faith row from another 
   assert.equal((await choose(r, 'mo', 'open-hand')).status, 200); assert.equal((await spends(r, 'mo')).length, 1);
 });
 
+test('Aurelle: the spend batch only maps a missing ledger table to an error; any other failure is never "insufficient Royal Favor" (QA1 #1)', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'ava', 'aurelle'); await citizen(r, 'bo', 'aurelle');
+  await giveFavor(r, 'ava', 30); await giveFavor(r, 'bo', 30); // 60 Favor each
+  assert.equal(await favorOf(r, 'ava'), 60);
+  // Some other database failure inside the batch: not a Favor problem, so it must not read "costs 10... You have 60".
+  const batch = r.db.batch.bind(r.db);
+  r.db.batch = () => { throw new Error('disk I/O error'); };
+  let res; try { res = await choose(r, 'ava', 'open-hand'); } catch (error) { res = { status: 500, data: { error: String(error) } }; }
+  r.db.batch = batch;
+  assert.ok(res.status >= 500, JSON.stringify(res.data)); assert.notEqual(res.data.reason, 'insufficient_royal_favor'); assert.doesNotMatch(String(res.data.error), /You have/);
+  assert.equal((await read(r, 'ava')).faith.id, 'kinward-rite'); assert.equal(await favorOf(r, 'ava'), 60); assert.deepEqual(await spends(r, 'ava'), []);
+  // The spend ledger table itself is missing (migration 0028 not applied; SQLite/D1 and Postgres word it differently): nothing changes and the reason names the ledger, not the balance.
+  for (const message of ['no such table: aurelle_favor_spends', 'PostgreSQL operation failed (42P01): relation "aurelle_favor_spends" does not exist.']) {
+    r.db.batch = () => { throw new Error(message); };
+    const noLedger = await choose(r, 'bo', 'open-hand');
+    r.db.batch = batch;
+    assert.equal(noLedger.status, 503, JSON.stringify(noLedger.data)); assert.equal(noLedger.data.reason, 'favor_ledger_unavailable'); assert.doesNotMatch(noLedger.data.error, /You have/);
+    assert.equal((await read(r, 'bo')).faith.id, 'kinward-rite');
+  }
+  // A different missing table is not the spend ledger.
+  r.db.batch = () => { throw new Error('no such table: citizen_faith'); };
+  let other; try { other = await choose(r, 'bo', 'open-hand'); } catch (error) { other = { status: 500, data: {} }; }
+  r.db.batch = batch;
+  assert.ok(other.status >= 500); assert.notEqual(other.data.reason, 'favor_ledger_unavailable');
+});
+
+test('Aurelle: an older leave request id cannot be replayed to leave again for free (QA1 #2)', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'ava', 'aurelle');
+  await giveFavor(r, 'ava', 30); // 60 Favor
+  const R = randomUUID();
+  assert.equal((await choose(r, 'ava', 'open-hand', undefined, R)).status, 200);
+  assert.equal(await favorOf(r, 'ava'), 50);
+  assert.equal((await choose(r, 'ava', 'kinward-rite', undefined, randomUUID())).status, 200); // back to the Kinward Rite under a different id
+  r.setNow(r.now + 61 * 86400 * 1000); // cooldown over
+  const again = await choose(r, 'ava', 'open-hand', undefined, R);
+  assert.equal(again.status, 409, JSON.stringify(again.data)); assert.equal(again.data.reason, 'request_reused');
+  assert.equal((await read(r, 'ava')).faith.id, 'kinward-rite', 'the replayed id did not leave');
+  assert.equal(await favorOf(r, 'ava'), 50); assert.equal((await spends(r, 'ava')).length, 1);
+  // A fresh id pays the cost as usual.
+  assert.equal((await choose(r, 'ava', 'open-hand', undefined, randomUUID())).status, 200);
+  assert.equal(await favorOf(r, 'ava'), 40); assert.equal((await spends(r, 'ava')).length, 2);
+});
+
+test('Aurelle: a leave that fails the cooldown guard never refunds or deletes an earlier landed spend', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'ava', 'aurelle');
+  await giveFavor(r, 'ava', 30);
+  const R = randomUUID();
+  assert.equal((await choose(r, 'ava', 'open-hand', undefined, R)).status, 200);
+  assert.equal((await choose(r, 'ava', 'kinward-rite', undefined, randomUUID())).status, 200); // now inside the 60-day cooldown
+  // Replayed R inside the cooldown (the pre-check is skipped to simulate the race): the batch's spend row is not inserted, so nothing may be deleted.
+  const first = r.db.prepare.bind(r.db);
+  let hid = false;
+  r.db.prepare = sql => { if (!hid && /SELECT clerk_user_id FROM aurelle_favor_spends WHERE request_id/.test(sql)) { hid = true; return first('SELECT CAST(? AS TEXT) AS clerk_user_id WHERE 1=0'); } return first(sql); };
+  const res = await choose(r, 'ava', 'open-hand', undefined, R);
+  r.db.prepare = first;
+  assert.equal(hid, true); assert.equal(res.status, 409, JSON.stringify(res.data));
+  assert.deepEqual((await spends(r, 'ava')).map(x => x.request_id), [R], 'the earlier spend row survives');
+  assert.equal(await favorOf(r, 'ava'), 50);
+});
+
 test('GET /api/faith makes no writes', async t => {
   const r = await runtime(t);
   await choose(r, 'alice', 'kinward-rite'); await worship(r, 'alice'); r.setNow(r.now + 5 * gameDay);
