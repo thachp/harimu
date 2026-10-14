@@ -19,5 +19,5 @@ test('accounting collisions fail closed instead of overwriting/refunding an exis
 });
 
 test('single named news prebook uses the global guard, is idempotent and consumes both windows',async t=>{
- const r=await localRuntime();t.after(()=>r.close());await r.reconcileAcceptanceCharges();assert.equal(await r.prebookNewsAcceptance(now,now+3600),true);assert.equal(await r.prebookNewsAcceptance(now,now+3600),true);const budget=await readAiBudget(r.db,now);assert.equal(budget.reservedMicroUsd,959000);assert.equal(budget.nextDayReservedMicroUsd,959000);assert.equal(budget.remainingMicroUsd,11000);assert.equal(await reserveAiSequence(r.db,randomUUID(),now,now+3600),false);
+ const r=await localRuntime();t.after(()=>r.close());await r.reconcileAcceptanceCharges();assert.equal(await r.prebookNewsAcceptance(now,now+3600),true);assert.equal(await r.prebookNewsAcceptance(now,now+3600),true);const budget=await readAiBudget(r.db,now);assert.equal(budget.reservedMicroUsd,959000);assert.equal(budget.nextDayReservedMicroUsd,959000);assert.equal(budget.remainingMicroUsd,11000);assert.equal((await r.db.prepare("SELECT status FROM harimu_ai_reservations WHERE request_id='acceptance:2026-10-14:news-final'").first()).status,'finished');assert.equal(await reserveAiSequence(r.db,randomUUID(),now,now+3600),false);
 });

@@ -24,7 +24,7 @@ Successful real-model content generation, factual verification and output modera
 
 References: https://developers.cloudflare.com/workers-ai/features/json-mode/ ; https://developers.cloudflare.com/workers-ai/models/llama-3.2-3b-instruct/ ; https://developers.cloudflare.com/workers-ai/models/llama-guard-3-8b/ ; https://developers.cloudflare.com/workers-ai/platform/pricing/ .
 
-## Reconciliation and remaining allowance
+## Reconciliation and allowance before the final news prebook
 
 `lib/ai-acceptance-charges.ts` is the immutable manifest of the actual six attempted sequences and two probes. The archived fixture SQLite files remain under `/tmp/harimu-ai-live-acceptance-20261014*/reservations.sqlite`, `/tmp/harimu-ai-approval-probe.sqlite` and `/tmp/harimu-ai-moderation-probe.sqlite`. Those archives are evidence, not the authoritative live budget. Actual attempt timestamps come from the probe reservations and captured request-file timestamps, not the mocked fixture calendar.
 
@@ -43,4 +43,16 @@ With no additional reservations, both windows contain US$0.8866 against the cons
 
 News uses its own generation context and runtime switch. Isolated fake-provider coverage proves supported, moderated news can publish after a rejected Notable attempt; it does not establish actual model acceptance. Notable availability no longer depends on the news switch. Both flags remain OFF.
 
-Next bounded acceptance step: after observing the reconciled live ledger, prebook one US$0.0724 news sequence in that same ledger (with stable test identity) before running any isolated paid acceptance. Retain its charge and outcome; never mirror/refund it to obtain another attempt. Only execute when both day windows and the uncertain-carryover check permit the full sequence. This pass makes no further real inference calls.
+That reconciliation pass made no further real inference calls. The owner subsequently authorized the single globally prebooked news attempt documented below; its full cost is now also retained. No further paid sequence fits the remaining allowance.
+
+## Single prepaid news acceptance — 2026-10-14
+
+The separately authorized final news sequence was atomically prebooked in the shared PostgreSQL ledger as `acceptance:2026-10-14:news-final`, using the normal reservation predicate. Live UI confirmed US$0.0110 remained before inference, from US$0.9590 reserved in both October 14 and 15 windows. No alternative account, model or local allowance was used to authorize payment. The isolated fixture held only article/diagnostic data; its mirror reservation is not an additional global charge.
+
+Public facts read from the live Kindle feed at 08:52:53 UTC were 2 registered citizens, 3 completed paid shifts and 8 food earned. Exactly one sequence was invoked, with no retries or prompt changes during it. Generation returned title “National Status Report,” summary “National Ledger Facts” and the three allowed fact keys. Structured verification returned supported:false. The service recorded a validation failure and zero articles. Moderation was not called after rejection. The draft was not force-accepted, repaired or substituted with authored output. Both runtime flags remain OFF and #22/#30 remain open.
+
+The two successful Llama 3.2 3B calls reported 332 input tokens and 53 output tokens, approximately US$0.0000346538 at the verified rates. The entire US$0.0724 reservation remains charged despite the uncalled moderation stage. This confirmed rejected attempt is marked finished; the three earlier uncertain charges are unchanged. Cumulative conservative reservations are US$0.9590, with US$0.0110 left. Cumulative reported-token estimate is approximately US$0.0009753988 (16 successful real inference calls; the earlier schema-error request reported no usage). These are estimates, not a billing statement.
+
+Next budget-eligible UTC time: there is **no finite automatic time** under the current ledger. Another complete news sequence cannot fit on October 14; October 15 still carries the full US$0.9590 and is also blocked by unresolved October 14 attempts. At 2026-10-16T00:00:00Z the monetary windows would clear, but those three uncertain attempts continue to block inference until legitimately reconciled. Price review also expires at 2026-10-15T08:06:58Z. Neither uncertainty nor charges were reset to gain allowance.
+
+Captured public-only request/response payloads and the fixture SQLite snapshot remain at `/tmp/harimu-one-news-20261014/`. The exact generation and verification responses are retained in the repository companion diagnostic below for offline work. No further paid attempt is authorized by this result.

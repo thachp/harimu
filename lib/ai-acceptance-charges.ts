@@ -28,7 +28,7 @@ export async function reconcileAiAcceptanceCharges(db:GameDatabase){
 }
 
 export const newsAcceptanceId='acceptance:2026-10-14:news-final';
-export const newsAcceptanceOutcome:'pending'|'finished'|'uncertain'='pending';
+export const newsAcceptanceOutcome:string='finished'; // Confirmed supported:false; full charge retained.
 /** This single new attempt uses the normal atomic shared-budget predicate. */
 export async function prebookNewsAcceptance(db:GameDatabase,now:number,priceReviewedUntil:number){
  const read=()=>db.prepare('SELECT utc_day,next_utc_day,model,reserved_micro,status FROM harimu_ai_reservations WHERE request_id=?').bind(newsAcceptanceId).first<{utc_day:string;next_utc_day:string;model:string;reserved_micro:number;status:string}>();
