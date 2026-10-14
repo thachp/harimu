@@ -1,4 +1,4 @@
-/** First-week tutorial scripts for the MVP nations (issue #227: Kindle; shape reused for #228 Korund and #230 Aurelle).
+/** First-week tutorial scripts for the MVP nations (issue #227: Kindle; #228: Korund; shape reused for #230 Aurelle).
  * Content only: no tutorial runner reads this yet. Same day shape as lib/varkand-national-service.ts (#112), so one
  * runner can play any nation. Complements lib/first-week.ts (goals and completion signals); this module is the
  * narration around them. Canon (harimu-docs): nation pages, citizens-daily-loops §11.2 shared core loop, work-capacity,
@@ -66,5 +66,44 @@ export const kindleFirstWeek:FirstWeekScript={nationId:'kindle',
    'First week done. The Republic is yours to argue with.'),
  ]};
 
-export const firstWeekScripts:Readonly<Partial<Record<TutorialNation,FirstWeekScript>>>={kindle:kindleFirstWeek};
+export const korundFirstWeek:FirstWeekScript={nationId:'korund',
+ voice:'Formal, collective and steady: "One hammer, one heart." The plan comes first; costs are stated, not hidden.',
+ days:[
+  d(1,'Arrival in Stonehearth','List up to three job preferences for the Labor Bureau.',
+   ['Welcome to Stonehearth, Worker. Housing and work are assigned here.',
+    'List up to three job preferences. The AI Labor Bureau then assigns your job.',
+    'Nothing is due today, and missing a day costs you nothing.'],
+   'Preferences filed. Your assignment will follow.'),
+  d(2,'Your First Quota Shift','Work one shift with your brigade.',
+   ['Each city and job has a quota in the Five-Year Plan. Your brigade works toward it together.',
+    'A shift costs Work Capacity. It refills once a day while you are away.',
+    'Wages are paid in Labor Notes. Praise the brigade, not yourself.'],
+   'Shift logged. The quota bar moved.'),
+  d(3,'The Coupon Book','Redeem a ration coupon at the state store.',
+   ['Ration coupons arrive weekly and expire. Use them before they lapse.',
+    'Queue at the state store. Order at the rails keeps it fair for everyone.',
+    'Cook a household meal to get some Work Capacity back.'],
+   'Ration collected. Your household is fed.',
+   'Shelves empty? Shortages happen when the plan falls short. Check again tomorrow.'),
+  d(4,'Listening to State Media','Read today\'s report from Korund State Media.',
+   ['Korund State Media reports: every brigade advanced the plan this week. The figures follow.',
+    'Foreign reports are not carried. The citizen needs only what the plan requires.'],
+   'Report read. The plan advances.'),
+  d(5,'The Chairman and the Presidium','Read how the Chairman, the Presidium and the People\'s Congress work.',
+   ['The Chairman rules for life, advised by the Presidium. All of them are AI.',
+    'The People\'s Congress meets to approve, not to choose. Citizens do not elect the Chairman.',
+    'Rule by one person can be good or bad. The plan\'s results show which.'],
+   'Briefing read. You know who decides here.'),
+  d(6,'Production Drive','Join a shift during a Production Drive.',
+   ['Drives push the whole city toward its quota. Monuments rise fastest here.',
+    'A missed plan means shortages for everyone. A met plan means nobody goes hungry.'],
+   'Shift done. Your brigade\'s total counts toward the Drive.'),
+  d(7,'One Hammer, One Heart','Look over your coupon book and your shifts for the week.',
+   ['Your rank starts at Worker. Exemplary Worker and Party Member come with plan over-fulfilment and Drives.',
+    'You may ask the Labor Bureau for a new assignment every 30 real days. Travel needs a permit.',
+    'Security here is high and choice is narrow. Both are part of life in Korund.'],
+   'First week done. The plan continues, and so do you.'),
+ ]};
+
+export const firstWeekScripts:Readonly<Partial<Record<TutorialNation,FirstWeekScript>>>={kindle:kindleFirstWeek,korund:korundFirstWeek};
 export function firstWeekScript(nationId:string){return (firstWeekScripts as Record<string,FirstWeekScript|undefined>)[nationId];}
