@@ -2,7 +2,9 @@ import type {GameDatabase} from './database-contract';
 import {publicNewsFacts,validatedNewsDraft,newsDraftText,inferenceText,newsDraftResponseFormat,newsVerificationResponseFormat,supportedNewsDraft,type NewsAiBinding} from './ai-news';
 import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,meteredAiCost,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 import {readNationalNews} from './national-news';
-import {notableProfile,notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
+import {notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
+import {nationNotables} from './notable-choice';
+export {notableFor,nationNotables} from './notable-choice';
 export {notableProfile,notableTopics,notableDailyLimit,validNotableCommand} from './notable-profiles';
 export const notablesEnabled=true; // Explicit preview approval; independent runtime switch and shared pricing gate remain required.
 async function ownerPrefix(userId:string){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(userId));return 'notable:'+Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')+':';}
@@ -11,8 +13,11 @@ async function ownerPrefix(userId:string){const digest=await crypto.subtle.diges
 export async function answerNotable(db:GameDatabase,userId:string,command:NotableCommand,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null}={}){
  const fail=(status:number,error:string)=>({status,error});
  if(!validNotableCommand(command))return fail(400,'Choose a listed public topic and a valid request.');
- const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();const profile=notableProfile(citizen?.nation_id??null);
- if(!profile||profile.id!==command.notableId)return fail(403,'Only your nation’s Notable is available.');
+ const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();const nation=citizen?.nation_id??null;
+ // #151: GET serves today's pick (notableFor); a command may name any of the citizen's own nation's Notables,
+ // so a dialog left open across UTC midnight keeps working. Foreign Notables are still rejected.
+ const profile=nationNotables(nation).find(p=>p.id===command.notableId)??null;
+ if(!profile)return fail(403,'Only your nation’s Notable is available.');
  if(!enabled||!binding||!budget)return fail(503,'AI conversations are disabled. Authored topic examples remain available.');
  const prefix=await ownerPrefix(userId),id=prefix+command.requestId.toLowerCase();
  if(await db.prepare('SELECT request_id FROM harimu_ai_reservations WHERE request_id=?').bind(id).first())return fail(409,'This request was already attempted. Repeating it makes no further inference call.');
