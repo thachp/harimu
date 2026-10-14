@@ -42,7 +42,7 @@ export async function localRuntime({ballotPrivacyReady=false,backend=process.env
     'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/world-simulation.ts',
-    'lib/korund.ts',
+    'lib/korund.ts','lib/korund-queue.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
     'lib/citizenship.ts',
     'app/api/citizen/route.ts', 'app/api/square/route.ts', 'app/api/world/route.ts',

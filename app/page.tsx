@@ -668,9 +668,9 @@ export default function Home() {
     try {
       const raw = userId ? window.sessionStorage.getItem(`harimu-korund-intent-v1:${userId}`) : null;
       const command = raw ? JSON.parse(raw) : null;
-      if (command && ['korund-start-work', 'korund-claim-work', 'korund-redeem-ration', 'korund-household-meal'].includes(command.action)
+      if (command && ['korund-start-work', 'korund-claim-work', 'korund-redeem-ration', 'korund-household-meal','korund-join-ration-queue','korund-cancel-ration-queue'].includes(command.action)
         && typeof command.requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(command.requestId)
-        && (command.action !== 'korund-claim-work' || typeof command.shiftId === 'string')) {
+        && (command.action !== 'korund-cancel-ration-queue' || typeof command.queueId === 'string') && (command.action !== 'korund-claim-work' || typeof command.shiftId === 'string')) {
         korundIntent.current = command; setKorundCommand(command);
       }
     } catch { /* Storage recovery is best-effort. */ }
@@ -953,9 +953,10 @@ export default function Home() {
   function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
 
   async function runKorundCommand(command: KorundCommand) {
+    const confirmingKorundIntent=korundIntent.current?.requestId===command.requestId;
     const originalKorundClaim = command.action === 'korund-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'LN');
     if (marketIntent.current || playerIntent.current || aurelleIntent.current) return;
-    if (!clerkConfigured || citizenSessionStatus !== 'ready' || (citizenNation?.id !== 'korund' && !originalKorundClaim) || workLock.current) return;
+    if (!clerkConfigured || citizenSessionStatus !== 'ready' || (citizenNation?.id !== 'korund' && !originalKorundClaim && !confirmingKorundIntent) || workLock.current) return;
     if (korundIntent.current && korundIntent.current.requestId !== command.requestId) return;
     const epoch = citizenEpoch.current;
     const userId = citizenIdentity.current;
@@ -972,7 +973,7 @@ export default function Home() {
     persist(command);
     try {
       const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
-      const result = await response.json() as { error?: string; ok?: boolean; korundPlan?: KorundPlanView; capacity?: number; shifts?: WorkShift[] };
+      const result = await response.json() as { error?: string; ok?: boolean; replayed?:boolean; korundPlan?: KorundPlanView; capacity?: number; shifts?: WorkShift[] };
       if (epoch !== citizenEpoch.current) return;
       if (response.status >= 500 || (response.ok && (!result.korundPlan || typeof result.capacity !== 'number'))) throw new Error('Action needs confirmation.');
       if (result.korundPlan) setKorundPlan(result.korundPlan);
@@ -980,7 +981,7 @@ export default function Home() {
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       korundIntent.current = null; setKorundCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Korund action refused; refresh your assignment and ration book.'); return; }
-      setRecentAction(command.action === 'korund-start-work' ? 'Assigned shift started; work continues while you are away.'
+      setRecentAction(result.replayed?'Previous Korund action confirmed. Check the current ration book and queue.':command.action==='korund-join-ration-queue'?'Ration request joined the national FIFO queue.':command.action==='korund-cancel-ration-queue'?'Ration request cancelled; unused coupons retained.':command.action === 'korund-start-work' ? 'Assigned shift started; work continues while you are away.'
         : command.action === 'korund-claim-work' ? 'Assigned-shift wages collected in Labor Notes; output added to the state food pool.'
           : command.action === 'korund-redeem-ration' ? 'Ration coupons redeemed for household food.' : 'Household ration meal recorded; capacity updated.');
     } catch {
@@ -990,7 +991,7 @@ export default function Home() {
     }
   }
 
-  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand({ action, shiftId, requestId: crypto.randomUUID() });
+  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand({ action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
   async function runAurelleCommand(command: AurelleCommand) {
     const originalAurelleClaim = command.action === 'aurelle-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'CRN');
     if (marketIntent.current || playerIntent.current || korundIntent.current) return;

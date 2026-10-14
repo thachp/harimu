@@ -12,8 +12,8 @@ import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
 
 export type KorundPlanView = KorundPlan;
-export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal';
-export type KorundCommand = { action: KorundAction; requestId: string; shiftId?: string };
+export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal' | 'korund-join-ration-queue' | 'korund-cancel-ration-queue';
+export type KorundCommand = { action: KorundAction; requestId: string; shiftId?: string; queueId?:string };
 
 export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, onCommand, onRetry, onRefresh, onNavigate }: {
   plan: KorundPlanView | null; scene: SceneView; capacity: number; pending: boolean; uncertain: boolean;
@@ -29,6 +29,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
   const active = plan.shifts.find(shift => !shift.claimedAt);
   const ready = Boolean(active && now > 0 && Date.parse(active.completesAt) <= now);
   const couponsCurrent = now > 0 && Date.parse(plan.couponExpiresAt) > now;
+  const queue=plan.queue;
   const mealReady = now > 0 && (!plan.mealReadyAt || Date.parse(plan.mealReadyAt) <= now);
   return <NationDocument nationId="korund" className="citizen-market korund-plan" label="Korund assignment and ration account">
     <h3>{scene === 'workplace' ? 'Labor Bureau assignment' : scene === 'market' ? 'State ration counter' : 'Korund household account'}</h3>
@@ -48,11 +49,12 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       {otherShiftActive && <p>Collect your earlier nation’s shift before beginning another assignment.</p>}
       <button type="button" onClick={() => onNavigate('market')}>Visit the ration counter</button>
     </> : scene === 'market' ? <>
-      <p><strong>Queue status:</strong> Not recorded in this preview. Coupon redemption checks the available state food directly.</p>
+      <p><strong>National FIFO queue:</strong> {queue?`${queue.waiting} waiting requests${queue.position!==null?` · Your position: ${queue.position}`:''}`:'Queue information unavailable; refresh the ration book'}. No wait-time estimate is available.</p><p>Requests expire with the coupon week. Joining reserves no stock and consumes no coupons. Collect at the counter when you reach the front and stock covers your ration; cancelling preserves unused coupons.</p>
+      {queue?.requestId?<ActionButton type="button" reason={pendingActionReason(pending,uncertain)??firstActionReason([!couponsCurrent,'The request expired with the coupon week. Refresh the ration book.'])} onClick={()=>onCommand('korund-cancel-ration-queue',queue.requestId!)}>Cancel my ration request</ActionButton>:<ActionButton type="button" reason={pendingActionReason(pending,uncertain)??firstActionReason([!queue,'Refresh to load the current queue.'],[!couponsCurrent,'Refresh for the current coupon week.'],[plan.couponFoodRemaining<=0,'This game week’s coupons have been used.'])} onClick={()=>onCommand('korund-join-ration-queue')}>Join ration queue</ActionButton>}
       <p>Coupons are non-transferable and expire each game week (14 real hours / 7 game days at 12× time). Redemption costs no Labor Notes. Rations come from actual plan output; available state food: {plan.publicFoodRemaining}.</p>
       {!couponsCurrent && <p>Ration book expired or timing is loading. Refresh for this game week’s allocation.</p>}
       {couponsCurrent && plan.couponFoodRemaining > plan.publicFoodRemaining && <p>State food shortage · available output cannot cover this ration. Assigned work replenishes the pool when collected.</p>}
-      <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!couponsCurrent, 'Refresh for the current game week’s ration book.'], [plan.couponFoodRemaining <= 0, 'This game week’s food coupons have been used.'], [plan.publicFoodRemaining < plan.couponFoodRemaining, 'State food cannot cover this ration. Collected assignments replenish it.'])} onClick={() => onCommand('korund-redeem-ration')}>Redeem this week’s food coupons · {plan.couponFoodRemaining} food</ActionButton>
+      <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!couponsCurrent, 'Refresh for the current game week’s ration book.'], [plan.couponFoodRemaining <= 0, 'This game week’s food coupons have been used.'], [!queue,'Refresh to load the current queue.'], [Boolean(queue&&queue.waiting>0&&queue.position!==1),'Join the queue and wait for earlier requests to collect or cancel.'], [plan.publicFoodRemaining < plan.couponFoodRemaining, 'State food cannot cover this ration. Collected assignments replenish it.'])} onClick={() => onCommand('korund-redeem-ration')}>Redeem this week’s food coupons · {plan.couponFoodRemaining} food</ActionButton>
       <button type="button" onClick={() => onNavigate('household')}>Take rations to your household</button>
     </> : scene === 'household' ? <>
       <p>A household meal uses 2 food and restores up to 4 WC, capped at 24. Meals have a two-real-hour (one game day) cooldown; normal capacity recovery continues.</p>

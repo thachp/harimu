@@ -1,3 +1,8 @@
+-- Reference game schema, generated without game rows.
+CREATE TABLE ai_news_articles(id TEXT COLLATE "C" PRIMARY KEY,nation_id TEXT COLLATE "C" NOT NULL CHECK(nation_id IN('kindle','korund','aurelle')),title TEXT COLLATE "C" NOT NULL,body TEXT COLLATE "C" NOT NULL,created_at BIGINT NOT NULL,model TEXT COLLATE "C" NOT NULL,facts_json TEXT COLLATE "C" NOT NULL);
+
+CREATE TABLE ai_news_jobs(id TEXT COLLATE "C" PRIMARY KEY,nation_id TEXT COLLATE "C" NOT NULL CHECK(nation_id IN('kindle','korund','aurelle')),utc_day TEXT COLLATE "C" NOT NULL,started_at BIGINT NOT NULL,status TEXT COLLATE "C" NOT NULL CHECK(status IN('running','published','failed')),failure_code TEXT COLLATE "C");
+
 CREATE TABLE "aurelle_resources" (
 	"id" TEXT COLLATE "C" PRIMARY KEY NOT NULL,
 	"initial_food" BIGINT NOT NULL,
@@ -20,6 +25,8 @@ CREATE TABLE government_reviews(
   petition_count BIGINT NOT NULL CHECK(petition_count >= 0), snapshot_json TEXT COLLATE "C" NOT NULL,
   PRIMARY KEY(nation_id,period_start)
 );
+
+CREATE TABLE harimu_ai_reservations(request_id TEXT COLLATE "C" PRIMARY KEY,utc_day TEXT COLLATE "C" NOT NULL,next_utc_day TEXT COLLATE "C" NOT NULL,model TEXT COLLATE "C" NOT NULL,reserved_micro BIGINT NOT NULL CHECK(reserved_micro>0),started_at BIGINT NOT NULL,status TEXT COLLATE "C" NOT NULL CHECK(status IN('pending','finished','uncertain')));
 
 CREATE TABLE "korund_resources" (
 	"id" TEXT COLLATE "C" PRIMARY KEY NOT NULL,
@@ -243,6 +250,8 @@ CREATE TABLE "korund_meals" (
 	CONSTRAINT "korund_meal_capacity" CHECK("korund_meals"."capacity_applied" IN(0,1))
 );
 
+CREATE TABLE korund_ration_queue(seq BIGINT PRIMARY KEY,request_id TEXT COLLATE "C" NOT NULL UNIQUE,clerk_user_id TEXT COLLATE "C" NOT NULL REFERENCES citizens(clerk_user_id),game_week BIGINT NOT NULL CHECK(game_week>=1),joined_at BIGINT NOT NULL,expires_at BIGINT NOT NULL CHECK(expires_at>joined_at),status TEXT COLLATE "C" NOT NULL DEFAULT 'waiting' CHECK(status IN('waiting','cancelled','redeemed')));
+
 CREATE TABLE "korund_rations" (
 	"id" TEXT COLLATE "C" PRIMARY KEY NOT NULL,
 	"clerk_user_id" TEXT COLLATE "C" NOT NULL,
@@ -342,6 +351,8 @@ CREATE TABLE government_petition_resolutions(
   FOREIGN KEY(nation_id,period_start) REFERENCES government_reviews(nation_id,period_start)
 );
 
+CREATE TABLE korund_queue_cancellations(request_id TEXT COLLATE "C" PRIMARY KEY,queue_id TEXT COLLATE "C" NOT NULL REFERENCES korund_ration_queue(request_id),clerk_user_id TEXT COLLATE "C" NOT NULL REFERENCES citizens(clerk_user_id),cancelled_at BIGINT NOT NULL);
+
 CREATE TABLE "korund_settlements" (
 	"shift_id" TEXT COLLATE "C" PRIMARY KEY NOT NULL,
 	"clerk_user_id" TEXT COLLATE "C" NOT NULL,
@@ -400,6 +411,8 @@ CREATE INDEX idx_civic_petitions_created ON civic_petitions(created_at);
 CREATE INDEX idx_economy_events_user_item ON citizen_economy_events(clerk_user_id, item);
 
 CREATE INDEX idx_government_petitions_nation_period ON government_petitions(nation_id, period_start);
+
+CREATE UNIQUE INDEX idx_korund_queue_waiting ON korund_ration_queue(clerk_user_id,game_week) WHERE status='waiting';
 
 CREATE UNIQUE INDEX idx_one_active_shift
   ON work_shifts(clerk_user_id) WHERE claimed_at IS NULL;

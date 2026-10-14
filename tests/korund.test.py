@@ -11,7 +11,9 @@ import uuid
 spec=importlib.util.spec_from_file_location('economy_fixture',pathlib.Path(__file__).with_name('economy.test.py'))
 fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
 source=(pathlib.Path(__file__).parents[1]/'lib/korund.ts').read_text()
-def sql(name):return re.search(r'export const '+name+r' = `([^`]+)`',source).group(1)
+queue_source=(pathlib.Path(__file__).parents[1]/'lib/korund-queue.ts').read_text()
+active_queue=re.search(r'export const activeRationQueue=`([^`]+)`',queue_source).group(1)
+def sql(name):return re.search(r'export const '+name+r' = `([^`]+)`',source).group(1).replace('${activeRationQueue}',active_queue)
 
 class KorundTests(unittest.TestCase):
     def setUp(self):
@@ -20,7 +22,7 @@ class KorundTests(unittest.TestCase):
         self.db.execute('DELETE FROM shift_rewards')
         self.db.execute("UPDATE citizens SET nation_id='korund',capacity=18")
         self.db.execute("INSERT INTO work_orders VALUES ('korund-food-production')")
-        for schema in re.findall(r'`(CREATE [^`]+)`',source):self.db.execute(schema)
+        for schema in re.findall(r'`(CREATE [^`]+)`',source+queue_source):self.db.execute(schema)
         self.db.execute("INSERT INTO korund_resources VALUES ('state',40,100000)");self.db.commit()
     def tearDown(self):self.db.close()
     def race(self,workers):
@@ -42,9 +44,9 @@ class KorundTests(unittest.TestCase):
             self.db.close();self.db=sqlite3.connect(':memory:');self.db.executescript(dump)
             return results
     def ration(self,connection,user,id,week=1):
-        return connection.execute(sql('korundRationSql'),(id,week,1000,user,user,week,id,id)).rowcount
+        return connection.execute(sql('korundRationSql'),(id,week,1000,user,user,week,id,id,id,id,week,1000,week,1000,user,week,1000)).rowcount
     def start(self,connection,user,id):
-        count=connection.execute(sql('korundStartSql'),(id,'2026-10-12T00:00:00.000Z','2026-10-12T02:00:00.000Z',user,user,id,id)).rowcount
+        count=connection.execute(sql('korundStartSql'),(id,'2026-10-12T00:00:00.000Z','2026-10-12T02:00:00.000Z',user,user,id,id,id,id)).rowcount
         connection.execute(sql('korundStartReceiptSql'),(id,user))
         connection.execute(sql('korundDebitSql'),('2026-10-12T00:00:00.000Z',user,id))
         connection.execute('UPDATE korund_work_starts SET capacity_applied=1 WHERE id=?',(id,))
@@ -89,10 +91,18 @@ class KorundTests(unittest.TestCase):
     def test_meal_same_id_race_debits_household_food_once(self):
         ration=str(uuid.uuid4());meal=str(uuid.uuid4())
         with self.db:self.assertEqual(self.ration(self.db,'alice',ration),1)
-        def eat(connection):return connection.execute(sql('korundMealSql'),(meal,1000,'alice',1000,meal,meal)).rowcount
+        def eat(connection):return connection.execute(sql('korundMealSql'),(meal,1000,'alice',1000,meal,meal,meal,meal)).rowcount
         self.assertEqual(sum(self.race([eat,eat])),1)
         self.assertEqual(self.db.execute('SELECT SUM(quantity) FROM korund_meals').fetchone()[0],2)
         self.assertEqual(self.db.execute('SELECT SUM(quantity) FROM korund_rations').fetchone()[0],2)
         self.assertEqual(eat(self.db),0)
+
+    def test_fifo_head_wins_last_ration_across_separate_connections(self):
+        self.db.execute('UPDATE korund_resources SET initial_food=2')
+        for seq,user in [(1,'alice'),(2,'bob')]:self.db.execute("INSERT INTO korund_ration_queue VALUES (?,?,?,?,?,?,'waiting')",(seq,str(uuid.uuid4()),user,1,999,2000))
+        self.db.commit();ids={user:str(uuid.uuid4()) for user in ['alice','bob']}
+        results=self.race([lambda db:self.ration(db,'bob',ids['bob']),lambda db:self.ration(db,'alice',ids['alice'])])
+        self.assertEqual(sum(results),1);self.assertEqual(self.db.execute('SELECT clerk_user_id FROM korund_rations').fetchone()[0],'alice')
+        self.assertEqual(self.db.execute(sql('korundPublicFoodSql')).fetchone()[0],0)
 
 if __name__=='__main__':unittest.main()

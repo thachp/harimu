@@ -1,4 +1,5 @@
 import type {GameDatabase} from './database-contract';
+import {activeRationQueue,readRationQueue,executeRationQueue,queueIdentifierUsed,type RationQueue} from './korund-queue';
 import type { WorkShift } from './work-shifts';
 export const korundJob = {id:'korund-food-production',name:'State food-production brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4} as const;
 export const gameWeekSeconds = 50400;
@@ -13,7 +14,8 @@ export const korundPublicFoodSql = `SELECT initial_food+COALESCE((SELECT SUM(foo
 export const korundStartSql = `INSERT OR IGNORE INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at)
  SELECT ?,clerk_user_id,'korund-food-production','State food-production brigade','4 food contributed to state ration supply',4,?,? FROM citizens
  WHERE clerk_user_id=? AND nation_id='korund' AND capacity>=4 AND NOT EXISTS(SELECT 1 FROM work_shifts WHERE clerk_user_id=? AND claimed_at IS NULL)
- AND NOT EXISTS(SELECT 1 FROM korund_rations WHERE id=?) AND NOT EXISTS(SELECT 1 FROM korund_meals WHERE id=?)`;
+ AND NOT EXISTS(SELECT 1 FROM korund_rations WHERE id=?) AND NOT EXISTS(SELECT 1 FROM korund_meals WHERE id=?)
+ AND NOT EXISTS(SELECT 1 FROM korund_ration_queue WHERE request_id=?) AND NOT EXISTS(SELECT 1 FROM korund_queue_cancellations WHERE request_id=?)`;
 export const korundStartReceiptSql = `INSERT OR IGNORE INTO korund_work_starts(id,capacity_applied) SELECT id,0 FROM work_shifts WHERE id=? AND clerk_user_id=? AND work_order_id='korund-food-production'`;
 export const korundDebitSql = `UPDATE citizens SET capacity=capacity-4,updated_at=? WHERE clerk_user_id=? AND EXISTS(SELECT 1 FROM korund_work_starts k JOIN work_shifts s ON s.id=k.id WHERE k.id=? AND s.clerk_user_id=citizens.clerk_user_id AND k.capacity_applied=0)`;
 export const korundSettleSql = `INSERT OR IGNORE INTO korund_settlements(shift_id,clerk_user_id,wage_minor,food_output,settled_at)
@@ -24,19 +26,23 @@ export const korundRationSql = `INSERT OR IGNORE INTO korund_rations(id,clerk_us
  SELECT ?,clerk_user_id,?,2,? FROM citizens WHERE clerk_user_id=? AND nation_id='korund'
  AND 2<=(SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) FROM korund_resources WHERE id='state')
  AND NOT EXISTS(SELECT 1 FROM korund_rations WHERE clerk_user_id=? AND game_week=?)
- AND NOT EXISTS(SELECT 1 FROM korund_meals WHERE id=?) AND NOT EXISTS(SELECT 1 FROM korund_work_starts WHERE id=?)`;
+ AND NOT EXISTS(SELECT 1 FROM korund_meals WHERE id=?) AND NOT EXISTS(SELECT 1 FROM korund_work_starts WHERE id=?)
+ AND NOT EXISTS(SELECT 1 FROM korund_ration_queue WHERE request_id=?) AND NOT EXISTS(SELECT 1 FROM korund_queue_cancellations WHERE request_id=?)
+ AND (NOT EXISTS(SELECT 1 FROM korund_ration_queue q WHERE ${activeRationQueue}) OR EXISTS(SELECT 1 FROM korund_ration_queue q WHERE ${activeRationQueue} AND q.clerk_user_id=? AND q.seq=(SELECT MIN(q.seq) FROM korund_ration_queue q WHERE ${activeRationQueue})))`;
 export const korundMealSql = `INSERT OR IGNORE INTO korund_meals(id,clerk_user_id,quantity,occurred_at)
  SELECT ?,clerk_user_id,2,? FROM citizens WHERE clerk_user_id=? AND nation_id='korund' AND capacity<24
  AND 2<=COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=citizens.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=citizens.clerk_user_id),0)
  AND NOT EXISTS(SELECT 1 FROM korund_meals WHERE clerk_user_id=citizens.clerk_user_id AND occurred_at>?-7200)
- AND NOT EXISTS(SELECT 1 FROM korund_rations WHERE id=?) AND NOT EXISTS(SELECT 1 FROM korund_work_starts WHERE id=?)`;
+ AND NOT EXISTS(SELECT 1 FROM korund_rations WHERE id=?) AND NOT EXISTS(SELECT 1 FROM korund_work_starts WHERE id=?)
+ AND NOT EXISTS(SELECT 1 FROM korund_ration_queue WHERE request_id=?) AND NOT EXISTS(SELECT 1 FROM korund_queue_cancellations WHERE request_id=?)`;
 export type KorundPlan = { available:boolean; mode:'bounded state planning'; assignment:typeof korundJob;
  walletMinor:number;foodQuantity:number;publicFoodRemaining:number;publicFundMinor:number;
- gameWeek:number;couponFoodRemaining:number;couponExpiresAt:string;mealReadyAt:string|null;shifts:WorkShift[] };
-export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'; requestId?:string;shiftId?:string};
+ gameWeek:number;couponFoodRemaining:number;couponExpiresAt:string;mealReadyAt:string|null;shifts:WorkShift[];queue?:RationQueue };
+export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'|'korund-join-ration-queue'|'korund-cancel-ration-queue'; requestId?:string;shiftId?:string;queueId?:string};
 const uuid=(v:unknown):v is string=>typeof v==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export function validKorundCommand(body:Record<string,unknown>):body is Record<string,unknown>&KorundCommand {
- return body.action==='korund-claim-work' ? uuid(body.shiftId) : ['korund-start-work','korund-redeem-ration','korund-household-meal'].includes(String(body.action)) && uuid(body.requestId);
+ if(body.action==='korund-cancel-ration-queue')return uuid(body.requestId)&&uuid(body.queueId);
+ return body.action==='korund-claim-work' ? uuid(body.shiftId)&&(body.requestId===undefined||uuid(body.requestId)) : ['korund-start-work','korund-redeem-ration','korund-household-meal','korund-join-ration-queue'].includes(String(body.action)) && uuid(body.requestId);
 }
 async function week(db:GameDatabase,now:number) {
  const clock=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
@@ -61,21 +67,23 @@ export async function readKorund(db:GameDatabase,userId:string,now:number):Promi
  ]);
  return {available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
- mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
+ queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
 export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  // An already-started shift may settle into its original LN ledger after a grace-period move.
  if(nation?.nation_id!=='korund' && command.action!=='korund-claim-work') return {status:409,error:'Korund citizenship required; previous balances remain in their original currency.'};
  const iso=new Date(now*1000).toISOString();
- const id=(command.requestId??command.shiftId??'').toLowerCase();
+ const id=(command.action==='korund-claim-work'?command.shiftId!:command.requestId!).toLowerCase();
+ if(command.action==='korund-join-ration-queue'||command.action==='korund-cancel-ration-queue'){const w=await week(db,now);return executeRationQueue(db,userId,command.action,id,command.queueId?.toLowerCase(),w.number,now,Date.parse(w.expiresAt)/1000);}
+ if(await queueIdentifierUsed(db,id))return {status:409,error:'Request identifier already used for a ration queue action.'};
  if(command.action==='korund-start-work') {
  const conflicting=await db.prepare('SELECT id FROM korund_rations WHERE id=? UNION ALL SELECT id FROM korund_meals WHERE id=?').bind(id,id).first();
  if(conflicting) return {status:409,error:'Request identifier already used for another action.'};
  const existing=await db.prepare('SELECT clerk_user_id,work_order_id FROM work_shifts WHERE id=?').bind(id).first<{clerk_user_id:string;work_order_id:string}>();
  if(existing) return existing.clerk_user_id===userId&&existing.work_order_id===korundJob.id?{status:200,replayed:true}:{status:409,error:'Work identifier already used.'};
  await db.batch([
- db.prepare(korundStartSql).bind(id,iso,new Date((now+7200)*1000).toISOString(),userId,userId,id,id),
+ db.prepare(korundStartSql).bind(id,iso,new Date((now+7200)*1000).toISOString(),userId,userId,id,id,id,id),
  db.prepare(korundStartReceiptSql).bind(id,userId),db.prepare(korundDebitSql).bind(iso,userId,id),
  db.prepare('UPDATE korund_work_starts SET capacity_applied=1 WHERE id=? AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)').bind(id,id,userId),
  ]);
@@ -96,12 +104,12 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  if(other) return {status:409,error:'Request identifier already used for another action.'};
  if(existing) return existing.clerk_user_id===userId?{status:200,replayed:true}:{status:409,error:'Request identifier already used.'};
  if(command.action==='korund-redeem-ration') {
- const w=await week(db,now);await db.prepare(korundRationSql).bind(id,w.number,now,userId,userId,w.number,id,id).run();
+ const w=await week(db,now);await db.batch([db.prepare(korundRationSql).bind(id,w.number,now,userId,userId,w.number,id,id,id,id,w.number,now,w.number,now,userId,w.number,now),db.prepare("UPDATE korund_ration_queue SET status='redeemed' WHERE clerk_user_id=? AND game_week=? AND status='waiting' AND EXISTS(SELECT 1 FROM korund_rations WHERE id=? AND clerk_user_id=korund_ration_queue.clerk_user_id AND game_week=korund_ration_queue.game_week)").bind(userId,w.number,id)]);
  } else {
- await db.batch([db.prepare(korundMealSql).bind(id,now,userId,now,id,id),
+ await db.batch([db.prepare(korundMealSql).bind(id,now,userId,now,id,id,id,id),
  db.prepare('UPDATE citizens SET capacity=MIN(24,capacity+4),updated_at=? WHERE clerk_user_id=? AND EXISTS(SELECT 1 FROM korund_meals WHERE id=? AND clerk_user_id=? AND capacity_applied=0)').bind(iso,userId,id,userId),
  db.prepare('UPDATE korund_meals SET capacity_applied=1 WHERE id=? AND clerk_user_id=?').bind(id,userId)]);
  }
  const receipt=await db.prepare(`SELECT id FROM ${table} WHERE id=? AND clerk_user_id=?`).bind(id,userId).first();
- return receipt?{status:200}:{status:409,error:command.action==='korund-redeem-ration'?'Ration unavailable: this game-week coupon was used or public food is exhausted.':'Meal unavailable: check household food, Work Capacity and the two-hour meal timer.'};
+ return receipt?{status:200}:{status:409,error:command.action==='korund-redeem-ration'?'Ration unavailable: this game-week coupon was used or public food is exhausted or an earlier FIFO request must collect first.':'Meal unavailable: check household food, Work Capacity and the two-hour meal timer.'};
 }

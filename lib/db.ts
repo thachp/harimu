@@ -1,3 +1,5 @@
+import {aiNewsSchemas} from './ai-news';
+import {korundQueueSchemas} from './korund-queue';
 import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
 import type {GameDatabase} from './database-contract';
 import {addressSchemas} from './weekly-addresses';
@@ -174,6 +176,8 @@ async function initialize(database: GameDatabase) {
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
   await database.batch([
     ...addressSchemas.map(sql=>database.prepare(sql)),
+    ...korundQueueSchemas.map(sql=>database.prepare(sql)),
+    ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),
     database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema),

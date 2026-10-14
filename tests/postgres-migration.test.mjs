@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {randomUUID} from 'node:crypto';
+import {reserveAiCall} from '../lib/ai-budget.ts';
 import {DatabaseSync} from 'node:sqlite';
 import {localRuntime} from './helpers/local-runtime.mjs';
 import {snapshotSqlite,snapshotManifest,orderedSchema,replayJournalSqlite,importSnapshot} from '../scripts/postgres-migration.mjs';
@@ -18,13 +20,17 @@ test('storage activation requires preview, explicit cutover readiness and config
  assertPostgresApplicationRole({canCreateSchema:1,canChangeMarker:1,superuser:0},true);assert.throws(()=>assertPostgresApplicationRole({canCreateSchema:1,canChangeMarker:1,superuser:1},true));assertPostgresApplicationRole({canCreateSchema:0,canChangeMarker:0,superuser:0});for(const flag of ['canCreateSchema','canChangeMarker','superuser'])assert.throws(()=>assertPostgresApplicationRole({canCreateSchema:0,canChangeMarker:0,superuser:0,[flag]:1}));
 });
 test('a PostgreSQL fixture preserves its snapshot and journal restores subsequent writes to SQLite exactly once',async t=>{
- const r=await localRuntime({backend:'postgres'});t.after(()=>r.close());assert.equal(r.postgresSnapshot.schema.filter(s=>s.type==='table').length,52);
+ const r=await localRuntime({backend:'postgres'});t.after(()=>r.close());assert.equal(r.postgresSnapshot.schema.filter(s=>s.type==='table').length,57);
  const source=new DatabaseSync(':memory:');t.after(()=>source.close());
  for(const entry of orderedSchema(r.postgresSnapshot))source.exec(entry.sql);
  for(const entry of orderedSchema(r.postgresSnapshot).filter(s=>s.type==='table'))for(const row of r.postgresSnapshot.data[entry.name]){const keys=Object.keys(row);source.prepare(`INSERT INTO ${identifier(entry.name)} (${keys.map(identifier).join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...keys.map(key=>row[key]));}
  const started=await r.call('citizen','alice',{action:'commit-work',workOrderId:'harvest'});assert.equal(started.status,200);const shift=started.data.shifts[0];r.setNow(Date.parse(shift.completesAt));
  assert.equal((await r.call('citizen','alice',{action:'claim-work',shiftId:shift.id})).status,200);
  await r.call('citizen','alice');
+ await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'").run();
+ const queueId=randomUUID();assert.equal((await r.call('citizen','alice',{action:'korund-join-ration-queue',requestId:queueId})).status,200);
+ assert.equal((await r.call('citizen','alice',{action:'korund-cancel-ration-queue',requestId:randomUUID(),queueId})).status,200);
+ const budgetNow=Math.floor(Date.now()/1000);assert.equal(await reserveAiCall(r.db,randomUUID(),'@cf/meta/llama-3.2-3b-instruct',budgetNow,budgetNow+3600),true);
  const target={...r.postgresSnapshot,data:{}};for(const table of r.postgresSnapshot.schema.filter(s=>s.type==='table'))target.data[table.name]=(await r.db.prepare(`SELECT * FROM ${identifier(table.name)}`).all()).results;
  const journal=(await r.db.prepare('SELECT id,statements_json FROM harimu_postgres_write_journal ORDER BY id').all()).results;assert.ok(journal.length);
  replayJournalSqlite(source,journal);replayJournalSqlite(source,journal);

@@ -29,7 +29,7 @@ const {KorundPlanPanel}=await import(await load(resolve(root,'app/korund-plan-pa
 const {simulateGovernment}=await import(await load(resolve(root,'lib/government.ts')));
 const base={localDemo:false,pending:false,uncertain:false,error:null,capacity:18,onCommand(){},onRetry(){},onRefresh(){},onNavigate(){},onPetition(){}};
 const civic=nationId=>renderToStaticMarkup(React.createElement(GovernmentPanel,{...base,nationId,snapshot:simulateGovernment({nationId,availableBudgetMinor:0,foodSecurity:35,petitionCounts:{}}),verification:{countedActionsEligible:false,reason:'Phone verification unavailable.'}}));
-const ration=renderToStaticMarkup(React.createElement(KorundPlanPanel,{...base,scene:'market',plan:{available:true,gameWeek:4,couponFoodRemaining:2,couponExpiresAt:'2050-01-01T00:00:00Z',walletMinor:800,foodQuantity:2,publicFoodRemaining:40,shifts:[],assignment:{name:'Food brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4}}}));
+const ration=renderToStaticMarkup(React.createElement(KorundPlanPanel,{...base,scene:'market',plan:{available:true,gameWeek:4,couponFoodRemaining:2,couponExpiresAt:'2050-01-01T00:00:00Z',walletMinor:800,foodQuantity:2,publicFoodRemaining:40,queue:{waiting:3,position:2,requestId:'fixture-request'},shifts:[],assignment:{name:'Food brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4}}}));
 const luminance=hex=>{const channels=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4);return channels[0]*0.2126+channels[1]*0.7152+channels[2]*0.0722;};
 const contrast=(a,b)=>{const values=[luminance(a),luminance(b)].sort((a,b)=>b-a);return(values[0]+0.05)/(values[1]+0.05);};
 test('three civic themes have text/motif distinction and accessible foreground/accent contrast',()=>{
@@ -47,8 +47,8 @@ test('government themes follow authoritative snapshot nation rather than inspect
   else assert.doesNotMatch(html,/35\/100|below the 40-point/);
  }
 });
-test('Korund ration booklet shows actual coupons, clear unknown queue and no merchant prices',()=>{
- assert.match(ration,/data-nation-theme="korund"/);assert.match(ration,/Game week 4/);assert.match(ration,/2 food coupons/);assert.match(ration,/Queue status/);assert.match(ration,/Not recorded in this preview/);
+test('Korund ration booklet shows actual coupons, recorded FIFO queue and no merchant prices',()=>{
+ assert.match(ration,/data-nation-theme="korund"/);assert.match(ration,/Game week 4/);assert.match(ration,/2 food coupons/);assert.match(ration,/National FIFO queue/);assert.match(ration,/3 waiting requests/);
  assert.doesNotMatch(ration,/Buy |Sell |SPK|CRN|23 people|price per|1\.50/);
 });
 if(process.env.HARIMU_THEME_FIXTURE){
