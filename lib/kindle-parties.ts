@@ -25,7 +25,7 @@ export const kindleParties:readonly KindleParty[]=[
  party('steady-hand','Steady Hand Party','Work for everyone first; trade opened with care, one deal at a time.','Brass',
   'A job for every Resident who wants one. New trade deals only when they keep work at home. Slow and sure, and proud of it.'),
  party('open-ledger','Open Ledger Party','Low taxes and open markets; let prices and traders do the work.','Ember Orange',
-  'Lighter taxes, fewer rules and markets open to every trader. Strike your own spark and keep more of it.'),
+  'Lighter taxes, fewer rules and markets open to every trader. Keep more of what you earn.'),
  party('dockside-builders','Dockside Builders','Build it in public: homes, docks and works the whole Republic can use.','Basalt Black',
   'Public housing for those priced out, and docks to bring the trade in. If the market will not build it, the Republic should.'),
 ];
@@ -38,7 +38,6 @@ export const pledgeCatalog:readonly Pledge[]=[
  p('jobs-public-works','jobs','Hire for public works','The public works hiring never started.'),
  p('jobs-mines','jobs','Reopen frontier mine shifts','The frontier mine shifts are still closed.'),
  p('housing-public','housing','Build public housing','The public housing promised on the trail is still on paper.'),
- p('housing-rent-board','housing','Post every rent in public','Rents are still not posted, despite the pledge.'),
  p('trade-meridian-deal','trade','Trade deal with Meridian','No trade deal with Meridian has been signed.'),
  p('trade-open-markets','trade','Open the markets to every trader','Markets are no more open than before the vote.'),
  p('trade-careful-deals','trade','No trade deal that costs Kindle jobs','A trade deal went through without a word on jobs.'),
@@ -52,7 +51,7 @@ export const pledgeCatalog:readonly Pledge[]=[
 export const kindleCandidatePlatforms:Readonly<Record<string,{partyId:string;pledges:readonly string[]}>>={
  'ines-varro':{partyId:'steady-hand',pledges:['jobs-full-employment','jobs-public-works','trade-careful-deals','jobs-mines']},
  'tobin-achterberg':{partyId:'open-ledger',pledges:['tax-lower-income','tax-lower-sales','trade-open-markets','trade-meridian-deal','civic-fewer-rules']},
- 'mara-quell':{partyId:'dockside-builders',pledges:['housing-public','frontier-docks','housing-rent-board','tax-fair-land']},
+ 'mara-quell':{partyId:'dockside-builders',pledges:['housing-public','frontier-docks','tax-fair-land']},
 };
 
 export function pledge(key:string){return pledgeCatalog.find(x=>x.key===key);}

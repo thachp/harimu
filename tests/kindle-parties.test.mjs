@@ -19,7 +19,7 @@ test('exactly 3 AI parties with locked ids and full fields', () => {
 });
 test('pledge catalog: 12-18 locked keys, categories, length limits, no figures', () => {
   assert.deepEqual(pledgeCatalog.map(x=>x.key),['tax-lower-income','tax-lower-sales','tax-fair-land','jobs-full-employment','jobs-public-works','jobs-mines',
-    'housing-public','housing-rent-board','trade-meridian-deal','trade-open-markets','trade-careful-deals','frontier-new-cities','frontier-docks','civic-open-ballots','civic-fewer-rules']);
+    'housing-public','trade-meridian-deal','trade-open-markets','trade-careful-deals','frontier-new-cities','frontier-docks','civic-open-ballots','civic-fewer-rules']);
   assert.ok(pledgeCatalog.length>=12&&pledgeCatalog.length<=18);
   assert.deepEqual([...new Set(pledgeCatalog.map(x=>x.category))].sort(),['civic','frontier','housing','jobs','tax','trade']);
   for (const x of pledgeCatalog) { assert.equal(x.proposal,true); assert.ok(x.key.startsWith(x.category+'-'), x.key);
@@ -33,7 +33,7 @@ test('every lib/elections.ts candidate (3) maps to one party and 3-5 resolving p
   assert.deepEqual(kindleCandidatePlatforms,{
     'ines-varro':{partyId:'steady-hand',pledges:['jobs-full-employment','jobs-public-works','trade-careful-deals','jobs-mines']},
     'tobin-achterberg':{partyId:'open-ledger',pledges:['tax-lower-income','tax-lower-sales','trade-open-markets','trade-meridian-deal','civic-fewer-rules']},
-    'mara-quell':{partyId:'dockside-builders',pledges:['housing-public','frontier-docks','housing-rent-board','tax-fair-land']}});
+    'mara-quell':{partyId:'dockside-builders',pledges:['housing-public','frontier-docks','tax-fair-land']}});
   const used=new Set();
   for (const [id,m] of Object.entries(kindleCandidatePlatforms)) { assert.ok(kindleParty(m.partyId), id);
     assert.ok(m.pledges.length>=PLEDGES_PER_CANDIDATE_MIN&&m.pledges.length<=PLEDGES_PER_CANDIDATE_MAX, id);
@@ -53,4 +53,8 @@ test('only canon nations and places; no real-world parties, ideologies, places o
   assert.doesNotMatch(t,/Notable/);
   const proper=t.match(/\b(Meridian|Varkand|Korund|Aurelle|Ilmar|Hoarvale|Veldwood|Fulmara|Confluence|Kindle|Brasswell Port|Republic|Resident)\b/g)??[];
   assert.ok(proper.includes('Meridian')&&proper.includes('Brasswell Port'));
+});
+test('no party blurb uses the Kindle national motto (ARC #262)', () => {
+  for (const x of kindleParties) assert.doesNotMatch(x.blurb+x.ideology+x.name,/strike your own spark/i, x.id);
+  assert.equal(pledgeCatalog.length,14); assert.equal(pledge('housing-rent-board'),undefined);
 });
