@@ -31,6 +31,7 @@ import { SceneNews } from './world-scene';
 import { firstLoopStep } from '@/lib/first-loop';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
+import { WalletPanel } from './wallet-panel';
 import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
@@ -524,6 +525,7 @@ function ClerkCitizenSession({
 export default function Home() {
   const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
+  const [walletOpen, setWalletOpen] = useState(false);
   const [aurellePlan, setAurellePlan] = useState<AurellePlanView | null>(null);
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
   const aurelleIntent = useRef<AurelleCommand | null>(null);
@@ -1648,10 +1650,12 @@ export default function Home() {
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
+      onOpenWallet={clerkConfigured && !guestActive && citizenNation?.id === 'kindle' ? () => setWalletOpen(true) : undefined}
       onNavigate={navigateGame} onSelectNation={selectNation}
       socialDock={<CitizenDock key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} collectivePetitions={collectivePetitions} election={election} korund={korundPlan} onNavigate={navigateGame} />}
       accountControls={<>{citizenNation && !guestActive && <button type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief"><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
+      {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}

@@ -132,6 +132,23 @@ html[data-harimu-motion="reduce"] *,html[data-harimu-motion="reduce"] *::before,
 .notable-conversation textarea { width: 100%; max-width: 100%; min-height: 96px; box-sizing: border-box; resize: vertical; }
 .notable-conversation form p { margin: 0; overflow-wrap: anywhere; }
 
+/* Wallet panel (issue #39) */
+.game-wallet-button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.game-wallet-button:hover strong, .game-wallet-button:focus-visible strong { text-decoration: underline; }
+.wallet-panel-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(4, 8, 10, .6); }
+.wallet-panel { width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow: auto; padding: 18px 20px; border: 1px solid rgba(239, 214, 156, .35); background: #11181a; color: #e8e4d4; }
+.wallet-panel header { display: flex; align-items: center; justify-content: space-between; }
+.wallet-panel header button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.wallet-balances { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.wallet-balances dt { color: #a9a58f; font-size: 11px; }
+.wallet-balances dd { margin: 4px 0 0; color: #efd69c; font-family: Georgia, serif; font-size: 22px; }
+.wallet-quote small, .wallet-panel > small { color: #858f8b; }
+.wallet-history { width: 100%; border-collapse: collapse; font-size: 12px; }
+.wallet-history th, .wallet-history td { padding: 4px 6px; border-bottom: 1px solid rgba(255, 255, 255, .08); text-align: left; }
+.wallet-history td:last-child, .wallet-history th:last-child { text-align: right; }
+.wallet-credit { color: #9fd59a; }
+.wallet-debit { color: #e59a8a; }
+.game-resources>.game-wallet-button{display:grid;grid-template-columns:19px auto;column-gap:8px;align-items:center;min-width:82px;height:100%;padding:8px 12px;border-left:1px solid #263d46}
 .notable-transcript{list-style:none;padding:0;margin:0.5rem 0;display:grid;gap:0.5rem;max-height:40vh;overflow-y:auto}
 .notable-transcript li{border-left:3px solid currentColor;padding-left:0.5rem;overflow-wrap:anywhere}
 .morning-brief{position:fixed;top:72px;right:16px;z-index:40;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 96px);overflow:auto;padding:14px 16px;color:#dce7e8;background:#10232c;border:1px solid #34535d;border-radius:4px;box-shadow:0 8px 24px #0008}.morning-brief header{display:flex;justify-content:space-between;align-items:center;gap:8px}.morning-brief h2{font-size:17px;margin:0}.morning-brief h3{font-size:13px;margin:12px 0 6px;color:#90adb7;text-transform:uppercase;letter-spacing:.04em}.morning-brief ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}.morning-brief li button{width:100%;min-height:44px;display:grid;text-align:left;gap:2px;padding:8px 10px;color:inherit;background:#15303b;border:1px solid #34535d;border-radius:3px;cursor:pointer}.morning-brief li span{font-size:12px;color:#90adb7}
