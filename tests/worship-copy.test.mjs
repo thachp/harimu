@@ -38,3 +38,8 @@ test('unwired: nothing in app/ or components/ imports worship-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/worship-copy/, f);
 });
+test('ARC #265: Fair-Wind is location-neutral; Kinward stands at the hearth; one fixed completion per faith', () => {
+  assert.doesNotMatch(lines(worshipCopy['fair-wind-vow']).join(' '),/chapel/i);
+  assert.equal(worshipCopy['kinward-rite'].body[0],'Stand at the hearth.'); assert.doesNotMatch(lines(worshipCopy['kinward-rite']).join(' '),/kneel/i);
+  for (const c of Object.values(worshipCopy)) assert.equal(typeof c.completion,'string');
+});

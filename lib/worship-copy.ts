@@ -17,10 +17,10 @@ const w=(faithId:WorshipFaithId,label:string,body:string[],completion:string):Wo
 
 export const worshipCopy:Readonly<Record<WorshipFaithId,WorshipCopy>>={
  'kinward-rite':w('kinward-rite','Tend the Hearth',
-  ['Kneel at the household hearth and its carved name-stones.','Remember those who came before, and keep your oaths and your name.'],
+  ['Stand at the hearth.','Remember those named on its carved name-stones. Keep your oaths and your name.'],
   'The hearth is tended. Your name is kept.'),
  'fair-wind-vow':w('fair-wind-vow','Make Your Vow',
-  ['Stop at the chapel and make a vow before the day\'s travel or trade.','Ask for Honest Measure, Safe Return and Good Fortune.'],
+  ['Pause and make a vow before the day\'s travel or trade.','Ask for Honest Measure, Safe Return and Good Fortune.'],
   'Vow made. Trade fairly and travel safe.'),
  'open-hand':w('open-hand','Give at the Bread Hall',
   ['Bring what you can spare to the bread hall.','All are equal before the Giver. What you hold is held in trust for those in need.'],
