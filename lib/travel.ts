@@ -1,6 +1,6 @@
 import type { GameDatabase } from './database-contract';
 import { mapHeight, mapWidth, mvpNations } from './map-zones';
-import { citiesForNation } from './cities';
+import { citiesForNation, outpostCityForNation } from './cities';
 
 /**
  * Travel between owned and city squares with a travel timer (#123, docs 6: squares are the unit of movement).
@@ -30,13 +30,14 @@ const fail = (status: 400 | 403 | 409, reason: string, error: string): TravelRes
 const cheb = (a: Point, b: Point) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 export const travelSeconds = (from: Point, to: Point) => Math.min(maximumTravelSeconds, cheb(from, to) * travelSecondsPerSquare);
 
-/** City squares of a nation: seed capital and border outpost (first two catalog cities) plus founded cities. */
+/** City squares of a nation, mapped by city role (ARC ruling on #264): the capital square is the role 'capital' city and the
+ *  outpost square is the role 'frontier' city; founded cities (#202) are added. Other catalog cities have no square yet. */
 export async function citySquares(db: GameDatabase, nationId: string): Promise<Place[]> {
   const seed = mvpNations.find(n => n.id === nationId); if (!seed) return [];
-  const names = citiesForNation(nationId);
+  const capital = citiesForNation(nationId).find(c => c.role === 'capital'); const outpost = outpostCityForNation(nationId);
   const places: Place[] = [
-    { ...seed.capital, cityId: names[0]?.id ?? null, label: names[0]?.name ?? 'Capital' },
-    { ...seed.outpost, cityId: names[1]?.id ?? null, label: names[1]?.name ?? 'Border outpost' },
+    { ...seed.capital, cityId: capital?.id ?? null, label: capital?.name ?? 'Capital' },
+    { ...seed.outpost, cityId: outpost?.role === 'frontier' ? outpost.id : null, label: outpost?.name ?? 'Border outpost' },
   ];
   try {
     const founded = await db.prepare('SELECT id,name,center_x,center_y FROM world_cities WHERE nation_id=?').bind(nationId).all<{ id: string; name: string; center_x: number; center_y: number }>();
@@ -71,6 +72,13 @@ export async function travelBlock(db: GameDatabase, userId: string, now: number,
   return null;
 }
 
+/** #123 (ARC ruling on #264): with travel enabled, POST /api/city {action:'travel'} becomes a timed journey to that city's square. */
+export async function startCityTravel(db: GameDatabase, userId: string, cityId: string, requestId: string, now: number): Promise<TravelResult> {
+  const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
+  const place = (await citySquares(db, citizen?.nation_id ?? '')).find(p => p.cityId === cityId);
+  if (!place) return fail(409, 'no_square', 'That city has no square on the map yet, so it cannot be reached by travel.');
+  return startTravel(db, userId, { x: place.x, y: place.y, requestId }, now, true);
+}
 export function parseTravelCommand(body: Record<string, unknown>): { x: number; y: number; requestId: string } | null {
   if (body.action !== 'start-travel' || !Number.isInteger(body.x) || !Number.isInteger(body.y)) return null;
   if (typeof body.requestId !== 'string' || !/^[A-Za-z0-9-]{8,64}$/.test(body.requestId)) return null;

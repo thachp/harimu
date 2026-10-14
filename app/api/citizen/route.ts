@@ -23,7 +23,7 @@ import { checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstW
 import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
 
 export const dynamic = 'force-dynamic';
-const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'aurelle-start-work']);
+const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
 const privateJson = (data: unknown, init?: ResponseInit) => Response.json(data, { ...init, headers: { ...init?.headers, 'Cache-Control': 'private, no-store' } });
 
 const allowedHorizons = new Set(['today', 'week', 'season']);
