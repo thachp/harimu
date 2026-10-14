@@ -110,3 +110,9 @@ test('#169 follow-up: marking a transport failure uncertain never touches a fini
  const get=id=>r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id=?').bind(id).first();
  assert.deepEqual({...await get('done')},{reserved_micro:4200,status:'finished'});assert.deepEqual({...await get('open')},{reserved_micro:72400,status:'uncertain'});
 });
+test('#170 a Cabinet rejection with reported usage settles to the true token cost',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());await reached(r);const usage={prompt_tokens:600,completion_tokens:120};
+ const ai={seen:[],async run(){this.seen.push(1);return {response:JSON.stringify({response:'bad'}),usage};}};
+ assert.equal((await r.prepareAiCabinetResponse(ai,{enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}})).status,'failed');
+ assert.deepEqual({...await r.db.prepare("SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id LIKE 'cabinet:%'").first()},{reserved_micro:71,status:'finished'});
+});
