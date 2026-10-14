@@ -9,7 +9,7 @@ import unittest
 import uuid
 
 root = pathlib.Path(__file__).parents[1]
-source = ''.join((root / 'lib' / path).read_text() for path in ['market.ts', 'economy.ts', 'work-shifts.ts', 'player-market.ts', 'world-simulation.ts'])
+source = ''.join((root / 'lib' / path).read_text() for path in ['market.ts', 'market-orders.ts', 'economy.ts', 'work-shifts.ts', 'player-market.ts', 'world-simulation.ts'])
 def sql(name):
     return re.search(r'export const ' + name + r' = `([^`]+)`', source).group(1)
 
@@ -23,7 +23,7 @@ class MarketTests(unittest.TestCase):
           INSERT INTO citizens VALUES ('alice','kindle',18,''),('bob','kindle',18,''),('carl','korund',18,''),('visitor',NULL,18,'');
           INSERT INTO work_orders VALUES ('harvest');''')
         for name in ['worldClockSchema','worldTickSchema','worldSupplySchema','policyExecutionSchema','shiftSchema','activeShiftIndex','economySchema','recoverySchema','rewardSchema','fundSchema',
-                     'marketItemsSchema','starterSchema','marketEventsSchema','listingSchema','fillSchema','cancelSchema','playerReceiptView','openLotsView','walletViewSql','inventoryViewSql','merchantViewSql','merchantCashSql']:
+                     'marketItemsSchema','starterSchema','marketEventsSchema','listingSchema','fillSchema','cancelSchema','playerReceiptView','openLotsView','marketGoodsSchema','marketOrdersSchema','marketCancellationsSchema','marketTradesSchema','marketOpenOrdersView','walletViewSql','inventoryViewSql','merchantViewSql','merchantCashSql']:
             self.db.execute(sql(name))
         self.db.execute("INSERT INTO economy_funds VALUES ('kindle-merchant',10000)")
         self.db.execute("INSERT INTO market_items VALUES ('food','Food',150,100,100)")
