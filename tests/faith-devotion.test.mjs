@@ -66,17 +66,44 @@ test('worship raises Devotion once per game day, is idempotent on retry, and dec
   const s = await read(r, 'alice'); assert.equal(s.devotion.tier.label, 'Newcomer'); assert.match(s.devotion.explanation, /social standing only/);
 });
 
-test('faith change is blocked for 60 real days with a visible reason, and resets Devotion', async t => {
+test('a first pick is free; the first change starts the 60-day cooldown with a visible reason and resets Devotion', async t => {
   const r = await runtime(t);
   assert.equal((await choose(r, 'alice', 'open-hand')).status, 200);
+  const afterFirst = await read(r, 'alice');
+  assert.equal(afterFirst.changeBlockedReason, null, 'first pick starts no cooldown'); assert.equal(afterFirst.changeAvailableAt, null);
   await worship(r, 'alice');
-  const blocked = await choose(r, 'alice', 'fair-wind-vow');
-  assert.equal(blocked.status, 409); assert.equal(blocked.data.reason, 'cooldown'); assert.match(blocked.data.error, /once every 60 real days. Next change: \d{4}-\d{2}-\d{2}/);
-  assert.match((await read(r, 'alice')).changeBlockedReason, /60 real days/);
-  r.setNow(r.now + 60 * 86400 * 1000);
   const changed = await choose(r, 'alice', 'fair-wind-vow');
   assert.equal(changed.status, 200, JSON.stringify(changed.data)); assert.equal(changed.data.state.devotion.value, 0);
-  assert.equal(changed.data.state.faith.name, 'Fair-Wind Vow'); assert.equal(changed.data.state.changeBlockedReason.includes('60 real days'), true);
+  assert.equal(changed.data.state.faith.name, 'Fair-Wind Vow'); assert.match(changed.data.state.changeBlockedReason, /60 real days/);
+  const blocked = await choose(r, 'alice', 'open-hand');
+  assert.equal(blocked.status, 409); assert.equal(blocked.data.reason, 'cooldown'); assert.match(blocked.data.error, /once every 60 real days. Next change: \d{4}-\d{2}-\d{2}/);
+  r.setNow(r.now + 60 * 86400 * 1000);
+  assert.equal((await choose(r, 'alice', 'open-hand')).status, 200);
+});
+
+test('a first pick of Unaffiliated is free and starts no cooldown (Kindle and Korund)', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'kai', 'korund');
+  assert.equal((await choose(r, 'alice', 'unaffiliated')).status, 200);
+  assert.equal((await read(r, 'alice')).changeBlockedReason, null);
+  assert.equal((await choose(r, 'alice', 'open-hand')).status, 200, 'change right after a first Unaffiliated pick');
+  assert.equal((await choose(r, 'kai', 'unaffiliated')).status, 200);
+  assert.equal((await read(r, 'kai')).changeAvailableAt, null);
+  assert.equal((await choose(r, 'kai', 'unaffiliated', 'open-hand')).status, 200, 'Korund can add a hidden faith right after a first pick');
+});
+
+test('Aurelle: leaving the Kinward Rite is blocked with a visible Royal Favor reason (14.2), even after worship records the default', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'ava', 'aurelle'); await citizen(r, 'bo', 'aurelle');
+  const ava = await read(r, 'ava'); assert.match(ava.leaveBlockedReason, /costs Royal Favor/);
+  for (const to of ['open-hand', 'fair-wind-vow', 'unaffiliated']) {
+    const res = await choose(r, 'ava', to);
+    assert.equal(res.status, 409); assert.equal(res.data.reason, 'royal_favor_unavailable'); assert.match(res.data.error, /Royal Favor/);
+  }
+  assert.equal((await worship(r, 'bo')).status, 200);
+  assert.equal((await choose(r, 'bo', 'open-hand')).data.reason, 'royal_favor_unavailable');
+  assert.equal((await read(r, 'bo')).faith.id, 'kinward-rite');
+  assert.equal((await read(r, 'alice')).leaveBlockedReason, null, 'Kindle has no Favor cost');
 });
 
 test('GET /api/faith makes no writes', async t => {
