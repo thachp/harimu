@@ -18,3 +18,9 @@ test('form submits only explicit bounded text and pending or disabled service re
  for(const state of [{pending:true},{unresolved:{requestId:'fixture',notableId:view.profile.id,topic:'news',question:'Original public question'}},{view:{...view,enabled:false}},{question:'tiny'}]){const sent=[],tree=exports.NotablePanel({view,question:'Public question',onRefresh(){},onSubmit:(...args)=>sent.push(args),...state});all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});assert.equal(sent.length,0);assert.equal(all(tree).find(n=>n?.type==='textarea').props.value,state.question??'Public question');}
  const sent=[],tree=exports.NotablePanel({view,question:'  What public work is recorded?  ',onRefresh(){},onSubmit:(...args)=>sent.push(args)});all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});assert.deepEqual(sent,[['news','What public work is recorded?']]);
 });
+
+test('shared allowance prevents an unaffordable freeform request while retaining an affordable listed topic',()=>{
+ const budget={remainingMicroUsd:83400,topicMicroUsd:72400,questionMicroUsd:136400,blocked:false};
+ for(const state of [{question:'A public question',budget},{question:'',budget:{...budget,blocked:true}}]){const sent=[],tree=exports.NotablePanel({view:{...view,budget:state.budget},question:state.question,onRefresh(){},onSubmit:(...args)=>sent.push(args)});all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});assert.equal(sent.length,0);assert.match(renderToStaticMarkup(tree),/Shared AI allowance/);}
+ const sent=[],tree=exports.NotablePanel({view:{...view,budget},question:'',onRefresh(){},onSubmit:(...args)=>sent.push(args)});all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});assert.deepEqual(sent,[['news',undefined]]);
+});

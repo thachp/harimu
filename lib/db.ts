@@ -1,3 +1,4 @@
+import {reconcileAiAcceptanceCharges} from './ai-acceptance-charges';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
 import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
@@ -347,6 +348,7 @@ export async function getDatabase():Promise<GameDatabase> {
     // rewrite an imported world using the old SQLite compatibility migrations.
     const marker=await database.prepare("SELECT validated,backup_sha256 FROM harimu_storage_migrations WHERE id='d1-to-postgres-v1'").first<{validated:number;backup_sha256:string}>();
     if(marker?.validated!==1||!/^[a-f0-9]{64}$/.test(marker.backup_sha256))throw Error('PostgreSQL import has not been validated.');
+    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true')await reconcileAiAcceptanceCharges(database);
     return database;
   }
   const database = databaseBinding();
