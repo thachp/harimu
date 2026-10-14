@@ -5,6 +5,7 @@ import {korundQueueSchemas} from './korund-queue';
 import {korundCouponSchemas} from './korund-coupons';
 import {firstWeekGoalsSchema} from './first-week-server';
 import {worldRegistrySchemas} from './world-registry';
+import { tesseraExchangeSchema, tesseraExchangeIndex } from './tessera-exchange';
 import {travelSchema} from './travel';
 import {stabilitySchemas} from './stability';
 import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
@@ -198,7 +199,7 @@ async function initialize(database: GameDatabase) {
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
     ...korundCouponSchemas.map(sql=>database.prepare(sql)),
     database.prepare(firstWeekGoalsSchema),
-    ...worldRegistrySchemas.map(sql=>database.prepare(sql)),
+    ...worldRegistrySchemas.map(sql=>database.prepare(sql)), database.prepare(tesseraExchangeSchema), database.prepare(tesseraExchangeIndex), // #210
     database.prepare(travelSchema),
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
@@ -254,6 +255,14 @@ async function initialize(database: GameDatabase) {
       database.prepare('DROP VIEW IF EXISTS market_open_orders'),
       database.prepare(marketOpenOrdersView), database.prepare(walletViewSql), database.prepare(inventoryViewSql),
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('market-spoilage-v1')"),
+    ]);
+  }
+  // #210: Clearing House kiosk purchases debit Spark. Same atomic wallet-view swap as market-orders-v1.
+  const tesseraExchangeInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'tessera-exchange-v1'").first();
+  if (!tesseraExchangeInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('tessera-exchange-v1')"),
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));

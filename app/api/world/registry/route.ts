@@ -4,16 +4,19 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { buySquare, parsePurchaseCommand, readTessera, squarePriceMinor } from '@/lib/world-registry';
+import { buyTessera, parseExchangeCommand, sparkPerTessera, kioskMinTesseraMinor, kioskMaxTesseraMinor } from '@/lib/tessera-exchange';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const enabled = () => (env as unknown as { HARIMU_SQUARE_PURCHASE_ENABLED?: string }).HARIMU_SQUARE_PURCHASE_ENABLED === 'true';
 
 // #122: World Registry listing (price + your Tessera) and the buy-square action.
+// #210: buy-tessera at the Clearing House kiosk is the citizen Tessera source; it opens with the registry.
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  return privateJson({ open: enabled(), priceMinor: squarePriceMinor, currency: 'TSR', tesseraMinor: await readTessera(await getDatabase(), userId, enabled()) });
+  return privateJson({ open: enabled(), priceMinor: squarePriceMinor, currency: 'TSR', tesseraMinor: await readTessera(await getDatabase(), userId),
+    kiosk: { sparkPerTessera, minTesseraMinor: kioskMinTesseraMinor, maxTesseraMinor: kioskMaxTesseraMinor } });
 }
 
 export async function POST(request: Request) {
@@ -25,7 +28,13 @@ export async function POST(request: Request) {
   }
   if (!isSameOriginCommand(request)) return privateJson({ error: 'Same-origin request required.' }, 403);
   let body: Record<string, unknown>;
-  try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send a buy-square command.', reason: 'bad_request' }, 400); }
+  try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send a buy-square or buy-tessera command.', reason: 'bad_request' }, 400); }
+  if (body.action === 'buy-tessera') {
+    const exchange = parseExchangeCommand(body);
+    if (!exchange) return privateJson({ error: `Send action "buy-tessera", an integer tesseraMinor between ${kioskMinTesseraMinor} and ${kioskMaxTesseraMinor} and a requestId.`, reason: 'bad_request' }, 400);
+    const bought = await buyTessera(await getDatabase(), userId, exchange, Math.floor(Date.now() / 1000), enabled());
+    return bought.ok ? privateJson(bought) : privateJson({ error: bought.error, reason: bought.reason }, bought.status);
+  }
   const command = parsePurchaseCommand(body);
   if (!command) return privateJson({ error: 'Send action "buy-square", integer x/y and a requestId.', reason: 'bad_request' }, 400);
   const result = await buySquare(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), enabled());

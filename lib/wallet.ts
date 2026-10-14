@@ -6,7 +6,7 @@ export const tesseraRateSource = 'fixed PoC placeholder rate';
 
 export type WalletTransaction = {
   id: string;
-  kind: 'wage' | 'market-buy' | 'market-sell' | 'citizen-buy' | 'citizen-sale' | 'fee';
+  kind: 'wage' | 'tessera-buy' | 'market-buy' | 'market-sell' | 'citizen-buy' | 'citizen-sale' | 'fee';
   amountMinor: number;
   reason: string;
   occurredAt: string;
@@ -30,6 +30,9 @@ export const walletHistorySql = `SELECT id, kind, amount_minor, item, quantity, 
     CAST(strftime('%s', s.settled_at) AS INTEGER) AS occurred_at
     FROM shift_settlements s JOIN work_shifts w ON w.id = s.shift_id WHERE s.clerk_user_id = ?
   UNION ALL
+  SELECT 'tessera:' || request_id, 'tessera-buy', -spark_minor, 'TSR', tessera_minor, occurred_at
+    FROM citizen_tessera_exchanges WHERE clerk_user_id = ?
+  UNION ALL
   SELECT 'market:' || id, CASE kind WHEN 'buy' THEN 'market-buy' ELSE 'market-sell' END, wallet_delta, item, ABS(quantity_delta), occurred_at
     FROM citizen_economy_events WHERE clerk_user_id = ? AND wallet_delta != 0
   UNION ALL
@@ -44,6 +47,7 @@ export function describeTransaction(row: WalletHistoryRow): string {
   const goods = `${row.quantity ?? 0} ${row.item ?? 'goods'}`;
   switch (row.kind) {
     case 'wage': return `Wage · ${row.item ?? 'paid shift'}`;
+    case 'tessera-buy': return `Clearing House kiosk · bought ${((row.quantity ?? 0) / 100).toFixed(2)} TSR`;
     case 'market-buy': return `Market purchase · ${goods}`;
     case 'market-sell': return `Market sale · ${goods}`;
     case 'citizen-buy': return `Citizen listing purchase · ${goods}`;

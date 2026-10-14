@@ -23,7 +23,7 @@ export type Economy = {
   nextRecoveryAt: string;
   /** Recent SPK movements, newest first (issue #39 wallet panel). */
   transactions?: WalletTransaction[];
-  /** Tessera holdings from the World Registry ledger (#122): PoC starter grant minus square purchases. */
+  /** Tessera holdings (#122, #210): Clearing House kiosk purchases plus the World Registry ledger (square purchases). */
   tesseraMinor?: number;
 };
 export const economySchema = `CREATE TABLE IF NOT EXISTS shift_settlements (
@@ -110,7 +110,8 @@ export async function pendingStarterFood(db: GameDatabase, userId: string): Prom
 export const isMissingRelation = (error: unknown) => /no such table|does not exist|42P01/i.test(String((error as { code?: string })?.code ?? '') + ' ' + String((error as Error)?.message ?? error));
 export async function readTesseraBalance(db: GameDatabase, userId: string): Promise<number> {
   try {
-    const row = await db.prepare('SELECT COALESCE(SUM(delta_minor),0) AS balance FROM citizen_tessera_ledger WHERE clerk_user_id=?').bind(userId).first<{ balance: number }>();
+    const row = await db.prepare(`SELECT COALESCE((SELECT SUM(delta_minor) FROM citizen_tessera_ledger WHERE clerk_user_id=?),0)
+      + COALESCE((SELECT SUM(tessera_minor) FROM citizen_tessera_exchanges WHERE clerk_user_id=?),0) AS balance`).bind(userId, userId).first<{ balance: number }>();
     return Number(row?.balance ?? 0);
   } catch (error) { if (isMissingRelation(error)) return 0; throw error; }
 }
@@ -119,11 +120,11 @@ export async function readEconomy(db: GameDatabase, userId: string, interval: nu
   if (!options.readOnly) await db.prepare(starterGrantSql).bind(userId).run();
   // One SQLite read snapshot keeps wallet and goods consistent during another tab's claim.
   // Wallet history is read in the same statement so the balance and the listed movements always agree (#49 review).
-  const row = await db.prepare(economyWalletSnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId).first<{
+  const row = await db.prepare(economyWalletSnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId, userId).first<{
     wallet_minor: number; inventory_json: string; recovered_at: number | null; history_json: string | null;
   }>();
   const history = sortHistory(JSON.parse(row?.history_json ?? '[]') as WalletHistoryRow[]);
-  // #122: Tessera comes from the World Registry ledger (PoC starter grant minus square purchases).
+  // #122/#210: Tessera = kiosk purchases plus the World Registry ledger.
   let inventory = JSON.parse(row?.inventory_json ?? '[]') as Economy['inventory'];
   let recoveredAt = row?.recovered_at ?? Math.floor(Date.now() / 1000);
   if (options.readOnly) {
