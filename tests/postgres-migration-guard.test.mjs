@@ -117,4 +117,11 @@ test('preview workflow deploys only dev after CI, migrates first, secret names o
   for (const name of ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'PREVIEW_DATABASE_ADMIN_URL']) assert.match(wf, new RegExp(`secrets\\.${name}`));
   assert.doesNotMatch(wf, /pull_request|postgres:\/\/|branches: \[main/);
   assert.ok(wf.indexOf('db:postgres:migrate') < wf.indexOf('npm run deploy'));
+  // Deploy can never run if migrate failed or was skipped.
+  assert.doesNotMatch(wf, /continue-on-error/);
+  assert.match(wf, /id: migrate\n\s+env:[\s\S]*?run: npm run db:postgres:migrate\n/);
+  assert.doesNotMatch(wf.slice(wf.indexOf('id: migrate'), wf.indexOf('db:postgres:migrate')), /\bif:/, 'migrate step is unconditional');
+  const deployStep = wf.slice(wf.indexOf('- name: Deploy'));
+  assert.match(deployStep, /if: success\(\) && steps\.migrate\.outcome == 'success'/);
+  assert.match(await readFile('scripts/deploy-cloudflare.mjs', 'utf8'), /assertPostgresMigrationsApplied\(db\)[\s\S]*deployArgs\(false\)/);
 });

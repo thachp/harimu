@@ -44,11 +44,13 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Apply pending Postgres migrations (fails closed)
+        id: migrate
         env:
           PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
         run: npm run db:postgres:migrate
       - name: Deploy with pinned wrangler (runs the #119 migration guard)
-        if: github.event_name == 'workflow_run' || !inputs.migrate_only
+        # Never runs unless the migration step itself succeeded (not failed, not skipped).
+        if: success() && steps.migrate.outcome == 'success' && (github.event_name == 'workflow_run' || !inputs.migrate_only)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
