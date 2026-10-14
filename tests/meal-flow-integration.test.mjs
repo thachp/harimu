@@ -18,6 +18,7 @@ function client(snapshot,fetch){
  const state={Capacity:snapshot.capacity,Economy:snapshot.economy,Market:snapshot.market};const ref=current=>({current});
  const bindings={clerkConfigured:true,citizenSessionStatus:'ready',citizenNation:{id:'kindle'},citizenEpoch:ref(1),workLock:ref(false),marketIntent:ref(null),playerIntent:ref(null),korundIntent:ref(null),aurelleIntent:ref(null),validMarketCommand,persistIntents(){},fetch};
  for(const name of ['WorkPending','WorkError','MarketCommand','Economy','Market','PlayerMarket','Capacity','RecentAction'])bindings[`set${name}`]=value=>{state[name]=value;};
+ bindings.viewMode='household';bindings.announce=(_origin,text)=>{state.RecentAction=text;};
  const run=command=>{const scope={...bindings,economy:state.Economy,market:state.Market};return new Function(...Object.keys(scope),`${commandJs};return runMarket;`)(...Object.values(scope))(command);};
  const render=()=>flatten(exports.CitizenMarket({market:state.Market,economy:state.Economy,capacity:state.Capacity,busy:Boolean(state.WorkPending),uncertain:Boolean(state.MarketCommand)&&!state.WorkPending,pendingAction:state.MarketCommand?.action,showTrading:false,onMeal(){},onTrade(){},onRetry(){}}));
  return {state,bindings,run,render};

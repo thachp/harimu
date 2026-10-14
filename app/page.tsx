@@ -616,6 +616,8 @@ export default function Home() {
   const [waterSecurity, setWaterSecurity] = useState(71);
   const [wardStability, setWardStability] = useState(86);
   const [recentAction, setRecentAction] = useState<string | null>(null);
+  // Success notices only surface if the player is still in the view where the action began.
+  const announce = (origin: string, text: string) => setRecentAction(typeof window === 'undefined' || !window.location || sceneFromSearch(window.location.search) === origin ? text : null);
   const [horizon, setHorizon] = useState<PlanHorizon>('week');
   const [completedPlanIds, setCompletedPlanIds] = useState<string[]>(['capacity']);
   const [planSaved, setPlanSaved] = useState(false);
@@ -825,7 +827,7 @@ export default function Home() {
             ? { ...shift, claimedAt: new Date().toISOString() } : shift));
         }
       }
-      setRecentAction(action === 'commit-work'
+      announce(viewMode, action === 'commit-work'
         ? `Shift started: ${order?.name}. Work continues while you are away.`
         : action === 'refresh-work' ? 'Citizen account refreshed.' : 'Shift settled: wages and goods recorded in your citizen account.');
     } catch {
@@ -897,7 +899,7 @@ export default function Home() {
         setDemoReceipts((current) => [...current, command.requestId]);
       }
       marketIntent.current = null; persistIntents(); setMarketCommand(null);
-      setRecentAction(command.action === 'household-meal'
+      announce(viewMode, command.action === 'household-meal'
         ? 'Household fed: 2 food consumed, up to 4 Work Capacity restored.' : `Market ${command.side}: ${command.quantity} ${command.item} settled.`);
     } catch {
       if (epoch !== citizenEpoch.current) return;
@@ -930,7 +932,7 @@ export default function Home() {
       if (result.playerMarket) setPlayerMarket(result.playerMarket);
       playerIntent.current = null; persistIntents(); setPlayerCommand(null);
       if (!response.ok) { setWorkError(result.error ?? 'Listing action refused. Refresh your account.'); return; }
-      setRecentAction(command.action === 'create-listing' ? 'Citizen listing created: goods reserved.'
+      announce(viewMode, command.action === 'create-listing' ? 'Citizen listing created: goods reserved.'
         : command.action === 'buy-listing' ? 'Citizen purchase settled: payment and goods transferred.' : 'Listing cancelled: reserved goods returned.');
     } catch {
       if (epoch !== citizenEpoch.current) return;
@@ -969,7 +971,7 @@ export default function Home() {
         setCitizenshipStatus((current) => current ? { ...current, politicalActionTaken:true, canChange:false, lockedReason:'political-action' } : current);
         governmentIntent.current=null; persistIntents();
       }
-      setRecentAction('Citizen petition recorded; the rule-bound government proposal reflects public priorities.');
+      announce(viewMode, 'Citizen petition recorded; the rule-bound government proposal reflects public priorities.');
     } catch {
       if (epoch !== citizenEpoch.current) return; setGovernmentError('Connection interrupted. Retry the same petition topic to confirm its saved result.'); }
     finally {
@@ -1007,7 +1009,7 @@ export default function Home() {
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       korundIntent.current = null; setKorundCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Korund action refused; refresh your assignment and ration book.'); return; }
-      setRecentAction(result.replayed?'Previous Korund action confirmed. Check the current ration book and queue.':command.action==='korund-join-ration-queue'?'Ration request joined the national FIFO queue.':command.action==='korund-cancel-ration-queue'?'Ration request cancelled; unused coupons retained.':command.action === 'korund-start-work' ? 'Assigned shift started; work continues while you are away.'
+      announce(viewMode, result.replayed?'Previous Korund action confirmed. Check the current ration book and queue.':command.action==='korund-join-ration-queue'?'Ration request joined the national FIFO queue.':command.action==='korund-cancel-ration-queue'?'Ration request cancelled; unused coupons retained.':command.action === 'korund-start-work' ? 'Assigned shift started; work continues while you are away.'
         : command.action === 'korund-claim-work' ? 'Assigned-shift wages collected in Labor Notes; output added to the state food pool.'
           : command.action === 'korund-redeem-ration' ? 'Ration coupons redeemed for household food.' : 'Household ration meal recorded; capacity updated.');
     } catch {
@@ -1046,7 +1048,7 @@ export default function Home() {
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       aurelleIntent.current = null; setAurelleCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Aurelle action refused; refresh your charter account.'); return; }
-      setRecentAction(command.action === 'aurelle-start-work' ? 'Chartered service started; work continues while you are away.'
+      announce(viewMode, command.action === 'aurelle-start-work' ? 'Chartered service started; work continues while you are away.'
         : command.action === 'aurelle-claim-work' ? 'Crown wages and Favor collected; estate food recorded.'
           : command.action === 'aurelle-buy-food' ? 'Chartered food purchased.' : 'Household meal recorded; capacity updated.');
     } catch {
