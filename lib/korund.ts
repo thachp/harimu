@@ -1,6 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import {activeRationQueue,readRationQueue,executeRationQueue,queueIdentifierUsed,type RationQueue} from './korund-queue';
 import type { WorkShift } from './work-shifts';
+import { readBureau, setPreferences, requestAssignment, type BureauView } from './labor-bureau';
 import {readCouponsAndQuota,korundCouponGoods,korundCouponRedeemSql,type KorundCoupon,type KorundQuota} from './korund-coupons';
 export const korundJob = {id:'korund-food-production',name:'State food-production brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4} as const;
 export const gameWeekSeconds = 50400;
@@ -39,10 +40,13 @@ export const korundMealSql = `INSERT OR IGNORE INTO korund_meals(id,clerk_user_i
 export type KorundPlan = { available:boolean; mode:'bounded state planning'; assignment:typeof korundJob;
  walletMinor:number;foodQuantity:number;publicFoodRemaining:number;publicFundMinor:number;
  gameWeek:number;couponFoodRemaining:number;couponExpiresAt:string;mealReadyAt:string|null;shifts:WorkShift[];queue?:RationQueue;
- coupons?:KorundCoupon[];quota?:KorundQuota;clothingQuantity?:number;goodsQuantity?:number };
-export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'|'korund-join-ration-queue'|'korund-cancel-ration-queue'|'korund-redeem-coupon'; requestId?:string;shiftId?:string;queueId?:string;coupon?:'clothing'|'goods';gameWeek?:number};
+ coupons?:KorundCoupon[];quota?:KorundQuota;bureau?:BureauView;clothingQuantity?:number;goodsQuantity?:number };
+export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'|'korund-join-ration-queue'|'korund-cancel-ration-queue'|'korund-redeem-coupon'|'korund-set-preferences'|'korund-request-assignment'; requestId?:string;preferences?:string[];shiftId?:string;queueId?:string;coupon?:'clothing'|'goods';gameWeek?:number};
 const uuid=(v:unknown):v is string=>typeof v==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export function validKorundCommand(body:Record<string,unknown>):body is Record<string,unknown>&KorundCommand {
+ // #235 (flag-gated at execution): preferences are three job ids; the assignment request carries only an id.
+ if(body.action==='korund-set-preferences')return uuid(body.requestId)&&Array.isArray(body.preferences)&&Object.keys(body).every(k=>['action','requestId','preferences'].includes(k));
+ if(body.action==='korund-request-assignment')return uuid(body.requestId)&&Object.keys(body).every(k=>['action','requestId'].includes(k));
  if(body.action==='korund-cancel-ration-queue')return uuid(body.requestId)&&uuid(body.queueId);
  if(body.action==='korund-redeem-coupon')return uuid(body.requestId)&&(body.coupon==='clothing'||body.coupon==='goods')&&(body.gameWeek===undefined||(Number.isInteger(body.gameWeek)&&Number(body.gameWeek)>=1))&&Object.keys(body).every(k=>['action','requestId','coupon','gameWeek'].includes(k));
  return body.action==='korund-claim-work' ? uuid(body.shiftId)&&(body.requestId===undefined||uuid(body.requestId)) : ['korund-start-work','korund-redeem-ration','korund-household-meal','korund-join-ration-queue'].includes(String(body.action)) && uuid(body.requestId);
@@ -55,7 +59,7 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{laborBureau?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -72,14 +76,20 @@ export async function readKorund(db:GameDatabase,userId:string,now:number):Promi
  db.prepare(`SELECT s.* FROM work_shifts s JOIN korund_work_starts k ON k.id=s.id WHERE s.clerk_user_id=? ORDER BY s.started_at DESC LIMIT 20`).bind(userId).all<{id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
  ]);
  const extra=await readCouponsAndQuota(db,userId,w.number,Boolean(ledger?.coupon_used),w.start,w.end);
- return {...extra,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
+ const bureau=options.laborBureau&&citizen?.nation_id==='korund'?{bureau:await readBureau(db,userId,now)}:{};
+ return {...extra,...bureau,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number) {
+export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{laborBureau?:boolean}={}) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  // An already-started shift may settle into its original LN ledger after a grace-period move.
  if(nation?.nation_id!=='korund' && command.action!=='korund-claim-work') return {status:409,error:'Korund citizenship required; previous balances remain in their original currency.'};
+ if(command.action==='korund-set-preferences'||command.action==='korund-request-assignment'){
+  // #235: the Labor Bureau ships off; with the flag off these actions change nothing.
+  if(!options.laborBureau)return {status:403,reason:'disabled',error:'The Labor Bureau is not open yet.'};
+  return command.action==='korund-set-preferences'?setPreferences(db,userId,command.preferences,now):requestAssignment(db,userId,command.requestId!.toLowerCase(),now);
+ }
  const iso=new Date(now*1000).toISOString();
  const id=(command.action==='korund-claim-work'?command.shiftId!:command.requestId!).toLowerCase();
  if(command.action==='korund-join-ration-queue'||command.action==='korund-cancel-ration-queue'){const w=await week(db,now);return executeRationQueue(db,userId,command.action,id,command.queueId?.toLowerCase(),w.number,now,Date.parse(w.expiresAt)/1000);}
