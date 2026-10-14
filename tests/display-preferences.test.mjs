@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import ts from 'typescript';
-import {displayPreferences,displayTimestamp,graphicsOptions} from '../lib/display-preferences.ts';
+import {displayPreferences,displayTimestamp,graphicsOptions,defaultDisplayPreferences} from '../lib/display-preferences.ts';
 const require=createRequire(import.meta.url);
 const compiled=ts.transpileModule(await readFile(new URL('../app/display-preferences.tsx',import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
 function harness(saved){
@@ -17,8 +17,8 @@ function harness(saved){
  return{render,flush:()=>tasks.splice(0).forEach(fn=>fn()),saved:()=>stored,block:()=>{blocked=true;},external(value){stored=value;listeners.get('storage')({key:'harimu:display-preferences:v1'});},cleanup,listeners};
 }
 test('preferences allow only supported values and never retain arbitrary stored fields',()=>{
- assert.deepEqual(displayPreferences({graphics:'low',timeFormat:'12',citizen:'private'}),{graphics:'low',timeFormat:'12',motion:'system'});
- for(const input of [null,'low',{graphics:'ultra',timeFormat:'locale'}])assert.deepEqual(displayPreferences(input),{graphics:'standard',timeFormat:'24',motion:'system'});
+ assert.deepEqual(displayPreferences({graphics:'low',timeFormat:'12',citizen:'private'}),{graphics:'low',timeFormat:'12',motion:'system',textScale:100});
+ for(const input of [null,'low',{graphics:'ultra',timeFormat:'locale'}])assert.deepEqual(displayPreferences(input),{graphics:'standard',timeFormat:'24',motion:'system',textScale:100});
 });
 test('low graphics reduces resolution and disables expensive features; standard clamps device density',()=>{
  assert.deepEqual(graphicsOptions('low',3),{pixelRatio:1,shadows:false,antialias:false});
@@ -31,15 +31,21 @@ test('12/24-hour formatting changes presentation, consistently uses UTC and reje
 });
 test('provider hydrates deterministically, persists only display values and follows another tab',()=>{
  const h=harness(JSON.stringify({graphics:'low',timeFormat:'12',token:'discard'}));assert.equal(h.render().preferences.graphics,'standard');h.flush();assert.equal(h.render().preferences.graphics,'low');
- h.render().save({graphics:'standard',timeFormat:'12',motion:'system'});assert.deepEqual(JSON.parse(h.saved()),{graphics:'standard',timeFormat:'12',motion:'system'});
- h.external(JSON.stringify({graphics:'low',timeFormat:'24',motion:'system'}));assert.deepEqual(h.render().preferences,{graphics:'low',timeFormat:'24',motion:'system'});h.cleanup();assert.equal(h.listeners.size,0);
+ h.render().save({graphics:'standard',timeFormat:'12',motion:'system',textScale:100});assert.deepEqual(JSON.parse(h.saved()),{graphics:'standard',timeFormat:'12',motion:'system',textScale:100});
+ h.external(JSON.stringify({graphics:'low',timeFormat:'24',motion:'system'}));assert.deepEqual(h.render().preferences,{graphics:'low',timeFormat:'24',motion:'system',textScale:100});h.cleanup();assert.equal(h.listeners.size,0);
 });
 test('unavailable browser storage still permits settings for this visit and reports persistence limitation',()=>{
- const h=harness(null);h.block();h.flush();assert.equal(h.render().storageAvailable,false);h.render().save({graphics:'low',timeFormat:'12',motion:'system'});assert.equal(h.render().preferences.graphics,'low');assert.equal(h.render().storageAvailable,false);h.cleanup();
+ const h=harness(null);h.block();h.flush();assert.equal(h.render().storageAvailable,false);h.render().save({graphics:'low',timeFormat:'12',motion:'system',textScale:100});assert.equal(h.render().preferences.graphics,'low');assert.equal(h.render().storageAvailable,false);h.cleanup();
  const invalid=harness('{bad json');invalid.flush();assert.equal(invalid.render().storageAvailable,false);invalid.cleanup();
 });
 
 test('explicit reduced motion is retained without allowing unsupported motion modes',()=>{
  assert.equal(displayPreferences({motion:'reduce'}).motion,'reduce');
  for(const motion of ['full','none',null,123])assert.equal(displayPreferences({motion}).motion,'system');
+});
+
+test('text size (#80) accepts only 100/125/150 and defaults to 100',()=>{
+ for(const textScale of [100,125,150])assert.equal(displayPreferences({textScale}).textScale,textScale);
+ for(const textScale of [0,90,200,'150',null,undefined,Infinity])assert.equal(displayPreferences({textScale}).textScale,100);
+ assert.equal(defaultDisplayPreferences.textScale,100);
 });

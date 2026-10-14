@@ -1,8 +1,11 @@
-export type DisplayPreferences = {graphics:'standard'|'low';timeFormat:'24'|'12';motion?:'system'|'reduce'};
-export const defaultDisplayPreferences:DisplayPreferences={graphics:'standard',timeFormat:'24',motion:'system'};
+export type DisplayPreferences = {graphics:'standard'|'low';timeFormat:'24'|'12';motion?:'system'|'reduce';textScale?:TextScale};
+/** Text size (#80): applied as the root --text-scale CSS variable. */
+export const textScales=[100,125,150] as const;
+export type TextScale=typeof textScales[number];
+export const defaultDisplayPreferences:DisplayPreferences={graphics:'standard',timeFormat:'24',motion:'system',textScale:100};
 export function displayPreferences(value:unknown):DisplayPreferences{
  const source=value&&typeof value==='object'?value as Record<string,unknown>:{};
- return {graphics:source.graphics==='low'?'low':'standard',timeFormat:source.timeFormat==='12'?'12':'24',motion:source.motion==='reduce'?'reduce':'system'};
+ return {graphics:source.graphics==='low'?'low':'standard',timeFormat:source.timeFormat==='12'?'12':'24',motion:source.motion==='reduce'?'reduce':'system',textScale:textScales.includes(source.textScale as TextScale)?source.textScale as TextScale:100};
 }
 export function graphicsOptions(graphics:DisplayPreferences['graphics'],deviceRatio:number){
  return {antialias:graphics!=='low',shadows:graphics!=='low',pixelRatio:graphics==='low'?1:Math.min(Number.isFinite(deviceRatio)&&deviceRatio>0?deviceRatio:1,2)};

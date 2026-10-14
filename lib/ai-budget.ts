@@ -59,7 +59,8 @@ export async function releaseAiReservation(db:GameDatabase,id:string){await db.p
 /** #92: persist "handed to the gateway" BEFORE the first gateway call. 'uncertain' = sent, outcome unknown: it never
  * expires and is never released, so a crash mid-call stays charged and keeps its request id (Notable replay guard). */
 /** #141: settle a terminal failure to the metered cost of the calls the gateway actually answered (per-token from provider usage
- * when valid, else the per-call table bound; #170), releasing the rest of the sequence reservation. Never raises a charge; at least 1 micro-USD stays booked. */
+ * when valid, else the per-call table bound; #170), releasing the rest of the sequence reservation. Never raises a charge; at least 1 micro-USD stays booked.
+ * #169: only an open (pending/uncertain) row is settled; a row another path already finished is left untouched. */
 /** #170: Workers AI list prices in micro-USD per million tokens (developers.cloudflare.com/workers-ai/platform/pricing, checked 2026-10-14). */
 export const aiModelTokenPrices:{readonly [M in AiModel]:{readonly inputPerM:number;readonly outputPerM:number}}={
  '@cf/meta/llama-3.2-3b-instruct':{inputPerM:51000,outputPerM:335000},
@@ -80,7 +81,7 @@ export function meteredAiCallCost(call:AiMeteredCall){
  return Math.min(bound,Math.max(1,Math.ceil((input*price.inputPerM+output*price.outputPerM)/1_000_000)));
 }
 export function meteredAiCost(calls:readonly AiMeteredCall[]){return calls.reduce((sum,c)=>sum+meteredAiCallCost(c),0);}
-export async function settleAiReservation(db:GameDatabase,id:string,actualMicro:number){const micro=Math.max(1,Number.isSafeInteger(actualMicro)?actualMicro:Number.MAX_SAFE_INTEGER);await db.prepare("UPDATE harimu_ai_reservations SET status='finished',reserved_micro=CASE WHEN ?<reserved_micro THEN ? ELSE reserved_micro END WHERE request_id=?").bind(micro,micro,id).run();}
+export async function settleAiReservation(db:GameDatabase,id:string,actualMicro:number){const micro=Math.max(1,Number.isSafeInteger(actualMicro)?actualMicro:Number.MAX_SAFE_INTEGER);await db.prepare("UPDATE harimu_ai_reservations SET status='finished',reserved_micro=CASE WHEN ?<reserved_micro THEN ? ELSE reserved_micro END WHERE request_id=? AND status IN ('pending','uncertain')").bind(micro,micro,id).run();}
 export async function markAiReservationSent(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status='pending'").bind(id).run();}
 /** #92: ids of the removed preview acceptance ledger/prebook. Written by readiness, never sent through the gateway,
  * some already 'finished'/'uncertain'. Real ids are UUIDs, notable:<sha>: or cabinet:, so this never matches them. */

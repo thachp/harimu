@@ -11,6 +11,11 @@ export const rewards: Record<string, { wageMinor: number; item: string; quantity
   harvest: { wageMinor: 800, item: 'food', quantity: 4 },
   freight: { wageMinor: 1200, item: 'materials', quantity: 2 },
   archive: { wageMinor: 600, item: 'knowledge', quantity: 1 },
+  // #196 Market MVP raw goods (Kindle). Base output; the same terms apply to any worker (no per-citizen multiplier yet).
+  // [ASSUMPTION] wages/quantities tuned so 1 WC earns about the same Spark as the existing jobs.
+  orchard: { wageMinor: 700, item: 'fruit', quantity: 3 },
+  herding: { wageMinor: 900, item: 'meat', quantity: 2 },
+  logging: { wageMinor: 1000, item: 'wood', quantity: 3 },
 };
 export type Economy = {
   walletMinor: number;
@@ -18,7 +23,7 @@ export type Economy = {
   nextRecoveryAt: string;
   /** Recent SPK movements, newest first (issue #39 wallet panel). */
   transactions?: WalletTransaction[];
-  /** Tessera holdings. No TSR source exists in the PoC, so this is always 0. */
+  /** Tessera holdings from the World Registry ledger (#122): PoC starter grant minus square purchases. */
   tesseraMinor?: number;
 };
 export const economySchema = `CREATE TABLE IF NOT EXISTS shift_settlements (
@@ -94,7 +99,9 @@ export async function readEconomy(db: GameDatabase, userId: string, interval: nu
     wallet_minor: number; inventory_json: string; recovered_at: number | null; history_json: string | null;
   }>();
   const history = sortHistory(JSON.parse(row?.history_json ?? '[]') as WalletHistoryRow[]);
-  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: 0, transactions: toTransactions(history),
+  // #122: Tessera comes from the World Registry ledger (PoC starter grant minus square purchases).
+  const tessera = await db.prepare('SELECT COALESCE(SUM(delta_minor),0) AS balance FROM citizen_tessera_ledger WHERE clerk_user_id=?').bind(userId).first<{ balance: number }>().catch(() => null);
+  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: Number(tessera?.balance ?? 0), transactions: toTransactions(history),
     inventory: JSON.parse(row?.inventory_json ?? '[]') as Economy['inventory'],
     nextRecoveryAt: new Date(((row?.recovered_at ?? Math.floor(Date.now() / 1000)) + interval) * 1000).toISOString() };
 }

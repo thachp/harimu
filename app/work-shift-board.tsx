@@ -6,6 +6,11 @@ import { GameTimer } from './game-timer';
 import { useEffect, useState } from 'react';
 import type { Economy } from '@/lib/economy';
 import type { WorkShift } from '@/lib/work-shifts';
+
+// Grade labels mirror lib/shift-quality.ts (kept inline so this board stays dependency-light).
+const gradeNames: Record<string, string> = { poor: 'Poor', fair: 'Fair', good: 'Good', excellent: 'Excellent' };
+const gradeLabel = (grade: WorkShift['qualityGrade']) => grade ? gradeNames[grade] : 'Base (step skipped)';
+const qualityText = (shift: WorkShift) => shift.qualityMultiplierPct === undefined ? '' : ` · Quality: ${gradeLabel(shift.qualityGrade)} ×${(shift.qualityMultiplierPct / 100).toFixed(2)}`;
 import type { SceneView } from '@/lib/scene-navigation';
 
 export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onRefresh, onClaim, onNavigate }: {
@@ -48,7 +53,8 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
       {active ? (
         <div>
           <strong>{active.orderName}</strong>
-          {active.wageMinor !== undefined && <p>On completion: {(active.wageMinor / 100).toFixed(2)} SPK + {active.rewardQuantity} {active.rewardItem}</p>}
+          {active.wageMinor !== undefined && <p>On completion: {(active.wageMinor / 100).toFixed(2)} SPK + {active.rewardQuantity} {active.rewardItem}{qualityText(active)}</p>}
+          {active.qualityPending && <p>Quality step recorded · your grade and reward are revealed when the shift completes.</p>}
           <p>Public contribution target: {active.output} · {active.capacitySpent} WC committed</p>
           <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>
           <GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" />
@@ -69,7 +75,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
         </div>
       ) : <p>Choose a contribution to start your next shift.</p>}
       {completed.map((shift) => (
-        <p key={shift.id}><strong>Recorded: {shift.orderName}</strong><br />{shift.wageMinor !== undefined ? `${(shift.wageMinor / 100).toFixed(2)} SPK + ${shift.rewardQuantity} ${shift.rewardItem}` : shift.output}</p>
+        <p key={shift.id}><strong>Recorded: {shift.orderName}</strong><br />{shift.wageMinor !== undefined ? `${(shift.wageMinor / 100).toFixed(2)} SPK + ${shift.rewardQuantity} ${shift.rewardItem}${qualityText(shift)}` : shift.output}</p>
       ))}
     </section>
   );
