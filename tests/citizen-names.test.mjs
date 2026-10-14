@@ -26,7 +26,25 @@ export const realNameBlocklist = ['tesla','ferrari','lamborghini','versace','guc
   'rolex','nike','elon','musk','trump','biden','putin','obama','stalin','lenin','marx','messi','ronaldo','beyonce','swift','bezos','gates',
   'jobs','disney','pixar','marvel','kodak','bosch','siemens','bugatti','maserati','lavazza','barilla','ferrero','nutella','gazprom','lada',
   'skoda','toyota','honda','sony','samsung','huawei','tencent','alibaba','xiaomi','moana','ariel','zorro','loki','freya','thor','havel',
-  'ostmark','copperfield','sunwell','lorien','miraval','mazara','navarra','gorm','aeryn','vostro'];
+  'ostmark','copperfield','sunwell','lorien','miraval','mazara','navarra','gorm','aeryn','vostro',
+  // more brands, politicians and celebrities
+  'apple','google','amazon','microsoft','meta','netflix','spotify','adidas','puma','chanel','dior','hermes','fendi','cartier','tiffany',
+  'porsche','audi','mercedes','renault','peugeot','fiat','kia','hyundai','nissan','mazda','subaru','lexus','pepsi','cocacola','nestle',
+  'heineken','starbucks','mcdonald','walmart','visa','paypal','uber','lyft','oracle','intel','nvidia','tiktok','twitter','halo','honor',
+  'macron','merkel','zelensky','modi','xi','kim','erdogan','orban','meloni','sunak','starmer','harris','pelosi','clinton','bush','reagan',
+  'churchill','thatcher','gandhi','mandela','napoleon','kanye','rihanna','madonna','adele','shakira','drake','oprah','kardashian',
+  'zuckerberg','gretzky','federer','nadal','djokovic','jordan','bolt','pele','maradona','mbappe','neymar','tolkien','gandalf','frodo',
+  'aragorn','legolas','skywalker','vader','yoda','potter','hermione','pikachu','mario','zelda','kratos'];
+// Offensive or crude substrings in English and other major languages, matched inside every token and every generated full name.
+export const offensiveSubstrings = ['slag','shag','vulgar','chav','poo','piss','shit','fuck','cunt','cock','dick','pussy','twat','wank',
+  'bitch','slut','whore','fag','nigg','nigga','negro','spic','kike','gook','coon','jizz','rape','nazi','hitler','porn','crap','turd','fart',
+  'bollock','prick','knob','retard','tranny','dyke','merd','puta','culo','cazz','cono','chinga','verga','pendej','scheiss','fotze','arsch',
+  'hure','kurwa','blyat','pizd','mierd','caca','minchia','vaff','salope','connard','putain','enculer','skank','nonce','spaz','paki',
+  'chink','cuck','smeg','minge','tosser','bellend','pillock','dago','kraut','gringo','honky','beaner','sambo','pikey','dildo','penis',
+  'vagin','semen','sperm','pedo','incest','jihad','satan','bastard','marica','frocio','troia','zoccol','jebat','zalup','vittu','fitta'];
+const offensive = s => offensiveSubstrings.find(b => norm(s).includes(b));
+// Real full names a generated citizen must never reproduce.
+const realFullNames = ['Elon Musk','Donald Trump','Joe Biden','Taylor Swift','Lionel Messi','Kim Kardashian','Mark Zuckerberg','Jeff Bezos'];
 const blocked = new Set(realNameBlocklist.map(norm));
 const isBlocked = name => tokens(name).some(t => blocked.has(norm(t)));
 
@@ -67,8 +85,12 @@ test('naming rules per nation', () => {
   for (const g of L.aurelle.given) assert.match(g, /(ae|ie|el|ri|li)/i);
   for (const g of L.confluence.given) assert.match(g, /(aa|ee|oo|uu|ii)|[lmn]/i);
   for (const g of L.varkand.given) assert.match(g, /[vkd]/i);
-  for (const g of L.ilmar.given) assert.match(g, /(th|s)/i);
-  for (const g of L.kindle.given) assert.match(g, /[ktr]/i);
+  // Ilmar: virtue or light-word given names, then an order name with a/o vowels and soft th/s.
+  const virtueOrLight = /^(dawn|solace|amber|gleam|lumen|lucent|vesper|candle|prism|radiance|clarity|grace|mercy|patience|constance|verity|glimmer|temperance|prudence|hope|charity|serenity|harmony|aurora|sunray|morning|glory|shimmer|steadfast|tranquil|candor|fidelity)$/i;
+  for (const g of L.ilmar.given) assert.match(g, virtueOrLight);
+  for (const f of L.ilmar.family) { assert.match(f, /(th|s)/i); assert.match(f, /[ao]/i); }
+  // Kindle: clipped k/t/r syllables with -an/-ek/-o endings (Language flavor row).
+  for (const g of L.kindle.given) { assert.match(g, /[ktr]/i); assert.match(g, /(an|ek|o)$/); }
   assert.match(citizenName('meridian', 3), /^\S+ \S+-\d$/);
   assert.match(citizenName('korund', 3), /^\S+ \S+ · Brigade \d+$/);
   assert.match(citizenName('varkand', 3), /^\S+ "[^"]+" \S+$/);
@@ -77,4 +99,23 @@ test('blocklist screens real people and brands', () => {
   for (const [nation, { given, family }] of lists) for (const n of [...given, ...family]) assert.ok(!isBlocked(n), `${nation}: ${n}`);
   for (const c of varkandCallSigns) assert.ok(!isBlocked(c), c);
   assert.ok(isBlocked('Elon Musk') && isBlocked('Vico Ferrari') && isBlocked('Beyoncé'));
+});
+test('no name, call sign or generated full name contains an offensive substring', () => {
+  for (const [nation, { given, family }] of lists) {
+    for (const n of [...given, ...family]) assert.equal(offensive(n), undefined, `${nation}: ${n}`);
+    for (let i = 0; i < 300; i++) {
+      const full = citizenName(nation, i);
+      for (const t of full.split(/[\s"·-]+/)) assert.equal(offensive(t), undefined, `${nation}: ${full}`);
+      assert.equal(offensive(full), undefined, `${nation}: ${full}`);
+    }
+  }
+  for (const c of varkandCallSigns) assert.equal(offensive(c), undefined, c);
+  assert.ok(offensive('Slagmore') && offensive('Chavo') && offensive('Poolen'));
+});
+test('generated full names never reproduce a real person', () => {
+  const real = new Set(realFullNames.map(norm));
+  for (const [nation] of lists) for (let i = 0; i < 300; i++) {
+    const n = citizenName(nation, i);
+    assert.ok(!real.has(norm(n)) && !isBlocked(n), `${nation}: ${n}`);
+  }
 });
