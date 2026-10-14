@@ -1,4 +1,5 @@
 'use client';
+import {NotableControl} from './notable-control';
 
 import type { VerificationState } from '@/lib/verification';
 import type { SimulationState } from '@/lib/world-simulation';
@@ -1439,6 +1440,7 @@ export default function Home() {
     </div> : <>
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</ActionButton></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</ActionButton></div>}
+      {viewMode === 'square' && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
       {viewMode === 'household' && <>
         {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>

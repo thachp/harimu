@@ -118,3 +118,8 @@ body:has(.harimu-game){overflow:auto}
 .ranked-ballot .ballot-candidates{list-style:none;padding:0}.ranked-ballot .ballot-candidates li{border-bottom:1px solid var(--nation-edge);padding-block:10px}.ranked-ballot label{display:block;margin-block:12px}.ranked-ballot select{display:block;width:100%;min-height:44px;padding:8px}.ranked-ballot table{table-layout:fixed;width:100%;font-size:12px}.ranked-ballot th:first-child,.ranked-ballot td:first-child{width:54%}.ranked-ballot :is(td,th){padding:6px 3px;overflow-wrap:anywhere;text-align:left}.ranked-ballot .i-voted{border:1px solid var(--nation-accent);padding:8px}
 
 html[data-harimu-motion="reduce"] *,html[data-harimu-motion="reduce"] *::before,html[data-harimu-motion="reduce"] *::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+
+.notable-conversation > p { margin: 12px 0; }
+.notable-conversation > h2 { margin: 0 0 12px; }
+.notable-conversation > label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.notable-conversation select { max-width: 100%; }

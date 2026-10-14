@@ -22,6 +22,7 @@ async function load(path,clock){
  }
  return `data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;
 }
+const {NotablePanel}=await import(await load(resolve(root,'app/notable-control.tsx')));
 const {ActionButton}=await import(await load(resolve(root,'app/action-button.tsx')));
 const {AurellePlanPanel}=await import(await load(resolve(root,'app/aurelle-plan-panel.tsx')));
 const {KorundPlanPanel}=await import(await load(resolve(root,'app/korund-plan-panel.tsx')));
@@ -105,4 +106,11 @@ test('Korund queue waiting reason distinguishes an existing request from joining
  assert.match(outsider,/Join the queue and wait for earlier requests/);
  const head=render(ClockedPanel,{...common,scene:'market',plan:{...korund,queue:{waiting:3,position:1,requestId:'fixture-request'}}});
  assert.doesNotMatch(head,/<button[^>]*disabled[^>]*>Redeem/);
+});
+
+test('disabled Notables show authored examples and accessible reasons rather than fabricated live responses',()=>{
+ const profile={id:'fixture-notable',name:'Fixture chronicler',role:'Court chronicler',persona:'Public records only.',introduction:'Authored introduction.'};
+ const html=render(NotablePanel,{view:{profile,enabled:false,dailyLimit:20,source:'authored',reason:'AI conversations are disabled.'},onRefresh(){},onSubmit(){}});
+ assert.match(html,/AI character/);assert.match(html,/Authored persona introduction/);assert.match(html,/Authored topic example/);assert.match(html,/disabled[^>]*>Ask this public topic/);assert.match(html,/AI conversations are disabled. These examples are authored./);assert.doesNotMatch(html,/AI-generated response/);
+ assert.match(render(NotablePanel,{view:null,error:'Profile unavailable.',onRefresh(){},onSubmit(){}}),/role="alert"/);
 });

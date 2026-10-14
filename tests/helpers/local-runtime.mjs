@@ -42,7 +42,7 @@ export async function localRuntime({ballotPrivacyReady=false,backend=process.env
     'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/world-simulation.ts',
-    'lib/korund.ts','lib/korund-queue.ts','lib/ai-news.ts','lib/ai-budget.ts',
+    'lib/notable-profiles.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
     'lib/citizenship.ts',
     'app/api/citizen/route.ts', 'app/api/square/route.ts', 'app/api/world/route.ts',
@@ -94,6 +94,8 @@ export async function readVerification(userId) {
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, `import { Date } from ${JSON.stringify(pathToFileURL(clockPath).href)};\n${output}`);
   }
+  const notableService=await import(pathToFileURL(join(directory,'lib/notables.mjs')).href);
+  const notables=await import(pathToFileURL(join(directory,'app/api/notables/route.mjs')).href);
   const { env } = await import(pathToFileURL(envPath).href);
   env.DB = new LocalD1(path);
   // Apply the real additive world migration before the production bootstrap,
@@ -128,12 +130,12 @@ export async function readVerification(userId) {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (user) identify(request, user);
-    const handlers = endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
+    const handlers = endpoint === 'notables' ? notables : endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
     const response = await handlers[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
   return {
-    call, sqliteBackupPath:path, storageEngine:backend, get postgresSnapshot(){return postgres?.snapshot;}, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
+    call, setFixtureAiBinding:binding=>{env.AI=binding;env.HARIMU_AI_NEWS_ENABLED='true';env.HARIMU_AI_PRICE_REVIEWED_UNTIL=new Date(clock.Date.now()+3600000).toISOString();}, answerNotable:(user,command,binding,options)=>notableService.answerNotable(env.DB,user,command,Math.floor(clock.Date.now()/1000),binding,options), sqliteBackupPath:path, storageEngine:backend, get postgresSnapshot(){return postgres?.snapshot;}, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
     reopen() { if(postgres){postgres.reopen();return;}env.DB.close(); env.DB = new LocalD1(path); },
     async close() { if(postgres)await postgres.close();else env.DB.close(); await rm(directory, { recursive: true, force: true }); },
   };
