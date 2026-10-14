@@ -8,6 +8,8 @@
   "compatibility_date": "2026-05-22",
   "compatibility_flags": ["nodejs_compat"],
   "placement": { "region": "gcp:us-central1" },
+  // #247: scheduled Worker for AI Cabinet petition responses (no-op unless HARIMU_AI_CABINET_RESPONSES_ENABLED="true").
+  "triggers": { "crons": ["*/15 * * * *"] },
   // Prepared preview connection; preview only; D1 remains available for rollback.
   "hyperdrive": [{
     "binding": "HYPERDRIVE",
@@ -33,6 +35,7 @@
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "false",
+    "HARIMU_TRAVEL_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

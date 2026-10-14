@@ -1,5 +1,7 @@
 import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
+import {startCityTravel} from '@/lib/travel';
+import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {cityForNation} from '@/lib/cities';
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
@@ -19,6 +21,13 @@ export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  let body:Record<string,unknown>;try{body=await readCommandObject(request);}catch{return json({error:'Invalid request.'},400);}
+ // #123 (ARC ruling on #264): with HARIMU_TRAVEL_ENABLED on, city travel is a timed journey; the instant #19 path below is unreachable.
+ if((env as unknown as {HARIMU_TRAVEL_ENABLED?:string}).HARIMU_TRAVEL_ENABLED==='true'){
+  if(body.action!=='travel'||typeof body.cityId!=='string')return json({error:'Choose a city in your current nation.'},400);
+  const requestId=typeof body.requestId==='string'&&/^[A-Za-z0-9-]{8,64}$/.test(body.requestId)?body.requestId:crypto.randomUUID();
+  const result=await startCityTravel(ctx.db,ctx.userId,body.cityId,requestId,ctx.now);
+  return result.ok?json({...result,timed:true}):json({error:result.error,reason:result.reason},result.status);
+ }
  if(body.action!=='travel'||typeof body.cityId!=='string'||!cityForNation(ctx.nationId,body.cityId))return json({error:'Choose a city in your current nation.'},400);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const results=await ctx.db.batch([

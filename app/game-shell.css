@@ -192,3 +192,6 @@ body:has(.harimu-game){overflow:auto}
 /* #186 (QA3 on #220): on phones the clock had a fixed 65px box with nowrap text, so at 125/150% the text ran under Glossary.
    Let it wrap at word boundaries inside a box that grows with the text size; the HUD is height:auto on mobile, so it grows instead of colliding. */
 @media(max-width:760px){.game-account>.game-hud-help{margin-right:calc(2px * var(--text-scale, 1))}.game-account .game-clock{width:auto;max-width:calc(65px * var(--text-scale, 1));white-space:normal;overflow-wrap:normal;word-break:normal;line-height:1.15}.game-account .game-clock small{white-space:normal}}
+/* #229: dock labels never break mid-word. On phones each button is at least as wide as its longest word (labels wrap only between
+   words, e.g. "State / store"); above 100% text the seven places don't fit across, so the dock becomes two even rows (4 + 3) instead. */
+@media(max-width:760px){.game-dock button{min-width:min-content;flex:1 1 clamp(calc(100% / 7), calc((var(--text-scale, 1) - 1) * 1000%), 25%)}.game-dock button span{overflow-wrap:normal;word-break:normal;hyphens:manual}}

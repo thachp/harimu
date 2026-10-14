@@ -1,6 +1,8 @@
 import {readCityLocation} from '@/lib/city-location';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
+import { travelBlock } from '@/lib/travel';
+import { env } from 'cloudflare:workers';
 import { postSquareSql, readSquare, uuidPattern, validSquareText } from '@/lib/square-chat';
 import { latchAfterWrite } from '@/lib/first-week-server';
 export const dynamic='force-dynamic';
@@ -35,6 +37,7 @@ async function handleSquarePost(request:Request) {
   const {db,userId,nationId,now}=ctx;
   if((body.action==='post'||body.action==='delete')&&typeof body.expectedNationId!=='string')return privateResponse({error:'Refresh the conversation before submitting a nation-scoped command.'},400);
   if(body.expectedNationId!==undefined&&body.expectedNationId!==nationId)return privateResponse({error:'Citizenship changed. Refresh your citizen before reopening the conversation.'},409);
+  if(body.action==='post'){const blocked=await travelBlock(db,userId,now,(env as unknown as {HARIMU_TRAVEL_ENABLED?:string}).HARIMU_TRAVEL_ENABLED==='true');if(blocked)return privateResponse({error:blocked,reason:'traveling'},409);} // #123
   if(body.action==='presence') {
     if(typeof body.active!=='boolean')return privateResponse({error:'Invalid presence choice.'},400);
     const location=await readCityLocation(db,userId,nationId,now);
