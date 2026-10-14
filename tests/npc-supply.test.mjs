@@ -35,7 +35,7 @@ async function setup(t, flag = true) {
     r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','fixture-cash',-1,?,1)").bind(randomUUID(), u, cash),
     ...Array.from({ length: Math.ceil(fruit / 10) }, (_, i) => r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'buy','fruit',?,-1,1)").bind(randomUUID(), u, Math.min(10, fruit - i * 10))),
   ]);
-  await fund('alice', 50000, 1); await fund('bob', 1000, 60);
+  await fund('alice', 50000, 1); await fund('bob', 1000, 200); // #199: fruit spoils daily, so bob holds extra
   const day = d => r.setNow((epoch + d * tick + 60) * 1000);
   const place = (u, side, qty, price) => r.call('market/orders', u, { action: 'market-order-place', requestId: randomUUID(), side, good: 'fruit', qty, limitUnitMinor: price });
   const npc = async (good, d) => r.db.prepare('SELECT qty, limit_unit_minor FROM market_orders WHERE id = ?').bind(npcOrderId(good, d)).first();

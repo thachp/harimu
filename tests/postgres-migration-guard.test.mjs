@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
-import { createdTables, postgresMigrations, repoTables, isDestructive, migrationProblems, createdObjects, hasReviewMarker, applyPostgresMigrations, bootstrapEmptyPostgres, assertPostgresMigrationsApplied, destructiveReviewedMarker, backfillThrough, transactionProblem } from '../scripts/postgres-migrations.mjs';
+import { createdTables, postgresMigrations, repoTables, isDestructive, migrationProblems, createdObjects, hasReviewMarker, applyPostgresMigrations, bootstrapEmptyPostgres, assertPostgresMigrationsApplied, destructiveReviewedMarker, backfillThrough, transactionProblem, stripComments } from '../scripts/postgres-migrations.mjs';
 
 const adapter = pg => ({ query: (t, p) => pg.query(t, p), exec: t => pg.exec(t) });
 /** A database shaped like preview today: base schema plus every migration through 0010, no schema_migrations. */
@@ -188,4 +188,13 @@ test('#236 migrations may not control their own transaction or use CONCURRENTLY;
     assert.equal((await rows(empty, "SELECT COUNT(*)::int AS n FROM pg_tables WHERE schemaname='public'"))[0].n, 0);
     await empty.close();
   }
+});
+
+test('#255 nit: -- and /* inside string literals are not comments, so they cannot hide SQL', () => {
+  assert.equal(isDestructive("INSERT INTO t(note) VALUES ('a--b'); DROP TABLE t;"), true, 'DROP after a -- inside a literal is seen');
+  assert.equal(isDestructive("INSERT INTO t(note) VALUES ('/* x'); DROP TABLE t; -- */"), true);
+  assert.equal(transactionProblem("INSERT INTO t(note) VALUES ('it''s -- fine'); COMMIT;") !== null, true);
+  assert.equal(isDestructive("INSERT INTO t(note) VALUES ('safe'); -- DROP TABLE t"), false, 'a real trailing comment is still ignored');
+  assert.equal(isDestructive('/* DROP TABLE t */ CREATE TABLE IF NOT EXISTS u(a int);'), false);
+  assert.equal(stripComments("SELECT 'a--b', \"c--d\" -- gone\nFROM x"), "SELECT 'a--b', \"c--d\" \nFROM x");
 });
