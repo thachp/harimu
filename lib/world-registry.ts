@@ -7,7 +7,8 @@ import { mapHeight, mapWidth, type Zone } from './map-zones';
  * square's owner becomes the nation, its zone becomes Frontier, and the debit is written to a Tessera ledger.
  *
  * Tessera source: none exists yet in the economy, so when HARIMU_SQUARE_PURCHASE_ENABLED=true each citizen
- * receives a one-time PoC starter grant of `TEMP_STARTER_GRANT` (ledger reason 'starter-grant').
+ * receives a one-time PoC starter grant of `TEMP_STARTER_GRANT` (ledger reason 'starter-grant'), written only together with
+ * their first successful purchase so a rejected purchase never pays it out (#205).
  */
 export const squarePriceMinor = 2500; // 25.00 TSR
 // TEMPORARY placeholder (#210): there is no real Tessera source yet. Remove this grant once #210 adds one.
@@ -69,8 +70,12 @@ export function checkPurchaseSite(squares: readonly Square[], nationId: string, 
   return null;
 }
 
-export async function readTessera(db: GameDatabase, userId: string): Promise<number> {
-  const row = await db.prepare('SELECT COALESCE(SUM(delta_minor),0) AS balance FROM citizen_tessera_ledger WHERE clerk_user_id=?').bind(userId).first<{ balance: number }>();
+/** Spendable Tessera. While the registry is open, a not-yet-paid TEMP_STARTER_GRANT counts as spendable; it is
+ *  written only in the same batch as a successful purchase, so a rejected purchase never pays it out (#205, QA1 #208). */
+const pendingGrantSql = `CASE WHEN EXISTS (SELECT 1 FROM citizen_tessera_ledger WHERE clerk_user_id=? AND reason='starter-grant') THEN 0 ELSE ? END`;
+export async function readTessera(db: GameDatabase, userId: string, includePendingGrant = false): Promise<number> {
+  const row = await db.prepare(`SELECT COALESCE(SUM(delta_minor),0) + ${includePendingGrant ? pendingGrantSql : '0'} AS balance FROM citizen_tessera_ledger WHERE clerk_user_id=?`)
+    .bind(...(includePendingGrant ? [userId, TEMP_STARTER_GRANT, userId] : [userId])).first<{ balance: number }>();
   return Number(row?.balance ?? 0);
 }
 
@@ -79,19 +84,17 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id ?? null;
   if (!nationId || !(registryNations as readonly string[]).includes(nationId)) return fail(403, 'no_nation', 'Only Kindle, Korund and Aurelle citizens can buy squares in this preview.');
-  await db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at) VALUES (?,?,?,'starter-grant',?) ON CONFLICT DO NOTHING`)
-    .bind(`tsr-grant-${userId}`, userId, TEMP_STARTER_GRANT, now).run();
   const prior = await db.prepare('SELECT clerk_user_id,nation_id,x,y,price_minor FROM world_square_purchases WHERE request_id=?').bind(command.requestId)
     .first<{ clerk_user_id: string; nation_id: string; x: number; y: number; price_minor: number }>();
   if (prior) {
     if (prior.clerk_user_id !== userId || Number(prior.x) !== command.x || Number(prior.y) !== command.y) return fail(409, 'request_reused', 'That request id was already used for a different purchase.');
-    return { ok: true, square: { x: command.x, y: command.y, owner: prior.nation_id, zone: 'frontier' }, priceMinor: Number(prior.price_minor), tesseraMinor: await readTessera(db, userId), replay: true };
+    return { ok: true, square: { x: command.x, y: command.y, owner: prior.nation_id, zone: 'frontier' }, priceMinor: Number(prior.price_minor), tesseraMinor: await readTessera(db, userId, true), replay: true };
   }
   const { results } = await db.prepare('SELECT x,y,zone,owner FROM world_squares').all<Square>();
   const squares = (results ?? []).map(s => ({ ...s, x: Number(s.x), y: Number(s.y) }));
   if (squares.length !== mapWidth * mapHeight) return fail(409, 'map_unavailable', 'The world map is not available right now.');
   const site = checkPurchaseSite(squares, nationId, command.x, command.y); if (site) return site;
-  const balance = await readTessera(db, userId);
+  const balance = await readTessera(db, userId, true);
   if (balance < squarePriceMinor) return fail(409, 'insufficient_tessera', `A square costs ${(squarePriceMinor / 100).toFixed(2)} TSR; you hold ${(balance / 100).toFixed(2)} TSR.`);
   const { x, y, requestId } = command;
   // One batch (one transaction): the purchase row is inserted only if the square is still unowned Wildlands next to the
@@ -100,8 +103,11 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
     db.prepare(`INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at)
       SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM world_squares WHERE x=? AND y=? AND zone='wildlands' AND owner IS NULL)
       AND EXISTS (SELECT 1 FROM world_squares WHERE owner=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND NOT (x=? AND y=?))
-      AND (SELECT COALESCE(SUM(delta_minor),0) FROM citizen_tessera_ledger WHERE clerk_user_id=?) >= ?
-      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, squarePriceMinor, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, userId, squarePriceMinor),
+      AND (SELECT COALESCE(SUM(delta_minor),0) FROM citizen_tessera_ledger WHERE clerk_user_id=?) + ${pendingGrantSql} >= ?
+      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, squarePriceMinor, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, userId, userId, TEMP_STARTER_GRANT, squarePriceMinor),
+    db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
+      SELECT ?,?,?,'starter-grant',? WHERE EXISTS (SELECT 1 FROM world_square_purchases WHERE request_id=? AND clerk_user_id=?)
+      ON CONFLICT DO NOTHING`).bind(`tsr-grant-${userId}`, userId, TEMP_STARTER_GRANT, now, requestId, userId),
     db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
       SELECT ?,?,?,'square-purchase',? WHERE EXISTS (SELECT 1 FROM world_square_purchases WHERE request_id=? AND clerk_user_id=?)
       ON CONFLICT DO NOTHING`)
@@ -111,5 +117,5 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   ]);
   const created = await db.prepare('SELECT request_id FROM world_square_purchases WHERE request_id=?').bind(requestId).first();
   if (!created) return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
-  return { ok: true, square: { x, y, owner: nationId, zone: 'frontier' }, priceMinor: squarePriceMinor, tesseraMinor: await readTessera(db, userId) };
+  return { ok: true, square: { x, y, owner: nationId, zone: 'frontier' }, priceMinor: squarePriceMinor, tesseraMinor: await readTessera(db, userId, true) };
 }

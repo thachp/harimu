@@ -48,8 +48,9 @@ export function validKorundCommand(body:Record<string,unknown>):body is Record<s
  return body.action==='korund-claim-work' ? uuid(body.shiftId)&&(body.requestId===undefined||uuid(body.requestId)) : ['korund-start-work','korund-redeem-ration','korund-household-meal','korund-join-ration-queue'].includes(String(body.action)) && uuid(body.requestId);
 }
 async function week(db:GameDatabase,now:number) {
- const clock=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
- if(!clock) throw new Error('World clock unavailable.');
+ const row=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
+ // #205: before any write path has started the clock, read the epoch advanceWorld would record (tick-aligned now).
+ const clock={epoch_seconds:row?Number(row.epoch_seconds):Math.floor(now/7200)*7200};
  const index=Math.floor(Math.max(0,now-clock.epoch_seconds)/gameWeekSeconds);
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};

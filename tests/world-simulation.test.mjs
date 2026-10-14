@@ -12,7 +12,13 @@ test('actual routes derive durable clock from server time; anonymous citizen can
   assert.equal(initial.status, 200); assert.equal(initial.data.simulation.clock.latestTick, 0);
   const epoch = initial.data.simulation.clock.epochSeconds;
   r.setNow((epoch + 7200 * 7) * 1000);
-  const first = await r.call('citizen', 'alice');
+  // #205: GET /api/citizen is read-only; it reports due ticks as pending and processes none.
+  const peek = await r.call('citizen', 'alice');
+  assert.equal(peek.data.simulation.clock.latestTick, 0);
+  assert.equal(peek.data.simulation.clock.pendingTicks, 7);
+  assert.equal(peek.data.simulation.clock.gameDay, 8);
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS count FROM world_ticks').first()).count, 0);
+  const first = await r.call('world', null);
   assert.equal(first.data.simulation.clock.latestTick, 3);
   assert.equal(first.data.simulation.clock.pendingTicks, 4);
   assert.equal(first.data.simulation.clock.gameDay, 8);
@@ -21,7 +27,10 @@ test('actual routes derive durable clock from server time; anonymous citizen can
   assert.equal(second.data.simulation.clock.epochSeconds, epoch);
   assert.equal(second.data.simulation.clock.latestTick, 6);
   assert.equal(second.data.simulation.clock.pendingTicks, 1);
-  const third = await r.call('citizen', 'bob');
+  const between = await r.call('citizen', 'bob');
+  assert.equal(between.data.simulation.clock.latestTick, 6, 'citizen GET reads, does not advance');
+  assert.equal(between.data.simulation.clock.pendingTicks, 1);
+  const third = await r.call('world', null);
   assert.equal(third.data.simulation.clock.latestTick, 7);
   assert.equal(third.data.simulation.clock.pendingTicks, 0);
   const rows = await r.db.prepare('SELECT * FROM world_ticks ORDER BY tick').all();
@@ -45,7 +54,8 @@ test('concurrent route ticks execute finite food transfer once and preserve supp
     r.db.prepare("UPDATE economy_funds SET initial_minor=10000 WHERE id='kindle-employer'"),
   ]);
   r.setNow((epoch + 7200) * 1000);
-  const [alice,bob] = await Promise.all([r.call('citizen','alice'),r.call('citizen','bob')]);
+  // #205: ticks advance on write paths and GET /api/world, not on GET /api/citizen.
+  const [alice,bob] = await Promise.all([r.call('world',null),r.call('world',null)]);
   assert.equal(alice.status,200); assert.equal(bob.status,200);
   const receipt = await r.db.prepare('SELECT * FROM government_policy_executions').first();
   assert.equal(receipt.tick,1); assert.equal(receipt.food_quantity,10); assert.equal(receipt.spend_minor,1000);
@@ -61,9 +71,11 @@ test('concurrent route ticks execute finite food transfer once and preserve supp
   };
   await verify(); r.reopen(); await verify();
   r.setNow((epoch + 7200 * 4) * 1000);
-  await Promise.all([r.call('world',null),r.call('citizen','bob')]);
+  await Promise.all([r.call('world',null),r.call('world',null)]); // #205: two concurrent tick writers (citizen GET no longer advances)
   const executions = await r.db.prepare('SELECT * FROM government_policy_executions ORDER BY tick').all();
   assert.equal(executions.results.length,2);
-  assert.equal(executions.results.reduce((sum,row) => sum + row.food_quantity,0),19);
-  assert.equal((await r.db.prepare("SELECT stock FROM merchant_inventory_balances WHERE item='food'").first()).stock,19);
+  // #205: GETs no longer record Kindle starter food grants, so households hold 2 less food here and the government's
+  // food proposal (driven by household need) is 10 instead of 9 on the second execution. Stock still equals what was bought.
+  assert.equal(executions.results.reduce((sum,row) => sum + row.food_quantity,0),20);
+  assert.equal((await r.db.prepare("SELECT stock FROM merchant_inventory_balances WHERE item='food'").first()).stock,20);
 });
