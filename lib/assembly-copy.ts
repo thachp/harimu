@@ -1,8 +1,8 @@
 /** Kindle mid-term Assembly copy: ballot explainer, Republic Wire Service press items and results caption (issue #299,
  * companion to SDE #283). Content only: #283 owns district seats, party lists, the count and the day-60 trigger; no UI
  * imports this. Canon: harimu-docs politics/elections §9.1 ("Mid-term Assembly election ... half the seats"; ballots
- * secret, results hidden until close), §9.3 (party-list PR within the district; results show human votes and the Simulated Public
- * bloc, i.e. the AI bloc, separately), §9.5 and the Kindle Republic page (Forgehaven Assembly dome; per-district counts fully published), plus
+ * secret, results hidden until close), §9.3 (party-list PR within the district; results show human votes and the AI bloc
+ * separately; "Simulated Public" is the bloc's internal tally name, not results wording), §9.5 and the Kindle Republic page (Forgehaven Assembly dome; per-district counts fully published), plus
  * the #237 Kindle press voice (plain, argumentative, officials questioned). The byline is the Kindle pack's
  * "Republic Wire Service" (lib/press-templates.ts, #242).
  *
@@ -45,7 +45,7 @@ export const ballotExplainer={
 } as const;
 
 export const resultsCaption={
- humanAndSimulatedPublic:L('Human votes and the Simulated Public are counted and shown separately.'),
+ humanAndBloc:L('Human votes and the AI bloc are counted and shown separately.'),
  districtCounts:L('Each district\'s count is public.'),
  proposal:true,
 } as const;
