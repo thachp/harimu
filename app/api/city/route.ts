@@ -2,7 +2,7 @@ import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {cityForNation} from '@/lib/cities';
-import {cityPresence,readCityLocation} from '@/lib/city-location';
+import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 async function context(request:Request){
@@ -12,7 +12,8 @@ async function context(request:Request){
 }
 export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
- return json({...await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now),presence:await cityPresence(ctx.db,ctx.nationId,ctx.now)});
+ const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
+ return json({...location,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now)});
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
@@ -26,5 +27,5 @@ export async function POST(request:Request){
  ]);
  if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json({...current,homeCityId:location.homeCityId,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now)});
+ return json({...current,homeCityId:location.homeCityId,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now)});
 }
