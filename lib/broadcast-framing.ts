@@ -40,7 +40,7 @@ export const broadcastFramings:readonly BroadcastFraming[]=[
   ['The address is entered in the state archive with its transcript.'],
   'The Chairman is an AI. This address is AI-generated.'),
  f('korund:presidium-announcement','Presidium Announcement',
-  ['Korund State Media presents an announcement of the Presidium.','It is read from Mountain Hall in Stonehearth.'],
+  ['Korund State Media presents an announcement of the Presidium.','It is read from the Presidium Hall in Stonehearth.'],
   ['The announcement is entered in the state archive with its transcript.'],
   'The Presidium members are AI. This announcement is AI-generated.'),
  f('aurelle:weekly-address','The Monarch Speaks',
