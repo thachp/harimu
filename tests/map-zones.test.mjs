@@ -47,7 +47,7 @@ test('acquisition rules use the documented plain words', () => {
   assert.match(acquisitionRules.commons, /Claimed only by war or treaty/);
 });
 test('committed Postgres migration matches the generator', async () => {
-  const file = await readFile(new URL('../db/postgres/0010_world_squares.sql', import.meta.url), 'utf8');
+  const file = await readFile(new URL('../db/postgres/0011_world_squares.sql', import.meta.url), 'utf8');
   assert.equal(file, postgresWorldSquaresMigration());
 });
 const adapter = sqlite => ({ prepare: sql => ({ all: async () => ({ results: sqlite.prepare(sql).all() }) }) });
@@ -62,7 +62,7 @@ test('reads seeded table rows (idempotent seed) and falls back to the seed witho
 });
 test('committed D1 migration matches the generator and applies idempotently', async () => {
   const { sqliteWorldSquaresMigration } = await import('../lib/map-zones.ts');
-  const file = await readFile(new URL('../drizzle/0010_world_squares.sql', import.meta.url), 'utf8');
+  const file = await readFile(new URL('../drizzle/0011_world_squares.sql', import.meta.url), 'utf8');
   assert.equal(file, sqliteWorldSquaresMigration());
   const sqlite = new DatabaseSync(':memory:'); sqlite.exec(file); sqlite.exec(file);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM world_squares').get().n, mapWidth * mapHeight);
