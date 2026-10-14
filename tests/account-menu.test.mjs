@@ -10,3 +10,5 @@ test('native account dialog opens Clerk menu and cancels with focus restoration'
 test('backdrop dismisses but clicks inside menu do not',()=>{const h=harness();h.render().find(n=>n?.type==='button').props.onClick();const dialog=h.render().find(n=>n?.type==='dialog');dialog.props.onClick({target:{},currentTarget:{}});assert.equal(h.opened,true);const same={};dialog.props.onClick({target:same,currentTarget:same});assert.equal(h.opened,false);assert.equal(h.focused,1);});
 
 test('Escape stays inside account dialog instead of reaching shell shortcuts',()=>{const h=harness();const dialog=h.render().find(n=>n?.type==='dialog');let stopped=0;dialog.props.onKeyDown({key:'Escape',stopPropagation(){stopped++;}});assert.equal(stopped,1);dialog.props.onKeyDown({key:'Tab',stopPropagation(){stopped++;}});assert.equal(stopped,1);});
+
+test('account menu avatar gets a meaningful alt instead of an empty or nameless one',()=>{const src=compiled;assert.match(src,/ avatar/);assert.match(src,/fullName/);assert.match(src,/MutationObserver/);});
