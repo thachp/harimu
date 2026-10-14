@@ -11,10 +11,11 @@ function SquareChatSession({enabled,nationId,cityId,configured=true,presenceAllo
   const [state,setState]=useState<SquareState|null>(null),[text,setText]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[presence,setPresence]=useState(false),[uncertain,setUncertain]=useState(false);
   const [muted,setMuted]=useState<string[]>([]);
   const intent=useRef<{id:string;text:string}|null>(null);
-  const generation=useRef(0);
+  const generation=useRef(0),readVersion=useRef(0),commandActive=useRef(false);
   const refresh=useCallback(async()=>{
-    const current=generation.current;
-    try{const response=await fetch('/api/square',{cache:'no-store'});const data=await response.json() as SquareState & {error?:string};if(current!==generation.current)return;if(!response.ok)throw Error(data.error);if(data.nationId!==nationId)throw Error('Citizenship changed. Refresh your citizen before reopening chat.');setState(data);setError('');}catch(e){if(current===generation.current)setError(e instanceof Error?e.message:'City conversation unavailable.');}
+    if(commandActive.current)return;
+    const current=generation.current,version=++readVersion.current;
+    try{const response=await fetch('/api/square',{cache:'no-store'});const data=await response.json() as SquareState & {error?:string};if(current!==generation.current||version!==readVersion.current||commandActive.current)return;if(!response.ok)throw Error(data.error);if(data.nationId!==nationId)throw Error('Citizenship changed. Refresh your citizen before reopening chat.');setState(data);setError('');}catch(e){if(current===generation.current&&version===readVersion.current&&!commandActive.current)setError(e instanceof Error?e.message:'City conversation unavailable.');}
   },[nationId]);
   useEffect(()=>{const current=++generation.current;if(!enabled)return;const initial=setTimeout(()=>void refresh(),0);const timer=setInterval(()=>{if(!document.hidden)void refresh();},15000);return()=>{generation.current=current+1;clearTimeout(initial);clearInterval(timer);};},[enabled,nationId,cityId,refresh]);
   useEffect(()=>{
@@ -26,9 +27,9 @@ function SquareChatSession({enabled,nationId,cityId,configured=true,presenceAllo
     return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('pagehide',leave);ping(false);};
   },[enabled,presence,nationId,cityId,presenceAllowed]);
   async function command(payload:Record<string,unknown>,posted=false){
-    if(!enabled||busy||(!posted&&uncertain))return;setBusy(true);setError('');const current=generation.current;
+    if(!enabled||busy||commandActive.current||(!posted&&uncertain))return;commandActive.current=true;++readVersion.current;setBusy(true);setError('');const current=generation.current;
     try{const response=await fetch('/api/square',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,expectedNationId:nationId})});const data=await response.json() as SquareState & {error?:string};if(current!==generation.current)return;if(!response.ok){if(posted&&response.status<500){intent.current=null;setUncertain(false);}throw Error(data.error);}if(data.nationId!==nationId)throw Error('Citizenship changed. Refresh your citizen before reopening chat.');setState(data);if(posted){intent.current=null;setUncertain(false);setText('');}}
-    catch(e){if(current===generation.current)setError(e instanceof Error?e.message:'Connection uncertain. Retry the same message.');}finally{if(current===generation.current)setBusy(false);}
+    catch(e){if(current===generation.current)setError(e instanceof Error?e.message:'Connection uncertain. Retry the same message.');}finally{if(current===generation.current){commandActive.current=false;++readVersion.current;setBusy(false);}}
   }
   const sendingReason=busy?'An action is being saved. Please wait.':!validSquareText(text)?'Enter a plain-text message of 1–280 characters.':null;
   const editingReason=busy?'An action is being saved. Please wait.':uncertain?'Retry the same message before editing or removing messages.':null;

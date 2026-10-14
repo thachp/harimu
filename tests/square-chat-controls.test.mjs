@@ -10,7 +10,7 @@ function harness({text='',busy=false,uncertain=false,pendingIntent=null,cityId='
  const state={nationId:'kindle',cityId:'city',present:0,messages:[{id:'message',mine:true,handle:'Citizen',body:'A message',postedAt:0}]};
  const slots=[state,text,'',busy,false,uncertain,[]], refs=[{current:pendingIntent},{current:0}], requests=[];
  let cursor=0,refCursor=0;
- const react={useState(){const i=cursor++;return [slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next;}];},useRef(){return refs[refCursor++];},useCallback(fn){return fn;},useEffect(){}};
+ const react={useState(){const i=cursor++;return [slots[i],next=>{slots[i]=typeof next==='function'?next(slots[i]):next;}];},useRef(initial){const i=refCursor++;return refs[i]??(refs[i]={current:initial});},useCallback(fn){return fn;},useEffect(){}};
  const exports={};
  new Function('exports','require','fetch',compiled)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react'?react:name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?validation:require(name),async(url,options)=>{requests.push({url,...options});return {ok:true,status:200,json:async()=>({...state,nationId:responseNation})};});
  function render(){cursor=0;refCursor=0;const wrapper=exports.SquareChat({enabled:true,nationId:'kindle',cityId,session:'ready'});return wrapper.type(wrapper.props);}

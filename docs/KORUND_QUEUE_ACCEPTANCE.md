@@ -8,7 +8,7 @@ Two defects were reproduced and fixed: unavailable ration-book data hid same-req
 
 The civic inbox now includes read-only Korund counter guidance for an available own-nation plan, an unexpired coupon week, unused coupons, an existing head request and sufficient recorded stock. It directs the citizen to Market and refresh; it neither reserves stock nor redeems coupons. Foreign, missing, expired, short-stock and non-head records produce no entry. The timestamp is explicitly the coupon-week start; it does not invent a queue arrival or availability event. Inbox acknowledgement stays local to the session.
 
-This is fixture acceptance. No live citizenship was changed and no live queue, cancellation, ration, meal, work, ballot or petition was submitted. Issue #27 stays open pending its live cross-nation acceptance criteria; #24 remains open pending its broader live civic criteria.
+This is fixture acceptance. No live citizenship was changed and no live queue, cancellation, ration, meal, work, ballot or petition was submitted. Issue #27’s actual criteria are presentation-only: switching synthetic citizen context in the integrated real-component fixture is sufficient to verify the themed screens; live citizenship changes or ration redemption are not prerequisites. Issue #24’s dock/inbox criteria likewise do not require submitting a live ballot or petition. The integrated closure review records the final criterion evidence.
 
 ## Disabled AI preparation: reservation and throughput
 

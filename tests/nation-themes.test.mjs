@@ -24,6 +24,7 @@ async function load(path){
  }
  const url=`data:text/javascript;base64,${Buffer.from(output).toString('base64')}`;cache.set(path,url);return url;
 }
+const {NewsEdition}=await import(await load(resolve(root,'app/national-news.tsx')));
 const {GovernmentPanel}=await import(await load(resolve(root,'app/government-panel.tsx')));
 const {KorundPlanPanel}=await import(await load(resolve(root,'app/korund-plan-panel.tsx')));
 const {simulateGovernment}=await import(await load(resolve(root,'lib/government.ts')));
@@ -56,3 +57,10 @@ if(process.env.HARIMU_THEME_FIXTURE){
  const contents=[civic('kindle'),ration,civic('aurelle')];
  await writeFile(process.env.HARIMU_THEME_FIXTURE,`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Harimu isolated theme fixtures</title><style>${css}\nbody{background:#0b1c24;padding:20px;margin:0;color:#dce7e8}h1{font-size:22px}.fixture-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}.fixture-grid>*{min-width:0}.fixture-grid>.game-inspector-body{padding:0;overflow:visible}@media(max-width:760px){body{padding:12px}.fixture-grid{grid-template-columns:minmax(0,1fr)}}</style><h1>Isolated component fixtures</h1><p>Fixture records only. No authentication, network gameplay actions or live citizen data.</p><main class="fixture-grid">${contents.map(content=>`<div class="game-inspector-body">${content}</div>`).join('')}</main></html>`);
 }
+
+test('national news uses each authoritative nation motif and preserves system statistics and provenance',()=>{
+ for(const [nationId,style,title,masthead] of [['kindle','press','Kindle Press','National press'],['korund','state','Korund State Media','State Media'],['aurelle','court','Court Gazette','Court gazette']]){
+  const html=renderToStaticMarkup(React.createElement(NewsEdition,{news:{nationId,style,title,fetchedAt:Date.parse('2026-10-14T00:00:00Z'),statistics:{citizens:2,completedShifts:3,food:12},items:[{id:'fixture',title:'Ledger record',text:'Recorded settlement.',occurredAt:Date.parse('2026-10-14T00:00:00Z'),source:'system'}]}}));
+  assert.match(html,new RegExp(`data-nation-theme="${nationId}"`));assert.match(html,new RegExp(nationThemes[nationId].motif));assert.match(html,new RegExp(masthead));assert.match(html,/System statistics/);assert.match(html,/System record/);assert.match(html,/No model-written articles/);assert.doesNotMatch(html,/class="ai-text-tag"/);
+ }
+});

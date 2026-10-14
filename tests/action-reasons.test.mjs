@@ -114,3 +114,8 @@ test('disabled Notables show authored examples and accessible reasons rather tha
  assert.match(html,/AI character/);assert.match(html,/Authored persona introduction/);assert.match(html,/Authored topic example/);assert.match(html,/disabled[^>]*>Ask this public topic/);assert.match(html,/AI conversations are disabled. These examples are authored./);assert.doesNotMatch(html,/AI-generated response/);
  assert.match(render(NotablePanel,{view:null,error:'Profile unavailable.',onRefresh(){},onSubmit(){}}),/role="alert"/);
 });
+
+test('both civic inbox launchers expose the same expanded state',async()=>{
+ const source=await readFile(resolve(root,'app/citizen-dock.tsx'),'utf8');const tree=ts.createSourceFile('dock.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);const buttons=[];const visit=node=>{if(ts.isJsxOpeningElement(node)&&node.tagName.getText(tree)==='button')buttons.push(node);ts.forEachChild(node,visit);};visit(tree);
+ const bell=buttons.find(node=>node.attributes.properties.some(attr=>ts.isJsxAttribute(attr)&&attr.name.getText(tree)==='className'&&attr.initializer?.text==='game-notifications'));assert.ok(bell);const expanded=bell.attributes.properties.find(attr=>ts.isJsxAttribute(attr)&&attr.name.getText(tree)==='aria-expanded');assert.equal(expanded?.initializer?.expression?.getText(tree),"tab==='inbox'");
+});

@@ -123,3 +123,7 @@ html[data-harimu-motion="reduce"] *,html[data-harimu-motion="reduce"] *::before,
 .notable-conversation > h2 { margin: 0 0 12px; }
 .notable-conversation > label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .notable-conversation select { max-width: 100%; }
+
+.national-news.nation-document[data-nation-theme] :is(.news-statistics,.national-news-items article,.news-source){border-color:var(--nation-edge);background:transparent;color:var(--nation-ink)}
+.national-news.nation-document[data-nation-theme] time { color:var(--nation-ink); }
+.national-news.nation-document[data-nation-theme] .national-news-items article { border-left:3px solid var(--nation-accent); }
