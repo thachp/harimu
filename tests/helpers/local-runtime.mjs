@@ -38,7 +38,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','app/api/petitions/route.ts',
     'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/wallet.ts',
-    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-quality.ts', 'lib/government.ts',
+    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/government.ts',
     'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/world-simulation.ts','lib/stability.ts',

@@ -38,7 +38,7 @@ import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { WalletPanel } from './wallet-panel';
 import { ShiftQualityStep } from './shift-quality-step';
-import { gradeShift, applyQuality, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
+import { qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
@@ -836,12 +836,12 @@ export default function Home() {
           const rule = shiftRules[order.id];
           if (!rule) throw new Error('Work order unavailable.');
           const startedAt = new Date().toISOString();
-          const graded = gradeShift(order.id, quality, 'human');
-          const demoReward = rewards[order.id] ? applyQuality(rewards[order.id], graded.multiplierPct) : undefined;
+          // Local demo has no server and no answer key, so it never grades: every demo shift pays the base reward.
+          void quality;
+          const demoReward = rewards[order.id];
           setWorkShifts((current) => [{ id: crypto.randomUUID(), workOrderId: order.id, orderName: order.name,
             output: rule.output, capacitySpent: order.cost, startedAt,
-            ...(order.id === qualityWorkOrderId ? { qualityGrade: graded.grade, qualityMultiplierPct: graded.multiplierPct } : {}),
-            wageMinor: demoReward?.wageMinor, rewardItem: rewards[order.id]?.item, rewardQuantity: demoReward?.quantity,
+            wageMinor: demoReward?.wageMinor, rewardItem: demoReward?.item, rewardQuantity: demoReward?.quantity,
             completesAt: new Date(Date.now() + rule.hours * 3600000).toISOString(), claimedAt: null }, ...current]);
           setCapacity((current) => current - order.cost);
         } else {

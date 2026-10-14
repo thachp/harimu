@@ -8,7 +8,8 @@ import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment } from '@/lib/government-state';
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
-import { gradeShift, applyQuality, validQualityInput, type QualityInput } from '@/lib/shift-quality';
+import { applyQuality, validQualityInput, type QualityInput } from '@/lib/shift-quality';
+import { gradeShift } from '@/lib/shift-quality-key';
 import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
@@ -451,6 +452,8 @@ export async function POST(request: Request) {
     const base = rewards[workOrderId];
     if (!base) return privateJson({ error: 'Shift reward unavailable.' }, { status: 409 });
     if (body.quality !== undefined && !validQualityInput(body.quality)) return privateJson({ error: 'Answer all three quality questions or skip the step.' }, { status: 400 });
+    // Graded exactly once, here at shift start; the result is stored with the shift (shift_id PK) and a repeat
+    // commit-work is refused by the one-active-shift rule, so it cannot re-grade (QA1 #125 review).
     // This route serves signed-in human citizens only; AI/background actors never reach it, and gradeShift
     // returns the base reward for any non-human actor.
     const quality = gradeShift(workOrderId, body.quality as QualityInput | undefined, 'human');

@@ -54,6 +54,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
         <div>
           <strong>{active.orderName}</strong>
           {active.wageMinor !== undefined && <p>On completion: {(active.wageMinor / 100).toFixed(2)} SPK + {active.rewardQuantity} {active.rewardItem}{qualityText(active)}</p>}
+          {active.qualityPending && <p>Quality step recorded · your grade and reward are revealed when the shift completes.</p>}
           <p>Public contribution target: {active.output} · {active.capacitySpent} WC committed</p>
           <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>
           <GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" />

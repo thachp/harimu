@@ -13,6 +13,8 @@ export type WorkShift = {
   /** Quality step result (#40): null grade = step skipped or not offered; multiplier in percent. */
   qualityGrade?: 'poor' | 'fair' | 'good' | 'excellent' | null;
   qualityMultiplierPct?: number;
+  /** True while a graded shift is still running: grade, multiplier and the graded reward stay hidden until completion. */
+  qualityPending?: boolean;
   orderName: string;
   output: string;
   capacitySpent: number;
@@ -70,5 +72,10 @@ export async function readShifts(database: GameDatabase, userId: string): Promis
     currency: row.work_order_id==='aurelle-food-estate'?'CRN':row.work_order_id==='korund-food-production'?'LN':'SPK',
     wageMinor: ['aurelle-food-estate','korund-food-production'].includes(row.work_order_id)?800:row.wage_minor ?? undefined, rewardItem: row.item ?? undefined, rewardQuantity: row.quantity ?? undefined,
     ...(row.multiplier_pct == null ? {} : { qualityGrade: (row.grade ?? null) as WorkShift['qualityGrade'], qualityMultiplierPct: Number(row.multiplier_pct) }),
-  }));
+  })).map((shift) => {
+    // #40 / QA1: a graded result is revealed only once the shift is complete (the reward also encodes the multiplier).
+    if (!shift.qualityGrade || shift.claimedAt || Date.parse(shift.completesAt) <= Date.now()) return shift;
+    const { qualityGrade: _g, qualityMultiplierPct: _m, wageMinor: _w, rewardQuantity: _q, ...hidden } = shift;
+    return { ...hidden, qualityPending: true };
+  });
 }
