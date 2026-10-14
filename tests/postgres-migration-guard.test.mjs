@@ -39,16 +39,16 @@ test('destructive SQL is detected, comments ignored', () => {
   assert.ok(!isDestructive('-- DROP TABLE x\nCREATE TABLE IF NOT EXISTS x(a int);'));
   for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql), `${m.file} must stay additive`);
 });
-test('first run on preview backfills through 0010 without re-running, then applies newer ones in order', async () => {
+test('first run on preview backfills through backfillThrough (0012) without re-running, then applies newer ones in order', async () => {
   const pg = await previewLike(); const db = adapter(pg);
   const dir = dirWith({ '0901_a.sql': 'CREATE TABLE IF NOT EXISTS zz_a (id int);', '0903_c.sql': 'CREATE TABLE IF NOT EXISTS zz_c (id int REFERENCES zz_b(id));', '0902_b.sql': 'CREATE TABLE IF NOT EXISTS zz_b (id int PRIMARY KEY);' });
   await assert.rejects(assertPostgresMigrationsApplied(db, postgresMigrations(dir)), /0008.*not applied/);
-  assert.ok(newer().includes('0011_world_squares.sql') && newer().includes('0012_nation_stability.sql'), 'only <=0010 is backfilled; 0011+ run as pending');
+  assert.ok(postgresMigrations().filter(m => m.number <= backfillThrough).some(m => m.file === '0012_nation_stability.sql'), 'backfill covers through 0012');
   const dry = await applyPostgresMigrations(db, postgresMigrations(dir), { dryRun: true });
   assert.deepEqual(dry.pending, [...newer(), '0901_a.sql', '0902_b.sql', '0903_c.sql']);
   assert.equal((await rows(pg, "SELECT 1 FROM pg_tables WHERE tablename='schema_migrations'")).length, 0, 'dry run writes nothing');
   const result = await applyPostgresMigrations(db, postgresMigrations(dir));
-  assert.equal((await rows(pg, "SELECT 1 FROM pg_tables WHERE tablename='nation_stability_scores'")).length, 1, '0012 actually ran');
+  assert.equal((await rows(pg, "SELECT 1 FROM pg_tables WHERE tablename='nation_stability_scores'")).length, 1, '0012 table present');
   assert.deepEqual(result.applied, [...newer(), '0901_a.sql', '0902_b.sql', '0903_c.sql']);
   const recorded = await rows(pg, 'SELECT id, backfilled FROM schema_migrations ORDER BY id');
   assert.deepEqual(recorded.filter(r => r.backfilled).map(r => r.id), postgresMigrations().filter(m => m.number <= backfillThrough).map(m => m.id));

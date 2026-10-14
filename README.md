@@ -296,7 +296,7 @@ Postgres (Hyperdrive) never bootstraps schema, so numbered `db/postgres/NNNN_*.s
 `npm run db:postgres:migrate` and recorded (with a SHA-256 checksum) in `schema_migrations`:
 
 - Each pending file runs in its own transaction, in order, under an advisory lock; any failure rolls that file back and stops.
-- First run backfills migrations through `0010` as applied **without re-running them**, and only if every table they create already exists.
+- First run backfills migrations through `0012` (confirmed applied on preview) as applied **without re-running them**, and only if every table they create already exists.
 - Migrations must stay idempotent and additive. SQL that drops, truncates, deletes or renames is rejected unless the file carries `-- harimu:destructive-reviewed` after manual review. Editing an applied file fails; add a new one.
 - `npm run db:postgres:migrate -- --dry-run` lists what would run. It needs `PREVIEW_DATABASE_ADMIN_URL` (admin role with CREATE on `public`), never the app role.
 - `npm run deploy` refuses to upload when storage is Postgres and any migration is unrecorded, edited, or missing tables (needs `HARIMU_POSTGRES_URL` or `PREVIEW_DATABASE_ADMIN_URL`).

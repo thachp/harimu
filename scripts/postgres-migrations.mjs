@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 
 /** Migrations already on preview before `schema_migrations` existed; recorded, not re-run. */
-export const backfillThrough = '0010';
+export const backfillThrough = '0012'; // 0008-0012 confirmed on preview (ARC, #143)
 export const destructiveReviewedMarker = '-- harimu:destructive-reviewed';
 const lockKey = 1191280; // advisory lock: one migrator at a time
 export const schemaMigrationsTable = `CREATE TABLE IF NOT EXISTS schema_migrations (
