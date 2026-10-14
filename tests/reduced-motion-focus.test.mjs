@@ -65,7 +65,7 @@ test('provider sets the shared attribute from the in-app toggle and from the OS 
   off.cleanup(); assert.equal(off.has(), false); assert.equal(off.listeners.size, 0); off.close();
 });
 
-test('Tab order reaches Account, Work, Market and the dock in order, and each shows a visible focus ring', () => {
+test('focus-visible CSS only (synthetic markup; real component tab order is in real-tab-order.test.mjs): each control shows a ring', () => {
   const { window, d } = page();
   try {
     const order = [...d.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')].filter(e => !e.disabled).map(e => e.id);

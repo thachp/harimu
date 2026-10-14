@@ -2192,7 +2192,7 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 html[data-harimu-reduced-motion] * { scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
 html[data-harimu-reduced-motion] *::before, html[data-harimu-reduced-motion] *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
 html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
-/* Fallback only until the provider hydrates and sets the attribute. */
+/* Fallback only until the provider hydrates and sets the attribute (covers elements, not ::before/::after/::backdrop, for that brief window). */
 @media (prefers-reduced-motion: reduce) {
   html:not([data-harimu-motion]) * { scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important; animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
 }
