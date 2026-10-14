@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en" data-nation="kindle" data-screen="city">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harimu · Visual direction v1 (static mockup)</title>
+<meta name="robots" content="noindex">
+<style>
+/* Visual direction v1: STATIC MOCKUP for review. Not wired to game data. Copy is placeholder. */
+:root{--bg:#0c171c;--panel:#111f26;--panel-2:#152831;--line:#26404a;--ink:#e3ecec;--muted:#9fb6bb;--teal:#5fd0c0;--accent:var(--teal);--accent-ink:#06211d;--good:#7ad69a;--warn:#e8c46a;--risk:#ef8a7a;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:Inter,"Segoe UI",system-ui,sans-serif;--s:clamp(12px,1.2vw,18px)}
+[data-nation=kindle]{--accent:#5fd0c0;--accent-ink:#06211d}
+[data-nation=korund]{--accent:#e6a57e;--accent-ink:#2a120a}
+[data-nation=aurelle]{--accent:#dcc185;--accent-ink:#261c06}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--sans)}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.review{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:8px var(--s);background:#081014;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.review strong{color:var(--ink)}.review .seg{display:flex;gap:4px;flex-wrap:wrap}
+.review button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:4px;min-height:36px;padding:4px 10px;cursor:pointer}
+.review button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+.app{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,30%);grid-template-rows:auto minmax(420px,1fr) auto;grid-template-areas:"top top" "map side" "cast side";min-height:calc(100vh - 53px)}
+/* Top bar: title + icon/value/label chips */
+.top{grid-area:top;display:flex;flex-wrap:wrap;align-items:stretch;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{padding:12px var(--s);border-right:1px solid var(--line);min-width:220px}
+.brand h1{margin:0;font:600 24px/1.1 var(--serif);letter-spacing:.3px}.brand p{margin:4px 0 0;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.where{padding:12px var(--s);border-right:1px solid var(--line);min-width:200px}.where strong{display:block;font:600 16px/1.2 var(--serif)}.where span{font-size:12px;color:var(--muted)}
+.chips{display:flex;flex:1;flex-wrap:wrap;margin:0;padding:0;list-style:none}
+.chips li{display:grid;grid-template-columns:22px auto;column-gap:8px;align-items:center;padding:10px 14px;border-left:1px solid var(--line);flex:1 0 auto;min-width:max-content}
+.chips svg{grid-row:span 2;width:20px;height:20px;color:var(--accent)}.chips b{font:600 18px/1.1 var(--sans);font-variant-numeric:tabular-nums}.chips small{font-size:11px;color:var(--muted)}
+/* Map hero */
+.map{grid-area:map;position:relative;overflow:hidden;border-right:1px solid var(--line);background:#0a1418}
+.map img.art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.9) contrast(1.02)}
+.map::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 55%,#0c171ccc);pointer-events:none}
+.clock,.objective,.legend{position:absolute;z-index:2;background:#0c171ce6;border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(2px)}
+.clock{top:16px;left:16px;display:flex;gap:14px;align-items:center;padding:10px 14px}.clock b{font:600 26px/1 var(--sans);font-variant-numeric:tabular-nums}.clock small{display:block;color:var(--muted);font-size:12px}
+.objective{left:16px;bottom:16px;max-width:340px;padding:10px 14px}.objective h2{margin:0;font:600 13px/1.3 var(--sans);letter-spacing:2px;text-transform:uppercase}.objective p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+.legend{right:16px;bottom:16px;display:flex;gap:14px;padding:8px 12px;font-size:12px;list-style:none;margin:0}.legend li{display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}.d-you{background:var(--accent)}.d-open{background:var(--warn)}.d-risk{background:var(--risk)}
+.node{position:absolute;z-index:3;display:flex;align-items:center;gap:10px;transform:translate(-20px,-20px);text-decoration:none;color:var(--ink)}
+.node.flip{flex-direction:row-reverse;transform:translate(calc(-100% + 20px),-20px)}.node .pin{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#0c171c;border:2px solid var(--accent);box-shadow:0 0 0 4px #0c171c99}
+.node .pin svg{width:18px;height:18px;color:var(--accent)}.node.open .pin{border-color:var(--warn)}.node.open .pin svg{color:var(--warn)}.node.risk .pin{border-color:var(--risk)}.node.risk .pin svg{color:var(--risk)}
+.node .tag{background:#0c171ce6;border:1px solid var(--line);border-radius:5px;padding:6px 10px}.node .tag b{display:block;font:600 14px/1.2 var(--serif)}.node .tag span{font-size:12px;color:var(--muted)}
+.node:focus-visible .pin,.node:hover .pin{background:var(--accent)}.node:focus-visible .pin svg,.node:hover .pin svg{color:var(--accent-ink)}
+/* Decision panel */
+.side{grid-area:side;display:flex;flex-direction:column;background:var(--panel);min-width:0}
+.side>header{display:flex;justify-content:space-between;align-items:center;padding:16px var(--s);border-bottom:1px solid var(--line)}.side h2{margin:0;font:600 22px/1.2 var(--serif)}
+.note{display:grid;grid-template-columns:40px 1fr;gap:12px;padding:16px var(--s);border-bottom:1px solid var(--line)}
+.avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font:600 16px var(--serif)}
+.note b{font:600 15px var(--serif)}.note small{display:block;color:var(--muted);font-size:12px}.note p{margin:8px 0 0;font-size:14px;line-height:1.6;color:#cfdcdd}
+.stop{display:flex;align-items:center;gap:12px;margin:12px var(--s) 0;padding:10px 12px;border:1px solid var(--accent);border-radius:6px;background:color-mix(in srgb,var(--accent) 10%,transparent)}.stop small{display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}.stop b{font-weight:600}
+.choices{display:grid;gap:10px;padding:14px var(--s)}
+.choice{display:grid;grid-template-columns:28px 1fr 20px;gap:12px;align-items:center;width:100%;min-height:60px;padding:12px 14px;text-align:left;font:inherit;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.choice b{display:block;font:600 16px/1.25 var(--serif)}.choice span{font-size:12.5px;color:var(--muted)}.choice svg{width:20px;height:20px}
+.choice.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.choice.primary span{color:var(--accent-ink);opacity:.85}
+.choice:not(.primary):hover{border-color:var(--accent)}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:6px var(--s) 18px}
+.facts section{border-left:2px solid var(--accent);padding-left:12px}.facts section.assume{border-color:var(--warn)}
+.facts h3{margin:0 0 6px;font:600 13px/1.3 var(--sans)}.facts .assume h3{color:var(--warn)}.facts .know h3{color:var(--accent)}
+.facts ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.55;color:#c7d5d7}
+.side footer{margin-top:auto;padding:14px var(--s);border-top:1px solid var(--line);font:500 12px/1.4 var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--muted);text-align:right}
+/* Cast cards */
+.cast{grid-area:cast;display:flex;border-top:1px solid var(--line);border-right:1px solid var(--line);background:var(--panel);overflow-x:auto}
+.cast>header{flex:0 0 170px;padding:16px}.cast h2{margin:0;font:600 18px/1.2 var(--serif)}.cast>header p{font-size:12px;color:var(--muted)}
+.card{flex:1 1 0;min-width:200px;display:grid;grid-template-columns:96px 1fr;border-left:1px solid var(--line);min-height:170px;text-align:left;font:inherit;color:inherit;background:none;border-top:0;border-right:0;border-bottom:0;padding:0;cursor:pointer}
+.card[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:-2px}
+.card .portrait{width:96px;height:100%;object-fit:cover;background:#1b2f37}
+.card .mono{display:grid;place-items:center;font:600 36px var(--serif);color:var(--accent);background:linear-gradient(160deg,#1b2f37,#0e1a1f)}
+.card .info{padding:12px 14px;display:flex;flex-direction:column;gap:3px;min-width:0}.card b{font:600 18px/1.2 var(--serif)}.card small{font-size:12px;color:var(--muted)}
+.card .trait{font-size:12.5px;color:#cbd8da}.status{font-size:12.5px;display:flex;align-items:center;gap:6px}
+.trust{margin-top:auto}.trust small{display:block;margin-bottom:3px}.bar{display:flex;gap:3px}.bar i{flex:1;height:5px;border-radius:2px;background:#2a434c}.bar i.on{background:var(--accent)}
+@media (max-width:900px){
+ .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(300px,56vh) auto auto;grid-template-areas:"top" "map" "side" "cast"}
+ .map{border-right:0}.brand,.where{min-width:0;flex:1 1 50%}.chips li{flex:1 1 30%;padding:8px 10px}
+ .legend{left:auto;right:12px;bottom:auto;top:12px;flex-direction:column;gap:4px;font-size:11px}.clock{top:12px;left:12px;padding:8px 10px;gap:10px}.clock b{font-size:20px}.clock small{display:none}.objective{max-width:calc(100% - 32px)}
+ .node .tag span{display:none}.facts{grid-template-columns:1fr}
+ .cast{flex-wrap:nowrap;scroll-snap-type:x mandatory}.cast>header{flex-basis:140px}.card{scroll-snap-align:start;flex:0 0 260px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <symbol id="i-coin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></symbol>
+ <symbol id="i-bread" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11a4 4 0 0 1 4-4h8a4 4 0 0 1 1 7.9V19H7v-4.1A4 4 0 0 1 4 11Z"/></symbol>
+ <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></symbol>
+ <symbol id="i-cube" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 9 8-4.5M12 12v9M12 12 4 7.5"/></symbol>
+ <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3V5Zm18 0h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7V5Z"/></symbol>
+ <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></symbol>
+ <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></symbol>
+ <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4v-9Z"/></symbol>
+ <symbol id="i-hammer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m14 6 4 4-9 9-4-4 9-9Zm0 0 3-3 4 4-3 3"/></symbol>
+ <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v16M6 20h12M5 8h14M5 8l-3 6h6L5 8Zm14 0-3 6h6l-3-6Z"/></symbol>
+ <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v11H9l-5 4V5Z"/></symbol>
+ <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+ <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 4 4 10-10"/></symbol>
+</svg>
+
+<nav class="review" aria-label="Mockup review controls">
+ <strong>Visual direction v1 · static mockup</strong>
+ <span class="seg" role="group" aria-label="Screen"><button data-set-screen="world">World</button><button data-set-screen="city">City</button><button data-set-screen="household">Household</button></span>
+ <span class="seg" role="group" aria-label="Nation accent"><button data-set-nation="kindle">Kindle</button><button data-set-nation="korund">Korund</button><button data-set-nation="aurelle">Aurelle</button></span>
+ <span>Placeholder copy · not game data</span>
+</nav>
+
+<div class="app">
+ <header class="top">
+  <div class="brand"><h1>Harimu</h1><p id="t-nation">Kindle Republic</p></div>
+  <div class="where"><strong id="t-where">Day 3 · Emberford</strong><span id="t-sub">City square · market open</span></div>
+  <ul class="chips" aria-label="Your resources">
+   <li><svg aria-hidden="true"><use href="#i-bolt"/></svg><b>18</b><small>Work capacity</small></li>
+   <li><svg aria-hidden="true"><use href="#i-coin"/></svg><b id="t-cash">412 SPK</b><small>Wallet</small></li>
+   <li><svg aria-hidden="true"><use href="#i-bread"/></svg><b>6</b><small>Food</small></li>
+   <li><svg aria-hidden="true"><use href="#i-cube"/></svg><b>3</b><small>Materials</small></li>
+   <li><svg aria-hidden="true"><use href="#i-heart"/></svg><b>82%</b><small>Household health</small></li>
+   <li><svg aria-hidden="true"><use href="#i-scale"/></svg><b>41%</b><small>Civic standing</small></li>
+  </ul>
+ </header>
+
+ <main class="map" id="map" aria-labelledby="map-title">
+  <h2 class="sr-only" id="map-title">Map</h2>
+  <img class="art" id="map-art" src="/assets/verdant-ward-town.webp" alt="Painted aerial view of the city: river, market square, terraces and work yards.">
+  <div class="clock" aria-label="Game time"><b>05:10</b><span>Day 3<small>Market opens at 06:00</small></span></div>
+  <div id="nodes"></div>
+  <section class="objective" aria-labelledby="obj-h"><h2 id="obj-h">City square</h2><p id="obj-p">Pick where to spend today’s capacity. Labels show what you know.</p></section>
+  <ul class="legend" aria-label="Map legend"><li><span class="dot d-you"></span>Your nation · verified</li><li><span class="dot d-open"></span>Unverified</li><li><span class="dot d-risk"></span>Unrest</li></ul>
+ </main>
+
+ <aside class="side" aria-labelledby="dp-h">
+  <header><h2 id="dp-h">Decision point</h2><small id="dp-time">05:10</small></header>
+  <div class="note"><span class="avatar" id="dp-av" aria-hidden="true">I</span><div><b id="dp-who">Ines Varro</b><small id="dp-role">President · Kindle Press notice</small><p id="dp-text"></p></div></div>
+  <div class="stop"><svg width="22" height="22" aria-hidden="true"><use href="#i-pin"/></svg><div><small>Nearby</small><b id="dp-stop">Emberford market · posted prices</b></div></div>
+  <div class="choices" id="choices" role="group" aria-label="Your choices"></div>
+  <div class="facts">
+   <section class="know" aria-labelledby="k-h"><h3 id="k-h">✓ What we know</h3><ul id="know"></ul></section>
+   <section class="assume" aria-labelledby="a-h"><h3 id="a-h">! What we assume</h3><ul id="assume"></ul></section>
+  </div>
+  <footer id="dp-foot">Every price is posted. Every vote is counted.</footer>
+ </aside>
+
+ <section class="cast" aria-labelledby="cast-h">
+  <header><h2 id="cast-h">Your household</h2><p>Select a person to see health, trust and skills.</p></header>
+  <div id="cards" style="display:contents"></div>
+ </section>
+</div>
+
+<script>
+const N={
+ kindle:{name:'Kindle Republic',city:'Emberford',cash:'412 SPK',leader:['I','Ines Varro','President · Kindle Press notice'],foot:'Every price is posted. Every vote is counted.'},
+ korund:{name:'Korund People’s State',city:'Korund Works',cash:'96 LN',leader:['N','Neral Voss','Chairman · State Media bulletin'],foot:'The plan is built shift by shift.'},
+ aurelle:{name:'Kingdom of Aurelle',city:'Solenne',cash:'58 CRN',leader:['M','Maera Solenne','Monarch · Court Gazette decree'],foot:'Every thread in its place.'}};
+const S={
+ world:{where:d=>'Day 3 · The known world',sub:()=>'World view · 12× time',art:'/harimu-world-atlas.jpg',alt:'Painted atlas of the Harimu continent: mountains, forests, deserts and coasts.',obj:['The known world','Compare nations before you move. Nodes show what is verified.'],
+  nodes:n=>[[22,46,'you','i-pin',N[n].name,'Your nation'],[52,30,'open','i-scale','Trade corridor','Unverified tariffs'],[68,62,'risk','i-chat','Border district','Reports of unrest'],[40,70,'open','i-coin','Grain market','Prices rising']],
+  text:n=>`${n==='kindle'?'The Assembly':n==='korund'?'The Planning Council':'The royal council'} will set this week’s grain policy at dusk. Neighbours are stockpiling and the border market is quiet. Your word counts for more if you act before the vote.`,
+  stop:'World news · 3 sources',
+  choices:[['primary','i-scale','Read the policy brief','See who funds each option first'],['','i-coin','Buy grain before the vote','Spend 40 now; price may fall'],['','i-chat','Ask your square what they heard','Slower, but more voices']],
+  know:['The vote is at dusk today.','Grain is up 12% this week.','Two sources confirm the brief.'],assume:['The border market reopens soon.','Neighbours will sell after the vote.','The brief is complete.'],
+  castTitle:'Voices of the world',cast:n=>[['I','Ines Varro','Kindle · President','Funded programme','good','Steady · 70%',4],['N','Neral Voss','Korund · Chairman','Quota first','warn','Guarded · 45%',2],['M','Maera Solenne','Aurelle · Monarch','Royal favor','good','Calm · 60%',3],['C','Celine Orrel','Court chronicler','Published records','warn','Unknown',1]]},
+ city:{where:n=>`Day 3 · ${N[n].city}`,sub:()=>'City square · market opens 06:00',art:'/assets/verdant-ward-town.webp',alt:'Painted aerial view of the city: river, market square, terraces and work yards.',obj:['City square','Pick where to spend today’s capacity. Labels show what you know.'],
+  nodes:()=>[[20,38,'you','i-home','Your household','2 meals stocked'],[46,22,'you','i-scale','Assembly hall','Ballot open'],[62,48,'open','i-coin','Market','New listings'],[34,64,'you','i-hammer','Work yard','Freight shift'],[78,70,'risk','i-chat','Riverside','Crowd forming']],
+  text:n=>`${n==='kindle'?'The preview ballot closes tonight. Three AI candidates have published programmes; only one says how it pays for grain.':n==='korund'?'Your brigade is two shifts short of the weekly plan. The ration queue opens at six.':'The court posts a call for estate service. Royal Favor is earned one shift at a time.'}`,
+  stop:'Market · food · materials · tools',
+  choices:[['primary','i-hammer','Take the freight shift','6 capacity · pays wages at the deadline'],['','i-scale','Rank the candidates','Compare funded promises first'],['','i-coin','Sell bread at the posted price','Earn now; less food at home']],
+  know:['The shift pays at its deadline.','Your household has 2 meals.','The ballot closes at 23:00.'],assume:['Prices hold until noon.','The crowd by the river is peaceful.','You can work again tomorrow.'],
+  castTitle:'Your household',cast:()=>HH},
+ household:{where:()=>'Day 3 · Vale household',sub:()=>'Home · kitchen and stores',art:'/assets/verdant-ward-town.webp',alt:'Painted aerial view of the city with the household quarter in the foreground.',obj:['The Vale household','Keep everyone fed and rested. Select a person for details.'],
+  nodes:()=>[[26,58,'you','i-home','Home','Stores: 6 food'],[56,40,'open','i-coin','Corner market','Price unverified'],[44,72,'you','i-hammer','Workshop','Tools ready']],
+  text:()=>'Mika has a cough and Niko outgrew his boots. There is food for two meals. Toma’s shift pays at noon; Leora can trade at the market or rest.',
+  stop:'Kitchen · 6 food · 2 meals',
+  choices:[['primary','i-bread','Cook a meal now','Uses 2 food · restores capacity'],['','i-coin','Sell 2 food for boots','Niko stays warm; tighter stores'],['','i-heart','Let Leora rest today','Health up; no trade income']],
+  know:['Toma’s shift pays at noon.','Stores last two meals.','Mika’s cough began yesterday.'],assume:['The market has boots in stock.','Mika recovers with rest.','Prices are fair today.'],
+  castTitle:'Your household',cast:()=>HH}};
+const HH=[['/assets/household/leora-vale.webp','Leora Vale','she/her · 34','Trader · keeps the books','good','Good · 84%',5],['/assets/household/toma-vale.webp','Toma Vale','he/him · 37','Freight crew','good','Good · 78%',4],['/assets/household/mika-vale.webp','Mika Vale','she/her · 9','Curious · cough','warn','Tired · 61%',4],['/assets/household/niko-vale.webp','Niko Vale','he/him · 13','Apprentice','good','Good · 80%',3]];
+const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function render(){
+ const n=document.documentElement.dataset.nation, k=document.documentElement.dataset.screen, s=S[k], nn=N[n];
+ $('t-nation').textContent=nn.name; $('t-where').textContent=s.where(n); $('t-sub').textContent=s.sub(n); $('t-cash').textContent=nn.cash;
+ $('map-art').src=s.art; $('map-art').alt=s.alt; $('obj-h').textContent=s.obj[0]; $('obj-p').textContent=s.obj[1];
+ $('nodes').innerHTML=s.nodes(n).map(([x,y,c,i,t,sub])=>`<a class="node ${c==='you'?'':c}${x>60?' flip':''}" href="#map" style="left:${x}%;top:${y}%"><span class="pin"><svg aria-hidden="true"><use href="#${i}"/></svg></span><span class="tag"><b>${esc(t)}</b><span>${esc(sub)}</span></span></a>`).join('');
+ const [av,who,role]=nn.leader; $('dp-av').textContent=k==='household'?'L':av; $('dp-who').textContent=k==='household'?'Leora Vale':who; $('dp-role').textContent=k==='household'?'Household notebook':role;
+ $('dp-text').textContent=s.text(n); $('dp-stop').textContent=s.stop; $('dp-foot').textContent=nn.foot;
+ $('choices').innerHTML=s.choices.map(([c,i,t,sub])=>`<button type="button" class="choice ${c}"><svg aria-hidden="true"><use href="#${i}"/></svg><span><b>${esc(t)}</b><span>${esc(sub)}</span></span><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>`).join('');
+ $('know').innerHTML=s.know.map(x=>`<li>${esc(x)}</li>`).join(''); $('assume').innerHTML=s.assume.map(x=>`<li>${esc(x)}</li>`).join('');
+ $('cast-h').textContent=s.castTitle;
+ $('cards').innerHTML=s.cast(n).map(([img,name,meta,trait,st,stat,trust],idx)=>`<button type="button" class="card" aria-pressed="${idx===0}">${img.startsWith('/')?`<img class="portrait" src="${img}" alt="">`:`<span class="portrait mono" aria-hidden="true">${esc(img)}</span>`}<span class="info"><b>${esc(name)}</b><small>${esc(meta)}</small><span class="trait">${esc(trait)}</span><span class="status"><span class="dot" style="background:var(--${st})"></span>${esc(stat)}</span><span class="trust"><small>Trust</small><span class="bar" role="img" aria-label="Trust ${trust} of 5">${[1,2,3,4,5].map(v=>`<i class="${v<=trust?'on':''}"></i>`).join('')}</span></span></span></button>`).join('');
+ document.querySelectorAll('[data-set-screen]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.setScreen===k));
+ document.querySelectorAll('[data-set-nation]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.setNation===n));
+ document.querySelectorAll('.card').forEach(c=>c.onclick=()=>document.querySelectorAll('.card').forEach(o=>o.setAttribute('aria-pressed',o===c)));
+}
+const q=new URLSearchParams(location.search); if(N[q.get('nation')])document.documentElement.dataset.nation=q.get('nation'); if(S[q.get('screen')])document.documentElement.dataset.screen=q.get('screen');
+document.addEventListener('click',e=>{const b=e.target.closest('[data-set-screen],[data-set-nation]');if(!b)return;if(b.dataset.setScreen)document.documentElement.dataset.screen=b.dataset.setScreen;if(b.dataset.setNation)document.documentElement.dataset.nation=b.dataset.setNation;render();});
+render();
+</script>
+</body>
+</html>
