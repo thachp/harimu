@@ -59,3 +59,11 @@ assert.equal(new URL(cityVisit).searchParams.get('nation'),'korund','Sample city
   assert.equal(kept.searchParams.get('city'), 'meetwater');
   assert.equal(kept.searchParams.get('nation'), 'confluence');
 }
+
+// #56: Back to an entry whose state the framework rewrote (marker lost) stays in-game.
+{
+  const { isGamePopstate } = await import('../lib/scene-navigation.ts');
+  assert.equal(isSceneTraversal({ __NA: true }, '/'), false);
+  assert.equal(isGamePopstate('/', '/'), true);
+  assert.equal(isGamePopstate('/', '/sign-in'), false);
+}

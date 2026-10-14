@@ -28,3 +28,12 @@ export function sceneUrl(href: string, scene: SceneView, nationId?: string, city
   if (cityId) url.searchParams.set('city', cityId); else url.searchParams.delete('city');
   return url.href;
 }
+/**
+ * The game page owns every query-only history entry on its own pathname (#56).
+ * The framework can rewrite an entry's state (e.g. the first entry during
+ * hydration) and drop our marker, so a marker check alone would hand Back to
+ * the RSC router, which remounts the page and reloads the citizen session.
+ */
+export function isGamePopstate(mountedPathname: string, currentPathname: string): boolean {
+  return currentPathname === mountedPathname;
+}
