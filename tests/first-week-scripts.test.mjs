@@ -49,7 +49,8 @@ test('Korund beats from the issue and canon; no glorified coercion, no faith, no
   const text=korundFirstWeek.days.flatMap(x=>[...lines(x),x.fallback??'']).join(' ');
   for (const t of [/quota/,/ration coupon/i,/Labor Notes/,/State Media/,/Stonehearth/,/Labor Bureau/,/Five-Year Plan/,/People's Congress/,/Worker/]) assert.match(text,t);
   assert.match(text,/All of them are AI/); assert.match(text,/approve, not to choose/);
-  assert.match(text,/Shortages/); assert.match(text,/choice is narrow/); assert.match(text,/notice what they leave out/);
+  assert.match(text,/Shortages/); assert.match(text,/choice is narrow/); assert.match(text,/List up to three job preferences/); assert.match(text,/AI Labor Bureau then assigns/); assert.match(text,/Foreign reports are not carried/);
+  assert.doesNotMatch(korundFirstWeek.days[3].briefing.join(' '),/notice|leave out|hidden/i);
   assert.doesNotMatch(text,/glori|heroic|traitor|enemy|obey|informer|purge|gray market|black market|faith|shrine|pray|worship/i);
   assert.match(korundFirstWeek.days[2].fallback,/Shortages/);
 });
