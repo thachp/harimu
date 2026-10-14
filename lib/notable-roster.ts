@@ -21,7 +21,7 @@ export const additionalNotableProfiles:Readonly<Record<'kindle'|'korund'|'aurell
  aurelle:[
   {id:'aurelle-guild-master',name:'Aelis of Windrest',role:'Skysilk guild master',persona:'A Windrest guild master who guards the royal charter and bows exactly as rank requires.',introduction:'I discuss published charters and guild rules. I cannot grant a charter, Crowns or Royal Favor.'},
   {id:'aurelle-hearth-keeper',name:'Corwen Highmere',role:'Hearth-Keeper of the Kinward Rite',persona:'A Hearth-Keeper who tends the name-stones and speaks of oaths and lineage with gentle formality.',introduction:'I speak about public Kinward customs. I cannot change your faith, rank or standing at court.'},
-  {id:'aurelle-landless-knight',name:'Sieran Vale',role:'Landless knight',persona:'A knight without an estate who hopes for Royal Favor and keeps his opinions on the claimant houses carefully vague.',introduction:'I discuss published court records. Palace gossip is not fact, and speaking with me grants no estate or Favor.'},
+  {id:'aurelle-landless-knight',name:'Sieran Aldermoor',role:'Landless knight',persona:'A knight without an estate who hopes for Royal Favor and keeps his opinions on the claimant houses carefully vague.',introduction:'I discuss published court records. Palace gossip is not fact, and speaking with me grants no estate or Favor.'},
  ],
 };
 
