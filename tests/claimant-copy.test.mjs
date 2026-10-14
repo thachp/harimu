@@ -1,17 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { pledgeCard, pledgeToasts, risingStageCopy, risingStage, RISING_STAGES, CLAIMANT_PLACEHOLDERS, CLAIMANT_LABEL_MAX, CLAIMANT_BODY_MAX, PLEDGE_CHANGE_DAYS } from '../lib/claimant-copy.ts';
+import { pledgeCard, pledgeToasts, risingStageCopy, risingStage, RISING_STAGES, CLAIMANT_PLACEHOLDERS, CLAIMANT_LABEL_MAX, CLAIMANT_BODY_MAX } from '../lib/claimant-copy.ts';
 
 const stageTexts=s=>[s.notice,s.crownGazette,s.claimantVoice];
-const allTexts=()=>[pledgeCard.nameLine.text,pledgeCard.motto.text,pledgeCard.body.text,...Object.values(pledgeCard.buttons),
+const allTexts=()=>[pledgeCard.nameLine.text,pledgeCard.motto.text,pledgeCard.body.text,pledgeCard.informerNote.text,...Object.values(pledgeCard.buttons),
   ...Object.values(pledgeToasts).map(l=>l.text),...risingStageCopy.flatMap(stageTexts)];
 
 test('locks the four Rising stages; every entry proposal', () => {
   assert.deepEqual(risingStageCopy.map(s=>s.stage),[...RISING_STAGES]);
   assert.deepEqual([...RISING_STAGES],['support-growing','crisis-window-open','rising-succeeded','rising-failed']);
   for (const s of risingStageCopy) { assert.equal(s.proposal,true); assert.equal(risingStage(s.stage),s); }
-  for (const l of [pledgeCard.nameLine,pledgeCard.motto,pledgeCard.body,...Object.values(pledgeToasts)]) assert.equal(l.proposal,true);
+  for (const l of [pledgeCard.nameLine,pledgeCard.motto,pledgeCard.body,pledgeCard.informerNote,...Object.values(pledgeToasts)]) assert.equal(l.proposal,true);
   assert.equal(pledgeCard.proposal,true); assert.deepEqual(pledgeCard.buttons,{pledge:'Pledge',withdraw:'Withdraw'});
 });
 test('length limits: labels <= 40, bodies <= 140', () => {
@@ -19,10 +19,15 @@ test('length limits: labels <= 40, bodies <= 140', () => {
   assert.ok(pledgeCard.nameLine.text.length<=CLAIMANT_LABEL_MAX);
   for (const t of allTexts()) assert.ok(t.length<=CLAIMANT_BODY_MAX, t);
 });
-test('pledge copy: private, aggregate, 7-day change limit', () => {
-  assert.equal(PLEDGE_CHANGE_DAYS,7);
-  assert.match(pledgeCard.body.text,/private from other players/); assert.match(pledgeCard.body.text,/aggregate/); assert.match(pledgeCard.body.text,/7 real days/);
-  assert.match(pledgeToasts.cooldown.text,/7 real days/); assert.match(pledgeToasts.pledged.text,/No other player can see/);
+test('pledge copy: private, aggregate, figure-free change limit (ARC #269)', () => {
+  assert.match(pledgeCard.body.text,/private from other players/); assert.match(pledgeCard.body.text,/aggregate/);
+  assert.match(pledgeToasts.cooldown.text,/waiting period/); assert.match(pledgeToasts.pledged.text,/No other player can see/);
+  for (const t of [pledgeCard.body.text,pledgeCard.informerNote.text,...Object.values(pledgeToasts).map(l=>l.text)]) assert.doesNotMatch(t,/\d|%|\b(seven|week)\b/i, t);
+});
+test('informer note is plain and non-threatening (ARC #269)', () => {
+  const n=pledgeCard.informerNote.text; assert.equal(pledgeCard.informerNote.proposal,true);
+  assert.match(n,/informer's report can reveal/); assert.ok(n.length<=CLAIMANT_BODY_MAX);
+  assert.doesNotMatch(n,/arrest|punish|prison|jail|danger|beware|warning|penalt|consequence|watch(ed|ing)|!|\btraitor/i);
 });
 test('no figures in stage copy', () => {
   for (const s of risingStageCopy) for (const t of stageTexts(s)) assert.doesNotMatch(t,/\d|%|percent|threshold/i, t);

@@ -2,8 +2,8 @@
  * Crisis Window math, and no UI imports this. Canon: harimu-docs ai-leadership §8.12 (rival AI houses each keep a
  * claimant persona with a public grievance and programme; only Tier-1 verified humans pledge, AI citizens cannot;
  * success crowns the claimant and founds a new AI royal house, and the absolute monarchy survives), coups-transitions
- * §10.3 (a Rising opens a Crisis Window; failed risings leave Grievance; pledges are seen only in aggregate) and the
- * #239 Court Gazette voice. The 7-day pledge change limit comes from the issue.
+ * §10.3 / §11.10 (informer reports can expose a pledge; a Rising opens a Crisis Window; failed risings leave Grievance; pledges are seen only in aggregate) and the
+ * #239 Court Gazette voice. The pledge-change limit is a #71 rule; the copy states no figure for it (ARC #269).
  *
  * No claimant house is named anywhere in content yet (lib/ names only the reigning House Solenne, and #107 added no
  * claimants), so claimant name, house name and motto are placeholders filled from persona data. Nothing here invents a
@@ -16,7 +16,6 @@ export type StageCopy={stage:RisingStage;notice:string;crownGazette:string;claim
 
 export const CLAIMANT_LABEL_MAX=40;
 export const CLAIMANT_BODY_MAX=140;
-export const PLEDGE_CHANGE_DAYS=7;
 export const RISING_STAGES:readonly RisingStage[]=['support-growing','crisis-window-open','rising-succeeded','rising-failed'];
 
 const L=(text:string):Line=>({text,proposal:true});
@@ -24,7 +23,8 @@ const L=(text:string):Line=>({text,proposal:true});
 export const pledgeCard={
  nameLine:L('{claimant}, claimant of {house}'),
  motto:L('"{motto}"'),
- body:L(`Your pledge is private from other players and counted only in aggregate. You can change it once every ${PLEDGE_CHANGE_DAYS} real days.`),
+ body:L('Your pledge is private from other players and counted only in aggregate. You can change it now and then, not every day.'),
+ informerNote:L('Pledges stay private, though an informer\'s report can reveal one.'),
  buttons:{pledge:'Pledge',withdraw:'Withdraw'},
  proposal:true,
 } as const;
@@ -32,7 +32,7 @@ export const pledgeCard={
 export const pledgeToasts={
  pledged:L('You have pledged to {claimant} of {house}. No other player can see your pledge.'),
  withdrawn:L('Your pledge to {claimant} is withdrawn.'),
- cooldown:L(`You changed your pledge recently. You can change it again ${PLEDGE_CHANGE_DAYS} real days after the last change.`),
+ cooldown:L('You changed your pledge recently. You can change it again once the waiting period ends.'),
 } as const;
 
 const st=(stage:RisingStage,notice:string,crownGazette:string,claimantVoice:string):StageCopy=>({stage,notice,crownGazette,claimantVoice,proposal:true});
