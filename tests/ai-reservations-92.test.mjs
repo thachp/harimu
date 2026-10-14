@@ -82,3 +82,20 @@ test('#92 a repeated Notable request id is still rejected after the expiry pass'
  const again=await r.answerNotable('alice',c,binding,{enabled:true,budget});
  assert.notEqual(first.status,409);assert.equal(again.status,409);assert.equal(calls,1);
 });
+
+test('#92 legacy phantom rows (9 rows, 959,000 on Oct 14 and 15) are released in-app; real sent/uncertain rows are untouched',async t=>{
+ const at=Date.parse('2026-10-14T13:00:00Z')/1000,n='notable-question-3b-double-guard-2026-10-14',s='@cf/meta/llama-3.2-3b-instruct';
+ const legacy=[['generation-probe',s,4200,1791965562,'finished'],['notable-1',n,136400,1791965661,'finished'],['notable-2',n,136400,1791965778,'finished'],['notable-3',n,136400,1791965827,'finished'],['notable-4',n,136400,1791965931,'finished'],['notable-5',n,136400,1791965992,'finished'],['notable-6',n,136400,1791966068,'finished'],['moderation-probe','@cf/meta/llama-guard-3-8b',64000,1791966223,'finished'],['news-final','news-sequence-3b-guard-2026-10-14',72400,1791966300,'finished']];
+ assert.equal(legacy.reduce((a,x)=>a+x[2],0),959000);
+ const r=await localRuntime();t.after(()=>r.close());const ins=(id,model,cost,started,status)=>r.db.prepare('INSERT INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,?,?,?,?,?,?)').bind(id,'2026-10-14','2026-10-15',model,cost,started,status).run();
+ for(const [id,...rest] of legacy)await ins('acceptance:2026-10-14:'+id,...rest);
+ await ins('real-finished',s,4200,at-60,'finished');await ins('notable:'+'a'.repeat(64)+':'+randomUUID(),s,4200,at-7200,'uncertain');
+ // Budget read already ignores them (before any write runs).
+ assert.equal((await readAiBudget(r.db,at,budget)).reservedMicroUsd,8400);assert.equal((await readAiBudget(r.db,at+86400,budget)).reservedMicroUsd,8400);
+ assert.equal(await reserveAiSequence(r.db,'fresh-1',at,budget),true); // the next reservation deletes them
+ await expireStaleAiReservations(r.db,at); // idempotent second pass
+ const rows=(await r.db.prepare('SELECT request_id,status FROM harimu_ai_reservations ORDER BY request_id').all()).results;
+ assert.equal(rows.filter(x=>x.request_id.startsWith('acceptance:')).length,0);
+ assert.deepEqual(rows.map(x=>x.status).sort(),['finished','pending','uncertain']);
+ assert.equal((await readAiBudget(r.db,at,budget)).remainingMicroUsd,970000-8400-aiNewsSequenceReservation);
+});

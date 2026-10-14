@@ -57,8 +57,12 @@ export async function releaseAiReservation(db:GameDatabase,id:string){await db.p
 /** #92: persist "handed to the gateway" BEFORE the first gateway call. 'uncertain' = sent, outcome unknown: it never
  * expires and is never released, so a crash mid-call stays charged and keeps its request id (Notable replay guard). */
 export async function markAiReservationSent(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status='pending'").bind(id).run();}
-/** #92: expire stale pending rows (no gateway evidence) so they stop consuming the daily budget. */
-export async function expireStaleAiReservations(db:GameDatabase,now:number){if(!Number.isSafeInteger(now))return;await db.prepare("DELETE FROM harimu_ai_reservations WHERE status='pending' AND started_at<=?").bind(now-aiPendingExpirySeconds).run();}
+/** #92: ids of the removed preview acceptance ledger/prebook. Written by readiness, never sent through the gateway,
+ * some already 'finished'/'uncertain'. Real ids are UUIDs, notable:<sha>: or cabinet:, so this never matches them. */
+export const legacyPhantomReservationPattern='acceptance:%';
+/** #92: expire stale pending rows (no gateway evidence) and release the legacy phantom rows so neither consumes the
+ * daily budget. Idempotent; a plain DELETE the app role already performs for over-cap rows (no elevated privileges). */
+export async function expireStaleAiReservations(db:GameDatabase,now:number){if(!Number.isSafeInteger(now))return;await db.prepare("DELETE FROM harimu_ai_reservations WHERE (status='pending' AND started_at<=?) OR request_id LIKE ?").bind(now-aiPendingExpirySeconds,legacyPhantomReservationPattern).run();}
 export const aiBudgetSchema=`CREATE TABLE IF NOT EXISTS harimu_ai_reservations (request_id TEXT PRIMARY KEY,utc_day TEXT NOT NULL,next_utc_day TEXT NOT NULL,model TEXT NOT NULL,reserved_micro INTEGER NOT NULL CHECK(reserved_micro>0),started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','finished','uncertain')))`;
 export async function reserveAiCall(db:GameDatabase,id:string,model:AiModel,now:number,config:AiBudgetConfig|null){
  if(!isPricedAiModel(model))return false;return reserveBudget(db,id,model,aiModelReservations[model],1,now,config);
@@ -94,7 +98,7 @@ export async function readAiBudget(db:GameDatabase,now:number,config?:AiBudgetCo
  const limit=config===undefined?aiDailyBudgetMicroUsd:validConfig(config)?config.dailyBudgetMicro:0;
  if(!Number.isSafeInteger(now))throw Error('Invalid budget time.');
  const day=new Date(now*1000).toISOString().slice(0,10),nextDay=new Date((now+86400)*1000).toISOString().slice(0,10);
- const row=await db.prepare("SELECT COALESCE(SUM(CASE WHEN (utc_day=? OR next_utc_day=?) AND (status<>'pending' OR started_at>?) THEN reserved_micro ELSE 0 END),0) AS reserved,COALESCE(SUM(CASE WHEN (utc_day=? OR next_utc_day=?) AND (status<>'pending' OR started_at>?) THEN reserved_micro ELSE 0 END),0) AS next_reserved,COALESCE(SUM(CASE WHEN status IN ('pending','uncertain') AND utc_day<? AND started_at>? THEN 1 ELSE 0 END),0) AS blocked FROM harimu_ai_reservations").bind(day,day,now-aiPendingExpirySeconds,nextDay,nextDay,now-aiPendingExpirySeconds,day,now-aiUncertainBlockTtlSeconds).first<{reserved:number;next_reserved:number;blocked:number}>();
+ const row=await db.prepare("SELECT COALESCE(SUM(CASE WHEN (utc_day=? OR next_utc_day=?) AND (status<>'pending' OR started_at>?) AND request_id NOT LIKE 'acceptance:%' THEN reserved_micro ELSE 0 END),0) AS reserved,COALESCE(SUM(CASE WHEN (utc_day=? OR next_utc_day=?) AND (status<>'pending' OR started_at>?) AND request_id NOT LIKE 'acceptance:%' THEN reserved_micro ELSE 0 END),0) AS next_reserved,COALESCE(SUM(CASE WHEN status IN ('pending','uncertain') AND utc_day<? AND started_at>? THEN 1 ELSE 0 END),0) AS blocked FROM harimu_ai_reservations").bind(day,day,now-aiPendingExpirySeconds,nextDay,nextDay,now-aiPendingExpirySeconds,day,now-aiUncertainBlockTtlSeconds).first<{reserved:number;next_reserved:number;blocked:number}>();
  if(!row||![row.reserved,row.next_reserved,row.blocked].every(n=>Number.isSafeInteger(n)&&n>=0))throw Error('AI budget unavailable.');
  return {day,nextDay,reservedMicroUsd:row.reserved,nextDayReservedMicroUsd:row.next_reserved,remainingMicroUsd:Math.max(0,Math.min(limit-row.reserved,limit-row.next_reserved)),dailyBudgetMicroUsd:limit,pricesVerifiedAt:aiPricesVerifiedAt,priceTableVersion:aiPriceTableVersion,pricesStale:aiPricesStale(now),blocked:row.blocked>0,topicMicroUsd:aiNewsSequenceReservation,questionMicroUsd:aiNotableQuestionReservation};
 }

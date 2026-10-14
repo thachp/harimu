@@ -2260,3 +2260,6 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 .korund-quota-own { background: var(--gold, #efd69c); }
 .korund-coupons ul { margin: 6px 0; padding-left: 18px; }
 .korund-coupons li { margin: 4px 0; }
+
+/* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
+button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }

@@ -12,7 +12,7 @@ const tree=ts.createSourceFile('page.tsx',source,ts.ScriptTarget.Latest,true,ts.
 let commandNode;function find(node){if(ts.isFunctionDeclaration(node)&&node.name?.text==='runMarket')commandNode=node;ts.forEachChild(node,find);}find(tree);assert.ok(commandNode);
 const commandJs=ts.transpileModule(commandNode.getText(tree),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
 const marketJs=ts.transpileModule(await readFile(new URL('../app/citizen-market.tsx',import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
-const exports={};new Function('exports','require',marketJs)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-timer'?{GameTimer:()=>null}:name==='react'?{useState:initial=>[initial,()=>{}],useEffect(){}}:require(name));
+const exports={};new Function('exports','require',marketJs)(exports,name=>name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-timer'?{GameTimer:()=>null}:name==='react'?{useState:initial=>[initial,()=>{}],useEffect(){}}:require(name));
 const flatten=node=>[node,...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child=>typeof child==='object'?flatten(child):[child])];
 function client(snapshot,fetch){
  const state={Capacity:snapshot.capacity,Economy:snapshot.economy,Market:snapshot.market};const ref=current=>({current});
