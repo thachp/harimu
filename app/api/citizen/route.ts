@@ -16,6 +16,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
+import { checkFirstWeekGoal, completeFirstWeekGoal, readFirstWeekProgress } from '@/lib/first-week-server';
 import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
 
 export const dynamic = 'force-dynamic';
@@ -137,6 +138,7 @@ export async function GET(request: Request) {
     election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined),...(accountLevel?{id:accountElectionId}:{})}:null,
     collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow):null,
     korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
+    firstWeek: profile ? await readFirstWeekProgress(database,userId,profile.nation_id,profile.created_at,civicNow) : null,
     simulation,
     verification,
     economy: await readEconomy(database, userId, interval),
@@ -174,6 +176,16 @@ export async function POST(request: Request) {
   }
   const now = new Date().toISOString();
 
+  // #135: record a first-week goal (view-backed or client-detected). Idempotent; guidance only.
+  if (body.action === 'first-week-complete') {
+    if (typeof body.requestId !== 'string' || !/^[A-Za-z0-9-]{8,64}$/.test(body.requestId)) return privateJson({ error: 'Use a valid request identifier.' }, { status: 400 });
+    const citizen = await database.prepare('SELECT nation_id, created_at FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null; created_at: string }>();
+    const nowSec = Math.floor(Date.parse(now) / 1000);
+    const check = checkFirstWeekGoal(citizen?.nation_id ?? null, citizen?.created_at ?? '', body.goalId, nowSec);
+    if (!check.ok) return privateJson({ error: check.error }, { status: check.status });
+    await completeFirstWeekGoal(database, userId, body.goalId as string, nowSec);
+    return privateJson({ ok: true, firstWeek: await readFirstWeekProgress(database, userId, citizen?.nation_id ?? null, citizen?.created_at ?? '', nowSec) });
+  }
   if (typeof body.action === 'string' && body.action.startsWith('aurelle-')) {
     if (!validAurelleCommand(body)) return privateJson({error:'Use a valid request identifier, shift identifier and food quantity of 1 or 2.'},{status:400});
     const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000));
