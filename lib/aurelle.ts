@@ -1,6 +1,5 @@
 import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
-import { isMissingRelation } from './db-errors';
 // Bounded prototype tuning; no gold backing, issuance, ranks or charter allocation model.
 export const aurelleJob = {id:'aurelle-food-estate',name:'Chartered food-estate service',capacityCost:4,hours:2,wageMinor:800,foodOutput:4,favorReward:2} as const;
 export const aurelleFoodPriceMinor=150;
@@ -24,7 +23,7 @@ export const royalFavorBalanceSql=`MAX(0,MIN(100,COALESCE((SELECT SUM(favor) FRO
 /** Spendable Royal Favor. A database without migration 0028 yet has nothing spent, but nothing can be spent either (see faith.ts). */
 export async function royalFavorBalance(db:GameDatabase,userId:string):Promise<number>{
  try{const row=await db.prepare(`SELECT ${royalFavorBalanceSql} AS favor`).bind(userId,userId).first<{favor:number}>();return Number(row?.favor??0);}
- catch(error){if(!isMissingRelation(error))throw error;/* only a missing aurelle_favor_spends falls back: any other failure must not read as a balance */const row=await db.prepare('SELECT MIN(100,COALESCE(SUM(favor),0)) AS favor FROM aurelle_settlements WHERE clerk_user_id=?').bind(userId).first<{favor:number}>();return Number(row?.favor??0);}
+ catch(error){if(!/no such table|does not exist|42P01/i.test(String((error as {code?:string})?.code??'')+' '+String((error as Error)?.message??error)))throw error;/* only a missing aurelle_favor_spends falls back: any other failure must not read as a balance (inline: tests/aurelle.test.py loads this file without a resolver, so no ./db-errors import) */const row=await db.prepare('SELECT MIN(100,COALESCE(SUM(favor),0)) AS favor FROM aurelle_settlements WHERE clerk_user_id=?').bind(userId).first<{favor:number}>();return Number(row?.favor??0);}
 }
 const publicFood=`initial_food+COALESCE((SELECT SUM(food_output) FROM aurelle_settlements),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_purchases),0)`;
 const publicFunds=`initial_minor+COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements),0)`;
