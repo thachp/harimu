@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 export const marketSeeds = [
   ['food', 'Food', 150, 100, 100],
   ['materials', 'Materials', 300, 200, 40],
@@ -107,7 +108,7 @@ export function validMarketCommand(body: Record<string, unknown>): body is Recor
     && marketSeeds.some(([id]) => id === body.item) && Number.isSafeInteger(body.quantity)
     && (body.quantity as number) >= 1 && (body.quantity as number) <= 10;
 }
-export async function executeMarketCommand(db: D1Database, userId: string, command: MarketCommand, now: number, interval: number) {
+export async function executeMarketCommand(db: GameDatabase, userId: string, command: MarketCommand, now: number, interval: number) {
   const expectedKind = command.action === 'household-meal' ? 'meal' : command.side;
   const receipt = () => db.prepare('SELECT clerk_user_id, kind, item, quantity_delta FROM citizen_economy_events WHERE id = ?')
     .bind(command.requestId).first<{ clerk_user_id: string; kind: string; item: string; quantity_delta: number }>();
@@ -131,7 +132,7 @@ export async function executeMarketCommand(db: D1Database, userId: string, comma
     ? 'Meal unavailable: check food, capacity, Kindle citizenship and the meal timer.'
     : 'Trade unavailable: check funds, stock, quantity and Kindle citizenship.' };
 }
-export async function readMarket(db: D1Database, userId: string, interval: number): Promise<MarketState> {
+export async function readMarket(db: GameDatabase, userId: string, interval: number): Promise<MarketState> {
   const [citizen, cash, quotes, lastMeal, starterGrant] = await Promise.all([
     db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>(),
     db.prepare("SELECT balance FROM merchant_cash_balance WHERE EXISTS(SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id='kindle')").bind(userId).first<{ balance: number }>(),

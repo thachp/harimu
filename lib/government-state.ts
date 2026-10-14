@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import { simulateGovernment, rebaseGovernmentBudget } from './government';
 export const petitionSchema = `CREATE TABLE IF NOT EXISTS government_petitions (
   request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),
@@ -43,7 +44,7 @@ export const petitionResolutionSql = `INSERT INTO government_petition_resolution
   ON CONFLICT(request_id) DO NOTHING`;
 
 /** Completed UTC days are reviewed once; this read may persist bounded, idempotent reviews. */
-export async function readGovernment(db: D1Database, nationId: string, now: number, userId?: string) {
+export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string) {
   const [budget, needs, days] = await Promise.all([
     db.prepare("SELECT initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number }>(),
     db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN CASE WHEN c.nation_id='korund' THEN COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=c.clerk_user_id),0) WHEN c.nation_id='aurelle' THEN COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=c.clerk_user_id),0) ELSE COALESCE(i.quantity,0) END >= 2 THEN 1 ELSE 0 END) AS supplied

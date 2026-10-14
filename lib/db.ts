@@ -1,3 +1,5 @@
+import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
+import type {GameDatabase} from './database-contract';
 import {addressSchemas} from './weekly-addresses';
 import {electionSchemas} from './elections';
 import {collectivePetitionSchemas} from './collective-petitions';
@@ -53,12 +55,12 @@ const worldEventSeeds = [
 let initialization: Promise<void> | undefined;
 
 function databaseBinding() {
-  const database = (env as unknown as { DB?: D1Database }).DB;
+  const database = (env as unknown as { DB?: GameDatabase }).DB;
   if (!database) throw new Error('The Harimu database binding is unavailable.');
   return database;
 }
 
-async function initialize(database: D1Database) {
+async function initialize(database: GameDatabase) {
   await database.batch([
     database.prepare(`CREATE TABLE IF NOT EXISTS nations (
       id TEXT PRIMARY KEY NOT NULL,
@@ -327,7 +329,22 @@ async function initialize(database: D1Database) {
   await database.prepare('PRAGMA optimize').run();
 }
 
-export async function getDatabase() {
+export async function getDatabase():Promise<GameDatabase> {
+  const bindings=env as unknown as {HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_ROLLBACK_UNTIL?:string;HYPERDRIVE?:{connectionString:string}};
+  const journalUntilSeconds=Math.floor(Date.parse(bindings.HARIMU_POSTGRES_ROLLBACK_UNTIL??'')/1000);
+  const selected=selectStorageBackend({backend:bindings.HARIMU_STORAGE_BACKEND,implementationEnabled:postgresRuntimeEnabled,developmentPreview:bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,maintenance:bindings.HARIMU_STORAGE_MAINTENANCE,cutoverReady:bindings.HARIMU_POSTGRES_CUTOVER_READY,hyperdriveConfigured:Boolean(bindings.HYPERDRIVE),journalWindowReady:Number.isSafeInteger(journalUntilSeconds)&&journalUntilSeconds>Math.floor(Date.now()/1000)});
+  if(selected==='postgres'){
+    const {postgresConnection}=await import('./postgres/driver');
+    const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalUntilSeconds);
+    const role=await database.prepare("SELECT has_schema_privilege(current_user,'public','CREATE') AS can_create_schema,has_any_column_privilege(current_user,'harimu_storage_migrations','UPDATE') AS can_change_marker,(SELECT rolsuper FROM pg_roles WHERE rolname=current_user) AS superuser").first<{can_create_schema:number;can_change_marker:number;superuser:number}>();
+    if(!role)throw Error('PostgreSQL application role could not be verified.');
+    assertPostgresApplicationRole({canCreateSchema:role.can_create_schema,canChangeMarker:role.can_change_marker,superuser:role.superuser});
+    // Imported schema/data must have passed validation. Do not bootstrap or
+    // rewrite an imported world using the old SQLite compatibility migrations.
+    const marker=await database.prepare("SELECT validated,backup_sha256 FROM harimu_storage_migrations WHERE id='d1-to-postgres-v1'").first<{validated:number;backup_sha256:string}>();
+    if(marker?.validated!==1||!/^[a-f0-9]{64}$/.test(marker.backup_sha256))throw Error('PostgreSQL import has not been validated.');
+    return database;
+  }
   const database = databaseBinding();
   initialization ??= initialize(database);
   await initialization;

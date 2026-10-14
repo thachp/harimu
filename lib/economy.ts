@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import { defaultRecoverySeconds } from './economy-rules';
 export { recoveryInterval } from './economy-rules';
 import { starterGrantSql } from './market';
@@ -59,7 +60,7 @@ export const finishSettledShiftSql = `UPDATE work_shifts SET claimed_at = ?
   WHERE id = ? AND clerk_user_id = ? AND claimed_at IS NULL AND completes_at <= ?
     AND EXISTS (SELECT 1 FROM shift_settlements WHERE shift_id = work_shifts.id)`;
 
-export async function recoverCapacity(db: D1Database, userId: string, now: string, interval: number) {
+export async function recoverCapacity(db: GameDatabase, userId: string, now: string, interval: number) {
   const seconds = Math.floor(Date.parse(now) / 1000);
   await db.batch([
     db.prepare(starterGrantSql).bind(userId),
@@ -72,10 +73,10 @@ export async function recoverCapacity(db: D1Database, userId: string, now: strin
 export const economySnapshotSql = `SELECT
   (SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id = ?) AS wallet_minor,
   (SELECT json_group_array(json_object('item', item, 'quantity', quantity)) FROM
-    (SELECT item, quantity FROM citizen_inventory_balances WHERE clerk_user_id = ? AND quantity > 0)) AS inventory_json,
+    (SELECT item, quantity FROM citizen_inventory_balances WHERE clerk_user_id = ? AND quantity > 0 ORDER BY item)) AS inventory_json,
   (SELECT recovered_at FROM capacity_clocks WHERE clerk_user_id = ?) AS recovered_at`;
 
-export async function readEconomy(db: D1Database, userId: string, interval: number): Promise<Economy> {
+export async function readEconomy(db: GameDatabase, userId: string, interval: number): Promise<Economy> {
   await db.prepare(starterGrantSql).bind(userId).run();
   // One SQLite read snapshot keeps wallet and goods consistent during another tab's claim.
   const row = await db.prepare(economySnapshotSql).bind(userId, userId, userId).first<{

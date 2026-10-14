@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {DatabaseSync} from 'node:sqlite';
+import {localRuntime} from './helpers/local-runtime.mjs';
+import {snapshotManifest,orderedSchema,replayJournalSqlite,importSnapshot} from '../scripts/postgres-migration.mjs';
+import {postgresSql} from '../lib/postgres/sql.ts';
+import {assertPostgresApplicationRole,selectStorageBackend} from '../lib/storage-selection.ts';
+const identifier=name=>`"${name}"`;
+test('SQL literals and values stay separate; unsupported dialects fail closed',()=>{
+ const result=postgresSql("SELECT 'integer ? MIN(1,2)' AS literal,MIN(?,MAX(0,?)),changes()",[4,7],1);assert.ok(result.text.includes("'integer ? MIN(1,2)'"));assert.match(result.text,/LEAST\(\$1::bigint,GREATEST\(0,\$2::bigint\)\)/);assert.deepEqual(result.values,[4,7]);
+ assert.throws(()=>postgresSql('SELECT ?; DELETE FROM citizens',[1]));assert.throws(()=>postgresSql('SELECT ?',[1.5]));assert.throws(()=>postgresSql('SELECT json_extract(?,?)',['{}','$.unknown']));
+});
+test('storage activation requires preview, explicit cutover readiness and configured Hyperdrive; maintenance fails closed',()=>{
+ const base={hyperdriveConfigured:false};assert.equal(selectStorageBackend(base),'d1');
+ assert.equal(selectStorageBackend({...base,backend:'postgres',cutoverReady:'true'}),'d1');
+ for(const input of [{...base,backend:'postgres',implementationEnabled:true},{...base,backend:'postgres',implementationEnabled:true,cutoverReady:'true',developmentPreview:'true'},{...base,backend:'unexpected'},{...base,maintenance:'true'}])assert.throws(()=>selectStorageBackend(input));
+ assert.equal(selectStorageBackend({...base,backend:'postgres',implementationEnabled:true,hyperdriveConfigured:true,developmentPreview:'true',cutoverReady:'true',journalWindowReady:true}),'postgres');
+ assertPostgresApplicationRole({canCreateSchema:0,canChangeMarker:0,superuser:0});for(const flag of ['canCreateSchema','canChangeMarker','superuser'])assert.throws(()=>assertPostgresApplicationRole({canCreateSchema:0,canChangeMarker:0,superuser:0,[flag]:1}));
+});
+test('a PostgreSQL fixture preserves its snapshot and journal restores subsequent writes to SQLite exactly once',async t=>{
+ const r=await localRuntime({backend:'postgres'});t.after(()=>r.close());assert.equal(r.postgresSnapshot.schema.filter(s=>s.type==='table').length,52);
+ const source=new DatabaseSync(':memory:');t.after(()=>source.close());
+ for(const entry of orderedSchema(r.postgresSnapshot))source.exec(entry.sql);
+ for(const entry of orderedSchema(r.postgresSnapshot).filter(s=>s.type==='table'))for(const row of r.postgresSnapshot.data[entry.name]){const keys=Object.keys(row);source.prepare(`INSERT INTO ${identifier(entry.name)} (${keys.map(identifier).join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...keys.map(key=>row[key]));}
+ const started=await r.call('citizen','alice',{action:'commit-work',workOrderId:'harvest'});assert.equal(started.status,200);const shift=started.data.shifts[0];r.setNow(Date.parse(shift.completesAt));
+ assert.equal((await r.call('citizen','alice',{action:'claim-work',shiftId:shift.id})).status,200);
+ await r.call('citizen','alice');
+ const target={...r.postgresSnapshot,data:{}};for(const table of r.postgresSnapshot.schema.filter(s=>s.type==='table'))target.data[table.name]=(await r.db.prepare(`SELECT * FROM ${identifier(table.name)}`).all()).results;
+ const journal=(await r.db.prepare('SELECT id,statements_json FROM harimu_postgres_write_journal ORDER BY id').all()).results;assert.ok(journal.length);
+ replayJournalSqlite(source,journal);replayJournalSqlite(source,journal);
+ const restored={...r.postgresSnapshot,data:{}};for(const table of r.postgresSnapshot.schema.filter(s=>s.type==='table'))restored.data[table.name]=source.prepare(`SELECT * FROM ${identifier(table.name)}`).all();
+ assert.deepEqual(snapshotManifest(restored),snapshotManifest(target));
+ assert.throws(()=>replayJournalSqlite(source,[...journal].reverse()),/ordering/);
+ assert.throws(()=>replayJournalSqlite(source,[{...journal[0],statements_json:JSON.stringify([{sql:"UPDATE citizens SET capacity=0",values:[]}])}]),/content changed/);
+ const afterRejected={...r.postgresSnapshot,data:{}};for(const table of r.postgresSnapshot.schema.filter(s=>s.type==='table'))afterRejected.data[table.name]=source.prepare(`SELECT * FROM ${identifier(table.name)}`).all();assert.deepEqual(snapshotManifest(afterRejected),snapshotManifest(target));
+});
+
+test('the production PostgreSQL adapter rejects ballot writes before connection or journal access',async()=>{
+ const {readFile}=await import('node:fs/promises');const ts=(await import('typescript')).default;
+ const source=(await readFile(new URL('../lib/postgres/database.ts',import.meta.url),'utf8')).replace("'./sql'",JSON.stringify(new URL('../lib/postgres/sql.ts',import.meta.url).href));
+ const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;const {PostgresDatabase}=await import(`data:text/javascript;base64,${Buffer.from(output).toString('base64')}`);
+ let connects=0;const db=new PostgresDatabase(async()=>{connects++;throw Error('Must not connect.');});
+ await assert.rejects(db.prepare('INSERT INTO civic_voter_receipts(request_id) VALUES (?)').bind('fixture').run(),/disabled pending privacy/);
+ await assert.rejects(db.prepare('UPDATE civic_anonymous_ballots SET ranking_json=?').bind('[]').run(),/disabled pending privacy/);await assert.rejects(db.prepare('INSERT INTO public."civic_anonymous_ballots"(id) VALUES (?)').bind('fixture').run(),/disabled pending privacy/);
+ await assert.rejects(db.prepare('UPDATE citizens SET capacity=18').run(),/journal window/);assert.equal(connects,0);
+});
+
+test('offline backup preparation keeps private rows outside the repository and reports only aggregate metadata',async t=>{
+ const {mkdtemp,readFile,stat,rm}=await import('node:fs/promises');const {tmpdir}=await import('node:os');const {join}=await import('node:path');const {spawnSync}=await import('node:child_process');
+ const r=await localRuntime({backend:'sqlite'});t.after(()=>r.close());const output=await mkdtemp(join(tmpdir(),'harimu-private-migration-'));t.after(()=>rm(output,{recursive:true,force:true}));
+ const result=spawnSync(process.execPath,['--experimental-strip-types','scripts/prepare-postgres-migration.mjs',r.sqliteBackupPath,output],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.doesNotMatch(result.stdout,/alice|bob|Private/);
+ const manifest=JSON.parse(await readFile(join(output,'manifest.json'),'utf8'));const snapshot=JSON.parse(await readFile(join(output,'snapshot.json'),'utf8'));const {backupSha256,...expected}=manifest;assert.match(backupSha256,/^[a-f0-9]{64}$/);assert.deepEqual(snapshotManifest(snapshot),expected);assert.equal((await stat(join(output,'snapshot.json'))).mode&0o077,0);
+ const forbidden=spawnSync(process.execPath,['--experimental-strip-types','scripts/prepare-postgres-migration.mjs',r.sqliteBackupPath,process.cwd()],{encoding:'utf8'});assert.notEqual(forbidden.status,0);
+});
+test('unverified backup manifests and nonempty targets are refused before a migration writes',async()=>{
+ let queries=0;const connection={query:async()=>{queries++;return {rows:[{tablename:'existing'}]};}};const snapshot={format:'harimu-sqlite-snapshot-v1',schema:[],data:{}};
+ const options={backupSha256:'a'.repeat(64),expectedManifest:snapshotManifest(snapshot),compatibilitySql:'CREATE SCHEMA IF NOT EXISTS harimu_compat;'};
+ await assert.rejects(importSnapshot(connection,snapshot,{...options,expectedManifest:{}}),/independently verified/);assert.equal(queries,0);
+ await assert.rejects(importSnapshot(connection,snapshot,options),/Target must be empty/);assert.equal(queries,1);
+});

@@ -1,3 +1,4 @@
+import type {GameDatabase} from '@/lib/database-contract';
 import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
 import {readVerification} from '@/lib/verification';
@@ -8,7 +9,7 @@ import {trustedBallotPrivacyReady,ballotPrivacyReason} from '@/lib/ballot-privac
 import {candidateIds,electionId,openPreviewElection,readElection,voteReceiptSql,anonymousBallotSql,markBallotWrittenSql} from '@/lib/elections';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
-const kindle=async(db:D1Database,userId:string)=>(await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>())?.nation_id==='kindle';
+const kindle=async(db:GameDatabase,userId:string)=>(await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>())?.nation_id==='kindle';
 export async function GET(request:Request){
  const userId=await authenticatedUserId(request);if(!userId)return json({error:'Sign in required.'},401);
  const db=await getDatabase();if(!await kindle(db,userId))return json({error:'This preview election is for Kindle citizens only.'},403);

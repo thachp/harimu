@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import {readCityLocation,cityPresence} from './city-location';
 export const squareSchema = [
 `CREATE TABLE IF NOT EXISTS square_handles (user_id TEXT PRIMARY KEY REFERENCES citizens(clerk_user_id), handle TEXT NOT NULL UNIQUE)`,
@@ -13,7 +14,7 @@ AND NOT EXISTS (SELECT 1 FROM square_messages WHERE id=?)
 AND NOT EXISTS (SELECT 1 FROM square_messages WHERE user_id=? AND posted_at>?)
 AND (SELECT COUNT(*) FROM square_messages WHERE user_id=? AND posted_at>?)<20`;
 export {uuidPattern,validSquareText} from './square-chat-validation';
-export async function readSquare(db:D1Database,userId:string,nationId:string,now:number) {
+export async function readSquare(db:GameDatabase,userId:string,nationId:string,now:number) {
   await db.batch([db.prepare('DELETE FROM square_messages WHERE posted_at<=?').bind(now-604800),db.prepare('DELETE FROM square_presence WHERE expires_at<=?').bind(now)]);
   const location=await readCityLocation(db,userId,nationId,now);
   const messages=await db.prepare(`SELECT m.id,h.handle,m.body,m.posted_at FROM square_messages m JOIN square_handles h ON h.user_id=m.user_id WHERE m.nation_id=? AND m.deleted=0 AND m.posted_at>? AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id=?) ORDER BY m.posted_at DESC,m.id DESC LIMIT 50`).bind(nationId,now-604800,userId,nationId).all<{id:string;handle:string;body:string;posted_at:number}>();

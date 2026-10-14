@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import {instantRunoffCounts,type RunoffResult} from './instant-runoff';
 import {trustedBallotPrivacyReady,ballotPrivacyReason} from './ballot-privacy';
 export const electionId='kindle-presidential-poc-1';
@@ -16,7 +17,7 @@ export const electionSchemas=[
  `CREATE INDEX IF NOT EXISTS idx_anonymous_ballots_election ON civic_anonymous_ballots(election_id)`,
 ];
 export type ElectionSnapshot={nationId:'kindle';id:string;candidates:readonly {id:string;name:string;platform:string}[];status:'waiting'|'open'|'closed';opensAt:number|null;closesAt:number|null;voted:boolean;result:RunoffResult|null;privacyReady:boolean;privacyReason:string};
-export async function openPreviewElection(db:D1Database,userId:string,now:number){
+export async function openPreviewElection(db:GameDatabase,userId:string,now:number){
  if(!trustedBallotPrivacyReady())return;
  // The caller must first obtain fresh trusted Tier-1 evidence. No unverified read opens a window.
  await db.prepare(`INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) SELECT ?,'kindle',?,?,?+259200 FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(id) DO NOTHING`).bind(electionId,JSON.stringify(electionCandidates),now,now,userId).run();
@@ -28,7 +29,7 @@ export const voteReceiptSql=`INSERT INTO civic_voter_receipts (election_id,clerk
 export const anonymousBallotSql=`INSERT INTO civic_anonymous_ballots (id,election_id,ranking_json,policy)
  SELECT ?,r.election_id,?,'tier1-human-v1' FROM civic_voter_receipts r WHERE r.request_id=? AND r.clerk_user_id=? AND r.election_id=? AND r.ballot_written=0`;
 export const markBallotWrittenSql=`UPDATE civic_voter_receipts SET ballot_written=1 WHERE request_id=? AND clerk_user_id=? AND election_id=? AND ballot_written=0`;
-async function finalizedResult(db:D1Database,now:number){
+async function finalizedResult(db:GameDatabase,now:number){
  await db.prepare('UPDATE civic_elections SET closed_at=? WHERE id=? AND closed_at IS NULL AND closes_at<=?').bind(now,electionId,now).run();
  const election=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(electionId).first<{result_json:string|null}>();
  if(!election)return null;
@@ -48,7 +49,7 @@ async function finalizedResult(db:D1Database,now:number){
  if(result.rounds.some(round=>round.eliminated!==null&&!candidateIds.some(id=>id===round.eliminated)))throw Error('Saved election count could not be verified.');
  return {winner:result.winner,humanBallots:result.humanBallots,simulatedPublicUnits:result.simulatedPublicUnits,weightScale:4 as const,rounds:result.rounds.map(round=>({human:counts(round.human),simulatedUnits:counts(round.simulatedUnits),weightedUnits:counts(round.weightedUnits),eliminated:round.eliminated}))};
 }
-export async function readElection(db:D1Database,userId:string,now:number):Promise<ElectionSnapshot>{
+export async function readElection(db:GameDatabase,userId:string,now:number):Promise<ElectionSnapshot>{
  const election=await db.prepare('SELECT candidates_json,opens_at,closes_at,closed_at FROM civic_elections WHERE id=?').bind(electionId).first<{candidates_json:string;opens_at:number;closes_at:number;closed_at:number|null}>();
  const base={nationId:'kindle' as const,id:electionId,candidates:electionCandidates,voted:false,result:null,privacyReady:trustedBallotPrivacyReady(),privacyReason:ballotPrivacyReason};
  if(!election)return {...base,status:'waiting',opensAt:null,closesAt:null};

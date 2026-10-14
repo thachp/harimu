@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
 // Bounded prototype tuning; no gold backing, issuance, ranks or charter allocation model.
 export const aurelleJob = {id:'aurelle-food-estate',name:'Chartered food-estate service',capacityCost:4,hours:2,wageMinor:800,foodOutput:4,favorReward:2} as const;
@@ -60,7 +61,7 @@ export function validAurelleCommand(body:Record<string,unknown>):body is Record<
  if(body.action==='aurelle-buy-food') return body.quantity===1||body.quantity===2;
  return (body.action==='aurelle-start-work'||body.action==='aurelle-household-meal')&&body.quantity===undefined;
 }
-export async function readAurelle(db:D1Database,userId:string):Promise<AurellePlan>{
+export async function readAurelle(db:GameDatabase,userId:string):Promise<AurellePlan>{
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
  db.prepare(`SELECT ${publicFood} AS public_food,${publicFunds} AS funds,
@@ -77,7 +78,7 @@ export async function readAurelle(db:D1Database,userId:string):Promise<AurellePl
  mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),
  shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,rewardItem:'estate food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeAurelle(db:D1Database,userId:string,command:AurelleCommand,now:number){
+export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number){
  const id=command.requestId.toLowerCase(),shiftId=command.shiftId?.toLowerCase()??null;
  const quantity=command.action==='aurelle-buy-food'?command.quantity!:command.action==='aurelle-household-meal'?2:0;
  const receipt=()=>db.prepare('SELECT clerk_user_id,action,quantity,shift_id FROM aurelle_receipts WHERE id=?').bind(id).first<{clerk_user_id:string;action:string;quantity:number;shift_id:string|null}>();

@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 export type PlayerCommand = {
   action: 'create-listing' | 'buy-listing' | 'cancel-listing'; requestId: string;
   item?: string; quantity?: number; unitMinor?: number; listingId?: string;
@@ -63,7 +64,7 @@ export function parseSparkPrice(value: string): number | null {
   const minor = Number(whole) * 100 + Number(cents.padEnd(2, '0'));
   return minor >= 1 && minor <= 1000 ? minor : null;
 }
-export async function executePlayerCommand(db: D1Database, userId: string, command: PlayerCommand, now: number) {
+export async function executePlayerCommand(db: GameDatabase, userId: string, command: PlayerCommand, now: number) {
   const find = () => db.prepare(`SELECT r.user_id, r.action, r.listing_id, l.item, l.quantity, l.unit_minor
     FROM player_request_receipts r JOIN player_listings l ON l.id = r.listing_id WHERE r.request_id = ?`)
     .bind(command.requestId).first<{ user_id: string; action: string; listing_id: string; item: string; quantity: number; unit_minor: number }>();
@@ -85,7 +86,7 @@ export async function executePlayerCommand(db: D1Database, userId: string, comma
     ? 'Listing refused: check available goods, quantity, price, Kindle citizenship and the five-listing limit.'
     : 'Listing unavailable, already closed, insufficient funds, or ownership/citizenship does not permit this action.' };
 }
-export async function readPlayerMarket(db: D1Database, userId: string): Promise<PlayerMarketState> {
+export async function readPlayerMarket(db: GameDatabase, userId: string): Promise<PlayerMarketState> {
   const columns = `SELECT l.id, l.item, l.quantity, l.unit_minor, l.created_at,
     CASE WHEN EXISTS (SELECT 1 FROM player_fills WHERE listing_id = l.id) THEN 'sold'
       WHEN EXISTS (SELECT 1 FROM player_cancellations WHERE listing_id = l.id) THEN 'cancelled' ELSE 'open' END AS status
@@ -93,7 +94,7 @@ export async function readPlayerMarket(db: D1Database, userId: string): Promise<
   type Row = { id: string; item: string; quantity: number; unit_minor: number; created_at: number; status: PlayerLot['status'] };
   const [citizen, mine, others] = await Promise.all([
     db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>(),
-    db.prepare(`${columns} WHERE l.seller_id = ? ORDER BY (status = 'open') DESC, l.created_at DESC, l.id DESC LIMIT 20`).bind(userId).all<Row>(),
+    db.prepare(`SELECT * FROM (${columns} WHERE l.seller_id = ?) own_lots ORDER BY (status = 'open') DESC, created_at DESC, id DESC LIMIT 20`).bind(userId).all<Row>(),
     db.prepare(`${columns} WHERE l.seller_id != ? AND l.id IN (SELECT id FROM player_open_lots)
       AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id = ? AND nation_id = 'kindle')
       AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id = l.seller_id AND nation_id = 'kindle')

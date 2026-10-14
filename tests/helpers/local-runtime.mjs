@@ -28,12 +28,12 @@ class LocalD1 {
   close() { this.sqlite.close(); }
 }
 
-export async function localRuntime({ballotPrivacyReady=false}={}) {
+export async function localRuntime({ballotPrivacyReady=false,backend=process.env.HARIMU_TEST_STORAGE??'sqlite'}={}) {
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
   const path = join(directory, 'fixture.sqlite');
   const modules = [
-    'lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
+    'lib/storage-selection.ts','lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'app/api/city/route.ts',
     'lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','app/api/petitions/route.ts',
@@ -121,6 +121,8 @@ export async function readVerification(userId) {
   await env.DB.batch(['alice', 'bob'].map(user => env.DB.prepare(`INSERT INTO citizens
     (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at)
     VALUES (?,'kindle',?,18,1240,'Good standing',?,?)`).bind(user, `Private ${user}`, now, now)));
+  let postgres;
+  if(backend==='postgres'){const {postgresFixture}=await import('./postgres-runtime.mjs');postgres=await postgresFixture(env.DB.sqlite,path,directory);env.DB.close();env.DB=postgres.db;}
   const call = async (endpoint, user, body, origin = 'https://fixture.invalid', query = '') => {
     const request = new Request(`https://fixture.invalid/api/${endpoint}${query}`, body === undefined ? undefined : {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -131,8 +133,8 @@ export async function readVerification(userId) {
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
   return {
-    call, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
-    reopen() { env.DB.close(); env.DB = new LocalD1(path); },
-    async close() { env.DB.close(); await rm(directory, { recursive: true, force: true }); },
+    call, sqliteBackupPath:path, storageEngine:backend, get postgresSnapshot(){return postgres?.snapshot;}, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
+    reopen() { if(postgres){postgres.reopen();return;}env.DB.close(); env.DB = new LocalD1(path); },
+    async close() { if(postgres)await postgres.close();else env.DB.close(); await rm(directory, { recursive: true, force: true }); },
   };
 }

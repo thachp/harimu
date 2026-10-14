@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 // Server-owned timings and output; clients send only a work order identifier.
 export const shiftRules: Record<string, { hours: number; output: string }> = {
   harvest: { hours: 2, output: '480 food contributed to the savanna harvest' },
@@ -48,7 +49,7 @@ export const recordShiftSql = `INSERT INTO work_contributions
 export const claimShiftSql = `UPDATE work_shifts SET claimed_at = ?
   WHERE id = ? AND clerk_user_id = ? AND claimed_at IS NULL AND completes_at <= ?`;
 
-export async function readShifts(database: D1Database, userId: string): Promise<WorkShift[]> {
+export async function readShifts(database: GameDatabase, userId: string): Promise<WorkShift[]> {
   const rows = await database.prepare(`SELECT s.id, s.work_order_id, s.order_name, s.output, s.capacity_spent,
     s.started_at, s.completes_at, s.claimed_at, r.wage_minor, r.item, r.quantity FROM work_shifts s
     LEFT JOIN shift_rewards r ON r.shift_id = s.id

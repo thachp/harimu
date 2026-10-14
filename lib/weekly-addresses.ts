@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import {leaderPersonas} from './leader-personas';
 export const addressWeekSeconds=604800;
 export const addressSchemas=[
@@ -11,7 +12,7 @@ const scripts={
 } as const;
 export type Address={id:string;week:number;scheduledAt:number;publishedAt:number;leaderName:string;office:string;title:string;transcript:string;provenance:'authored-poc';agree:number;disagree:number;ownReaction:'agree'|'disagree'|null};
 export type AddressArchive={nationId:string;currentWeek:number;nextAddressAt:number;addresses:Address[];nextBeforeWeek:number|null};
-export async function publishDueAddress(db:D1Database,userId:string,nationId:string,now:number){
+export async function publishDueAddress(db:GameDatabase,userId:string,nationId:string,now:number){
  if(!Object.hasOwn(scripts,nationId))return null;
  const clock=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
  if(!clock||now<clock.epoch_seconds)return null;
@@ -23,7 +24,7 @@ export async function publishDueAddress(db:D1Database,userId:string,nationId:str
  .bind(`${nationId}:address:${week}`,nationId,week,scheduledAt,now,persona.name,persona.office,script[0],script[1],userId,nationId).run();
  return {week,nextAddressAt:scheduledAt+addressWeekSeconds};
 }
-export async function readAddressArchive(db:D1Database,userId:string,nationId:string,now:number,beforeWeek?:number):Promise<AddressArchive|null>{
+export async function readAddressArchive(db:GameDatabase,userId:string,nationId:string,now:number,beforeWeek?:number):Promise<AddressArchive|null>{
  const due=await publishDueAddress(db,userId,nationId,now);if(!due)return null;
  const rows=await db.prepare(`SELECT a.*,
  (SELECT COUNT(*) FROM address_reactions WHERE address_id=a.id AND reaction='agree') AS agree,

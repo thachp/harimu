@@ -1,3 +1,4 @@
+import type {GameDatabase} from '@/lib/database-contract';
 import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
 import {readVerification} from '@/lib/verification';
@@ -5,7 +6,7 @@ import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {createCollectivePetitionSql,signCollectivePetitionSql,latchCollectiveThresholdSql,readCollectivePetitions,recordVerifiedHumanVisit,petitionWindowSeconds,validPetitionId,validPetitionText} from '@/lib/collective-petitions';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
-async function citizen(db:D1Database,userId:string){return await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>();}
+async function citizen(db:GameDatabase,userId:string){return await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>();}
 export async function GET(request:Request){
  const userId=await authenticatedUserId(request);if(!userId)return json({error:'Sign in required.'},401);
  const db=await getDatabase();if((await citizen(db,userId))?.nation_id!=='kindle')return json({error:'Collective petitions are available to Kindle citizens only.'},403);

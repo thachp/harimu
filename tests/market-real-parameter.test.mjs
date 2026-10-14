@@ -5,7 +5,8 @@ import {localRuntime} from './helpers/local-runtime.mjs';
 
 test('integer-valued REAL bindings trade through actual routes and preserve replay/conservation after reopen',async t=>{
  const r=await localRuntime();t.after(()=>r.close());
- assert.equal((await r.db.prepare('SELECT typeof(?) AS type').bind(1).first()).type,'real');
+ // D1 binds numbers as REAL; PostgreSQL uses explicit whole-number parameters.
+ assert.equal((await r.db.prepare('SELECT typeof(?) AS type').bind(1).first()).type,r.storageEngine==='postgres'?'integer':'real');
  await r.call('citizen','alice',{action:'commit-work',workOrderId:'harvest'});
  const shift=(await r.call('citizen','alice')).data.shifts[0];r.setNow(Date.parse(shift.completesAt));
  assert.equal((await r.call('citizen','alice',{action:'claim-work',shiftId:shift.id})).status,200);

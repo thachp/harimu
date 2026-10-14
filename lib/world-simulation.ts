@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
 
 export const tickSeconds = 7200;
@@ -36,7 +37,7 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
   supplierFoodRemaining: number; supplierCashMinor: number };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: D1Database, now = Math.floor(Date.now()/1000)): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000)): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   await db.prepare("INSERT OR IGNORE INTO world_clock (id,epoch_seconds) VALUES ('main',?)")
     .bind(Math.floor(now/tickSeconds)*tickSeconds).run();

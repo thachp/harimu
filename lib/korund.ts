@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
 export const korundJob = {id:'korund-food-production',name:'State food-production brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4} as const;
 export const gameWeekSeconds = 50400;
@@ -37,13 +38,13 @@ const uuid=(v:unknown):v is string=>typeof v==='string' && /^[0-9a-f]{8}-[0-9a-f
 export function validKorundCommand(body:Record<string,unknown>):body is Record<string,unknown>&KorundCommand {
  return body.action==='korund-claim-work' ? uuid(body.shiftId) : ['korund-start-work','korund-redeem-ration','korund-household-meal'].includes(String(body.action)) && uuid(body.requestId);
 }
-async function week(db:D1Database,now:number) {
+async function week(db:GameDatabase,now:number) {
  const clock=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
  if(!clock) throw new Error('World clock unavailable.');
  const index=Math.floor(Math.max(0,now-clock.epoch_seconds)/gameWeekSeconds);
  return {number:index+1,expiresAt:new Date((clock.epoch_seconds+(index+1)*gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:D1Database,userId:string,now:number):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -62,7 +63,7 @@ export async function readKorund(db:D1Database,userId:string,now:number):Promise
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeKorund(db:D1Database,userId:string,command:KorundCommand,now:number) {
+export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  // An already-started shift may settle into its original LN ledger after a grace-period move.
  if(nation?.nation_id!=='korund' && command.action!=='korund-claim-work') return {status:409,error:'Korund citizenship required; previous balances remain in their original currency.'};

@@ -151,7 +151,10 @@ test('grace switching preserves private draft, citizen attributes and existing e
 test('future enrollment dates and corrupt persisted counters cannot unlock a grace switch',async t=>{
  const r=await fixture(t);
  for(const [createdAt,changes] of [[new Date(r.now+1000).toISOString(),0],[new Date(r.now).toISOString(),-1],[new Date(r.now).toISOString(),0.5]]) {
-  await r.db.prepare('UPDATE citizens SET created_at=?,nation_changes=? WHERE clerk_user_id=?').bind(createdAt,changes,'alice').run();
+  const update=r.db.prepare('UPDATE citizens SET created_at=?,nation_changes=? WHERE clerk_user_id=?').bind(createdAt,changes,'alice');
+  // PostgreSQL rejects fractional integer corruption before it can persist.
+  if(r.storageEngine==='postgres'&&!Number.isInteger(changes)){await assert.rejects(update.run());assert.equal((await citizen(r,'alice')).nation_id,'kindle');continue;}
+  await update.run();
   const denied=await r.call('citizen','alice',enroll('korund','kindle'));
   assert.equal(denied.status,409);assert.equal(denied.data.citizenship.canChange,false);
   assert.equal((await citizen(r,'alice')).nation_id,'kindle');

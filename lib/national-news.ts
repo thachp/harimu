@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 import type { GovernmentSnapshot } from './government';
 import { publicGovernmentSnapshot, governmentDisclosure } from './government-disclosure';
 
@@ -6,7 +7,7 @@ export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:D1Database,nationId:string,now:number):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number):Promise<NationalNews|null> {
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
  if(!edition)return null;

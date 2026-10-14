@@ -1,3 +1,4 @@
+import type {GameDatabase} from './database-contract';
 export const petitionWindowSeconds=7*86400;
 export const collectivePetitionSchemas=[
  `CREATE TABLE IF NOT EXISTS civic_human_activity (clerk_user_id TEXT PRIMARY KEY REFERENCES citizens(clerk_user_id),last_seen INTEGER NOT NULL,policy TEXT NOT NULL CHECK(policy='tier1-human-v1'))`,
@@ -12,10 +13,10 @@ export function validPetitionText(value:unknown,min:number,max:number):value is 
 export function validPetitionId(value:unknown):value is string{return typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);}
 const weeklyCountSql=`SELECT COUNT(*) AS count FROM civic_human_activity a JOIN citizens c ON c.clerk_user_id=a.clerk_user_id WHERE c.nation_id='kindle' AND a.policy='tier1-human-v1' AND a.last_seen>=? AND a.last_seen<=?`;
 /** Only call after fresh trusted Tier-1 evidence. AI/background actors never enter this ledger. */
-export async function recordVerifiedHumanVisit(db:D1Database,userId:string,now:number){
- await db.prepare(`INSERT INTO civic_human_activity (clerk_user_id,last_seen,policy) SELECT clerk_user_id,?,'tier1-human-v1' FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(clerk_user_id) DO UPDATE SET last_seen=MAX(last_seen,excluded.last_seen)`).bind(now,userId).run();
+export async function recordVerifiedHumanVisit(db:GameDatabase,userId:string,now:number){
+ await db.prepare(`INSERT INTO civic_human_activity (clerk_user_id,last_seen,policy) SELECT clerk_user_id,?,'tier1-human-v1' FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(clerk_user_id) DO UPDATE SET last_seen=MAX(civic_human_activity.last_seen,excluded.last_seen)`).bind(now,userId).run();
 }
-export async function weeklyHumans(db:D1Database,now:number){return (await db.prepare(weeklyCountSql).bind(now-petitionWindowSeconds,now).first<{count:number}>())?.count??0;}
+export async function weeklyHumans(db:GameDatabase,now:number){return (await db.prepare(weeklyCountSql).bind(now-petitionWindowSeconds,now).first<{count:number}>())?.count??0;}
 export const createCollectivePetitionSql=`INSERT INTO civic_petitions (id,creator_id,nation_id,title,demand,created_at,expires_at,weekly_humans,threshold)
  SELECT ?,c.clerk_user_id,'kindle',?,?,?,?+604800,pop.count,CAST((pop.count*3+99)/100 AS INTEGER)
  FROM citizens c CROSS JOIN (SELECT COUNT(*) AS count FROM civic_human_activity a JOIN citizens h ON h.clerk_user_id=a.clerk_user_id WHERE h.nation_id='kindle' AND a.policy='tier1-human-v1' AND a.last_seen>=? AND a.last_seen<=?) pop
@@ -28,7 +29,7 @@ export const signCollectivePetitionSql=`INSERT INTO civic_petition_signatures (p
  AND (?='sign' OR p.creator_id=c.clerk_user_id) ON CONFLICT DO NOTHING`;
 export const latchCollectiveThresholdSql=`UPDATE civic_petitions SET reached_at=? WHERE id=? AND reached_at IS NULL AND created_at<=? AND expires_at>?
  AND (SELECT COUNT(*) FROM civic_petition_signatures s WHERE s.petition_id=civic_petitions.id AND s.policy='tier1-human-v1' AND s.signed_at>=civic_petitions.created_at AND s.signed_at<civic_petitions.expires_at)>=threshold`;
-export async function readCollectivePetitions(db:D1Database,userId:string,now:number):Promise<CollectivePetitions>{
+export async function readCollectivePetitions(db:GameDatabase,userId:string,now:number):Promise<CollectivePetitions>{
  const rows=await db.prepare(`SELECT p.*, (SELECT COUNT(*) FROM civic_petition_signatures s WHERE s.petition_id=p.id AND s.policy='tier1-human-v1' AND s.signed_at>=p.created_at AND s.signed_at<p.expires_at) AS signatures,
  EXISTS(SELECT 1 FROM civic_petition_signatures s WHERE s.petition_id=p.id AND s.clerk_user_id=?) AS signed FROM civic_petitions p WHERE p.nation_id='kindle' ORDER BY p.created_at DESC,p.id LIMIT 50`).bind(userId).all<{id:string;creator_id:string;title:string;demand:string;created_at:number;expires_at:number;weekly_humans:number;threshold:number;signatures:number;signed:number;reached_at:number|null;response_text:string|null;response_at:number|null}>();
  return {nationId:'kindle',asOf:now,weeklyHumans:await weeklyHumans(db,now),petitions:rows.results.map(p=>({id:p.id,title:p.title,demand:p.demand,createdAt:p.created_at,expiresAt:p.expires_at,weeklyHumans:p.weekly_humans,threshold:p.threshold,signatures:p.signatures,signed:Boolean(p.signed),mine:p.creator_id===userId,status:p.response_text!==null?'responded':p.reached_at!==null?'awaiting-response':now>=p.expires_at?'expired':'collecting',reachedAt:p.reached_at,response:p.response_text!==null&&p.response_at!==null?{text:p.response_text,at:p.response_at}:null}))};
@@ -38,7 +39,7 @@ export async function readCollectivePetitions(db:D1Database,userId:string,now:nu
  * The caller must supply an actually recorded Cabinet session, not a client time
  * or an invented daily Council Hour. Authored PoC replies never claim live AI.
  */
-export async function recordAuthoredCabinetResponse(db:D1Database,input:{petitionId:string;sessionAt:number;transcript:string},now:number){
+export async function recordAuthoredCabinetResponse(db:GameDatabase,input:{petitionId:string;sessionAt:number;transcript:string},now:number){
  if(!validPetitionId(input.petitionId)||!Number.isSafeInteger(now)||now<0||!Number.isSafeInteger(input.sessionAt)||input.sessionAt<0||input.sessionAt>now||!validPetitionText(input.transcript,10,2000))return {status:'unavailable' as const};
  const id=input.petitionId.toLowerCase(),text=`Authored PoC Cabinet response: ${input.transcript}`;
  const saved=await db.prepare(`UPDATE civic_petitions SET response_text=?,response_at=?
