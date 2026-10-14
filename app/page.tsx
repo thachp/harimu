@@ -18,7 +18,7 @@ import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
-import { isGamePopstate, isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
+import { isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -380,6 +380,8 @@ const fallbackWorldEvents: WorldEvent[] = [
   { id: 3, occurredAt: 'Day 45 · 18:00', headline: 'Trade corridor vote', kind: 'Ballot', detail: 'Citizens decide the Kindle-Confluence corridor mandate.', location: 'Kindle Assembly' },
 ];
 
+const fallbackNationIds = fallbackNations.map(nation => nation.id);
+
 function subscribeToLocation(onStoreChange: () => void) {
   const pathname = window.location.pathname;
   // These query-only entries belong to the game, not the framework's RSC router.
@@ -540,7 +542,14 @@ export default function Home() {
   // Our own store still owns query-only scene history after hydration.
   const frameworkSearch = useSearchParams()?.toString() ?? '';
   const getInitialSearch = useCallback(() => frameworkSearch ? `?${frameworkSearch}` : '', [frameworkSearch]);
-  const locationSearch = useSyncExternalStore(subscribeToLocation, getLocationSearch, getInitialSearch);
+  const rawLocationSearch = useSyncExternalStore(subscribeToLocation, getLocationSearch, getInitialSearch);
+  // Old or hand-edited links may carry unknown or mismatched params (#90): render the cleaned scene.
+  const locationSearch = normalizeSceneSearch(rawLocationSearch, fallbackNationIds, (nationId, cityId) => Boolean(cityForNation(nationId, cityId)));
+  useEffect(() => {
+    if (locationSearch === rawLocationSearch || window.location.search !== rawLocationSearch) return;
+    window.history.replaceState(sceneHistoryState(window.history.state, window.location.pathname), '', `${window.location.pathname}${locationSearch}${window.location.hash}`);
+    window.dispatchEvent(new Event('harimu-scenechange'));
+  }, [locationSearch, rawLocationSearch]);
   const viewMode = sceneFromSearch(locationSearch);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
