@@ -8,10 +8,10 @@ test('actual acceptance charges reconcile once into the shared ledger, preservin
  const r=await localRuntime();t.after(()=>r.close());r.setNow(now*1000);await Promise.all([r.reconcileAcceptanceCharges(),r.reconcileAcceptanceCharges()]);await r.reconcileAcceptanceCharges();
  const row=await r.db.prepare("SELECT COUNT(*) AS n,SUM(reserved_micro) AS cost,SUM(CASE WHEN status='uncertain' THEN 1 ELSE 0 END) AS uncertain FROM harimu_ai_reservations").first();assert.deepEqual({...row},{n:8,cost:886600,uncertain:0});
  const budget=await readAiBudget(r.db,now);assert.equal(budget.reservedMicroUsd,886600);assert.equal(budget.nextDayReservedMicroUsd,886600);assert.equal(budget.remainingMicroUsd,83400);assert.equal(budget.blocked,false);
- assert.equal(await reserveAiSequence(r.db,randomUUID(),now,now+3600,undefined,true),false);
- const news=await Promise.all([reserveAiSequence(r.db,randomUUID(),now,now+3600),reserveAiSequence(r.db,randomUUID(),now,now+3600)]);assert.equal(news.filter(Boolean).length,1);
+ assert.equal(await reserveAiSequence(r.db,randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'},undefined,true),false);
+ const news=await Promise.all([reserveAiSequence(r.db,randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'}),reserveAiSequence(r.db,randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'})]);assert.equal(news.filter(Boolean).length,1);
  assert.equal((await readAiBudget(r.db,now)).reservedMicroUsd,959000);
- const tomorrow=await readAiBudget(r.db,now+86400);assert.equal(tomorrow.reservedMicroUsd,959000);assert.equal(tomorrow.blocked,true);assert.equal(await reserveAiSequence(r.db,randomUUID(),now+86400,now+90000),false);
+ const tomorrow=await readAiBudget(r.db,now+86400);assert.equal(tomorrow.reservedMicroUsd,959000);assert.equal(tomorrow.blocked,true);assert.equal(await reserveAiSequence(r.db,randomUUID(),now+86400,{dailyBudgetMicro:970000,gatewayId:'harimu-test'}),false);
  await r.reconcileAcceptanceCharges();assert.equal((await readAiBudget(r.db,now)).reservedMicroUsd,959000);
 });
 test('accounting collisions fail closed instead of overwriting/refunding an existing charge',async t=>{
@@ -19,7 +19,7 @@ test('accounting collisions fail closed instead of overwriting/refunding an exis
 });
 
 test('single named news prebook uses the global guard, is idempotent and consumes both windows',async t=>{
- const r=await localRuntime();t.after(()=>r.close());r.setNow(now*1000);await r.reconcileAcceptanceCharges();assert.equal(await r.prebookNewsAcceptance(now,now+3600),true);assert.equal(await r.prebookNewsAcceptance(now,now+3600),true);const budget=await readAiBudget(r.db,now);assert.equal(budget.reservedMicroUsd,959000);assert.equal(budget.nextDayReservedMicroUsd,959000);assert.equal(budget.remainingMicroUsd,11000);assert.equal((await r.db.prepare("SELECT status FROM harimu_ai_reservations WHERE request_id='acceptance:2026-10-14:news-final'").first()).status,'finished');assert.equal(await reserveAiSequence(r.db,randomUUID(),now,now+3600),false);
+ const r=await localRuntime();t.after(()=>r.close());r.setNow(now*1000);await r.reconcileAcceptanceCharges();assert.equal(await r.prebookNewsAcceptance(now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'}),true);assert.equal(await r.prebookNewsAcceptance(now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'}),true);const budget=await readAiBudget(r.db,now);assert.equal(budget.reservedMicroUsd,959000);assert.equal(budget.nextDayReservedMicroUsd,959000);assert.equal(budget.remainingMicroUsd,11000);assert.equal((await r.db.prepare("SELECT status FROM harimu_ai_reservations WHERE request_id='acceptance:2026-10-14:news-final'").first()).status,'finished');assert.equal(await reserveAiSequence(r.db,randomUUID(),now,{dailyBudgetMicro:970000,gatewayId:'harimu-test'}),false);
 });
 
 test('approved exact terminal failures reconcile once, preserve every financial field and leave unrelated uncertainty alone',async t=>{

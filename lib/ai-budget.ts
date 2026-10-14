@@ -1,37 +1,72 @@
 import type {GameDatabase} from './database-contract';
-// Verified 2026-10-14. Upper bounds cover full model context plus 256 output tokens,
-// including templates. Free allowances are deliberately not deducted.
+// ---- Versioned price table (kept in this module so the Node test runner can import it without a bundler) ----
+/**
+ * Versioned Workers AI price table. Each entry is the reservation upper bound in
+ * micro-dollars per call: full model context plus 256 output tokens, including
+ * templates. Free allowances are deliberately not deducted.
+ * Bump `aiPriceTableVersion` and `aiPricesVerifiedAt` whenever prices are re-checked.
+ */
+export const aiPriceTableVersion=1;
+export const aiPricesVerifiedAt='2026-10-14';
+/** A table older than this is reported as stale (log + budget readout); it does not block AI. */
+export const aiPriceStaleAfterDays=30;
 export const aiModelReservations={
  '@cf/meta/llama-3.2-3b-instruct':4200,
  '@cf/meta/llama-guard-3-8b':64000,
 } as const;
 export type AiModel=keyof typeof aiModelReservations;
+export function isPricedAiModel(model:string):model is AiModel{return Object.hasOwn(aiModelReservations,model);}
+export function aiPriceAgeDays(now:number){return Math.floor((now-Date.parse(aiPricesVerifiedAt+'T00:00:00Z')/1000)/86400);}
+export function aiPricesStale(now:number){return aiPriceAgeDays(now)>aiPriceStaleAfterDays;}
+// ---- Durable daily budget ----
 export const aiNewsSequenceOperation='news-sequence-3b-guard-2026-10-14';
 export const aiNewsSequenceReservation=aiModelReservations['@cf/meta/llama-3.2-3b-instruct']*2+aiModelReservations['@cf/meta/llama-guard-3-8b'];
 export const aiNotableQuestionOperation='notable-question-3b-double-guard-2026-10-14';
 export const aiNotableQuestionReservation=aiModelReservations['@cf/meta/llama-3.2-3b-instruct']*2+aiModelReservations['@cf/meta/llama-guard-3-8b']*2;
-export const aiDailyBudgetMicroUsd=970000; // US$0.97, below approved US$1 ceiling.
+/** Hard ceiling: US$0.97, below the approved US$1/day. The env budget can only lower it. */
+export const aiDailyBudgetMicroUsd=970000;
+/** Validated runtime AI spend configuration. Null means AI is off (authored content only). */
+export type AiBudgetConfig={readonly dailyBudgetMicro:number;readonly gatewayId:string};
+type AiBudgetEnv={HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string};
+let staleWarned=false;
+/** Parses HARIMU_AI_DAILY_BUDGET_MICRO (integer 1..970000) and HARIMU_AI_GATEWAY_ID. Invalid or missing config fails closed (null). */
+export function aiBudgetConfig(env:AiBudgetEnv,now=Math.floor(Date.now()/1000)):AiBudgetConfig|null{
+ const raw=env.HARIMU_AI_DAILY_BUDGET_MICRO??'',gatewayId=env.HARIMU_AI_GATEWAY_ID??'';
+ if(!/^[1-9][0-9]{0,8}$/.test(raw)||!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(gatewayId))return null;
+ const dailyBudgetMicro=Number(raw);if(dailyBudgetMicro>aiDailyBudgetMicroUsd)return null;
+ if(aiPricesStale(now)&&!staleWarned){staleWarned=true;console.warn(`[ai-budget] Workers AI price table v${aiPriceTableVersion} was verified ${aiPricesVerifiedAt} (${aiPriceAgeDays(now)} days ago); re-verify prices in lib/ai-models.ts.`);}
+ return {dailyBudgetMicro,gatewayId};
+}
+function validConfig(config:unknown):config is AiBudgetConfig{
+ if(!config||typeof config!=='object')return false;const c=config as AiBudgetConfig;
+ return Number.isSafeInteger(c.dailyBudgetMicro)&&c.dailyBudgetMicro>0&&c.dailyBudgetMicro<=aiDailyBudgetMicroUsd&&typeof c.gatewayId==='string'&&/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(c.gatewayId);
+}
+/** Workers AI run options routing the call through the configured AI Gateway. */
+export function aiGatewayOptions(config:AiBudgetConfig){return {gateway:{id:config.gatewayId}};}
 export const aiBudgetSchema=`CREATE TABLE IF NOT EXISTS harimu_ai_reservations (request_id TEXT PRIMARY KEY,utc_day TEXT NOT NULL,next_utc_day TEXT NOT NULL,model TEXT NOT NULL,reserved_micro INTEGER NOT NULL CHECK(reserved_micro>0),started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','finished','uncertain')))`;
-export async function reserveAiCall(db:GameDatabase,id:string,model:AiModel,now:number,priceReviewedUntil:number){
- if(!Object.hasOwn(aiModelReservations,model))return false;return reserveBudget(db,id,model,aiModelReservations[model],1,now,priceReviewedUntil);
+export async function reserveAiCall(db:GameDatabase,id:string,model:AiModel,now:number,config:AiBudgetConfig|null){
+ if(!isPricedAiModel(model))return false;return reserveBudget(db,id,model,aiModelReservations[model],1,now,config);
 }
-export async function reserveAiSequence(db:GameDatabase,id:string,now:number,priceReviewedUntil:number,quota?:{ownerPrefix:string;dailyLimit:number},freeform=false){
+export async function reserveAiSequence(db:GameDatabase,id:string,now:number,config:AiBudgetConfig|null,quota?:{ownerPrefix:string;dailyLimit:number},freeform=false){
  if(quota&&(!/^[a-z]+:[a-f0-9]{64}:$/.test(quota.ownerPrefix)||!id.startsWith(quota.ownerPrefix)||!Number.isSafeInteger(quota.dailyLimit)||quota.dailyLimit<1||quota.dailyLimit>20))return false;
- return reserveBudget(db,id,freeform?aiNotableQuestionOperation:aiNewsSequenceOperation,freeform?aiNotableQuestionReservation:aiNewsSequenceReservation,freeform?4:3,now,priceReviewedUntil,quota);
+ return reserveBudget(db,id,freeform?aiNotableQuestionOperation:aiNewsSequenceOperation,freeform?aiNotableQuestionReservation:aiNewsSequenceReservation,freeform?4:3,now,config,quota);
 }
-async function reserveBudget(db:GameDatabase,id:string,model:string,cost:number,units:number,now:number,priceReviewedUntil:number,quota?:{ownerPrefix:string;dailyLimit:number}){
- if(!Number.isSafeInteger(now)||!Number.isSafeInteger(priceReviewedUntil)||priceReviewedUntil<=now||priceReviewedUntil>now+86400||!id)return false;
+async function reserveBudget(db:GameDatabase,id:string,model:string,cost:number,units:number,now:number,config:AiBudgetConfig|null,quota?:{ownerPrefix:string;dailyLimit:number}){
+ // Fail closed: no valid budget config (or a legacy timestamp argument) means no reservation.
+ if(!Number.isSafeInteger(now)||!validConfig(config)||!id)return false;
+ const budget=config.dailyBudgetMicro;
  const day=new Date(now*1000).toISOString().slice(0,10),next=new Date((now+86400)*1000).toISOString().slice(0,10);
  // Pre-book the next UTC day too, to cover requests spanning midnight. Old
  // uncertain/pending calls block further inference rather than being refunded.
- const result=await db.prepare(`INSERT OR IGNORE INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) SELECT ?,?,?,?,?,?,'pending' WHERE NOT EXISTS(SELECT 1 FROM harimu_ai_reservations WHERE status IN ('pending','uncertain') AND utc_day<?) AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND COALESCE((SELECT SUM(CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND (?=0 OR (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id LIKE ? AND utc_day=?)<?)`).bind(id,day,next,model,cost,now,day,day,day,aiDailyBudgetMicroUsd,cost,next,next,aiDailyBudgetMicroUsd,cost,aiNewsSequenceOperation,aiNotableQuestionOperation,day,day,units,aiNewsSequenceOperation,aiNotableQuestionOperation,next,next,units,quota?1:0,quota?quota.ownerPrefix+'%':'',day,quota?.dailyLimit??0).run();
+ const result=await db.prepare(`INSERT OR IGNORE INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) SELECT ?,?,?,?,?,?,'pending' WHERE NOT EXISTS(SELECT 1 FROM harimu_ai_reservations WHERE status IN ('pending','uncertain') AND utc_day<?) AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND COALESCE((SELECT SUM(CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND (?=0 OR (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id LIKE ? AND utc_day=?)<?)`).bind(id,day,next,model,cost,now,day,day,day,budget,cost,next,next,budget,cost,aiNewsSequenceOperation,aiNotableQuestionOperation,day,day,units,aiNewsSequenceOperation,aiNotableQuestionOperation,next,next,units,quota?1:0,quota?quota.ownerPrefix+'%':'',day,quota?.dailyLimit??0).run();
  return result.meta.changes===1;
 }
 
-export async function readAiBudget(db:GameDatabase,now:number){
+export async function readAiBudget(db:GameDatabase,now:number,config?:AiBudgetConfig|null){
+ const limit=config===undefined?aiDailyBudgetMicroUsd:validConfig(config)?config.dailyBudgetMicro:0;
  if(!Number.isSafeInteger(now))throw Error('Invalid budget time.');
  const day=new Date(now*1000).toISOString().slice(0,10),nextDay=new Date((now+86400)*1000).toISOString().slice(0,10);
  const row=await db.prepare("SELECT COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS reserved,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS next_reserved,COALESCE(SUM(CASE WHEN status IN ('pending','uncertain') AND utc_day<? THEN 1 ELSE 0 END),0) AS blocked FROM harimu_ai_reservations").bind(day,day,nextDay,nextDay,day).first<{reserved:number;next_reserved:number;blocked:number}>();
  if(!row||![row.reserved,row.next_reserved,row.blocked].every(n=>Number.isSafeInteger(n)&&n>=0))throw Error('AI budget unavailable.');
- return {day,nextDay,reservedMicroUsd:row.reserved,nextDayReservedMicroUsd:row.next_reserved,remainingMicroUsd:Math.max(0,Math.min(aiDailyBudgetMicroUsd-row.reserved,aiDailyBudgetMicroUsd-row.next_reserved)),blocked:row.blocked>0,topicMicroUsd:aiNewsSequenceReservation,questionMicroUsd:aiNotableQuestionReservation};
+ return {day,nextDay,reservedMicroUsd:row.reserved,nextDayReservedMicroUsd:row.next_reserved,remainingMicroUsd:Math.max(0,Math.min(limit-row.reserved,limit-row.next_reserved)),dailyBudgetMicroUsd:limit,pricesVerifiedAt:aiPricesVerifiedAt,priceTableVersion:aiPriceTableVersion,pricesStale:aiPricesStale(now),blocked:row.blocked>0,topicMicroUsd:aiNewsSequenceReservation,questionMicroUsd:aiNotableQuestionReservation};
 }
