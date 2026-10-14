@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import type {NationalNews,NewsItem} from './national-news';
-import {reserveAiSequence,releaseAiReservation,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
+import {reserveAiSequence,releaseAiReservation,markAiReservationSent,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 export const aiNewsEnabled=true; // Preview activation approved 2026-10-14; runtime flags and pricing expiry still gate inference.
 export const aiNewsSchemas=[aiBudgetSchema,
  `CREATE TABLE IF NOT EXISTS ai_news_jobs(id TEXT PRIMARY KEY,nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),utc_day TEXT NOT NULL,started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('running','published','failed')),failure_code TEXT)`,
@@ -47,7 +47,7 @@ export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number
  let reached=false; // #92: true once any request is handed to the gateway
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error('Inference input exceeded the public-facts bound.');
-  let timeout:ReturnType<typeof setTimeout>|undefined;let result:unknown;reached=true;
+  let timeout:ReturnType<typeof setTimeout>|undefined;let result:unknown;if(!reached){reached=true;await markAiReservationSent(db,reservation);}
   try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},aiGatewayOptions(budget)),new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>reject(Error('Inference timed out.')),30000);})]);}catch(error){throw new AiNewsFailure(error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain');}finally{if(timeout!==undefined)clearTimeout(timeout);}
   // The provider has returned: malformed content is a known rejected attempt,
   // not an unresolved transport. Its complete reservation remains charged.

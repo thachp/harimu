@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import {publicNewsFacts,validatedNewsDraft,newsDraftText,inferenceText,newsDraftResponseFormat,newsVerificationResponseFormat,supportedNewsDraft,type NewsAiBinding} from './ai-news';
-import {reserveAiSequence,releaseAiReservation,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
+import {reserveAiSequence,releaseAiReservation,markAiReservationSent,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 import {readNationalNews} from './national-news';
 import {notableProfile,notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 export {notableProfile,notableTopics,notableDailyLimit,validNotableCommand} from './notable-profiles';
@@ -21,7 +21,7 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
  let uncertain=false,reached=false,failureCode='validation'; // #92: reached = a request was handed to the gateway
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error();
-  let timer:ReturnType<typeof setTimeout>|undefined;let result:unknown;reached=true;
+  let timer:ReturnType<typeof setTimeout>|undefined;let result:unknown;if(!reached){reached=true;await markAiReservationSent(db,id);}
   try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},aiGatewayOptions(budget)),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error()),30000);})]);}
   catch(error){uncertain=true;failureCode=error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain';throw Error();}
   finally{if(timer!==undefined)clearTimeout(timer);}

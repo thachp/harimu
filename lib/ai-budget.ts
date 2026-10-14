@@ -49,11 +49,14 @@ export function aiGatewayOptions(config:AiBudgetConfig){return {gateway:{id:conf
  * charge is never refunded and still counts against the day(s) it reserved.
  */
 export const aiUncertainBlockTtlSeconds=3600;
-/** #92: a 'pending' row older than this has no evidence its inference ever reached the gateway (each call times out
+/** #92: a 'pending' row was never marked sent (see markAiReservationSent), so its inference never reached the gateway (each call times out
  * after 30s, a sequence has at most four). It stops counting and is deleted on the next reservation. */
 export const aiPendingExpirySeconds=aiUncertainBlockTtlSeconds;
 /** #92: withdraw a reservation whose inference never reached the gateway (nothing was sent, so nothing is charged). */
 export async function releaseAiReservation(db:GameDatabase,id:string){await db.prepare("DELETE FROM harimu_ai_reservations WHERE request_id=? AND status='pending'").bind(id).run();}
+/** #92: persist "handed to the gateway" BEFORE the first gateway call. 'uncertain' = sent, outcome unknown: it never
+ * expires and is never released, so a crash mid-call stays charged and keeps its request id (Notable replay guard). */
+export async function markAiReservationSent(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status='pending'").bind(id).run();}
 /** #92: expire stale pending rows (no gateway evidence) so they stop consuming the daily budget. */
 export async function expireStaleAiReservations(db:GameDatabase,now:number){if(!Number.isSafeInteger(now))return;await db.prepare("DELETE FROM harimu_ai_reservations WHERE status='pending' AND started_at<=?").bind(now-aiPendingExpirySeconds).run();}
 export const aiBudgetSchema=`CREATE TABLE IF NOT EXISTS harimu_ai_reservations (request_id TEXT PRIMARY KEY,utc_day TEXT NOT NULL,next_utc_day TEXT NOT NULL,model TEXT NOT NULL,reserved_micro INTEGER NOT NULL CHECK(reserved_micro>0),started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','finished','uncertain')))`;

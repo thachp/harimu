@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 import {localRuntime} from './helpers/local-runtime.mjs';
-import {aiBudgetConfig,readAiBudget,reserveAiSequence,aiPendingExpirySeconds,aiNewsSequenceReservation} from '../lib/ai-budget.ts';
+import {markAiReservationSent,expireStaleAiReservations,aiBudgetConfig,readAiBudget,reserveAiSequence,aiPendingExpirySeconds,aiNewsSequenceReservation} from '../lib/ai-budget.ts';
 // #92: preview showed 959,000/970,000 reserved for today and tomorrow with zero gateway requests.
 const load=async(patch=s=>s)=>{const source=patch((await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace('30000','5'));return import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64')}`);};
 const now=Math.floor(Date.now()/1000),budget={dailyBudgetMicro:970000,gatewayId:'harimu-test'};
@@ -58,4 +58,27 @@ test('#92 preview cleanup SQL releases only the unsent acceptance rows and is id
  await r.db.prepare("INSERT INTO harimu_ai_reservations VALUES ('acceptance:2026-10-14:news-final','2026-10-14','2026-10-15','x',959000,1,'finished')").run();
  for(let i=0;i<2;i++)for(const s of sql)await r.db.prepare(s).run();
  assert.deepEqual((await r.db.prepare('SELECT request_id FROM harimu_ai_reservations').all()).results.map(x=>x.request_id),['real-1']);
+});
+
+test('#92 a row marked sent before the gateway call never expires or gets released, even with no terminal update',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const old=now-aiPendingExpirySeconds-10;
+ assert.equal(await reserveAiSequence(r.db,'sent-1',old,budget),true);assert.equal(await reserveAiSequence(r.db,'unsent-1',old,budget),true);
+ await markAiReservationSent(r.db,'sent-1'); // Worker evicted mid binding.run: no catch/success update ever runs
+ await expireStaleAiReservations(r.db,now);
+ const {releaseAiReservation}=await import('../lib/ai-budget.ts');await releaseAiReservation(r.db,'sent-1');
+ assert.deepEqual((await r.db.prepare('SELECT request_id,status FROM harimu_ai_reservations').all()).results.map(x=>({...x})),[{request_id:'sent-1',status:'uncertain'}]);
+ assert.equal((await readAiBudget(r.db,now)).reservedMicroUsd,aiNewsSequenceReservation);
+});
+test('#92 news marks its row sent before the first gateway call',async t=>{
+ const {prepareAiNews}=await load();const r=await localRuntime();t.after(()=>r.close());let seen;
+ await prepareAiNews(r.db,news,now,{async run(){seen=(await r.db.prepare('SELECT status FROM harimu_ai_reservations').first()).status;throw Error('evicted');}},{enabled:true,budget});
+ assert.equal(seen,'uncertain');
+});
+test('#92 a repeated Notable request id is still rejected after the expiry pass',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const c={requestId:randomUUID(),notableId:'kindle-journalist',topic:'news'};let calls=0;
+ const binding={async run(){calls++;throw Error('evicted');}};
+ await r.call('notables','alice');const first=await r.answerNotable('alice',c,binding,{enabled:true,budget});
+ await expireStaleAiReservations(r.db,now+aiPendingExpirySeconds*3);
+ const again=await r.answerNotable('alice',c,binding,{enabled:true,budget});
+ assert.notEqual(first.status,409);assert.equal(again.status,409);assert.equal(calls,1);
 });
