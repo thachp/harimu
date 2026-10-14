@@ -18,7 +18,9 @@ export async function fetchIdempotent(fetchFn: FetchLike, url: string, init: Req
       const response = await fetchFn(url, { ...init, signal: controller.signal });
       // 5xx may be a dropped upstream; client errors (4xx) are final answers from the server.
       if (response.status >= 500 && attempt < attempts - 1) { lastError = new Error(`Server error ${response.status}`); continue; }
-      return response;
+      // Read the whole body inside the timed attempt: a stalled or dropped body is retried too.
+      const body = await response.text();
+      return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
     } catch (error) {
       lastError = error;
     } finally {

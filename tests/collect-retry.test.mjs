@@ -19,6 +19,14 @@ test('a hung request times out and is retried', async () => {
   const response = await fetchIdempotent(fetchFn, '/x', {}, { ...noSleep, timeoutMs: 20 });
   assert.equal(response.status, 200); assert.equal(calls, 2);
 });
+test('a body that stalls or drops after headers is retried within the attempt', async () => {
+  let calls = 0;
+  const stalled = signal => new Response(new ReadableStream({ start(c) { signal.addEventListener('abort', () => c.error(new Error('aborted'))); } }), { status: 200 });
+  const dropped = () => new Response(new ReadableStream({ start(c) { c.error(new TypeError('network')); } }), { status: 200 });
+  const fetchFn = async (url, init) => { calls++; return calls === 1 ? stalled(init.signal) : calls === 2 ? dropped() : new Response('{"ok":true}', { status: 200 }); };
+  const response = await fetchIdempotent(fetchFn, '/x', {}, { ...noSleep, timeoutMs: 20 });
+  assert.equal(calls, 3); assert.deepEqual(await response.json(), { ok: true });
+});
 test('5xx is retried but 4xx is a final server answer; persistent failure still surfaces', async () => {
   let calls = 0;
   assert.equal((await fetchIdempotent(async () => new Response('', { status: ++calls === 1 ? 503 : 200 }), '/x', {}, noSleep)).status, 200);
