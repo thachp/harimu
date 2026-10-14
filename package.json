@@ -46,6 +46,7 @@
     "drizzle-kit": "^0.31.11",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "happy-dom": "^21.0.1",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",

@@ -43,6 +43,8 @@ import { CitizenMarket } from './citizen-market';
 import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
+import { fetchIdempotent } from '@/lib/retry-fetch';
+import { shiftDeadlineText, shiftDeadlineDelay } from '@/lib/shift-deadline';
 import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
 import {
   Show,
@@ -595,10 +597,14 @@ export default function Home() {
   const workLock = useRef(false);
   const [demoLoaded, setDemoLoaded] = useState(false);
   const hasActiveShift = workShifts.some((shift) => !shift.claimedAt);
+  const [deadlineConfirmedId, setDeadlineConfirmedId] = useState<string | null>(null);
+  const runWorkRef = useRef<((action: 'refresh-work') => Promise<void>) | null>(null);
   const [influence, setInfluence] = useState(1240);
   const [waterSecurity, setWaterSecurity] = useState(71);
   const [wardStability, setWardStability] = useState(86);
   const [recentAction, setRecentAction] = useState<string | null>(null);
+  // Success notices only surface if the player is still in the view where the action began.
+  const announce = (origin: string, text: string) => setRecentAction(typeof window === 'undefined' || !window.location || sceneFromSearch(window.location.search) === origin ? text : null);
   const [horizon, setHorizon] = useState<PlanHorizon>('week');
   const [completedPlanIds, setCompletedPlanIds] = useState<string[]>(['capacity']);
   const [planSaved, setPlanSaved] = useState(false);
@@ -754,10 +760,13 @@ export default function Home() {
     setWorkError(null);
     try {
       if (clerkConfigured) {
-        const response = await fetch('/api/citizen', {
+        const init: RequestInit = {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
           body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
-        });
+        };
+        // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
+        // Starting a shift has no request id, so it is never retried automatically.
+        const response = action === 'commit-work' ? await fetch('/api/citizen', init) : await fetchIdempotent(fetch, '/api/citizen', init);
         const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; profile?: CitizenSnapshot['profile'] };
       if (epoch !== citizenEpoch.current) return;
         if (result.simulation) setSimulation(result.simulation);
@@ -805,7 +814,7 @@ export default function Home() {
             ? { ...shift, claimedAt: new Date().toISOString() } : shift));
         }
       }
-      setRecentAction(action === 'commit-work'
+      announce(viewMode, action === 'commit-work'
         ? `Shift started: ${order?.name}. Work continues while you are away.`
         : action === 'refresh-work' ? 'Citizen account refreshed.' : 'Shift settled: wages and goods recorded in your citizen account.');
     } catch {
@@ -817,6 +826,8 @@ export default function Home() {
       setWorkPending(false);
     }
   }
+
+  useEffect(() => { runWorkRef.current = (action) => runWork(action); });
 
   async function runMarket(command: MarketCommand) {
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
@@ -875,7 +886,7 @@ export default function Home() {
         setDemoReceipts((current) => [...current, command.requestId]);
       }
       marketIntent.current = null; persistIntents(); setMarketCommand(null);
-      setRecentAction(command.action === 'household-meal'
+      announce(viewMode, command.action === 'household-meal'
         ? 'Household fed: 2 food consumed, up to 4 Work Capacity restored.' : `Market ${command.side}: ${command.quantity} ${command.item} settled.`);
     } catch {
       if (epoch !== citizenEpoch.current) return;
@@ -908,7 +919,7 @@ export default function Home() {
       if (result.playerMarket) setPlayerMarket(result.playerMarket);
       playerIntent.current = null; persistIntents(); setPlayerCommand(null);
       if (!response.ok) { setWorkError(result.error ?? 'Listing action refused. Refresh your account.'); return; }
-      setRecentAction(command.action === 'create-listing' ? 'Citizen listing created: goods reserved.'
+      announce(viewMode, command.action === 'create-listing' ? 'Citizen listing created: goods reserved.'
         : command.action === 'buy-listing' ? 'Citizen purchase settled: payment and goods transferred.' : 'Listing cancelled: reserved goods returned.');
     } catch {
       if (epoch !== citizenEpoch.current) return;
@@ -947,7 +958,7 @@ export default function Home() {
         setCitizenshipStatus((current) => current ? { ...current, politicalActionTaken:true, canChange:false, lockedReason:'political-action' } : current);
         governmentIntent.current=null; persistIntents();
       }
-      setRecentAction('Citizen petition recorded; the rule-bound government proposal reflects public priorities.');
+      announce(viewMode, 'Citizen petition recorded; the rule-bound government proposal reflects public priorities.');
     } catch {
       if (epoch !== citizenEpoch.current) return; setGovernmentError('Connection interrupted. Retry the same petition topic to confirm its saved result.'); }
     finally {
@@ -985,7 +996,7 @@ export default function Home() {
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       korundIntent.current = null; setKorundCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Korund action refused; refresh your assignment and ration book.'); return; }
-      setRecentAction(result.replayed?'Previous Korund action confirmed. Check the current ration book and queue.':command.action==='korund-join-ration-queue'?'Ration request joined the national FIFO queue.':command.action==='korund-cancel-ration-queue'?'Ration request cancelled; unused coupons retained.':command.action === 'korund-start-work' ? 'Assigned shift started; work continues while you are away.'
+      announce(viewMode, result.replayed?'Previous Korund action confirmed. Check the current ration book and queue.':command.action==='korund-join-ration-queue'?'Ration request joined the national FIFO queue.':command.action==='korund-cancel-ration-queue'?'Ration request cancelled; unused coupons retained.':command.action === 'korund-start-work' ? 'Assigned shift started; work continues while you are away.'
         : command.action === 'korund-claim-work' ? 'Assigned-shift wages collected in Labor Notes; output added to the state food pool.'
           : command.action === 'korund-redeem-ration' ? 'Ration coupons redeemed for household food.' : 'Household ration meal recorded; capacity updated.');
     } catch {
@@ -1024,7 +1035,7 @@ export default function Home() {
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       aurelleIntent.current = null; setAurelleCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Aurelle action refused; refresh your charter account.'); return; }
-      setRecentAction(command.action === 'aurelle-start-work' ? 'Chartered service started; work continues while you are away.'
+      announce(viewMode, command.action === 'aurelle-start-work' ? 'Chartered service started; work continues while you are away.'
         : command.action === 'aurelle-claim-work' ? 'Crown wages and Favor collected; estate food recorded.'
           : command.action === 'aurelle-buy-food' ? 'Chartered food purchased.' : 'Household meal recorded; capacity updated.');
     } catch {
@@ -1556,6 +1567,17 @@ export default function Home() {
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
       workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} /> : citizenScene;
+  const deadlineShift = [...workShifts, ...(korundPlan?.shifts ?? []), ...(aurellePlan?.shifts ?? [])].find(shift => !shift.claimedAt);
+  const deadlineShiftId = deadlineShift?.id, deadlineShiftEnds = deadlineShift?.completesAt;
+  // One-time deadline timer: when the active shift's deadline passes, refresh the citizen snapshot
+  // automatically so the banner stops asking the player to refresh (client-side only; same GET as Refresh).
+  useEffect(() => {
+    if (!deadlineShiftId || !deadlineShiftEnds) return;
+    const delay = shiftDeadlineDelay(deadlineShiftEnds, Date.now());
+    if (delay === null) return;
+    const timer = window.setTimeout(() => { void runWorkRef.current?.('refresh-work').finally(() => setDeadlineConfirmedId(deadlineShiftId)); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [deadlineShiftId, deadlineShiftEnds]);
   const activeShift = priorNationShift ?? (citizenNation?.id === 'aurelle' ? aurellePlan?.shifts ?? [] : citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
   const nextDeadlineCandidates = [
     activeShift ? {label:'Work',endsAt:activeShift.completesAt} : null,
@@ -1564,7 +1586,8 @@ export default function Home() {
       : market?.mealReadyAt ? {label:'Meal',endsAt:market.mealReadyAt} : null,
     capacity < 24 && economy?.nextRecoveryAt ? {label:'Recovery',endsAt:economy.nextRecoveryAt} : null,
   ].filter((event):event is {label:string;endsAt:string} => Boolean(event && Number.isFinite(Date.parse(event.endsAt))));
-  const nextDeadline = activeShift ? {label:'Work',endsAt:activeShift.completesAt} : nextDeadlineCandidates.filter(event=>Date.parse(event.endsAt)>guideNow).sort((a,b)=>Date.parse(a.endsAt)-Date.parse(b.endsAt))[0];
+  const shiftExpiredText = activeShift ? shiftDeadlineText(activeShift.id, deadlineConfirmedId) : undefined;
+  const nextDeadline = activeShift ? {label:'Work',endsAt:activeShift.completesAt,expiredText:shiftExpiredText} : nextDeadlineCandidates.filter(event=>Date.parse(event.endsAt)>guideNow).sort((a,b)=>Date.parse(a.endsAt)-Date.parse(b.endsAt))[0];
   const contextItems: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[] =
     viewMode === 'country' ? [{id:'current-city',label:'Open City',detail:countryOwnNation ? activeCity?.name ?? 'Loading your city' : cityForNation(selected.id,countryCityId ?? '')?.name ?? 'City preview',onSelect:()=>changeView('square')}] : citizenNation?.id === 'aurelle' && ['household','workplace','market'].includes(viewMode) ? [
       {id:'aurelle-service',label:'Chartered service',detail:'4 WC · 8 CRN · 2 Favor',onSelect:()=>changeView('workplace')},
@@ -1609,7 +1632,7 @@ export default function Home() {
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
     <GameShell nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
-      shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
+      shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onNavigate={navigateGame} onSelectNation={selectNation}
