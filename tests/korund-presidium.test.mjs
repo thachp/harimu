@@ -58,7 +58,7 @@ test(`#70 ${backend}: 7 days of Unrest ≥ 65 opens exactly one session; resolve
   const done = (await sessions())[0];
   assert.deepEqual([done.outcome, done.successor, done.purged_seat], ['purged', 'morrow', 'kestrel']);
   const record = JSON.parse(done.decision_json); assert.equal(record.kind, 'ai-decision-record'); assert.match(record.reasoning, /Charter Limits/);
-  const gov = await r.readGovernment('korund', 'alice');
+  const gov = (await r.call('citizen', 'alice')).data.government;
   assert.equal(gov.presidium.chairman.name, 'Ilsa Morrow');
   assert.deepEqual(gov.presidium.seats.map(x => [x.name, x.status]), [['Ilsa Morrow', 'serving'], ['Neral Voss', 'purged'], ['Vera Holt', 'serving'], ['Dagan Kestrel', 'purged'], ['Oren Brand', 'serving']]);
   const address = (await r.call('addresses', 'alice', undefined, 'https://fixture.invalid', '')).data;
@@ -77,7 +77,7 @@ test(`#70 ${backend}: mild Unrest survives with a concession; flag off opens not
   r.setNow((Number(s.resolves_at) + 1) * 1000);
   await r.call('world', null);
   assert.equal((await sessions())[0].outcome, 'survived');
-  assert.equal((await r.readGovernment('korund', 'alice')).presidium.chairman.name, 'Neral Voss');
+  assert.equal((await r.call('citizen', 'alice')).data.government.presidium.chairman.name, 'Neral Voss');
   assert.ok((await r.call('news', 'alice')).data.items.some(i => /thanks the Presidium/.test(i.title)));
   await r.call('world', null); assert.equal((await sessions()).length, 1, 'cool-down');
 
@@ -87,6 +87,36 @@ test(`#70 ${backend}: mild Unrest survives with a concession; flag off opens not
   const other = await setup(t); const k = other.now();
   await other.unrest(k - 8 * D, k, 99, 'aurelle'); await other.unrest(k - 8 * D, k, 99, 'kindle'); await other.r.call('world', null);
   assert.equal((await other.sessions()).length, 0, 'only Korund Unrest counts');
+});
+
+test(`#70 ${backend}: flag off renders no roster, rumors or successor name even after sessions exist; GETs make zero writes`, async t => {
+  const { r, unrest, sessions, now } = await setup(t);
+  const n = now();
+  await unrest(n - 8 * D, n, 92);
+  await r.call('world', null);
+  const [s] = await sessions(); assert.ok(s);
+  r.setNow((Number(s.resolves_at) + 1) * 1000); await unrest(Number(s.resolves_at) - 2 * H, Number(s.resolves_at), 92); await r.call('world', null);
+  assert.equal((await sessions())[0].outcome, 'purged');
+  // Flag on: the roster is visible.
+  assert.equal((await r.call('citizen', 'alice')).data.government.presidium.chairman.name, 'Ilsa Morrow');
+  // GETs (flag on) write nothing to the Presidium, world or civic ledgers.
+  const ledgers = ['korund_presidium_sessions', 'world_events', 'world_ticks', 'civic_human_activity', 'nation_stability_scores'];
+  const snapshot = async () => JSON.stringify(await Promise.all(ledgers.map(async x => (await r.db.prepare(`SELECT * FROM ${x}`).all()).results)));
+  const before = await snapshot();
+  for (const ep of ['citizen', 'news']) { assert.equal((await r.call(ep, 'alice')).status, 200); }
+  assert.equal(await snapshot(), before, 'GET /api/citizen and /api/news make zero Presidium/world writes (flag on)');
+  // Flag off: complete no-op on every read surface.
+  r.setFixtureEnv('HARIMU_KORUND_PRESIDIUM_ENABLED', undefined);
+  const citizen = (await r.call('citizen', 'alice')).data;
+  assert.equal(citizen.government.presidium, undefined, 'no roster in the Government snapshot');
+  assert.ok(!JSON.stringify((await r.call('news', 'alice')).data).match(/Presidium|Rumors from Stonehearth|Ilsa Morrow/), 'no Presidium news or rumors');
+  assert.equal(await snapshot(), before, 'GETs make zero writes (flag off)');
+  const addresses = (await r.call('addresses', 'alice', undefined, 'https://fixture.invalid', '')).data;
+  assert.notEqual(addresses.addresses[0].leaderName, 'Ilsa Morrow', 'address uses the authored Chairman with the flag off');
+  const ui = await readFile('app/leader-panel.tsx', 'utf8');
+  assert.match(ui, /snapshot\.presidium&&<section aria-label="Presidium seats"/, 'panel renders the roster only when the snapshot carries it');
+  const running = await readFile('lib/government-state.ts', 'utf8');
+  assert.match(running, /nationId === 'korund' && options\.korundPresidium/, 'snapshot gate is the flag');
 });
 
 test('#70 migration 0024 is additive, matches runtime schema, passes the guard', async () => {

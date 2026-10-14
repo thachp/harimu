@@ -10,7 +10,7 @@ export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean}={}):Promise<NationalNews|null> {
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
  if(!edition)return null;
@@ -31,7 +31,7 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  for(const item of items)item.kind='record';
  if(nationId==='korund')for(const row of receipts.results)items.push({id:`korund:template:${row.occurred_at}`,title:korundTemplateHeadline(row.food),text:`The brigades of Korund report ${row.shifts} completed shift${row.shifts===1?'':'s'} and ${row.food} food delivered to the common store. Every worker strengthens the plan. (State Media template · the figures are copied from the system ledger and cannot be edited.)`,occurredAt:row.occurred_at*1000,source:'deterministic',kind:'template'});
  if(nationId==='aurelle')for(const row of accessions.results)items.push({id:`aurelle:decree:register:${row.occurred_at}`,title:'By order of the Crown: new subjects received',text:`Hear ye. The Herald proclaims that ${row.citizens} new subject${row.citizens===1?' has':'s have'} sworn the oath and been entered in the royal register. This gazette entry records a fact; it grants no charter, fief or title.`,occurredAt:row.occurred_at*1000,source:'deterministic',kind:'decree'});
- if(nationId==='korund')for(const r of presidiumRumors(await readPresidium(db)))items.push({...r,source:'deterministic',kind:'template'}); // #70 State Media rumors
+ if(nationId==='korund'&&options.korundPresidium)for(const r of presidiumRumors(await readPresidium(db)))items.push({...r,source:'deterministic',kind:'template'}); // #70 State Media rumors
  if(tick){
   const proposals=JSON.parse(tick.proposals_json) as (GovernmentSnapshot|null)[];
   const snapshot=publicGovernmentSnapshot(proposals.find(proposal=>proposal?.nationId===nationId)??null);
