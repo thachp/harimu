@@ -5,6 +5,7 @@ import { NationDocument } from './nation-document';
 import { LeaderPanel } from './leader-panel';
 import { AiBadge } from './ai-disclosure';
 import { GameTimer } from './game-timer';
+import { StabilityPanel } from './stability-panel';
 
 import type { SimulationState } from '@/lib/world-simulation';
 import type { VerificationState } from '@/lib/verification';
@@ -31,6 +32,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     {localDemo && <p>Local demo · petitions and decisions stay in this browser.</p>}
     {!localDemo && <section aria-label="Civic verification"><h4>Phone verification for petitions</h4><p>Petitions need a verified phone number to help protect each citizen’s voice. You can read policy previews while petition submission is unavailable.</p><p role="status">{verification?.reason ?? 'Checking whether your petitions can count…'}</p></section>}
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> <AiBadge /> · {role.controller}</li>)}</ul>
+    {!localDemo && simulation?.stability && <StabilityPanel score={simulation.stability.find(score => score.nationId === snapshot.nationId)} />}
     {!localDemo && simulation && <section aria-label="Durable world simulation">
       <h4>World day {simulation.clock.gameDay} · 12× time</h4>
       <p>Saved tick {simulation.clock.latestTick}. Routine decisions run every two real hours (one game day); server visits process up to three overdue ticks. {simulation.clock.pendingTicks ? `${simulation.clock.pendingTicks} ticks remain to process on later visits.` : 'The saved simulation is caught up.'} There is no background scheduler or connected AI model.</p>

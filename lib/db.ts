@@ -2,12 +2,14 @@ import {accountElectionEnabled,accountElectionSchemas} from './preview-election'
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
 import {korundCouponSchemas} from './korund-coupons';
+import {stabilitySchemas} from './stability';
 import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
 import type {GameDatabase} from './database-contract';
 import {addressSchemas} from './weekly-addresses';
 import {electionSchemas} from './elections';
 import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
+import { worldSquaresSchema, worldSquaresSeedSql } from './map-zones';
 import { aurelleSchemas } from './aurelle';
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
@@ -185,6 +187,7 @@ async function initialize(database: GameDatabase) {
     ...addressSchemas.map(sql=>database.prepare(sql)),
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
     ...korundCouponSchemas.map(sql=>database.prepare(sql)),
+    ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),
@@ -192,6 +195,8 @@ async function initialize(database: GameDatabase) {
     database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_government_petitions_nation_period ON government_petitions(nation_id, period_start)'),
     database.prepare(cityLocationSchema),
+    database.prepare(worldSquaresSchema),
+    ...worldSquaresSeedSql().map(sql => database.prepare(sql)),
     ...squareSchema.map(sql => database.prepare(sql)),
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),

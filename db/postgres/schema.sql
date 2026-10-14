@@ -471,3 +471,7 @@ CREATE VIEW citizen_inventory_balances AS
     UNION SELECT clerk_user_id,'food' AS item FROM starter_food_grants
     UNION SELECT buyer_id AS clerk_user_id,item FROM player_fills
   ) c;
+
+CREATE TABLE nation_stability_scores(nation_id TEXT COLLATE "C" NOT NULL CHECK(nation_id IN('kindle','korund','aurelle')),tick BIGINT NOT NULL CHECK(tick>0),scheduled_at BIGINT NOT NULL,computed_at BIGINT NOT NULL,stability BIGINT NOT NULL CHECK(stability BETWEEN 0 AND 100),unrest BIGINT NOT NULL CHECK(unrest BETWEEN 0 AND 100),inputs_json TEXT COLLATE "C" NOT NULL,breakdown_json TEXT COLLATE "C" NOT NULL,PRIMARY KEY(nation_id,tick));
+
+CREATE INDEX idx_nation_stability_time ON nation_stability_scores(nation_id,scheduled_at);

@@ -88,3 +88,21 @@ assert.equal(new URL(cityVisit).searchParams.get('nation'),'korund','Sample city
   assert.equal(normalizeSceneSearch('?view=planning', nations, inNation), '?view=planning');
   assert.equal(normalizeSceneSearch('', nations, inNation), '');
 }
+
+// #91: Country -> Civic with a foreign nation keeps the nation and is read-only.
+{
+  const { isForeignCivic } = await import('../lib/scene-navigation.ts');
+  const country = 'https://harimu.com/?view=country&nation=confluence';
+  const civic = new URL(sceneUrl(country, 'government', 'confluence', undefined, 'confluence' !== 'kindle'));
+  assert.equal(civic.searchParams.get('view'), 'government');
+  assert.equal(civic.searchParams.get('nation'), 'confluence');
+  assert.equal(isForeignCivic('government', civic.searchParams.get('nation'), 'confluence', 'kindle'), true);
+  assert.equal(isForeignCivic('government', civic.searchParams.get('nation'), 'confluence', null), true);
+  // Own nation's Civic stays the citizen scene (no nation param, full actions).
+  const own = new URL(sceneUrl('https://harimu.com/?view=country&nation=kindle', 'government', 'kindle', undefined, false));
+  assert.equal(own.searchParams.get('nation'), null);
+  assert.equal(isForeignCivic('government', own.searchParams.get('nation'), 'kindle', 'kindle'), false);
+  assert.equal(isForeignCivic('government', 'kindle', 'kindle', 'kindle'), false);
+  // Personal scenes never carry a foreign nation.
+  assert.equal(new URL(sceneUrl(country, 'household', 'confluence', undefined, true)).searchParams.get('nation'), null);
+}
