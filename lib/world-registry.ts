@@ -7,10 +7,11 @@ import { mapHeight, mapWidth, type Zone } from './map-zones';
  * square's owner becomes the nation, its zone becomes Frontier, and the debit is written to a Tessera ledger.
  *
  * Tessera source: none exists yet in the economy, so when HARIMU_SQUARE_PURCHASE_ENABLED=true each citizen
- * receives a one-time PoC starter grant of `tesseraStarterGrantMinor` (ledger reason 'starter-grant').
+ * receives a one-time PoC starter grant of `TEMP_STARTER_GRANT` (ledger reason 'starter-grant').
  */
 export const squarePriceMinor = 2500; // 25.00 TSR
-export const tesseraStarterGrantMinor = 5000; // 50.00 TSR: room for two squares in the PoC
+// TEMPORARY placeholder (#210): there is no real Tessera source yet. Remove this grant once #210 adds one.
+export const TEMP_STARTER_GRANT = 5000; // 50.00 TSR: room for two squares in the PoC
 export const registryNations = ['kindle', 'korund', 'aurelle'] as const;
 
 export const worldRegistrySchemas = [
@@ -79,7 +80,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   const nationId = citizen?.nation_id ?? null;
   if (!nationId || !(registryNations as readonly string[]).includes(nationId)) return fail(403, 'no_nation', 'Only Kindle, Korund and Aurelle citizens can buy squares in this preview.');
   await db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at) VALUES (?,?,?,'starter-grant',?) ON CONFLICT DO NOTHING`)
-    .bind(`tsr-grant-${userId}`, userId, tesseraStarterGrantMinor, now).run();
+    .bind(`tsr-grant-${userId}`, userId, TEMP_STARTER_GRANT, now).run();
   const prior = await db.prepare('SELECT clerk_user_id,nation_id,x,y,price_minor FROM world_square_purchases WHERE request_id=?').bind(command.requestId)
     .first<{ clerk_user_id: string; nation_id: string; x: number; y: number; price_minor: number }>();
   if (prior) {
