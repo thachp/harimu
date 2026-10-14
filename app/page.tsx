@@ -58,6 +58,7 @@ import {
 import { MORNING_BRIEF_TRIGGER_ID, MorningBrief } from './morning-brief';
 import { Newspaper } from '@phosphor-icons/react';
 import { briefDayKey, claimDailyBrief, morningBriefSections } from '@/lib/morning-brief';
+import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { clerkConfigured } from './providers';
 
@@ -1578,7 +1579,7 @@ export default function Home() {
   const countryCityId = countryOwnNation ? currentCityAccount?.currentCityId ?? null : clerkConfigured && citizenNation ? null : previewCity?.id ?? capitalCityForNation(countryNation.id)?.id ?? null;
   const countryHomeId = countryOwnNation ? currentCityAccount?.homeCityId ?? null : clerkConfigured && citizenNation ? null : capitalCityForNation(countryNation.id)?.id ?? null;
   const canCityTravel = !clerkConfigured || citizenSessionStatus === 'anonymous' || Boolean(countryOwnNation && currentCityAccount && citizenSessionStatus === 'ready');
-  const countryMap = <CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} />;
+  const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} /></>;
   const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : viewMode==='square' ? <>
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
