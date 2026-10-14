@@ -8,17 +8,22 @@
  *  - A membership counts only while the citizen still holds that faith (public) and still lives in that capital, so a
  *    faith change or a move ends it on read without any write.
  *  - Officiant: members may opt in. An empty or invalid seat goes to the highest-Devotion opted-in member; a holder can be
- *    challenged by a higher-Devotion opted-in member once they have held it 7 game days. The seat is written only on POST;
+ *    challenged by a higher-Devotion opted-in member once they have held it 7 game days. Devotion caps at 100, so (#292) a tie at
+ *    the cap counts as "more" for a challenger: a challenger who has sat at the cap for 7 consecutive game days alongside a holder
+ *    who has held the seat at least 7 game days takes it. No decay and no term limit. If several qualify: the longest continuous
+ *    time at the cap, then the earliest join, then the lowest user id. [ASSUMPTION] (ARC ruling on #292; docs 14.4 sets no cap rule).
+ *    The seat is written only on POST;
  *    GET projects who would hold it now, so GET never writes (#217/#246).
  *  - The Officiant may "officiate" once per game day for a small Devotion bonus (lib/faith.ts devotionPerService). Nothing
  *    in work, wages, the market or combat reads any of this. */
 import type { GameDatabase } from './database-contract';
 import { capitalCityForNation } from './cities';
 import { faithCopy } from './faith-copy';
-import { gameDayOf, readFaith } from './faith';
+import { capStreak, devotionEvents, devotionMax, devotionSeries, gameDayOf, readFaith } from './faith';
 import type { WorshipFaithId } from './worship-copy';
 
 export const officiantChallengeGameDays = 7;
+const devotionCap = devotionMax; // Devotion caps at 100 (lib/faith.ts)
 export const congregationFaiths: readonly WorshipFaithId[] = ['kinward-rite', 'fair-wind-vow', 'open-hand'];
 export const congregationNations = ['kindle', 'korund', 'aurelle'] as const;
 
@@ -202,11 +207,26 @@ async function settleSeat(db: GameDatabase, cong: { id: string; faithId: string;
   const today = gameDayOf(now);
   let next: string | null = holder?.user_id ?? null;
   if (!holder) next = top?.user_id ?? null;
-  else if (top && top.user_id !== holder.user_id && top.devotion > holder.devotion && today - Number(seat!.since_day) >= officiantChallengeGameDays) next = top.user_id;
+  else if (today - Number(seat!.since_day) >= officiantChallengeGameDays) {
+    if (top && top.user_id !== holder.user_id && top.devotion > holder.devotion) next = top.user_id;
+    else next = (await capChallenger(db, holder, ranked, today)) ?? next; // #292: a tie at the cap
+  }
   if (next === (seat?.user_id ?? null) && holder) return next;
   if (!next) { if (seat) await db.prepare('DELETE FROM congregation_officiants WHERE congregation_id=? AND user_id=?').bind(cong.id, seat.user_id).run(); return null; }
   // Compare-and-set on the previous holder so two concurrent settles can't both win.
   if (seat) await db.prepare('UPDATE congregation_officiants SET user_id=?,since_day=?,seated_at=? WHERE congregation_id=? AND user_id=?').bind(next, today, now, cong.id, seat.user_id).run();
   else await db.prepare('INSERT INTO congregation_officiants (congregation_id,user_id,since_day,seated_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING').bind(cong.id, next, today, now).run();
   return (await db.prepare('SELECT user_id FROM congregation_officiants WHERE congregation_id=?').bind(cong.id).first<{ user_id: string }>())?.user_id ?? null;
+}
+
+/** #292: when the holder sits at the 100 cap nobody can have "more" Devotion, so a challenger tied at the cap for 7 consecutive game days
+ * (the holder also at the cap on each of those days) takes the seat. Longest streak at the cap wins, then earliest join, then lowest id. */
+async function capChallenger(db: GameDatabase, holder: { user_id: string; devotion: number }, ranked: (MemberRow & { devotion: number })[], today: number) {
+  if (holder.devotion < devotionCap) return null;
+  const streakOf = async (userId: string) => capStreak(devotionSeries(await devotionEvents(db, userId), today), today);
+  if ((await streakOf(holder.user_id)) < officiantChallengeGameDays) return null;
+  const qualified = (await Promise.all(ranked.filter(m => m.user_id !== holder.user_id && m.devotion >= devotionCap)
+    .map(async m => ({ m, streak: await streakOf(m.user_id) })))).filter(x => x.streak >= officiantChallengeGameDays);
+  qualified.sort((a, b) => b.streak - a.streak || Number(a.m.joined_at) - Number(b.m.joined_at) || a.m.user_id.localeCompare(b.m.user_id));
+  return qualified[0]?.m.user_id ?? null;
 }

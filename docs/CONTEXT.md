@@ -156,6 +156,9 @@ A nation's fixed position on religion, ranging from theocracy through pluralism 
 **Devotion**  
 A citizen's 0-100 commitment to their chosen faith. It grants social progression, not direct economic or combat power. In Ilmar, Devotion is called Piety.
 
+**Officiant**  
+The one clergy seat of a congregation, held by an opted-in member. A challenger with more Devotion takes it once the holder has held it 7 game days. Devotion caps at 100, so a challenger tied at the cap for 7 consecutive game days also takes it once the holder has held it 7 game days; if several qualify, the longest at the cap wins, then the earliest join, then the lowest id. There is no decay and no term limit. The cap tie-break is an [ASSUMPTION] (ARC ruling on #292), not in the official docs. Seat changes are saved only on POST, never on GET, and only while `HARIMU_FAITH_ENABLED` is on.
+
 **Religious Harmony**  
 A national meter representing relations among permitted faiths and feeding into Stability.
 
