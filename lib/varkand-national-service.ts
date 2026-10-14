@@ -17,10 +17,13 @@ export const SERVICE_LINE_MAX=140;
 export const SERVICE_BRIEFING_MIN=2;
 export const SERVICE_BRIEFING_MAX=4;
 
+/** Shown on any term day while the Alert Level is Red. Training continues; the 14-day no-combat guarantee always holds. */
+export const redAlertLine={text:'Red Alert. Recruits stay in training. You are not deployed in your first 14 days, whatever the alert.',proposal:true} as const;
+
 /** Canon names this script may use. Tests check every capitalized place/institution term against this list. */
 export const VARKAND_CANON_TERMS=['Varkand','Watchfast','Voren Light','Moorhald','Dunkar Pass','Vett Crossing','Directorate',
  'Directorate Bastion','Chaplaincy Corps','Arsenal','Arsenal Combines','Cabinet of Technocrats','Mandate Plebiscite','Muster Day',
- 'Rotation Day','Lantern Watch','Ward','Field Scrip','Green','Amber','Red','Hazequartz','National Service','Peat Commons'] as const;
+ 'Rotation Day','Tessera','Lantern Watch','Ward','Field Scrip','Green','Amber','Red','Hazequartz','National Service','Peat Commons'] as const;
 
 export const nationalServiceDays:readonly NationalServiceDay[]=[
  {day:1,title:'Intake at Watchfast',proposal:true,
@@ -45,7 +48,7 @@ export const nationalServiceDays:readonly NationalServiceDay[]=[
   objective:'Find three signal posts on the moor using map and foghorn schedule.',
   briefing:['Fog orienteering is training and sport. It teaches you the ground and the foghorn hours.',
    'Go with a partner. Nobody here is scored for bravery.',
-   'Your unit will give you a call sign today. Most people keep it for life.'],
+   'Your unit assigns your call sign today from the Varkand roll. You may ask for one reroll. Most people keep it for life.'],
   completion:'Three posts found. Call sign recorded on your card.'},
  {day:5,title:'Chapel and Choice',proposal:true,
   objective:'Visit a garrison chapel and learn how the Chaplaincy Corps registers faiths.',
@@ -63,8 +66,16 @@ export const nationalServiceDays:readonly NationalServiceDay[]=[
   objective:'Attend the term-end muster and choose your next step as a reservist.',
   briefing:['Your recruit term ends today. You become a reservist.',
    'Reservists are not deployed in their first 14 days, nor while away from the game.',
-   'From here you can apply for the ranks, take civilian work, or apply for an exit permit. Each choice has costs.'],
+   'From here you can apply for the ranks or take civilian work.',
+   'Leaving Varkand needs an exit permit. It can be denied. If you go, you lose savings not moved through the Tessera, and some standing.'],
   completion:'Term complete. You are a reservist and a citizen of Varkand. The choice of what comes next is yours.'},
 ];
+
+/** Day 4 call sign: drawn from a roll (pass `varkandCallSigns` from lib/citizen-names.ts); one reroll; never typed freely. */
+export const CALL_SIGN_REROLLS=1;
+export function recruitCallSign(roll:readonly string[],seed:number,reroll=0){
+ const n=roll.length, i=((Math.trunc(seed)%n)+n)%n;
+ return roll[(i+Math.min(Math.max(reroll,0),CALL_SIGN_REROLLS)*7)%n];
+}
 
 export function nationalServiceDay(day:number){return nationalServiceDays.find(d=>d.day===day);}
