@@ -28,6 +28,9 @@ for(const nationId of ['kindle','korund','aurelle']){
    assert.ok(response.data.items.some(item=>item.text.includes('1 completed shift')));
    assert.ok(response.data.items.every(item=>['system','deterministic'].includes(item.source)));
    const text=JSON.stringify(response.data);assert.doesNotMatch(text,/Private alice|Private bob|clerk_user_id|alice|bob|shift_id/);
+   if(nationId==='korund'){const template=response.data.items.find(item=>item.kind==='template');assert.ok(template);assert.equal(template.source,'deterministic');assert.match(template.text,/1 completed shift and 4 food/);}
+   if(nationId==='aurelle'){const decrees=response.data.items.filter(item=>item.kind==='decree');assert.ok(decrees.length>=1);assert.ok(decrees.every(item=>item.title.startsWith('By order of the Crown')&&item.source==='deterministic'));}
+   if(nationId==='kindle')assert.ok(response.data.items.every(item=>item.kind==='record'));
    if(nationId!=='kindle')assert.doesNotMatch(text,/Food security is|below the 40-point|ties favor|proposal is capped/);
    const bob=await read(r,'bob');assert.notEqual(bob.data.nationId,nationId);assert.equal(bob.data.statistics.completedShifts,0);
    r.reopen();
