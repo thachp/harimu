@@ -32,7 +32,7 @@ async function setup(t, flag = true) {
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'").run();
   await r.db.prepare("UPDATE citizens SET nation_id='aurelle' WHERE clerk_user_id='bob'").run();
   const unrest = async (from, to, value, nation = 'korund') => {
-    const rows = []; for (let s = from; s <= to; s += 2 * H) rows.push(r.db.prepare("INSERT OR REPLACE INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,40,?,'{}','{}')").bind(nation, 100000 + Math.floor(s / (2 * H)), s, s, value));
+    const rows = []; for (let s = from; s <= to; s += 2 * H) rows.push(r.db.prepare("INSERT INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,40,?,'{}','{}') ON CONFLICT DO NOTHING").bind(nation, 100000 + Math.floor(s / (2 * H)), s, s, value));
     for (let i = 0; i < rows.length; i += 50) await r.db.batch(rows.slice(i, i + 50));
   };
   const sessions = async () => (await r.db.prepare('SELECT * FROM korund_presidium_sessions ORDER BY opened_at').all()).results;
