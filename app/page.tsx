@@ -43,6 +43,7 @@ import { CitizenMarket } from './citizen-market';
 import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
+import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
 import { shiftDeadlineText, shiftDeadlineDelay } from '@/lib/shift-deadline';
 import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
@@ -597,6 +598,16 @@ export default function Home() {
   const workLock = useRef(false);
   const [demoLoaded, setDemoLoaded] = useState(false);
   const hasActiveShift = workShifts.some((shift) => !shift.claimedAt);
+  const [dockNow, setDockNow] = useState(() => Date.now());
+  const activeCompletesAt = workShifts.find((shift) => !shift.claimedAt)?.completesAt;
+  // Re-render the jobs dock when the active shift reaches its deadline (#54).
+  useEffect(() => {
+    if (!activeCompletesAt) return;
+    const wait = Date.parse(activeCompletesAt) - Date.now();
+    const timer = window.setTimeout(() => setDockNow(Date.now()), Math.min(Math.max(0, wait + 250), 2147483647));
+    return () => window.clearTimeout(timer);
+  }, [activeCompletesAt]);
+  const dockStatus = (order: { id: string; name: string; cost: number }) => { const status = workOrderDockStatus(order, workShifts, capacity, dockNow); return status ? ` · ${status}` : ''; };
   const [deadlineConfirmedId, setDeadlineConfirmedId] = useState<string | null>(null);
   const runWorkRef = useRef<((action: 'refresh-work') => Promise<void>) | null>(null);
   const [influence, setInfluence] = useState(1240);
@@ -1601,7 +1612,7 @@ export default function Home() {
     })) : viewMode === 'workplace' ? availableWorkOrders
       .filter(order => Boolean(citizenNation) && (!order.nationId || order.nationId === citizenNation?.id))
       .map(order => ({ id: order.id, label: order.name,
-        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${hasActiveShift ? ' · Shift in progress' : capacity < order.cost ? ' · More capacity needed' : ''}`,
+        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${dockStatus(order)}`,
       })) : viewMode === 'market' ? [
         ...(market?.quotes ?? []).map(quote => ({ id: quote.item, label: quote.label,
           detail: `Buy ${(quote.buyMinor / 100).toFixed(2)} · Sell ${(quote.sellMinor / 100).toFixed(2)} SPK · ${quote.stock} in stock`,
