@@ -17,6 +17,7 @@ import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsVie
 import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
 import { economySchema, recoverySchema, rewardSchema, fundSchema, employerBudgetMinor, rewards } from './economy';
 import { shiftSchema, activeShiftIndex } from './work-shifts';
+import { shiftQualitySchema } from './shift-quality';
 import { env } from 'cloudflare:workers';
 import { isolateOnce } from './postgres/readiness';
 
@@ -181,6 +182,7 @@ async function initialize(database: GameDatabase) {
   ]);
 
   await database.batch([database.prepare(shiftSchema), database.prepare(activeShiftIndex)]);
+  await database.prepare(shiftQualitySchema).run();
 
   await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);

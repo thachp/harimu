@@ -32,6 +32,8 @@ import { firstLoopStep } from '@/lib/first-loop';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { WalletPanel } from './wallet-panel';
+import { ShiftQualityStep } from './shift-quality-step';
+import { gradeShift, applyQuality, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
@@ -526,6 +528,7 @@ export default function Home() {
   const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [qualityOrder, setQualityOrder] = useState<WorkOrder | null>(null);
   const [aurellePlan, setAurellePlan] = useState<AurellePlanView | null>(null);
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
   const aurelleIntent = useRef<AurelleCommand | null>(null);
@@ -762,7 +765,7 @@ export default function Home() {
     return () => controller.abort();
   }, [citizenSessionStatus]);
 
-  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string) {
+  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string, quality?: QualityInput) {
     if (enrollmentLock.current) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
@@ -777,7 +780,7 @@ export default function Home() {
       if (clerkConfigured) {
         const init: RequestInit = {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
-          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
+          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId, quality }),
         };
         // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
         // Starting a shift has no request id, so it is never retried automatically.
@@ -811,9 +814,12 @@ export default function Home() {
           const rule = shiftRules[order.id];
           if (!rule) throw new Error('Work order unavailable.');
           const startedAt = new Date().toISOString();
-          setWorkShifts((current) => [{ id: crypto.randomUUID(), orderName: order.name,
+          const graded = gradeShift(order.id, quality, 'human');
+          const demoReward = rewards[order.id] ? applyQuality(rewards[order.id], graded.multiplierPct) : undefined;
+          setWorkShifts((current) => [{ id: crypto.randomUUID(), workOrderId: order.id, orderName: order.name,
             output: rule.output, capacitySpent: order.cost, startedAt,
-            wageMinor: rewards[order.id]?.wageMinor, rewardItem: rewards[order.id]?.item, rewardQuantity: rewards[order.id]?.quantity,
+            ...(order.id === qualityWorkOrderId ? { qualityGrade: graded.grade, qualityMultiplierPct: graded.multiplierPct } : {}),
+            wageMinor: demoReward?.wageMinor, rewardItem: rewards[order.id]?.item, rewardQuantity: demoReward?.quantity,
             completesAt: new Date(Date.now() + rule.hours * 3600000).toISOString(), claimedAt: null }, ...current]);
           setCapacity((current) => current - order.cost);
         } else {
@@ -980,7 +986,8 @@ export default function Home() {
       if (epoch !== citizenEpoch.current) return; workLock.current=false; setGovernmentPending(false); }
   }
 
-  function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
+  // #40: the quality job opens the quality step first; WC is only spent when the player starts from it.
+  function commitWork(order: WorkOrder) { if (order.id === qualityWorkOrderId && rewards[order.id]) { setQualityOrder(order); return Promise.resolve(); } return runWork('commit-work', order); }
 
   async function runKorundCommand(command: KorundCommand) {
     const confirmingKorundIntent=korundIntent.current?.requestId===command.requestId;
@@ -1656,6 +1663,8 @@ export default function Home() {
       accountControls={<>{citizenNation && !guestActive && <button type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief"><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
       {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
+      {qualityOrder && rewards[qualityOrder.id] && <ShiftQualityStep orderId={qualityOrder.id} orderName={qualityOrder.name} cost={qualityOrder.cost} base={rewards[qualityOrder.id]}
+        onCancel={() => setQualityOrder(null)} onStart={(quality) => { const order = qualityOrder; setQualityOrder(null); void runWork('commit-work', order, undefined, quality); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}
