@@ -1,4 +1,8 @@
-export type City = { id: string; nationId: string; name: string; capital: boolean; description: string };
+/** #123 (ARC ruling on #264): a city's role from the docs Cities table on each nation page; the capital's role is 'capital'. */
+export type CityRole = 'capital' | 'frontier' | string;
+export type City = { id: string; nationId: string; name: string; capital: boolean; role: CityRole; description: string };
+// Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
+const roles: Record<string, string> = {"Tarrek Foundry": "Industry", "Kolt Savanna": "Farming", "Lanu Terraces": "Farming", "Oalin Harbor": "Port / fisheries", "Tsenga SEZ": "Trade zone", "Holv Gorge": "Energy / industry", "Strova Mines": "Mining", "Gren Plateau": "Farming", "Windrest": "Silk / crafts", "Highmere": "Farming / fief", "Lume Mesa": "Pilgrimage", "Glassen": "Industry (Sunglass)", "Fjeldmark": "Frostcore / logistics", "Isling Springs": "Spa / tourism", "Voren Light": "Port / signals", "Moorhald": "Farming / peat", "Ashglade": "Timber / crafts", "Fernhollow": "Farming", "Vendezzo": "Shipyard", "Malvara Rods": "Energy (Stormcells)"};
 // Canonical city names and visual lore, GDD nation pages /world/nations/ (read 2026-10-13).
 // This bounded catalog is capital + two cities per nation; no live city simulation is implied.
 const roster: Record<string, readonly [string, string][]> = {
@@ -14,8 +18,20 @@ const roster: Record<string, readonly [string, string][]> = {
   fulmara: [['Arcport','An archipelago capital of canals, finance towers and a public share register.'],['Vendezzo','A shipyard city with copper slipways on a northern headland.'],['Malvara Rods','An eastern energy town of lightning rods on a storm cape.']],
 };
 const catalog: readonly City[] = Object.entries(roster).flatMap(([nationId, entries]) => entries.map(([name, description], index) => ({
-  id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), nationId, name, capital: index === 0, description,
+  id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), nationId, name, capital: index === 0, role: index === 0 ? 'capital' : roles[name] ?? 'unknown', description,
 })));
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
 export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.id === cityId); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
+
+/** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its
+ *  docs role. Not part of the capital + two cities catalog above, so city lists and vignettes are unchanged. */
+const outposts: Record<string, { name: string; role: CityRole; description: string }> = {
+  kindle: { name: 'Ashby Crossing', role: 'frontier', description: 'Frontier / mining border village in the western badlands.' },
+  korund: { name: 'Krel Arsenal', role: 'frontier', description: 'Military / industry frontier fortress in the eastern border passes.' },
+  aurelle: { name: 'Vale Bridge', role: 'frontier', description: 'Frontier / trade fortified bridge town on the southern border gorge.' },
+};
+export function outpostCityForNation(nationId: string): City | undefined {
+  const o = outposts[nationId]; if (!o) return undefined;
+  return { id: o.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), nationId, name: o.name, capital: false, role: o.role, description: o.description };
+}
