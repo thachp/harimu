@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { acquisitionRules, zoneLabels, zoneOrder, type WorldSquare, type Zone } from '@/lib/map-zones';
 import styles from './world-zones.module.css';
 
+export const zoneOverlayKey = 'harimu:zone-overlay';
+
 export const zoneColors: Record<Zone, string> = { heartland: '#c9893a', frontier: '#d9c46a', wildlands: '#6f9a6b', commons: '#8a6fb8' };
 type Payload = { width: number; height: number; squares: WorldSquare[] };
 const ownerName = (owner: string | null, names: Record<string, string>) => owner ? names[owner] ?? owner : 'Unclaimed';
@@ -16,7 +18,10 @@ export function squareInspection(square: WorldSquare, names: Record<string, stri
 }
 
 export function WorldZones({ nationNames = {} }: { nationNames?: Record<string, string> }) {
-  const [show, setShow] = useState(false);
+  const [show, setShowState] = useState(false);
+  // #189: remember the Zone overlay choice for the session so it survives leaving and returning to Country.
+  useEffect(() => { try { if (sessionStorage.getItem(zoneOverlayKey) === '1') queueMicrotask(() => setShowState(true)); } catch {} }, []);
+  const setShow = (value: boolean) => { setShowState(value); try { sessionStorage.setItem(zoneOverlayKey, value ? '1' : '0'); } catch {} };
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<WorldSquare | null>(null);
