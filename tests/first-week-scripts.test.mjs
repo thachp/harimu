@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { firstWeekScripts, firstWeekScript, kindleFirstWeek, TUTORIAL_DAYS, TUTORIAL_TITLE_MAX, TUTORIAL_LINE_MAX, TUTORIAL_BRIEFING_MIN, TUTORIAL_BRIEFING_MAX } from '../lib/first-week-scripts.ts';
+import { firstWeekScripts, firstWeekScript, kindleFirstWeek, TUTORIAL_DAYS, TUTORIAL_TITLE_MAX, TUTORIAL_LINE_MAX, TUTORIAL_BRIEFING_MIN, TUTORIAL_BRIEFING_MAX, GUIDED_DAYS } from '../lib/first-week-scripts.ts';
 import { nationalServiceDays } from '../lib/varkand-national-service.ts';
 import { citizenNameLists } from '../lib/citizen-names.ts';
 
@@ -36,4 +36,12 @@ test('Kindle beats from the issue and canon', () => {
   assert.doesNotMatch(text,/run for (office|mayor|president|assembly)|become (mayor|president)/i);
   // No penalty for missing a day (vision: gentle pulls); costs named (inequality, instability).
   assert.match(text,/missing a day costs you nothing/); assert.match(text,/Inequality/); assert.match(text,/instability/);
+});
+test('days 1-3 guided, days 4-7 optional tips', () => {
+  assert.equal(GUIDED_DAYS,3);
+  for (const s of scripts) for (const x of s.days) assert.equal(x.kind, x.day<=3?'guided':'optional-tip', `${s.nationId} day ${x.day}`);
+});
+test('fallback lines are within limits; Kindle day 3 uses the player market with a stall fallback', () => {
+  for (const s of scripts) for (const x of s.days) if (x.fallback) assert.ok(x.fallback.length<=TUTORIAL_LINE_MAX, x.fallback);
+  const d3=kindleFirstWeek.days[2]; assert.match(d3.objective,/player market/); assert.match(d3.briefing.join(' '),/order book/); assert.match(d3.fallback,/stall/);
 });

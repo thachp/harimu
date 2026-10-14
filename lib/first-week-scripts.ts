@@ -7,8 +7,14 @@
  * copy, not AI-citizen speech, so they carry no AI-text flag (issue #227 puts AI-generated lines out of scope). */
 
 export type TutorialNation='kindle'|'korund'|'aurelle';
+/** 'guided' = the 3-day guided tutorial (onboarding §19.1). 'optional-tip' = days 4-7: never blocks progress,
+ * can be dismissed, and never holds back rewards. */
+export type TutorialKind='guided'|'optional-tip';
+export const GUIDED_DAYS=3;
 export type TutorialDay={
- day:1|2|3|4|5|6|7;title:string;objective:string;briefing:readonly string[];completion:string;proposal:true;
+ day:1|2|3|4|5|6|7;kind:TutorialKind;title:string;objective:string;briefing:readonly string[];completion:string;
+ /** Shown instead of the objective when its target is unavailable (e.g. an empty player market). */
+ fallback?:string;proposal:true;
 };
 export type FirstWeekScript={nationId:TutorialNation;voice:string;days:readonly TutorialDay[]};
 
@@ -18,7 +24,7 @@ export const TUTORIAL_LINE_MAX=140;
 export const TUTORIAL_BRIEFING_MIN=2;
 export const TUTORIAL_BRIEFING_MAX=4;
 
-const d=(day:TutorialDay['day'],title:string,objective:string,briefing:readonly string[],completion:string):TutorialDay=>({day,title,objective,briefing,completion,proposal:true});
+const d=(day:TutorialDay['day'],title:string,objective:string,briefing:readonly string[],completion:string,fallback?:string):TutorialDay=>({day,kind:day<=GUIDED_DAYS?'guided':'optional-tip',title,objective,briefing,completion,...(fallback?{fallback}:{}),proposal:true});
 
 export const kindleFirstWeek:FirstWeekScript={nationId:'kindle',
  voice:'Plain, quick and a little proud: "Strike your own spark." Prices out loud, arguments in the open.',
@@ -33,11 +39,12 @@ export const kindleFirstWeek:FirstWeekScript={nationId:'kindle',
     'Pick a job that suits you. In Kindle you choose your own work.',
     'Eat a household meal when you\'re tired. It gives some capacity back.'],
    'Shift started. Wages come in when it settles.'),
-  d(3,'Read the Price Board','Buy or sell one item at the posted price.',
-   ['Every stall posts its price. Hiding the price is rude here.',
+  d(3,'Read the Price Board','Place one buy or sell order on the player market.',
+   ['The player market is an order book. Every order shows its price. Hiding the price is rude here.',
     'Prices rise and fall with supply and demand. Booms come, and so do busts.',
     'Shake on a deal and keep it. Rigging a scale is taboo.'],
-   'Trade done at a fair price. That\'s how the market works.'),
+   'Order placed at a fair price. That\'s how the market works.',
+   'No orders on the market yet? Buy from a stall at its posted price instead.'),
   d(4,'Many Voices, One Plaza','Read the free press, then post in the city square.',
    ['Kindle has a free press and free speech. Read more than one side.',
     'Say your piece in the square. Speak plainly; boast only if you can back it up.'],
