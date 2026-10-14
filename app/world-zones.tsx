@@ -23,8 +23,9 @@ export function WorldZones({ nationNames = {} }: { nationNames?: Record<string, 
   useEffect(() => {
     if (!show || data) return;
     let active = true;
+    queueMicrotask(() => { if (active) setError(false); });
     fetch('/api/world/squares').then(r => r.ok ? r.json() as Promise<Payload> : Promise.reject())
-      .then(v => { if (active) setData(v); }, () => { if (active) setError(true); });
+      .then(v => { if (active) { setData(v); setError(false); } }, () => { if (active) setError(true); });
     return () => { active = false; };
   }, [show, data]);
   return <section className={styles.zones} aria-label="World map zones">
@@ -33,7 +34,7 @@ export function WorldZones({ nationNames = {} }: { nationNames?: Record<string, 
       <ul className={styles.legend} aria-label="Zone legend">{zoneOrder.map(z => <li key={z}><span style={{ background: zoneColors[z] }} aria-hidden="true" />{zoneLabels[z]}</li>)}</ul>
       {error && <p role="alert">World squares are unavailable right now.</p>}
       {!data && !error && <p role="status">Loading world squares…</p>}
-      {data && <div className={styles.grid} style={{ gridTemplateColumns: `repeat(${data.width}, 1fr)` }} role="grid" aria-label={`World squares, ${data.width} by ${data.height}`}>
+      {data && <div className={styles.grid} style={{ gridTemplateColumns: `repeat(${data.width}, 1fr)` }} role="group" aria-label={`World squares, ${data.width} by ${data.height}`}>
         {data.squares.map(s => <button key={`${s.x},${s.y}`} type="button" className={styles.square} style={{ background: zoneColors[s.zone] }}
           aria-pressed={selected?.x === s.x && selected?.y === s.y} onClick={() => setSelected(s)}
           aria-label={`Square ${s.x}, ${s.y}: ${zoneLabels[s.zone]}${s.feature ? `, ${s.feature}` : ''}`}>{s.feature === 'capital' ? '★' : s.feature === 'border outpost' ? '▲' : ''}</button>)}

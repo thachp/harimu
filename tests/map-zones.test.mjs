@@ -67,3 +67,8 @@ test('committed D1 migration matches the generator and applies idempotently', as
   const sqlite = new DatabaseSync(':memory:'); sqlite.exec(file); sqlite.exec(file);
   assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM world_squares').get().n, mapWidth * mapHeight);
 });
+test('a partially seeded table falls back to the full seed', async () => {
+  const sqlite = new DatabaseSync(':memory:'); sqlite.exec(worldSquaresSchema); sqlite.exec(worldSquaresSeedSql()[0]);
+  const read = await readWorldSquares({ prepare: sql => ({ all: async () => ({ results: sqlite.prepare(sql).all() }) }) });
+  assert.equal(read.source, 'seed'); assert.equal(read.squares.length, mapWidth * mapHeight);
+});

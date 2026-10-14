@@ -100,7 +100,8 @@ export async function readWorldSquares(db: GameDatabase): Promise<{ squares: Wor
   try {
     const result = await db.prepare('SELECT x,y,zone,owner,terrain,resource,feature FROM world_squares ORDER BY y,x').all<Row>();
     const rows = result.results ?? [];
-    if (rows.length) return { squares: rows.map(r => ({ x: Number(r.x), y: Number(r.y), zone: r.zone, owner: r.owner, terrain: r.terrain, resource: r.resource, feature: r.feature })), source: 'table' };
+    // Only a complete grid counts; a partially applied seed falls back to the identical in-code seed.
+    if (rows.length === mapWidth * mapHeight) return { squares: rows.map(r => ({ x: Number(r.x), y: Number(r.y), zone: r.zone, owner: r.owner, terrain: r.terrain, resource: r.resource, feature: r.feature })), source: 'table' };
   } catch { /* table not migrated yet on this backend: serve the identical deterministic seed */ }
   return { squares: seedWorldSquares(), source: 'seed' };
 }
