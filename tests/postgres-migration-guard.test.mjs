@@ -27,7 +27,7 @@ const rows = async (pg, sql) => (await pg.query(sql)).rows;
 
 test('inventory lists numbered migrations in order, never schema/compatibility', () => {
   const migrations = postgresMigrations();
-  assert.ok(migrations.length >= 2 && migrations.every(m => /^\d{4}_/.test(m.file) && m.tables.length && m.checksum.length === 64));
+  assert.ok(migrations.length >= 2 && migrations.every(m => /^\d{4}_/.test(m.file) && (m.tables.length || /^\s*INSERT INTO/m.test(m.sql)) && m.checksum.length === 64)); // #196: 0020 is data-only (seed rows)
   assert.deepEqual(migrations.map(m => m.file), [...migrations.map(m => m.file)].sort());
   assert.ok(!migrations.some(m => /schema|compatibility/.test(m.file)));
   assert.deepEqual(createdTables('CREATE TABLE IF NOT EXISTS "a_b"(x int); create table `c` (y int); CREATE TABLE d(z int);'), ['a_b', 'c', 'd']);
