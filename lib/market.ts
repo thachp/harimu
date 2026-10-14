@@ -63,7 +63,8 @@ export const inventoryViewSql = `CREATE VIEW IF NOT EXISTS citizen_inventory_bal
     + COALESCE((SELECT SUM(quantity) FROM player_fills WHERE buyer_id=c.clerk_user_id AND item=c.item),0)
     + COALESCE((SELECT SUM(t.qty) FROM market_trades t JOIN market_orders o ON o.id=t.buy_order_id WHERE o.citizen_id=c.clerk_user_id AND t.good=c.item),0)
     - COALESCE((SELECT SUM(t.qty) FROM market_trades t JOIN market_orders o ON o.id=t.sell_order_id WHERE o.citizen_id=c.clerk_user_id AND t.good=c.item),0)
-    - COALESCE((SELECT SUM(remaining) FROM market_open_orders WHERE citizen_id=c.clerk_user_id AND side='sell' AND good=c.item),0) AS quantity
+    - COALESCE((SELECT SUM(remaining) FROM market_open_orders WHERE citizen_id=c.clerk_user_id AND side='sell' AND good=c.item),0)
+    - COALESCE((SELECT SUM(qty) FROM market_spoilage WHERE clerk_user_id=c.clerk_user_id AND good=c.item),0) AS quantity
   FROM (
     SELECT clerk_user_id,item FROM shift_settlements
     UNION SELECT clerk_user_id,item FROM citizen_economy_events
