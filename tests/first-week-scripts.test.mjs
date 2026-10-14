@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { firstWeekScripts, firstWeekScript, kindleFirstWeek, korundFirstWeek, TUTORIAL_DAYS, TUTORIAL_TITLE_MAX, TUTORIAL_LINE_MAX, TUTORIAL_BRIEFING_MIN, TUTORIAL_BRIEFING_MAX, GUIDED_DAYS } from '../lib/first-week-scripts.ts';
+import { firstWeekScripts, firstWeekScript, kindleFirstWeek, korundFirstWeek, aurelleFirstWeek, TUTORIAL_DAYS, TUTORIAL_TITLE_MAX, TUTORIAL_LINE_MAX, TUTORIAL_BRIEFING_MIN, TUTORIAL_BRIEFING_MAX, GUIDED_DAYS } from '../lib/first-week-scripts.ts';
 import { nationalServiceDays } from '../lib/varkand-national-service.ts';
 import { citizenNameLists } from '../lib/citizen-names.ts';
 
@@ -53,4 +53,15 @@ test('Korund beats from the issue and canon; no glorified coercion, no faith, no
   assert.doesNotMatch(korundFirstWeek.days[3].briefing.join(' '),/notice|leave out|hidden/i);
   assert.doesNotMatch(text,/glori|heroic|traitor|enemy|obey|informer|purge|gray market|black market|faith|shrine|pray|worship/i);
   assert.match(korundFirstWeek.days[2].fallback,/Shortages/);
+});
+test('Aurelle beats from the issue and canon; no noble house named, no claimant content', () => {
+  const text=aurelleFirstWeek.days.flatMap(x=>[...lines(x),x.fallback??'']).join(' ');
+  for (const t of [/oath/,/Royal Favor/,/Crown/,/Sky Throne/,/Kinward Rite/,/Highspire/,/Commoner/,/chartered market/,/court gazette/]) assert.match(text,t);
+  assert.match(text,/Monarch and the lords are AI/); assert.match(text,/no jurisdiction/);
+  assert.match(text,/debase/); assert.match(text,/lèse-majesté/); assert.match(text,/dissenters pay a levy/); assert.match(text,/Birth and favor/);
+  const [d1,,d3,d4]=aurelleFirstWeek.days;
+  assert.match(lines(d1).join(' '),/register/); assert.match(lines(d1).join(' '),/Immigrants .* take an oath/); assert.doesNotMatch(d1.objective,/oath/i);
+  assert.doesNotMatch(lines(d3).join(' '),/debase/); assert.match(lines(d3).join(' '),/chartered market/); assert.match(lines(d3).join(' '),/Crown/);
+  assert.equal(d4.kind,'optional-tip'); assert.match(d4.briefing.join(' '),/debases/);
+  assert.doesNotMatch(text,/\bHouse of\b|of the \w+ House\b/); assert.doesNotMatch(text,/claimant|pretender|pledge|\bcoups?\b|usurp/i);
 });

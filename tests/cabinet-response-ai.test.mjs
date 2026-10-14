@@ -102,6 +102,14 @@ test('#169 settle is a no-op on a finished row and settles an open one',async t=
  const get=id=>r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id=?').bind(id).first();
  assert.deepEqual({...await get('done')},{reserved_micro:72400,status:'finished'});assert.deepEqual({...await get('open')},{reserved_micro:4200,status:'finished'});
 });
+test('#169 follow-up: marking a transport failure uncertain never touches a finished row',async t=>{
+ const {markAiReservationUncertain}=await import('../lib/ai-budget.ts');const r=await localRuntime();t.after(()=>r.close());
+ const insert=(id,status,micro)=>r.db.prepare("INSERT INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,'2026-10-14','2026-10-15','x',?,1,?)").bind(id,micro,status).run();
+ await insert('done','finished',4200);await insert('open','pending',72400);
+ await markAiReservationUncertain(r.db,'done');await markAiReservationUncertain(r.db,'open');
+ const get=id=>r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id=?').bind(id).first();
+ assert.deepEqual({...await get('done')},{reserved_micro:4200,status:'finished'});assert.deepEqual({...await get('open')},{reserved_micro:72400,status:'uncertain'});
+});
 test('#170 a Cabinet rejection with reported usage settles to the true token cost',async t=>{
  const r=await localRuntime();t.after(()=>r.close());await reached(r);const usage={prompt_tokens:600,completion_tokens:120};
  const ai={seen:[],async run(){this.seen.push(1);return {response:JSON.stringify({response:'bad'}),usage};}};

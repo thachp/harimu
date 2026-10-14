@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import type {NationalNews,NewsItem} from './national-news';
-import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,meteredAiCost,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiMeteredCall,type AiBudgetConfig} from './ai-budget';
+import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiMeteredCall,type AiBudgetConfig} from './ai-budget';
 export const aiNewsEnabled=true; // Preview activation approved 2026-10-14; runtime flags and pricing expiry still gate inference.
 export const aiNewsSchemas=[aiBudgetSchema,
  `CREATE TABLE IF NOT EXISTS ai_news_jobs(id TEXT PRIMARY KEY,nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),utc_day TEXT NOT NULL,started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('running','published','failed')),failure_code TEXT)`,
@@ -78,7 +78,7 @@ export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number
   await db.batch([db.prepare('INSERT OR IGNORE INTO ai_news_articles(id,nation_id,title,body,created_at,model,facts_json) VALUES (?,?,?,?,?,?,?)').bind(id,facts.nationId,draft.title,newsDraftText(draft,facts),now,'@cf/meta/llama-3.2-3b-instruct',JSON.stringify(facts)),db.prepare("UPDATE ai_news_jobs SET status='published' WHERE id=?").bind(id),db.prepare("UPDATE harimu_ai_reservations SET status='finished' WHERE request_id=?").bind(reservation)]);
  }catch(error){if(!reached){await releaseAiReservation(db,reservation);await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code='not-sent' WHERE id=?").bind(id).run();return;}const code=error instanceof AiNewsFailure?error.code:'validation';await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code=? WHERE id=?").bind(code,id).run();
   // #141: an unresolved transport keeps the full reservation; a known rejection settles to the metered cost.
-  if(error instanceof AiNewsFailure)await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=?").bind(reservation).run();else await settleAiReservation(db,reservation,meteredAiCost(answered));}
+  if(error instanceof AiNewsFailure)await markAiReservationUncertain(db,reservation);else await settleAiReservation(db,reservation,meteredAiCost(answered));}
 }
 export async function readAiNews(db:GameDatabase,nationId:string):Promise<NewsItem[]>{
  const result=await db.prepare('SELECT id,title,body,created_at FROM ai_news_articles WHERE nation_id=? ORDER BY created_at DESC LIMIT 6').bind(nationId).all<{id:string;title:string;body:string;created_at:number}>();

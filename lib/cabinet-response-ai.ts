@@ -1,5 +1,5 @@
 import type {GameDatabase} from './database-contract';
-import {reserveAiCabinetSequence,markAiReservationSent,releaseAiReservation,settleAiReservation,meteredAiCost,aiGatewayOptions,type AiBudgetConfig,type AiModel,type AiMeteredCall} from './ai-budget';
+import {reserveAiCabinetSequence,markAiReservationSent,releaseAiReservation,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiGatewayOptions,type AiBudgetConfig,type AiModel,type AiMeteredCall} from './ai-budget';
 import {inferenceText,supportedNewsDraft,newsVerificationResponseFormat,type NewsAiBinding} from './ai-news';
 import {validPetitionText} from './collective-petitions';
 /** Issue #20: the mandatory public Cabinet response to a petition that reached 3%.
@@ -53,7 +53,7 @@ export async function prepareAiCabinetResponse(db:GameDatabase,now:number,bindin
   // #92: nothing reached the gateway, so nothing is charged. The petition is retried on a later run.
   if(!reached){await releaseAiReservation(db,reservation);return {status:'not-sent' as const,petitionId:p.id};}
   // #169 (#141 semantics): transport/timeout stays fully charged as 'uncertain'; a known rejection settles to the answered calls.
-  if(error&&typeof error==='object'&&'uncertain' in error&&error.uncertain)await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=?").bind(reservation).run();
+  if(error&&typeof error==='object'&&'uncertain' in error&&error.uncertain)await markAiReservationUncertain(db,reservation);
   else await settleAiReservation(db,reservation,meteredAiCost(answered));
   return {status:'failed' as const,petitionId:p.id};
  }

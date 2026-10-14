@@ -82,6 +82,9 @@ export function meteredAiCallCost(call:AiMeteredCall){
 }
 export function meteredAiCost(calls:readonly AiMeteredCall[]){return calls.reduce((sum,c)=>sum+meteredAiCallCost(c),0);}
 export async function settleAiReservation(db:GameDatabase,id:string,actualMicro:number){const micro=Math.max(1,Number.isSafeInteger(actualMicro)?actualMicro:Number.MAX_SAFE_INTEGER);await db.prepare("UPDATE harimu_ai_reservations SET status='finished',reserved_micro=CASE WHEN ?<reserved_micro THEN ? ELSE reserved_micro END WHERE request_id=? AND status IN ('pending','uncertain')").bind(micro,micro,id).run();}
+/** #169 follow-up (QA1 nit on #182): a transport/timeout failure keeps the full charge as 'uncertain', but only on an
+ * open row. A row another path already settled or finished is left untouched. Same SQL on SQLite and Postgres. */
+export async function markAiReservationUncertain(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status IN ('pending','uncertain')").bind(id).run();}
 export async function markAiReservationSent(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status='pending'").bind(id).run();}
 /** #92: ids of the removed preview acceptance ledger/prebook. Written by readiness, never sent through the gateway,
  * some already 'finished'/'uncertain'. Real ids are UUIDs, notable:<sha>: or cabinet:, so this never matches them. */
