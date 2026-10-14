@@ -36,3 +36,10 @@ export function matchOrder(incoming: { side: 'buy' | 'sell'; limitUnitMinor: num
   return fills;
 }
 
+
+/** A fill lands only if, inside the same transaction, both orders still have qty open and the prices still cross (#197). */
+export const tradeSql = `INSERT INTO market_trades (id, buy_order_id, sell_order_id, good, qty, unit_minor, filled_at)
+  SELECT ?, b.id, s.id, b.good, ?, ?, ? FROM market_open_orders b JOIN market_open_orders s ON s.good = b.good AND s.city_id = b.city_id
+  WHERE b.id = ? AND s.id = ? AND b.side = 'buy' AND s.side = 'sell' AND b.remaining >= ? AND s.remaining >= ?
+    AND b.limit_unit_minor >= ? AND s.limit_unit_minor <= ?
+    AND (b.citizen_id IS NULL OR s.citizen_id IS NULL OR b.citizen_id != s.citizen_id)`;

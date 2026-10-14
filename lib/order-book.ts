@@ -15,7 +15,7 @@ import { marketGoods, type MarketGood } from './market-orders';
  * Fixed-lot player listings (lib/player-market.ts) stay as they are while this API is behind
  * HARIMU_ORDER_BOOK_ENABLED (default off); #200's board replaces them, and they are retired then.
  */
-import { orderBookCityId, orderBookLimits, matchOrder, type OrderCommand, type OrderBookState, type RestingOrder } from './order-book-rules';
+import { orderBookCityId, orderBookLimits, matchOrder, tradeSql, type OrderCommand, type OrderBookState, type RestingOrder } from './order-book-rules';
 export * from './order-book-rules';
 export type BookLevel = { unitMinor: number; qty: number; npc: boolean };
 const receiptSql = `SELECT 'place' AS kind, id, citizen_id, side, good, qty, limit_unit_minor, NULL AS order_id FROM market_orders WHERE id = ?
@@ -30,11 +30,6 @@ export const placeBuySql = `${placeOrderBase}
     AND COALESCE((SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id = c.clerk_user_id), 0) >= ?`;
 export const placeSellSql = `${placeOrderBase}
     AND COALESCE((SELECT quantity FROM citizen_inventory_balances WHERE clerk_user_id = c.clerk_user_id AND item = ?), 0) >= ?`;
-export const tradeSql = `INSERT INTO market_trades (id, buy_order_id, sell_order_id, good, qty, unit_minor, filled_at)
-  SELECT ?, b.id, s.id, b.good, ?, ?, ? FROM market_open_orders b JOIN market_open_orders s ON s.good = b.good AND s.city_id = b.city_id
-  WHERE b.id = ? AND s.id = ? AND b.side = 'buy' AND s.side = 'sell' AND b.remaining >= ? AND s.remaining >= ?
-    AND b.limit_unit_minor >= ? AND s.limit_unit_minor <= ?
-    AND (b.citizen_id IS NULL OR s.citizen_id IS NULL OR b.citizen_id != s.citizen_id)`;
 export const cancelOrderSql = `INSERT INTO market_order_cancellations (request_id, order_id, cancelled_at)
   SELECT ?, o.id, ? FROM market_open_orders o WHERE o.id = ? AND o.citizen_id = ?
     AND NOT EXISTS (SELECT 1 FROM market_orders WHERE id = ?)`;

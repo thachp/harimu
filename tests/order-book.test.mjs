@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { tradeSql } from '../lib/order-book-rules.ts';
 import { matchOrder, validOrderCommand, orderBookLimits, orderBookGoods } from '../lib/order-book-rules.ts';
 import { marketGoods } from '../lib/market-orders.ts';
 
@@ -121,4 +122,22 @@ test(`#197 ${backend}: concurrent overspend and oversell attempts never double-s
   const sold = Number((await r.db.prepare("SELECT COALESCE(SUM(t.qty),0) AS n FROM market_trades t").first()).n);
   assert.equal(sold, 1);
   assert.equal((await wallet('alice')) + (await wallet('bob')), cash0, 'cash conserved');
+});
+
+test(`#197 ${backend}: fills are capped at remaining inside the transaction; a stale or racing fill cannot overfill`, async t => {
+  const { r, wallet, goods, place } = await market(t);
+  const bid = randomUUID(); await place('alice', 'buy', 3, 100, bid);
+  const ask = randomUUID(); await place('bob', 'sell', 2, 100, ask);
+  assert.equal(Number((await r.db.prepare('SELECT remaining FROM market_open_orders WHERE id=?').bind(bid).first()).remaining), 1);
+  // Replaying a stale fill plan (qty 2 against remaining 1) inserts nothing.
+  const other = randomUUID(); await place('bob', 'sell', 3, 200, other);
+  const stale = await r.db.batch([r.db.prepare(tradeSql).bind('stale', 2, 100, 1, bid, other, 2, 2, 100, 100)]);
+  assert.equal(stale[0].meta.changes, 0);
+  // Two sellers race for the last unit: exactly one fill lands.
+  const racers = await Promise.all([1, 2].map(() => place('bob', 'sell', 1, 50)));
+  assert.ok(racers.every(x => x.status === 200));
+  const filled = Number((await r.db.prepare('SELECT COALESCE(SUM(qty),0) AS n FROM market_trades WHERE buy_order_id=?').bind(bid).first()).n);
+  assert.equal(filled, 3, 'never more than the order quantity');
+  assert.equal(await r.db.prepare('SELECT id FROM market_open_orders WHERE id=?').bind(bid).first(), null);
+  assert.equal(await goods('alice'), 3); assert.ok(await wallet('alice') >= 0);
 });
