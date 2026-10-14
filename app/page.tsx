@@ -46,6 +46,7 @@ import { DailyLoop } from './daily-loop';
 import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
 import { GovernmentPanel } from './government-panel';
+import { AurelleRisingPanel } from './aurelle-rising';
 import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
 import { PlayerMarket } from './player-market';
 import { validPlayerCommand, type PlayerCommand, type PlayerMarketState } from '@/lib/player-market';
@@ -69,6 +70,7 @@ import { CityCoResidents } from './city-coresidents';
 import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { clerkConfigured } from './providers';
+import { describeKindlePay, withholdIncomeTax } from '@/lib/income-tax';
 
 type ViewMode = SceneView;
 type PlanHorizon = 'today' | 'week' | 'season';
@@ -878,7 +880,7 @@ export default function Home() {
             const item = eligible.rewardItem;
             const inventory = economy.inventory.filter((entry) => entry.item !== item);
             if (item) inventory.push({ item, quantity: (economy.inventory.find((entry) => entry.item === item)?.quantity ?? 0) + (eligible.rewardQuantity ?? 0) });
-            setEconomy({ ...economy, walletMinor: economy.walletMinor + (eligible.wageMinor ?? 0), inventory });
+            setEconomy({ ...economy, walletMinor: economy.walletMinor + withholdIncomeTax(eligible.wageMinor ?? 0, economy.incomeTaxPercent ?? 0).netMinor, inventory });
           }
           setWorkShifts((current) => current.map((shift) => shift.id === shiftId
             && !shift.claimedAt && Date.parse(shift.completesAt) <= Date.now()
@@ -1603,7 +1605,7 @@ export default function Home() {
         <section className="scene-work-orders"><h2>Available contributions</h2>
           {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <ActionButton key={order.id} type="button"
             reason={pendingActionReason(workPending, Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)) ?? firstActionReason([hasActiveShift, 'Finish and collect your active shift first.'], [capacity < order.cost, `You need ${order.cost} WC. Prepare a meal or wait for recovery.`])} onClick={() => void commitWork(order)}>
-            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></ActionButton>)}
+            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${describeKindlePay(rewards[order.id].wageMinor, economy?.incomeTaxPercent ?? 0)} + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></ActionButton>)}
         {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length === 0 && <p>No shifts are available for this nation yet. Kindle has the first supported work and wage programme; other national workplaces are planned.</p>}
         </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
       </>}
@@ -1620,6 +1622,7 @@ export default function Home() {
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={citizenSessionKey} onSnapshot={setElection}/>}
+        {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={citizenSessionKey}/>}
         {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={citizenSessionKey} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
         <p>{citizenNation.id==='kindle'&&clerkConfigured?'Kindle’s preview ballot status is shown above. Protests and broader public-opinion systems are planned.':'This location has no counted ballot. Protests and broader public-opinion systems are planned under each nation’s rules.'}</p>
       </>}
@@ -1671,7 +1674,7 @@ export default function Home() {
 
     {(!clerkConfigured || !citizenNationId) && <SceneNews events={worldEvents} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
-    <NationInstitutions nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
+    <NationInstitutions incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
@@ -1712,7 +1715,7 @@ export default function Home() {
     })) : viewMode === 'workplace' ? availableWorkOrders
       .filter(order => Boolean(citizenNation) && (!order.nationId || order.nationId === citizenNation?.id))
       .map(order => ({ id: order.id, label: order.name,
-        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${dockStatus(order)}`,
+        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${describeKindlePay(rewards[order.id].wageMinor, economy?.incomeTaxPercent ?? 0)} + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${dockStatus(order)}`,
       })) : viewMode === 'market' ? [
         ...(market?.quotes ?? []).map(quote => ({ id: quote.item, label: quote.label,
           detail: `Buy ${(quote.buyMinor / 100).toFixed(2)} · Sell ${(quote.sellMinor / 100).toFixed(2)} SPK · ${quote.stock} in stock`,

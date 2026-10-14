@@ -3,7 +3,10 @@ import { accountElectionDatabase } from './preview-election';
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
 import { runSpoilage } from './spoilage';
+import { runAurelleRising } from './aurelle-rising';
+import { runKorundPresidium } from './korund-presidium';
 import { runNpcSupply } from './npc-supply';
+import { holidayNationsOn } from './festivals';
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
 export const tickSeconds = 7200;
@@ -44,7 +47,7 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
   supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[] };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; korundPresidium?: boolean; faithFestivals?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
@@ -70,7 +73,7 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
     const missing = await db.prepare(`SELECT t.tick,t.scheduled_at FROM world_ticks t WHERE t.tick>(SELECT COALESCE(MAX(tick),0) FROM world_ticks)-?
       AND (SELECT COUNT(*) FROM nation_stability_scores s WHERE s.tick=t.tick)<${stabilityNations.length} ORDER BY t.tick`)
       .bind(maximumCatchupTicks+scoreRepairTicks).all<{tick:number;scheduled_at:number}>();
-    for (const row of missing.results) await db.batch(await stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now));
+    for (const row of missing.results) await db.batch(await stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}));
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
   // Market day, only while the order book is on (write paths only). Idempotent per tick:
   // #199 fruit and meat spoil first, then #198 NPC farm asks are posted for the current game day.
@@ -81,6 +84,10 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       await runNpcSupply(db, Number(current.tick), Number(current.scheduled_at), now, tickSeconds);
     }
   }
+  // #71: Aurelle Rising thresholds and Crisis Window resolution, only while HARIMU_AURELLE_RISING_ENABLED is on (write paths only).
+  if (options.aurelleRising) await runAurelleRising(db, now);
+  // #70: Korund emergency Presidium session and succession, only while HARIMU_KORUND_PRESIDIUM_ENABLED is on (write paths only).
+  if (options.korundPresidium) await runKorundPresidium(db, now);
   return readWorldSimulation(db, now);
 
 }

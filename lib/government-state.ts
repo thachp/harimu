@@ -1,3 +1,5 @@
+import { readCrown } from './aurelle-rising';
+import { readPresidium } from './korund-presidium';
 import type {GameDatabase} from './database-contract';
 import { simulateGovernment, rebaseGovernmentBudget } from './government';
 export const petitionSchema = `CREATE TABLE IF NOT EXISTS government_petitions (
@@ -43,6 +45,12 @@ export const petitionResolutionSql = `INSERT INTO government_petition_resolution
   WHERE p.nation_id=? AND p.period_start=?
   ON CONFLICT(request_id) DO NOTHING`;
 
+/** #86 (QA1): report only what spending allows. Policy spend is guarded by the kindle-employer fund alone, so the budget is
+ *  min(fund, cap); the kindle-treasury balance is not spendable yet and is not added. */
+export function spendableKindleBudget(fundMinor: number, capMinor: number): number {
+  return Math.max(0, Math.min(Number(fundMinor), Number(capMinor)));
+}
+
 export async function latchGovernmentReviews(db: GameDatabase, nationId: string, now: number) {
   await readGovernment(db, nationId, now);
 }
@@ -50,9 +58,9 @@ export async function latchGovernmentReviews(db: GameDatabase, nationId: string,
 type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;snapshot_json:string};
 /** Completed UTC days are reviewed once. By default this persists bounded, idempotent reviews (POST and world-tick paths).
  *  With readOnly (#205, GET /api/citizen) the same reviews are projected in memory and nothing is written. */
-export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean } = {}) {
+export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean } = {}) {
   const [budget, needs, days] = await Promise.all([
-    db.prepare("SELECT initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number }>(),
+    db.prepare("SELECT initial_minor AS cap, initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number; cap: number }>(),
     db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN CASE WHEN c.nation_id='korund' THEN COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=c.clerk_user_id),0) WHEN c.nation_id='aurelle' THEN COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=c.clerk_user_id),0) ELSE COALESCE(i.quantity,0) END >= 2 THEN 1 ELSE 0 END) AS supplied
       FROM citizens c LEFT JOIN citizen_inventory_balances i ON i.clerk_user_id=c.clerk_user_id AND i.item='food'
       WHERE c.nation_id=?`).bind(nationId).first<{ households: number; supplied: number }>(),
@@ -63,7 +71,7 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       ORDER BY p.period_start ASC LIMIT 30`)
       .bind(nationId, Math.floor(now/86400)*86400).all<{ period_start: number }>(),
   ]);
-  const inputs = { nationId, availableBudgetMinor: nationId === 'kindle' ? Math.max(0,budget?.balance ?? 0) : 0,
+  const inputs = { nationId, availableBudgetMinor: nationId === 'kindle' ? spendableKindleBudget(budget?.balance ?? 0, budget?.cap ?? 0) : 0,
     foodSecurity: needs?.households ? Math.floor(100*(needs.supplied ?? 0)/needs.households) : 100 };
   const projected = new Map<number, ReviewRow & { selected_topic: string }>();
   for (const day of days.results) {
@@ -123,6 +131,12 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       status:r.status ?? 'pending',reviewedAt:r.reviewed_at,
       reason:!r.eligibility_receipt ? 'Legacy prototype petition retained for your records; it has no Tier 1 receipt and is not counted in new reviews.' : r.snapshot_json ? `${r.status === 'accepted' ? 'Accepted as the reviewed policy priority.' : 'Deferred because another priority took precedence.'} ${JSON.parse(r.snapshot_json).decision.reason}`
         : 'Pending until the UTC day ends; the next government visit records the daily review.'}));
+  }
+  if (nationId === 'aurelle') { const crown = await readCrown(db); if (crown) snapshot.crown = crown; } // #71
+  if (nationId === 'korund' && options.korundPresidium) { // #70/#74 (flag off = no roster at all): roster derived from session records; never exposes the vote.
+    const p = await readPresidium(db);
+    snapshot.presidium = { chairman: { name: p.chairman.name }, seats: p.seats.map(s => ({ id: s.id, name: s.name, role: s.role, status: s.status })),
+      session: p.session && { status: p.session.status, openedAt: p.session.openedAt, resolvesAt: p.session.resolvesAt, resolvedAt: p.session.resolvedAt } };
   }
   return snapshot;
 }
