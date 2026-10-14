@@ -13,7 +13,7 @@ const {NotableRequest,notableFailureAcknowledged}=await import(`data:text/javasc
 test('lost response retries the original client intent and reserves only one full inference sequence',async t=>{
  const r=await localRuntime();t.after(()=>r.close());const session=new NotableRequest(),calls=[];
  const fake={async run(model,input){calls.push({model,input});return {response:[JSON.stringify({title:'Public record',summary:'The public ledger records settled work.',claims:['completedShifts']}),'supported','safe'][(calls.length-1)%3]};}};
- const options={enabled:true,priceReviewedUntil:Math.floor(r.now/1000)+3600};
+ const options={enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}};
  const first=session.begin('kindle-journalist','news');assert.ok(first);
  assert.equal((await r.answerNotable('alice',first.intent,fake,options)).status,200);
  // The server completed, but the transport discarded its response.

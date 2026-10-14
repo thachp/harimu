@@ -24,3 +24,9 @@ test('shared allowance prevents an unaffordable freeform request while retaining
  for(const state of [{question:'A public question',budget},{question:'',budget:{...budget,blocked:true}}]){const sent=[],tree=exports.NotablePanel({view:{...view,budget:state.budget},question:state.question,onRefresh(){},onSubmit:(...args)=>sent.push(args)});all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});assert.equal(sent.length,0);assert.match(renderToStaticMarkup(tree),/Shared AI allowance/);}
  const sent=[],tree=exports.NotablePanel({view:{...view,budget},question:'',onRefresh(){},onSubmit:(...args)=>sent.push(args)});all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});assert.deepEqual(sent,[['news',undefined]]);
 });
+
+test('session transcript labels every model reply as AI-generated and renders player text as plain text',()=>{
+ const turns=[{id:'a',ask:'<img src=x onerror=alert(1)>',reply:'Public ledgers record completed shifts.'}],html=renderToStaticMarkup(exports.NotablePanel({view,transcript:turns,onRefresh(){},onSubmit(){}}));
+ assert.match(html,/You asked:/);assert.match(html,/AI-generated response:<\/strong> Public ledgers/);assert.doesNotMatch(html,/<img/);assert.match(html,/not sent back to the Notable/);
+ assert.doesNotMatch(renderToStaticMarkup(exports.NotablePanel({view,onRefresh(){},onSubmit(){}})),/notable-transcript/);
+});

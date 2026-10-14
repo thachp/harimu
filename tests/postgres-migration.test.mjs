@@ -30,7 +30,7 @@ test('a PostgreSQL fixture preserves its snapshot and journal restores subsequen
  await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'").run();
  const queueId=randomUUID();assert.equal((await r.call('citizen','alice',{action:'korund-join-ration-queue',requestId:queueId})).status,200);
  assert.equal((await r.call('citizen','alice',{action:'korund-cancel-ration-queue',requestId:randomUUID(),queueId})).status,200);
- const budgetNow=Math.floor(Date.now()/1000);assert.equal(await reserveAiCall(r.db,randomUUID(),'@cf/meta/llama-3.2-3b-instruct',budgetNow,budgetNow+3600),true);
+ const budgetNow=Math.floor(Date.now()/1000);assert.equal(await reserveAiCall(r.db,randomUUID(),'@cf/meta/llama-3.2-3b-instruct',budgetNow,{dailyBudgetMicro:970000,gatewayId:'harimu-test'}),true);
  const target={...r.postgresSnapshot,data:{}};for(const table of r.postgresSnapshot.schema.filter(s=>s.type==='table'))target.data[table.name]=(await r.db.prepare(`SELECT * FROM ${identifier(table.name)}`).all()).results;
  const journal=(await r.db.prepare('SELECT id,statements_json FROM harimu_postgres_write_journal ORDER BY id').all()).results;assert.ok(journal.length);
  replayJournalSqlite(source,journal);replayJournalSqlite(source,journal);

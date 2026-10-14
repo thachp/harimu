@@ -1,0 +1,37 @@
+name: CI
+
+# Test-only workflow. There is intentionally NO deploy step and no Cloudflare
+# secrets here. Production deploys stay manual and are owned by the release owner.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # package.json engines: >=22.13.0
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12' # scripts/test-sql.py (stdlib + sqlite3 only)
+
+      - run: npm ci
+
+      # npm test + test:sql + lint + tsc --noEmit (SQLite storage; no Postgres needed)
+      - run: npm run check

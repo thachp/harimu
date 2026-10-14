@@ -1,5 +1,6 @@
 import {env} from 'cloudflare:workers';
 import {aiNewsEnabled,prepareAiNews,readAiNews,type NewsAiBinding} from '@/lib/ai-news';
+import {aiBudgetConfig} from '@/lib/ai-budget';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { readNationalNews } from '@/lib/national-news';
@@ -13,6 +14,6 @@ export async function GET(request:Request){
  if(!citizen?.nation_id)return privateJson({error:'Choose citizenship before reading national news.'},403);
  // Query parameters, inspected nation and body data cannot select a foreign edition.
  const news=await readNationalNews(db,citizen.nation_id,Date.now());
- if(news){const bindings=env as unknown as {AI?:NewsAiBinding;HARIMU_AI_NEWS_ENABLED?:string;HARIMU_AI_PRICE_REVIEWED_UNTIL?:string};await prepareAiNews(db,news,Math.floor(Date.now()/1000),bindings.AI,{enabled:aiNewsEnabled&&bindings.HARIMU_AI_NEWS_ENABLED==='true',priceReviewedUntil:Math.floor(Date.parse(bindings.HARIMU_AI_PRICE_REVIEWED_UNTIL??'')/1000)});news.items=[...await readAiNews(db,citizen.nation_id),...news.items].sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12);}
+ if(news){const bindings=env as unknown as {AI?:NewsAiBinding;HARIMU_AI_NEWS_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string};await prepareAiNews(db,news,Math.floor(Date.now()/1000),bindings.AI,{enabled:aiNewsEnabled&&bindings.HARIMU_AI_NEWS_ENABLED==='true',budget:aiBudgetConfig(bindings)});news.items=[...await readAiNews(db,citizen.nation_id),...news.items].sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12);}
  return news?privateJson(news):privateJson({error:'Your nation’s news edition is not built yet.'},404);
 }
