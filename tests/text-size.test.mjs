@@ -56,3 +56,18 @@ test('Settings has a labelled Text size select with 100/125/150% that saves with
   assert.match(settings, /save\(\{\.\.\.preferences,textScale:Number\(event\.target\.value\)/);
   assert.deepEqual(require('../lib/display-preferences.ts').textScales, [100, 125, 150]);
 });
+
+test('HUD, mobile top bar, resources, context strip and dock size to their content (no fixed heights win)', async () => {
+  const css = (await read('game-shell.css')).replace(/\s+/g, '');
+  // The last matching declaration wins; check the final rule block appended for #80.
+  const tail = css.slice(css.lastIndexOf('/*Textsize(#80'));
+  assert.match(tail, /\.game-hud\{height:auto;min-height:calc\(62px\*var\(--text-scale,1\)\)\}/);
+  const mobile = tail.slice(tail.indexOf('@media(max-width:760px)'));
+  for (const sel of ['game-hud', 'game-resources', 'game-context-strip']) assert.match(mobile, new RegExp(`\\.${sel}\\{height:auto;min-height:calc\\(`), sel);
+  assert.match(mobile, /\.harimu-game\{overflow-x:clip\}/, 'no horizontal page scroll on mobile');
+  assert.match(mobile, /\.game-dockbuttonspan\{overflow-wrap:anywhere/, 'dock labels wrap instead of overflowing');
+  for (const rows of css.match(/grid-template-rows:[^;}]*/g).filter(r => r.includes('260px') || r.includes('620px'))) {
+    assert.ok(rows.startsWith('grid-template-rows:autominmax(calc(40px*var(--text-scale,1)),auto)'), rows);
+    assert.doesNotMatch(rows, /\)\s*calc\(\d+px/, `${rows}: fixed context row`);
+  }
+});
