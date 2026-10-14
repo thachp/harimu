@@ -142,6 +142,16 @@ export function publicStability(row: StabilityRecord): PublicStability {
  return {nationId: row.nationId, tick: row.tick, scheduledAt: row.scheduledAt, kind: 'state-approved', approvedStability: korundApprovedStability,
   systemStats: {citizensApprox: roundCitizens(i.citizens), foodSupply: band(pct(Math.min(i.fed,i.citizens), i.citizens, 0)), workTurnout: band(pct(Math.min(i.worked,i.citizens), i.citizens, 0))}};
 }
+/** Hotfix for #95: true only when nation_stability_scores does not exist (migration 0012 not applied):
+ * Postgres SQLSTATE 42P01 (also as the adapter's "PostgreSQL operation failed (42P01)."), "relation … does not exist", or the SQLite/D1 equivalent "no such table". */
+export function isMissingStabilityTable(error: unknown): boolean {
+ const e = error as {code?: unknown; message?: unknown; cause?: unknown} | null;
+ if (!e || typeof e !== 'object') return false;
+ const message = typeof e.message === 'string' ? e.message : '';
+ if ((e.code === '42P01' || /relation "?nation_stability_scores"? does not exist/i.test(message) || /no such table: nation_stability_scores/i.test(message) || /PostgreSQL operation failed \(42P01\)/.test(message))) return true;
+ return e.cause !== undefined && e.cause !== error ? isMissingStabilityTable(e.cause) : false;
+}
 export async function readPublicStability(db: GameDatabase): Promise<PublicStability[]> {
- return (await Promise.all(stabilityNations.map(id => latestStability(db, id)))).filter((row): row is StabilityRecord => row !== null).map(publicStability);
+ try { return (await Promise.all(stabilityNations.map(id => latestStability(db, id)))).filter((row): row is StabilityRecord => row !== null).map(publicStability); }
+ catch (error) { if (isMissingStabilityTable(error)) return []; throw error; }
 }
