@@ -1,7 +1,8 @@
 /** #186 rendered HUD check: the world-clock TEXT (not its box) must never reach the Glossary link.
  *  Renders the real GameShell markup with the shipped CSS in headless Chromium and measures the clock text with a
  *  Range rect against the Glossary link at 1280x800 and 390x844 for text size 100/125/150%, for every clock label.
- *  Also asserts the HUD never runs into the dock and the page never scrolls sideways.
+ *  Also asserts the HUD never runs into the dock and the page never scrolls sideways, and (#229) at 390 and 360 wide that
+ *  no dock label breaks mid-word, spills out of its button, or makes the dock scroll sideways.
  *  Run: npm run test:layout   (CI installs Chromium for it; `npm test` stays browser-free). */
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -43,6 +44,8 @@ const variants = [
   { name: 'Loading world', props: { citizenNation: nation } },
   { name: 'Day 12 · 12×', props: { citizenNation: nation, worldClock: { gameDay: 12, latestTick: 140 } } },
   { name: 'Sample', props: { guestDemo: true } },
+  // Korund renames two dock places (State store, Assignment): the longest dock labels.
+  { name: 'Korund dock labels', props: { nation: { id: 'korund', name: 'Korund', capital: 'Stonehearth' }, citizenNation: { id: 'korund', name: 'Korund', capital: 'Stonehearth' } } },
 ];
 // Local-demo account controls, as page.tsx renders them (Brief button + demo label).
 const accountControls = React.createElement(React.Fragment, null,
@@ -67,10 +70,26 @@ try {
         const rects = [...range.getClientRects()].filter(x => x.width > 0); const text = { left: Math.min(...rects.map(x => x.left)), right: Math.max(...rects.map(x => x.right)), top: Math.min(...rects.map(x => x.top)), bottom: Math.max(...rects.map(x => x.bottom)) };
         const g = glossary.getBoundingClientRect(); const hud = document.querySelector('.game-hud').getBoundingClientRect(); const dock = document.querySelector('.game-dock').getBoundingClientRect();
         const vOverlap = text.top < g.bottom && g.top < text.bottom;
-        return { gap: Math.round((g.left - text.right) * 10) / 10, vOverlap, lines: new Set(rects.map(x => Math.round(x.top))).size, hudDock: Math.round(hud.bottom - dock.top), sw: document.scrollingElement.scrollWidth, cw: document.scrollingElement.clientWidth };
+        // #229 dock labels: no word may be split across lines, and the label text must stay inside its button.
+        const dockIssues = []; const dockEl = document.querySelector('.game-dock');
+        for (const btn of dockEl.querySelectorAll('button')) {
+          const span = btn.querySelector('span'); if (!span || !span.firstChild) continue;
+          const node = span.firstChild, text = node.textContent, b = btn.getBoundingClientRect();
+          for (const m of text.matchAll(/\S+/g)) {
+            const rg = document.createRange(); rg.setStart(node, m.index); rg.setEnd(node, m.index + m[0].length);
+            const tops = new Set([...rg.getClientRects()].filter(x => x.width > 0).map(x => Math.round(x.top)));
+            if (tops.size > 1) dockIssues.push(`"${m[0]}" breaks mid-word`);
+          }
+          const all = document.createRange(); all.selectNodeContents(span); const rs = [...all.getClientRects()].filter(x => x.width > 0);
+          if (rs.some(x => x.left < b.left - 0.5 || x.right > b.right + 0.5)) dockIssues.push(`"${text}" overflows its button`);
+        }
+        if (dockEl.scrollWidth > dockEl.clientWidth + 1) dockIssues.push(`dock scrolls sideways (${dockEl.scrollWidth} > ${dockEl.clientWidth})`);
+        const labels = [...dockEl.querySelectorAll('button span')].map(x => x.textContent).join('/');
+        return { dockIssues, labels, dockRows: new Set([...dockEl.querySelectorAll('button')].map(x => Math.round(x.getBoundingClientRect().top))).size, gap: Math.round((g.left - text.right) * 10) / 10, vOverlap, lines: new Set(rects.map(x => Math.round(x.top))).size, hudDock: Math.round(hud.bottom - dock.top), sw: document.scrollingElement.scrollWidth, cw: document.scrollingElement.clientWidth };
       });
       const id = `${w}x${h} @${scale * 100}% "${v.name}"`;
-      rows.push(`${id}: text→Glossary gap ${r.gap}px, ${r.lines} line(s), HUD-dock ${r.hudDock}px, page ${r.sw}/${r.cw}`);
+      rows.push(`${id}: text→Glossary gap ${r.gap}px, ${r.lines} line(s), HUD-dock ${r.hudDock}px, page ${r.sw}/${r.cw}, dock ${r.dockRows} row(s)${r.dockIssues.length ? ' ✗ ' + r.dockIssues.join('; ') : ' labels OK'}`);
+      if (w <= 390) for (const d of r.dockIssues) failures.push(`${id}: dock ${d}`);
       if (r.vOverlap && r.gap < 4) failures.push(`${id}: clock text is ${r.gap}px from Glossary (needs ≥4px)`);
       if (r.hudDock > 0) failures.push(`${id}: HUD runs ${r.hudDock}px into the dock`);
       if (r.sw > r.cw) failures.push(`${id}: page scrolls sideways (${r.sw} > ${r.cw})`);

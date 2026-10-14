@@ -39,7 +39,7 @@ import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { WalletPanel } from './wallet-panel';
 import { ShiftQualityStep } from './shift-quality-step';
-import { qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
+import { qualityWorkOrderId, harvestQuestions, type QualityInput, type QualityQuestion } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
@@ -545,7 +545,8 @@ export default function Home() {
   const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
-  const [qualityOrder, setQualityOrder] = useState<WorkOrder | null>(null);
+  // #252: the step for the next quality shift; ticket/questions come from the server (null ticket = local demo).
+  const [qualityOrder, setQualityOrder] = useState<{ order: WorkOrder; ticket: string | null; questions: readonly QualityQuestion[] } | null>(null);
   const [aurellePlan, setAurellePlan] = useState<AurellePlanView | null>(null);
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
   const aurelleIntent = useRef<AurelleCommand | null>(null);
@@ -1018,7 +1019,20 @@ export default function Home() {
   }
 
   // #40: the quality job opens the quality step first; WC is only spent when the player starts from it.
-  function commitWork(order: WorkOrder) { if (order.id === qualityWorkOrderId && rewards[order.id]) { setQualityOrder(order); return Promise.resolve(); } return runWork('commit-work', order); }
+  async function commitWork(order: WorkOrder) {
+    if (order.id !== qualityWorkOrderId || !rewards[order.id]) return runWork('commit-work', order);
+    if (!clerkConfigured) { setQualityOrder({ order, ticket: null, questions: harvestQuestions }); return; }
+    // #252: the server shuffles this shift's options and signs a ticket; the answer key never leaves the server.
+    // If the step is unavailable, the shift starts for the base reward exactly as before.
+    try {
+      const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'quality-ticket', workOrderId: order.id }) });
+      const result = await response.json() as { ticket?: unknown; questions?: unknown };
+      if (response.ok && typeof result.ticket === 'string' && Array.isArray(result.questions) && result.questions.length === harvestQuestions.length) {
+        setQualityOrder({ order, ticket: result.ticket, questions: result.questions as QualityQuestion[] }); return;
+      }
+    } catch { /* fall through to the base-reward start */ }
+    return runWork('commit-work', order);
+  }
 
   async function runKorundCommand(command: KorundCommand) {
     const confirmingKorundIntent=korundIntent.current?.requestId===command.requestId;
@@ -1730,8 +1744,10 @@ export default function Home() {
       accountControls={<>{citizenNation && !guestActive && <button id={MORNING_BRIEF_TRIGGER_ID} type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief" aria-haspopup="dialog" aria-expanded={morningBriefOpen} aria-controls={morningBriefOpen ? 'morning-brief' : undefined}><Newspaper size={17} aria-hidden="true" /><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
       {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
-      {qualityOrder && rewards[qualityOrder.id] && <ShiftQualityStep orderId={qualityOrder.id} orderName={qualityOrder.name} cost={qualityOrder.cost} base={rewards[qualityOrder.id]}
-        onCancel={() => setQualityOrder(null)} onStart={(quality) => { const order = qualityOrder; setQualityOrder(null); void runWork('commit-work', order, undefined, quality); }} />}
+      {qualityOrder && rewards[qualityOrder.order.id] && <ShiftQualityStep orderName={qualityOrder.order.name} cost={qualityOrder.order.cost} base={rewards[qualityOrder.order.id]} questions={qualityOrder.questions}
+        onCancel={() => setQualityOrder(null)} onStart={(choice) => { const { order, ticket } = qualityOrder; setQualityOrder(null);
+          const quality: QualityInput | undefined = 'skip' in choice ? choice : ticket ? { answers: choice.answers, ticket } : undefined;
+          void runWork('commit-work', order, undefined, quality); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}
