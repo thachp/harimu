@@ -14,7 +14,7 @@ export function validPetitionId(value:unknown):value is string{return typeof val
 const weeklyCountSql=`SELECT COUNT(*) AS count FROM civic_human_activity a JOIN citizens c ON c.clerk_user_id=a.clerk_user_id WHERE c.nation_id='kindle' AND a.policy='tier1-human-v1' AND a.last_seen>=? AND a.last_seen<=?`;
 /** Only call after fresh trusted Tier-1 evidence. AI/background actors never enter this ledger. */
 export async function recordVerifiedHumanVisit(db:GameDatabase,userId:string,now:number){
- await db.prepare(`INSERT INTO civic_human_activity (clerk_user_id,last_seen,policy) SELECT clerk_user_id,?,'tier1-human-v1' FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(clerk_user_id) DO UPDATE SET last_seen=MAX(civic_human_activity.last_seen,excluded.last_seen)`).bind(now,userId).run();
+ await db.prepare(`INSERT INTO civic_human_activity (clerk_user_id,last_seen,policy) SELECT clerk_user_id,?,'tier1-human-v1' FROM citizens WHERE clerk_user_id=? AND nation_id IN ('kindle','aurelle') ON CONFLICT(clerk_user_id) DO UPDATE SET last_seen=MAX(civic_human_activity.last_seen,excluded.last_seen)`).bind(now,userId).run();
 }
 export async function weeklyHumans(db:GameDatabase,now:number){return (await db.prepare(weeklyCountSql).bind(now-petitionWindowSeconds,now).first<{count:number}>())?.count??0;}
 export const createCollectivePetitionSql=`INSERT INTO civic_petitions (id,creator_id,nation_id,title,demand,created_at,expires_at,weekly_humans,threshold)
