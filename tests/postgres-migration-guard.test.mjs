@@ -108,3 +108,21 @@ test('deploy guard and migrate command are wired', async () => {
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
   assert.equal(pkg.scripts['db:postgres:migrate'], 'node scripts/apply-postgres-migrations.mjs');
 });
+test('preview workflow deploys only dev after CI, migrates first, secret names only', async () => {
+  const wf = await readFile('.github/workflows/deploy-preview.yml', 'utf8');
+  assert.match(wf, /workflow_run:[\s\S]*workflows: \[CI\][\s\S]*branches: \[dev\]/);
+  assert.match(wf, /conclusion == 'success'/);
+  assert.match(wf, /head_branch == 'dev'/);
+  assert.match(wf, /cancel-in-progress: true/);
+  for (const name of ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'PREVIEW_DATABASE_ADMIN_URL']) assert.match(wf, new RegExp(`secrets\\.${name}`));
+  assert.doesNotMatch(wf, /pull_request|postgres:\/\/|branches: \[main/);
+  assert.ok(wf.indexOf('db:postgres:migrate') < wf.indexOf('npm run deploy'));
+  // Deploy can never run if migrate failed or was skipped.
+  assert.doesNotMatch(wf, /continue-on-error|always\(\)|failure\(\)|cancelled\(\)|needs:/, 'no step can bypass a failed migrate');
+  assert.equal((wf.match(/^  [a-z-]+:\n    (if|runs-on):/gm) ?? []).length, 1, 'migrate and deploy share one job');
+  assert.match(wf, /id: migrate\n\s+env:[\s\S]*?run: npm run db:postgres:migrate\n/);
+  assert.doesNotMatch(wf.slice(wf.indexOf('id: migrate'), wf.indexOf('db:postgres:migrate')), /\bif:/, 'migrate step is unconditional');
+  const deployStep = wf.slice(wf.indexOf('- name: Deploy'));
+  assert.match(deployStep, /if: success\(\) && steps\.migrate\.outcome == 'success'/);
+  assert.match(await readFile('scripts/deploy-cloudflare.mjs', 'utf8'), /assertPostgresMigrationsApplied\(db\)[\s\S]*deployArgs\(false\)/);
+});

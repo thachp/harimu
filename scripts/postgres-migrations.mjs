@@ -149,10 +149,32 @@ export async function applyPostgresMigrations(db, migrations = postgresMigration
   } finally { await db.query('SELECT pg_advisory_unlock($1)', [lockKey]); }
 }
 
-/** node-postgres adapter (deploy machine / CI only). */
-export async function connectPostgres(connectionString) {
+export const connectTimeoutMs = 15000;
+/**
+ * Client config for node-postgres. pg-connection-string 2.14.x reads `sslrootcert=system` as a
+ * file path and crashes, so strip it (and sslmode, which would override our ssl option) and
+ * verify against the system CAs with `ssl: { rejectUnauthorized: true }` instead.
+ */
+export function postgresClientConfig(connectionString, timeoutMs = connectTimeoutMs) {
+  const config = { connectionString, connectionTimeoutMillis: timeoutMs };
+  let url;
+  try { url = new URL(connectionString); } catch { return config; }
+  if (url.searchParams.get('sslrootcert') === 'system') {
+    url.searchParams.delete('sslrootcert'); url.searchParams.delete('sslmode');
+    return { connectionString: url.toString(), connectionTimeoutMillis: timeoutMs, ssl: { rejectUnauthorized: true } };
+  }
+  return config;
+}
+const redact = connectionString => { try { const u = new URL(connectionString); return `${u.hostname}${u.port ? `:${u.port}` : ''}`; } catch { return 'the database'; } };
+/** node-postgres adapter (deploy machine / CI only). Fails within timeoutMs, never hangs. */
+export async function connectPostgres(connectionString, { timeoutMs = connectTimeoutMs } = {}) {
   const { Client } = await import('pg');
-  const client = new Client({ connectionString });
-  await client.connect();
+  const client = new Client(postgresClientConfig(connectionString, timeoutMs));
+  try { await client.connect(); }
+  catch (error) {
+    await client.end().catch(() => {});
+    const timedOut = /timeout/i.test(error?.message ?? '');
+    throw new Error(timedOut ? `Postgres connection to ${redact(connectionString)} timed out after ${timeoutMs} ms; nothing was migrated or deployed.` : `Postgres connection to ${redact(connectionString)} failed: ${error?.message ?? error}; nothing was migrated or deployed.`);
+  }
   return { query: (text, params) => client.query(text, params), exec: text => client.query(text), close: () => client.end() };
 }

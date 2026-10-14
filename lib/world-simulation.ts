@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
-import { stabilityStatements, readPublicStability, type PublicStability } from './stability';
+import { stabilityStatements, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
 export const tickSeconds = 7200;
 export const maximumCatchupTicks = 3;
@@ -49,13 +49,15 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
     const scheduledAt = epoch+tick*tickSeconds;
     // Catch-up evaluates current authoritative needs, not reconstructed historical households.
     const proposals = await Promise.all(['kindle','korund','aurelle'].map(id=>readGovernment(db,id,scheduledAt)));
-    const scores = await stabilityStatements(db,tick,scheduledAt,now);
     await db.batch([
       db.prepare('INSERT OR IGNORE INTO world_ticks (tick,scheduled_at,processed_at,proposals_json) VALUES (?,?,?,?)')
         .bind(tick,scheduledAt,now,JSON.stringify(proposals)),
       db.prepare(policyExecutionSql).bind(now,tick),
-      ...scores,
     ]);
+    // Hotfix for #95: scores are written in their own batch after the tick commits, so a missing
+    // nation_stability_scores table (migration 0012 not applied) can't abort the tick. Other errors still throw.
+    try { await db.batch(await stabilityStatements(db,tick,scheduledAt,now)); }
+    catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Tick', tick, 'recorded without scores.'); }
   }
   const [latest,execution,supply,stability] = await Promise.all([
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
