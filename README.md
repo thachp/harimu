@@ -300,3 +300,15 @@ Postgres (Hyperdrive) never bootstraps schema, so numbered `db/postgres/NNNN_*.s
 - Migrations must stay idempotent and additive. Any `DROP …`, `RENAME`, `TRUNCATE`, column type change or `DELETE FROM` (even with `WHERE`; over-broad on purpose) is rejected unless `-- harimu:destructive-reviewed` sits on its own line in the file's first 5 lines, after manual review. Editing an applied file fails; add a new one.
 - `npm run db:postgres:migrate -- --dry-run` lists what would run. It needs `PREVIEW_DATABASE_ADMIN_URL` (admin role with CREATE on `public`), never the app role.
 - `npm run deploy` refuses to upload when storage is Postgres and any migration is unrecorded, edited, or missing tables (needs `HARIMU_POSTGRES_URL` or `PREVIEW_DATABASE_ADMIN_URL`).
+
+## Preview auto-deploy (#128)
+
+`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** when CI succeeds on a push to `dev`. It never runs for `main` or for PRs, and only the newest commit deploys. It applies pending Postgres migrations first (any failure means no deploy), then runs `npm run deploy`, which uses the pinned wrangler with `--keep-vars` and the #119 guard. The commit SHA and the Cloudflare version ID go to the job summary. `workflow_dispatch` on `dev` can run the migration step alone. Production stays manual.
+
+Repository secrets (environment `preview`):
+
+| Secret | Purpose |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Account: Workers Scripts Edit, D1 Edit (for the schema check query), Account Settings Read. Zone: Workers Routes Edit, if preview uses routes. Scope it to the one account. |
+| `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account that owns harimu-preview. |
+| `PREVIEW_DATABASE_ADMIN_URL` | Postgres admin connection string for the preview database. |

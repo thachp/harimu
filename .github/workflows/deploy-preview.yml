@@ -1,0 +1,64 @@
+# #128: deploy harimu-preview after CI passes on a push to dev. Never main, never PRs.
+# Production stays manual (see CONTRIBUTING.md / README "Preview auto-deploy").
+# Uses repository secret NAMES only: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, PREVIEW_DATABASE_ADMIN_URL.
+name: Deploy preview
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      migrate_only:
+        description: Apply pending Postgres migrations to preview without deploying
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-preview
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'dev') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/dev')
+    runs-on: ubuntu-latest
+    environment: preview
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply pending Postgres migrations (fails closed)
+        env:
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+        run: npm run db:postgres:migrate
+      - name: Deploy with pinned wrangler (runs the #119 migration guard)
+        if: github.event_name == 'workflow_run' || !inputs.migrate_only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+        run: |
+          set -o pipefail
+          npm run deploy 2>&1 | tee deploy.log
+          version=$(grep -oE 'Current Version ID: [0-9a-f-]+' deploy.log | tail -1 | cut -d' ' -f4)
+          {
+            echo "### harimu-preview deployed"
+            echo "- Commit: \`$SHA\`"
+            echo "- Cloudflare version ID: \`${version:-unknown}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
