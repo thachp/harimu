@@ -38,7 +38,17 @@ To re-verify: check Workers AI pricing, update the amounts if needed, bump the v
 - **Stale pending expires.** A `pending` row (never marked sent) older than `aiPendingExpirySeconds` (1h) has no evidence of a gateway call:
   it stops counting immediately and is deleted on the next reservation.
 
-## Preview cleanup (PM step, #92)
+## Preview cleanup (#92): automatic, in-app
+Preview readiness used to insert hard-coded `acceptance:2026-10-14:*` rows (9 rows, 959,000 micro-USD on Oct 14 and
+Oct 15; most already `finished`) that never went through `harimu-preview`. After #92 deploys:
+- `readAiBudget` ignores any `acceptance:%` row immediately, so the budget readout is restored on the first read.
+- The next reservation (`expireStaleAiReservations`, run inside every `reserveBudget`) deletes them. It is idempotent and
+  is the same plain `DELETE` the app role already runs for over-cap rows, so no elevated privilege is needed.
+- Real rows (UUID / `notable:` / `cabinet:` ids) are untouched whatever their status, including sent/`uncertain` ones.
+- Rollout window: old isolates may re-insert rows for a minute or so after deploy; they are ignored on read and deleted
+  again on the next reservation. Keep AI flags off until `GET /api/notables` shows `budget.remainingMicroUsd` restored.
+
+### Optional manual fallback (only if the in-app release cannot run)
 Preview readiness used to insert hard-coded `acceptance:2026-10-14:*` rows (959,000 micro-USD on Oct 14 and Oct 15)
 that never went through `harimu-preview`. After deploying #92, PM runs, against the **preview** database only:
 
