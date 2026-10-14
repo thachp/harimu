@@ -17,6 +17,7 @@ Scores are deterministic rules over records the game already keeps. Exact weight
 - **Work:** how many citizens took a shift recently. Higher turnout raises Stability and lowers Unrest.
 - **Promise-keeping:** how often the government accepted, rather than deferred, reviewed petitions over the past week. No reviews is neutral.
 - **Petition backlog:** petitions still awaiting review, relative to population. A larger backlog lowers Stability and raises Unrest.
+- **Festival holiday (#291, only while `HARIMU_FAITH_ENABLED` is on):** on the game day of an endorsed festival (today Aurelle's Night of Names and Oath Day) the nation gets a small Stability bonus, and a work-turnout shortfall is not counted against it ("one fewer shift", GDD 14.4). The bonus size is an [ASSUMPTION]. The `festival` term appears in the breakdown only on those days.
 
 Each factor has a bounded contribution, so both scores always stay within 0–100 without clamping, and **the stored breakdown always sums exactly to the score**.
 
