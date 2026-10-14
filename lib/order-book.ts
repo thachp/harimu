@@ -40,7 +40,7 @@ const sameIntent = (r: Receipt | null, userId: string, c: OrderCommand) => !!r &
   : r.kind === 'cancel' && r.order_id === c.orderId);
 
 /** Match an open order against the book. Re-reads after each guarded batch so a concurrent change only shortens the fill. */
-async function matchOpen(db: GameDatabase, orderId: string, now: number) {
+export async function matchOpen(db: GameDatabase, orderId: string, now: number) {
   for (let round = 0; round < orderBookLimits.matchRounds; round++) {
     const me = await db.prepare('SELECT id, citizen_id, side, good, city_id, limit_unit_minor, remaining, created_at FROM market_open_orders WHERE id = ?').bind(orderId)
       .first<RestingOrder & { good: string; city_id: string }>();
