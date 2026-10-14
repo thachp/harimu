@@ -63,7 +63,7 @@ import {
 } from '@clerk/nextjs';
 import { MORNING_BRIEF_TRIGGER_ID, MorningBrief } from './morning-brief';
 import { Newspaper } from '@phosphor-icons/react';
-import { briefDayKey, claimDailyBrief, morningBriefSections } from '@/lib/morning-brief';
+import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHeadline } from '@/lib/morning-brief';
 import { CityCoResidents } from './city-coresidents';
 import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
@@ -1691,9 +1691,21 @@ export default function Home() {
       ] : [];
   const briefInventory = citizenNation?.id === 'aurelle' ? aurellePlan?.foodQuantity : citizenNation?.id === 'korund' ? korundPlan?.foodQuantity : economy ? goods('food') : undefined;
   const briefStorageKey = citizenNation ? `harimu:morning-brief:${citizenNation.id}` : null;
+  // #73: headlines come from the same /api/news edition as the News panel, fetched only while the brief is open.
+  const [briefHeadlines, setBriefHeadlines] = useState<{ nationId: string; items: MorningBriefHeadline[] } | null>(null);
+  useEffect(() => {
+    if (!morningBriefOpen || !citizenNationId || guestActive || !clerkConfigured || citizenSessionStatus !== 'ready') return;
+    const controller = new AbortController();
+    void fetch('/api/news', { cache: 'no-store', signal: controller.signal }).then(async response => {
+      const data = await response.json() as { nationId?: string; items?: MorningBriefHeadline[] };
+      if (response.ok && data.nationId === citizenNationId && Array.isArray(data.items)) setBriefHeadlines({ nationId: data.nationId, items: data.items.slice(0, 3).map(item => ({ id: item.id, title: item.title, source: item.source, kind: item.kind })) });
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [morningBriefOpen, citizenNationId, guestActive, citizenSessionStatus]); // clerkConfigured is a module-level constant (build-time env), so it is not a dependency.
   const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow,
     shift: activeShift ? { title: activeShift.orderName, endsAt: Date.parse(activeShift.completesAt) / 1000 } : null,
-    leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null }) : [];
+    leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null,
+    headlines: briefHeadlines?.nationId === citizenNationId ? briefHeadlines.items : [] }) : [];
   const closeMorningBrief = () => { setMorningBriefOpen(false); if (briefStorageKey) try { window.localStorage.setItem(briefStorageKey, briefDayKey(Date.now())); } catch {} };
   const contextTitle = citizenNation?.id === 'korund' && viewMode === 'market' ? 'State rations' : citizenNation?.id === 'korund' && viewMode === 'workplace' ? 'Assigned work' : viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
