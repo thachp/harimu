@@ -81,6 +81,33 @@ export async function serviceDays(db: GameDatabase, userId: string, faithId: str
 }
 export const devotionPerService = 2;
 
+/** #292: Devotion on each game day from the first gain to `today` (pure). Same rules as devotionFromEvents: +amount on a gain day, -1 on a day without one. */
+export function devotionSeries(events: { day: number; amount: number }[], today: number): Map<number, number> {
+  const byDay = new Map<number, number>(); let first = Infinity;
+  for (const e of events) if (e.day <= today) { byDay.set(e.day, (byDay.get(e.day) ?? 0) + e.amount); first = Math.min(first, e.day); }
+  const series = new Map<number, number>(); let devotion = 0;
+  for (let day = first; day <= today; day++) { const gain = byDay.get(day); devotion = gain ? Math.min(devotionMax, devotion + gain) : Math.max(0, devotion - devotionDecayPerGameDay); series.set(day, devotion); }
+  return series;
+}
+/** #292: consecutive game days, ending at `today`, on which a citizen's Devotion sat at the cap. */
+export function capStreak(series: Map<number, number>, today: number): number {
+  let streak = 0; for (let day = today; series.get(day) === devotionMax; day--) streak++; return streak;
+}
+/** #292: the dated Devotion gains for the citizen's current faith (worship, Officiant service, festival joins), the same inputs readFaith uses. */
+export async function devotionEvents(db: GameDatabase, userId: string): Promise<{ day: number; amount: number }[]> {
+  const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
+  const nationId = citizen?.nation_id ?? null;
+  if (!faithOptions(nationId ?? '').public.length) return [];
+  const row = await db.prepare('SELECT faith_id,chosen_at FROM citizen_faith WHERE user_id=? AND nation_id=?').bind(userId, nationId).first<{ faith_id: FaithChoice; chosen_at: number }>();
+  const faith = row?.faith_id ?? defaultFaith(nationId!);
+  if (faith === 'unaffiliated') return [];
+  const since = Number(row?.chosen_at ?? 0);
+  const days = (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, faith, since).all<{ game_day: number }>()).results.map(r => Number(r.game_day));
+  const service = await serviceDays(db, userId, faith, since);
+  const festivals = (await festivalJoins(db, userId)).filter(j => j.faith_id === faith && Number(j.joined_at) >= since).map(j => Number(j.game_day));
+  return [...days.map(day => ({ day, amount: devotionPerWorship })), ...service.map(day => ({ day, amount: devotionPerService })), ...festivals.map(day => ({ day, amount: devotionPerFestival }))];
+}
+
 type FaithRow = { faith_id: FaithChoice; hidden_faith_id: WorshipFaithId | null; chosen_at: number; changed_at: number | null; request_id: string };
 const label = (id: FaithChoice) => id === 'unaffiliated' ? unaffiliatedCopy.name : faithCopy[id].name;
 const fail = (status: 400 | 403 | 409 | 503, reason: string, error: string) => ({ ok: false as const, status, reason, error });
@@ -161,7 +188,8 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   // Guarded upsert: a concurrent change inside the cooldown cannot slip through. A first pick (no row, or Aurelle's recorded default) leaves changed_at NULL.
   // Leaving the Kinward Rite debits Royal Favor in the same transactional batch. The spend row is keyed by the request id (a retry cannot debit twice),
   // is only written while the balance covers it and the cooldown allows the change, and the faith change only lands if that spend row exists.
-  const cooldownGuard = 'WHERE citizen_faith.changed_at IS NULL OR citizen_faith.changed_at <= ?';
+  // #318: a concurrent replay of the same request id never rewrites the row, so it cannot stamp the cooldown on a free first pick.
+  const cooldownGuard = 'WHERE (citizen_faith.changed_at IS NULL OR citizen_faith.changed_at <= ?) AND citizen_faith.request_id <> excluded.request_id';
   const upsert = (guardSpend: boolean) => db.prepare(`INSERT INTO citizen_faith (user_id,nation_id,faith_id,hidden_faith_id,chosen_at,request_id)
     SELECT clerk_user_id,nation_id,?,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?${guardSpend ? ' AND EXISTS (SELECT 1 FROM aurelle_favor_spends WHERE request_id=? AND clerk_user_id=?)' : ''}
     ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,faith_id=excluded.faith_id,hidden_faith_id=excluded.hidden_faith_id,chosen_at=excluded.chosen_at,
@@ -193,7 +221,11 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
     }
   } else {
     saved = await upsert(false).run();
-    if (!saved.meta.changes) return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
+    if (!saved.meta.changes) {
+      const landed = await db.prepare('SELECT user_id FROM citizen_faith WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
+      if (landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) }; // a concurrent call with this id already did it
+      return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
+    }
   }
   return { ok: true as const, state: await readFaith(db, userId, now, enabled) };
 }

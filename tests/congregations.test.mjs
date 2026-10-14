@@ -122,3 +122,91 @@ test('congregations and clergy never touch wages, production, the market or comb
   for (const f of (await readdir(new URL('../lib/', import.meta.url))).filter(f => /^(economy|market|work|shift|order-book|wallet|npc|spoilage|world-registry|city-founding|korund|combat|war)/.test(f)))
     assert.doesNotMatch(await readFile(new URL(`../lib/${f}`, import.meta.url), 'utf8'), /congregation|officiant/i, f);
 });
+
+// #292: tie at the 100 Devotion cap. Worship rows are seeded per game day (offset from the start day) so members reach the cap on known days:
+// worshipping every day from day W gives 3, 6, ... so the cap is first reached on day W+33 and held after.
+async function capScenario(t, { worship, join, order }) {
+  const r = await runtime(t);
+  const start = r.now, day0 = Math.floor(start / gameDay);
+  const users = Object.keys(worship);
+  for (const u of users) if (u !== 'alice') await citizen(r, u, 'kindle', u);
+  for (const u of users) await faith(r, u, 'kinward-rite');
+  for (const d of [...new Set(Object.values(join))].sort()) {
+    r.setNow(start + d * gameDay);
+    for (const u of order.filter(x => join[x] === d)) assert.equal((await cmd(r, u, 'join-congregation')).status, 200);
+  }
+  for (const [u, [from, to]] of Object.entries(worship)) for (let d = from; d <= to; d++)
+    await r.db.prepare('INSERT INTO citizen_worship (user_id,game_day,faith_id,worshipped_at,request_id) VALUES (?,?,?,?,?)').bind(u, day0 + d, 'kinward-rite', start, randomUUID()).run();
+  const at = d => r.setNow(start + d * gameDay);
+  const stand = (u, d) => { at(d); return cmd(r, u, 'stand-for-officiant'); };
+  const holder = async d => { at(d); return kinwardForge(await panel(r)).officiant?.name; };
+  return { r, at, stand, holder, day0 };
+}
+
+test('Officiant cap tie: a challenger tied at the cap takes the seat on its 7th consecutive day at the cap, not the 6th', async t => {
+  // Alice is at the cap from day 33 and takes the seat on day 40. Bob starts on day 20, so he first sits at the cap on day 53 (streak 7 on day 59).
+  const s = await capScenario(t, { worship: { alice: [0, 80], 'cg-bob': [20, 100] }, join: { alice: 0, 'cg-bob': 0 }, order: ['alice', 'cg-bob'] });
+  assert.equal((await s.stand('alice', 40)).data.seated, true);
+  assert.equal((await s.stand('cg-bob', 40)).data.seated, false);
+  assert.equal((await s.stand('cg-bob', 58)).data.seated, false, '6 consecutive days at the cap is not enough');
+  assert.equal(await s.holder(58), 'Private alice');
+  assert.equal((await s.stand('cg-bob', 59)).data.seated, true, 'the 7th consecutive day at the cap takes the seat');
+  assert.equal(await s.holder(59), 'cg-bob');
+});
+
+test('Officiant cap tie: a holder with fewer than 7 game days in the seat keeps it', async t => {
+  const s = await capScenario(t, { worship: { alice: [0, 80], 'cg-bob': [0, 80] }, join: { alice: 0, 'cg-bob': 0 }, order: ['alice', 'cg-bob'] });
+  assert.equal((await s.stand('alice', 40)).data.seated, true);
+  assert.equal((await s.stand('cg-bob', 40)).data.seated, false, 'both are long at the cap, but the seat is new');
+  assert.equal((await s.stand('cg-bob', 46)).data.seated, false, 'holder has held it 6 game days');
+  assert.equal((await s.stand('cg-bob', 47)).data.seated, true, 'holder has held it 7 game days');
+});
+
+test('Officiant cap tie: a challenger who has not been at the cap 7 days waits, and a dip below the cap resets the streak', async t => {
+  // Bob sits at the cap on days 33-60, skips worship on day 61 (99 on day 61, ties no more), is back at the cap on day 62 (streak restarts at 1).
+  const s = await capScenario(t, { worship: { alice: [0, 100], 'cg-bob': [0, 60] }, join: { alice: 0, 'cg-bob': 0 }, order: ['alice', 'cg-bob'] });
+  assert.equal((await s.stand('alice', 20)).data.seated, true);
+  for (let d = 62; d <= 80; d++) await s.r.db.prepare('INSERT INTO citizen_worship (user_id,game_day,faith_id,worshipped_at,request_id) VALUES (?,?,?,?,?)').bind('cg-bob', s.day0 + d, 'kinward-rite', s.r.now, randomUUID()).run();
+  assert.equal((await s.stand('cg-bob', 20)).data.seated, false);
+  assert.equal((await s.stand('cg-bob', 61)).data.seated, false, 'Bob is at 99 on day 61, below the cap');
+  assert.equal(await s.holder(61), 'Private alice');
+  assert.equal((await s.stand('cg-bob', 67)).data.seated, false, 'streak since day 62 is 6 days');
+  assert.equal((await s.stand('cg-bob', 68)).data.seated, true, 'streak since day 62 is 7 days');
+});
+
+test('Officiant cap tie: several qualified challengers go to longest at the cap, then earliest join, then lowest id', async t => {
+  // Everybody opts in on day 30 (nobody at the cap yet except none), then nothing is written until day 60, when two challengers qualify at once.
+  const run = async (join, order, worship, expected, msg) => {
+    const s = await capScenario(t, { worship, join, order });
+    assert.equal((await s.stand('alice', 30)).data.seated, true);
+    for (const u of order.filter(x => x !== 'alice')) assert.equal((await s.stand(u, 30)).data.seated, false);
+    assert.equal(await s.holder(60), 'Private alice', 'GET never moves the seat');
+    await s.stand(order.at(-1), 60);
+    assert.equal(await s.holder(60), expected, msg);
+  };
+  // Cat has been at the cap longest (from day 43) although Bob joined first.
+  await run({ alice: 0, 'cg-bob': 0, 'cg-cat': 1 }, ['alice', 'cg-bob', 'cg-cat'], { alice: [0, 90], 'cg-bob': [20, 90], 'cg-cat': [10, 90] }, 'cg-cat', 'longest at cap wins over earlier join');
+  // Same streak: Cat joined on day 0 and Bob on day 1, so Cat wins although Bob has the lower id.
+  await run({ alice: 0, 'cg-cat': 0, 'cg-bob': 1 }, ['alice', 'cg-cat', 'cg-bob'], { alice: [0, 90], 'cg-bob': [10, 90], 'cg-cat': [10, 90] }, 'cg-cat', 'earliest join wins on equal streaks');
+  // Same streak, same join time: lowest id wins (Bob), whatever order they joined in.
+  await run({ alice: 0, 'cg-cat': 0, 'cg-bob': 0 }, ['alice', 'cg-cat', 'cg-bob'], { alice: [0, 90], 'cg-bob': [10, 90], 'cg-cat': [10, 90] }, 'cg-bob', 'lowest id wins on equal streak and join');
+});
+
+test('Officiant cap tie: GET stays read-only and the flag off changes nothing', async t => {
+  const s = await capScenario(t, { worship: { alice: [0, 80], 'cg-bob': [0, 80] }, join: { alice: 0, 'cg-bob': 0 }, order: ['alice', 'cg-bob'] });
+  await s.stand('alice', 30); await s.stand('cg-bob', 30);
+  s.at(60);
+  const writes = []; const prepare = s.r.db.prepare.bind(s.r.db), batch = s.r.db.batch.bind(s.r.db);
+  s.r.db.prepare = sql => { if (/^\s*(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER)\b/i.test(sql)) writes.push(sql.slice(0, 60)); return prepare(sql); };
+  s.r.db.batch = x => { writes.push('batch'); return batch(x); };
+  try { for (const u of ['alice', 'cg-bob', null]) assert.equal((await s.r.call('congregations', u)).status, 200); } finally { s.r.db.prepare = prepare; s.r.db.batch = batch; }
+  assert.deepEqual(writes, []);
+  assert.equal(kinwardForge(await panel(s.r)).officiant.name, 'Private alice');
+  s.r.setFaith(false);
+  const off = await cmd(s.r, 'cg-bob', 'stand-for-officiant');
+  assert.equal(off.data.reason, 'disabled');
+  const seat = await s.r.db.prepare('SELECT user_id FROM congregation_officiants').all();
+  assert.deepEqual(seat.results.map(x => x.user_id), ['alice']);
+  s.r.setFaith(true);
+  assert.equal((await cmd(s.r, 'cg-bob', 'stand-for-officiant')).data.seated, true, 'with the flag on again the tie takes the seat');
+});

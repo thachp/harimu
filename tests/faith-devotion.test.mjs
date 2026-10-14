@@ -189,6 +189,12 @@ test('Aurelle: the spend batch only maps a missing ledger table to an error; any
   r.db.batch = batch;
   assert.ok(res.status >= 500, JSON.stringify(res.data)); assert.notEqual(res.data.reason, 'insufficient_royal_favor'); assert.doesNotMatch(String(res.data.error), /You have/);
   assert.equal((await read(r, 'ava')).faith.id, 'kinward-rite'); assert.equal(await favorOf(r, 'ava'), 60); assert.deepEqual(await spends(r, 'ava'), []);
+  // A failing balance read is not "no spends yet": it must not fall back to the earned-only balance.
+  const prepare = r.db.prepare.bind(r.db);
+  r.db.prepare = sql => { if (/SELECT MAX\(0,MIN\(100/.test(sql)) throw new Error('disk I/O error'); return prepare(sql); };
+  let broken; try { broken = await choose(r, 'bo', 'open-hand'); } catch (error) { broken = { status: 500, data: {} }; }
+  r.db.prepare = prepare;
+  assert.ok(broken.status >= 500); assert.equal((await read(r, 'bo')).faith.id, 'kinward-rite');
   // The spend ledger table itself is missing (migration 0028 not applied; SQLite/D1 and Postgres word it differently): nothing changes and the reason names the ledger, not the balance.
   for (const message of ['no such table: aurelle_favor_spends', 'PostgreSQL operation failed (42P01): relation "aurelle_favor_spends" does not exist.']) {
     r.db.batch = () => { throw new Error(message); };
@@ -238,6 +244,38 @@ test('Aurelle: a leave that fails the cooldown guard never refunds or deletes an
   assert.equal(hid, true); assert.equal(res.status, 409, JSON.stringify(res.data));
   assert.deepEqual((await spends(r, 'ava')).map(x => x.request_id), [R], 'the earlier spend row survives');
   assert.equal(await favorOf(r, 'ava'), 50);
+});
+
+// #318: two simultaneous first-pick changes sharing one request id. The second call's request-id pre-checks ran before the first landed, so hide them once.
+async function replayRace(r, user, faithId, requestId) {
+  // The racing call read its checks before the first call landed: no prior request row, no spend row, and the pre-change faith row.
+  const prepare = r.db.prepare.bind(r.db); let hidden = 0; const seen = new Set(); // each stale read is hidden once; later re-reads see the truth
+  const stale = sql => /^\s*SELECT/.test(sql) && (/SELECT (user_id,faith_id,hidden_faith_id FROM citizen_faith|clerk_user_id FROM aurelle_favor_spends) WHERE request_id=\?/.test(sql) || /SELECT nation_id,faith_id,hidden_faith_id,changed_at FROM citizen_faith WHERE user_id=\?/.test(sql));
+  r.db.prepare = sql => { if (stale(sql) && !seen.has(sql)) { seen.add(sql); hidden++; return prepare('SELECT CAST(? AS TEXT) AS user_id WHERE 1=0'); } return prepare(sql); };
+  try { return { res: await choose(r, user, faithId, undefined, requestId), hidden }; } finally { r.db.prepare = prepare; }
+}
+test('a concurrent replay of a first-pick change never stamps the 60-day cooldown (Kindle)', async t => {
+  const r = await runtime(t);
+  const R = randomUUID();
+  assert.equal((await choose(r, 'alice', 'open-hand', undefined, R)).status, 200);
+  const { res, hidden } = await replayRace(r, 'alice', 'open-hand', R);
+  assert.ok(hidden >= 1); assert.equal(res.status, 200, JSON.stringify(res.data)); assert.equal(res.data.replay, true);
+  const after = await read(r, 'alice');
+  assert.equal(after.changeBlockedReason, null, 'the replay did not start a cooldown'); assert.equal(after.changeAvailableAt, null);
+  assert.equal((await choose(r, 'alice', 'fair-wind-vow')).status, 200, 'the next change is still free of cooldown');
+  assert.equal((await choose(r, 'alice', 'open-hand')).data.reason, 'cooldown', 'and only that change starts it');
+});
+
+test('a concurrent replay of a free first-pick leave (Aurelle) neither restamps the cooldown nor spends twice', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'ava', 'aurelle'); await giveFavor(r, 'ava', 30);
+  const R = randomUUID();
+  assert.equal((await choose(r, 'ava', 'open-hand', undefined, R)).status, 200);
+  const { res, hidden } = await replayRace(r, 'ava', 'open-hand', R);
+  assert.ok(hidden >= 3); assert.equal(res.status, 200, JSON.stringify(res.data)); assert.equal(res.data.replay, true);
+  assert.equal((await read(r, 'ava')).changeBlockedReason, null);
+  assert.equal(await favorOf(r, 'ava'), 50); assert.equal((await spends(r, 'ava')).length, 1);
+  assert.equal((await choose(r, 'ava', 'fair-wind-vow')).status, 200);
 });
 
 test('GET /api/faith makes no writes', async t => {
