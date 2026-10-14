@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS citizen_faith (
  faith_id TEXT NOT NULL CHECK(faith_id IN ('unaffiliated','kinward-rite','fair-wind-vow','open-hand')),
  hidden_faith_id TEXT CHECK(hidden_faith_id IS NULL OR (nation_id='korund' AND hidden_faith_id IN ('kinward-rite','fair-wind-vow','open-hand'))),
  chosen_at INTEGER NOT NULL,
+ changed_at INTEGER,
  request_id TEXT NOT NULL UNIQUE
 );
 CREATE TABLE IF NOT EXISTS citizen_worship (

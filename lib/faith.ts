@@ -28,6 +28,7 @@ export const faithSchemas = [
  faith_id TEXT NOT NULL CHECK(faith_id IN ('unaffiliated','kinward-rite','fair-wind-vow','open-hand')),
  hidden_faith_id TEXT CHECK(hidden_faith_id IS NULL OR (nation_id='korund' AND hidden_faith_id IN ('kinward-rite','fair-wind-vow','open-hand'))),
  chosen_at INTEGER NOT NULL,
+ changed_at INTEGER,
  request_id TEXT NOT NULL UNIQUE
 )`,
   `CREATE TABLE IF NOT EXISTS citizen_worship (
@@ -48,6 +49,9 @@ export function faithOptions(nationId: string): { public: FaithChoice[]; hidden:
   return { public: [], hidden: [] };
 }
 const defaultFaith = (nationId: string): FaithChoice => nationId === 'aurelle' ? 'kinward-rite' : 'unaffiliated';
+/** 14.2: leaving the Kinward Rite in Aurelle costs Royal Favor. Royal Favor is a derived total with no spend ledger yet, so leaving is blocked until that exists (follow-up #289). */
+export const kinwardLeaveBlockedReason = 'Leaving the Kinward Rite costs Royal Favor in Aurelle. Spending Royal Favor is not built yet, so this change is unavailable for now.';
+const leavesKinward = (nationId: string | null | undefined, from: string, to: string) => nationId === 'aurelle' && from === 'kinward-rite' && to !== 'kinward-rite';
 
 export const gameDayOf = (now: number) => Math.floor(now / gameDaySeconds);
 /** Devotion from a sorted list of worship game days, evaluated at `today` (pure). */
@@ -62,7 +66,7 @@ export function devotionFrom(days: number[], today: number) {
   return devotion;
 }
 
-type FaithRow = { faith_id: FaithChoice; hidden_faith_id: WorshipFaithId | null; chosen_at: number; request_id: string };
+type FaithRow = { faith_id: FaithChoice; hidden_faith_id: WorshipFaithId | null; chosen_at: number; changed_at: number | null; request_id: string };
 const label = (id: FaithChoice) => id === 'unaffiliated' ? unaffiliatedCopy.name : faithCopy[id].name;
 const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 
@@ -72,13 +76,14 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const nationId = citizen?.nation_id ?? null;
   const options = faithOptions(nationId ?? '');
   const supported = options.public.length > 0;
-  const row = supported ? await db.prepare('SELECT faith_id,hidden_faith_id,chosen_at,request_id FROM citizen_faith WHERE user_id=? AND nation_id=?').bind(userId, nationId).first<FaithRow>() : null;
+  const row = supported ? await db.prepare('SELECT faith_id,hidden_faith_id,chosen_at,changed_at,request_id FROM citizen_faith WHERE user_id=? AND nation_id=?').bind(userId, nationId).first<FaithRow>() : null;
   const faith = row?.faith_id ?? (supported ? defaultFaith(nationId!) : 'unaffiliated');
   const worshipFaith: WorshipFaithId | null = faith !== 'unaffiliated' ? faith : null; // Korund hidden faiths have no public worship in the PoC
   const today = gameDayOf(now);
   const days = worshipFaith ? (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, worshipFaith, row?.chosen_at ?? 0).all<{ game_day: number }>()).results.map(r => Number(r.game_day)) : [];
   const devotion = devotionFrom(days, today);
-  const changeAvailableAt = row ? Number(row.chosen_at) + faithChangeCooldownSeconds : null;
+  // A first pick (including Unaffiliated) is free and starts no cooldown; only a later change does (changed_at).
+  const changeAvailableAt = row?.changed_at != null ? Number(row.changed_at) + faithChangeCooldownSeconds : null;
   const changeBlockedReason = !enabled ? 'Faith is not open yet.' : changeAvailableAt !== null && now < changeAvailableAt
     ? `You can change faith once every 60 real days. Next change: ${new Date(changeAvailableAt * 1000).toISOString().slice(0, 10)}.` : null;
   const worshippedToday = days.includes(today);
@@ -92,6 +97,7 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
     devotion: { value: devotion, max: devotionMax, tier: worshipFaith ? devotionTier(devotion) : null, explanation: 'Devotion gives social standing only. It never changes wages, production, prices or combat.' },
     worship: worshipFaith ? { ...worshipCopy[worshipFaith], gameDay: today, worshippedToday, nextAt: worshippedToday ? (today + 1) * gameDaySeconds : null } : null,
     worshipBlockedReason, changeAvailableAt, changeBlockedReason,
+    leaveBlockedReason: leavesKinward(nationId, faith, 'unaffiliated') ? kinwardLeaveBlockedReason : null,
   };
 }
 
@@ -116,14 +122,17 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   if (!options.public.length) return fail(403, 'unsupported_nation', 'Faith choice is available in Kindle, Korund and Aurelle for now.');
   if (!options.public.includes(command.faithId as FaithChoice)) return fail(400, 'not_allowed', citizen?.nation_id === 'korund' ? 'In Korund the only public option is Unaffiliated.' : 'Your nation does not allow that faith.');
   if (command.hiddenFaithId !== null && !options.hidden.includes(command.hiddenFaithId as WorshipFaithId)) return fail(400, 'not_allowed', 'Only Korund citizens may hold a hidden faith.');
-  const current = await db.prepare('SELECT faith_id,hidden_faith_id,chosen_at FROM citizen_faith WHERE user_id=?').bind(userId).first<{ faith_id: string; hidden_faith_id: string | null; chosen_at: number }>();
-  if (current && current.faith_id === command.faithId && (current.hidden_faith_id ?? null) === command.hiddenFaithId) return fail(409, 'unchanged', 'That is already your faith.');
-  if (current && now < Number(current.chosen_at) + faithChangeCooldownSeconds) return fail(409, 'cooldown', `You can change faith once every 60 real days. Next change: ${new Date((Number(current.chosen_at) + faithChangeCooldownSeconds) * 1000).toISOString().slice(0, 10)}.`);
-  // Guarded upsert: a concurrent change inside the cooldown cannot slip through.
+  const current = await db.prepare('SELECT faith_id,hidden_faith_id,changed_at FROM citizen_faith WHERE user_id=?').bind(userId).first<{ faith_id: string; hidden_faith_id: string | null; changed_at: number | null }>();
+  const currentFaith = current?.faith_id ?? defaultFaith(citizen!.nation_id!);
+  if (current && currentFaith === command.faithId && (current?.hidden_faith_id ?? null) === command.hiddenFaithId) return fail(409, 'unchanged', 'That is already your faith.');
+  if (leavesKinward(citizen!.nation_id, currentFaith, command.faithId)) return fail(409, 'royal_favor_unavailable', kinwardLeaveBlockedReason);
+  if (current?.changed_at != null && now < Number(current.changed_at) + faithChangeCooldownSeconds) return fail(409, 'cooldown', `You can change faith once every 60 real days. Next change: ${new Date((Number(current.changed_at) + faithChangeCooldownSeconds) * 1000).toISOString().slice(0, 10)}.`);
+  // Guarded upsert: a concurrent change inside the cooldown cannot slip through. A first pick (no row, or Aurelle's recorded default) leaves changed_at NULL.
   const saved = await db.prepare(`INSERT INTO citizen_faith (user_id,nation_id,faith_id,hidden_faith_id,chosen_at,request_id)
     SELECT clerk_user_id,nation_id,?,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?
-    ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,faith_id=excluded.faith_id,hidden_faith_id=excluded.hidden_faith_id,chosen_at=excluded.chosen_at,request_id=excluded.request_id
-    WHERE citizen_faith.chosen_at <= ?`).bind(command.faithId, command.hiddenFaithId, now, command.requestId, userId, citizen!.nation_id, now - faithChangeCooldownSeconds).run();
+    ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,faith_id=excluded.faith_id,hidden_faith_id=excluded.hidden_faith_id,chosen_at=excluded.chosen_at,
+      changed_at=CASE WHEN citizen_faith.request_id LIKE 'default-%' THEN NULL ELSE excluded.chosen_at END,request_id=excluded.request_id
+    WHERE citizen_faith.changed_at IS NULL OR citizen_faith.changed_at <= ?`).bind(command.faithId, command.hiddenFaithId, now, command.requestId, userId, citizen!.nation_id, now - faithChangeCooldownSeconds).run();
   if (!saved.meta.changes) return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
   return { ok: true as const, state: await readFaith(db, userId, now, enabled) };
 }
