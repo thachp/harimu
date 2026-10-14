@@ -1,5 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import {leaderPersonas} from './leader-personas';
+import {currentChairmanName} from './korund-presidium';
 export const addressWeekSeconds=604800;
 export const addressSchemas=[
  `CREATE TABLE IF NOT EXISTS weekly_addresses (id TEXT PRIMARY KEY,nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),week INTEGER NOT NULL CHECK(week>=0),scheduled_at INTEGER NOT NULL,published_at INTEGER NOT NULL,leader_name TEXT NOT NULL,office TEXT NOT NULL,title TEXT NOT NULL,transcript TEXT NOT NULL,provenance TEXT NOT NULL CHECK(provenance='authored-poc'),UNIQUE(nation_id,week),CHECK(published_at>=scheduled_at))`,
@@ -19,7 +20,9 @@ export async function publishDueAddress(db:GameDatabase,userId:string,nationId:s
  const clock=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
  if(!clock||now<clock.epoch_seconds)return null;
  const week=Math.floor((now-clock.epoch_seconds)/addressWeekSeconds),scheduledAt=clock.epoch_seconds+week*addressWeekSeconds;
- const persona=leaderPersonas[nationId as keyof typeof scripts],script=scripts[nationId as keyof typeof scripts][week%2];
+ const authored=leaderPersonas[nationId as keyof typeof scripts],script=scripts[nationId as keyof typeof scripts][week%2];
+ // #70: Korund's address is given by the current Chairman (the Chosen Comrade after a purge).
+ const persona=nationId==='korund'?{...authored,name:await currentChairmanName(db)}:authored;
  // Publish only the current period, never fabricate missed historical broadcasts.
  await db.prepare(`INSERT OR IGNORE INTO weekly_addresses(id,nation_id,week,scheduled_at,published_at,leader_name,office,title,transcript,provenance)
  SELECT ?,?,?,?,?,?,?,?,?,'authored-poc' FROM citizens WHERE clerk_user_id=? AND nation_id=?`)

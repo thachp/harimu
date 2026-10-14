@@ -1,3 +1,4 @@
+import { readPresidium } from './korund-presidium';
 import type {GameDatabase} from './database-contract';
 import { simulateGovernment, rebaseGovernmentBudget } from './government';
 export const petitionSchema = `CREATE TABLE IF NOT EXISTS government_petitions (
@@ -123,6 +124,11 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       status:r.status ?? 'pending',reviewedAt:r.reviewed_at,
       reason:!r.eligibility_receipt ? 'Legacy prototype petition retained for your records; it has no Tier 1 receipt and is not counted in new reviews.' : r.snapshot_json ? `${r.status === 'accepted' ? 'Accepted as the reviewed policy priority.' : 'Deferred because another priority took precedence.'} ${JSON.parse(r.snapshot_json).decision.reason}`
         : 'Pending until the UTC day ends; the next government visit records the daily review.'}));
+  }
+  if (nationId === 'korund') { // #70/#74: roster derived from session records; never exposes the vote.
+    const p = await readPresidium(db);
+    snapshot.presidium = { chairman: { name: p.chairman.name }, seats: p.seats.map(s => ({ id: s.id, name: s.name, role: s.role, status: s.status })),
+      session: p.session && { status: p.session.status, openedAt: p.session.openedAt, resolvesAt: p.session.resolvesAt, resolvedAt: p.session.resolvedAt } };
   }
   return snapshot;
 }
