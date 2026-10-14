@@ -7,7 +7,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace('30000','5');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {prepareAiNews,publicNewsFacts,validatedNewsDraft,newsDraftText,aiNewsEnabled,inferenceText,supportedNewsDraft}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+const {prepareAiNews,publicNewsFacts,validatedNewsDraft,newsDraftText,aiNewsEnabled,inferenceText,supportedNewsDraft,validatedNewsIntroduction}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const model='@cf/meta/llama-3.2-3b-instruct';
 const now=Math.floor(Date.now()/1000),until=now+3600;
 const news={nationId:'kindle',title:'Kindle Press',style:'press',fetchedAt:now*1000,statistics:{citizens:2,completedShifts:3,food:12},items:[],privateDraft:'never transmit',accountId:'private'};
@@ -79,4 +79,12 @@ test('documented structured responses are accepted only for schema-mode drafts; 
 
 test('structured fact checking accepts only explicit support and refuses false or malformed decisions',()=>{
  assert.equal(supportedNewsDraft('{"supported":true}'),true);for(const raw of ['{"supported":false}','{"supported":"true"}','{"supported":true,"override":true}','safe','[true]','null'])assert.equal(Boolean(supportedNewsDraft(raw)),false);
+});
+
+test('captured heading-only news is not an explanatory introduction; supported sentences still require verification',()=>{
+ const captured={title:'National Status Report',summary:'National Ledger Facts',claims:['citizens','completedShifts','food']};assert.ok(validatedNewsDraft(captured));assert.equal(validatedNewsIntroduction(captured),null);assert.ok(validatedNewsIntroduction({...captured,summary:'The ledger records registered citizens and completed paid work.'}));
+});
+
+test('fulfilled malformed response is terminal failure, retains the full charge and does not create permanent uncertainty',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());await prepareAiNews(r.db,news,now,{async run(){return {response:42};}},{enabled:true,priceReviewedUntil:until});const row=await r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations').first();assert.equal(row.reserved_micro,72400);assert.equal(row.status,'finished');assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM ai_news_articles').first()).n,0);assert.equal(await reserveAiCall(r.db,randomUUID(),model,now+86400,now+90000),true);
 });

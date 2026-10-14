@@ -19,7 +19,16 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
  const news=await readNationalNews(db,citizen!.nation_id,now*1000);if(!news)return fail(503,'Public context is unavailable.');const facts=publicNewsFacts(news);
  if(!await reserveAiSequence(db,id,now,priceReviewedUntil,{ownerPrefix:prefix,dailyLimit:notableDailyLimit},command.question!==undefined))return fail(429,'The equal daily limit or shared inference budget is unavailable.');
  let uncertain=false,failureCode='validation';
- const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{let timer:ReturnType<typeof setTimeout>|undefined;try{if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error();return inferenceText(await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})}),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error()),30000);})]),Boolean(json));}catch(error){uncertain=true;failureCode=error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain';throw Error();}finally{if(timer!==undefined)clearTimeout(timer);}};
+ const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
+  if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error();
+  let timer:ReturnType<typeof setTimeout>|undefined;let result:unknown;
+  try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})}),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error()),30000);})]);}
+  catch(error){uncertain=true;failureCode=error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain';throw Error();}
+  finally{if(timer!==undefined)clearTimeout(timer);}
+  // A fulfilled provider call is terminal even when its content is invalid.
+  // Validation failure publishes nothing and never refunds the reservation.
+  return inferenceText(result,Boolean(json));
+ };
  try{
   const context={persona:profile.persona,topic:command.topic,question:command.question??notableTopics[command.topic].question,facts};
   if(command.question!==undefined){const inputSafe=await call('@cf/meta/llama-guard-3-8b',[{role:'user',content:command.question}]);if(inputSafe.trim()!=='safe')throw Error();}
