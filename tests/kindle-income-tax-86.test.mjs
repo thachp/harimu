@@ -65,18 +65,6 @@ test('non-Kindle citizens are not taxed; Korund settlements are unchanged', asyn
   const korund = await readFile(new URL('../lib/korund.ts', import.meta.url), 'utf8').catch(() => '');
   assert.ok(!/shift_income_tax|income-tax/.test(korund), 'Korund ledger never references the Kindle tax');
 });
-test('Kindle availableBudgetMinor includes the treasury balance', async t => {
-  const r = await taxed(t);
-  const government = await r.importModule('lib/government-state.ts');
-  const nowSec = () => Math.floor(Date.now() / 1000);
-  const shift = await finishShift(r, 'alice');
-  await r.call('citizen', 'alice', { action: 'claim-work', shiftId: shift.id });
-  const employer = (await r.db.prepare("SELECT initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first()).balance;
-  const snapshot = await government.readGovernment(r.db, 'kindle', nowSec(), undefined, { readOnly: true });
-  const inputs = snapshot.inputs ?? snapshot;
-  assert.equal(employer, 100000 - 800);
-  assert.equal(inputs.availableBudgetMinor, Math.min(employer + 120, 100000));
-});
 test('shift board and work menus show gross, tax and net from the same rounding', async () => {
   assert.equal(describeKindlePay(800, 0), '8.00 SPK', 'flag off: no tax line');
   assert.equal(describeKindlePay(800, 15), '8.00 SPK gross − 1.20 income tax (15%, set by the AI Assembly) = 6.80 SPK net');
@@ -103,15 +91,28 @@ test('flag on: the snapshot reports the 15% rate used for the gross/tax/net copy
   const r = await taxed(t);
   assert.equal((await r.call('citizen', 'alice')).data.economy.incomeTaxPercent, 15);
 });
-test('availableBudgetMinor = min(treasury + employer fund, employer-fund cap)', async t => {
+test('availableBudgetMinor equals what spending allows: min(employer fund, cap); the treasury is not added (QA1)', async t => {
   const r = await taxed(t);
   const g = await r.importModule('lib/government-state.ts');
-  assert.equal(g.spendableKindleBudget(99200, 120, 100000), 99320, 'below the cap: fund + treasury');
-  assert.equal(g.spendableKindleBudget(100000, 500, 100000), 100000, 'capped at the employer-fund cap');
-  assert.equal(g.spendableKindleBudget(-50, 300, 100000), 300, 'an overdrawn fund never counts negative');
-  assert.equal(g.spendableKindleBudget(0, 0, 100000), 0);
-  // Integration: a treasury larger than the drawdown is capped.
-  await r.db.prepare("UPDATE economy_funds SET initial_minor=50000 WHERE id='kindle-treasury'").run();
-  const snapshot = await g.readGovernment(r.db, 'kindle', Math.floor(Date.now() / 1000), undefined, { readOnly: true });
-  assert.equal((snapshot.inputs ?? snapshot).availableBudgetMinor, 100000);
+  assert.equal(g.spendableKindleBudget(100, 100000), 100, 'fund 100 (+ treasury 50) shows 100');
+  assert.equal(g.spendableKindleBudget(120000, 100000), 100000, 'never above the cap');
+  assert.equal(g.spendableKindleBudget(-50, 100000), 0, 'an overdrawn fund never counts negative');
+  // Integration: fund 100 plus treasury 50 shows 100, and the shown budget is exactly what the settlement guard will let out.
+  const shift = await finishShift(r, 'alice');
+  await r.call('citizen', 'alice', { action: 'claim-work', shiftId: shift.id }); // 800 wage, 120 tax into kindle-treasury
+  await r.db.prepare("UPDATE economy_funds SET initial_minor=900 WHERE id='kindle-employer'").run(); // fund now 900 - 800 = 100
+  await r.db.prepare('UPDATE shift_income_tax SET tax_minor=50').run(); // treasury now 50
+  assert.equal((await treasury(r)).balance, 50);
+  const read = async () => { const s = await g.readGovernment(r.db, 'kindle', Math.floor(Date.now() / 1000), undefined, { readOnly: true }); return (s.inputs ?? s).availableBudgetMinor; };
+  assert.equal(await read(), 100);
+  // What can actually be spent: a 100 wage settles, a further 1 does not.
+  const spend = async (wage, user) => { const id = `probe-${wage}-${Math.random()}`;
+    await r.db.prepare("INSERT INTO work_shifts (id, clerk_user_id, work_order_id, order_name, output, capacity_spent, started_at, completes_at) SELECT ?, ?, work_order_id, order_name, output, capacity_spent, started_at, completes_at FROM work_shifts LIMIT 1").bind(id, user).run();
+    await r.db.prepare('INSERT INTO shift_rewards (shift_id, wage_minor, item, quantity) VALUES (?,?,?,?)').bind(id, wage, 'food', 0).run();
+    const ec = await r.importModule('lib/economy.ts');
+    await r.db.prepare(ec.settleSql).bind(new Date().toISOString(), id, user, '9999').run();
+    return Boolean(await r.db.prepare('SELECT 1 AS ok FROM shift_settlements WHERE shift_id=?').bind(id).first()); };
+  assert.equal(await spend(101, 'bob'), false, 'more than the shown budget cannot be spent');
+  assert.equal(await spend(100, 'alice'), true, 'exactly the shown budget can be spent');
+  assert.equal(await read(), 0, 'and afterwards the budget shows 0 even though the treasury still holds 50');
 });
