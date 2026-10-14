@@ -131,3 +131,6 @@ html[data-harimu-motion="reduce"] *,html[data-harimu-motion="reduce"] *::before,
 .notable-conversation form { display: grid; gap: 10px; }
 .notable-conversation textarea { width: 100%; max-width: 100%; min-height: 96px; box-sizing: border-box; resize: vertical; }
 .notable-conversation form p { margin: 0; overflow-wrap: anywhere; }
+
+.notable-transcript{list-style:none;padding:0;margin:0.5rem 0;display:grid;gap:0.5rem;max-height:40vh;overflow-y:auto}
+.notable-transcript li{border-left:3px solid currentColor;padding-left:0.5rem;overflow-wrap:anywhere}
