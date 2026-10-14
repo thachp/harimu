@@ -43,3 +43,16 @@ test('ARC #274: at least 3 variants per answer; figures and outcomes unchanged',
   assert.match(key,/canonicalBest: readonly number\[\] = \[1, 1, 2\]/);
   assert.match(key,/multiplierPct: Record<QualityGrade, number> = \{ poor: 100, fair: 110, good: 125, excellent: 150 \}/);
 });
+import { shiftOptionOrder, shiftAnswerKey } from '../lib/shift-quality-key.ts';
+test('ARC #276: best option mean variant length within ~15% of the other two options', async () => {
+  const secret='test-secret-0123456789', shiftId='00000000-0000-4000-8000-000000000000';
+  const [order,key]=[await shiftOptionOrder(secret,shiftId,harvestQuestions),await shiftAnswerKey(secret,shiftId,harvestQuestions)];
+  const best=key.map((pos,qi)=>order[qi][pos]); // canonical index of the best option, from the server key
+  const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  harvestAnswerVariants.forEach((q,qi)=>{
+    const m=q.options.map(o=>mean(o.variants.map(v=>v.length)));
+    const others=mean(m.filter((_,i)=>i!==best[qi]));
+    const ratio=m[best[qi]]/others;
+    assert.ok(ratio>=0.85&&ratio<=1.15, `q${qi}: best ${m[best[qi]].toFixed(1)} vs others ${others.toFixed(1)} (ratio ${ratio.toFixed(2)})`);
+  });
+});
