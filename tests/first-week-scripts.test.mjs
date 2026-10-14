@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { firstWeekScripts, firstWeekScript, kindleFirstWeek, TUTORIAL_DAYS, TUTORIAL_TITLE_MAX, TUTORIAL_LINE_MAX, TUTORIAL_BRIEFING_MIN, TUTORIAL_BRIEFING_MAX, GUIDED_DAYS } from '../lib/first-week-scripts.ts';
+import { firstWeekScripts, firstWeekScript, kindleFirstWeek, aurelleFirstWeek, TUTORIAL_DAYS, TUTORIAL_TITLE_MAX, TUTORIAL_LINE_MAX, TUTORIAL_BRIEFING_MIN, TUTORIAL_BRIEFING_MAX, GUIDED_DAYS } from '../lib/first-week-scripts.ts';
 import { nationalServiceDays } from '../lib/varkand-national-service.ts';
 import { citizenNameLists } from '../lib/citizen-names.ts';
 
@@ -44,4 +44,11 @@ test('days 1-3 guided, days 4-7 optional tips', () => {
 test('fallback lines are within limits; Kindle day 3 uses the player market with a stall fallback', () => {
   for (const s of scripts) for (const x of s.days) if (x.fallback) assert.ok(x.fallback.length<=TUTORIAL_LINE_MAX, x.fallback);
   const d3=kindleFirstWeek.days[2]; assert.match(d3.objective,/player market/); assert.match(d3.briefing.join(' '),/order book/); assert.match(d3.fallback,/stall/);
+});
+test('Aurelle beats from the issue and canon; no noble house named, no claimant content', () => {
+  const text=aurelleFirstWeek.days.flatMap(x=>[...lines(x),x.fallback??'']).join(' ');
+  for (const t of [/oath/,/Royal Favor/,/Crown/,/Sky Throne/,/Kinward Rite/,/Highspire/,/Commoner/,/chartered market/,/court gazette/]) assert.match(text,t);
+  assert.match(text,/Monarch and the lords are AI/); assert.match(text,/no jurisdiction/);
+  assert.match(text,/debase/); assert.match(text,/lèse-majesté/); assert.match(text,/dissenters pay a levy/); assert.match(text,/Birth and favor/);
+  assert.doesNotMatch(text,/\bHouse of\b|of the \w+ House\b/); assert.doesNotMatch(text,/claimant|pretender|pledge|\bcoups?\b|usurp/i);
 });

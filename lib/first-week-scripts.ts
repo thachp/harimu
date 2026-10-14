@@ -1,4 +1,4 @@
-/** First-week tutorial scripts for the MVP nations (issue #227: Kindle; shape reused for #228 Korund and #230 Aurelle).
+/** First-week tutorial scripts for the MVP nations (issue #227: Kindle; #230: Aurelle; shape reused for #228 Korund).
  * Content only: no tutorial runner reads this yet. Same day shape as lib/varkand-national-service.ts (#112), so one
  * runner can play any nation. Complements lib/first-week.ts (goals and completion signals); this module is the
  * narration around them. Canon (harimu-docs): nation pages, citizens-daily-loops §11.2 shared core loop, work-capacity,
@@ -66,5 +66,43 @@ export const kindleFirstWeek:FirstWeekScript={nationId:'kindle',
    'First week done. The Republic is yours to argue with.'),
  ]};
 
-export const firstWeekScripts:Readonly<Partial<Record<TutorialNation,FirstWeekScript>>>={kindle:kindleFirstWeek};
+export const aurelleFirstWeek:FirstWeekScript={nationId:'aurelle',
+ voice:'Courtly and ordered: "Every thread in its place." Rank is spoken of openly, and so is its price.',
+ days:[
+  d(1,'An Oath at Highspire','Take the oath to the Crown and become a Commoner of Aurelle.',
+   ['Welcome to Highspire, beneath the Sky Throne. Aurelle asks an oath of those who join it.',
+    'The Monarch rules by royal decree, advised by the Privy Council. The Monarch and the lords are AI.',
+    'Nothing is due today, and missing a day costs you nothing.'],
+   'Oath taken. You are a Commoner of the realm.'),
+  d(2,'Service to Your Lord','Work one shift in service to your AI lord.',
+   ['Commoners serve a lord or tend an estate. Faithful service is noticed.',
+    'A shift costs Work Capacity. It refills once a day while you are away.'],
+   'Service done. Your lord has seen it.'),
+  d(3,'The Chartered Market','Buy or sell one good in a chartered market.',
+   ['Commoners trade in chartered markets. Guild charters grant the right to trade.',
+    'Coin is the Crown, gold-backed and stamped with the reigning Monarch.',
+    'The Monarch may debase the coin by decree. Then old full-weight Crowns trade at a premium.'],
+   'Trade done in Crowns. Mind the weight of your coin.',
+   'Nothing on offer in the market today? Return after your next shift.'),
+  d(4,'Reading the Gazette','Read the court gazette, then a tolerated broadsheet.',
+   ['The court gazette speaks for the Crown. Some broadsheets are tolerated beside it.',
+    'Criticizing the Monarch is lèse-majesté. Choose your words with care.'],
+   'Gazette read. You know what the court wishes known.'),
+  d(5,'Royal Favor','Learn how Royal Favor is earned and spent.',
+   ['Royal Favor is earned by service, gifts, victories, audiences and verse.',
+    'It is spent on petitions, ranks, estates and pardons. It fades if left untended.'],
+   'You know the coin of the court.'),
+  d(6,'The Kinward Rite','Visit a hall and see the Kinward name-stones.',
+   ['The Kinward Rite is the state church. The Monarch is Keeper of the Hearth.',
+    'Other faiths may worship privately. Commoner dissenters pay a levy set by decree.',
+    'On Hearth Night, the Rite blesses the houses of the realm.'],
+   'Hall visited. You have seen the stones of the great houses.'),
+  d(7,'Every Thread in Its Place','Look over your week and your standing.',
+   ['Your rank starts at Commoner. Freeholder, Knight and Baron are open to citizens, with estates but no jurisdiction.',
+    'Counts, Dukes, the Privy Council and the Monarch are AI. Birth and favor set much of who rises.',
+    'Rank brings honor and limits alike. Wear no higher than your rank.'],
+   'First week done. Your thread is in its place, for now.'),
+ ]};
+
+export const firstWeekScripts:Readonly<Partial<Record<TutorialNation,FirstWeekScript>>>={kindle:kindleFirstWeek,aurelle:aurelleFirstWeek};
 export function firstWeekScript(nationId:string){return (firstWeekScripts as Record<string,FirstWeekScript|undefined>)[nationId];}
