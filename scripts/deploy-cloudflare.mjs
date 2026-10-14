@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { assertDevelopmentConfig, readDevelopmentConfig } from './development-config.mjs';
 import { assertPostgresMigrationsApplied, connectPostgres } from './postgres-migrations.mjs';
+import { redactSecrets } from './redact.mjs';
 import { assertPinnedWrangler, deployArgs, isDryRun, withoutLegacyEnv } from './wrangler-pin.mjs';
 
 // #89: newer wrangler (e.g. 4.151) rejects `legacy_env` in the vinext-built config.
@@ -34,7 +35,11 @@ const schemaCheck = spawnSync('node_modules/.bin/wrangler', [
   'd1', 'execute', 'harimu-preview', '--remote', '--config', 'dist/server/wrangler.json', '--json',
   '--command', "SELECT COUNT(*) AS installed FROM sqlite_master WHERE type='table' AND name IN ('world_clock','world_ticks','world_supply','government_policy_executions','korund_resources','korund_work_starts','citizen_city_locations')",
 ], { encoding: 'utf8', env: { ...process.env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' } });
-if (schemaCheck.status !== 0) throw new Error('Preview D1 schema verification failed.');
+if (schemaCheck.status !== 0) {
+  // #163: show wrangler's own error (redacted) so a failed check is diagnosable.
+  console.error(redactSecrets(`wrangler exit ${schemaCheck.status ?? schemaCheck.signal}\n${schemaCheck.stderr ?? ''}\n${schemaCheck.stdout ?? ''}`).trim());
+  throw new Error('Preview D1 schema verification failed (wrangler output above).');
+}
 const schema = JSON.parse(schemaCheck.stdout);
 if (schema[0]?.results?.[0]?.installed !== 7) {
   throw new Error('Apply the existing Drizzle migrations to fresh preview D1 before deployment; see migration runbook.');

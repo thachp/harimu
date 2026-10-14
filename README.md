@@ -303,7 +303,7 @@ Postgres (Hyperdrive) never bootstraps schema, so numbered `db/postgres/NNNN_*.s
 
 ## Preview auto-deploy (#128)
 
-`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** when CI succeeds on a push to `dev`. It never runs for `main` or for PRs, and only the newest commit deploys. It applies pending Postgres migrations first (any failure means no deploy), then runs `npm run deploy`, which uses the pinned wrangler with `--keep-vars` and the #119 guard. The commit SHA and the Cloudflare version ID go to the job summary. `workflow_dispatch` on `dev` can run the migration step alone. Production stays manual.
+`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** when CI succeeds on a push to `dev`. It never runs for `main` or for PRs, and runs queue (never cancelled mid-migration) and only the newest pending commit deploys; only CI runs from this repository can trigger it. It applies pending Postgres migrations first (any failure means no deploy), then runs `npm run deploy`, which uses the pinned wrangler with `--keep-vars` and the #119 guard. The commit SHA and the Cloudflare version ID go to the job summary. `workflow_dispatch` on `dev` can run the migration step alone. Production stays manual.
 
 Repository secrets (environment `preview`):
 
