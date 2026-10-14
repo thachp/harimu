@@ -1,0 +1,99 @@
+{
+  "authorization": "Scoped terminal-failure correction approved in the delegated task; charges/windows preserved, no inference or successful acceptance asserted",
+  "entries": [
+    {
+      "ledgerId": "acceptance:2026-10-14:notable-1",
+      "fixtureCommandId": "79be2b40-46a2-4c7f-bac7-12d4fab6a260",
+      "originalStatus": "uncertain",
+      "newStatus": "finished",
+      "outcome": "known-failed-no-publication",
+      "reservedMicroUsd": 136400,
+      "utcDay": "2026-10-14",
+      "nextUtcDay": "2026-10-15",
+      "requestSha256": "7f8f3ceedae7930bd205ed19cb41b1b035385d035f62b4afc0461473e2f7ac4a",
+      "responseSha256": "b771711933e87cc227c05a6dc8c5d7553c9e760f1ba67fb495b5ba9bb9674841",
+      "evidenceDirectory": "/tmp/harimu-ai-live-acceptance-20261014",
+      "highestRequestedStage": 2,
+      "noDownstreamRequestFiles": true,
+      "terminalEvidence": {
+        "httpStatus": 200,
+        "finishReason": "stop",
+        "providerRequestId": "chatcmpl-55f1a6d8-af27-4eb4-93e5-c5ce52120df4",
+        "reportedUsage": {
+          "prompt_tokens": 223,
+          "completion_tokens": 199,
+          "total_tokens": 422,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "neurons": 7.095761299133301
+        },
+        "reason": "Completed generation rejected locally by the former string-only parser."
+      },
+      "recordedRequestedCalls": 2,
+      "stageRequestUtc": "2026-10-14T08:14:35.283232+00:00",
+      "terminalResponseCapturedUtc": "2026-10-14T08:14:53.217168+00:00",
+      "fixtureTerminatedUtc": "2026-10-14T08:14:53.279965+00:00"
+    },
+    {
+      "ledgerId": "acceptance:2026-10-14:notable-2",
+      "fixtureCommandId": "79be2b40-46a2-4c7f-bac7-12d4fab6a261",
+      "originalStatus": "uncertain",
+      "newStatus": "finished",
+      "outcome": "known-failed-no-publication",
+      "reservedMicroUsd": 136400,
+      "utcDay": "2026-10-14",
+      "nextUtcDay": "2026-10-15",
+      "requestSha256": "e422ce937ce884827a45a8d8fbb6a7ad4ef370f70da1d426e7c90ef69a4e0b55",
+      "responseSha256": "474ee3e70fb77fa906f5c1f17ae8ad8a7ae5e4aafa0b530554bcdfce674248c8",
+      "evidenceDirectory": "/tmp/harimu-ai-live-acceptance-20261014-second",
+      "highestRequestedStage": 2,
+      "noDownstreamRequestFiles": true,
+      "terminalEvidence": {
+        "source": "Exact original connected Cloudflare execute tool response, before bridge error normalization",
+        "providerTraceId": "bbcf73fb-be44-48f3-9637-2c280b6fc4a4",
+        "providerError": "Cloudflare API error: 8007: AiError: AiError: {\"error\":{\"message\":\"Grammar error: Unimplemented keys: [\\\"uniqueItems\\\"]\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}",
+        "connectorErrorCode": "INVALID_ARGUMENT",
+        "endpoint": "POST /accounts/{configured-preview-account}/ai/run/@cf/meta/llama-3.2-3b-instruct",
+        "reason": "Matched remote grammar rejection of the uniqueItems schema in the hashed request; not local fixture validation. No generation usage was returned; no zero-spend inference is made."
+      },
+      "recordedRequestedCalls": 2,
+      "stageRequestUtc": "2026-10-14T08:16:39.905031+00:00",
+      "terminalResponseCapturedUtc": "2026-10-14T08:17:06.631274+00:00",
+      "fixtureTerminatedUtc": "2026-10-14T08:17:06.710368+00:00"
+    },
+    {
+      "ledgerId": "acceptance:2026-10-14:notable-5",
+      "fixtureCommandId": "79be2b40-46a2-4c7f-bac7-12d4fab6a264",
+      "originalStatus": "uncertain",
+      "newStatus": "finished",
+      "outcome": "known-failed-no-publication",
+      "reservedMicroUsd": 136400,
+      "utcDay": "2026-10-14",
+      "nextUtcDay": "2026-10-15",
+      "requestSha256": "9888d1bacb5ee152fdbed5c78dc39177385b705bb5ab132b793bc250afbd8160",
+      "responseSha256": "8a3dedf99a794362dd106223616a1dbd38987d9800e03153d11cadf2d22683f4",
+      "evidenceDirectory": "/tmp/harimu-ai-live-acceptance-20261014-fifth",
+      "highestRequestedStage": 1,
+      "noDownstreamRequestFiles": true,
+      "terminalEvidence": {
+        "httpStatus": 200,
+        "response": "safe",
+        "reportedUsage": {
+          "prompt_tokens": 208,
+          "completion_tokens": 3,
+          "total_tokens": 211,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "neurons": 9.160823560478999
+        },
+        "reason": "Guard completed after the local timeout; stopped fixture issued no generation or later stage."
+      },
+      "recordedRequestedCalls": 1,
+      "stageRequestUtc": "2026-10-14T08:19:52.679543+00:00",
+      "terminalResponseCapturedUtc": "2026-10-14T08:20:24.850783+00:00",
+      "fixtureTerminatedUtc": "2026-10-14T08:20:22.688062+00:00"
+    }
+  ]
+}

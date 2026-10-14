@@ -56,3 +56,7 @@ The two successful Llama 3.2 3B calls reported 332 input tokens and 53 output to
 Next budget-eligible UTC time: there is **no finite automatic time** under the current ledger. Another complete news sequence cannot fit on October 14; October 15 still carries the full US$0.9590 and is also blocked by unresolved October 14 attempts. At 2026-10-16T00:00:00Z the monetary windows would clear, but those three uncertain attempts continue to block inference until legitimately reconciled. Price review also expires at 2026-10-15T08:06:58Z. Neither uncertainty nor charges were reset to gain allowance.
 
 Captured public-only request/response payloads and the fixture SQLite snapshot remain at `/tmp/harimu-one-news-20261014/`. The exact generation and verification responses are retained in the repository companion diagnostic below for offline work. No further paid attempt is authorized by this result.
+
+## Approved status-only correction
+
+The subsequent bounded authorization permits the three matched terminal failures (#1, #2, #5) to be recorded as known failed/finished, retaining their full charges and both monetary windows. Evidence and transition safeguards are in [AI_TERMINAL_RECONCILIATION.md](AI_TERMINAL_RECONCILIATION.md). The shared total remains US$0.9590 and remainder US$0.0110. No inference or feature activation occurs. With no other unknown request, monetary eligibility is 2026-10-16T00:00:00Z; price review and real-model acceptance still require separate review before any restart.

@@ -13,18 +13,32 @@ export const aiAcceptanceCharges=[
  {id:'acceptance:2026-10-14:moderation-probe',model:'@cf/meta/llama-guard-3-8b',cost:64000,startedAt:1791966223,status:'finished'},
 ] as const;
 const day='2026-10-14',next='2026-10-15';
+export const aiTerminalEvidenceSha256='4be4d4ac89ec1cf1d4c60ba22f5e89853d9e192c7ace6f2172bcad7e646b28d4';
+const terminalIds=new Set(['acceptance:2026-10-14:notable-1','acceptance:2026-10-14:notable-2','acceptance:2026-10-14:notable-5']);
 /** Preview-only accounting correction. Atomic/idempotent, with collision checks.
- * Never creates citizens, replays gameplay, refunds cost or resolves uncertainty.
+ * Never creates citizens, replays gameplay or refunds cost. Only the three
+ * explicitly approved terminal failures may transition, with journaled evidence.
  */
 export async function reconcileAiAcceptanceCharges(db:GameDatabase){
- const ids=aiAcceptanceCharges.map(c=>c.id),query='SELECT request_id,utc_day,next_utc_day,model,reserved_micro,status FROM harimu_ai_reservations WHERE request_id IN ('+ids.map(()=>'?').join(',')+')';
- type Row={request_id:string;utc_day:string;next_utc_day:string;model:string;reserved_micro:number;status:string};
+ const ids=aiAcceptanceCharges.map(c=>c.id),query='SELECT request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status FROM harimu_ai_reservations WHERE request_id IN ('+ids.map(()=>'?').join(',')+')';
+ type Row={request_id:string;utc_day:string;next_utc_day:string;model:string;reserved_micro:number;started_at:number;status:string};
  let rows=(await db.prepare(query).bind(...ids).all<Row>()).results;
  if(rows.length!==aiAcceptanceCharges.length){
   await db.batch(aiAcceptanceCharges.map(c=>db.prepare("INSERT OR IGNORE INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,?,?,?,?,?,?)").bind(c.id,day,next,c.model,c.cost,c.startedAt,c.status)));
   rows=(await db.prepare(query).bind(...ids).all<Row>()).results;
  }
- for(const c of aiAcceptanceCharges){const row=rows.find(r=>r.request_id===c.id);if(!row||row.utc_day!==day||row.next_utc_day!==next||row.model!==c.model||row.reserved_micro!==c.cost||row.status!==c.status)throw Error('AI acceptance accounting mismatch; inference must remain unavailable.');}
+ // Validate every immutable field before any corrective transition.
+ for(const c of aiAcceptanceCharges){const row=rows.find(r=>r.request_id===c.id);const statusValid=row&&(row.status===c.status||(terminalIds.has(c.id)&&row.status==='finished'));if(!row||row.utc_day!==day||row.next_utc_day!==next||row.model!==c.model||row.reserved_micro!==c.cost||row.started_at!==c.startedAt||!statusValid)throw Error('AI acceptance accounting mismatch; inference must remain unavailable.');}
+ const changes=aiAcceptanceCharges.filter(c=>terminalIds.has(c.id)&&rows.find(r=>r.request_id===c.id)?.status==='uncertain');
+ if(changes.length){
+  // The existing PostgreSQL adapter serializes this transaction and records the
+  // original SQL and bound evidence/timestamp in its protected rollback journal.
+  // Evidence equality is an explicit assertion; timestamp must follow the
+  // original attempt. Keep the existing uncommented SQL/journal format intact.
+  await db.batch(changes.map(c=>db.prepare(`UPDATE harimu_ai_reservations SET status='finished' WHERE request_id=? AND utc_day=? AND next_utc_day=? AND model=? AND reserved_micro=? AND started_at=? AND status='uncertain' AND ?=? AND ?>=started_at`).bind(c.id,day,next,c.model,c.cost,c.startedAt,`approved-known-failed evidence:docs/AI_TERMINAL_FAILURE_EVIDENCE.json sha256:${aiTerminalEvidenceSha256}`,`approved-known-failed evidence:docs/AI_TERMINAL_FAILURE_EVIDENCE.json sha256:${aiTerminalEvidenceSha256}`,Math.floor(Date.now()/1000))));
+  rows=(await db.prepare(query).bind(...ids).all<Row>()).results;
+ }
+ for(const c of aiAcceptanceCharges){const row=rows.find(r=>r.request_id===c.id);if(!row||row.utc_day!==day||row.next_utc_day!==next||row.model!==c.model||row.reserved_micro!==c.cost||row.started_at!==c.startedAt||row.status!==(terminalIds.has(c.id)?'finished':c.status))throw Error('AI terminal-failure reconciliation did not complete.');}
 }
 
 export const newsAcceptanceId='acceptance:2026-10-14:news-final';
