@@ -93,7 +93,7 @@ test('Korund payload cannot reconstruct the true score',()=>{
 test('Korund entries in /api/citizen and /api/world carry no true score fields at any depth',async t=>{
  const r=await localRuntime();t.after(()=>r.close());const epoch=(await r.call('world',null)).data.simulation.clock.epochSeconds;
  await r.call('citizen','alice');await r.db.prepare("UPDATE citizens SET nation_id='korund'").run();
- r.setNow((epoch+7200)*1000);const res=await r.call('citizen','alice');assert.equal(res.status,200);
+ r.setNow((epoch+7200)*1000);await r.call('world',null);/* #205: citizen GET no longer advances ticks */const res=await r.call('citizen','alice');assert.equal(res.status,200);
  const truth=await r.db.prepare("SELECT stability,unrest FROM nation_stability_scores WHERE nation_id='korund'").first();assert.ok(truth);
  const korund=res.data.simulation.stability.find(v=>v.nationId==='korund');assert.equal(korund.kind,'state-approved');
  for(const key of keysDeep(korund))assert.ok(!forbidden.includes(key),`Korund view leaks ${key}`);
