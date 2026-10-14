@@ -22,7 +22,7 @@ export function trustedVerificationProvider(): VerificationProvider | undefined 
 
 export async function readVerification(userId: string, provider = trustedVerificationProvider(), now = Date.now()): Promise<VerificationState> {
   const denied = (status: 'unavailable' | 'required', reason: string): VerificationState => ({ tier: 0, countedActionsEligible: false, status, reason });
-  if (!provider) return denied('unavailable', 'Phone verification is not available yet, so counted civic actions (petitions and voting) are unavailable. Work, trade, chat and private planning remain available.');
+  if (!provider) return denied('unavailable', 'Phone verification is not available yet, so actions requiring verified human eligibility are unavailable. Work, trade, chat and private planning remain available.');
   try {
     const evidence = await provider.read(userId);
     if (!evidence || evidence.userId !== userId || evidence.emailVerified !== true || evidence.phoneVerified !== true || evidence.phoneUnique !== true || evidence.revoked !== false ||
