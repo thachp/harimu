@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   if (!validOrderCommand(body)) return privateJson({ error: `Send a requestId (UUID) and either a buy/sell order for fruit, meat or wood with quantity 1–${orderBookLimits.maxQty} and an integer limit price 1–${orderBookLimits.maxUnitMinor} Spark cents, or an orderId to cancel.`, reason: 'bad_request' }, 400);
   const command = { ...body, requestId: body.requestId.toLowerCase(), ...('orderId' in body && typeof body.orderId === 'string' ? { orderId: body.orderId.toLowerCase() } : {}) } as typeof body;
   const db = await getDatabase();
-  await advanceWorld(db, undefined, { npcSupply: true }); // #198
+  await advanceWorld(db, undefined, { npcSupply: true, faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true' }); // #198
   const result = await executeOrderCommand(db, userId, command, Math.floor(Date.now() / 1000));
   return privateJson({ ...result, book: await readOrderBook(db, userId) }, result.status);
 }
