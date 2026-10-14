@@ -1,3 +1,4 @@
+import { travelBlock } from '@/lib/travel';
 import { env } from 'cloudflare:workers';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
@@ -22,6 +23,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
+  { // #123: location-bound while travelling (QA1 on #264); no-op unless HARIMU_TRAVEL_ENABLED=true.
+    const blocked = await travelBlock(await getDatabase(), userId, Math.floor(Date.now() / 1000), (env as unknown as { HARIMU_TRAVEL_ENABLED?: string }).HARIMU_TRAVEL_ENABLED === 'true');
+    if (blocked) return privateJson({ error: blocked, reason: 'traveling' }, 409);
+  }
   if (!isSameOriginCommand(request)) return privateJson({ error: 'Same-origin request required.' }, 403);
   if (!enabled()) return privateJson({ error: 'The city order book is not open yet.', reason: 'closed' }, 403);
   let body: Record<string, unknown>;
