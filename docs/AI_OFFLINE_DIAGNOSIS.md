@@ -1,5 +1,7 @@
 # Offline AI diagnosis — 2026-10-14
 
+> **Superseded by #92.** The `lib/ai-acceptance-charges.ts` ledger and its readiness reconciliation/prebook were removed: they wrote 959,000 micro-USD of reservations into preview that never went through the `harimu-preview` AI Gateway and blocked all AI. See docs/AI_BUDGET_GATEWAY.md › Preview cleanup.
+
 No new inference calls, refunds, deletions, historical status changes, access changes or model changes were made. Both services remain OFF. The shared ledger retains US$0.9590, including all three uncertain attempts.
 
 ## Captured news rejection

@@ -1,6 +1,4 @@
 import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
-import {reconcileAiAcceptanceCharges,prebookNewsAcceptance} from './ai-acceptance-charges';
-import {aiBudgetConfig} from './ai-budget';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
 import {korundCouponSchemas} from './korund-coupons';
@@ -64,7 +62,6 @@ let initialization: Promise<void> | undefined;
 // its own Hyperdrive connection (5+ connects before the route's own work), and
 // the preview AI accounting ran a writer-locked transaction per request. Verify
 // once per isolate and refresh the preview accounting at most once a minute.
-const aiAccountingRefreshMs=60_000;
 
 function databaseBinding() {
   const database = (env as unknown as { DB?: GameDatabase }).DB;
@@ -363,7 +360,7 @@ const postgresReady=isolateOnce(async(database:GameDatabase,bindings:PostgresBin
       if(schema?.count!==3){if(bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED!=='true')throw Error('Approved preview election migration required.');const {initializeAccountElectionSchema}=await import('./postgres/driver');await initializeAccountElectionSchema(bindings.HYPERDRIVE!.connectionString);}
     }
 });
-const postgresAccounting=isolateOnce(async(database:GameDatabase,bindings:PostgresBindings)=>{await reconcileAiAcceptanceCharges(database);await prebookNewsAcceptance(database,Math.floor(Date.now()/1000),aiBudgetConfig(bindings));},aiAccountingRefreshMs);
+// #92: readiness never writes AI reservations. Only a real, enabled, gateway-routed inference reserves budget.
 
 export async function getDatabase():Promise<GameDatabase> {
   const bindings=env as unknown as {HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
@@ -374,7 +371,6 @@ export async function getDatabase():Promise<GameDatabase> {
     const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved,accountElectionEnabled(bindings));
     const key=await readinessKey(bindings);
     await postgresReady(key,database,bindings);
-    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true')await postgresAccounting(key,database,bindings);
     return database;
   }
   const database = databaseBinding();

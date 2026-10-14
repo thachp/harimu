@@ -55,7 +55,7 @@ test('aborting during backoff stops waiting at once and clears the timer', async
 });
 test('wiring: db memoizes readiness, driver bounds connects, page retries the citizen GET', ()=>{
  const db=readFileSync(new URL('../lib/db.ts',import.meta.url),'utf8');
- assert.match(db,/const key=await readinessKey\(bindings\);\s*await postgresReady\(key,database,bindings\)/);assert.match(db,/crypto\.subtle\.digest\('SHA-256'/);assert.match(db,/aiBudgetConfig\(bindings\)\);\},aiAccountingRefreshMs\)/);assert.doesNotMatch(db,/PRICE_REVIEWED_UNTIL/);
+ assert.match(db,/const key=await readinessKey\(bindings\);\s*await postgresReady\(key,database,bindings\)/);assert.match(db,/crypto\.subtle\.digest\('SHA-256'/);assert.doesNotMatch(db,/reserveAi|prebookNewsAcceptance|reconcileAiAcceptanceCharges|harimu_ai_reservations/);assert.doesNotMatch(db,/PRICE_REVIEWED_UNTIL/);
  const driver=readFileSync(new URL('../lib/postgres/driver.ts',import.meta.url),'utf8');
  assert.match(driver,/connectWithRetry\(/);assert.match(driver,/connectBudgetMillis=3000/);assert.match(driver,/budgetMs:connectBudgetMillis/);
  const page=readFileSync(new URL('../app/page.tsx',import.meta.url),'utf8');
