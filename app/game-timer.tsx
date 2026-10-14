@@ -5,7 +5,8 @@ import {useDisplayTimestamp} from './display-preferences';
 import styles from './game-timer.module.css';
 
 /** Presentation only. Local countdown never grants rewards or changes authoritative deadlines. */
-export function GameTimer({endsAt,label='Remaining',compact=false,expiredText='Deadline reached · refresh to confirm.'}: {endsAt:string|number;label?:string;compact?:boolean;expiredText?:string}) {
+/** #137: `label` describes the running countdown; `readyLabel` (when given) replaces it only once the deadline has passed. */
+export function GameTimer({endsAt,label='Remaining',readyLabel,compact=false,expiredText='Deadline reached · refresh to confirm.'}: {endsAt:string|number;label?:string;readyLabel?:string;compact?:boolean;expiredText?:string}) {
   const formatTime=useDisplayTimestamp();
   const [now,setNow]=useState<number|null>(null);
   const [offline,setOffline]=useState(false);
@@ -20,9 +21,10 @@ export function GameTimer({endsAt,label='Remaining',compact=false,expiredText='D
   },[]);
   const value=gameTimerSnapshot(endsAt,now);
   const deadline=value.deadline === null ? null : new Date(value.deadline).toISOString();
+  const shown=value.status==='expired'&&readyLabel?readyLabel:label;
   return <span className={`${styles.timer} ${compact?styles.compact:''}`}>
-    <span role="timer" aria-live="off" aria-label={`${label}: ${value.real} real time; ${value.game} game time at 12 times speed`}>
-      <strong>{label}</strong> · {value.status==='loading' ? 'Checking clock…' : value.status==='invalid' ? 'Deadline unavailable' : <><span>{value.real} real</span><span> · {value.game} game</span></>}
+    <span role="timer" aria-live="off" aria-label={`${shown}: ${value.real} real time; ${value.game} game time at 12 times speed`}>
+      <strong>{shown}</strong> · {value.status==='loading' ? 'Checking clock…' : value.status==='invalid' ? 'Deadline unavailable' : <><span>{value.real} real</span><span> · {value.game} game</span></>}
     </span>
     {!compact && deadline && <small>Deadline: <time dateTime={deadline}>{formatTime(deadline)}</time></small>}
     {value.status==='expired' && <small role="status">{expiredText}</small>}

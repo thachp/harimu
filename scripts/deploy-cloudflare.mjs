@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { assertDevelopmentConfig, readDevelopmentConfig } from './development-config.mjs';
+import { assertPostgresMigrationsApplied, connectPostgres } from './postgres-migrations.mjs';
 import { assertPinnedWrangler, deployArgs, isDryRun, withoutLegacyEnv } from './wrangler-pin.mjs';
 
 // #89: newer wrangler (e.g. 4.151) rejects `legacy_env` in the vinext-built config.
@@ -37,6 +38,13 @@ if (schemaCheck.status !== 0) throw new Error('Preview D1 schema verification fa
 const schema = JSON.parse(schemaCheck.stdout);
 if (schema[0]?.results?.[0]?.installed !== 7) {
   throw new Error('Apply the existing Drizzle migrations to fresh preview D1 before deployment; see migration runbook.');
+}
+// #119: on Postgres the app never bootstraps schema; refuse to ship if any db/postgres migration is not applied.
+if ((process.env.HARIMU_STORAGE_BACKEND ?? config.vars?.HARIMU_STORAGE_BACKEND) === 'postgres') {
+  const url = process.env.HARIMU_POSTGRES_URL ?? process.env.PREVIEW_DATABASE_ADMIN_URL;
+  if (!url) throw new Error('HARIMU_STORAGE_BACKEND=postgres: set HARIMU_POSTGRES_URL (read access is enough) so deploy can verify Postgres migrations.');
+  const db = await connectPostgres(url);
+  try { await assertPostgresMigrationsApplied(db); } finally { await db.close(); }
 }
 const result = spawnSync('node_modules/.bin/wrangler', deployArgs(false), {
   stdio: 'inherit', env: { ...process.env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' },
