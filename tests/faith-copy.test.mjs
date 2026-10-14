@@ -5,7 +5,7 @@ import { faithCopy, unaffiliatedCopy, korundFaithCopy, FAITH_INVENTED_NOTE, FAIT
 const canon={ 'lumen-canon':['Lumen Canon',['Long Light','Clearing'],'Prism Spire'], 'kinward-rite':['Kinward Rite',['Night of Names','Oath Day'],'Hearth of First Names'],
   'the-round':['The Round',['Turning Days'],'The Old Ring'], 'fair-wind-vow':['Fair-Wind Vow',['Launching','Safe Return'],'Harbor of Vows'],
   'quiet-path':['The Quiet Path',['Still Week','Lantern of Attention'],'High Retreat'], 'open-hand':['The Open Hand',['Bread Day','Day of the Open Door'],'Bread Hall'] };
-const all=()=>[...Object.values(faithCopy).flatMap(f=>[f.name,f.archetype,f.tagline,f.description,...f.practices,...f.clergy,f.holySite,...f.festivals.flatMap(x=>[x.name,x.blurb])]),
+const all=()=>[...Object.values(faithCopy).flatMap(f=>[f.name,f.archetype,f.tagline,f.description,...f.practices.map(p=>p.text),...f.clergy,f.holySite,...f.festivals.flatMap(x=>[x.name,x.blurb])]),
   ...Object.values(unaffiliatedCopy),...Object.values(korundFaithCopy),FAITH_INVENTED_NOTE];
 const fold=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
@@ -14,12 +14,12 @@ test('all six faiths covered with canon names, festivals and holy sites', () => 
   for (const [id,[name,fests,site]] of Object.entries(canon)) { const f=faithCopy[id];
     assert.equal(f.id,id); assert.equal(f.name,name); assert.equal(f.proposal,false);
     assert.deepEqual(faithFestivals(id),fests); assert.ok(f.holySite.startsWith(site));
-    assert.ok(f.practices.length>=2 && f.clergy.length>=1);
+    assert.ok(f.practices.length>=2 && f.clergy.length>=1); for (const p of f.practices) assert.equal(p.proposal,true);
     for (const x of f.festivals) assert.equal(x.proposal,true, `${id} ${x.name} blurb is new wording`); }
 });
 test('length limits', () => {
   for (const f of Object.values(faithCopy)) { assert.ok(f.description.length<=FAITH_DESCRIPTION_MAX, f.id);
-    for (const s of [f.tagline,...f.practices,...f.festivals.map(x=>x.blurb)]) assert.ok(s.length<=FAITH_LINE_MAX, s); }
+    for (const s of [f.tagline,...f.practices.map(p=>p.text),...f.festivals.map(x=>x.blurb)]) assert.ok(s.length<=FAITH_LINE_MAX, s); }
 });
 test('no real-world religion names, titles or slurs', () => {
   const banned=['christ','jesus','bible','church','catholic','pope','islam','muslim','allah','quran','koran','mosque','imam','jew','juda','torah','rabbi','synagogue','hindu','vedic','buddh','dharma','nirvana','sikh','taoi','dao ','shinto','pagan','wicca','druid','mormon','zoroast','jain','baha','heathen','infidel','heretic','cult','kafir','gentile','saint','amen','hallelu','messiah','prophet'];
