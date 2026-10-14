@@ -54,7 +54,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
       {active ? (
         <div>
           <strong>{active.orderName}</strong>
-          {active.wageMinor !== undefined && <p>On completion: {describeKindlePay(active.wageMinor)} + {active.rewardQuantity} {active.rewardItem}{qualityText(active)}</p>}
+          {active.wageMinor !== undefined && <p>On completion: {describeKindlePay(active.wageMinor, economy?.incomeTaxPercent ?? 0)} + {active.rewardQuantity} {active.rewardItem}{qualityText(active)}</p>}
           {active.qualityPending && <p>Quality step recorded · your grade and reward are revealed when the shift completes.</p>}
           <p>Public contribution target: {active.output} · {active.capacitySpent} WC committed</p>
           <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>

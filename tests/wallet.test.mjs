@@ -21,21 +21,21 @@ test('every wage and market purchase appears in history and reconciles with the 
  const shift=(await r.call('citizen','alice')).data.shifts[0];r.setNow(Date.parse(shift.completesAt));
  const claimed=await r.call('citizen','alice',{action:'claim-work',shiftId:shift.id});assert.equal(claimed.status,200);
  assert.equal(claimed.data.economy.tesseraMinor,0);
- assert.deepEqual(claimed.data.economy.transactions.map(x=>[x.kind,x.amountMinor]),[['income-tax',-120],['wage',800]]);
- assert.match(claimed.data.economy.transactions[0].reason,/^Income tax · 15% withheld · /);assert.match(claimed.data.economy.transactions[1].reason,/^Wage · /);
+ assert.deepEqual(claimed.data.economy.transactions.map(x=>[x.kind,x.amountMinor]),[['wage',800]]);
+ assert.match(claimed.data.economy.transactions[0].reason,/^Wage · /);
  const sum=e=>e.transactions.reduce((a,x)=>a+x.amountMinor,0);
  assert.equal(sum(claimed.data.economy),claimed.data.economy.walletMinor,'balance after shift matches history');
  const bought=await r.call('citizen','alice',{action:'market-trade',requestId:randomUUID(),side:'buy',item:'food',quantity:1});assert.equal(bought.status,200,bought.data.error);
- const e=bought.data.economy;assert.equal(e.walletMinor,530);
+ const e=bought.data.economy;assert.equal(e.walletMinor,650);
  assert.equal(e.transactions[0].kind,'market-buy');assert.equal(e.transactions[0].amountMinor,-150);assert.equal(e.transactions[0].reason,'Market purchase · 1 food');
  assert.equal(sum(e),e.walletMinor,'balance after purchase matches history');
  assert.ok(e.transactions.every(x=>!Number.isNaN(Date.parse(x.occurredAt))));
- r.reopen();const read=(await r.call('citizen','alice')).data.economy;assert.deepEqual(read.transactions,e.transactions);assert.equal(read.walletMinor,530);
+ r.reopen();const read=(await r.call('citizen','alice')).data.economy;assert.deepEqual(read.transactions,e.transactions);assert.equal(read.walletMinor,650);
  // Food bought for a meal is a market purchase and must be listed; eating stored food moves no SPK and adds no row.
  await r.db.prepare('UPDATE citizens SET capacity=10 WHERE clerk_user_id=?').bind('alice').run();
  r.setNow(r.now+60000);const mealFood=await r.call('citizen','alice',{action:'market-trade',requestId:randomUUID(),side:'buy',item:'food',quantity:2});assert.equal(mealFood.status,200,mealFood.data.error);
  const meal=await r.call('citizen','alice',{action:'household-meal',requestId:randomUUID()});assert.equal(meal.status,200,meal.data.error);
- const m=meal.data.economy;assert.deepEqual(m.transactions.map(x=>[x.kind,x.amountMinor,x.reason]),[['market-buy',-300,'Market purchase · 2 food'],['market-buy',-150,'Market purchase · 1 food'],['income-tax',-120,m.transactions[2].reason],['wage',800,m.transactions[3].reason]]);
+ const m=meal.data.economy;assert.deepEqual(m.transactions.map(x=>[x.kind,x.amountMinor,x.reason]),[['market-buy',-300,'Market purchase · 2 food'],['market-buy',-150,'Market purchase · 1 food'],['wage',800,m.transactions[2].reason]]);
  assert.equal(sum(m),m.walletMinor,'balance after buying meal food and eating matches history');
 });
 

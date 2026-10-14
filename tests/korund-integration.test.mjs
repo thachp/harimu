@@ -119,7 +119,7 @@ test('previous Spark and goods stay separate from Labor Notes and ration food af
   r.setNow(Date.parse(shift.completesAt));
   assert.equal((await r.call('citizen','alice',{action:'claim-work',shiftId:shift.id})).status,200);
   const before=(await r.call('citizen','alice')).data.economy;
-  assert.equal(before.walletMinor,680); // #86: Kindle wage net of income tax
+  assert.equal(before.walletMinor,800);
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'").run();
   const moved=await r.call('citizen','alice');
   assert.deepEqual(moved.data.economy,before);assert.equal(moved.data.korundPlan.walletMinor,0);

@@ -8,10 +8,9 @@ import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
-import { kindleIncomeTaxPercent } from '@/lib/income-tax';
 import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
 import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket, shiftAnswerKey } from '@/lib/shift-quality-key';
-import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
+import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, incomeTaxPercentNow, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
 import {readCollectivePetitions,recordVerifiedHumanVisit} from '@/lib/collective-petitions';
@@ -565,12 +564,13 @@ async function handlePost(request: Request) {
     if (shift.completes_at > now) {
       return privateJson({ error: 'Your shift is still underway.' }, { status: 409 });
     }
+    const taxPercent = incomeTaxPercentNow();
     // One ledger transfer carries both wages and inventory; every write rolls back together.
     // Budget guard is in the insert itself, so concurrent settlements cannot overdraw the pool.
     await database.batch([
       database.prepare(settleSql).bind(now, shiftId, userId, now),
-      // #86: Kindle income tax is withheld from this settlement in the same transaction.
-      database.prepare(withholdIncomeTaxSql).bind(kindleIncomeTaxPercent, kindleIncomeTaxPercent, shiftId, userId, now),
+      // #86: Kindle income tax is withheld from this settlement in the same transaction (only while the flag is on).
+      ...(taxPercent > 0 ? [database.prepare(withholdIncomeTaxSql).bind(taxPercent, taxPercent, shiftId, userId, now)] : []),
       database.prepare(settledContributionSql)
         .bind(now, shiftId, userId, now),
       database.prepare(finishSettledShiftSql)

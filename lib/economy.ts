@@ -3,6 +3,10 @@ import { defaultRecoverySeconds } from './economy-rules';
 export { recoveryInterval } from './economy-rules';
 import { starterGrantSql } from './market';
 import { walletHistorySql, toTransactions, sortHistory, type WalletHistoryRow, type WalletTransaction } from './wallet';
+import { env } from 'cloudflare:workers';
+import { activeIncomeTaxPercent } from './income-tax';
+/** #86: the Kindle income tax rate in force (0 while the feature flag is off). */
+export const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 // Prototype tuning. Integer minor units: 100 cents = 1 Spark.
 export const employerBudgetMinor = 100000;
 export const maximumCapacity = 24;
@@ -25,6 +29,8 @@ export type Economy = {
   transactions?: WalletTransaction[];
   /** Tessera holdings from the World Registry ledger (#122): PoC starter grant minus square purchases. */
   tesseraMinor?: number;
+  /** #86: Kindle income tax rate withheld at settlement; 0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off. */
+  incomeTaxPercent?: number;
 };
 export const economySchema = `CREATE TABLE IF NOT EXISTS shift_settlements (
   shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id),
@@ -153,5 +159,5 @@ export async function readEconomy(db: GameDatabase, userId: string, interval: nu
     recoveredAt = (await readCapacityProjection(db, userId, now, interval))?.recoveredAt ?? recoveredAt;
   }
   return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: await readTesseraBalance(db, userId), transactions: toTransactions(history),
-    inventory, nextRecoveryAt: new Date((recoveredAt + interval) * 1000).toISOString() };
+    inventory, nextRecoveryAt: new Date((recoveredAt + interval) * 1000).toISOString(), incomeTaxPercent: incomeTaxPercentNow() };
 }

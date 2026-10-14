@@ -60,8 +60,6 @@ test('meal and player trade latch through their real routes (seller included)', 
 
 test('square, ballot, freight shift and Korund queue/coupons latch in their own arc day only', async t => {
   const { r, at, sec } = await setup(t);
-  // #86: this arc budgets many 1-food buys against the untaxed wage; income tax is covered in kindle-income-tax-86.
-  await r.db.prepare('UPDATE shift_income_tax SET tax_minor=0').run();
   const kindle = [
     ['kindle-3-square', 3, s => r.db.prepare('INSERT INTO square_messages(id,user_id,nation_id,body,posted_at) VALUES (?,?,?,?,?)').bind(randomUUID(), 'alice', 'kindle', 'hi', s).run()],
     ['kindle-6-shift', 6, s => r.db.prepare("UPDATE work_shifts SET claimed_at=? WHERE id=(SELECT id FROM work_shifts WHERE clerk_user_id='alice' LIMIT 1)").bind(new Date(s * 1000).toISOString()).run()],

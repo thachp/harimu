@@ -22,9 +22,16 @@ export function withholdIncomeTax(grossMinor: number, percent = kindleIncomeTaxP
   return { grossMinor: gross, taxMinor, netMinor: gross - taxMinor, percent: clampIncomeTaxPercent(percent) };
 }
 
-/** Shift board / wallet copy: gross, tax and net side by side, from the same rounding as settlement. */
-export function describeKindlePay(grossMinor: number, percent = kindleIncomeTaxPercent): string {
-  const pay = withholdIncomeTax(grossMinor, percent);
+/** Feature flag HARIMU_KINDLE_INCOME_TAX_ENABLED (ships "false"). Off: nothing is withheld and no tax lines are shown. */
+export function activeIncomeTaxPercent(flag: unknown): number {
+  return flag === 'true' ? kindleIncomeTaxPercent : 0;
+}
+
+/** Shift board / wallet copy: gross, tax and net side by side, from the same rounding as settlement.
+ *  With the tax off (percent 0) it is just the wage. */
+export function describeKindlePay(grossMinor: number, percent: number): string {
   const spk = (minor: number) => (minor / 100).toFixed(2);
+  if (!(percent > 0)) return `${spk(Math.max(0, Math.floor(grossMinor)))} SPK`;
+  const pay = withholdIncomeTax(grossMinor, percent);
   return `${spk(pay.grossMinor)} SPK gross − ${spk(pay.taxMinor)} income tax (${pay.percent}%, ${incomeTaxRateSource}) = ${spk(pay.netMinor)} SPK net`;
 }

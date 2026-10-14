@@ -27,7 +27,7 @@ test(`#196 ${backend}: each raw-goods job credits its good once; retried claims 
     const again = await r.call('citizen', 'alice', { action: 'claim-work', shiftId: shift.id });
     assert.notEqual(again.status, 500);
     assert.equal(await goods(r, 'alice', item), before.good + qty, `${item} credited once`);
-    assert.equal(await wallet(r, 'alice'), before.cash + wage - Math.floor(wage * 15 / 100)); // #86: net of Kindle income tax
+    assert.equal(await wallet(r, 'alice'), before.cash + wage);
     assert.equal(await goods(r, 'alice', 'food'), before.food, 'fruit/meat are not meal food (#195)');
     assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM shift_settlements WHERE shift_id=?').bind(shift.id).first()).n), 1);
   }

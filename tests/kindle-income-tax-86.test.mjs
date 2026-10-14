@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { clampIncomeTaxPercent, withholdIncomeTax, describeKindlePay, kindleIncomeTaxPercent } from '../lib/income-tax.ts';
+import { clampIncomeTaxPercent, withholdIncomeTax, describeKindlePay, kindleIncomeTaxPercent, activeIncomeTaxPercent } from '../lib/income-tax.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
 
 // Issue #86: Kindle income tax is withheld at settlement into the kindle-treasury fund.
 const treasury = r => r.db.prepare("SELECT COALESCE((SELECT initial_minor FROM economy_funds WHERE id='kindle-treasury'),0) + COALESCE((SELECT SUM(tax_minor) FROM shift_income_tax),0) AS balance").first();
+// The tax ships behind HARIMU_KINDLE_INCOME_TAX_ENABLED (off). These runtimes turn it on unless noted.
+async function taxed(t, on = true) { const r = await localRuntime(); t.after(() => r.close()); r.setFixtureEnv('HARIMU_KINDLE_INCOME_TAX_ENABLED', on ? 'true' : undefined); return r; }
 async function finishShift(r, user, order = 'harvest') {
   await r.call('citizen', user, { action: 'commit-work', workOrderId: order });
   const shift = (await r.call('citizen', user)).data.shifts.find(s => !s.claimedAt);
@@ -28,7 +30,7 @@ test('a rate config outside 0–50 is clamped', () => {
   assert.equal(withholdIncomeTax(1000, 90).taxMinor, 500); assert.equal(withholdIncomeTax(1000, -10).taxMinor, 0);
 });
 test('settling a Kindle shift credits net to the citizen and tax to kindle-treasury once, even on retry', async t => {
-  const r = await localRuntime(); t.after(() => r.close());
+  const r = await taxed(t);
   const before = (await r.call('citizen', 'alice')).data.economy.walletMinor;
   const shift = await finishShift(r, 'alice');
   const first = await r.call('citizen', 'alice', { action: 'claim-work', shiftId: shift.id });
@@ -46,7 +48,7 @@ test('settling a Kindle shift credits net to the citizen and tax to kindle-treas
   assert.ok(tx.indexOf(tax) < tx.indexOf(wage), 'tax sorts after the wage it was withheld from');
 });
 test('the tax rides the settlement transaction: no settlement, no tax', async t => {
-  const r = await localRuntime(); t.after(() => r.close());
+  const r = await taxed(t);
   const shift = await finishShift(r, 'alice');
   await r.db.prepare("UPDATE economy_funds SET initial_minor=0 WHERE id='kindle-employer'").run();
   const res = await r.call('citizen', 'alice', { action: 'claim-work', shiftId: shift.id });
@@ -55,7 +57,7 @@ test('the tax rides the settlement transaction: no settlement, no tax', async t 
   assert.equal((await treasury(r)).balance, 0);
 });
 test('non-Kindle citizens are not taxed; Korund settlements are unchanged', async t => {
-  const r = await localRuntime(); t.after(() => r.close());
+  const r = await taxed(t);
   const shift = await finishShift(r, 'bob');
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
   await r.call('citizen', 'bob', { action: 'claim-work', shiftId: shift.id });
@@ -64,7 +66,7 @@ test('non-Kindle citizens are not taxed; Korund settlements are unchanged', asyn
   assert.ok(!/shift_income_tax|income-tax/.test(korund), 'Korund ledger never references the Kindle tax');
 });
 test('Kindle availableBudgetMinor includes the treasury balance', async t => {
-  const r = await localRuntime(); t.after(() => r.close());
+  const r = await taxed(t);
   const government = await r.importModule('lib/government-state.ts');
   const nowSec = () => Math.floor(Date.now() / 1000);
   const shift = await finishShift(r, 'alice');
@@ -73,10 +75,43 @@ test('Kindle availableBudgetMinor includes the treasury balance', async t => {
   const snapshot = await government.readGovernment(r.db, 'kindle', nowSec(), undefined, { readOnly: true });
   const inputs = snapshot.inputs ?? snapshot;
   assert.equal(employer, 100000 - 800);
-  assert.equal(inputs.availableBudgetMinor, employer + 120);
+  assert.equal(inputs.availableBudgetMinor, Math.min(employer + 120, 100000));
 });
 test('shift board and work menus show gross, tax and net from the same rounding', async () => {
-  assert.equal(describeKindlePay(800), '8.00 SPK gross − 1.20 income tax (15%, set by the AI Assembly) = 6.80 SPK net');
+  assert.equal(describeKindlePay(800, 0), '8.00 SPK', 'flag off: no tax line');
+  assert.equal(describeKindlePay(800, 15), '8.00 SPK gross − 1.20 income tax (15%, set by the AI Assembly) = 6.80 SPK net');
   for (const file of ['../app/work-shift-board.tsx', '../app/nation-institutions.tsx', '../app/page.tsx'])
-    assert.match(await readFile(new URL(file, import.meta.url), 'utf8'), /describeKindlePay\(/, file);
+    assert.match(await readFile(new URL(file, import.meta.url), 'utf8'), /describeKindlePay\([^)]*incomeTaxPercent/, file);
+});
+
+test('flag off (shipped default): nothing is withheld, the full wage is credited, no tax lines, snapshot reports 0%', async t => {
+  const r = await taxed(t, false);
+  const before = (await r.call('citizen', 'alice')).data.economy.walletMinor;
+  const shift = await finishShift(r, 'alice');
+  const res = await r.call('citizen', 'alice', { action: 'claim-work', shiftId: shift.id });
+  assert.equal(res.status, 200);
+  assert.equal(res.data.economy.walletMinor - before, 800, 'gross wage');
+  assert.equal(res.data.economy.incomeTaxPercent, 0);
+  assert.ok(!res.data.economy.transactions.some(x => x.kind === 'income-tax'));
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM shift_income_tax').first()).n, 0);
+  assert.equal((await treasury(r)).balance, 0);
+  assert.equal(activeIncomeTaxPercent(undefined), 0); assert.equal(activeIncomeTaxPercent('false'), 0); assert.equal(activeIncomeTaxPercent('true'), 15);
+  const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_KINDLE_INCOME_TAX_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
+});
+test('flag on: the snapshot reports the 15% rate used for the gross/tax/net copy', async t => {
+  const r = await taxed(t);
+  assert.equal((await r.call('citizen', 'alice')).data.economy.incomeTaxPercent, 15);
+});
+test('availableBudgetMinor = min(treasury + employer fund, employer-fund cap)', async t => {
+  const r = await taxed(t);
+  const g = await r.importModule('lib/government-state.ts');
+  assert.equal(g.spendableKindleBudget(99200, 120, 100000), 99320, 'below the cap: fund + treasury');
+  assert.equal(g.spendableKindleBudget(100000, 500, 100000), 100000, 'capped at the employer-fund cap');
+  assert.equal(g.spendableKindleBudget(-50, 300, 100000), 300, 'an overdrawn fund never counts negative');
+  assert.equal(g.spendableKindleBudget(0, 0, 100000), 0);
+  // Integration: a treasury larger than the drawdown is capped.
+  await r.db.prepare("UPDATE economy_funds SET initial_minor=50000 WHERE id='kindle-treasury'").run();
+  const snapshot = await g.readGovernment(r.db, 'kindle', Math.floor(Date.now() / 1000), undefined, { readOnly: true });
+  assert.equal((snapshot.inputs ?? snapshot).availableBudgetMinor, 100000);
 });
