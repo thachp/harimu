@@ -1,5 +1,6 @@
 'use client';
 import {NotableControl} from './notable-control';
+import { fetchWithRetry } from '@/lib/fetch-retry';
 
 import type { VerificationState } from '@/lib/verification';
 import type { SimulationState } from '@/lib/world-simulation';
@@ -496,7 +497,7 @@ function ClerkCitizenSession({
 
     async function loadCitizen() {
       try {
-        const response = await fetch('/api/citizen', { signal: controller.signal });
+        const response = await fetchWithRetry('/api/citizen', { signal: controller.signal });
         if (controller.signal.aborted) return;
         if (!response.ok) {
           onStatus('error');
