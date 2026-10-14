@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { postgresMigrations, isDestructive, transactionProblem } from '../scripts/postgres-migrations.mjs';
 import { greatLords, boundedName, coupNameMax, coupConfig, formationOdds, plotForms, plotState, plotRuler, powerWeight, coupSucceeds, pressureSeconds, hash } from '../lib/aurelle-coup-rules.ts';
 import { COUP_NAME_MAX } from '../lib/palace-coup-copy.ts';
 
@@ -177,4 +179,29 @@ test(`#281 ${backend}: GETs are read-only; names are capped at 24 characters by 
   await assert.rejects(r.db.prepare("INSERT INTO aurelle_coups (id,formed_at,ruler_id,ruler_name,house) VALUES ('c1',1,'ashgrove',?,'House X')").bind(long).run());
   await assert.rejects(r.db.prepare("INSERT INTO aurelle_coups (id,formed_at,ruler_id,ruler_name,house) VALUES ('c2',1,'ashgrove','Lord X',?)").bind(long).run());
   await assert.rejects(r.db.prepare("INSERT INTO aurelle_coups (id,formed_at,ruler_id,ruler_name,house) VALUES ('c3',1,'nobody','Lord X','House X')").run());
+});
+
+test(`#281 ${backend}: flag off after an earlier coup: the crowned ruler still shows, nothing else runs`, async t => {
+  const c = await setup(t); const { r } = c;
+  const day = c.startDay('ready'), n = await formPlot(c, day); const st = plotState(`coup:${day}`, 60); const openAt = n + st.ageDays * D;
+  r.setNow(openAt * 1000); await c.scores(n, openAt, 100, 0); await c.tick();
+  const closes = Number((await c.coups())[0].window_closes_at); r.setNow((closes + 1) * 1000); await c.scores(closes - 2 * H, closes, 100, 0); await c.tick();
+  const done = (await c.coups())[0]; assert.equal(done.outcome, 'succeeded');
+  const gazetteBefore = (await c.gazette()).length;
+  r.setFixtureEnv('HARIMU_AURELLE_COUP_ENABLED', undefined);
+  assert.equal((await r.call('citizen', 'alice')).data.government.crown.name, done.ruler_name, 'the crown, already history, still shows');
+  const view = (await r.call('aurelle/rising', 'bob')).data;
+  assert.equal(view.crown.name, done.ruler_name); assert.equal('coup' in view, false, 'no coup window field with the flag off');
+  const later = closes + 9 * D; r.setNow(later * 1000); await c.scores(later - 72 * H, later, 100, 0); await c.tick(); await c.tick();
+  assert.equal((await c.coups()).length, 1, 'no new plot after the cool-down while the flag is off'); assert.equal((await c.gazette()).length, gazetteBefore, 'no new gazette');
+});
+
+test('#281 migration 0029 is additive, matches the runtime schema, passes the guard', async () => {
+  const d1 = await readFile('drizzle/0029_aurelle_palace_coup.sql', 'utf8'), pg = await readFile('db/postgres/0029_aurelle_palace_coup.sql', 'utf8');
+  const src = await readFile('lib/aurelle-coup.ts', 'utf8');
+  const schema = src.match(/export const aurelleCoupSchema = `([\s\S]*?)`;/)[1].replace(/\s*\n\s*/g, ' ').trim();
+  assert.ok(d1.includes(schema), 'D1 migration matches the runtime schema'); assert.ok(d1.includes('idx_aurelle_coups_formed'));
+  const m = postgresMigrations().find(x => x.file === '0029_aurelle_palace_coup.sql'); assert.ok(m); assert.deepEqual([...m.tables], ['aurelle_coups']);
+  assert.ok(!isDestructive(pg) && !isDestructive(d1)); assert.equal(transactionProblem(pg), null);
+  assert.match(pg, /length\(ruler_name\) BETWEEN 1 AND 24/); assert.match(pg, /length\(house\) BETWEEN 1 AND 24/);
 });
