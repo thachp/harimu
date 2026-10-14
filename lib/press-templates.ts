@@ -1,5 +1,5 @@
-/** Static press template packs for the MVP nations (issue #237: Kindle free press; #238: Korund State Media; shape
- * reused for #239 Aurelle Court Gazette). Content only: no press or reader UI reads this yet. Unlike lib/news-templates.ts
+/** Static press template packs for the MVP nations (issue #237: Kindle free press; #238: Korund State Media;
+ * #239: Aurelle Court Gazette). Content only: no press or reader UI reads this yet. Unlike lib/news-templates.ts
  * (ledger-driven headlines), these are fixed sample stories: headline plus 1-2 short paragraphs, with no figures, so no
  * number can ever be invented (harimu-docs social-news-media §18.2: system stats stay truthful). Canon: nation pages,
  * social-news-media §18.2, culture bible. All prose is new wording, so `proposal: true`. Authored copy, not AI output,
@@ -52,7 +52,7 @@ export const kindlePress:PressPack={nationId:'kindle',outlet:'free-press',
   t('kindle-temples','civic-life','Many faiths, one plaza',
    'Temples of several faiths share the plaza. A joint "many voices" prayer opened the civic forum, favoring none.'),
   t('kindle-scales','civic-life','A rigged scale, and the shame of it',
-   'A market stall was caught with a rigged scale. Neighbors call it the deepest shame a trader can earn.'),
+   'A market stall was caught with a rigged scale. Rigging a scale is taboo here, and neighbors will not soon forget it.'),
  ]};
 
 /** Korund State Media (#238): official broadcast voice only, in-world, no narrator. No praise or mockery of the Chairman,
@@ -87,5 +87,37 @@ export const korundStateMedia:PressPack={nationId:'korund',outlet:'state-media',
    'Today\'s broadcast covers the work of the nation. Foreign reports are not carried.'),
  ]};
 
-export const pressPacks:Readonly<Partial<Record<PressNation,PressPack>>>={kindle:kindlePress,korund:korundStateMedia};
+/** Aurelle Court Gazette (#239): royal voice, ornate and deferential; the Herald announces with ceremony (§18.2).
+ * Byline is canon: "Court Gazette" (social-news-media §18.2). No noble house is named (none canon yet; same rule as
+ * #218/#230). No claimant, pledge or coup content. */
+export const aurelleGazette:PressPack={nationId:'aurelle',outlet:'court-gazette',
+ byline:{name:'Court Gazette',proposal:false},
+ voice:'Ornate, deferential and ranked: "Every thread in its place." The Crown speaks; the realm is informed.',
+ templates:[
+  t('aurelle-decree','sky-throne','A decree from the Sky Throne',
+   'Be it known that the Monarch has issued a royal decree, read this day by the Herald with due ceremony.'),
+  t('aurelle-privy-council','sky-throne','The Privy Council sits',
+   'The Privy Council has met at Highspire to advise the Crown. Its counsel is entered in the royal register.'),
+  t('aurelle-coronation','sky-throne','Coronation Day is proclaimed',
+   'The realm shall keep Coronation Day. Banners will hang from every bridge of Highspire.'),
+  t('aurelle-favor-service','favor','Faithful service is noticed',
+   'The court records that faithful service, gifts and verse have earned Royal Favor this season.',
+   'Let all remember that Favor fades if left untended.'),
+  t('aurelle-favor-audience','favor','Audiences granted at court',
+   'The court has granted audiences to loyal subjects. Royal Favor follows those who serve well.'),
+  t('aurelle-hearth-night','kinward-rite','Hearth Night approaches',
+   'On Hearth Night the Kinward Rite will bless the houses of the realm. Let every hall tend its name-stones.'),
+  t('aurelle-keeper','kinward-rite','The Keeper of the Hearth',
+   'The Monarch, as Keeper of the Hearth, gives thanks to the Hearth-Keepers for their blessing.'),
+  t('aurelle-mint','crown-economy','The Royal Mint strikes new Crowns',
+   'New Crowns, stamped with the reigning Monarch, are struck at the Royal Mint terrace.'),
+  t('aurelle-debasement','crown-economy','A decree on the coinage',
+   'By royal decree, the coinage is reissued at a new weight. Full-weight Crowns of earlier strikes are much sought after.'),
+  t('aurelle-charter-fair','crown-economy','Charter Fair opens',
+   'Royal charters will be granted at the Charter Fair. Guilds may present their petitions to trade.'),
+  t('aurelle-skysilk','crown-economy','Skysilk for the realm',
+   'The looms of Windrest have sent Skysilk to the royal monopoly. Its quality does the realm honor.'),
+ ]};
+
+export const pressPacks:Readonly<Partial<Record<PressNation,PressPack>>>={kindle:kindlePress,korund:korundStateMedia,aurelle:aurelleGazette};
 export function pressPack(nationId:string){return (pressPacks as Record<string,PressPack|undefined>)[nationId];}

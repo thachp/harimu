@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pressPacks, pressPack, kindlePress, korundStateMedia, PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX, PRESS_TEMPLATES_MIN, PRESS_TEMPLATES_MAX } from '../lib/press-templates.ts';
+import { pressPacks, pressPack, kindlePress, korundStateMedia, aurelleGazette, PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX, PRESS_TEMPLATES_MIN, PRESS_TEMPLATES_MAX } from '../lib/press-templates.ts';
 import { citizenNameLists } from '../lib/citizen-names.ts';
 
 const packs=Object.values(pressPacks);
@@ -53,4 +53,18 @@ test('Korund reads as State Media, covers the issue topics, stays in bounds', ()
   assert.doesNotMatch(text,/\bnotice (what|how)|leave out|hidden|censor|propaganda|you know/i);
   // Not free press or gazette.
   assert.doesNotMatch(text,/Be it known|royal|Reasoning Brief|public ledger|Assembly/i);
+});
+test('Aurelle reads as royal gazette, covers the issue topics, names no noble house', () => {
+  assert.deepEqual(aurelleGazette.byline,{name:'Court Gazette',proposal:false});
+  const topics=new Set(aurelleGazette.templates.map(x=>x.topic));
+  for (const k of ['sky-throne','favor','kinward-rite','crown-economy']) assert.ok(topics.has(k), k);
+  const text=aurelleGazette.templates.flatMap(lines).join(' ');
+  for (const r of [/Be it known/,/royal decree/,/Herald/,/Royal Favor/,/Kinward Rite/,/Sky Throne/,/Crowns/]) assert.match(text,r);
+  assert.doesNotMatch(text,/\bHouse of\b|of the \w+ House\b/); assert.doesNotMatch(text,/claimant|pretender|pledge|\bcoups?\b|usurp/i);
+  // Not free press or State Media.
+  assert.doesNotMatch(text,/Reasoning Brief|public ledger|Assembly|the plan advances|Foreign reports|State Media|quota/i);
+});
+test('Kindle rigged-scale line no longer uses the phrase reserved for cheating the count', () => {
+  const scales=kindlePress.templates.find(x=>x.id==='kindle-scales');
+  assert.doesNotMatch(lines(scales).join(' '),/deepest shame/); assert.match(lines(scales).join(' '),/taboo/);
 });
