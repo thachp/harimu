@@ -133,7 +133,7 @@ export const congregationActionCopy:Readonly<Record<MvpFaithId,readonly Congrega
 export const devotionTierCopy:readonly DevotionTierCopy[]=[
  tier(0,24,'Newcomer','You are welcome at services. Devotion grows with worship, festivals, charity and service.'),
  tier(25,49,'Member','The congregation knows your face. You can take small festival roles.'),
- tier(50,74,'Devoted','Your standing in the congregation is high. Clergy offices begin to open to you.'),
+ tier(50,74,'Devoted','Your standing in the congregation is high. You may be asked to serve.'),
  tier(75,100,'Pillar','The congregation looks to you. Devotion slowly fades if you step away.'),
 ];
 export function devotionTier(devotion:number){const d=Math.min(100,Math.max(0,Math.round(devotion)));return devotionTierCopy.find(t=>d>=t.min&&d<=t.max)!;}
@@ -144,7 +144,7 @@ export const korundUndergroundCopy={
  congregationLines:[
   {text:'A few people meet quietly. Nothing is written down.',proposal:true},
   {text:'The meeting ends early. Everyone leaves one at a time.',proposal:true},
-  {text:'A name-stone is passed from hand to hand, then put away.',proposal:true},
+  {text:'A quiet word is shared, then the room is empty again.',proposal:true},
   {text:'No one speaks of it at work the next day.',proposal:true},
  ],
  discovery:{

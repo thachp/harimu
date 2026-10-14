@@ -50,3 +50,10 @@ test('no Notable, no real-world religion terms', () => {
   assert.doesNotMatch(all,/Notable/);
   assert.doesNotMatch(all,/\b(church|mosque|temple|synagogue|priest|imam|rabbi|monk|nun|bishop|pope|christ\w*|islam\w*|jew\w*|buddh\w*|hindu\w*|bible|quran|torah|god)\b/i);
 });
+test('Korund underground lines are faith-neutral; Devotion tiers do not state a clergy-office gate (ARC #259)', () => {
+  const terms=/Kinward|Fair-Wind|Open Hand|Lumen|Round|Quiet Path|hearth|name-stone|chaplain|almoner|steward|pilot|bread|vow|oath|alms/i;
+  for (const l of korundUndergroundCopy.congregationLines) assert.doesNotMatch(l.text,terms, l.text);
+  assert.doesNotMatch(korundUndergroundCopy.hiddenShrine.description,terms);
+  for (const t of devotionTierCopy) assert.doesNotMatch(t.line,/clergy|office/i, t.label);
+  assert.deepEqual(devotionTierCopy.map(t=>t.label),['Newcomer','Member','Devoted','Pillar']);
+});
