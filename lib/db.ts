@@ -2,6 +2,7 @@ import {accountElectionEnabled,accountElectionSchemas} from './preview-election'
 import {reconcileAiAcceptanceCharges,prebookNewsAcceptance} from './ai-acceptance-charges';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
+import {korundCouponSchemas} from './korund-coupons';
 import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
 import type {GameDatabase} from './database-contract';
 import {addressSchemas} from './weekly-addresses';
@@ -179,6 +180,7 @@ async function initialize(database: GameDatabase) {
   await database.batch([
     ...addressSchemas.map(sql=>database.prepare(sql)),
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
+    ...korundCouponSchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),

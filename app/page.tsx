@@ -669,9 +669,9 @@ export default function Home() {
     try {
       const raw = userId ? window.sessionStorage.getItem(`harimu-korund-intent-v1:${userId}`) : null;
       const command = raw ? JSON.parse(raw) : null;
-      if (command && ['korund-start-work', 'korund-claim-work', 'korund-redeem-ration', 'korund-household-meal','korund-join-ration-queue','korund-cancel-ration-queue'].includes(command.action)
+      if (command && ['korund-start-work', 'korund-claim-work', 'korund-redeem-ration', 'korund-household-meal','korund-join-ration-queue','korund-cancel-ration-queue','korund-redeem-coupon'].includes(command.action)
         && typeof command.requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(command.requestId)
-        && (command.action !== 'korund-cancel-ration-queue' || typeof command.queueId === 'string') && (command.action !== 'korund-claim-work' || typeof command.shiftId === 'string')) {
+        && (command.action !== 'korund-cancel-ration-queue' || typeof command.queueId === 'string') && (command.action !== 'korund-redeem-coupon' || command.coupon === 'clothing' || command.coupon === 'goods') && (command.action !== 'korund-claim-work' || typeof command.shiftId === 'string')) {
         korundIntent.current = command; setKorundCommand(command);
       }
     } catch { /* Storage recovery is best-effort. */ }
@@ -984,7 +984,7 @@ export default function Home() {
       if (!response.ok) { setWorkError(result.error ?? 'Korund action refused; refresh your assignment and ration book.'); return; }
       setRecentAction(result.replayed?'Previous Korund action confirmed. Check the current ration book and queue.':command.action==='korund-join-ration-queue'?'Ration request joined the national FIFO queue.':command.action==='korund-cancel-ration-queue'?'Ration request cancelled; unused coupons retained.':command.action === 'korund-start-work' ? 'Assigned shift started; work continues while you are away.'
         : command.action === 'korund-claim-work' ? 'Assigned-shift wages collected in Labor Notes; output added to the state food pool.'
-          : command.action === 'korund-redeem-ration' ? 'Ration coupons redeemed for household food.' : 'Household ration meal recorded; capacity updated.');
+          : command.action === 'korund-redeem-ration' ? 'Ration coupons redeemed for household food.' : command.action === 'korund-redeem-coupon' ? `${command.coupon === 'goods' ? 'Goods' : 'Clothing'} coupon redeemed at the fixed Labor Note price.` : 'Household ration meal recorded; capacity updated.');
     } catch {
       if (epoch === citizenEpoch.current) setWorkError('Connection interrupted. Confirm the previous Korund action to recover its saved result.');
     } finally {
@@ -992,7 +992,7 @@ export default function Home() {
     }
   }
 
-  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand({ action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
+  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand(action === 'korund-redeem-coupon' ? { action, coupon: shiftId === 'goods' ? 'goods' : 'clothing', requestId: crypto.randomUUID() } : { action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
   async function runAurelleCommand(command: AurelleCommand) {
     const originalAurelleClaim = command.action === 'aurelle-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'CRN');
     if (marketIntent.current || playerIntent.current || korundIntent.current) return;
