@@ -158,7 +158,7 @@ test('#71 migration 0023 matches the runtime schema, is additive, and passes the
   const m = postgresMigrations().find(x => x.file === '0023_aurelle_rising.sql');
   assert.ok(m); assert.deepEqual([...m.tables].sort(), ['aurelle_pledges', 'aurelle_risings']);
   assert.equal(postgresMigrations().filter(x => x.number === '0023').length, 1);
-  assert.equal(postgresMigrations().filter(x => x.number === '0022').length, 0, '0022 is held for #86');
+  assert.equal(postgresMigrations().filter(x => x.number === '0022').length, 1, '0022 is #86 (Kindle income tax)');
   assert.ok(!isDestructive(pg) && !isDestructive(d1)); assert.equal(transactionProblem(pg), null);
 });
 

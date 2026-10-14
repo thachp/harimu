@@ -8,7 +8,7 @@ const source=await readFile(new URL('../app/work-shift-board.tsx',import.meta.ur
 const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
 function render(now){
  const exports={},visits=[],claims=[];
- new Function('exports','require',compiled)(exports,name=>name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-timer'?{GameTimer:()=>null}:name==='react'?{useState:()=>[now,()=>{}],useEffect(){}}:require(name));
+ new Function('exports','require',compiled)(exports,name=>name==='@/lib/income-tax'?require('../lib/income-tax.ts'):name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-timer'?{GameTimer:()=>null}:name==='react'?{useState:()=>[now,()=>{}],useEffect(){}}:require(name));
  const completesAt='2026-10-13T17:19:04.992Z';
  const tree=exports.WorkShiftBoard({shifts:[{id:'shift',orderName:'Harvest',completesAt,claimedAt:null}],pending:false,error:null,localDemo:false,economy:null,onRefresh(){},onClaim:id=>claims.push(id),onNavigate:view=>visits.push(view)});
  const all=node=>[node,...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child=>typeof child==='object'?all(child):[child])];

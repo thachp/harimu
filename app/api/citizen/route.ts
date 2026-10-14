@@ -10,7 +10,7 @@ import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/li
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
 import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket, shiftAnswerKey } from '@/lib/shift-quality-key';
-import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
+import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
 import {readCollectivePetitions,recordVerifiedHumanVisit} from '@/lib/collective-petitions';
@@ -21,6 +21,9 @@ import { getDatabase } from '@/lib/db';
 import { travelBlock } from '@/lib/travel';
 import { checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
 import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
+import { activeIncomeTaxPercent } from '@/lib/income-tax';
+/** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
+const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';
 const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
@@ -149,7 +152,7 @@ export async function GET(request: Request) {
     firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
     simulation,
     verification,
-    economy: await readEconomy(database, userId, interval, { readOnly: true, now: readNow }),
+    economy: await readEconomy(database, userId, interval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
     market,
     playerMarket: await readPlayerMarket(database, userId),
     government: profile?.nation_id ? publicGovernmentSnapshot(await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId, { readOnly: true, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' })) : null,
@@ -276,7 +279,7 @@ async function handlePost(request: Request) {
     if (!validPlayerCommand(body)) return privateJson({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: typeof body.listingId === 'string' ? body.listingId.toLowerCase() : undefined };
     const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000));
-    return privateJson({ ...result, aurellePlan:await readAurelle(database,userId), economy: await readEconomy(database, userId, interval),
+    return privateJson({ ...result, aurellePlan:await readAurelle(database,userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),
       playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
   }
 
@@ -285,7 +288,7 @@ async function handlePost(request: Request) {
     const command = { ...body, requestId: body.requestId.toLowerCase() };
     const result = await executeMarketCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), interval);
     const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ capacity: number }>();
-    return privateJson({ ...result, aurellePlan:await readAurelle(database,userId), economy: await readEconomy(database, userId, interval),
+    return privateJson({ ...result, aurellePlan:await readAurelle(database,userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),
       market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
@@ -313,7 +316,7 @@ async function handlePost(request: Request) {
       government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null,
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
-      economy:await readEconomy(database,userId,interval),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
+      economy:await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
     },{status:ok?200:409});
     const current=await readCurrent();
     // A repeated choice has no further effect, including after an uncertain response.
@@ -552,7 +555,7 @@ async function handlePost(request: Request) {
       return privateJson({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
     }
-    return privateJson({ ok: true, aurellePlan:await readAurelle(database,userId), shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelle(database,userId), shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   if (body.action === 'claim-work') {
@@ -564,10 +567,13 @@ async function handlePost(request: Request) {
     if (shift.completes_at > now) {
       return privateJson({ error: 'Your shift is still underway.' }, { status: 409 });
     }
+    const taxPercent = incomeTaxPercentNow();
     // One ledger transfer carries both wages and inventory; every write rolls back together.
     // Budget guard is in the insert itself, so concurrent settlements cannot overdraw the pool.
     await database.batch([
       database.prepare(settleSql).bind(now, shiftId, userId, now),
+      // #86: Kindle income tax is withheld from this settlement in the same transaction (only while the flag is on).
+      ...(taxPercent > 0 ? [database.prepare(withholdIncomeTaxSql).bind(taxPercent, taxPercent, shiftId, userId, now)] : []),
       database.prepare(settledContributionSql)
         .bind(now, shiftId, userId, now),
       database.prepare(finishSettledShiftSql)
@@ -576,7 +582,7 @@ async function handlePost(request: Request) {
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return privateJson({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
-    return privateJson({ ok: true, aurellePlan:await readAurelle(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelle(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   return privateJson({ error: 'Unknown action.' }, { status: 400 });
