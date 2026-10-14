@@ -84,7 +84,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
       <ol aria-label="Daily loop steps"><li>Work a paid shift {active ? '· underway' : collected ? '· first shift completed' : ''}</li>
         <li>Collect wages and goods {collected ? '· collected' : '· when the timer finishes'}</li>
         <li>Trade for food · {economy ? `${food} food owned` : 'loading'}</li><li>Prepare a household meal · recover capacity</li></ol>
-      <strong>{title}</strong><p>{detail}</p>{active && <GameTimer compact endsAt={active.completesAt} label="Shift ready" />}
+      <strong>{title}</strong><p>{detail}</p>{active && <GameTimer compact endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" />}
       {active && !readyToCollect && <aside aria-label="Things to do while your shift runs">
         <p>Your shift takes {shiftDuration}. You can visit other scenes or close the game; the real-time timer keeps running.</p>
         <p>Ready to collect: <time dateTime={active.completesAt}>{formatTime(active.completesAt)}</time>.</p>
