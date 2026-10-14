@@ -90,6 +90,9 @@ body:has(.harimu-game){overflow:auto}
 @media(max-width:760px){.game-country-stage{position:relative;padding:50px 10px 10px;overflow:visible;min-height:620px}.game-breadcrumbs{top:156px;left:12px;max-width:calc(100% - 24px);font-size:calc(10px * var(--text-scale, 1))}.game-breadcrumbs button{min-height:32px}.game-mode-city:has(.game-country-stage){grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(620px,auto) minmax(calc(148px * var(--text-scale, 1)),auto) minmax(0,auto)}.game-dock button{flex:1}.game-shift-chip{top:184px}}
 
 .harimu-game .game-country-stage{height:auto}
+/* #189: Country header in flow (breadcrumbs + active-shift chip) so nothing floats over the heading or the Zone overlay. */
+.harimu-game .game-country-stage{padding-top:14px}.game-country-header{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 14px}.game-country-header>.game-location-banner,.game-country-header>.game-shift-chip{position:static;top:auto;left:auto;max-width:100%;pointer-events:auto}
+@media(max-width:760px){.harimu-game .game-country-stage{padding-top:10px}.game-country-header{margin-bottom:10px}}
 
 .game-next-deadline{display:block;max-width:190px;font-size:calc(10px * var(--text-scale, 1));margin-top:3px}.game-next-deadline small{letter-spacing:0}.game-clock{max-width:190px}
 @media(max-width:760px){.game-next-deadline{max-width:112px;font-size:calc(8px * var(--text-scale, 1))}.game-clock{max-width:112px}}
