@@ -187,3 +187,5 @@ body:has(.harimu-game){overflow:auto}
  .game-dock{flex-wrap:wrap}
  .game-dock button span{overflow-wrap:anywhere;text-align:center;line-height:1.15}
 }
+/* #186: at 150% the clock's <details> shrank below its text (115px box, 142px clock), so the clock ran under the Glossary link. Keep the clock at its content width so the account row's gap holds at every text size. */
+.game-account>.game-hud-help{flex:none;min-width:max-content}

@@ -91,3 +91,9 @@ test('desktop 150%: whole-word wrap applies at all widths and resource items siz
   assert.match(global, /\.game-resources\{min-width:max-content\}\.game-resources>\*\{flex:00auto\}/);
   assert.match(global, /\.game-resources>div,\.game-resources>\.game-hud-help>summary,\.game-resources>\.game-wallet-button\{min-width:max-content\}/);
 });
+
+test('#186 the world clock keeps its content width, so it never runs under Glossary at 150%', async () => {
+  const css = await read('game-shell.css');
+  assert.match(css, /\.game-account>\.game-hud-help\{flex:none;min-width:max-content\}/);
+  assert.match(css, /\.game-account\{display:flex;align-items:center;gap:18px\}/, 'desktop account row keeps its gap');
+});
