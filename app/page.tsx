@@ -38,6 +38,8 @@ import { starterCopyFor } from '@/lib/starter-copy';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { WalletPanel } from './wallet-panel';
+import { ShiftQualityStep } from './shift-quality-step';
+import { qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
@@ -350,6 +352,9 @@ const fallbackWorkOrders: WorkOrder[] = [
   { id: 'harvest', nationId: 'kindle', name: 'Support the savanna harvest', detail: '+480 food · resolves in 2h real · 1 game day', cost: 4 },
   { id: 'freight', nationId: 'kindle', name: 'Move a foundry convoy', detail: '+210 materials · resolves in 4h real · 2 game days', cost: 6 },
   { id: 'archive', nationId: 'kindle', name: 'Catalogue the civic archive', detail: '+95 knowledge · resolves in 3h real · 1.5 game days', cost: 3 },
+  { id: 'orchard', nationId: 'kindle', name: 'Pick the savanna orchards', detail: '+3 fruit · resolves in 2h real · 1 game day', cost: 4 },
+  { id: 'herding', nationId: 'kindle', name: 'Drive the grassland herds', detail: '+2 meat · resolves in 3h real · 1.5 game days', cost: 5 },
+  { id: 'logging', nationId: 'kindle', name: 'Cut timber for the city', detail: '+3 wood · resolves in 4h real · 2 game days', cost: 6 },
 ];
 
 const fallbackPlanningItems: PlanningTask[] = [
@@ -540,6 +545,7 @@ export default function Home() {
   const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [qualityOrder, setQualityOrder] = useState<WorkOrder | null>(null);
   const [aurellePlan, setAurellePlan] = useState<AurellePlanView | null>(null);
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
   const aurelleIntent = useRef<AurelleCommand | null>(null);
@@ -790,7 +796,7 @@ export default function Home() {
     return () => controller.abort();
   }, [citizenSessionStatus]);
 
-  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string) {
+  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string, quality?: QualityInput) {
     if (enrollmentLock.current) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
@@ -805,7 +811,7 @@ export default function Home() {
       if (clerkConfigured) {
         const init: RequestInit = {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
-          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
+          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId, quality }),
         };
         // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
         // Starting a shift has no request id, so it is never retried automatically.
@@ -839,9 +845,12 @@ export default function Home() {
           const rule = shiftRules[order.id];
           if (!rule) throw new Error('Work order unavailable.');
           const startedAt = new Date().toISOString();
-          setWorkShifts((current) => [{ id: crypto.randomUUID(), orderName: order.name,
+          // Local demo has no server and no answer key, so it never grades: every demo shift pays the base reward.
+          void quality;
+          const demoReward = rewards[order.id];
+          setWorkShifts((current) => [{ id: crypto.randomUUID(), workOrderId: order.id, orderName: order.name,
             output: rule.output, capacitySpent: order.cost, startedAt,
-            wageMinor: rewards[order.id]?.wageMinor, rewardItem: rewards[order.id]?.item, rewardQuantity: rewards[order.id]?.quantity,
+            wageMinor: demoReward?.wageMinor, rewardItem: demoReward?.item, rewardQuantity: demoReward?.quantity,
             completesAt: new Date(Date.now() + rule.hours * 3600000).toISOString(), claimedAt: null }, ...current]);
           setCapacity((current) => current - order.cost);
         } else {
@@ -1008,7 +1017,8 @@ export default function Home() {
       if (epoch !== citizenEpoch.current) return; workLock.current=false; setGovernmentPending(false); }
   }
 
-  function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
+  // #40: the quality job opens the quality step first; WC is only spent when the player starts from it.
+  function commitWork(order: WorkOrder) { if (order.id === qualityWorkOrderId && rewards[order.id]) { setQualityOrder(order); return Promise.resolve(); } return runWork('commit-work', order); }
 
   async function runKorundCommand(command: KorundCommand) {
     const confirmingKorundIntent=korundIntent.current?.requestId===command.requestId;
@@ -1720,6 +1730,8 @@ export default function Home() {
       accountControls={<>{citizenNation && !guestActive && <button id={MORNING_BRIEF_TRIGGER_ID} type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief" aria-haspopup="dialog" aria-expanded={morningBriefOpen} aria-controls={morningBriefOpen ? 'morning-brief' : undefined}><Newspaper size={17} aria-hidden="true" /><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
       {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
+      {qualityOrder && rewards[qualityOrder.id] && <ShiftQualityStep orderId={qualityOrder.id} orderName={qualityOrder.name} cost={qualityOrder.cost} base={rewards[qualityOrder.id]}
+        onCancel={() => setQualityOrder(null)} onStart={(quality) => { const order = qualityOrder; setQualityOrder(null); void runWork('commit-work', order, undefined, quality); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}
