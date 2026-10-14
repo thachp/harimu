@@ -19,8 +19,9 @@ import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/gu
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { FirstWeekTracker } from './first-week-tracker';
-import { firstWeekTracker, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
-import { firstWeekDay } from '@/lib/first-week';
+import { firstWeekTracker, newlyDone, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
+import { firstWeekDay, visibleGoals, type WeekDay } from '@/lib/first-week';
+const visibleWeekDay = (day: WeekDay | null): WeekDay | null => day && {...day, goals: visibleGoals(day)};
 import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -1471,12 +1472,15 @@ export default function Home() {
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
   const weekKey = citizenNation ? weekStoreKey : '';
-  const weekTrack = !firstLoop && weekKey && citizenNation ? firstWeekTracker({day:firstWeekDay({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,firstLoopActive:Boolean(firstLoop)}),done:weekDone.key===weekKey?weekDone.ids:[]}) : null;
-  function toggleWeekGoal(goalId: string, done: boolean) {
-    const ids = (weekDone.key===weekKey?weekDone.ids:[]).filter(id => id !== goalId).concat(done ? [goalId] : []);
-    setWeekDone({key:weekKey,ids}); stubFirstWeekProgressStore().save(weekKey, ids);
-  }
-  const weekTracker = weekTrack && <FirstWeekTracker tracker={weekTrack} onToggle={toggleWeekGoal} onNavigate={screen=>navigateGame(screen)} />;
+  const weekDayInfo = weekKey && citizenNation ? visibleWeekDay(firstWeekDay({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,firstLoopActive:Boolean(firstLoop)})) : null;
+  const weekDayStart = weekDayInfo ? Date.parse(citizenshipStatus?.enrolledAt ?? '') + (weekDayInfo.day - 1) * 86400000 : 0;
+  const weekStored = weekDone.key===weekKey ? weekDone.ids : [];
+  const weekTrack = !firstLoop && weekDayInfo ? firstWeekTracker({day:weekDayInfo,done:weekStored,signals:{shifts:[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])],dayStart:weekDayStart,
+    mealReadyAt:citizenNation?.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation?.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt}}) : null;
+  const weekNew = newlyDone(weekTrack, weekStored);
+  // Latch detected completions in the stub store (#135 replaces it with server progress).
+  if (weekNew.length) { const ids = [...weekStored, ...weekNew]; setWeekDone({key:weekKey,ids}); stubFirstWeekProgressStore().save(weekKey, ids); }
+  const weekTracker = weekTrack && <FirstWeekTracker tracker={weekTrack} onNavigate={screen=>navigateGame(screen)} />;
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;

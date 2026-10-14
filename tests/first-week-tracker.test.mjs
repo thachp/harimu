@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { firstWeekArcs, firstWeekDay, visibleGoals } from '../lib/first-week.ts';
-import { firstWeekTracker, goalAvailable, availableFirstWeekFeatures, stubFirstWeekProgressStore, firstWeekStubKey } from '../lib/first-week-progress.ts';
+import { firstWeekTracker, goalAvailable, goalSignalDone, newlyDone, stubFirstWeekProgressStore, firstWeekStubKey } from '../lib/first-week-progress.ts';
 
 const enrolledAt='2026-10-01T12:00:00.000Z', day=86400000, t0=Date.parse(enrolledAt);
-const at=(n,nationId='kindle',done=[],available)=>firstWeekTracker({day:firstWeekDay({nationId,enrolledAt,now:t0+(n-1)*day+60000}),done,available});
+const vis=(d,available)=>d&&{...d,goals:visibleGoals(d,available)};
+const at=(n,nationId='kindle',done=[],available)=>firstWeekTracker({day:vis(firstWeekDay({nationId,enrolledAt,now:t0+(n-1)*day+60000}),available),done});
 
 test('progresses day 2 through 7, then disappears', () => {
   assert.equal(at(1),null, 'day 1 belongs to the first loop');
@@ -15,23 +16,40 @@ test('progresses day 2 through 7, then disappears', () => {
   assert.equal(firstWeekTracker({day:firstWeekDay({nationId:'unknown',enrolledAt,now:t0+day*2}),done:[]}),null);
 });
 
-test('goals that require unbuilt features stay hidden (requires flag from #132), unknown gaps fail closed', () => {
+test('uses #132 requires gating (visibleGoals); unbuilt goals hidden, needsCode without requires fails closed', () => {
   const all=firstWeekArcs.flatMap(a=>a.days.flatMap(d=>d.goals));
-  assert.deepEqual(availableFirstWeekFeatures,[],'no unbuilt feature is switched on');
-  for (const g of all.filter(g=>g.requires)) assert.equal(goalAvailable(g),false,g.id);
-  for (const g of all.filter(g=>g.needsCode)) assert.equal(goalAvailable(g),false,g.id);
-  assert.equal(goalAvailable({id:'new-x',screen:'nation',text:'x',signal:'x',needsCode:'?'},['petitions']),false,'needsCode without requires fails closed');
   for (const a of firstWeekArcs) for (const d of a.days) {
-    const t=firstWeekTracker({day:d,done:[]});
-    assert.deepEqual(t?.goals.map(e=>e.goal.id)??[],visibleGoals(d).filter(g=>!g.needsCode||g.requires).map(g=>g.id),`${a.nationId} day ${d.day}`);
+    const ids=firstWeekTracker({day:vis(d),done:[]})?.goals.map(e=>e.goal.id)??[];
+    for (const g of all.filter(g=>g.requires)) assert.ok(!ids.includes(g.id),`${g.id} hidden`);
   }
-  const d5=firstWeekArcs[0].days.find(d=>d.day===5); const pet=d5.goals.find(g=>g.id==='kindle-5-petition');
-  if (pet?.requires) assert.ok(firstWeekTracker({day:d5,done:[],available:pet.requires}).goals.some(e=>e.goal.id===pet.id),'shows once its feature is available');
+  assert.equal(goalAvailable({id:'new-x',screen:'nation',text:'x',signal:'x',needsCode:'?'}),false);
+  const d5=firstWeekArcs[0].days.find(d=>d.day===5); const pet=d5.goals.find(g=>g.requires);
+  if (pet) assert.ok(firstWeekTracker({day:vis(d5,pet.requires),done:[]}).goals.some(e=>e.goal.id===pet.id),'shows once its feature is available');
 });
 
-test('done state counts only visible goals', () => {
-  const t=at(2,'korund',[at(2,'korund').goals[0].goal.id,'korund-6-medal']);
-  assert.equal(t.doneCount,1); assert.equal(t.goals[0].done,true); assert.ok(t.goals.slice(1).every(e=>!e.done));
+test('no parallel requires map in the tracker module', async () => {
+  const lib=await readFile(new URL('../lib/first-week-progress.ts',import.meta.url),'utf8');
+  assert.doesNotMatch(lib,/firstWeekGoalRequires|availableFirstWeekFeatures|FirstWeekFeature/);
+});
+
+test('completion is driven by real records (settled shifts, meals), not manual ticks', () => {
+  const k2=vis(firstWeekDay({nationId:'kindle',enrolledAt,now:t0+day+60000})); const start=t0+day;
+  const shift=k2.goals.find(g=>g.id==='kindle-2-shift');
+  const iso=ms=>new Date(ms).toISOString();
+  assert.equal(goalSignalDone(shift,{shifts:[{orderName:'x',claimedAt:iso(start-1000)}],dayStart:start}),false,'second shift needs two');
+  assert.equal(goalSignalDone(shift,{shifts:[{orderName:'x',claimedAt:iso(start-1000)},{orderName:'y',claimedAt:iso(start+1000)}],dayStart:start}),true);
+  assert.equal(goalSignalDone(shift,{shifts:[{orderName:'x',claimedAt:null},{orderName:'y',claimedAt:null}],dayStart:start}),false,'unclaimed shifts do not count');
+  const sell=k2.goals.find(g=>g.id==='kindle-2-sell');
+  if (sell) assert.equal(goalSignalDone(sell,{shifts:[],dayStart:start}),null,'untracked signal reports null');
+  const all=firstWeekArcs.flatMap(a=>a.days.flatMap(d=>d.goals));
+  for (const g of all.filter(g=>/-meal$/.test(g.id))) {
+    assert.equal(goalSignalDone(g,{shifts:[],mealReadyAt:iso(start+5),dayStart:start}),true,g.id);
+    assert.equal(goalSignalDone(g,{shifts:[],mealReadyAt:null,dayStart:start}),false,g.id);
+  }
+  const t=firstWeekTracker({day:k2,done:['kindle-2-sell'],signals:{shifts:[],dayStart:start}});
+  assert.ok(t.goals.every(e=>!e.done),'stored ids for untracked goals never show as done');
+  const t2=firstWeekTracker({day:k2,done:[],signals:{shifts:[{orderName:'a',claimedAt:iso(start-9)},{orderName:'b',claimedAt:iso(start+9)}],dayStart:start}});
+  assert.deepEqual(newlyDone(t2,[]),['kindle-2-shift']); assert.deepEqual(newlyDone(t2,['kindle-2-shift']),[]);
 });
 
 test('stub store persists per citizen key and survives bad data', () => {
@@ -50,9 +68,9 @@ test('stub store persists per citizen key and survives bad data', () => {
 test('page wires the tracker after the first loop and labels the stub (#135)', async () => {
   const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
   assert.match(page,/\{firstLoopHint\}\{weekTracker\}\{dailyLoop\}/);
-  assert.match(page,/!firstLoop && weekKey/);
+  assert.match(page,/!firstLoop && weekDayInfo/);
   const ui=await readFile(new URL('../app/first-week-tracker.tsx',import.meta.url),'utf8');
-  assert.match(ui,/<details/); assert.match(ui,/type="checkbox"/); assert.match(ui,/this browser only/);
+  assert.match(ui,/<details/); assert.doesNotMatch(ui,/type="checkbox"/,'no manual ticks'); assert.match(ui,/this browser only/);
   const lib=await readFile(new URL('../lib/first-week-progress.ts',import.meta.url),'utf8');
   assert.match(lib,/STUB[^\n]*#135/);
 });
