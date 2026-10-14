@@ -18,7 +18,7 @@ import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
-import { isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -1079,7 +1079,8 @@ export default function Home() {
     setSelectedId(nextNation);
     const visitingCity = new URLSearchParams(window.location.search).get('city');
     const cityId = citizenNation?.id === nextNation ? currentCityAccount?.currentCityId : visitingCity && cityForNation(nextNation,visitingCity) ? visitingCity : undefined;
-    const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined);
+    // Civic keeps the nation being viewed (#91); a foreign nation renders read-only.
+    const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined, nextNation !== citizenNation?.id);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
   }
@@ -1571,6 +1572,16 @@ export default function Home() {
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <ActionButton type="button" reason={firstActionReason([clerkConfigured && citizenSessionStatus === 'loading', 'Your citizen account is loading. Please wait before choosing citizenship.'], [clerkConfigured && citizenSessionStatus === 'error', 'Your citizen account could not load. Retry loading it before choosing citizenship.'])} onClick={()=>{if (!clerkConfigured || !['loading','error'].includes(citizenSessionStatus)) beginEnrollment(selected.id);}}>Choose citizenship · {selected.shortName}</ActionButton>}
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
   </section>;
+  const viewedNationParam = new URLSearchParams(locationSearch).get('nation');
+  const foreignCivic = isForeignCivic(viewMode, viewedNationParam, selected.id, citizenNation?.id);
+  const foreignCivicPanel = <section className="game-national-context" aria-label={`${selected.name} government, read-only`}>
+    <p className="eyebrow">Civic · {selected.shortName} · read-only</p>
+    <h2>{selected.government}</h2>
+    <p>{selected.name} follows its own institutions. Computer-controlled leaders hold every government office in this release, following fixed game rules.</p>
+    <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd></dl>
+    <p role="note">You are viewing {selected.name} as a visitor. Petitions and ballots are only available to its citizens{citizenNation ? `; you are a citizen of ${citizenNation.name}` : ''}.</p>
+    <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
+  </section>;
   const countryNation = selected;
   const requestedPreviewCity = new URLSearchParams(locationSearch).get('city');
   const previewCity = requestedPreviewCity ? cityForNation(selected.id,requestedPreviewCity) : undefined;
@@ -1581,7 +1592,7 @@ export default function Home() {
   const canCityTravel = !clerkConfigured || citizenSessionStatus === 'anonymous' || Boolean(countryOwnNation && currentCityAccount && citizenSessionStatus === 'ready');
   const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} /></>;
   const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
-  const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : viewMode==='square' ? <>
+  const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {firstLoopHint}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
@@ -1657,7 +1668,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? 'Country travel' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
