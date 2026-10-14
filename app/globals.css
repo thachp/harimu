@@ -82,7 +82,7 @@ button:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 .brand-name {
   color: #f6efd9;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(28px, 2.55vw, 39px);
+  font-size: calc(clamp(28px, 2.55vw, 39px) * var(--text-scale, 1));
   font-weight: 600;
   letter-spacing: -.035em;
   line-height: .92;
@@ -369,7 +369,7 @@ button:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
   margin: 4px 0 0;
   color: #f4ecd7;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(25px, 2.6vw, 38px);
+  font-size: calc(clamp(25px, 2.6vw, 38px) * var(--text-scale, 1));
   font-weight: 500;
   letter-spacing: -.04em;
   line-height: 1;
@@ -737,7 +737,7 @@ button:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
   margin: 6px 0 7px;
   color: #f3ead5;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(30px, 3.1vw, 48px);
+  font-size: calc(clamp(30px, 3.1vw, 48px) * var(--text-scale, 1));
   font-weight: 500;
   letter-spacing: -.045em;
   line-height: .98;
@@ -1404,7 +1404,7 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
   font-family: Georgia, serif;
   font-size: calc(24px * var(--text-scale, 1));
 }
-.planning-access h1 { margin-inline: auto; font-size: clamp(32px, 4vw, 47px); }
+.planning-access h1 { margin-inline: auto; font-size: calc(clamp(32px, 4vw, 47px) * var(--text-scale, 1)); }
 .access-card > p { max-width: 430px; margin: 14px auto 22px; color: #a8b3ae; font-size: calc(11px * var(--text-scale, 1)); line-height: 1.55; }
 .access-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .access-actions button { width: 100%; min-height: 45px; font-size: calc(8px * var(--text-scale, 1)); font-weight: 800; letter-spacing: .08em; cursor: pointer; text-transform: uppercase; }
@@ -1665,7 +1665,7 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
   margin: 4px 0 2px;
   color: #f5ecd6;
   font-family: Georgia, serif;
-  font-size: clamp(25px, 2.4vw, 36px);
+  font-size: calc(clamp(25px, 2.4vw, 36px) * var(--text-scale, 1));
   font-weight: 500;
   letter-spacing: -.04em;
   line-height: 1;
@@ -2015,7 +2015,7 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
     min-height: 116px;
     padding: 9px 12px;
   }
-  .brand-mark { width: 39px; height: 39px; font-size: calc(18px * var(--text-scale, 1)); }
+  .brand-mark { width: calc(39px * var(--text-scale, 1)); height: calc(39px * var(--text-scale, 1)); font-size: calc(18px * var(--text-scale, 1)); }
   .brand-name { font-size: calc(27px * var(--text-scale, 1)); }
   .brand-kicker { margin-top: 4px; font-size: calc(7px * var(--text-scale, 1)); }
   .capacity-copy,
@@ -2240,7 +2240,7 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 :is(.nation-document[data-nation-theme="korund"], .game-inspector-body .nation-document[data-nation-theme="korund"]){border:3px dashed var(--nation-accent);border-radius:2px}
 :is(.nation-document[data-nation-theme="aurelle"], .game-inspector-body .nation-document[data-nation-theme="aurelle"]){border:4px double var(--nation-edge);border-radius:10px 3px}
 .nation-document-masthead{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--nation-edge);font-size:calc(12px * var(--text-scale, 1));font-weight:700;letter-spacing:.035em}
-.nation-document-mark{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;flex:0 0 30px;border:1px solid currentColor;color:var(--nation-accent);font-size:calc(22px * var(--text-scale, 1));line-height:1}
+.nation-document-mark{display:inline-flex;align-items:center;justify-content:center;width:calc(30px * var(--text-scale, 1));height:calc(30px * var(--text-scale, 1));flex:0 0 calc(30px * var(--text-scale, 1));border:1px solid currentColor;color:var(--nation-accent);font-size:calc(22px * var(--text-scale, 1));line-height:1}
 [data-nation-theme="korund"]>.nation-document-masthead .nation-document-mark{border:2px dashed currentColor;transform:rotate(-5deg)}
 [data-nation-theme="aurelle"]>.nation-document-masthead .nation-document-mark{border:3px double currentColor;border-radius:50%}
 :is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]) :is(p,small,dt,dd,h2,h3,h4,summary,label,[role="status"]){color:inherit}:is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]) :is(button,input,textarea,select){color:var(--nation-ink);background:var(--nation-paper);border:1px solid var(--nation-edge)}
