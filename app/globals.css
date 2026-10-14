@@ -2263,3 +2263,6 @@ html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; 
 .korund-quota-own { background: var(--gold, #efd69c); }
 .korund-coupons ul { margin: 6px 0; padding-left: 18px; }
 .korund-coupons li { margin: 4px 0; }
+
+/* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
+button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }

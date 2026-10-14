@@ -29,6 +29,7 @@ import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
 import { SceneNews } from './world-scene';
 import { firstLoopStep } from '@/lib/first-loop';
+import { starterCopyFor } from '@/lib/starter-copy';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { WalletPanel } from './wallet-panel';
@@ -1455,10 +1456,10 @@ export default function Home() {
     return () => { active = false; };
   }, [citizenNationId]);
   const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
-  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
+  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,copy:starterCopyFor(citizenNation.id),enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
-  const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
+  const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;
   useEffect(() => {
