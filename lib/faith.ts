@@ -71,6 +71,12 @@ export function devotionFromEvents(events: { day: number; amount: number }[], to
   if (last !== null) devotion = Math.max(0, devotion - devotionDecayPerGameDay * Math.max(0, today - last));
   return devotion;
 }
+/** #224: Officiant service days for the current faith (table from migration 0026; absent before it is applied). */
+export async function serviceDays(db: GameDatabase, userId: string, faithId: string, since: number): Promise<number[]> {
+  try { return (await db.prepare('SELECT game_day FROM officiant_service WHERE user_id=? AND faith_id=? AND served_at>=? ORDER BY game_day').bind(userId, faithId, since).all<{ game_day: number }>()).results.map(r => Number(r.game_day)); }
+  catch { return []; }
+}
+export const devotionPerService = 2;
 
 type FaithRow = { faith_id: FaithChoice; hidden_faith_id: WorshipFaithId | null; chosen_at: number; changed_at: number | null; request_id: string };
 const label = (id: FaithChoice) => id === 'unaffiliated' ? unaffiliatedCopy.name : faithCopy[id].name;
@@ -87,9 +93,10 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const worshipFaith: WorshipFaithId | null = faith !== 'unaffiliated' ? faith : null; // Korund hidden faiths have no public worship in the PoC
   const today = gameDayOf(now);
   const days = worshipFaith ? (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, worshipFaith, row?.chosen_at ?? 0).all<{ game_day: number }>()).results.map(r => Number(r.game_day)) : [];
+  const service = worshipFaith ? await serviceDays(db, userId, worshipFaith, row?.chosen_at ?? 0) : [];
   const joins = supported ? await festivalJoins(db, userId) : [];
   const festivalDays = worshipFaith ? joins.filter(j => j.faith_id === worshipFaith && Number(j.joined_at) >= Number(row?.chosen_at ?? 0)).map(j => Number(j.game_day)) : [];
-  const devotion = devotionFromEvents([...days.map(day => ({ day, amount: devotionPerWorship })), ...festivalDays.map(day => ({ day, amount: devotionPerFestival }))], today);
+  const devotion = devotionFromEvents([...days.map(day => ({ day, amount: devotionPerWorship })), ...service.map(day => ({ day, amount: devotionPerService })), ...festivalDays.map(day => ({ day, amount: devotionPerFestival }))], today);
   const calendar = supported ? festivalCalendar(nationId!, worshipFaith, today, gameDaySeconds, new Set(joins.map(j => `${j.festival_id}:${Number(j.occurrence)}`)), enabled) : null;
   // A first pick (including Unaffiliated) is free and starts no cooldown; only a later change does (changed_at).
   const changeAvailableAt = row?.changed_at != null ? Number(row.changed_at) + faithChangeCooldownSeconds : null;
