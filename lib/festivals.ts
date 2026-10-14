@@ -78,3 +78,11 @@ export async function festivalJoins(db: GameDatabase, userId: string): Promise<{
   try { return (await db.prepare('SELECT festival_id,occurrence,faith_id,game_day,joined_at FROM citizen_festival_joins WHERE user_id=? ORDER BY game_day').bind(userId).all<{ festival_id: string; occurrence: number; faith_id: string; game_day: number; joined_at: number }>()).results; }
   catch { return []; }
 }
+
+/** #291: nations in which `gameDay` is an endorsed festival public holiday (docs 14.4). Pure; used by the world tick for the Stability input. */
+export function holidayNationsOn(gameDay: number, gameDaySeconds: number): Set<string> {
+  const nations = new Set<string>();
+  for (const nation of ['kindle', 'korund', 'aurelle'] as const)
+    if (festivalCalendar(nation, null, gameDay, gameDaySeconds, new Set(), true).holiday) nations.add(nation);
+  return nations;
+}
