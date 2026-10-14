@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en" data-nation="kindle" data-screen="world">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harimu · Visual direction v2 (static mockup)</title>
+<meta name="robots" content="noindex">
+<style>
+/* Visual direction v2 (#180): STATIC MOCKUP. Four zoom levels, four compositions, one design language.
+   Real Harimu names from the repo/docs; anything marked "placeholder" is invented for layout only. */
+:root{--bg:#0c171c;--panel:#111f26;--panel-2:#152831;--line:#26404a;--ink:#e3ecec;--muted:#9fb6bb;--good:#7ad69a;--warn:#e8c46a;--risk:#ef8a7a;--ally:#6fd3c4;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:Inter,"Segoe UI",system-ui,sans-serif;--pad:clamp(12px,1.3vw,20px)}
+[data-nation=kindle]{--accent:#5fd0c0;--accent-ink:#06211d;--nation:#cf4b32}
+[data-nation=korund]{--accent:#e6a57e;--accent-ink:#2a120a;--nation:#a8916c}
+[data-nation=aurelle]{--accent:#dcc185;--accent-ink:#261c06;--nation:#94afbf}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--sans)}
+h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.ph{font:500 10px/1 var(--sans);letter-spacing:1px;text-transform:uppercase;color:var(--warn);border:1px dashed var(--warn);border-radius:3px;padding:2px 4px;margin-left:6px;vertical-align:middle;white-space:nowrap}
+.eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.review{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:8px var(--pad);background:#081014;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.review strong{color:var(--ink)}.seg{display:flex;gap:4px;flex-wrap:wrap}
+.review button{background:var(--panel);border:1px solid var(--line);border-radius:4px;min-height:36px;padding:4px 10px;cursor:pointer}
+.review button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+/* Shared top bar */
+.top{display:flex;flex-wrap:wrap;align-items:stretch;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{padding:10px var(--pad);border-right:1px solid var(--line)}.brand h1{font-size:24px;line-height:1.1}.brand p{margin:3px 0 0}
+.crumbs{display:flex;align-items:center;gap:6px;padding:10px var(--pad);border-right:1px solid var(--line);font-size:13px;color:var(--muted)}.crumbs b{color:var(--ink);font:600 15px var(--serif)}
+.chips{display:flex;flex:1;flex-wrap:wrap;margin:0;padding:0;list-style:none}
+.chips li{display:grid;grid-template-columns:20px auto;column-gap:8px;align-items:center;padding:8px 14px;border-left:1px solid var(--line);flex:1 0 auto}
+.chips svg{grid-row:span 2;width:18px;height:18px;color:var(--accent)}.chips b{font-size:17px;font-variant-numeric:tabular-nums;line-height:1.15}.chips small{font-size:11px;color:var(--muted)}
+.screen{display:none}[data-screen=world] #world,[data-screen=country] #country,[data-screen=city] #city,[data-screen=household] #household{display:grid}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:var(--pad)}
+.card h2{font-size:19px;margin-bottom:8px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;text-align:left}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.meter{height:6px;border-radius:3px;background:#2a434c;overflow:hidden}.meter i{display:block;height:100%;background:var(--accent)}
+.dots{display:flex;gap:3px}.dots i{width:14px;height:5px;border-radius:2px;background:#2a434c}.dots i.on{background:var(--accent)}
+ul.plain{list-style:none;margin:0;padding:0}
+.marker{position:absolute;z-index:3;transform:translate(-50%,-50%);display:flex;align-items:center;gap:8px;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.marker .pin{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#0c171c;border:2px solid var(--accent);font:600 13px var(--sans);color:var(--accent);box-shadow:0 0 0 3px #0c171caa}
+.marker .tag{background:#0c171ce8;border:1px solid var(--line);border-radius:5px;padding:4px 8px;font-size:12px;line-height:1.3;white-space:nowrap}.marker .tag b{display:block;font:600 14px var(--serif)}
+.marker[aria-pressed=true] .pin,.marker:hover .pin{background:var(--accent);color:var(--accent-ink)}
+.marker.left{flex-direction:row-reverse}
+.keylist{display:none}
+
+/* ===== WORLD: full-bleed atlas, relations, ticker, nation card ===== */
+#world{grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:minmax(520px,calc(100vh - 140px)) auto;grid-template-areas:"atlas card" "ticker ticker";position:relative}#world .atlas{grid-area:atlas}#world .ticker{grid-area:ticker}#world .keylist{grid-area:keys}
+.atlas{position:relative;overflow:hidden;background:#0a1418}
+.atlas>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.atlas>svg.rel{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+.rel path{fill:none}.rel .casing{stroke:#0c171c;stroke-width:6;opacity:.75}.rel .ally{stroke:var(--ally);stroke-width:3}.rel .tension{stroke:#ff9a88;stroke-width:3;stroke-dasharray:1.6 1.1}
+.atlas .legend{position:absolute;z-index:4;left:var(--pad);bottom:var(--pad);background:#0c171ce8;border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:12px}
+.legend .ln{display:inline-block;width:26px;height:0;border-top:2.5px solid var(--ally);vertical-align:middle;margin-right:6px}.legend .ln.t{border-top:2.5px dashed #ff9a88}
+.nation-card{grid-area:card;border-radius:0;border-width:0 0 0 1px;overflow:auto}
+.nation-card .swatch{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.nation-card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:10px 0;font-size:13px}.nation-card dt{color:var(--muted)}.nation-card dd{margin:0}
+.ticker{display:flex;align-items:stretch;border-top:1px solid var(--line);background:#081014}
+.ticker h2{flex:none;display:flex;align-items:center;padding:0 var(--pad);font-size:14px;letter-spacing:1.5px;text-transform:uppercase;font-family:var(--sans);color:var(--accent);border-right:1px solid var(--line)}
+.ticker ul{display:flex;gap:28px;overflow-x:auto;padding:12px var(--pad);margin:0;list-style:none;scrollbar-width:thin}
+.ticker li{white-space:nowrap;font-size:13.5px}.ticker li b{color:var(--muted);font-weight:500;margin-right:6px}
+
+/* ===== COUNTRY: national map + government panel + notables + headlines ===== */
+#country{grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);grid-template-areas:"map gov" "notables news";gap:var(--pad);padding:var(--pad)}
+.nmap{grid-area:map;position:relative;min-height:440px;padding:0;overflow:hidden;background:radial-gradient(ellipse at 40% 40%,#1a3540,#0c1a20)}
+.nmap svg{position:absolute;inset:0;width:100%;height:100%}
+.nmap .region{fill:color-mix(in srgb,var(--nation) 32%,#13262e);stroke:#6b8a90;stroke-width:1.2}
+.nmap .region.b{fill:color-mix(in srgb,var(--nation) 20%,#13262e)}.nmap .region.c{fill:color-mix(in srgb,var(--nation) 44%,#13262e)}
+.nmap .river{stroke:#5ea6c4;stroke-width:3;fill:none;opacity:.8}.nmap .road{stroke:#c9b48a;stroke-width:1.5;stroke-dasharray:4 4;fill:none;opacity:.7}
+.nmap .rlabel{fill:#cfdcdd;font:italic 600 14px var(--serif);letter-spacing:2px;text-transform:uppercase;opacity:.75}
+.nmap header{position:absolute;z-index:3;left:var(--pad);top:var(--pad)}
+.gov{grid-area:gov}
+.gov .ruler{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:center;margin-bottom:12px}
+.mono{display:grid;place-items:center;border-radius:50%;background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 35%,#1b2f37),#0e1a1f);color:var(--ink);font:600 22px var(--serif);border:1px solid var(--accent)}
+.gov .ruler .mono{width:56px;height:56px}
+.gov dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0 0 12px;font-size:13.5px}.gov dt{color:var(--muted)}.gov dd{margin:0}
+.laws li{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}.laws li span{color:var(--accent);font-weight:600;min-width:58px}
+.notables{grid-area:notables}.notables ul{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.notables li{display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel-2)}
+.notables .mono{width:44px;height:44px;font-size:17px}.notables b{font:600 15px var(--serif);display:block}.notables small{color:var(--muted);font-size:12px}
+.badge-ai{display:inline-block;font-size:10px;letter-spacing:1px;border:1px solid var(--accent);color:var(--accent);border-radius:3px;padding:0 4px;margin-left:4px}
+.news{grid-area:news}.news li{padding:10px 0;border-top:1px solid var(--line)}.news li b{display:block;font:600 15px/1.35 var(--serif)}.news li small{color:var(--muted)}
+
+/* ===== CITY: isometric district, neighbours, shift strip, chatter, decision ===== */
+#city{grid-template-columns:minmax(0,1fr) minmax(300px,30%);grid-template-rows:minmax(480px,1fr) auto;grid-template-areas:"district side" "shift side"}
+.district{grid-area:district;position:relative;overflow:hidden;background:linear-gradient(180deg,#0f2129,#0b171c)}
+.district{display:flex;align-items:center;justify-content:center}.iso-stage{position:relative;width:min(100%,calc((100vh - 200px) * 1.613));aspect-ratio:1000/620}.iso-stage svg{position:absolute;inset:0;width:100%;height:100%}
+.district .tagline{position:absolute;z-index:3;left:var(--pad);top:var(--pad)}
+.home-you .pin{width:38px;height:38px;border-width:3px;background:var(--accent);color:var(--accent-ink)}
+.home-you .tag{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 22%,#0c171c)}.home-you .pin{box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 35%,transparent)}
+.marker.nb .pin{border-color:#8fb0b6;color:#cfe0e3}.marker.nb .tag{font-size:11.5px}
+.peek{position:absolute;z-index:6;right:var(--pad);bottom:var(--pad);width:min(300px,46%)}
+.peek[hidden]{display:none}
+.shift{grid-area:shift;display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px var(--pad);border-top:1px solid var(--line);background:var(--panel)}
+.shift .now{flex:1 1 320px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:center}
+.shift .now .meter{grid-column:1/-1}
+.shift ol{display:flex;gap:8px;margin:0;padding:0;list-style:none;flex-wrap:wrap}.shift ol li{border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12.5px}.shift ol li b{display:block;font-size:13px}
+.cside{grid-area:side;display:flex;flex-direction:column;gap:0;background:var(--panel);border-left:1px solid var(--line)}
+.cside section{padding:var(--pad);border-bottom:1px solid var(--line)}
+.decision .choices{display:grid;gap:8px;margin-top:10px}.decision .btn{width:100%;justify-content:space-between}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;font-size:12.5px}.facts h3{font:600 12.5px var(--sans)}.facts .k h3{color:var(--accent)}.facts .a h3{color:var(--warn)}.facts ul{margin:4px 0 0;padding-left:16px;color:#c7d5d7}
+.chatter li{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}.chatter .mono{width:30px;height:30px;font-size:13px}.chatter small{color:var(--muted)}
+
+/* ===== HOUSEHOLD: interior, family cards, pantry, schedule, first-week goals ===== */
+#household{grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr);grid-template-areas:"room room" "family pantry" "family schedule" "goals goals";gap:var(--pad);padding:var(--pad)}
+.room{grid-area:room;position:relative;height:300px;padding:0;overflow:hidden;background:#1b1410}
+.room svg{position:absolute;inset:0;width:100%;height:100%}
+.room .caption{position:absolute;z-index:2;left:var(--pad);bottom:var(--pad);background:#120d0ae6;border:1px solid #5a4636;border-radius:6px;padding:8px 12px;max-width:440px}
+.family{grid-area:family}.family ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.person{display:grid;grid-template-columns:96px 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel-2);min-height:150px;width:100%;padding:0;text-align:left;cursor:pointer}
+.person[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.person img{width:96px;height:100%;object-fit:cover}.person .info{padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.person b{font:600 17px var(--serif)}.person small{color:var(--muted);font-size:12px}
+.need{display:grid;grid-template-columns:52px 1fr;gap:8px;align-items:center;font-size:11.5px;color:var(--muted)}
+.pantry{grid-area:pantry}.pantry ul{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.pantry li{border:1px solid var(--line);border-radius:6px;padding:8px;text-align:center}.pantry li b{display:block;font-size:20px}.pantry li small{color:var(--muted)}
+.schedule{grid-area:schedule}.schedule ol{margin:0;padding:0;list-style:none}.schedule li{display:grid;grid-template-columns:54px 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:13.5px}.schedule li time{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:600}.schedule li.now{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.goals{grid-area:goals}.goals ul{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.goals li{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:6px;padding:10px 12px}.goals li .st{font-weight:600;font-size:12px;min-width:92px}.goals .done{color:var(--good)}.goals .todo{color:var(--accent)}.goals .nt{color:var(--muted)}
+
+/* ===== Mobile ===== */
+@media (max-width:900px){
+ .chips li{flex:1 1 30%;padding:6px 10px}.crumbs{flex:1 1 100%;border-right:0;border-top:1px solid var(--line)}
+ /* Labels never overlap: scenes show numbered pins only; the labelled list sits under the scene. */
+ .marker .tag{display:none}.keylist{display:block;padding:12px var(--pad);background:var(--panel);border-top:1px solid var(--line)}
+ .keylist ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+ .keylist button{width:100%;min-height:44px;display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:center;text-align:left;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;cursor:pointer;font-size:13px}
+ .keylist button[aria-pressed=true]{border-color:var(--accent)}
+ .keylist .n{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--accent);font-size:12px;font-weight:600;color:var(--accent)}
+ .keylist small{display:block;color:var(--muted);font-size:11.5px}
+ #world{grid-template-columns:minmax(0,1fr);grid-template-rows:56vh auto auto auto;grid-template-areas:"atlas" "keys" "card" "ticker"}
+ .nation-card{border-width:1px 0 0}
+ .atlas .legend{left:8px;bottom:8px;font-size:11px;padding:6px 8px}
+ #country{grid-template-columns:1fr;grid-template-areas:"map" "gov" "notables" "news"}.nmap{min-height:320px}.notables ul{grid-template-columns:1fr}
+ #city{grid-template-columns:1fr;grid-template-rows:auto;grid-template-areas:"district" "keys" "shift" "side"}.district{min-height:360px}.cside{border-left:0}
+ #city .keylist{grid-area:keys}.peek{position:static;width:auto;margin:var(--pad)}
+ .facts{grid-template-columns:1fr}
+ #household{grid-template-columns:1fr;grid-template-areas:"room" "family" "pantry" "schedule" "goals"}.room{height:220px}.family ul{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <symbol id="i-coin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></symbol>
+ <symbol id="i-bread" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11a4 4 0 0 1 4-4h8a4 4 0 0 1 1 7.9V19H7v-4.1A4 4 0 0 1 4 11Z"/></symbol>
+ <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></symbol>
+ <symbol id="i-cube" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm0 9 8-4.5M12 12v9M12 12 4 7.5"/></symbol>
+ <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3V5Zm18 0h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7V5Z"/></symbol>
+ <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v16M6 20h12M5 8h14M5 8l-3 6h6L5 8Zm14 0-3 6h6l-3-6Z"/></symbol>
+ <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+</svg>
+
+<nav class="review" aria-label="Mockup review controls">
+ <strong>Visual direction v2 · static mockup</strong>
+ <span class="seg" role="group" aria-label="Zoom level"><button data-set-screen="world">World</button><button data-set-screen="country">Country</button><button data-set-screen="city">City</button><button data-set-screen="household">Household</button></span>
+ <span class="seg" role="group" aria-label="Nation accent"><button data-set-nation="kindle">Kindle</button><button data-set-nation="korund">Korund</button><button data-set-nation="aurelle">Aurelle</button></span>
+ <span>Not game data · <span class="ph" style="margin:0">placeholder</span> marks invented content</span>
+</nav>
+
+<header class="top">
+ <div class="brand"><h1>Harimu</h1><p class="eyebrow" id="t-nation">Kindle Republic</p></div>
+ <nav class="crumbs" aria-label="Zoom level"><span id="crumbs"></span></nav>
+ <ul class="chips" aria-label="Your resources">
+  <li><svg aria-hidden="true"><use href="#i-bolt"/></svg><b>18</b><small>Work capacity</small></li>
+  <li><svg aria-hidden="true"><use href="#i-coin"/></svg><b id="t-cash">412 SPK</b><small>Wallet</small></li>
+  <li><svg aria-hidden="true"><use href="#i-bread"/></svg><b>6</b><small>Food</small></li>
+  <li><svg aria-hidden="true"><use href="#i-cube"/></svg><b>3</b><small>Materials</small></li>
+  <li><svg aria-hidden="true"><use href="#i-book"/></svg><b>9</b><small>Knowledge</small></li>
+  <li><svg aria-hidden="true"><use href="#i-scale"/></svg><b>Day 3 · 12×</b><small>World clock</small></li>
+ </ul>
+</header>
+
+<!-- WORLD -->
+<main id="world" class="screen" aria-labelledby="w-h">
+ <section class="atlas" aria-labelledby="w-h">
+  <h2 id="w-h" style="position:absolute;left:-9999px">World atlas</h2>
+  <img src="/harimu-world-atlas.jpg" alt="Painted atlas of the Harimu continent with ten nations: mountains, forests, deserts and coasts.">
+  <svg class="rel" id="rel" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+  <div id="w-markers"></div>
+  <div class="legend" role="note" aria-label="Map legend"><div><span class="ln"></span>Alliance or trade pact</div><div><span class="ln t"></span>Tension</div><div style="margin-top:4px;color:var(--muted)">Relations are <span class="ph" style="margin:0">placeholder</span></div></div>
+ </section>
+ <aside class="nation-card card" id="w-card" aria-live="polite"></aside>
+ <div class="keylist" id="w-keys"></div>
+ <section class="ticker" aria-labelledby="tk-h"><h2 id="tk-h">World news</h2><ul id="ticker"></ul></section>
+</main>
+
+<!-- COUNTRY -->
+<main id="country" class="screen" aria-labelledby="c-h">
+ <section class="nmap card" aria-labelledby="c-h">
+  <header><p class="eyebrow">Country map</p><h2 id="c-h" style="font-size:26px"></h2></header>
+  <svg viewBox="0 0 600 420" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+   <path class="region" d="M40 120 L190 60 L300 90 L280 210 L150 240 L60 210 Z"/>
+   <path class="region c" d="M300 90 L470 70 L560 150 L520 250 L380 240 L280 210 Z"/>
+   <path class="region b" d="M60 210 L150 240 L280 210 L380 240 L360 370 L200 390 L90 330 Z"/>
+   <path class="region" d="M380 240 L520 250 L540 350 L430 390 L360 370 Z"/>
+   <path class="river" d="M120 60 C170 140 230 170 270 230 S360 330 420 400"/>
+   <path class="road" id="roads" d="M175 150 L415 160 M175 150 L250 300 M415 160 L250 300"/>
+   <text class="rlabel" x="110" y="150" id="rg1"></text><text class="rlabel" x="400" y="120" id="rg2"></text><text class="rlabel" x="150" y="330" id="rg3"></text><text class="rlabel" x="420" y="320" id="rg4"></text>
+  </svg>
+  <div id="c-markers"></div>
+ </section>
+ <section class="gov card" aria-labelledby="g-h">
+  <h2 id="g-h">Government</h2>
+  <div class="ruler"><span class="mono" id="g-mono" aria-hidden="true"></span><div><b id="g-ruler" style="font:600 18px var(--serif)"></b><span class="badge-ai">AI</span><br><small id="g-role" style="color:var(--muted)"></small></div></div>
+  <dl><dt>Regime</dt><dd id="g-regime"></dd><dt>Faith</dt><dd id="g-faith"></dd><dt>Currency</dt><dd id="g-cur"></dd><dt>Stability</dt><dd><span id="g-stab"></span><div class="meter" role="img" id="g-stab-m"><i></i></div></dd></dl>
+  <h3 style="font-size:15px;margin:6px 0 2px">Laws in force <span class="ph">placeholder</span></h3>
+  <ul class="plain laws" id="laws"></ul>
+  <div id="project" style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--panel-2)"></div>
+ </section>
+ <section class="notables card" aria-labelledby="n-h"><h2 id="n-h">Notables <span class="badge-ai">AI</span></h2><ul class="plain" id="notables"></ul></section>
+ <section class="news card" aria-labelledby="nh-h"><h2 id="nh-h">National headlines</h2><ul class="plain" id="headlines"></ul></section>
+</main>
+
+<!-- CITY -->
+<main id="city" class="screen" aria-labelledby="ci-h">
+ <section class="district" aria-labelledby="ci-h">
+  <div class="tagline"><p class="eyebrow">District view</p><h2 id="ci-h" style="font-size:26px"></h2></div>
+  <div class="iso-stage"><svg id="iso" viewBox="0 0 1000 620" aria-hidden="true"></svg><div id="ci-markers"></div></div>
+  <aside class="peek card" id="peek" hidden aria-live="polite"></aside>
+ </section>
+ <div class="keylist" id="ci-keys"></div>
+ <section class="shift" aria-labelledby="sh-h">
+  <div class="now"><h2 id="sh-h" style="font-size:16px">Active shift</h2><span id="sh-name"></span><b id="sh-left" style="font-variant-numeric:tabular-nums">1h 12m left</b><div class="meter" role="img" aria-label="Shift 64% complete"><i style="width:64%"></i></div></div>
+  <ol id="sh-next" aria-label="Open work orders"></ol>
+ </section>
+ <aside class="cside">
+  <section class="decision" aria-labelledby="d-h"><p class="eyebrow">Decision point</p><h2 id="d-h" style="font-size:20px;margin-top:4px"></h2><p id="d-text" style="font-size:14px;color:#cfdcdd;margin:8px 0 0"></p>
+   <div class="choices" id="d-choices"></div>
+   <div class="facts"><div class="k"><h3>✓ What we know</h3><ul id="d-know"></ul></div><div class="a"><h3>! What we assume</h3><ul id="d-assume"></ul></div></div></section>
+  <section class="chatter" aria-labelledby="ch-h"><h2 id="ch-h" style="font-size:17px">City square chatter <span class="ph">placeholder</span></h2><p style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">6 citizens walking this district now <span class="ph">proposal</span></p><ul class="plain" id="chatter"></ul></section>
+ </aside>
+</main>
+
+<!-- HOUSEHOLD -->
+<main id="household" class="screen" aria-labelledby="h-h">
+ <section class="room card" aria-labelledby="h-h">
+  <svg viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+   <rect width="1200" height="300" fill="#2a1d15"/><rect y="215" width="1200" height="85" fill="#3b2a1e"/>
+   <g stroke="#4a3526" stroke-width="2"><line x1="0" y1="235" x2="1200" y2="235"/><line x1="0" y1="262" x2="1200" y2="262"/></g>
+   <rect x="80" y="40" width="190" height="130" rx="4" fill="#4c6b78"/><rect x="80" y="40" width="190" height="130" rx="4" fill="none" stroke="#6b5240" stroke-width="10"/><line x1="175" y1="40" x2="175" y2="170" stroke="#6b5240" stroke-width="6"/><circle cx="230" cy="80" r="16" fill="#e8d9a0" opacity=".7"/>
+   <path d="M470 220 V90 h170 v130" fill="#3a2a20" stroke="#5a4232" stroke-width="6"/><rect x="495" y="150" width="120" height="70" fill="#130d0a"/><path d="M520 220 q35 -70 70 0" fill="#f2a03d"/><path d="M535 220 q20 -45 40 0" fill="#ffd27a"/>
+   <rect x="800" y="60" width="300" height="10" fill="#6b5240"/><rect x="800" y="120" width="300" height="10" fill="#6b5240"/><rect x="800" y="180" width="300" height="10" fill="#6b5240"/>
+   <g fill="#c9a26a"><rect x="820" y="30" width="30" height="30" rx="4"/><rect x="860" y="38" width="22" height="22" rx="3"/><ellipse cx="930" cy="105" rx="26" ry="14"/><rect x="980" y="90" width="26" height="30" rx="4"/><rect x="830" y="150" width="40" height="30" rx="4"/></g>
+   <rect x="300" y="200" width="300" height="16" rx="3" fill="#7a5a40"/><rect x="320" y="216" width="12" height="60" fill="#5a4232"/><rect x="568" y="216" width="12" height="60" fill="#5a4232"/>
+   <radialGradient id="glow"><stop offset="0" stop-color="#f2a03d" stop-opacity=".35"/><stop offset="1" stop-color="#f2a03d" stop-opacity="0"/></radialGradient><circle cx="555" cy="190" r="260" fill="url(#glow)"/>
+  </svg>
+  <div class="caption"><p class="eyebrow" style="color:#d9c3a5">Home · interior</p><h2 id="h-h" style="font-size:24px">The Vale household</h2><p style="margin:2px 0 0;font-size:13px;color:#d9c9b5">Townhouse template on plot 14 · Hearth lit · 2 meals possible <span class="ph">proposal</span></p></div>
+ </section>
+ <section class="family card" aria-labelledby="f-h"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><h2 id="f-h" style="margin:0">Family</h2><button class="btn" type="button" style="min-height:36px;padding:4px 10px">Customize home <span class="ph">proposal</span></button></div><ul class="plain" id="family"></ul></section>
+ <section class="pantry card" aria-labelledby="p-h"><h2 id="p-h">Meals and pantry</h2><ul class="plain" id="pantry"></ul><p style="font-size:13px;color:var(--muted);margin:10px 0">A meal uses 2 food and restores work capacity. Next meal ready at <b style="color:var(--ink)">11:40</b>.</p><button class="btn primary" type="button">Cook a meal <svg width="18" height="18" aria-hidden="true"><use href="#i-arrow"/></svg></button></section>
+ <section class="schedule card" aria-labelledby="s-h"><h2 id="s-h">Today’s schedule</h2><ol id="schedule"></ol></section>
+ <section class="goals card" aria-labelledby="gl-h"><h2 id="gl-h">First week · <span id="gl-theme"></span></h2><ul class="plain" id="goals"></ul></section>
+</main>
+
+<script>
+const NATIONS=[['kindle','Kindle Republic','Liberal democracy','#cf4b32',85,67,'Forgehaven'],['confluence','The Confluence','Single-party socialist state','#2776a6',50,88,'Meetwater'],['meridian','Meridian','Party-state','#a1639c',72,82,'Steamgate'],['korund','Korund','Full communism; leader for life','#75654e',14,45,'Stonehearth'],['aurelle','Aurelle','Absolute hereditary monarchy','#94afbf',72,28,'Highspire'],['ilmar','Ilmar Sanctum','Theocracy','#d3a72f',28,82,'Mirrorhall'],['hoarvale','Hoarvale','Constitutional monarchy','#45a7b8',50,20,'Rimehall'],['varkand','Varkand','Military junta','#526b68',28,28,'Watchfast'],['veldwood','Veldwood','Federal direct democracy','#5b8d42',14,65,'Ringhall'],['fulmara','Fulmara','Mercantile oligarchic republic','#6440a0',86,46,'Arcport']];
+const REL={ally:[['kindle','fulmara'],['hoarvale','aurelle'],['confluence','meridian'],['veldwood','kindle']],tension:[['korund','varkand'],['kindle','meridian'],['aurelle','ilmar']]}; // placeholder relations
+const N={
+ kindle:{name:'Kindle Republic',cash:'412 SPK',cur:'Spark (SPK) · free float',faith:'Secular pluralism',ruler:['IV','Ines Varro','President · elected'],regime:'Liberal democracy',stab:78,cities:[['Forgehaven','Capital · Assembly',175,150,true],['Tarrek Foundry','Foundries · lava fields',415,160],['Kolt Savanna','Granaries · farms',250,300]],regions:['Plateau','Lava Fields','Savanna','Coast'],
+  laws:[['Open','Posted prices on every market stall'],['Vote','Preview ballot ranks AI candidates'],['Work','Wages settle at each shift deadline']],
+  notables:[['RA','Rennek Ashby','Foundry union organizer'],['OB','Odo Brasswell','Emberball league owner'],['KT','Kaya Tarrek','Broadsheet cartoonist']],
+  press:'Kindle Press',heads:[['Assembly opens debate on foundry wages','Kindle Press · sourced'],['Savanna harvest beats forecast','Kindle Press · 2 sources'],['Preview ballot closes at 23:00','Electoral office']],
+  city:'Forgehaven',temple:['Open temple','Secular pluralism · all faiths'],work:['Foundry yard','Freight shift · pays SPK'],square:'Assembly square',
+  decision:['Rank the candidates tonight','The preview ballot closes at 23:00. Three AI candidates published programmes; only one says how it pays for grain.',['Rank the candidates','Read the programmes first'],['Take a freight shift','6 capacity · pays at the deadline'],['Post in the square','Ask what neighbours think']],
+  know:['Ballot closes 23:00.','Two programmes are costed.'],assume:['Grain prices hold.','Turnout is high.'],
+  week:['Many voices on one plaza',[['done','Say your piece in the city square.'],['nt','Read Kindle Press and check where each story comes from.']]],
+  shift:'Move a foundry convoy · +210 materials',project:['Assembly railway to Tarrek Foundry','Funded by Assembly law · private sponsors welcome',46],works:'New road · Mayor’s pick',orders:[['Support the savanna harvest','4 cap · 2h'],['Catalogue the civic archive','3 cap · 3h']]},
+ korund:{name:'Korund',cash:'96 LN',cur:'Labor Note (LN) + ration coupons',faith:'State atheism',ruler:['NV','Neral Voss','Chairman · leader for life'],regime:'Full communism; leader for life',stab:68,cities:[['Stonehearth','Capital · Presidium',175,150,true],['Strova Mines','Mines · rail',415,160],['Gren Plateau','Collective farms',250,300]],regions:['Granite Ridge','Strova','Gren Plateau','Rail Belt'],
+  laws:[['Plan','Brigade quotas set weekly'],['Ration','Coupons expire at week end'],['Order','Queue position is fairness']],
+  notables:[['SG','Strova Gren','Brigade leader'],['GT','Gruna Toss','Canteen cook'],['VK','Vardo Krel','Decorated veteran builder']],
+  press:'Korund State Media',heads:[['Brigades exceed plan in Strova Mines','State Media'],['Ration queue opens at six','State Media'],['Chairman praises steady hands','State Media']],
+  city:'Stonehearth',temple:['Workers’ hall','State atheism · no temple'],work:['Brigade yard','Quota shift · pays LN'],square:'Presidium plaza',
+  decision:['Two shifts short of the plan','Your brigade is two shifts short of the weekly plan. The ration queue opens at six.',['Work a quota shift','Plan before comfort'],['Join the ration queue','Order is fairness'],['Greet your comrades','The square is listening']],
+  know:['Queue opens 06:00.','Coupons expire Day 7.'],assume:['The plan holds.','Stock lasts the queue.'],
+  week:['Queue and comrades',[['todo','Take your place in the ration queue.'],['done','Greet your comrades in the city square.']]],
+  shift:'Assigned quota shift · +4 state food',project:['Strova rail spur','Five-Year Plan quota · brigades assigned',63],works:'Ration depot · plan quota',orders:[['Rail belt repairs','5 cap · 3h'],['Canteen service','3 cap · 2h']]},
+ aurelle:{name:'Aurelle',cash:'58 CRN',cur:'Crown (CRN) · gold-backed',faith:'Kinward Rite state church',ruler:['MS','Maera Solenne','Monarch · hereditary'],regime:'Absolute hereditary monarchy',stab:81,cities:[['Highspire','Capital · royal cliffs',175,150,true],['Windrest','Silk looms · wind vanes',415,160],['Highmere','Gardens · windmills',250,300]],regions:['Royal Gorge','Windrest','Highmere','Crown Lands'],
+  laws:[['Decree','Royal decrees bind all estates'],['Rank','Bow as rank requires'],['Favor','Royal Favor earned by service']],
+  notables:[['AW','Aelis of Windrest','Skysilk guild master'],['CH','Corwen Highmere','Hearth-Keeper of the Kinward Rite'],['SV','Sieran Vale','Landless knight']],
+  press:'Court Gazette',heads:[['Monarch decrees new bridge tolls','Court Gazette'],['Windrest looms receive charter','Court Gazette'],['Honors list published','Court Gazette']],
+  city:'Highspire',temple:['Kinward hearth-temple','Kinward Rite · name-stones'],work:['Royal estate','Service shift · pays CRN'],square:'Gilded bridge square',
+  decision:['A call for estate service','The court posts a call for estate service. Royal Favor is earned one shift at a time.',['Answer the call','Serve the royal estate'],['Visit the hearth-temple','Tend your name-stone'],['Pay respects in the square','Mind your rank']],
+  know:['Service pays Crowns.','The decree is posted.'],assume:['Favor follows service.','Tolls stay low.'],
+  week:['Every thread in its place',[['nt','Read the Court Gazette: today’s decrees and honors.'],['todo','Pay your respects in the city square.']]],
+  shift:'Royal estate service · +CRN',project:['Gilded bridge over the gorge','Royal decree · fiefs owe contributions',28],works:'Guild hall · chartered',orders:[['Windrest loom work','4 cap · 3h'],['Bridge upkeep','5 cap · 4h']]}};
+const HH=[['/assets/household/leora-vale.webp','Leora Vale','34 · keeps the books',[80,60],'Content',5],['/assets/household/toma-vale.webp','Toma Vale','37 · on shift',[65,40],'Tired',4],['/assets/household/mika-vale.webp','Mika Vale','9 · has a cough',[70,35],'Unwell',4],['/assets/household/niko-vale.webp','Niko Vale','13 · apprentice',[55,75],'Restless',3]];
+const NEIGH=[['Tarrek household','4 members · friendly'],['Moss household','2 members · new arrivals'],['Okafor household','5 members · tense with you'],['Ruel household','3 members · owes you 2 food']]; // placeholder neighbours
+const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let pickedNation='kindle';
+function marker({x,y,n,title,sub,cls='',pressed=false,left=false,data=''}){return `<button type="button" class="marker ${cls}${left?' left':''}" style="left:${x}%;top:${y}%" aria-pressed="${pressed}" ${data} aria-label="${esc(title)}${sub?': '+esc(sub):''}"><span class="pin">${n}</span><span class="tag"><b>${esc(title)}</b>${sub?esc(sub):''}</span></button>`}
+function keylist(items,attr){return `<ol>${items.map(i=>`<li><button type="button" ${attr(i)} aria-pressed="${!!i.pressed}"><span class="n">${i.n}</span><span>${esc(i.title)}<small>${esc(i.sub||'')}</small></span></button></li>`).join('')}</ol>`}
+const ISO={tw:60,th:30,ox:540,oy:70},IP=(gx,gy)=>[ISO.ox+(gx-gy)*ISO.tw/2,ISO.oy+(gx+gy)*ISO.th/2];
+// [gx,gy,w,d,h,colour,key]
+const BLD=[[1,1,3,3,46,'#b8735a','market'],[6,1,3,3,60,'#8a7a62','work'],[10,1,3,3,40,'#7d8f9a','temple'],[1,6,3,3,40,'ACCENT','you'],[6,6,3,3,6,'#5f8f6b','square'],[10,6,3,3,8,'#6b6450','works'],[6,14,3,3,28,'#7f7466','n1'],[1,14,3,3,22,'#8a6e58',''],[10,14,3,3,30,'#76826f',''],[1,10,3,3,34,'#9b6a52','n3'],[6,10,3,3,30,'#a4865e','n0'],[10,10,3,3,34,'#8c6a58','n2']];
+function anchor(key){const b=BLD.find(v=>v[6]===key&&key);const c=IP(b[0]+b[2]/2,b[1]+b[3]/2);return [c[0]/10,(c[1]-b[4]-14)/6.2];}
+function iso(){ // isometric district (drawn, placeholder art)
+ const P=IP;
+ let s=`<defs><linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d3a32"/><stop offset="1" stop-color="#16302a"/></linearGradient></defs>`;
+ const poly=pts=>pts.map(p=>p.join(',')).join(' ');
+ const g=[P(0,0),P(14,0),P(14,18),P(0,18)];s+=`<polygon points="${poly(g)}" fill="url(#ground)" stroke="#2c4a42"/>`;
+ for(const r of [5,9]){s+=`<polygon points="${poly([P(r,0),P(r+1,0),P(r+1,18),P(r,18)])}" fill="#4b4a44"/>`;}
+ for(const r of [5,9,13]){s+=`<polygon points="${poly([P(0,r),P(14,r),P(14,r+1),P(0,r+1)])}" fill="#4b4a44"/>`;}
+ const box=(gx,gy,w,d,h,top,l,r)=>{const a=P(gx,gy),b=P(gx+w,gy),c=P(gx+w,gy+d),e=P(gx,gy+d),up=p=>[p[0],p[1]-h];
+  return `<polygon points="${poly([e,c,up(c),up(e)])}" fill="${l}"/><polygon points="${poly([c,b,up(b),up(c)])}" fill="${r}"/><polygon points="${poly([up(a),up(b),up(c),up(e)])}" fill="${top}"/>`;};
+ const acc=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#5fd0c0';
+ for(const [x,y,w,d,h,c0] of BLD){const c=c0==='ACCENT'?acc:c0;s+=box(x,y,w,d,h,c,shade(c,-30),shade(c,-55));}
+ // public works scaffold + online citizens (walkable-city proposal)
+ {const a=P(11.5,7.5);s+=`<g stroke="#e8c46a" stroke-width="2" fill="none" opacity=".9"><path d="M${a[0]-60} ${a[1]+30} l0 -70 M${a[0]+60} ${a[1]+30} l0 -70 M${a[0]-60} ${a[1]-10} l120 0 M${a[0]-60} ${a[1]-40} l120 0"/><path d="M${a[0]-60} ${a[1]+30} L${a[0]+60} ${a[1]-40}" stroke-dasharray="5 4"/></g>`;}
+ for(const [x,y] of [[5.5,3],[5.4,7.2],[7.5,7.5],[9.6,4],[8,9.6],[5.5,12]]){const p=P(x,y);s+=`<circle cx="${p[0]}" cy="${p[1]-8}" r="6" fill="#f0e2c4" stroke="#0c171c" stroke-width="2"/>`;}
+ for(const [x,y] of [[4.5,4.5],[8.5,4.6],[4.6,8.6],[13.3,8.5],[0.5,5.5]]){const p=P(x,y);s+=`<circle cx="${p[0]}" cy="${p[1]-14}" r="12" fill="#2f6b4a"/><rect x="${p[0]-2}" y="${p[1]-6}" width="4" height="8" fill="#4a3526"/>`;}
+ $('iso').innerHTML=s;
+}
+function shade(h,a){const n=parseInt(h.slice(1),16);const c=[n>>16,(n>>8)&255,n&255].map(v=>Math.max(0,Math.min(255,v+a)));return '#'+c.map(v=>v.toString(16).padStart(2,'0')).join('')}
+function render(){
+ const d=document.documentElement,n=d.dataset.nation,k=d.dataset.screen,x=N[n];
+ $('t-nation').textContent=x.name;$('t-cash').textContent=x.cash;
+ const crumbs=[['world','World'],['country',x.name],['city',x.city],['household','Vale household']];const idx=crumbs.findIndex(c=>c[0]===k);
+ $('crumbs').innerHTML=crumbs.slice(0,idx+1).map(([s,l],i)=>i===idx?`<b aria-current="page">${esc(l)}</b>`:`<a href="?screen=${s}&nation=${n}" data-go="${s}" style="color:var(--muted)">${esc(l)}</a> ›`).join(' ');
+ // WORLD
+ const rel=[];for(const [t,list] of Object.entries(REL))for(const [a,b] of list){const A=NATIONS.find(v=>v[0]===a),B=NATIONS.find(v=>v[0]===b);{const dd=`M${A[4]} ${A[5]} Q${(A[4]+B[4])/2} ${(A[5]+B[5])/2-8} ${B[4]} ${B[5]}`;rel.push(`<path class="casing" vector-effect="non-scaling-stroke" d="${dd}"/><path class="${t==='ally'?'ally':'tension'}" vector-effect="non-scaling-stroke" d="${dd}"/>`);}}
+ $('rel').innerHTML=rel.join('');
+ const wItems=NATIONS.map((v,i)=>({n:i+1,id:v[0],title:v[1],sub:v[2],x:v[4],y:v[5],pressed:v[0]===pickedNation}));
+ $('w-markers').innerHTML=wItems.map(i=>marker({...i,left:i.x>60,data:`data-pick="${i.id}"`})).join('');
+ $('w-keys').innerHTML=keylist(wItems,i=>`data-pick="${i.id}"`);
+ const P=NATIONS.find(v=>v[0]===pickedNation),pr=N[pickedNation];
+ const rels=[...REL.ally.filter(r=>r.includes(P[0])).map(r=>['Alliance',r.find(v=>v!==P[0])]),...REL.tension.filter(r=>r.includes(P[0])).map(r=>['Tension',r.find(v=>v!==P[0])])].map(([t,o])=>`${t} with ${NATIONS.find(v=>v[0]===o)[1]}`);
+ $('w-card').innerHTML=`<p class="eyebrow"><span class="swatch" style="background:${P[3]}"></span>Nation</p><h2>${esc(P[1])}</h2><dl><dt>Government</dt><dd>${esc(P[2])}</dd><dt>Capital</dt><dd>${esc(P[6])}</dd><dt>Population</dt><dd>${['kindle','varkand'].includes(P[0])?'Thriving':['aurelle','veldwood'].includes(P[0])?'Needs citizens':'Growing'} <span class="ph">placeholder</span></dd><dt>Relations</dt><dd>${rels.length?rels.map(esc).join('<br>'):'None recorded'}</dd></dl>${pr?`<p style="font-size:13px;margin:0 0 10px;color:#cfdcdd">Led by ${esc(pr.ruler[1])} (AI). ${esc(pr.faith)}.</p>`:''}<button class="btn primary" type="button" data-go="country">Open ${esc(P[1])} <svg width="18" height="18" aria-hidden="true"><use href="#i-arrow"/></svg></button>`;
+ $('ticker').innerHTML=[['Kindle Press','Assembly opens debate on foundry wages'],['Korund State Media','Brigades exceed plan in Strova Mines'],['Court Gazette','Monarch decrees new bridge tolls'],['Fulmara Exchange','Charge rises on shareholder bank news'],['Varkand Ward','Border watch doubled at Watchfast'],['Veldwood','Initiative on the Citizen Dividend qualifies']].map(([s,h])=>`<li><b>${esc(s)}</b>${esc(h)} <span class="ph">placeholder</span></li>`).join('');
+ // COUNTRY
+ $('c-h').textContent=x.name;['rg1','rg2','rg3','rg4'].forEach((id,i)=>$(id).textContent=x.regions[i]);
+ const cItems=x.cities.map((c,i)=>({n:i+1,title:c[0],sub:c[1],x:c[2]/6,y:c[3]/4.2,cls:c[4]?'home-you':''}));
+ $('c-markers').innerHTML=cItems.map(i=>marker({...i,left:i.x>60})).join('');
+ $('g-mono').textContent=x.ruler[0];$('g-ruler').textContent=x.ruler[1];$('g-role').textContent=x.ruler[2];$('g-regime').textContent=x.regime;$('g-faith').textContent=x.faith;$('g-cur').textContent=x.cur;
+ $('g-stab').textContent=`${x.stab} / 100`;$('g-stab-m').setAttribute('aria-label',`Stability ${x.stab} of 100`);$('g-stab-m').firstElementChild.style.width=x.stab+'%';
+ const [pn,pw,pp]=x.project;$('project').innerHTML=`<p class="eyebrow">National project <span class="ph">proposal</span></p><b style="font:600 16px var(--serif)">${esc(pn)}</b><p style="margin:2px 0 8px;font-size:12.5px;color:var(--muted)">${esc(pw)}</p><div class="meter" role="img" aria-label="${pp}% of contributions"><i style="width:${pp}%"></i></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12.5px"><span>${pp}% contributed · your name goes on it</span><button class="btn" type="button" style="min-height:36px;padding:4px 10px">Contribute</button></div>`;
+ $('laws').innerHTML=x.laws.map(([t,l])=>`<li><span>${esc(t)}</span>${esc(l)}</li>`).join('');
+ $('notables').innerHTML=x.notables.map(([m,nm,r])=>`<li><span class="mono" aria-hidden="true">${m}</span><div><b>${esc(nm)}</b><small>${esc(r)}</small><br><button class="btn" type="button" style="min-height:36px;margin-top:6px;padding:4px 10px;font-size:13px">Talk</button></div></li>`).join('');
+ $('headlines').innerHTML=x.heads.map(([h,s])=>`<li><b>${esc(h)}</b><small>${esc(s)} <span class="ph">placeholder</span></small></li>`).join('');
+ // CITY
+ $('ci-h').textContent=`${x.city} · ${x.square}`;iso();
+ const at=k=>{const [ax,ay]=anchor(k);return {x:ax,y:ay};};
+ const places=[{n:1,title:'Market',sub:'Posted prices · open',...at('market')},{n:2,title:x.work[0],sub:x.work[1],...at('work')},{n:3,title:x.temple[0],sub:x.temple[1],...at('temple')},{n:4,title:x.square,sub:'Notables · notice board · kiosk',...at('square'),y:at('square').y-4},{n:10,title:'Public works',sub:x.works+' · 62% (proposal)',...at('works'),y:at('works').y-2}];
+ const homes=[{n:5,title:'Your home · Vale',sub:'4 members · 2 meals',...at('you'),cls:'home-you',data:'data-go="household"'},...NEIGH.map(([t,s2],i)=>({n:6+i,title:t,sub:s2,...at('n'+i),cls:'nb',data:`data-peek="${i}"`}))];
+ const LEFT=['Okafor household','Tarrek household'];
+ $('ci-markers').innerHTML=[...places,...homes].map(i=>marker({...i,left:i.title!=='Public works'&&(i.x>60||LEFT.includes(i.title))})).join('');
+ $('ci-keys').innerHTML=keylist([...places,...homes],i=>i.data||'');
+ $('sh-name').textContent=x.shift;$('sh-next').innerHTML=x.orders.map(([t,s])=>`<li><b>${esc(t)}</b>${esc(s)}</li>`).join('');
+ const [dt,dx,...ch]=x.decision;$('d-h').textContent=dt;$('d-text').textContent=dx;
+ $('d-choices').innerHTML=ch.map(([t,s],i)=>`<button type="button" class="btn${i===0?' primary':''}"><span><b style="display:block;font:600 15px var(--serif)">${esc(t)}</b><small>${esc(s)}</small></span><svg width="18" height="18" aria-hidden="true"><use href="#i-arrow"/></svg></button>`).join('');
+ $('d-know').innerHTML=x.know.map(v=>`<li>${esc(v)}</li>`).join('');$('d-assume').innerHTML=x.assume.map(v=>`<li>${esc(v)}</li>`).join('');
+ $('chatter').innerHTML=[['MT','Moss','Anyone know if the market takes old coupons?'],['RA','Ruel','Thanks for the bread yesterday, Vales.'],['OK','Okafor','The shift board is a mess again.']].map(([m,w,t])=>`<li><span class="mono" aria-hidden="true">${m}</span><div><b>${w}</b> <small>· 4 min ago</small><br>${esc(t)}</div></li>`).join('');
+ // HOUSEHOLD
+ $('family').innerHTML=HH.map(([img,nm,meta,[food,rest],mood,trust],i)=>`<li><button type="button" class="person" aria-pressed="${i===0}"><img src="${img}" alt=""><span class="info"><b>${esc(nm)}</b><small>${esc(meta)}</small><span class="need">Fed<span class="meter" role="img" aria-label="Fed ${food}%"><i style="width:${food}%"></i></span></span><span class="need">Rested<span class="meter" role="img" aria-label="Rested ${rest}%"><i style="width:${rest}%"></i></span></span><small>Mood: <b style="font:inherit;color:var(--ink)">${mood}</b></small><span class="need">Trust<span class="dots" role="img" aria-label="Trust ${trust} of 5">${[1,2,3,4,5].map(v=>`<i class="${v<=trust?'on':''}"></i>`).join('')}</span></span></span></button></li>`).join('');
+ $('pantry').innerHTML=[['6','Food'],['2','Meals possible'],['3','Materials']].map(([v,l])=>`<li><b>${v}</b><small>${l}</small></li>`).join('');
+ $('schedule').innerHTML=[['06:00','Toma starts his shift'],['08:00','Mika rests at home','now'],['11:40','Next meal ready'],['14:00','Leora at the market'],['23:00','Ballot closes · placeholder']].map(([t,l,c])=>`<li class="${c||''}"><time>${t}</time><span>${esc(l)}${c?' <b style="color:var(--accent)">· now</b>':''}</span></li>`).join('');
+ $('gl-theme').textContent=`Day 3 · ${x.week[0]}`;
+ $('goals').innerHTML=x.week[1].map(([st,t])=>`<li><span class="st ${st}">${st==='done'?'✓ Done':st==='todo'?'To do':'Not tracked yet'}</span><span>${esc(t)}</span></li>`).join('');
+ document.querySelectorAll('[data-set-screen]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.setScreen===k));
+ document.querySelectorAll('[data-set-nation]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.setNation===n));
+}
+function peek(i){const [t,s]=NEIGH[i];const p=$('peek');p.hidden=false;p.innerHTML=`<p class="eyebrow">Neighbour · peek in <span class="ph">placeholder</span></p><h2>${esc(t)}</h2><p style="font-size:13.5px;margin:4px 0 10px">${esc(s)}. Shared well, borrowed tools last week.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button">Visit</button><button class="btn" type="button" id="peek-close">Close</button></div>`;$('peek-close').focus();}
+const q=new URLSearchParams(location.search);if(N[q.get('nation')]){document.documentElement.dataset.nation=q.get('nation');pickedNation=q.get('nation');}
+if(['world','country','city','household'].includes(q.get('screen')))document.documentElement.dataset.screen=q.get('screen');
+if(q.get('pick')&&NATIONS.some(v=>v[0]===q.get('pick')))pickedNation=q.get('pick');
+document.addEventListener('click',e=>{const t=e.target.closest('[data-set-screen],[data-set-nation],[data-go],[data-pick],[data-peek],#peek-close');if(!t)return;
+ if(t.id==='peek-close'){$('peek').hidden=true;return;}
+ if(t.dataset.peek!==undefined){peek(+t.dataset.peek);return;}
+ if(t.dataset.pick){pickedNation=t.dataset.pick;if(N[t.dataset.pick])document.documentElement.dataset.nation=t.dataset.pick;render();return;}
+ e.preventDefault();
+ if(t.dataset.setScreen)document.documentElement.dataset.screen=t.dataset.setScreen;if(t.dataset.go)document.documentElement.dataset.screen=t.dataset.go;
+ if(t.dataset.setNation){document.documentElement.dataset.nation=t.dataset.setNation;pickedNation=t.dataset.setNation;}
+ render();if(q.get('peek')===null)$('peek').hidden=true;});
+render();if(q.get('peek')!==null&&NEIGH[+q.get('peek')])peek(+q.get('peek'));
+</script>
+</body>
+</html>
