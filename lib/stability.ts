@@ -148,11 +148,10 @@ export function isMissingStabilityTable(error: unknown): boolean {
  const e = error as {code?: unknown; message?: unknown; cause?: unknown} | null;
  if (!e || typeof e !== 'object') return false;
  const message = typeof e.message === 'string' ? e.message : '';
- // #159: when the message names a relation, it must be nation_stability_scores. A bare 42P01 (e.g. the adapter's
- // "PostgreSQL operation failed (42P01).", which drops the name) is still treated as this table.
+ // #159/#179: only a missing nation_stability_scores is swallowed. The error must name that relation; a bare 42P01
+ // with no relation name could be any table, so it is rethrown. The Postgres adapter keeps the relation name (#179).
  const named = /relation "?([\w.]+)"? does not exist|no such table: ([\w.]+)/i.exec(message);
  if (named) return /(^|\.)nation_stability_scores$/i.test(named[1] ?? named[2]);
- if (e.code === '42P01' || /PostgreSQL operation failed \(42P01\)/.test(message)) return true;
  return e.cause !== undefined && e.cause !== error ? isMissingStabilityTable(e.cause) : false;
 }
 export async function readPublicStability(db: GameDatabase): Promise<PublicStability[]> {

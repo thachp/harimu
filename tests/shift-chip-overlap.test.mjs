@@ -58,8 +58,26 @@ test('other scenes keep the floating breadcrumbs and chip', async () => {
   assert.equal(d.querySelector('.game-country-header'), null);
   assert.ok(d.querySelector('main > .game-shift-chip')); assert.ok(d.querySelector('main > .game-breadcrumbs'));
 });
-test('Zone overlay choice is remembered for the session (#189 follow-up)', async () => {
-  const src = await readFile(new URL('../app/world-zones.tsx', import.meta.url), 'utf8');
-  assert.match(src, /zoneOverlayKey = 'harimu:zone-overlay'/);
-  assert.match(src, /sessionStorage\.getItem\(zoneOverlayKey\) === '1'/); assert.match(src, /sessionStorage\.setItem\(zoneOverlayKey/);
+test('Zone overlay choice survives a remount within the session (behavioural, #194)', async () => {
+  const { WorldZones, zoneOverlayKey } = await load('world-zones');
+  const window = new Window({ url: 'https://fixture.invalid/' });
+  const saved = { window: globalThis.window, document: globalThis.document, sessionStorage: globalThis.sessionStorage, fetch: globalThis.fetch, act: globalThis.IS_REACT_ACT_ENVIRONMENT };
+  Object.assign(globalThis, { window, document: window.document, sessionStorage: window.sessionStorage, IS_REACT_ACT_ENVIRONMENT: true,
+    fetch: async () => new Response(JSON.stringify({ width: 1, height: 1, squares: [] })) });
+  const { createRoot } = require('react-dom/client'); const { act } = React;
+  const mount = async () => { const host = window.document.createElement('div'); window.document.body.append(host); const root = createRoot(host);
+    await act(async () => root.render(React.createElement(WorldZones))); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+    return { root, box: () => host.querySelector('input[type="checkbox"]') }; };
+  try {
+    let view = await mount();
+    assert.equal(view.box().checked, false, 'off by default');
+    await act(async () => view.box().click());
+    assert.equal(view.box().checked, true); assert.equal(window.sessionStorage.getItem(zoneOverlayKey), '1');
+    await act(async () => view.root.unmount());
+    view = await mount();
+    assert.equal(view.box().checked, true, 'kept after leaving and returning to Country');
+    await act(async () => view.box().click()); await act(async () => view.root.unmount());
+    view = await mount(); assert.equal(view.box().checked, false, 'turning it off is kept too');
+    await act(async () => view.root.unmount());
+  } finally { Object.assign(globalThis, { window: saved.window, document: saved.document, sessionStorage: saved.sessionStorage, fetch: saved.fetch, IS_REACT_ACT_ENVIRONMENT: saved.act }); await window.happyDOM.close(); }
 });
