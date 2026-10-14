@@ -66,7 +66,8 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
 }
 
 const iso = (seconds: number) => new Date(seconds*1000).toISOString();
-/** Reads the inputs for one nation as of `at` (unix seconds). */
+/** Reads the inputs for one nation as of `at` (unix seconds). Every input is windowed on `at`, so a catch-up tick
+ * reads that game day's records: a petition resolved after `at` still counts as backlog for that tick (#142). */
 export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number): Promise<StabilityInputs> {
  const since = at-signalWindowSeconds;
  const meals = nationId === 'kindle' ? "SELECT clerk_user_id FROM citizen_economy_events WHERE kind='meal' AND occurred_at>? AND occurred_at<=?"
@@ -78,8 +79,8 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
   (SELECT COUNT(*) FROM citizens c WHERE c.nation_id=? AND EXISTS(SELECT 1 FROM work_shifts s WHERE s.clerk_user_id=c.clerk_user_id AND s.started_at>? AND s.started_at<=?)) AS worked,
   (SELECT COUNT(*) FROM government_petition_resolutions r JOIN government_reviews v ON v.nation_id=r.nation_id AND v.period_start=r.period_start WHERE r.nation_id=? AND r.status='accepted' AND v.reviewed_at>? AND v.reviewed_at<=?) AS kept,
   (SELECT COUNT(*) FROM government_petition_resolutions r JOIN government_reviews v ON v.nation_id=r.nation_id AND v.period_start=r.period_start WHERE r.nation_id=? AND r.status='deferred' AND v.reviewed_at>? AND v.reviewed_at<=?) AS broken,
-  (SELECT COUNT(*) FROM government_petitions p WHERE p.nation_id=? AND p.occurred_at<=? AND NOT EXISTS(SELECT 1 FROM government_petition_resolutions r WHERE r.request_id=p.request_id)) AS backlog`)
-  .bind(nationId, nationId, since, at, nationId, iso(since), iso(at), nationId, at-promiseWindowSeconds, at, nationId, at-promiseWindowSeconds, at, nationId, at)
+  (SELECT COUNT(*) FROM government_petitions p WHERE p.nation_id=? AND p.occurred_at<=? AND NOT EXISTS(SELECT 1 FROM government_petition_resolutions r JOIN government_reviews v ON v.nation_id=r.nation_id AND v.period_start=r.period_start WHERE r.request_id=p.request_id AND v.reviewed_at<=?)) AS backlog`)
+  .bind(nationId, nationId, since, at, nationId, iso(since), iso(at), nationId, at-promiseWindowSeconds, at, nationId, at-promiseWindowSeconds, at, nationId, at, at)
   .first<{citizens:number;fed:number;worked:number;kept:number;broken:number;backlog:number}>();
  return {citizens: Number(row?.citizens ?? 0), fed: Number(row?.fed ?? 0), worked: Number(row?.worked ?? 0), promisesKept: Number(row?.kept ?? 0), promisesBroken: Number(row?.broken ?? 0), petitionBacklog: Number(row?.backlog ?? 0)};
 }
@@ -107,16 +108,17 @@ export async function stabilityHistory(db: GameDatabase, nationId: StabilityNati
 /**
  * "Days Unrest ≥ threshold in the last N real days": the number of distinct real UTC days in the window
  * where every recorded game-day score had Unrest ≥ threshold (a day with no scores does not count).
- * sustainedSeconds: real time covered by the current unbroken run of scores ≥ threshold, counting each
- * score as one full tick (latest − first + tickSeconds), so one qualifying score = 7200s; 24 scores = 48h.
+ * sustainedSeconds: real time covered by the current unbroken run of scores ≥ threshold ending at the latest score.
+ * Each qualifying score counts as one full tick (7200s; 24 scores = 48h). The run only continues across consecutive
+ * ticks (tick === previous + 1): a missing or never-processed tick breaks it, so gaps never count as Unrest (#142).
  */
 export async function unrestAtOrAbove(db: GameDatabase, nationId: StabilityNation, threshold: number, now: number, days = 7) {
  const history = await stabilityHistory(db, nationId, now, days*86400);
  const byDay = new Map<number, boolean>();
  for (const row of history) { const day = Math.floor(row.scheduledAt/86400); byDay.set(day, (byDay.get(day) ?? true) && row.unrest >= threshold); }
- let streakStart: number|null = null;
- for (const row of history) streakStart = row.unrest >= threshold ? streakStart ?? row.scheduledAt : null;
- return {days: [...byDay.values()].filter(Boolean).length, recordedDays: byDay.size, sustainedSeconds: streakStart === null ? 0 : history[history.length-1].scheduledAt-streakStart+tickSeconds};
+ let run = 0, previousTick: number|null = null;
+ for (const row of history) { run = row.unrest >= threshold ? (previousTick !== null && row.tick === previousTick+1 ? run+1 : 1) : 0; previousTick = row.tick; }
+ return {days: [...byDay.values()].filter(Boolean).length, recordedDays: byDay.size, sustainedSeconds: run*tickSeconds};
 }
 
 /** Coarse band; thresholds are internal and not published. */
