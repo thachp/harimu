@@ -40,6 +40,8 @@ export function inferenceText(value:unknown,json=false){
 }
 /** A 'running' news lease older than this died mid-run (a sequence is at most three 30s calls). */
 export const aiNewsStaleLeaseSeconds=600;
+/** #160: a job that failed before the gateway is retried at most once per this many seconds, not on every page load. */
+export const aiNewsRetrySeconds=300;
 export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null}={}){
  if(!enabled||!Number.isSafeInteger(now))return;
  // #140: flag on but no binding/budget used to return silently; say why so preview checks can see it.
@@ -49,8 +51,14 @@ export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number
  // #140: the daily lease used to be final, so a job that failed before any gateway call (budget unavailable, not
  // sent) or a run that died mid-flight blocked news for the rest of the UTC day with zero gateway calls.
  // Re-take it atomically in exactly those cases; a job that reached the gateway is never retried.
- if(lease.meta.changes!==1){const retake=await db.prepare("UPDATE ai_news_jobs SET status='running',failure_code=NULL,started_at=? WHERE id=? AND ((status='failed' AND failure_code IN ('budget-unavailable','not-sent')) OR (status='running' AND started_at<=?))").bind(now,id,now-aiNewsStaleLeaseSeconds).run();if(retake.meta.changes!==1)return;}
- const reservation=crypto.randomUUID();
+ // #160: (1) pre-gateway failures retry at most every aiNewsRetrySeconds, so a blocked budget doesn't rewrite the
+ // job on every page load. (2) Reservations are named ai-news:<job>:<attempt>, and a stale running lease is NOT
+ // retaken if any attempt for this job already reached the gateway (non-pending row): a crash after the call
+ // must not charge the budget a second time. A crashed attempt's unsent (pending) row is released on retake.
+ const attempts=`ai-news:${id}:%`;
+ if(lease.meta.changes!==1){const retake=await db.prepare("UPDATE ai_news_jobs SET status='running',failure_code=NULL,started_at=? WHERE id=? AND ((status='failed' AND failure_code IN ('budget-unavailable','not-sent') AND started_at<=?) OR (status='running' AND started_at<=? AND NOT EXISTS(SELECT 1 FROM harimu_ai_reservations WHERE request_id LIKE ? AND status<>'pending')))").bind(now,id,now-aiNewsRetrySeconds,now-aiNewsStaleLeaseSeconds,attempts).run();if(retake.meta.changes!==1)return;
+  await db.prepare("DELETE FROM harimu_ai_reservations WHERE request_id LIKE ? AND status='pending'").bind(attempts).run();}
+ const reservation=`ai-news:${id}:${now}`;
  if(!await reserveAiSequence(db,reservation,now,budget)){await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code='budget-unavailable' WHERE id=?").bind(id).run();return;}
  let reached=false;const answered:AiModel[]=[]; // #92: true once any request is handed to the gateway
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
