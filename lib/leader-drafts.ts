@@ -33,7 +33,7 @@ export const draftLeaderPersonas:Readonly<Record<DraftLeaderNation,readonly Draf
  ],
  fulmara:[
   {name:'Vico Lanzara',office:'Lodestar',affiliation:'Council of Ten',color:'#6c5aa8',biography:'Chosen by lot-and-ballot for one term, chairs the Council of Ten and speaks the language of contracts and fair winds.'},
-  {name:'Renza Calvio',office:'Tribune of the Docks',affiliation:'Elected by non-holders',color:'#6c5aa8',biography:'Elected one person, one vote by the docks, holds one veto per session and the power to call a Dock Strike.'},
+  {name:'Renza Calvezzo',office:'Tribune of the Docks',affiliation:'Elected by non-holders',color:'#6c5aa8',biography:'Elected one person, one vote by the docks, holds one veto per session and the power to call a Dock Strike.'},
  ],
 };
 

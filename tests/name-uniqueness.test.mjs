@@ -40,10 +40,16 @@ test('Notable modules do not collide with each other or with live personas', () 
     assert.ok(!seen.has(key) || seen.get(key) === index, `cross-module collision: ${name}`); seen.set(key, index);
   } });
 });
+test('leaders avoid surnames and given names flagged in review', () => {
+  const leaders = [...Object.values(draftLeaderPersonas).flat().map(p => p.name), ...aurelleClaimantHouses.map(h => h.claimant)].join(' ');
+  for (const token of ['Rimehald','Vakk','Voren','Thessar','Thessaly','Talia','Moorhald','Glassen','Windrest']) assert.ok(!leaders.includes(token), token);
+});
 test('naming conventions: Meridian rank-year suffix, Varkand call sign, claimant seats are Aurelle cities', () => {
   for (const p of draftLeaderPersonas.meridian) assert.match(p.name, /-\d+$/);
   for (const p of draftLeaderPersonas.varkand) assert.match(p.name, /^\S+ "[^"]+" \S+$/);
   const aurelleCities = ['Highspire','Windrest','Highmere','Dunmorrow','Vale Bridge'];
   for (const h of aurelleClaimantHouses) { assert.ok(aurelleCities.includes(h.seat)); assert.notEqual(h.seat, 'Highmere'); }
+  for (const p of draftLeaderPersonas.fulmara) assert.match(p.name, /(ara|ezzo)$/);
+  for (const p of draftLeaderPersonas.hoarvale) assert.match(p.name, /(hald|mark)$/);
   assert.equal(aurelleClaimantHouses.find(h => h.house === 'House Dunmorrow').seat, 'Dunmorrow');
 });
