@@ -8,6 +8,8 @@ export const shiftRules: Record<string, { hours: number; output: string }> = {
 
 export type WorkShift = {
   id: string;
+  /** Work order this shift belongs to; lets the jobs dock label only the active job (#54). */
+  workOrderId?: string;
   orderName: string;
   output: string;
   capacitySpent: number;
@@ -59,7 +61,7 @@ export async function readShifts(database: GameDatabase, userId: string): Promis
       wage_minor: number | null; item: string | null; quantity: number | null;
     }>();
   return rows.results.map((row) => ({
-    id: row.id, orderName: row.order_name, output: row.output,
+    id: row.id, workOrderId: row.work_order_id, orderName: row.order_name, output: row.output,
     capacitySpent: row.capacity_spent, startedAt: row.started_at,
     completesAt: row.completes_at, claimedAt: row.claimed_at,
     currency: row.work_order_id==='aurelle-food-estate'?'CRN':row.work_order_id==='korund-food-production'?'LN':'SPK',
