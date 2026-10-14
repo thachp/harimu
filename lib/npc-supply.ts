@@ -26,12 +26,17 @@ export async function runNpcSupply(db: GameDatabase, tick: number, scheduledAt: 
     ]);
     const qty = npcQuantity(good, Number(sold?.n ?? 0));
     const price = npcAskMinor(good, best?.p == null ? null : Number(best.p));
+    const cancelOlder = db.prepare(`INSERT OR IGNORE INTO market_order_cancellations (request_id, order_id, cancelled_at)
+        SELECT 'npc-cancel:' || id, id, ? FROM market_open_orders WHERE npc_id = ? AND good = ? AND side = 'sell' AND id != ?`).bind(now, npcSupplierId, good, id);
+    // Players already ask at the price cap: retire yesterday's ask and post nothing today.
+    if (price === null) { await cancelOlder.run(); continue; }
     await db.batch([
-      db.prepare(`INSERT OR IGNORE INTO market_order_cancellations (request_id, order_id, cancelled_at)
-        SELECT 'npc-cancel:' || id, id, ? FROM market_open_orders WHERE npc_id = ? AND good = ? AND side = 'sell' AND id != ?`).bind(now, npcSupplierId, good, id),
+      cancelOlder,
       db.prepare(`INSERT OR IGNORE INTO market_orders (id, city_id, citizen_id, npc_id, side, good, qty, limit_unit_minor, created_at)
         VALUES (?, ?, NULL, ?, 'sell', ?, ?, ?, ?)`).bind(id, orderBookCityId, npcSupplierId, good, qty, price, scheduledAt),
     ]);
+    // If matchOpen throws after the insert, the ask simply rests unmatched: fills are guarded and idempotent (#197),
+    // and the next player order that crosses it matches normally. No retry needed.
     await matchOpen(db, id, now);
   }
 }

@@ -10,12 +10,12 @@ const privateJson = (data: unknown, status = 200) => Response.json(data, { statu
 const enabled = () => (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true';
 
 // #197: Kindle city order book for fruit, meat and wood. Off unless HARIMU_ORDER_BOOK_ENABLED=true.
+// GET stays read-only (#219): no world tick and no NPC posting here.
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   if (!enabled()) return privateJson({ open: false });
   const db = await getDatabase();
-  await advanceWorld(db, undefined, { npcSupply: true }); // #198: today's NPC farm asks
   return privateJson({ open: true, book: await readOrderBook(db, userId) });
 }
 

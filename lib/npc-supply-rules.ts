@@ -21,8 +21,12 @@ export function npcQuantity(good: NpcGood, playerSoldInWindow: number): number {
   return Math.max(floor, baseQty - Math.max(0, Math.floor(playerSoldInWindow)));
 }
 /** NPC ask: reference × markup, but never at or below the best player ask (players win ties and cheaper asks fill first). */
-export function npcAskMinor(good: NpcGood, bestPlayerAskMinor: number | null): number {
-  const markup = Math.ceil(npcSupply[good].referenceMinor * npcMarkup);
-  return bestPlayerAskMinor !== null && bestPlayerAskMinor >= markup ? bestPlayerAskMinor + 1 : markup;
+/** Clamped to the order book price cap; null (post nothing) when players already ask at the cap, so the NPC never ties or undercuts them. */
+export function npcAskMinor(good: NpcGood, bestPlayerAskMinor: number | null): number | null {
+  const markup = Math.min(npcPriceCapMinor, Math.ceil(npcSupply[good].referenceMinor * npcMarkup));
+  if (bestPlayerAskMinor === null || bestPlayerAskMinor < markup) return markup;
+  return bestPlayerAskMinor + 1 <= npcPriceCapMinor ? bestPlayerAskMinor + 1 : null;
 }
+/** Must equal orderBookLimits.maxUnitMinor (#197); a test pins the parity. Literal so this file stays import-free. */
+export const npcPriceCapMinor = 10000;
 export const npcOrderId = (good: NpcGood, day: number) => `npc:${npcSupplierId}:${good}:${day}`;
