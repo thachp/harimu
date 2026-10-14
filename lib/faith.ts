@@ -161,7 +161,8 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   // Guarded upsert: a concurrent change inside the cooldown cannot slip through. A first pick (no row, or Aurelle's recorded default) leaves changed_at NULL.
   // Leaving the Kinward Rite debits Royal Favor in the same transactional batch. The spend row is keyed by the request id (a retry cannot debit twice),
   // is only written while the balance covers it and the cooldown allows the change, and the faith change only lands if that spend row exists.
-  const cooldownGuard = 'WHERE citizen_faith.changed_at IS NULL OR citizen_faith.changed_at <= ?';
+  // #318: a concurrent replay of the same request id never rewrites the row, so it cannot stamp the cooldown on a free first pick.
+  const cooldownGuard = 'WHERE (citizen_faith.changed_at IS NULL OR citizen_faith.changed_at <= ?) AND citizen_faith.request_id <> excluded.request_id';
   const upsert = (guardSpend: boolean) => db.prepare(`INSERT INTO citizen_faith (user_id,nation_id,faith_id,hidden_faith_id,chosen_at,request_id)
     SELECT clerk_user_id,nation_id,?,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?${guardSpend ? ' AND EXISTS (SELECT 1 FROM aurelle_favor_spends WHERE request_id=? AND clerk_user_id=?)' : ''}
     ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,faith_id=excluded.faith_id,hidden_faith_id=excluded.hidden_faith_id,chosen_at=excluded.chosen_at,
@@ -193,7 +194,11 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
     }
   } else {
     saved = await upsert(false).run();
-    if (!saved.meta.changes) return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
+    if (!saved.meta.changes) {
+      const landed = await db.prepare('SELECT user_id FROM citizen_faith WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
+      if (landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) }; // a concurrent call with this id already did it
+      return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
+    }
   }
   return { ok: true as const, state: await readFaith(db, userId, now, enabled) };
 }
