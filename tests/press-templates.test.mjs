@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pressPacks, pressPack, kindlePress, aurelleGazette, PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX, PRESS_TEMPLATES_MIN, PRESS_TEMPLATES_MAX } from '../lib/press-templates.ts';
+import { pressPacks, pressPack, kindlePress, korundStateMedia, aurelleGazette, PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX, PRESS_TEMPLATES_MIN, PRESS_TEMPLATES_MAX } from '../lib/press-templates.ts';
 import { citizenNameLists } from '../lib/citizen-names.ts';
 
 const packs=Object.values(pressPacks);
@@ -40,6 +40,19 @@ test('Kindle reads as free press, covering the issue topics', () => {
   for (const r of [/Assembly/,/Ballot Night/,/Reserve Board/,/public ledger/,/Reasoning Brief/,/Sparks/]) assert.match(text,r);
   // Not State Media or gazette voice.
   assert.doesNotMatch(text,/Be it known|by royal decree|the plan advances|Foreign reports are not carried|State Media|Court Gazette|Herald/i);
+});
+test('Korund reads as State Media, covers the issue topics, stays in bounds', () => {
+  assert.deepEqual(korundStateMedia.byline,{name:'Korund State Media',proposal:false});
+  const topics=new Set(korundStateMedia.templates.map(x=>x.topic));
+  for (const k of ['quotas','production-drive','shortages','presidium']) assert.ok(topics.has(k), k);
+  const text=korundStateMedia.templates.flatMap(lines).join(' ');
+  for (const r of [/The plan advances/,/Foreign reports are not carried/,/Production Drive/,/Presidium/,/quota/,/short/]) assert.match(text,r);
+  // Blocklist: coercion-glorifying and out-of-scope topics; the Chairman is neither praised nor mocked (not mentioned).
+  assert.doesNotMatch(text,/glori|heroic|traitor|enem|obey|crush|punish|arrest|raid|informer|purge|gray market|black market|faith|shrine|pray|worship|underground|Chairman/i);
+  // No narrator commentary on omissions.
+  assert.doesNotMatch(text,/\bnotice (what|how)|leave out|hidden|censor|propaganda|you know/i);
+  // Not free press or gazette.
+  assert.doesNotMatch(text,/Be it known|royal|Reasoning Brief|public ledger|Assembly/i);
 });
 test('Aurelle reads as royal gazette, covers the issue topics, names no noble house', () => {
   assert.deepEqual(aurelleGazette.byline,{name:'Court Gazette',proposal:false});
