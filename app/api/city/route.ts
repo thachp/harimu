@@ -1,5 +1,7 @@
 import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
+import {travelBlock} from '@/lib/travel';
+import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {cityForNation} from '@/lib/cities';
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
@@ -20,6 +22,7 @@ export async function POST(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  let body:Record<string,unknown>;try{body=await readCommandObject(request);}catch{return json({error:'Invalid request.'},400);}
  if(body.action!=='travel'||typeof body.cityId!=='string'||!cityForNation(ctx.nationId,body.cityId))return json({error:'Choose a city in your current nation.'},400);
+ {const blocked=await travelBlock(ctx.db,ctx.userId,ctx.now,(env as unknown as {HARIMU_TRAVEL_ENABLED?:string}).HARIMU_TRAVEL_ENABLED==='true');if(blocked)return json({error:blocked,reason:'traveling'},409);} // #123
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const results=await ctx.db.batch([
  ctx.db.prepare(`DELETE FROM square_presence WHERE user_id=? AND EXISTS(SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id=?) AND EXISTS(SELECT 1 FROM citizen_city_locations WHERE user_id=? AND nation_id=? AND current_city_id!=?)`).bind(ctx.userId,ctx.userId,ctx.nationId,ctx.userId,ctx.nationId,body.cityId),

@@ -18,10 +18,12 @@ import { authenticatedUserId } from '@/lib/auth';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
+import { travelBlock } from '@/lib/travel';
 import { checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
 import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
 
 export const dynamic = 'force-dynamic';
+const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'aurelle-start-work']);
 const privateJson = (data: unknown, init?: ResponseInit) => Response.json(data, { ...init, headers: { ...init?.headers, 'Cache-Control': 'private, no-store' } });
 
 const allowedHorizons = new Set(['today', 'week', 'season']);
@@ -208,6 +210,11 @@ async function handlePost(request: Request) {
     return privateJson({ error: 'Expected valid JSON.' }, { status: 400 });
   }
   const now = new Date().toISOString();
+  // #123: while travelling, location-bound actions wait for arrival (only when HARIMU_TRAVEL_ENABLED=true).
+  if (typeof body.action === 'string' && locationBoundActions.has(body.action)) {
+    const blocked = await travelBlock(database, userId, Math.floor(Date.parse(now) / 1000), (env as unknown as { HARIMU_TRAVEL_ENABLED?: string }).HARIMU_TRAVEL_ENABLED === 'true');
+    if (blocked) return privateJson({ error: blocked, reason: 'traveling' }, { status: 409 });
+  }
 
   // #135: record a first-week goal (view-backed or client-detected). Idempotent; guidance only.
   if (body.action === 'first-week-complete') {
