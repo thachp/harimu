@@ -86,8 +86,32 @@ export const economyWalletSnapshotSql = economySnapshotSql + `,
   (SELECT json_group_array(json_object('id', id, 'kind', kind, 'amount_minor', amount_minor, 'item', item, 'quantity', quantity, 'occurred_at', occurred_at))
     FROM (` + walletHistorySql + `)) AS history_json`;
 
-export async function readEconomy(db: GameDatabase, userId: string, interval: number): Promise<Economy> {
-  await db.prepare(starterGrantSql).bind(userId).run();
+/** #205: capacity and recovery clock as recoverCapacity would leave them at `now`, without writing. */
+export async function readCapacityProjection(db: GameDatabase, userId: string, now: number, interval: number) {
+  const row = await db.prepare('SELECT c.capacity, k.recovered_at FROM citizens c LEFT JOIN capacity_clocks k ON k.clerk_user_id=c.clerk_user_id WHERE c.clerk_user_id=?')
+    .bind(userId).first<{ capacity: number; recovered_at: number | null }>();
+  if (!row) return null;
+  const recovered = row.recovered_at == null ? now : Number(row.recovered_at);
+  const steps = Math.max(0, Math.floor((now - recovered) / interval));
+  return { capacity: steps > 0 ? Math.min(maximumCapacity, Number(row.capacity) + steps * maximumCapacity) : Number(row.capacity), recoveredAt: recovered + steps * interval };
+}
+/** #205: the Kindle starter food grant a write path would record (0 once recorded or for other nations). */
+export async function pendingStarterFood(db: GameDatabase, userId: string): Promise<number> {
+  const row = await db.prepare("SELECT 1 AS pending FROM citizens c WHERE c.clerk_user_id=? AND c.nation_id='kindle' AND NOT EXISTS (SELECT 1 FROM starter_food_grants g WHERE g.clerk_user_id=c.clerk_user_id)").bind(userId).first<{ pending: number }>();
+  return row ? 2 : 0;
+}
+
+/** #205 (QA1 note 2 on #208): only a missing ledger table (not yet migrated) reads as 0; any other error surfaces. */
+export const isMissingRelation = (error: unknown) => /no such table|does not exist|42P01/i.test(String((error as { code?: string })?.code ?? '') + ' ' + String((error as Error)?.message ?? error));
+export async function readTesseraBalance(db: GameDatabase, userId: string): Promise<number> {
+  try {
+    const row = await db.prepare('SELECT COALESCE(SUM(delta_minor),0) AS balance FROM citizen_tessera_ledger WHERE clerk_user_id=?').bind(userId).first<{ balance: number }>();
+    return Number(row?.balance ?? 0);
+  } catch (error) { if (isMissingRelation(error)) return 0; throw error; }
+}
+
+export async function readEconomy(db: GameDatabase, userId: string, interval: number, options: { readOnly?: boolean; now?: number } = {}): Promise<Economy> {
+  if (!options.readOnly) await db.prepare(starterGrantSql).bind(userId).run();
   // One SQLite read snapshot keeps wallet and goods consistent during another tab's claim.
   // Wallet history is read in the same statement so the balance and the listed movements always agree (#49 review).
   const row = await db.prepare(economyWalletSnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId).first<{
@@ -95,8 +119,16 @@ export async function readEconomy(db: GameDatabase, userId: string, interval: nu
   }>();
   const history = sortHistory(JSON.parse(row?.history_json ?? '[]') as WalletHistoryRow[]);
   // #122: Tessera comes from the World Registry ledger (PoC starter grant minus square purchases).
-  const tessera = await db.prepare('SELECT COALESCE(SUM(delta_minor),0) AS balance FROM citizen_tessera_ledger WHERE clerk_user_id=?').bind(userId).first<{ balance: number }>().catch(() => null);
-  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: Number(tessera?.balance ?? 0), transactions: toTransactions(history),
-    inventory: JSON.parse(row?.inventory_json ?? '[]') as Economy['inventory'],
-    nextRecoveryAt: new Date(((row?.recovered_at ?? Math.floor(Date.now() / 1000)) + interval) * 1000).toISOString() };
+  let inventory = JSON.parse(row?.inventory_json ?? '[]') as Economy['inventory'];
+  let recoveredAt = row?.recovered_at ?? Math.floor(Date.now() / 1000);
+  if (options.readOnly) {
+    // Show exactly what the skipped writes would have produced: the pending starter food and the advanced clock.
+    const now = options.now ?? Math.floor(Date.now() / 1000);
+    const starter = await pendingStarterFood(db, userId);
+    if (starter) inventory = inventory.some(i => i.item === 'food') ? inventory.map(i => i.item === 'food' ? { ...i, quantity: i.quantity + starter } : i)
+      : [...inventory, { item: 'food', quantity: starter }].sort((a, b) => a.item.localeCompare(b.item));
+    recoveredAt = (await readCapacityProjection(db, userId, now, interval))?.recoveredAt ?? recoveredAt;
+  }
+  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: await readTesseraBalance(db, userId), transactions: toTransactions(history),
+    inventory, nextRecoveryAt: new Date((recoveredAt + interval) * 1000).toISOString() };
 }

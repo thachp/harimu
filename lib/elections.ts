@@ -60,10 +60,11 @@ async function finalizedResult(db:GameDatabase,now:number){
  return projected;
 }
 
-export async function readElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady()):Promise<ElectionSnapshot>{
+export async function readElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),projectOpen=false):Promise<ElectionSnapshot>{
  const election=await db.prepare('SELECT candidates_json,opens_at,closes_at,closed_at FROM civic_elections WHERE id=?').bind(electionId).first<{candidates_json:string;opens_at:number;closes_at:number;closed_at:number|null}>();
  const base={nationId:'kindle' as const,id:electionId,candidates:electionCandidates,voted:false,result:null,privacyReady,privacyReason:privacyReady?'Account-level preview privacy: operators may correlate submissions.':ballotPrivacyReason};
- if(!election)return {...base,status:'waiting',opensAt:null,closesAt:null};
+ // #205: a read-only caller that would have opened the election shows it as openPreviewElection would create it.
+ if(!election)return projectOpen&&privacyReady?{...base,status:'open',opensAt:now,closesAt:now+259200}:{...base,status:'waiting',opensAt:null,closesAt:null};
  const slate=JSON.parse(election.candidates_json) as {id:string;name:string;platform:string}[];
  if(!Array.isArray(slate)||slate.length!==candidateIds.length||slate.some((candidate,index)=>candidate.id!==candidateIds[index]||typeof candidate.name!=='string'||typeof candidate.platform!=='string'))throw Error('Saved candidate slate could not be confirmed.');
  const candidates=slate.map(({id,name,platform})=>({id,name,platform}));
