@@ -1690,7 +1690,7 @@ export default function Home() {
       if (response.ok && data.nationId === citizenNationId && Array.isArray(data.items)) setBriefHeadlines({ nationId: data.nationId, items: data.items.slice(0, 3).map(item => ({ id: item.id, title: item.title, source: item.source, kind: item.kind })) });
     }).catch(() => {});
     return () => controller.abort();
-  }, [morningBriefOpen, citizenNationId, guestActive, clerkConfigured, citizenSessionStatus]);
+  }, [morningBriefOpen, citizenNationId, guestActive, citizenSessionStatus]); // clerkConfigured is a module-level constant (build-time env), so it is not a dependency.
   const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow,
     shift: activeShift ? { title: activeShift.orderName, endsAt: Date.parse(activeShift.completesAt) / 1000 } : null,
     leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null,
