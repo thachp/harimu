@@ -38,6 +38,7 @@
     "HARIMU_ORDER_BOOK_ENABLED": "false",
     "HARIMU_AURELLE_RISING_ENABLED": "false",
     "HARIMU_TRAVEL_ENABLED": "false",
+    "HARIMU_KORUND_PRESIDIUM_ENABLED": "false",
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
     "HARIMU_FAITH_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
