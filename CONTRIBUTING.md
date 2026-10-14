@@ -13,5 +13,6 @@
 Rules:
 - Branch from and rebase onto `origin/dev`. Open every PR against `dev` and include `Closes #N`.
 - Never push to `main` or `dev` directly, and never merge into `main` except through a PM release PR.
+- A `dev` → `main` release PR merges only after QA2 posts a go/no-go on the release head with CI green, and PM is the one who merges it.
 - CI (`.github/workflows/ci.yml`) runs `npm run check` on every pull request and on pushes to `main` and `dev`. It has no deploy step.
 - Postgres migrations are applied by an admin before deploy (see README). Never upload `.env*` files.
