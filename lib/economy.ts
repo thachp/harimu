@@ -2,7 +2,7 @@ import type {GameDatabase} from './database-contract';
 import { defaultRecoverySeconds } from './economy-rules';
 export { recoveryInterval } from './economy-rules';
 import { starterGrantSql } from './market';
-import { walletHistorySql, toTransactions, type WalletHistoryRow, type WalletTransaction } from './wallet';
+import { walletHistorySql, toTransactions, sortHistory, type WalletHistoryRow, type WalletTransaction } from './wallet';
 // Prototype tuning. Integer minor units: 100 cents = 1 Spark.
 export const employerBudgetMinor = 100000;
 export const maximumCapacity = 24;
@@ -79,16 +79,19 @@ export const economySnapshotSql = `SELECT
   (SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id = ?) AS wallet_minor,
   (SELECT json_group_array(json_object('item', item, 'quantity', quantity)) FROM
     (SELECT item, quantity FROM citizen_inventory_balances WHERE clerk_user_id = ? AND quantity > 0 ORDER BY item)) AS inventory_json,
-  (SELECT recovered_at FROM capacity_clocks WHERE clerk_user_id = ?) AS recovered_at`;
+  (SELECT recovered_at FROM capacity_clocks WHERE clerk_user_id = ?) AS recovered_at,
+  (SELECT json_group_array(json_object('id', id, 'kind', kind, 'amount_minor', amount_minor, 'item', item, 'quantity', quantity, 'occurred_at', occurred_at))
+    FROM (${walletHistorySql})) AS history_json`;
 
 export async function readEconomy(db: GameDatabase, userId: string, interval: number): Promise<Economy> {
   await db.prepare(starterGrantSql).bind(userId).run();
   // One SQLite read snapshot keeps wallet and goods consistent during another tab's claim.
-  const row = await db.prepare(economySnapshotSql).bind(userId, userId, userId).first<{
-    wallet_minor: number; inventory_json: string; recovered_at: number | null;
+  // Wallet history is read in the same statement so the balance and the listed movements always agree (#49 review).
+  const row = await db.prepare(economySnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId).first<{
+    wallet_minor: number; inventory_json: string; recovered_at: number | null; history_json: string | null;
   }>();
-  const history = await db.prepare(walletHistorySql).bind(userId, userId, userId, userId).all<WalletHistoryRow>();
-  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: 0, transactions: toTransactions(history.results),
+  const history = sortHistory(JSON.parse(row?.history_json ?? '[]') as WalletHistoryRow[]);
+  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: 0, transactions: toTransactions(history),
     inventory: JSON.parse(row?.inventory_json ?? '[]') as Economy['inventory'],
     nextRecoveryAt: new Date(((row?.recovered_at ?? Math.floor(Date.now() / 1000)) + interval) * 1000).toISOString() };
 }

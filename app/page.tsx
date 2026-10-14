@@ -1596,11 +1596,11 @@ export default function Home() {
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
-      onOpenWallet={!guestActive && citizenNation?.id === 'kindle' ? () => setWalletOpen(true) : undefined}
+      onOpenWallet={clerkConfigured && !guestActive && citizenNation?.id === 'kindle' ? () => setWalletOpen(true) : undefined}
       onNavigate={navigateGame} onSelectNation={selectNation}
       socialDock={<CitizenDock key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} collectivePetitions={collectivePetitions} election={election} korund={korundPlan} onNavigate={navigateGame} />}
       accountControls={<ClerkAccountControl />} />
-      {walletOpen && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onClose={() => setWalletOpen(false)} />}
+      {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}

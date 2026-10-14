@@ -63,3 +63,16 @@ test('wallet panel shows SPK and TSR balances, the quote and each transaction',a
  assert.match(text(nodes(exports.WalletPanel({onClose(){}}))),/Loading/);
  assert.match(text(nodes(exports.WalletPanel({sparkMinor:0,transactions:[],onClose(){}}))),/No wages, purchases or fees/);
 });
+
+test('review fixes: history comes from the balance snapshot, demo hides the wallet, Tab stays in the dialog',async()=>{
+ const economy=await readFile(new URL('../lib/economy.ts',import.meta.url),'utf8');
+ assert.match(economy,/AS history_json/);assert.doesNotMatch(economy,/prepare\(walletHistorySql\)/);
+ const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
+ assert.match(page,/onOpenWallet=\{clerkConfigured && !guestActive/);
+ const exports={};new Function('exports','require',await compile('../app/wallet-panel.tsx'))(exports,name=>name==='@phosphor-icons/react'?{X:()=>null}:name==='@/lib/wallet'?require('../lib/wallet.ts'):require(name));
+ const tree=nodes(exports.WalletPanel({sparkMinor:0,transactions:[],onClose(){}}));const dialog=tree.find(n=>n?.props?.role==='dialog');
+ let prevented=false,focused=false;dialog.props.onKeyDown({key:'Tab',preventDefault(){prevented=true;},currentTarget:{querySelector:()=>({focus(){focused=true;}})}});
+ assert.equal(prevented,true);assert.equal(focused,true);
+ const {sortHistory}=await import('../lib/wallet.ts');
+ assert.deepEqual(sortHistory([{id:'a',kind:'wage',occurred_at:5},{id:'b',kind:'market-buy',occurred_at:5},{id:'c',kind:'market-buy',occurred_at:9}]).map(r=>r.id),['c','b','a']);
+});

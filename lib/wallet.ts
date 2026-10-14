@@ -70,3 +70,9 @@ export function formatMinor(minor: number, signed = false): string {
   const text = (Math.abs(minor) / 100).toFixed(2);
   return minor < 0 ? `−${text}` : signed && minor > 0 ? `+${text}` : text;
 }
+
+/** Same order as walletHistorySql (newest first; within a second a wage sorts older), independent of JSON aggregation order. */
+export function sortHistory(rows: WalletHistoryRow[]): WalletHistoryRow[] {
+  return [...rows].sort((a, b) => (b.occurred_at ?? 0) - (a.occurred_at ?? 0)
+    || Number(a.kind === 'wage') - Number(b.kind === 'wage') || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+}
