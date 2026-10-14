@@ -4,10 +4,7 @@ import {getDatabase} from '@/lib/db';
 import {readVerification} from '@/lib/verification';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {createCollectivePetitionSql,signCollectivePetitionSql,latchCollectiveThresholdSql,readCollectivePetitions,recordVerifiedHumanVisit,petitionWindowSeconds,validPetitionId,validPetitionText} from '@/lib/collective-petitions';
-import {env,waitUntil} from 'cloudflare:workers';
-import {aiBudgetConfig} from '@/lib/ai-budget';
-import {prepareAiCabinetResponse} from '@/lib/cabinet-response-ai';
-import type {NewsAiBinding} from '@/lib/ai-news';
+import {cabinetResponsesConfigured} from '@/lib/cabinet-cron';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
 async function citizen(db:GameDatabase,userId:string){return await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>();}
@@ -15,12 +12,9 @@ export async function GET(request:Request){
  const userId=await authenticatedUserId(request);if(!userId)return json({error:'Sign in required.'},401);
  const db=await getDatabase();if((await citizen(db,userId))?.nation_id!=='kindle')return json({error:'Collective petitions are available to Kindle citizens only.'},403);
  const verification=await readVerification(userId);const now=Math.floor(Date.now()/1000);
- // #221: read-only for game state. The verified visit is recorded on POST (and citizen POSTs); GET counts the caller as it
- // would be recorded. The flag-gated AI Cabinet job below is unchanged (HARIMU_AI_CABINET_RESPONSES_ENABLED, default false).
- const bindings=env as unknown as {AI?:NewsAiBinding;HARIMU_AI_CABINET_RESPONSES_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string};
- const budget=aiBudgetConfig(bindings),cabinetResponses=bindings.HARIMU_AI_CABINET_RESPONSES_ENABLED==='true'&&Boolean(bindings.AI)&&budget!==null;
- // Mandatory response: a reached petition triggers the gated AI Cabinet reply in the background, never blocking this read.
- if(cabinetResponses)waitUntil(prepareAiCabinetResponse(db,now,bindings.AI,{enabled:true,budget}).catch(error=>{console.error('[petitions] AI Cabinet response job failed',{route:'/api/petitions',at:now,error:error instanceof Error?error.message:String(error)});}));
+ // #221/#247: read-only. The verified visit is recorded on POST (and citizen POSTs); GET counts the caller as it would be
+ // recorded. AI Cabinet responses run from the scheduled Worker (lib/cabinet-cron.ts), never from this read.
+ const cabinetResponses=cabinetResponsesConfigured();
  return json({...await readCollectivePetitions(db,userId,now,verification.countedActionsEligible),verification,cabinetResponses});
 }
 export async function POST(request:Request){
