@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { redactSecrets } from '../scripts/redact.mjs';
 
-test('#163 deploy-preview queues and only trusts this repo\'s dev push CI', async () => {
+test('#163/#177 deploy-preview queues and only trusts this repo\'s release branch', async () => {
   const wf = await readFile('.github/workflows/deploy-preview.yml', 'utf8');
   assert.match(wf, /concurrency:\n  group: deploy-preview\n  cancel-in-progress: false/);
   assert.doesNotMatch(wf, /cancel-in-progress: true/);
-  assert.match(wf, /workflow_run\.head_repository\.full_name == github\.repository/);
-  assert.match(wf, /workflow_run\.event == 'push'/);
-  assert.match(wf, /workflow_run\.head_branch == 'dev'/);
+  assert.match(wf, /github\.event\.repository\.full_name == github\.repository/);
+  assert.match(wf, /github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'/);
+  assert.match(wf, /github\.ref == 'refs\/heads\/release'/);
 });
 test('#163 D1 check failure prints wrangler output through redaction', async () => {
   const deploy = await readFile('scripts/deploy-cloudflare.mjs', 'utf8');
@@ -34,4 +34,11 @@ test('#172 Postgres backend skips the D1 check with a warning; D1 backend still 
   assert.ok(skip > 0 && d1 > skip, 'D1 check sits in the non-Postgres branch');
   assert.match(deploy.slice(skip, d1), /console\.warn\([^)]*skipping the legacy preview D1 schema check[\s\S]*\} else \{/);
   assert.match(deploy, /assertPostgresMigrationsApplied\(db\)/);
+});
+
+test('#177 CLOUDFLARE_API_KEY values are redacted', () => {
+  const env = { CLOUDFLARE_API_KEY: 'legacyGlobalKey12345' };
+  const out = redactSecrets('X-Auth-Key: legacyGlobalKey12345 failed', env);
+  assert.ok(!out.includes('legacyGlobalKey12345'));
+  assert.match(out, /\[CLOUDFLARE_API_KEY\]/);
 });
