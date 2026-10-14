@@ -121,13 +121,16 @@ test('with the flag on, POST /api/city travel is a timed journey; the instant pa
 });
 
 test('while travelling, every location-bound action is blocked (full list, QA1 on #264)', async t => {
+  // The full list, read from the route itself so a new entry cannot be missed.
+  const route = await (await import('node:fs/promises')).readFile(new URL('../app/api/citizen/route.ts', import.meta.url), 'utf8');
+  const locationBound = [...route.match(/const locationBoundActions = new Set\(\[([^\]]*)\]\)/)[1].matchAll(/'([a-z-]+)'/g)].map(m => m[1]);
+  for (const action of ['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'cancel-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'korund-household-meal', 'aurelle-start-work', 'aurelle-buy-food', 'aurelle-household-meal'])
+    assert.ok(locationBound.includes(action), `${action} is location-bound`);
   const r = await runtime(t);
   r.setOrderBook(true); r.setSquarePurchase(true); r.setCityFounding(true); // so each route reaches its travel check
   assert.equal((await go(r, 'alice', 8, 7)).status, 200);
   const blocked = [
-    ...['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'cancel-listing',
-      'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-household-meal',
-      'aurelle-start-work', 'aurelle-buy-food', 'aurelle-household-meal'].map(action => ['citizen', { action, requestId: randomUUID() }]),
+    ...locationBound.map(action => ['citizen', { action, requestId: randomUUID() }]),
     ['square', { action: 'post', expectedNationId: 'kindle', id: randomUUID(), text: 'from the road' }],
     ['market/orders', { action: 'place', requestId: randomUUID() }],
     ['world/registry', { action: 'buy-square', x: 9, y: 8, requestId: randomUUID() }],

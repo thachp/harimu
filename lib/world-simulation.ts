@@ -2,6 +2,7 @@ import { finalizeDueElection } from './elections';
 import { accountElectionDatabase } from './preview-election';
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
+import { runSpoilage } from './spoilage';
 import { runNpcSupply } from './npc-supply';
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
@@ -71,10 +72,14 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       .bind(maximumCatchupTicks+scoreRepairTicks).all<{tick:number;scheduled_at:number}>();
     for (const row of missing.results) await db.batch(await stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now));
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
-  // #198: NPC farm asks for the current game day, only while the order book is on. Idempotent per tick.
+  // Market day, only while the order book is on (write paths only). Idempotent per tick:
+  // #199 fruit and meat spoil first, then #198 NPC farm asks are posted for the current game day.
   if (options.npcSupply) {
     const current = await db.prepare('SELECT tick,scheduled_at FROM world_ticks ORDER BY tick DESC LIMIT 1').first<{tick:number;scheduled_at:number}>();
-    if (current) await runNpcSupply(db, Number(current.tick), Number(current.scheduled_at), now, tickSeconds);
+    if (current) {
+      await runSpoilage(db, Number(current.tick), now);
+      await runNpcSupply(db, Number(current.tick), Number(current.scheduled_at), now, tickSeconds);
+    }
   }
   return readWorldSimulation(db, now);
 

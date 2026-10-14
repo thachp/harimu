@@ -8,8 +8,8 @@ import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
-import { applyQuality, validQualityInput, type QualityInput } from '@/lib/shift-quality';
-import { gradeShift } from '@/lib/shift-quality-key';
+import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
+import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket, shiftAnswerKey } from '@/lib/shift-quality-key';
 import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
@@ -23,7 +23,7 @@ import { checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstW
 import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
 
 export const dynamic = 'force-dynamic';
-const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
+const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
 const privateJson = (data: unknown, init?: ResponseInit) => Response.json(data, { ...init, headers: { ...init?.headers, 'Cache-Control': 'private, no-store' } });
 
 const allowedHorizons = new Set(['today', 'week', 'season']);
@@ -490,6 +490,15 @@ async function handlePost(request: Request) {
     return privateJson({ ok: true, savedAt: now });
   }
 
+  // #252: issue the quality step for the citizen's next shift. Nothing is written and no WC is spent; the ticket
+  // carries the future shift id (signed for this user) and the questions in that shift's server-seeded option order.
+  if (body.action === 'quality-ticket') {
+    if (body.workOrderId !== qualityWorkOrderId) return privateJson({ error: 'This job has no quality step.' }, { status: 404 });
+    const secret = shiftQualitySecret(env as unknown as { HARIMU_SHIFT_QUALITY_SECRET?: string });
+    if (!secret) return privateJson({ error: 'The quality step is unavailable. You can start the shift for the base reward.' }, { status: 503 });
+    return privateJson({ ok: true, ...(await issueQualityTicket(secret, userId, harvestQuestions)) });
+  }
+
   if (body.action === 'commit-work') {
     const workOrderId = typeof body.workOrderId === 'string' ? body.workOrderId : '';
     const rule = shiftRules[workOrderId];
@@ -507,9 +516,21 @@ async function handlePost(request: Request) {
     // commit-work is refused by the one-active-shift rule, so it cannot re-grade (QA1 #125 review).
     // This route serves signed-in human citizens only; AI/background actors never reach it, and gradeShift
     // returns the base reward for any non-human actor.
-    const quality = gradeShift(workOrderId, body.quality as QualityInput | undefined, 'human');
+    // #252: answers are graded against this shift's own key, derived from the server secret and the shift id the
+    // ticket was issued for. The ticket's shift id becomes the shift's id, so a ticket can start at most one shift.
+    const input = body.quality as QualityInput | undefined;
+    let id: string = crypto.randomUUID();
+    let key: number[] | undefined;
+    if (input && 'answers' in input) {
+      const secret = shiftQualitySecret(env as unknown as { HARIMU_SHIFT_QUALITY_SECRET?: string });
+      if (!secret) return privateJson({ error: 'The quality step is unavailable. You can start the shift for the base reward.' }, { status: 503 });
+      const ticketShift = await redeemQualityTicket(secret, userId, input.ticket);
+      if (!ticketShift) return privateJson({ error: 'This quality step has expired. Open it again.' }, { status: 400 });
+      if (await database.prepare('SELECT 1 AS used FROM work_shifts WHERE id = ?').bind(ticketShift).first()) return privateJson({ error: 'This quality step was already used. Open it again.' }, { status: 409 });
+      id = ticketShift; key = await shiftAnswerKey(secret, ticketShift, harvestQuestions);
+    }
+    const quality = gradeShift(workOrderId, input, 'human', key);
     const reward = { ...base, ...applyQuality(base, quality.multiplierPct) };
-    const id = crypto.randomUUID();
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
     // D1 batch is transactional: scheduling and debiting succeed together.
     const [scheduled] = await database.batch([

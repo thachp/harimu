@@ -1,4 +1,4 @@
-import { marketSchemas, marketGoodsSeedSql } from './market-orders';
+import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView } from './market-orders';
 import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
@@ -243,6 +243,17 @@ async function initialize(database: GameDatabase) {
       database.prepare('DROP VIEW IF EXISTS citizen_inventory_balances'),
       database.prepare(walletViewSql), database.prepare(inventoryViewSql),
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('market-orders-v1')"),
+    ]);
+  }
+  // #199: spoilage reduces inventory and open sell order remaining. Atomic swap of all three views.
+  const spoilageInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'market-spoilage-v1'").first();
+  if (!spoilageInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'),
+      database.prepare('DROP VIEW IF EXISTS citizen_inventory_balances'),
+      database.prepare('DROP VIEW IF EXISTS market_open_orders'),
+      database.prepare(marketOpenOrdersView), database.prepare(walletViewSql), database.prepare(inventoryViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('market-spoilage-v1')"),
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));
