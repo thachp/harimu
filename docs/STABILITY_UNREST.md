@@ -44,8 +44,8 @@ computeStability(inputs): {stability, unrest, breakdown}   // pure
 ```
 
 - `days`: distinct real UTC days in the window where **every** recorded score had Unrest ≥ threshold. #70: `days >= 7` with `days = 7`.
-- `sustainedSeconds`: real time covered by the current unbroken run of scores ≥ threshold, counting each score as one full tick (latest − first + 7200 s; one qualifying score = 2 h, 24 consecutive = 48 h). #71: `sustainedSeconds >= 48*3600` at threshold 60.
-- **`sustainedSeconds` undercounts, never overcounts.** Ticks are processed only when someone visits (at most three overdue ticks per visit). Ticks that are never processed have no score, and the run spans only recorded scores. So after quiet periods or skipped catch-up the value can be lower than the real time Unrest stayed high. Callers should treat it as a conservative lower bound, and #71 should not expect it to be exact.
+- `sustainedSeconds`: real time covered by the current unbroken run of scores ≥ threshold ending at the latest score. Each qualifying score counts as one full tick (2 h; 24 consecutive = 48 h). The run only continues across consecutive ticks: a missing or never-processed tick breaks it, so gaps never count as Unrest (#142). #71: `sustainedSeconds >= 48*3600` at threshold 60.
+- **`sustainedSeconds` undercounts, never overcounts.** Ticks are processed only when someone visits (at most three overdue ticks per visit). Ticks that are never processed have no score, and a missing tick ends the run. So after quiet periods or skipped catch-up the value can be lower than the real time Unrest stayed high. Callers should treat it as a conservative lower bound, and #71 should not expect it to be exact.
 - Server code reads the raw truth for every nation, including Korund.
 
 ## Citizen-facing view
@@ -58,3 +58,5 @@ computeStability(inputs): {stability, unrest, breakdown}   // pure
 ## Out of scope
 
 Grievance/repression, war score, inequality, Currency Confidence, Religious Harmony, Unrest events and Crisis. Add new inputs as extra `ScoreTerm`s, keeping the ranges so the sum stays within 0..100.
+
+- **Catch-up reads that day's records (#142).** Every input is windowed on the tick's scheduled time, including petition backlog: a petition resolved after that time still counts as backlog for the earlier tick.
