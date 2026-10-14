@@ -5,7 +5,7 @@ export function StabilityPanel({ score }: { score: PublicStability | undefined }
   if (!score) return <section aria-label="Stability and Unrest"><h4>Stability and Unrest</h4><p>No daily score has been recorded yet. The first one is saved when the next game day (two real hours) is processed.</p></section>;
   if (score.kind === 'state-approved') return <section aria-label="State-approved stability"><h4>State-approved Stability: {score.approvedStability}/100</h4>
     <p>Figure published by the State Statistics Bureau for game day tick {score.tick}.</p>
-    <p>System stats: {score.systemStats.citizens} citizens · {score.systemStats.fedPercent}% ate in the last 24 real hours · {score.systemStats.workedPercent}% worked a shift · {score.systemStats.petitionBacklog} requests awaiting review.</p></section>;
+    <p>System stats: about {score.systemStats.citizensApprox} citizens · food supply {score.systemStats.foodSupply} · work turnout {score.systemStats.workTurnout}.</p></section>;
   return <section aria-label="Stability and Unrest"><h4>Stability {score.stability}/100 · Unrest {score.unrest}/100</h4>
     <p>Recalculated once per game day (every two real hours) from saved game records. Tick {score.tick}.</p>
     <details><summary>What moved them today</summary>

@@ -9,21 +9,20 @@ Per-nation **Stability** (0–100) and **Unrest** (0–100) for Kindle, Korund a
 - Idempotent: primary key `(nation_id, tick)` with `INSERT OR IGNORE`. A retried or concurrent tick never rewrites a recorded day.
 - Inputs are read as of the tick's `scheduled_at` (catch-up ticks read current records, same as government proposals).
 
-## Inputs (all from existing tables)
+## Factors
 
-| Input | Measure | Stability | Unrest |
-|---|---|---|---|
-| baseline | — | +50 | +10 |
-| food | % of the nation's citizens with a meal in the trailing 24 real h (`citizen_economy_events` kind `meal` / `korund_meals` / `aurelle_meals`) | `round((c−50)×0.3)` → −15..+15 | `round((100−c)×0.4)` → 0..40 |
-| work | % of citizens who started a shift (`work_shifts.started_at`) in the trailing 24 real h | `round((w−50)×0.2)` → −10..+10 | `round((100−w)×0.15)` → 0..15 |
-| promises | % of petitions reviewed in the trailing 7 real days that were `accepted` (vs `deferred`); no reviews = 0 points | `round((p−50)×0.2)` → −10..+10 | `round((100−p)×0.15)` → 0..15 |
-| petitions | petitions with no resolution, per 100 citizens (cap 100) | `−round(s×0.15)` → −15..0 | `round(s×0.2)` → 0..20 |
+Scores are deterministic rules over records the game already keeps. Exact weights and formulas live in `lib/stability.ts` only and are intentionally not published here.
 
-With no citizens, food and work use a neutral 50%. Ranges guarantee Stability ∈ [0, 85] and Unrest ∈ [10, 100], so no clamping is applied and **the breakdown always sums exactly to the score**.
+- **Food:** how many of the nation's citizens ate recently. Better coverage raises Stability and lowers Unrest.
+- **Work:** how many citizens took a shift recently. Higher turnout raises Stability and lowers Unrest.
+- **Promise-keeping:** how often the government accepted, rather than deferred, reviewed petitions over the past week. No reviews is neutral.
+- **Petition backlog:** petitions still awaiting review, relative to population. A larger backlog lowers Stability and raises Unrest.
+
+Each factor has a bounded contribution, so both scores always stay within 0–100 without clamping, and **the stored breakdown always sums exactly to the score**.
 
 ## Storage
 
-`nation_stability_scores(nation_id, tick, scheduled_at, computed_at, stability, unrest, inputs_json, breakdown_json)`, PK `(nation_id, tick)`, index `(nation_id, scheduled_at)`. Migrations: `drizzle/0011_nation_stability.sql`, `db/postgres/0011_nation_stability.sql`.
+`nation_stability_scores(nation_id, tick, scheduled_at, computed_at, stability, unrest, inputs_json, breakdown_json)`, PK `(nation_id, tick)`, index `(nation_id, scheduled_at)`. Migrations: `drizzle/0012_nation_stability.sql`, `db/postgres/0012_nation_stability.sql`.
 
 ## Server API (for #70 / #71)
 
@@ -45,7 +44,8 @@ computeStability(inputs): {stability, unrest, breakdown}   // pure
 ```
 
 - `days`: distinct real UTC days in the window where **every** recorded score had Unrest ≥ threshold. #70: `days >= 7` with `days = 7`.
-- `sustainedSeconds`: span of the current unbroken run of scores ≥ threshold (latest − first in run). #71: `sustainedSeconds >= 48*3600` at threshold 60.
+- `sustainedSeconds`: real time covered by the current unbroken run of scores ≥ threshold, counting each score as one full tick (latest − first + 7200 s; one qualifying score = 2 h, 24 consecutive = 48 h). #71: `sustainedSeconds >= 48*3600` at threshold 60.
+- **`sustainedSeconds` undercounts, never overcounts.** Ticks are processed only when someone visits (at most three overdue ticks per visit). Ticks that are never processed have no score, and the run spans only recorded scores. So after quiet periods or skipped catch-up the value can be lower than the real time Unrest stayed high. Callers should treat it as a conservative lower bound, and #71 should not expect it to be exact.
 - Server code reads the raw truth for every nation, including Korund.
 
 ## Citizen-facing view
@@ -53,7 +53,7 @@ computeStability(inputs): {stability, unrest, breakdown}   // pure
 `SimulationState.stability: PublicStability[]` on `/api/world` and `/api/citizen` (the `simulation` field), rendered by `app/stability-panel.tsx` in the Government panel.
 
 - Kindle / Aurelle: `{kind: 'measured', nationId, tick, scheduledAt, stability, unrest, breakdown}`.
-- Korund (GDD 8.6): `{kind: 'state-approved', nationId, tick, scheduledAt, approvedStability, systemStats: {citizens, fedPercent, workedPercent, petitionBacklog}}`. `approvedStability = max(92, stability)`; raw Unrest and the breakdown are never sent to clients.
+- Korund (GDD 8.6, architect decision on #95): `{kind: 'state-approved', nationId, tick, scheduledAt, approvedStability, systemStats: {citizensApprox, foodSupply, workTurnout}}`. `approvedStability` is a constant (92). The system stats are truthful but coarse: `citizensApprox` is the true count rounded to the nearest 10, and `foodSupply` / `workTurnout` are the true rates as `'Low' | 'Mid' | 'High'` bands. Raw Stability, Unrest, the breakdown and exact inputs are never sent to clients, so the true score cannot be reconstructed. True values stay server-side (`latestStability` etc.).
 
 ## Out of scope
 

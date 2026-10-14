@@ -1,3 +1,3 @@
--- Additive (#69): per-nation daily Stability/Unrest history. Numbered 0011 because 0010 is reserved by open PR #58.
+-- Additive (#69): per-nation daily Stability/Unrest history. Numbered 0012: 0010 is reserved by #88, 0011 by #58.
 CREATE TABLE IF NOT EXISTS nation_stability_scores (nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),tick INTEGER NOT NULL CHECK(tick>0),scheduled_at INTEGER NOT NULL,computed_at INTEGER NOT NULL,stability INTEGER NOT NULL CHECK(stability BETWEEN 0 AND 100),unrest INTEGER NOT NULL CHECK(unrest BETWEEN 0 AND 100),inputs_json TEXT NOT NULL,breakdown_json TEXT NOT NULL,PRIMARY KEY(nation_id,tick));
 CREATE INDEX IF NOT EXISTS idx_nation_stability_time ON nation_stability_scores(nation_id,scheduled_at);

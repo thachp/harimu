@@ -1,4 +1,6 @@
 import type {GameDatabase} from './database-contract';
+/** Mirrors world-simulation tickSeconds (one game day); duplicated to avoid an import cycle. */
+export const tickSeconds = 7200;
 
 /**
  * Daily (per game day) Stability and Unrest scores for the MVP nations (issue #69).
@@ -105,8 +107,8 @@ export async function stabilityHistory(db: GameDatabase, nationId: StabilityNati
 /**
  * "Days Unrest ≥ threshold in the last N real days": the number of distinct real UTC days in the window
  * where every recorded game-day score had Unrest ≥ threshold (a day with no scores does not count).
- * Also returns the longest current streak of consecutive scores ≥ threshold in seconds, for rules like
- * "Unrest ≥ 60 for 48 real hours".
+ * sustainedSeconds: real time covered by the current unbroken run of scores ≥ threshold, counting each
+ * score as one full tick (latest − first + tickSeconds), so one qualifying score = 7200s; 24 scores = 48h.
  */
 export async function unrestAtOrAbove(db: GameDatabase, nationId: StabilityNation, threshold: number, now: number, days = 7) {
  const history = await stabilityHistory(db, nationId, now, days*86400);
@@ -114,19 +116,29 @@ export async function unrestAtOrAbove(db: GameDatabase, nationId: StabilityNatio
  for (const row of history) { const day = Math.floor(row.scheduledAt/86400); byDay.set(day, (byDay.get(day) ?? true) && row.unrest >= threshold); }
  let streakStart: number|null = null;
  for (const row of history) streakStart = row.unrest >= threshold ? streakStart ?? row.scheduledAt : null;
- return {days: [...byDay.values()].filter(Boolean).length, recordedDays: byDay.size, sustainedSeconds: streakStart === null ? 0 : history[history.length-1].scheduledAt-streakStart};
+ return {days: [...byDay.values()].filter(Boolean).length, recordedDays: byDay.size, sustainedSeconds: streakStart === null ? 0 : history[history.length-1].scheduledAt-streakStart+tickSeconds};
 }
 
-/** Citizen-facing view. Korund publishes a state-approved figure plus truthful system stats only (GDD 8.6). */
+/** Coarse band; thresholds are internal and not published. */
+export type Band = 'Low'|'Mid'|'High';
+const band = (percent: number): Band => percent >= 67 ? 'High' : percent >= 34 ? 'Mid' : 'Low';
+/** Rounds a citizen count to the nearest 10 (minimum display "under 10" is 0). */
+const roundCitizens = (value: number) => Math.round(value/10)*10;
+/**
+ * Citizen-facing view. Korund publishes a state-approved figure plus coarse system stats only (GDD 8.6,
+ * architect decision on #95): bands and rounded citizens, never exact inputs that would let a client
+ * reconstruct the true score. True values stay server-side.
+ */
 export type PublicStability = {nationId: StabilityNation; tick: number; scheduledAt: number} & (
  {kind: 'measured'; stability: number; unrest: number; breakdown: StabilityScore['breakdown']} |
- {kind: 'state-approved'; approvedStability: number; systemStats: {citizens: number; fedPercent: number; workedPercent: number; petitionBacklog: number}});
-export const korundApprovedFloor = 92;
+ {kind: 'state-approved'; approvedStability: number; systemStats: {citizensApprox: number; foodSupply: Band; workTurnout: Band}});
+export const korundApprovedStability = 92;
 export function publicStability(row: StabilityRecord): PublicStability {
  if (row.nationId !== 'korund') return {nationId: row.nationId, tick: row.tick, scheduledAt: row.scheduledAt, kind: 'measured', stability: row.stability, unrest: row.unrest, breakdown: row.breakdown};
  const i = row.inputs;
- return {nationId: row.nationId, tick: row.tick, scheduledAt: row.scheduledAt, kind: 'state-approved', approvedStability: Math.max(korundApprovedFloor, row.stability),
-  systemStats: {citizens: i.citizens, fedPercent: pct(Math.min(i.fed,i.citizens), i.citizens, 0), workedPercent: pct(Math.min(i.worked,i.citizens), i.citizens, 0), petitionBacklog: i.petitionBacklog}};
+ // The approved figure is a constant so it carries no information about the true score.
+ return {nationId: row.nationId, tick: row.tick, scheduledAt: row.scheduledAt, kind: 'state-approved', approvedStability: korundApprovedStability,
+  systemStats: {citizensApprox: roundCitizens(i.citizens), foodSupply: band(pct(Math.min(i.fed,i.citizens), i.citizens, 0)), workTurnout: band(pct(Math.min(i.worked,i.citizens), i.citizens, 0))}};
 }
 export async function readPublicStability(db: GameDatabase): Promise<PublicStability[]> {
  return (await Promise.all(stabilityNations.map(id => latestStability(db, id)))).filter((row): row is StabilityRecord => row !== null).map(publicStability);

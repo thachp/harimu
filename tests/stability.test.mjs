@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {localRuntime} from './helpers/local-runtime.mjs';
-import {computeStability,foodTerms,workTerms,promiseTerms,petitionTerms,publicStability,unrestAtOrAbove,stabilityStatements,korundApprovedFloor} from '../lib/stability.ts';
+import {computeStability,foodTerms,workTerms,promiseTerms,petitionTerms,publicStability,unrestAtOrAbove,stabilityStatements,korundApprovedStability} from '../lib/stability.ts';
 
 const sum=terms=>terms.reduce((t,x)=>t+x.points,0);
 test('each input is bounded and monotonic',()=>{
@@ -23,8 +23,8 @@ test('breakdown sums to the score and scores stay within 0..100 at the extremes'
 test('Korund publishes only the state-approved figure and truthful system stats',()=>{
  const score=computeStability({citizens:4,fed:1,worked:2,petitionBacklog:1});
  const row={nationId:'korund',tick:3,scheduledAt:1,inputs:{citizens:4,fed:1,worked:2,promisesKept:0,promisesBroken:0,petitionBacklog:1},...score};
- const view=publicStability(row);assert.equal(view.kind,'state-approved');assert.equal(view.approvedStability,korundApprovedFloor);
- assert.deepEqual(view.systemStats,{citizens:4,fedPercent:25,workedPercent:50,petitionBacklog:1});assert.equal('unrest' in view,false);assert.equal('breakdown' in view,false);
+ const view=publicStability(row);assert.equal(view.kind,'state-approved');assert.equal(view.approvedStability,korundApprovedStability);
+ assert.deepEqual(view.systemStats,{citizensApprox:0,foodSupply:'Low',workTurnout:'Mid'});assert.equal('unrest' in view,false);assert.equal('breakdown' in view,false);
  assert.equal(publicStability({...row,nationId:'kindle'}).kind,'measured');
 });
 test('world ticks record one score per nation per game day, idempotently across retries',async t=>{
@@ -52,10 +52,10 @@ test('history answers "days Unrest >= 65 in the last 7 real days" and sustained 
  await put('aurelle',start+8*day,90);
  const now=start+9*day-1;
  const korund=await unrestAtOrAbove(r.db,'korund',65,now,7);assert.equal(korund.recordedDays,7);assert.equal(korund.days,6);
- assert.equal(korund.sustainedSeconds,(start+8*day+11*7200)-(start+4*day+7*7200));
+ assert.equal(korund.sustainedSeconds,(start+8*day+11*7200)-(start+4*day+7*7200)+7200,'each score covers one full tick');
  assert.equal((await unrestAtOrAbove(r.db,'korund',71,now,7)).days,0);
  assert.deepEqual(await unrestAtOrAbove(r.db,'kindle',65,now,7),{days:0,recordedDays:0,sustainedSeconds:0});
- assert.equal((await unrestAtOrAbove(r.db,'aurelle',65,now,7)).days,1);
+ assert.equal((await unrestAtOrAbove(r.db,'aurelle',65,now,7)).days,1);assert.equal((await unrestAtOrAbove(r.db,'aurelle',65,now,7)).sustainedSeconds,7200,'a single qualifying score is one tick');
 });
 test('inputs are read from saved shifts, meals and petitions',async t=>{
  const r=await localRuntime();t.after(()=>r.close());const epoch=(await r.call('world',null)).data.simulation.clock.epochSeconds;
@@ -78,4 +78,28 @@ test('stability panel shows the breakdown, but only the approved figure for Koru
  const korund=renderToStaticMarkup(exports.StabilityPanel({score:publicStability({...base,nationId:'korund'})}));
  assert.match(korund,/State-approved Stability: 92\/100/);assert.doesNotMatch(korund,/Unrest/);
  assert.match(renderToStaticMarkup(exports.StabilityPanel({score:undefined})),/No daily score/);
+});
+const forbidden=['stability','unrest','breakdown','inputs','fed','worked','petitionBacklog','promisesKept','promisesBroken','citizens','fedPercent','workedPercent'];
+const keysDeep=(v,out=[])=>{if(v&&typeof v==='object')for(const [k,x] of Object.entries(v)){out.push(k);keysDeep(x,out);}return out;};
+test('Korund payload cannot reconstruct the true score',()=>{
+ // Different true inputs/scores in the same bands produce byte-identical Korund payloads.
+ const mk=inputs=>({nationId:'korund',tick:5,scheduledAt:9,inputs,...computeStability(inputs)});
+ const a=mk({citizens:30,fed:21,worked:11,promisesKept:3,promisesBroken:0,petitionBacklog:0});
+ const b=mk({citizens:34,fed:34,worked:22,promisesKept:0,promisesBroken:4,petitionBacklog:30});
+ assert.notEqual(a.stability,b.stability);assert.notEqual(a.unrest,b.unrest);
+ assert.equal(JSON.stringify(publicStability(a)),JSON.stringify(publicStability(b)));
+ for(const key of keysDeep(publicStability(a)))assert.ok(!forbidden.includes(key),`Korund view leaks ${key}`);
+});
+test('Korund entries in /api/citizen and /api/world carry no true score fields at any depth',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const epoch=(await r.call('world',null)).data.simulation.clock.epochSeconds;
+ await r.call('citizen','alice');await r.db.prepare("UPDATE citizens SET nation_id='korund'").run();
+ r.setNow((epoch+7200)*1000);const res=await r.call('citizen','alice');assert.equal(res.status,200);
+ const truth=await r.db.prepare("SELECT stability,unrest FROM nation_stability_scores WHERE nation_id='korund'").first();assert.ok(truth);
+ const korund=res.data.simulation.stability.find(v=>v.nationId==='korund');assert.equal(korund.kind,'state-approved');
+ for(const key of keysDeep(korund))assert.ok(!forbidden.includes(key),`Korund view leaks ${key}`);
+ assert.doesNotMatch(JSON.stringify(korund),/"(stability|unrest|breakdown|inputs)"/);
+ const world=await r.call('world',null);const korundWorld=world.data.simulation.stability.find(v=>v.nationId==='korund');assert.equal(korundWorld.kind,'state-approved');
+ for(const key of keysDeep(korundWorld))assert.ok(!forbidden.includes(key),`/api/world Korund view leaks ${key}`);
+ assert.doesNotMatch(JSON.stringify(korundWorld),/"(stability|unrest|breakdown|inputs)"/);
+ assert.ok(!JSON.stringify(korundWorld).includes(`"${truth.unrest}"`));
 });
