@@ -2,29 +2,24 @@
  * Guidance only: no rewards, no game state. Goals marked `needsCode` in lib/first-week.ts stay hidden
  * until the feature they depend on is switched on here (fail closed for unknown ids).
  * Progress persistence is a STUB (browser localStorage) until server-side tracking lands in #135. */
-import type { WeekDay, WeekGoal } from './first-week';
+import type { GoalRequirement, WeekDay, WeekGoal } from './first-week';
 
-export type FirstWeekFeature='petitions'|'civicRank'|'meritBadges'|'notables'|'claimantPledges'|'royalFavor';
-/** Feature switches for goals whose screen or signal does not exist yet. All OFF until built. */
-export const firstWeekFeatures:Readonly<Record<FirstWeekFeature,boolean>>={petitions:false,civicRank:false,meritBadges:false,notables:false,claimantPledges:false,royalFavor:false};
-/** "requires" flag per needsCode goal. */
-export const firstWeekGoalRequires:Readonly<Record<string,FirstWeekFeature>>={
- 'kindle-5-petition':'petitions','aurelle-5-audience':'petitions','kindle-7-rank':'civicRank','korund-6-medal':'meritBadges',
- 'korund-7-chronicle':'notables','aurelle-6-chronicler':'notables','aurelle-6-claimants':'claimantPledges','aurelle-7-favor':'royalFavor',
-};
+/** Unbuilt features the tracker may show goals for. EMPTY until each feature ships: goals with
+ * `requires` (lib/first-week.ts, #132) stay hidden. A `needsCode` goal without `requires` is hidden too (fail closed). */
+export const availableFirstWeekFeatures:readonly GoalRequirement[]=[];
 
-export function goalAvailable(goal:WeekGoal,features:Readonly<Partial<Record<FirstWeekFeature,boolean>>>=firstWeekFeatures):boolean{
- if(!goal.needsCode)return true;
- const req=firstWeekGoalRequires[goal.id];
- return Boolean(req&&features[req]);
+export function goalAvailable(goal:WeekGoal,available:readonly GoalRequirement[]=availableFirstWeekFeatures):boolean{
+ if(goal.needsCode&&!goal.requires?.length)return false;
+ // Same rule as visibleGoals() in lib/first-week.ts (type-only import keeps this loadable by the node test runner).
+ return !goal.requires||goal.requires.every(need=>available.includes(need));
 }
 
 export type FirstWeekTracker={day:WeekDay['day'];theme:string;goals:{goal:WeekGoal;done:boolean}[];doneCount:number};
 /** `day` comes from firstWeekDay() in lib/first-week.ts (null outside days 2–7). */
-export function firstWeekTracker(input:{day:WeekDay|null;done:readonly string[];features?:Readonly<Partial<Record<FirstWeekFeature,boolean>>>}):FirstWeekTracker|null{
+export function firstWeekTracker(input:{day:WeekDay|null;done:readonly string[];available?:readonly GoalRequirement[]}):FirstWeekTracker|null{
  const day=input.day; if(!day)return null;
  const done=new Set(input.done);
- const goals=day.goals.filter(goal=>goalAvailable(goal,input.features)).map(goal=>({goal,done:done.has(goal.id)}));
+ const goals=day.goals.filter(goal=>goalAvailable(goal,input.available)).map(goal=>({goal,done:done.has(goal.id)}));
  if(!goals.length)return null;
  return {day:day.day,theme:day.theme,goals,doneCount:goals.filter(entry=>entry.done).length};
 }

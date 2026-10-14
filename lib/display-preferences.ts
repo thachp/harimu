@@ -11,3 +11,6 @@ export function displayTimestamp(value:string|number,timeFormat:DisplayPreferenc
  const date=new Date(value);if(!Number.isFinite(date.getTime()))return 'Time unavailable';
  return new Intl.DateTimeFormat('en-GB',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'UTC',hourCycle:timeFormat==='12'?'h12':'h23'}).format(date)+' UTC';
 }
+
+/** Reduced motion applies when the player chose Reduce in Settings or the OS prefers reduced motion (#120). */
+export function effectiveReducedMotion(motion:DisplayPreferences['motion'],osPrefersReduced:boolean):boolean{return motion==='reduce'||osPrefersReduced;}

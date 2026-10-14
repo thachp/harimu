@@ -2,11 +2,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { firstWeekArcs, firstWeekDay } from '../lib/first-week.ts';
-import { firstWeekTracker, goalAvailable, firstWeekGoalRequires, firstWeekFeatures, stubFirstWeekProgressStore, firstWeekStubKey } from '../lib/first-week-progress.ts';
+import { firstWeekArcs, firstWeekDay, visibleGoals } from '../lib/first-week.ts';
+import { firstWeekTracker, goalAvailable, availableFirstWeekFeatures, stubFirstWeekProgressStore, firstWeekStubKey } from '../lib/first-week-progress.ts';
 
 const enrolledAt='2026-10-01T12:00:00.000Z', day=86400000, t0=Date.parse(enrolledAt);
-const at=(n,nationId='kindle',done=[],features)=>firstWeekTracker({day:firstWeekDay({nationId,enrolledAt,now:t0+(n-1)*day+60000}),done,features});
+const at=(n,nationId='kindle',done=[],available)=>firstWeekTracker({day:firstWeekDay({nationId,enrolledAt,now:t0+(n-1)*day+60000}),done,available});
 
 test('progresses day 2 through 7, then disappears', () => {
   assert.equal(at(1),null, 'day 1 belongs to the first loop');
@@ -15,20 +15,23 @@ test('progresses day 2 through 7, then disappears', () => {
   assert.equal(firstWeekTracker({day:firstWeekDay({nationId:'unknown',enrolledAt,now:t0+day*2}),done:[]}),null);
 });
 
-test('every needsCode goal maps to a requires flag, and stays hidden while it is off', () => {
-  const gated=firstWeekArcs.flatMap(a=>a.days.flatMap(d=>d.goals)).filter(g=>g.needsCode);
-  assert.deepEqual(gated.map(g=>g.id).sort(),Object.keys(firstWeekGoalRequires).sort());
-  assert.ok(Object.values(firstWeekFeatures).every(v=>v===false),'no unbuilt feature is switched on');
-  for (const g of gated) assert.equal(goalAvailable(g),false,g.id);
-  assert.equal(goalAvailable({id:'new-x',screen:'nation',text:'x',signal:'x',needsCode:'?'},{petitions:true,civicRank:true,meritBadges:true,notables:true,claimantPledges:true,royalFavor:true}),false,'unknown gated goal fails closed');
-  assert.deepEqual(at(5).goals.map(e=>e.goal.id),['kindle-5-ballot']);
-  assert.deepEqual(at(5,'kindle',[],{petitions:true}).goals.map(e=>e.goal.id),['kindle-5-ballot','kindle-5-petition']);
-  assert.deepEqual(at(7,'aurelle').goals.map(e=>e.goal.id),['aurelle-7-review']);
+test('goals that require unbuilt features stay hidden (requires flag from #132), unknown gaps fail closed', () => {
+  const all=firstWeekArcs.flatMap(a=>a.days.flatMap(d=>d.goals));
+  assert.deepEqual(availableFirstWeekFeatures,[],'no unbuilt feature is switched on');
+  for (const g of all.filter(g=>g.requires)) assert.equal(goalAvailable(g),false,g.id);
+  for (const g of all.filter(g=>g.needsCode)) assert.equal(goalAvailable(g),false,g.id);
+  assert.equal(goalAvailable({id:'new-x',screen:'nation',text:'x',signal:'x',needsCode:'?'},['petitions']),false,'needsCode without requires fails closed');
+  for (const a of firstWeekArcs) for (const d of a.days) {
+    const t=firstWeekTracker({day:d,done:[]});
+    assert.deepEqual(t?.goals.map(e=>e.goal.id)??[],visibleGoals(d).filter(g=>!g.needsCode||g.requires).map(g=>g.id),`${a.nationId} day ${d.day}`);
+  }
+  const d5=firstWeekArcs[0].days.find(d=>d.day===5); const pet=d5.goals.find(g=>g.id==='kindle-5-petition');
+  if (pet?.requires) assert.ok(firstWeekTracker({day:d5,done:[],available:pet.requires}).goals.some(e=>e.goal.id===pet.id),'shows once its feature is available');
 });
 
 test('done state counts only visible goals', () => {
-  const t=at(2,'korund',['korund-2-quota','korund-6-medal']);
-  assert.equal(t.doneCount,1); assert.deepEqual(t.goals.map(e=>e.done),[true,false]);
+  const t=at(2,'korund',[at(2,'korund').goals[0].goal.id,'korund-6-medal']);
+  assert.equal(t.doneCount,1); assert.equal(t.goals[0].done,true); assert.ok(t.goals.slice(1).every(e=>!e.done));
 });
 
 test('stub store persists per citizen key and survives bad data', () => {

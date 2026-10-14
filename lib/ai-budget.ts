@@ -21,6 +21,8 @@ export function aiPricesStale(now:number){return aiPriceAgeDays(now)>aiPriceStal
 // ---- Durable daily budget ----
 export const aiNewsSequenceOperation='news-sequence-3b-guard-2026-10-14';
 export const aiNewsSequenceReservation=aiModelReservations['@cf/meta/llama-3.2-3b-instruct']*2+aiModelReservations['@cf/meta/llama-guard-3-8b'];
+/** Issue #20: Cabinet petition response, its own ledger operation (same 3b+3b+guard sequence cost). */
+export const aiCabinetResponseOperation='cabinet-response-3b-guard-2026-10-14';
 export const aiNotableQuestionOperation='notable-question-3b-double-guard-2026-10-14';
 export const aiNotableQuestionReservation=aiModelReservations['@cf/meta/llama-3.2-3b-instruct']*2+aiModelReservations['@cf/meta/llama-guard-3-8b']*2;
 /** Hard ceiling: US$0.97, below the approved US$1/day. The env budget can only lower it. */
@@ -67,6 +69,9 @@ export const aiBudgetSchema=`CREATE TABLE IF NOT EXISTS harimu_ai_reservations (
 export async function reserveAiCall(db:GameDatabase,id:string,model:AiModel,now:number,config:AiBudgetConfig|null){
  if(!isPricedAiModel(model))return false;return reserveBudget(db,id,model,aiModelReservations[model],1,now,config);
 }
+export async function reserveAiCabinetSequence(db:GameDatabase,id:string,now:number,config:AiBudgetConfig|null){
+ return reserveBudget(db,id,aiCabinetResponseOperation,aiNewsSequenceReservation,3,now,config);
+}
 export async function reserveAiSequence(db:GameDatabase,id:string,now:number,config:AiBudgetConfig|null,quota?:{ownerPrefix:string;dailyLimit:number},freeform=false){
  if(quota&&(!/^[a-z]+:[a-f0-9]{64}:$/.test(quota.ownerPrefix)||!id.startsWith(quota.ownerPrefix)||!Number.isSafeInteger(quota.dailyLimit)||quota.dailyLimit<1||quota.dailyLimit>20))return false;
  return reserveBudget(db,id,freeform?aiNotableQuestionOperation:aiNewsSequenceOperation,freeform?aiNotableQuestionReservation:aiNewsSequenceReservation,freeform?4:3,now,config,quota);
@@ -80,14 +85,14 @@ async function reserveBudget(db:GameDatabase,id:string,model:string,cost:number,
  // Pre-book the next UTC day too, to cover requests spanning midnight. Earlier-day
  // uncertain/pending calls block further inference for aiUncertainBlockTtlSeconds; they are never refunded.
  // Step 1: one atomic conditional INSERT ... SELECT (a single statement in its own write transaction).
- const limits=`COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND COALESCE((SELECT SUM(CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND (?=0 OR (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id LIKE ? AND utc_day=?)<?)`;
+ const limits=`COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND COALESCE((SELECT SUM(CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND (?=0 OR (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id LIKE ? AND utc_day=?)<?)`;
  const result=await db.prepare(`INSERT OR IGNORE INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) SELECT ?,?,?,?,?,?,'pending' WHERE NOT EXISTS(SELECT 1 FROM harimu_ai_reservations WHERE status IN ('pending','uncertain') AND utc_day<? AND started_at>?) AND ${limits}`).bind(id,day,next,model,cost,now,day,now-aiUncertainBlockTtlSeconds,day,day,budget,cost,next,next,budget,cost,aiNewsSequenceOperation,aiNotableQuestionOperation,day,day,units,aiNewsSequenceOperation,aiNotableQuestionOperation,next,next,units,quota?1:0,quota?quota.ownerPrefix+'%':'',day,quota?.dailyLimit??0).run();
  if(result.meta.changes!==1)return false;
  // Step 2: committed re-check. Under READ COMMITTED two concurrent inserts could each miss the other's
  // uncommitted row. After commit, the later re-check of any racing pair sees both rows, so an over-cap
  // total is always detected and the losing pending row (no inference made yet) is withdrawn. Ties fail
  // closed (both withdraw). Postgres writes additionally serialize on the adapter's transaction advisory lock.
- const totals=`SELECT COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS day_micro,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS next_micro,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN (CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) ELSE 0 END),0) AS day_units,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN (CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) ELSE 0 END),0) AS next_units,COALESCE(SUM(CASE WHEN ?=1 AND request_id LIKE ? AND utc_day=? THEN 1 ELSE 0 END),0) AS owned FROM harimu_ai_reservations`;
+ const totals=`SELECT COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS day_micro,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS next_micro,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN (CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) ELSE 0 END),0) AS day_units,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN (CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) ELSE 0 END),0) AS next_units,COALESCE(SUM(CASE WHEN ?=1 AND request_id LIKE ? AND utc_day=? THEN 1 ELSE 0 END),0) AS owned FROM harimu_ai_reservations`;
  const check=await db.prepare(totals).bind(day,day,next,next,day,day,aiNewsSequenceOperation,aiNotableQuestionOperation,next,next,aiNewsSequenceOperation,aiNotableQuestionOperation,quota?1:0,quota?quota.ownerPrefix+'%':'',day).first<{day_micro:number;next_micro:number;day_units:number;next_units:number;owned:number}>();
  const over=!check||check.day_micro>budget||check.next_micro>budget||check.day_units>200||check.next_units>200||(quota!==undefined&&check.owned>quota.dailyLimit);
  if(over){await db.prepare("DELETE FROM harimu_ai_reservations WHERE request_id=? AND status='pending'").bind(id).run();return false;}

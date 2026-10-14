@@ -1,5 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
+import { stabilityStatements, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
 export const tickSeconds = 7200;
 export const maximumCatchupTicks = 3;
@@ -34,7 +35,7 @@ export type WorldClock = {
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
 export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecution | null;
-  supplierFoodRemaining: number; supplierCashMinor: number };
+  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[] };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
 export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000)): Promise<SimulationState> {
@@ -53,17 +54,22 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
         .bind(tick,scheduledAt,now,JSON.stringify(proposals)),
       db.prepare(policyExecutionSql).bind(now,tick),
     ]);
+    // Hotfix for #95: scores are written in their own batch after the tick commits, so a missing
+    // nation_stability_scores table (migration 0012 not applied) can't abort the tick. Other errors still throw.
+    try { await db.batch(await stabilityStatements(db,tick,scheduledAt,now)); }
+    catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Tick', tick, 'recorded without scores.'); }
   }
-  const [latest,execution,supply] = await Promise.all([
+  const [latest,execution,supply,stability] = await Promise.all([
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')
       .first<{tick:number;nation_id:string;topic:string;food_quantity:number;spend_minor:number;scheduled_at:number;executed_at:number}>(),
     db.prepare("SELECT initial_food-COALESCE((SELECT SUM(food_quantity) FROM government_policy_executions),0) AS food, COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS cash FROM world_supply WHERE id='kindle-food-supplier'")
       .first<{food:number;cash:number}>(),
+    readPublicStability(db),
   ]);
   return {clock:{compression:12,epochSeconds:epoch,nowSeconds:now,gameDay:Math.floor(Math.max(0,now-epoch)*12/86400)+1,
     latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation'},
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability};
 }
