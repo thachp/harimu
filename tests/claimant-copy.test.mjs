@@ -51,7 +51,8 @@ test('no violence glorified, no real-world places, no Notable', () => {
   assert.doesNotMatch(t,/blood|slaughter|execut|behead|kill|massacre|traitor|glori/i);
   assert.doesNotMatch(t,/\b(Earth|Saudi|Thailand|England|France|Europe|London|Paris)\b/); assert.doesNotMatch(t,/Notable/);
 });
-test('unwired: nothing in app/ or components/ imports claimant-copy', () => {
+test('wired by #71 only: the Aurelle Rising panel is the one UI importer of claimant-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/claimant-copy/, f);
+  const importers=[...walk('app'),...walk('components')].filter(f=>/\.(t|j)sx?$/.test(f)&&/claimant-copy/.test(readFileSync(f,'utf8')));
+  assert.deepEqual(importers,['app/aurelle-rising.tsx']);
 });
