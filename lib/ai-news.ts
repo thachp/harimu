@@ -1,12 +1,12 @@
 import type {GameDatabase} from './database-contract';
 import type {NationalNews,NewsItem} from './national-news';
-import {reserveAiSequence,aiBudgetSchema,type AiModel} from './ai-budget';
+import {reserveAiSequence,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 export const aiNewsEnabled=true; // Preview activation approved 2026-10-14; runtime flags and pricing expiry still gate inference.
 export const aiNewsSchemas=[aiBudgetSchema,
  `CREATE TABLE IF NOT EXISTS ai_news_jobs(id TEXT PRIMARY KEY,nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),utc_day TEXT NOT NULL,started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('running','published','failed')),failure_code TEXT)`,
  `CREATE TABLE IF NOT EXISTS ai_news_articles(id TEXT PRIMARY KEY,nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),title TEXT NOT NULL,body TEXT NOT NULL,created_at INTEGER NOT NULL,model TEXT NOT NULL,facts_json TEXT NOT NULL)`,
 ] as const;
-export type NewsAiBinding={run:(model:string,input:{messages:{role:'system'|'user'|'assistant';content:string}[];max_tokens:number;temperature:number;stream:false;response_format?:typeof newsDraftResponseFormat|typeof newsVerificationResponseFormat})=>Promise<unknown>};
+export type NewsAiBinding={run:(model:string,input:{messages:{role:'system'|'user'|'assistant';content:string}[];max_tokens:number;temperature:number;stream:false;response_format?:typeof newsDraftResponseFormat|typeof newsVerificationResponseFormat},options?:{gateway:{id:string}})=>Promise<unknown>};
 class AiNewsFailure extends Error{constructor(readonly code:string){super('AI news unavailable.');}}
 type Facts={nationId:string;citizens:number;completedShifts:number;food:number};
 type Draft={title:string;summary:string;claims:('citizens'|'completedShifts'|'food')[]};
@@ -38,16 +38,16 @@ export function inferenceText(value:unknown,json=false){
  if(json&&r.response&&typeof r.response==='object'&&!Array.isArray(r.response))return JSON.stringify(r.response);
  throw Error('Invalid inference response.');
 }
-export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,priceReviewedUntil=0}={}){
- if(!enabled||!binding||!Number.isSafeInteger(now)||priceReviewedUntil<=now)return;
+export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null}={}){
+ if(!enabled||!binding||!budget||!Number.isSafeInteger(now))return;
  const facts=publicNewsFacts(news),id=`${facts.nationId}:${new Date(now*1000).toISOString().slice(0,10)}`;
  const lease=await db.prepare("INSERT OR IGNORE INTO ai_news_jobs(id,nation_id,utc_day,started_at,status) VALUES (?,?,?,?,'running')").bind(id,facts.nationId,id.slice(id.indexOf(':')+1),now).run();if(lease.meta.changes!==1)return;
  const reservation=crypto.randomUUID();
- if(!await reserveAiSequence(db,reservation,now,priceReviewedUntil)){await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code='budget-unavailable' WHERE id=?").bind(id).run();return;}
+ if(!await reserveAiSequence(db,reservation,now,budget)){await db.prepare("UPDATE ai_news_jobs SET status='failed',failure_code='budget-unavailable' WHERE id=?").bind(id).run();return;}
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error('Inference input exceeded the public-facts bound.');
   let timeout:ReturnType<typeof setTimeout>|undefined;let result:unknown;
-  try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})}),new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>reject(Error('Inference timed out.')),30000);})]);}catch(error){throw new AiNewsFailure(error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain');}finally{if(timeout!==undefined)clearTimeout(timeout);}
+  try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},aiGatewayOptions(budget)),new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>reject(Error('Inference timed out.')),30000);})]);}catch(error){throw new AiNewsFailure(error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain');}finally{if(timeout!==undefined)clearTimeout(timeout);}
   // The provider has returned: malformed content is a known rejected attempt,
   // not an unresolved transport. Its complete reservation remains charged.
   return inferenceText(result,Boolean(json));

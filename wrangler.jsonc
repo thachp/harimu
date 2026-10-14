@@ -26,7 +26,8 @@
     "HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED": "true",
     "HARIMU_AI_NEWS_ENABLED": "false",
     "HARIMU_NOTABLES_ENABLED": "false",
-    "HARIMU_AI_PRICE_REVIEWED_UNTIL": "2026-10-15T08:06:58.000Z"
+    "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
+    "HARIMU_AI_GATEWAY_ID": "harimu-preview"
   },
   // Isolated preview only; never bind this resource as migrated production.
   "d1_databases": [{
