@@ -47,9 +47,14 @@ ul.plain{list-style:none;margin:0;padding:0}
 /* ===== WORLD: full-bleed atlas, relations, ticker, nation card ===== */
 #world{grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:minmax(520px,calc(100vh - 140px)) auto;grid-template-areas:"atlas card" "ticker ticker";position:relative}#world .atlas{grid-area:atlas}#world .ticker{grid-area:ticker}#world .keylist{grid-area:keys}
 .atlas{position:relative;overflow:hidden;background:#0a1418}
-.atlas>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.atlas{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 50%,#132631 0,#0d1a22 45%,#0a1418 75%)}
+.atlas{container-type:size}.globe-wrap{position:relative;width:min(92cqw,92cqh);aspect-ratio:1}
+.globe-wrap>img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;-webkit-mask:radial-gradient(circle closest-side,#000 97%,transparent 99%);mask:radial-gradient(circle closest-side,#000 97%,transparent 99%)}
+.globe-wrap>svg.rel{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}
+.globe-hint{position:absolute;z-index:4;left:var(--pad);top:var(--pad);margin:0;max-width:260px;font-size:12.5px;color:var(--muted);background:#0c171ce0;border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+.globe-ctl{position:absolute;z-index:4;right:var(--pad);bottom:var(--pad);display:flex;gap:4px;align-items:center;background:#0c171ce8;border:1px solid var(--line);border-radius:6px;padding:4px}.globe-ctl button{min-width:36px;min-height:36px;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;cursor:pointer}.globe-ctl span{font-size:12px;color:var(--muted);padding:0 4px}
 .atlas>svg.rel{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
-.rel path{fill:none}.rel .casing{stroke:#0c171c;stroke-width:6;opacity:.75}.rel .ally{stroke:var(--ally);stroke-width:3}.rel .tension{stroke:#ff9a88;stroke-width:3;stroke-dasharray:1.6 1.1}
+.rel path{fill:none;vector-effect:non-scaling-stroke}.rel .casing{stroke:#0c171c;stroke-width:6;opacity:.75}.rel .ally{stroke:var(--ally);stroke-width:3}.rel .tension{stroke:#ff9a88;stroke-width:3;stroke-dasharray:9 6}
 .atlas .legend{position:absolute;z-index:4;left:var(--pad);bottom:var(--pad);background:#0c171ce8;border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:12px}
 .legend .ln{display:inline-block;width:26px;height:0;border-top:2.5px solid var(--ally);vertical-align:middle;margin-right:6px}.legend .ln.t{border-top:2.5px dashed #ff9a88}
 .nation-card{grid-area:card;border-radius:0;border-width:0 0 0 1px;overflow:auto}
@@ -126,6 +131,7 @@ ul.plain{list-style:none;margin:0;padding:0}
  .keylist button[aria-pressed=true]{border-color:var(--accent)}
  .keylist .n{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--accent);font-size:12px;font-weight:600;color:var(--accent)}
  .keylist small{display:block;color:var(--muted);font-size:11.5px}
+ .globe-ctl{display:none}.globe-hint{position:static;order:-1;align-self:stretch;max-width:none;border-radius:0;border-width:0 0 1px}#world .atlas .legend{position:static;align-self:stretch;margin:6px 8px 8px}#world .atlas{flex-direction:column}
  #world{grid-template-columns:minmax(0,1fr);grid-template-rows:56vh auto auto auto;grid-template-areas:"atlas" "keys" "card" "ticker"}
  .nation-card{border-width:1px 0 0}
  .atlas .legend{left:8px;bottom:8px;font-size:11px;padding:6px 8px}
@@ -172,10 +178,14 @@ ul.plain{list-style:none;margin:0;padding:0}
 <!-- WORLD -->
 <main id="world" class="screen" aria-labelledby="w-h">
  <section class="atlas" aria-labelledby="w-h">
-  <h2 id="w-h" style="position:absolute;left:-9999px">World atlas</h2>
-  <img src="/harimu-world-atlas.jpg" alt="Painted atlas of the Harimu continent with ten nations: mountains, forests, deserts and coasts.">
-  <svg class="rel" id="rel" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-  <div id="w-markers"></div>
+  <h2 id="w-h" style="position:absolute;left:-9999px">World globe</h2>
+  <div class="globe-wrap">
+   <img id="globe-img" src="globe-kindle.webp" alt="">
+   <svg class="rel" id="rel" viewBox="0 0 580 580" aria-hidden="true"></svg>
+   <div id="w-markers"></div>
+  </div>
+  <p class="globe-hint" id="globe-hint"></p>
+  <div class="globe-ctl" aria-label="Globe controls (mockup)" role="group"><button type="button" aria-label="Zoom in">+</button><span>100%</span><button type="button" aria-label="Zoom out">−</button><button type="button">Centre</button><button type="button" aria-label="Turn west">←</button><button type="button" aria-label="Turn east">→</button></div>
   <div class="legend" role="note" aria-label="Map legend"><div><span class="ln"></span>Alliance or trade pact</div><div><span class="ln t"></span>Tension</div><div style="margin-top:4px;color:var(--muted)">Relations are <span class="ph" style="margin:0">placeholder</span></div></div>
  </section>
  <aside class="nation-card card" id="w-card" aria-live="polite"></aside>
@@ -253,7 +263,7 @@ ul.plain{list-style:none;margin:0;padding:0}
 
 <script>
 const NATIONS=[['kindle','Kindle Republic','Liberal democracy','#cf4b32',85,67,'Forgehaven'],['confluence','The Confluence','Single-party socialist state','#2776a6',50,88,'Meetwater'],['meridian','Meridian','Party-state','#a1639c',72,82,'Steamgate'],['korund','Korund','Full communism; leader for life','#75654e',14,45,'Stonehearth'],['aurelle','Aurelle','Absolute hereditary monarchy','#94afbf',72,28,'Highspire'],['ilmar','Ilmar Sanctum','Theocracy','#d3a72f',28,82,'Mirrorhall'],['hoarvale','Hoarvale','Constitutional monarchy','#45a7b8',50,20,'Rimehall'],['varkand','Varkand','Military junta','#526b68',28,28,'Watchfast'],['veldwood','Veldwood','Federal direct democracy','#5b8d42',14,65,'Ringhall'],['fulmara','Fulmara','Mercantile oligarchic republic','#6440a0',86,46,'Arcport']];
-const REL={ally:[['kindle','fulmara'],['hoarvale','aurelle'],['confluence','meridian'],['veldwood','kindle']],tension:[['korund','varkand'],['kindle','meridian'],['aurelle','ilmar']]}; // placeholder relations
+const REL={ally:[['korund','meridian'],['kindle','fulmara'],['hoarvale','aurelle'],['confluence','meridian'],['veldwood','kindle']],tension:[['kindle','confluence'],['korund','varkand'],['kindle','meridian'],['aurelle','ilmar']]}; // placeholder relations
 const N={
  kindle:{name:'Kindle Republic',cash:'412 SPK',cur:'Spark (SPK) · free float',faith:'Secular pluralism',ruler:['IV','Ines Varro','President · elected'],regime:'Liberal democracy',stab:78,cities:[['Forgehaven','Capital · Assembly',175,150,true],['Tarrek Foundry','Foundries · lava fields',415,160],['Kolt Savanna','Granaries · farms',250,300]],regions:['Plateau','Lava Fields','Savanna','Coast'],
   laws:[['Open','Posted prices on every market stall'],['Vote','Preview ballot ranks AI candidates'],['Work','Wages settle at each shift deadline']],
@@ -286,6 +296,8 @@ const HH=[['/assets/household/leora-vale.webp','Leora Vale','34 · keeps the boo
 const NEIGH=[['Tarrek household','4 members · friendly'],['Moss household','2 members · new arrivals'],['Okafor household','5 members · tense with you'],['Ruel household','3 members · owes you 2 food']]; // placeholder neighbours
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let pickedNation='kindle';
+// Pin positions on the captured globe images (580×580 px crop of the game's globe, facing each nation).
+const GLOBE={kindle:{kindle:[290,290],confluence:[494,198],aurelle:[85,198],ilmar:[290,532]},korund:{korund:[290,290],meridian:[85,198],aurelle:[494,198],veldwood:[290,532]},aurelle:{aurelle:[290,290],korund:[85,198],kindle:[494,198],fulmara:[290,532]}};
 function marker({x,y,n,title,sub,cls='',pressed=false,left=false,data=''}){return `<button type="button" class="marker ${cls}${left?' left':''}" style="left:${x}%;top:${y}%" aria-pressed="${pressed}" ${data} aria-label="${esc(title)}${sub?': '+esc(sub):''}"><span class="pin">${n}</span><span class="tag"><b>${esc(title)}</b>${sub?esc(sub):''}</span></button>`}
 function keylist(items,attr){return `<ol>${items.map(i=>`<li><button type="button" ${attr(i)} aria-pressed="${!!i.pressed}"><span class="n">${i.n}</span><span>${esc(i.title)}<small>${esc(i.sub||'')}</small></span></button></li>`).join('')}</ol>`}
 const ISO={tw:60,th:30,ox:540,oy:70},IP=(gx,gy)=>[ISO.ox+(gx-gy)*ISO.tw/2,ISO.oy+(gx+gy)*ISO.th/2];
@@ -316,10 +328,13 @@ function render(){
  const crumbs=[['world','World'],['country',x.name],['city',x.city],['household','Vale household']];const idx=crumbs.findIndex(c=>c[0]===k);
  $('crumbs').innerHTML=crumbs.slice(0,idx+1).map(([s,l],i)=>i===idx?`<b aria-current="page">${esc(l)}</b>`:`<a href="?screen=${s}&nation=${n}" data-go="${s}" style="color:var(--muted)">${esc(l)}</a> ›`).join(' ');
  // WORLD
- const rel=[];for(const [t,list] of Object.entries(REL))for(const [a,b] of list){const A=NATIONS.find(v=>v[0]===a),B=NATIONS.find(v=>v[0]===b);{const dd=`M${A[4]} ${A[5]} Q${(A[4]+B[4])/2} ${(A[5]+B[5])/2-8} ${B[4]} ${B[5]}`;rel.push(`<path class="casing" vector-effect="non-scaling-stroke" d="${dd}"/><path class="${t==='ally'?'ally':'tension'}" vector-effect="non-scaling-stroke" d="${dd}"/>`);}}
+ // The globe faces your nation, like the current game's globe (captured from it). Only the nations on the visible face get pins.
+ const face=GLOBE[n];$('globe-img').src=`globe-${n}.webp`;
+ const rel=[];for(const [t,list] of Object.entries(REL))for(const [a,b] of list){const A=face[a],B=face[b];if(!A||!B)continue;const mx=(A[0]+B[0])/2,my=(A[1]+B[1])/2,dx=mx-290,dy=my-290,l=Math.hypot(dx,dy)||1,cx=mx+dx/l*60,cy=my+dy/l*60;const dd=`M${A[0]} ${A[1]} Q${cx} ${cy} ${B[0]} ${B[1]}`;rel.push(`<path class="casing" d="${dd}"/><path class="${t==='ally'?'ally':'tension'}" d="${dd}"/>`);}
  $('rel').innerHTML=rel.join('');
- const wItems=NATIONS.map((v,i)=>({n:i+1,id:v[0],title:v[1],sub:v[2],x:v[4],y:v[5],pressed:v[0]===pickedNation}));
- $('w-markers').innerHTML=wItems.map(i=>marker({...i,left:i.x>60,data:`data-pick="${i.id}"`})).join('');
+ const wItems=NATIONS.map((v,i)=>({n:i+1,id:v[0],title:v[1],sub:v[2],x:face[v[0]]?face[v[0]][0]/5.8:null,y:face[v[0]]?face[v[0]][1]/5.8:null,pressed:v[0]===pickedNation}));
+ $('w-markers').innerHTML=wItems.filter(i=>i.x!==null).map(i=>marker({...i,left:i.x>60,data:`data-pick="${i.id}"`})).join('');
+ $('globe-hint').textContent=`Globe faces ${N[n].name}: ${wItems.filter(i=>i.x!==null).length} of 10 nations in view. Turn the globe or pick from the strip to see the rest.`;
  $('w-keys').innerHTML=keylist(wItems,i=>`data-pick="${i.id}"`);
  const P=NATIONS.find(v=>v[0]===pickedNation),pr=N[pickedNation];
  const rels=[...REL.ally.filter(r=>r.includes(P[0])).map(r=>['Alliance',r.find(v=>v!==P[0])]),...REL.tension.filter(r=>r.includes(P[0])).map(r=>['Tension',r.find(v=>v!==P[0])])].map(([t,o])=>`${t} with ${NATIONS.find(v=>v[0]===o)[1]}`);
