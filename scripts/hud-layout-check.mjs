@@ -3,11 +3,15 @@
  *  Range rect against the Glossary link at 1280x800 and 390x844 for text size 100/125/150%, for every clock label.
  *  Also asserts the HUD never runs into the dock and the page never scrolls sideways, and (#229) at 390 and 360 wide that
  *  no dock label breaks mid-word, spills out of its button, or makes the dock scroll sideways.
+ *  (#280) The clock's "Public holiday" line is checked like every other clock label, and the faith card, congregation block and
+ *  holiday banner are rendered in the inspector for Kindle, Aurelle (holiday) and Korund at the same sizes: no text may leave its
+ *  card, no word may break mid-word, every control is at least 44px tall, and the page never scrolls sideways.
  *  Run: npm run test:layout   (CI installs Chromium for it; `npm test` stays browser-free). */
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { chromium } from 'playwright';
+import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
 const root = new URL('../', import.meta.url);
@@ -43,6 +47,7 @@ const variants = [
   { name: 'World preview', props: {} },
   { name: 'Loading world', props: { citizenNation: nation } },
   { name: 'Day 12 · 12×', props: { citizenNation: nation, worldClock: { gameDay: 12, latestTick: 140 } } },
+  { name: 'Public holiday', props: { citizenNation: nation, worldClock: { gameDay: 12, latestTick: 140 }, holidayName: 'Oath Day' } }, // #280: extra clock line
   { name: 'Sample', props: { guestDemo: true } },
   // Korund renames two dock places (State store, Assignment): the longest dock labels.
   { name: 'Korund dock labels', props: { nation: { id: 'korund', name: 'Korund', capital: 'Stonehearth' }, citizenNation: { id: 'korund', name: 'Korund', capital: 'Stonehearth' } } },
@@ -55,6 +60,7 @@ const accountControls = React.createElement(React.Fragment, null,
 const css = (await readFile(new URL('app/globals.css', root), 'utf8')).replace(/@import[^;]+;/g, '') + (await readFile(new URL('app/game-shell.css', root), 'utf8'));
 const preflight = '*,::before,::after{box-sizing:border-box;margin:0;padding:0;border:0 solid}button{background:none;font:inherit;color:inherit}svg{display:block}';
 const { GameShell } = await load('game-shell');
+const { FaithPanel, HolidayBanner } = await load('faith-panel');
 
 const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] });
 const failures = []; const rows = [];
@@ -93,6 +99,55 @@ try {
       if (r.vOverlap && r.gap < 4) failures.push(`${id}: clock text is ${r.gap}px from Glossary (needs ≥4px)`);
       if (r.hudDock > 0) failures.push(`${id}: HUD runs ${r.hudDock}px into the dock`);
       if (r.sw > r.cw) failures.push(`${id}: page scrolls sideways (${r.sw} > ${r.cw})`);
+      await page.close();
+    }
+  }
+
+  // #280: faith card, congregation block and holiday banner inside the real inspector.
+  const noop = () => {};
+  const api = (faith, congregations) => ({ faith, congregations, busy: false, message: '', error: '', chooseFaith: noop, attendWorship: noop, joinFestival: noop, congregation: noop });
+  const faithScenes = [
+    { name: 'Kindle · Fair-Wind Vow, not joined', nation, faith: faithState({ devotion: 34 }), cong: congregationState({}) },
+    { name: 'Kindle · locked, joined, Officiant, festival', nation, faith: faithState({ locked: true, worshippedToday: true, festivalBanner: true, devotion: 100 }), cong: congregationState({ member: true, opt: true, officiant: true, blocked: 'You can join or leave a congregation once per game day. Come back tomorrow.' }) },
+    { name: 'Aurelle · Oath Day holiday', nation: { id: 'aurelle', name: 'Aurelle', capital: 'Highspire' }, faith: faithState({ nation: 'aurelle', holiday: true, devotion: 62 }), cong: congregationState({ nation: 'aurelle', faith: 'kinward-rite', member: true }) },
+    { name: 'Korund · Unaffiliated', nation: { id: 'korund', name: 'Korund', capital: 'Stonehearth' }, faith: faithState({ nation: 'korund' }), cong: null },
+  ];
+  for (const sc of faithScenes) {
+    const panel = React.createElement(React.Fragment, null, React.createElement(HolidayBanner, { faith: sc.faith, busy: false, onJoin: noop }), React.createElement(FaithPanel, { api: api(sc.faith, sc.cong) }));
+    const body = renderToStaticMarkup(React.createElement(GameShell, { view: 'household', nation: sc.nation, citizenNation: sc.nation, nations: [sc.nation], capacity: 18, localDemo: true, panel, onNavigate() {}, accountControls, worldClock: { gameDay: 12, latestTick: 140 }, holidayName: sc.faith.holiday?.name ?? null }));
+    for (const [w, h] of [[1280, 800], [390, 844], [360, 740]]) for (const scale of [1, 1.25, 1.5]) {
+      const page = await browser.newPage({ viewport: { width: w, height: h } });
+      await page.setContent(`<!doctype html><html style="--text-scale:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${preflight}${css}</style></head><body>${body}</body></html>`);
+      const r = await page.evaluate(() => {
+        const issues = []; const cards = [...document.querySelectorAll('.faith-panel, .holiday-banner')];
+        for (const card of cards) {
+          const c = card.getBoundingClientRect();
+          const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+          for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            if (!n.textContent.trim()) continue;
+            const rg = document.createRange(); rg.selectNodeContents(n);
+            const rs = [...rg.getClientRects()].filter(x => x.width > 0);
+            if (rs.some(x => x.right > c.right + 0.5 || x.left < c.left - 0.5)) issues.push(`text leaves its card: "${n.textContent.trim().slice(0, 40)}"`);
+            // Words in controls and headings must not split across lines.
+            if (n.parentElement.closest('button, legend, h2, h3, strong')) for (const m of n.textContent.matchAll(/\S+/g)) {
+              const wr = document.createRange(); wr.setStart(n, m.index); wr.setEnd(n, m.index + m[0].length);
+              if (new Set([...wr.getClientRects()].filter(x => x.width > 0).map(x => Math.round(x.top))).size > 1) issues.push(`"${m[0]}" breaks mid-word`);
+            }
+          }
+          for (const el of card.querySelectorAll('button, input[type=radio]')) { const b = el.getBoundingClientRect(); if (el.tagName === 'BUTTON' && b.height < 43.5) issues.push(`button "${el.textContent}" is ${Math.round(b.height)}px tall (needs 44)`); if (b.right > c.right + 0.5) issues.push(`${el.tagName.toLowerCase()} "${el.textContent || el.value}" overflows the card`); }
+          const clipped = [...card.querySelectorAll('*')].find(el => el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX !== 'visible'); if (clipped) issues.push(`<${clipped.tagName.toLowerCase()}> clips its content`);
+        }
+        const clock = document.querySelector('.game-clock'), g = document.querySelector('.game-account > .game-glossary');
+        let gap = null; if (clock && g && getComputedStyle(clock).display !== 'none') { const rg = document.createRange(); rg.selectNodeContents(clock); const rs = [...rg.getClientRects()].filter(x => x.width > 0); const gb = g.getBoundingClientRect(); const right = Math.max(...rs.map(x => x.right)); const vo = rs.some(x => x.top < gb.bottom && gb.top < x.bottom); gap = vo ? gb.left - right : null; }
+        return { issues, cards: cards.length, gap, sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, hudDock: Math.round(document.querySelector('.game-hud').getBoundingClientRect().bottom - document.querySelector('.game-dock').getBoundingClientRect().top) };
+      });
+      const id = `${w}x${h} @${scale * 100}% faith "${sc.name}"`;
+      rows.push(`${id}: ${r.cards} card(s), page ${r.sw}/${r.cw}${r.issues.length ? ' ✗ ' + r.issues.join('; ') : ''}`);
+      if (!r.cards) failures.push(`${id}: faith card did not render`);
+      for (const i of new Set(r.issues)) failures.push(`${id}: ${i}`);
+      if (r.sw > r.cw) failures.push(`${id}: page scrolls sideways (${r.sw} > ${r.cw})`);
+      if (r.gap !== null && r.gap < 4) failures.push(`${id}: clock text is ${Math.round(r.gap)}px from Glossary (needs ≥4px)`);
+      if (r.hudDock > 0) failures.push(`${id}: HUD runs ${r.hudDock}px into the dock`);
       await page.close();
     }
   }

@@ -195,3 +195,21 @@ body:has(.harimu-game){overflow:auto}
 /* #229: dock labels never break mid-word. On phones each button is at least as wide as its longest word (labels wrap only between
    words, e.g. "State / store"); above 100% text the seven places don't fit across, so the dock becomes two even rows (4 + 3) instead. */
 @media(max-width:760px){.game-dock button{min-width:min-content;flex:1 1 clamp(calc(100% / 7), calc((var(--text-scale, 1) - 1) * 1000%), 25%)}.game-dock button span{overflow-wrap:normal;word-break:normal;hyphens:manual}}
+/* #280 faith card, congregation, holiday banner. Sizes scale with --text-scale; words wrap only between words (#131, #229); rows reflow (#186). */
+.faith-panel,.holiday-banner{margin:14px 0;padding:12px 14px;border:1px solid #37515b;border-radius:8px;background:#0f2630;color:#dce7e8;overflow-wrap:normal;word-break:normal;hyphens:manual}
+.faith-panel h2{margin:0 0 8px;font-size:calc(17px * var(--text-scale, 1))}.faith-panel h3{margin:12px 0 4px;font-size:calc(14px * var(--text-scale, 1))}
+.faith-panel p,.holiday-banner p{margin:6px 0;font-size:calc(13px * var(--text-scale, 1));line-height:1.55;min-width:0}
+.faith-panel .faith-tagline{font-style:italic;color:#bcd3d8}.faith-panel .faith-note{font-size:calc(12px * var(--text-scale, 1));color:#a1bdc5}
+.devotion-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:10px 0 4px;font-size:calc(13px * var(--text-scale, 1))}
+.devotion-meter{flex:1 1 calc(120px * var(--text-scale, 1));min-width:0;height:8px;border-radius:4px;background:#2a434c;overflow:hidden}.devotion-meter>span{display:block;height:100%;background:#80d8ce}
+.faith-panel fieldset{margin:12px 0 0;padding:10px 12px;border:1px solid #37515b;border-radius:6px;min-width:0}.faith-panel legend{padding:0 6px;font-weight:600;font-size:calc(13px * var(--text-scale, 1))}
+.faith-picker label{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:8px 4px;cursor:pointer}.faith-picker label>input{flex:none;width:20px;height:20px;margin-top:2px;accent-color:#80d8ce}
+.faith-picker label>span{min-width:0;font-size:calc(13px * var(--text-scale, 1))}.faith-picker label small{display:block;margin-top:2px;font-size:calc(12px * var(--text-scale, 1));color:#a1bdc5;line-height:1.5}.faith-picker label em{font-style:normal;color:#80d8ce}
+.faith-picker:disabled{opacity:.75}.faith-picker:disabled label{cursor:not-allowed}
+.game-inspector-body :is(.faith-panel,.holiday-banner) button:not(.market-item){min-height:44px;padding:8px 14px;font-size:calc(12px * var(--text-scale, 1));max-width:100%;overflow-wrap:normal;word-break:normal}
+.faith-panel :is(input,button):focus-visible,.holiday-banner button:focus-visible{outline:2px solid #80d8ce;outline-offset:2px}
+.faith-actions{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start}
+.faith-panel small[id],.holiday-banner small[id]{font-size:calc(12px * var(--text-scale, 1));color:#f3dca6;line-height:1.45}
+.faith-status p{margin:8px 0 0}.faith-status [role=alert]{color:#f3b3a6}
+.holiday-banner{border-color:#80d8ce;background:#12333a}.holiday-banner .holiday-line strong{font-size:calc(14px * var(--text-scale, 1))}.holiday-banner .festival-line{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between}.holiday-banner .festival-line>p{flex:1 1 calc(220px * var(--text-scale, 1))}
+.game-clock .game-clock-holiday{color:#80d8ce;letter-spacing:0}
