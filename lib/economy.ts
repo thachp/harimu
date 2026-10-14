@@ -2,6 +2,7 @@ import type {GameDatabase} from './database-contract';
 import { defaultRecoverySeconds } from './economy-rules';
 export { recoveryInterval } from './economy-rules';
 import { starterGrantSql } from './market';
+import { walletHistorySql, toTransactions, type WalletHistoryRow, type WalletTransaction } from './wallet';
 // Prototype tuning. Integer minor units: 100 cents = 1 Spark.
 export const employerBudgetMinor = 100000;
 export const maximumCapacity = 24;
@@ -15,6 +16,10 @@ export type Economy = {
   walletMinor: number;
   inventory: { item: string; quantity: number }[];
   nextRecoveryAt: string;
+  /** Recent SPK movements, newest first (issue #39 wallet panel). */
+  transactions?: WalletTransaction[];
+  /** Tessera holdings. No TSR source exists in the PoC, so this is always 0. */
+  tesseraMinor?: number;
 };
 export const economySchema = `CREATE TABLE IF NOT EXISTS shift_settlements (
   shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id),
@@ -82,7 +87,8 @@ export async function readEconomy(db: GameDatabase, userId: string, interval: nu
   const row = await db.prepare(economySnapshotSql).bind(userId, userId, userId).first<{
     wallet_minor: number; inventory_json: string; recovered_at: number | null;
   }>();
-  return { walletMinor: row?.wallet_minor ?? 0,
+  const history = await db.prepare(walletHistorySql).bind(userId, userId, userId, userId).all<WalletHistoryRow>();
+  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: 0, transactions: toTransactions(history.results),
     inventory: JSON.parse(row?.inventory_json ?? '[]') as Economy['inventory'],
     nextRecoveryAt: new Date(((row?.recovered_at ?? Math.floor(Date.now() / 1000)) + interval) * 1000).toISOString() };
 }

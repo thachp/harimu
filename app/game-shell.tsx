@@ -23,6 +23,8 @@ export type GameShellProps = {
   capacity: number;
   currencyCode?: 'SPK' | 'LN' | 'CRN';
   walletMinor?: number;
+  /** When set, the SPK wallet value in the top bar opens the Wallet panel. */
+  onOpenWallet?: () => void;
   inventory?: { food: number; materials: number; knowledge: number };
   shiftSummary?: { title: string; endsAt?: number };
   localDemo: boolean;
@@ -58,7 +60,7 @@ function HudHelp({ label, children, help }: { label: string; children: ReactNode
   return <details className="game-hud-help"><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ worldClock, nextDeadline, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ worldClock, nextDeadline, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
   const [family, setFamily] = useState<NationFamily>('all');
   const [lens, setLens] = useState<NationLens>('power');
   const [shortlistOnly, setShortlistOnly] = useState(false);
@@ -98,7 +100,8 @@ export function GameShell({ worldClock, nextDeadline, view, nation, citizenNatio
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>
         {guestDemo ? <span>No account · sample actions only</span> : !citizenNation && !localDemo ? <HudHelp label="Resources" help="Work capacity, money, food, materials and knowledge unlock after citizenship. Exploring nations does not create a citizen."><span>Resources unlock after citizenship</span></HudHelp> : <>
         <HudHelp label="Work capacity" help="Work capacity (WC) is energy available for jobs and civic actions. Meals restore it. Jobs use real-time timers."><Lightning size={19} weight="fill" aria-hidden="true" /><strong>{capacity}</strong><span>WC</span></HudHelp>
-        <HudHelp label="Wallet" help={`Your ${currencyCode} wallet holds national money. Amounts update after completed transactions; loading means the citizen snapshot has not arrived.`}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></HudHelp>
+        {onOpenWallet && currencyCode === 'SPK' ? <button type="button" className="game-wallet-button" aria-label={`Open wallet · ${walletMinor === undefined ? 'loading' : (walletMinor / 100).toFixed(2)} SPK`} aria-haspopup="dialog" onClick={onOpenWallet}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></button>
+        : <HudHelp label="Wallet" help={`Your ${currencyCode} wallet holds national money. Amounts update after completed transactions; loading means the citizen snapshot has not arrived.`}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></HudHelp>}
         <HudHelp label="Food" help="Food in your inventory can be used for meals to restore work capacity. Loading means the citizen snapshot has not arrived."><Bread size={19} aria-hidden="true" /><strong>{inventory?.food ?? 'Loading'}</strong><span>Food</span></HudHelp>
         <HudHelp label="Materials" help="Materials are supplies held by your citizen for production. Loading means the citizen snapshot has not arrived."><Cube size={18} aria-hidden="true" /><strong>{inventory?.materials ?? 'Loading'}</strong><span>Mat.</span></HudHelp>
         <HudHelp label="Knowledge" help="Knowledge is a resource held by your citizen for learning and production. Loading means the citizen snapshot has not arrived."><BookOpen size={18} aria-hidden="true" /><strong>{inventory?.knowledge ?? 'Loading'}</strong><span>Know.</span></HudHelp></>}
