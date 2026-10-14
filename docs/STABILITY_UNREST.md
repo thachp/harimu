@@ -60,3 +60,7 @@ computeStability(inputs): {stability, unrest, breakdown}   // pure
 Grievance/repression, war score, inequality, Currency Confidence, Religious Harmony, Unrest events and Crisis. Add new inputs as extra `ScoreTerm`s, keeping the ranges so the sum stays within 0..100.
 
 - **Catch-up reads that day's records (#142).** Every input is windowed on the tick's scheduled time, including petition backlog: a petition resolved after that time still counts as backlog for the earlier tick.
+
+## Score writes and repair (#159)
+
+Scores are written after each tick commits, so a missing `nation_stability_scores` table (migration 0012 not applied) cannot abort a tick. Every world pass rewrites the scores of any recent tick that lacks them (the catch-up window plus 12 ticks, i.e. one real day). That way a transient write failure is repaired on the next request and does not leave a gap that breaks the sustained-Unrest run. Writes use `INSERT OR IGNORE`, so repeated passes add nothing.

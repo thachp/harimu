@@ -1,11 +1,11 @@
 /** Additional Notables for the playable nations (issue #106). Same fields as lib/notable-profiles.ts.
- * The live API serves exactly one Notable per nation (notableProfile), so these are INACTIVE until the
- * route and dialog support choosing among several Notables. The existing primary profiles are unchanged.
+ * #151: these are ACTIVE. nationNotables() serves the primary profile plus these, and notableFor() picks one
+ * per citizen per UTC day. The primary profiles are unchanged.
  * Topic proposals extend notableTopics' shape for the nation-specific topics in gap #3 (#111).
  * Source: culture bible Notable casts, thachp/harimu-docs#3. */
 export type RosterNotableProfile={id:string;name:string;role:string;persona:string;introduction:string};
 export type RosterTopic={label:string;question:string;authored:string};
-export const notableRosterStatus='inactive' as const;
+export const notableRosterStatus='active' as const;
 
 export const additionalNotableProfiles:Readonly<Record<'kindle'|'korund'|'aurelle',readonly RosterNotableProfile[]>>={
  kindle:[
@@ -26,7 +26,7 @@ export const additionalNotableProfiles:Readonly<Record<'kindle'|'korund'|'aurell
 };
 
 export const proposedNationTopics:Readonly<Record<'kindle'|'korund'|'aurelle',Readonly<Record<string,RosterTopic>>>>={
- kindle:{elections:{label:'Elections',question:'How do Kindle elections work?',authored:'Citizens rank AI candidates on the ballot. Humans never hold office, and a conversation cannot change a ballot.'},prices:{label:'Price boards',question:'How should I read the price boards?',authored:'Posted prices are public records. Compare boards before you trade; a Notable cannot set a price.'}},
- korund:{rations:{label:'Rations',question:'How do ration coupons work?',authored:'Coupons are issued by the plan and expire. Redeem them in Market before they lapse.'},quotas:{label:'Quotas',question:'What does the quota mean for me?',authored:'Your quota is recorded shift by shift. Completed settlements count; an underway shift does not.'}},
- aurelle:{favor:{label:'Royal Favor',question:'How is Royal Favor earned?',authored:'Royal Favor rises with recorded service, as shown in your Aurelle plan panel. No conversation can grant it.'},decrees:{label:'Decrees',question:'How do I read a royal decree?',authored:'Decrees are published in the Court Gazette. Council deliberations stay private.'}},
+ kindle:{elections:{label:'Elections',question:'How do Kindle elections work?',authored:'Citizens rank AI candidates on the published ballot. Humans never hold office, and a conversation cannot change a ballot.'},prices:{label:'Price boards',question:'How should I read the price boards?',authored:'Posted prices are public records. Compare boards before you trade; a Notable cannot set a price.'}},
+ korund:{rations:{label:'Rations',question:'How do ration coupons work?',authored:'Coupons are issued by the plan under published ration rules and expire. Redeem them in Market before they lapse; a Notable cannot issue coupons.'},quotas:{label:'Quotas',question:'What does the quota mean for me?',authored:'Your quota is publicly recorded shift by shift. Completed settlements count; an underway shift does not, and a conversation cannot change a quota.'}},
+ aurelle:{favor:{label:'Royal Favor',question:'How is Royal Favor earned?',authored:'Royal Favor rises with publicly recorded service, as shown in your Aurelle plan panel. No conversation can grant it.'},decrees:{label:'Decrees',question:'How do I read a royal decree?',authored:'Decrees are published in the Court Gazette. Council deliberations are not public, and a Notable cannot change a decree.'}},
 };
