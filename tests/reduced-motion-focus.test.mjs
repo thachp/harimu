@@ -77,3 +77,14 @@ test('focus-visible CSS only (synthetic markup; real component tab order is in r
     }
   } finally { window.close(); }
 });
+
+test('toasts hide by unmounting, not by an exit animation, so .01ms/1-iteration cannot leave one visible', async () => {
+  const { readdir } = await import('node:fs/promises');
+  const dir = new URL('../app/', import.meta.url);
+  for (const f of (await readdir(dir)).filter(f => f.endsWith('.css'))) {
+    const css = await readFile(new URL(f, dir), 'utf8');
+    assert.doesNotMatch(css, /\.game-notice[^{]*\{[^}]*animation/, `${f}: toast exit animation`);
+  }
+  const shell = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
+  assert.match(shell, /\{noticeVisible && <div className="game-notice"/, 'toast is conditionally rendered');
+});

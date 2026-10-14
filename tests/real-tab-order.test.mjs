@@ -18,7 +18,7 @@ async function load(rel) {
   for (const [, name] of js.matchAll(/require\("([^"]+)"\)/g)) {
     if (name.startsWith('./') && !name.endsWith('.css') && !['./game-viewport', './game-timer', './square-chat'].includes(name)) deps[name] = await load(name.slice(2));
   }
-  const exports = {}; const module = { exports };
+  const exports = {}; const mod = { exports };
   new Function('exports', 'require', 'module', js)(exports, name => {
     if (deps[name]) return deps[name];
     if (name.endsWith('.css')) return {};
@@ -30,8 +30,8 @@ async function load(rel) {
     if (name.startsWith('@/lib/')) return require(`../lib/${name.slice(6)}.ts`);
     if (name.startsWith('../lib/')) return require(`${name}.ts`);
     return require(name);
-  }, module);
-  cache.set(rel, module.exports); return module.exports;
+  }, mod);
+  cache.set(rel, mod.exports); return mod.exports;
 }
 
 test('real Account, Work, Market and dock controls are tabbable in order and each shows a focus ring', async () => {
