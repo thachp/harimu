@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {localRuntime} from './helpers/local-runtime.mjs';
-import {computeStability,foodTerms,workTerms,promiseTerms,petitionTerms,publicStability,unrestAtOrAbove,stabilityStatements,readStabilityInputs,tickSeconds,korundApprovedStability} from '../lib/stability.ts';
+import {computeStability,foodTerms,workTerms,promiseTerms,petitionTerms,publicStability,unrestAtOrAbove,stabilityStatements,readStabilityInputs,readPublicStability,isMissingStabilityTable,tickSeconds,korundApprovedStability} from '../lib/stability.ts';
 
 const sum=terms=>terms.reduce((t,x)=>t+x.points,0);
 test('each input is bounded and monotonic',()=>{
@@ -128,4 +128,21 @@ test('#142 catch-up reads that day\'s petition backlog, not today\'s',async t=>{
  r.setNow((epoch+3*tickSeconds+5)*1000);await r.call('world',null);
  const row=await r.db.prepare('SELECT inputs_json FROM nation_stability_scores WHERE nation_id=? AND tick=1').bind(nation).first();
  assert.equal(JSON.parse(row.inputs_json).petitionBacklog,1,'catch-up tick 1 recorded that day\'s backlog');
+});
+test('hotfix #95: missing nation_stability_scores table: read returns [], ticks still commit',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const epoch=(await r.call('world',null)).data.simulation.clock.epochSeconds;
+ r.db.sqlite.exec('DROP TABLE nation_stability_scores'); // as in city-location-integration (DDL via the fixture)
+const warn=t.mock.method(console,'warn',()=>{});
+ assert.deepEqual(await readPublicStability(r.db),[]);
+ r.setNow((epoch+3*7200+5)*1000);const world=await r.call('world',null);
+ assert.equal(world.status,200);assert.deepEqual(world.data.simulation.stability,[]);
+ assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM world_ticks').first()).n,3,'all due ticks committed without scores');
+ assert.ok(warn.mock.callCount()>=1);
+});
+test('hotfix #95: only a missing-table error is swallowed',()=>{
+ assert.equal(isMissingStabilityTable({code:'42P01',message:'x'}),true);
+ assert.equal(isMissingStabilityTable(Error('relation "nation_stability_scores" does not exist')),true);
+ assert.equal(isMissingStabilityTable(Error('no such table: nation_stability_scores')),true);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (42P01).')),true);assert.equal(isMissingStabilityTable(Error('PostgreSQL operation failed (23505).')),false);
+ assert.equal(isMissingStabilityTable(Object.assign(Error('wrapped'),{cause:{code:'42P01'}})),true);
+ for(const e of [Error('relation "citizens" does not exist'),{code:'23505',message:'duplicate key'},Error('connection reset'),null,'42P01'])assert.equal(isMissingStabilityTable(e),false);
 });
