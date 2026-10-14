@@ -30,7 +30,7 @@ body:has(.harimu-game){overflow:auto}
 /* Inspector containment follows its own width, not the page breakpoint. */
 .game-inspector-body{min-width:0;min-height:0;container-type:inline-size;overflow-x:hidden}
 .game-inspector-title>div,.game-identity>div,.game-notice>span,.game-shift-chip strong{min-width:0;overflow-wrap:anywhere}
-.game-inspector-title h1,.game-location-banner strong,.game-context-heading h2,.game-context-items :is(strong,span){overflow-wrap:anywhere}
+.game-inspector-title h1,.game-location-banner strong{overflow-wrap:anywhere}
 .game-inspector-body :is(section,article,div,form,label,dl,dt,dd,p,h2,h3,h4){min-width:0;max-width:100%;overflow-wrap:anywhere}
 .game-inspector-body button:not(.market-item){max-width:100%;white-space:normal;overflow-wrap:anywhere}
 .game-inspector-body dl{grid-template-columns:minmax(90px,.8fr) minmax(0,1.2fr)}
@@ -155,17 +155,20 @@ body:has(.harimu-game){overflow:auto}
 /* Text size (#80, QA3 Playwright at 1280x800 / 390x844, 100–150%): containers grow with text instead of clipping. */
 .game-hud{height:auto;min-height:calc(62px * var(--text-scale, 1))}
 .game-identity strong{white-space:nowrap}
+.game-context-heading :is(h2,small,span),.game-context-items :is(strong,span){overflow-wrap:normal;word-break:normal;hyphens:manual}
+.game-resources{min-width:max-content}.game-resources>*{flex:0 0 auto}
+@media(min-width:761px){.game-resources>.game-hud-help>summary,.game-resources>.game-wallet-button{padding-inline:calc(12px / var(--text-scale, 1));column-gap:calc(8px / var(--text-scale, 1))}}
+.game-resources>div,.game-resources>.game-hud-help>summary,.game-resources>.game-wallet-button{min-width:max-content}
 @media(max-width:760px){
  .game-hud{height:auto;min-height:calc(110px * var(--text-scale, 1));max-width:100%}
  /* Resource row really wraps (QA3 #131 review): each item keeps a scaled basis so a row that no longer fits breaks onto a second line instead of colliding or clipping. */
  .game-resources{height:auto;min-height:calc(32px * var(--text-scale, 1));min-width:0;max-width:100%;flex-wrap:wrap;row-gap:4px}
  .game-resources>*,.game-resources>.game-hud-help{min-width:0;flex:1 1 calc(72px * var(--text-scale, 1))}
- .game-resources>.game-hud-help>summary{min-width:0}
+ .game-resources>div,.game-resources>.game-hud-help>summary,.game-resources>.game-wallet-button{min-width:0}
  .game-resources :is(strong,span){min-width:0;overflow-wrap:normal;white-space:nowrap}
  /* Context strip grows with its content: no fixed height, heading on its own row, words never split mid-word. */
  .harimu-game .game-context-strip,.harimu-game:has(.citizen-dock) .game-context-strip,.game-mode-world .game-context-strip{height:auto;min-height:calc(120px * var(--text-scale, 1));flex-wrap:wrap}
  .game-context-strip>.game-context-heading{flex:1 1 100%;border-right:0;border-bottom:1px solid #2c4651;padding:10px 12px}
- .game-context-heading :is(h2,small,span),.game-context-items :is(strong,span){overflow-wrap:normal;word-break:normal;hyphens:manual}
  .game-context-items{flex:1 1 100%;flex-wrap:nowrap;min-width:0}
  .game-nation-strip .game-context-heading,.game-nation-strip .game-context-items{grid-column:1/-1}
  .game-nation-strip .game-context-items{grid-row:3}

@@ -81,3 +81,13 @@ test('mobile HUD wraps instead of clipping, and the context strip grows with its
   assert.match(tail, /\.game-context-heading:is\(h2,small,span\)[^{]*\{overflow-wrap:normal;word-break:normal;hyphens:manual\}/);
   assert.doesNotMatch(css, /word-break:break-all/);
 });
+
+test('desktop 150%: whole-word wrap applies at all widths and resource items size to content (QA3 #131 review 2)', async () => {
+  const css = (await read('game-shell.css')).replace(/\s+/g, '');
+  const tail = css.slice(css.lastIndexOf('/*Textsize(#80'));
+  const global = tail.slice(0, tail.indexOf('@media(max-width:760px)'));
+  assert.match(global, /\.game-context-heading:is\(h2,small,span\),\.game-context-items:is\(strong,span\)\{overflow-wrap:normal;word-break:normal;hyphens:manual\}/);
+  assert.doesNotMatch(css, /\.game-context-headingh2[^{]*\{overflow-wrap:anywhere\}/);
+  assert.match(global, /\.game-resources\{min-width:max-content\}\.game-resources>\*\{flex:00auto\}/);
+  assert.match(global, /\.game-resources>div,\.game-resources>\.game-hud-help>summary,\.game-resources>\.game-wallet-button\{min-width:max-content\}/);
+});
