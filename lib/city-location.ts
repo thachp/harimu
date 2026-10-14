@@ -1,4 +1,6 @@
 import type {GameDatabase} from './database-contract';
+import {additionalNotableProfiles} from './notable-roster';
+import {notableProfiles} from './notable-profiles';
 import { capitalCityForNation, citiesForNation, cityForNation } from './cities';
 export const cityLocationSchema=`CREATE TABLE IF NOT EXISTS citizen_city_locations (
  user_id TEXT PRIMARY KEY REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
@@ -24,4 +26,25 @@ export async function cityPresence(db:GameDatabase,nationId:string,now:number){
  const effective=row.location_nation===nationId&&row.current_city_id&&cityForNation(nationId,row.current_city_id)?row.current_city_id:capital?.id;
  return effective===city.id;
  }).length}));
+}
+/** #75: who else lives in this city. Public fields only: no user ids, wallets or coordinates. */
+export type CoResident={key:string;name:string;nationId:string;kind:'human'|'ai';status:'working'|'idle';you:boolean};
+export const coResidentHumanLimit=12,coResidentAiSample=3;
+const aiCast:Record<string,readonly {id:string;name:string}[]>={
+ kindle:[notableProfiles.kindle,...additionalNotableProfiles.kindle],korund:[notableProfiles.korund,...additionalNotableProfiles.korund],aurelle:[notableProfiles.aurelle,...additionalNotableProfiles.aurelle],
+};
+const hash=(text:string)=>{let h=2166136261;for(const ch of text){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}return h;};
+/** Deterministic AI sample per city; status rotates hourly so the square feels alive without a sim. */
+export function aiCoResidents(nationId:string,cityId:string,now:number):CoResident[]{
+ const cast=[...(aiCast[nationId]??[])].sort((a,b)=>hash(cityId+a.id)-hash(cityId+b.id)).slice(0,coResidentAiSample);
+ const hour=Math.floor(now/3600);
+ return cast.map(ai=>({key:`ai:${ai.id}`,name:ai.name,nationId,kind:'ai',status:hash(`${ai.id}:${cityId}:${hour}`)%2?'working':'idle',you:false}));
+}
+export async function cityCoResidents(db:GameDatabase,viewerId:string,nationId:string,cityId:string,now:number):Promise<CoResident[]>{
+ if(!cityForNation(nationId,cityId))return [];
+ const rows=await db.prepare(`SELECT c.clerk_user_id AS id,c.display_name AS name,EXISTS(SELECT 1 FROM work_shifts s WHERE s.clerk_user_id=c.clerk_user_id AND s.claimed_at IS NULL) AS working
+ FROM citizens c JOIN citizen_city_locations l ON l.user_id=c.clerk_user_id AND l.nation_id=c.nation_id
+ WHERE c.nation_id=? AND l.current_city_id=? ORDER BY CASE WHEN c.clerk_user_id=? THEN 0 ELSE 1 END,l.updated_at DESC LIMIT ?`).bind(nationId,cityId,viewerId,coResidentHumanLimit).all<{id:string;name:string|null;working:number|boolean}>();
+ const humans=rows.results.map((row,index):CoResident=>({key:`h:${index}`,name:row.name?.trim()||'Citizen',nationId,kind:'human',status:Number(row.working)?'working':'idle',you:row.id===viewerId}));
+ return [...humans,...aiCoResidents(nationId,cityId,now)];
 }

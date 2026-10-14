@@ -13,7 +13,7 @@ import { ActionButton } from './action-button';
 import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import { CountryScene } from './country-scene';
 import { capitalCityForNation, cityForNation } from '@/lib/cities';
-import type { CityLocation } from '@/lib/city-location';
+import type { CityLocation, CoResident } from '@/lib/city-location';
 import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
@@ -58,6 +58,7 @@ import {
 import { MORNING_BRIEF_TRIGGER_ID, MorningBrief } from './morning-brief';
 import { Newspaper } from '@phosphor-icons/react';
 import { briefDayKey, claimDailyBrief, morningBriefSections } from '@/lib/morning-brief';
+import { CityCoResidents } from './city-coresidents';
 import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { clerkConfigured } from './providers';
@@ -646,7 +647,7 @@ export default function Home() {
   const citizenIdentity = useRef<string | null>(null);
   const citizenEpoch = useRef(0);
   const [citizenSessionKey, setCitizenSessionKey] = useState(0);
-  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[]}} | null>(null);
+  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[]}} | null>(null);
   const [cityError, setCityError] = useState('');
   const [cityRetry, setCityRetry] = useState(0);
   const [cityTravelPending, setCityTravelPending] = useState(false);
@@ -658,7 +659,7 @@ export default function Home() {
     const loadCity = async () => {
       try {
         const response = await fetch('/api/city', {cache:'no-store',signal:controller.signal});
-        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];error?:string};
+        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];error?:string};
         if (controller.signal.aborted || epoch !== citizenEpoch.current) return;
         if (!response.ok || value.nationId !== citizenNationId || !cityForNation(value.nationId,value.currentCityId)) throw Error(value.error ?? 'City account unavailable.');
         setCityAccount({key:citizenSessionKey,value}); setCityError('');
@@ -1109,7 +1110,7 @@ export default function Home() {
     cityTravelLock.current=true;setCityTravelPending(true);setCityError('');
     try {
       const response=await fetch('/api/city',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'travel',cityId})});
-      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];error?:string};
+      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];error?:string};
       if(epoch!==citizenEpoch.current)return;
       if(!response.ok || value.nationId!==citizenNation.id || value.currentCityId!==cityId)throw Error(value.error ?? 'Travel could not be confirmed. Refresh your city account before retrying.');
       setCityAccount({key:citizenSessionKey,value});
@@ -1597,6 +1598,7 @@ export default function Home() {
     {firstLoopHint}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
+    {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
 
     {(!clerkConfigured || !citizenNationId) && <SceneNews events={worldEvents} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
