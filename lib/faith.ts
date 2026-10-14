@@ -133,9 +133,11 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   if (!options.public.length) return fail(403, 'unsupported_nation', 'Faith choice is available in Kindle, Korund and Aurelle for now.');
   if (!options.public.includes(command.faithId as FaithChoice)) return fail(400, 'not_allowed', citizen?.nation_id === 'korund' ? 'In Korund the only public option is Unaffiliated.' : 'Your nation does not allow that faith.');
   if (command.hiddenFaithId !== null && !options.hidden.includes(command.hiddenFaithId as WorshipFaithId)) return fail(400, 'not_allowed', 'Only Korund citizens may hold a hidden faith.');
-  const current = await db.prepare('SELECT faith_id,hidden_faith_id,changed_at FROM citizen_faith WHERE user_id=?').bind(userId).first<{ faith_id: string; hidden_faith_id: string | null; changed_at: number | null }>();
-  const currentFaith = current?.faith_id ?? defaultFaith(citizen!.nation_id!);
-  if (current && currentFaith === command.faithId && (current?.hidden_faith_id ?? null) === command.hiddenFaithId) return fail(409, 'unchanged', 'That is already your faith.');
+  const current = await db.prepare('SELECT nation_id,faith_id,hidden_faith_id,changed_at FROM citizen_faith WHERE user_id=?').bind(userId).first<{ nation_id: string; faith_id: string; hidden_faith_id: string | null; changed_at: number | null }>();
+  // The leave check uses the citizen's current nation: a row from a former nation does not count (a move into Aurelle starts on the Kinward Rite).
+  const sameNation = current?.nation_id === citizen!.nation_id;
+  const currentFaith = sameNation ? current!.faith_id : defaultFaith(citizen!.nation_id!);
+  if (sameNation && currentFaith === command.faithId && (current?.hidden_faith_id ?? null) === command.hiddenFaithId) return fail(409, 'unchanged', 'That is already your faith.');
   if (leavesKinward(citizen!.nation_id, currentFaith, command.faithId)) return fail(409, 'royal_favor_unavailable', kinwardLeaveBlockedReason);
   if (current?.changed_at != null && now < Number(current.changed_at) + faithChangeCooldownSeconds) return fail(409, 'cooldown', `You can change faith once every 60 real days. Next change: ${new Date((Number(current.changed_at) + faithChangeCooldownSeconds) * 1000).toISOString().slice(0, 10)}.`);
   // Guarded upsert: a concurrent change inside the cooldown cannot slip through. A first pick (no row, or Aurelle's recorded default) leaves changed_at NULL.

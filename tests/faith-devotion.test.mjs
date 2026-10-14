@@ -106,6 +106,20 @@ test('Aurelle: leaving the Kinward Rite is blocked with a visible Royal Favor re
   assert.equal((await read(r, 'alice')).leaveBlockedReason, null, 'Kindle has no Favor cost');
 });
 
+test('Aurelle: a citizen who moves in with a non-Kinward faith row from another nation cannot skip the Royal Favor check', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'mo', 'kindle');
+  assert.equal((await choose(r, 'mo', 'open-hand')).status, 200);
+  await r.db.prepare("UPDATE citizens SET nation_id='aurelle' WHERE clerk_user_id='mo'").run();
+  const mo = await read(r, 'mo'); assert.equal(mo.faith.id, 'kinward-rite'); assert.match(mo.leaveBlockedReason, /costs Royal Favor/);
+  for (const to of ['open-hand', 'fair-wind-vow', 'unaffiliated']) {
+    const res = await choose(r, 'mo', to);
+    assert.equal(res.status, 409, to); assert.equal(res.data.reason, 'royal_favor_unavailable', to);
+  }
+  assert.equal((await read(r, 'mo')).faith.id, 'kinward-rite');
+  assert.equal((await choose(r, 'mo', 'kinward-rite')).status, 200, 'confirming the Kinward Rite is allowed');
+});
+
 test('GET /api/faith makes no writes', async t => {
   const r = await runtime(t);
   await choose(r, 'alice', 'kinward-rite'); await worship(r, 'alice'); r.setNow(r.now + 5 * gameDay);
