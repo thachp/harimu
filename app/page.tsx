@@ -17,7 +17,7 @@ import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
-import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
+import { isGamePopstate, isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -383,8 +383,9 @@ function subscribeToLocation(onStoreChange: () => void) {
     window.history.replaceState(sceneHistoryState(window.history.state, pathname), '');
   }
   const onPopState = (event: PopStateEvent) => {
-    if (window.location.pathname === pathname && isSceneTraversal(event.state, pathname)) {
+    if (isGamePopstate(pathname, window.location.pathname)) {
       event.stopImmediatePropagation();
+      if (!isSceneTraversal(window.history.state, pathname)) window.history.replaceState(sceneHistoryState(window.history.state, pathname), '');
       window.dispatchEvent(new Event('harimu-scenechange'));
     } else onStoreChange();
   };
