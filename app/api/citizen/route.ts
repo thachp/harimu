@@ -8,6 +8,8 @@ import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
+import { applyQuality, validQualityInput, type QualityInput } from '@/lib/shift-quality';
+import { gradeShift } from '@/lib/shift-quality-key';
 import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
@@ -491,8 +493,15 @@ async function handlePost(request: Request) {
     if (!order || !rule || order.capacity_cost <= 0) {
       return privateJson({ error: 'Work order unavailable.' }, { status: 404 });
     }
-    const reward = rewards[workOrderId];
-    if (!reward) return privateJson({ error: 'Shift reward unavailable.' }, { status: 409 });
+    const base = rewards[workOrderId];
+    if (!base) return privateJson({ error: 'Shift reward unavailable.' }, { status: 409 });
+    if (body.quality !== undefined && !validQualityInput(body.quality)) return privateJson({ error: 'Answer all three quality questions or skip the step.' }, { status: 400 });
+    // Graded exactly once, here at shift start; the result is stored with the shift (shift_id PK) and a repeat
+    // commit-work is refused by the one-active-shift rule, so it cannot re-grade (QA1 #125 review).
+    // This route serves signed-in human citizens only; AI/background actors never reach it, and gradeShift
+    // returns the base reward for any non-human actor.
+    const quality = gradeShift(workOrderId, body.quality as QualityInput | undefined, 'human');
+    const reward = { ...base, ...applyQuality(base, quality.multiplierPct) };
     const id = crypto.randomUUID();
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
     // D1 batch is transactional: scheduling and debiting succeed together.
@@ -504,6 +513,9 @@ async function handlePost(request: Request) {
       database.prepare(`INSERT INTO shift_rewards (shift_id, wage_minor, item, quantity)
         SELECT id, ?, ?, ? FROM work_shifts WHERE id = ? AND clerk_user_id = ?`)
         .bind(reward.wageMinor, reward.item, reward.quantity, id, userId),
+      database.prepare(`INSERT INTO shift_quality (shift_id, grade, multiplier_pct, correct)
+        SELECT id, ?, ?, ? FROM work_shifts WHERE id = ? AND clerk_user_id = ?`)
+        .bind(quality.grade, quality.multiplierPct, quality.correct, id, userId),
     ]);
     const shifts = await readShifts(database, userId);
     const profile = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?')

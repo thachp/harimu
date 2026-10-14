@@ -18,7 +18,8 @@
     "test:sql": "python3 scripts/test-sql.py",
     "deploy": "npm run check && npm run build && npm run deploy:cloudflare",
     "check": "npm test && npm run test:sql && npm run lint && tsc --noEmit",
-    "test:postgres": "HARIMU_TEST_STORAGE=postgres node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs"
+    "test:postgres": "HARIMU_TEST_STORAGE=postgres node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs",
+    "test:layout": "node --experimental-strip-types scripts/hud-layout-check.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.19.0",
@@ -48,6 +49,7 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
     "happy-dom": "^21.0.1",
+    "playwright": "1.64.1",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
