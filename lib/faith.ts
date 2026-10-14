@@ -11,6 +11,7 @@ import { worshipCopy, type WorshipFaithId } from './worship-copy';
 import { devotionTier, faithCopy, unaffiliatedCopy } from './faith-copy';
 import { devotionPerFestival, festivalCalendar, festivalJoins, festivalSchemas } from './festivals';
 import { mvpFestival } from './mvp-festival-copy';
+import { royalFavorBalance, royalFavorBalanceSql } from './aurelle';
 
 // ---- PoC constants, one place ----
 export const gameDaySeconds = 7200; // 12x clock: a game day is 2 real hours (lib/world-simulation.ts)
@@ -52,8 +53,10 @@ export function faithOptions(nationId: string): { public: FaithChoice[]; hidden:
   return { public: [], hidden: [] };
 }
 const defaultFaith = (nationId: string): FaithChoice => nationId === 'aurelle' ? 'kinward-rite' : 'unaffiliated';
-/** 14.2: leaving the Kinward Rite in Aurelle costs Royal Favor. Royal Favor is a derived total with no spend ledger yet, so leaving is blocked until that exists (follow-up #289). */
-export const kinwardLeaveBlockedReason = 'Leaving the Kinward Rite costs Royal Favor in Aurelle. Spending Royal Favor is not built yet, so this change is unavailable for now.';
+/** 14.2: leaving the Kinward Rite in Aurelle costs Royal Favor (#289). Royal Favor is spent for real: one row per spend in aurelle_favor_spends (migration 0028),
+ * balance = earned (capped at 100) minus spent, never below 0. Docs give no number: 10 Favor (5 estate shifts) is an [ASSUMPTION] tuning value. */
+export const kinwardLeaveFavorCost = 10;
+export const kinwardLeaveBlockedReason = (balance: number) => `Leaving the Kinward Rite costs ${kinwardLeaveFavorCost} Royal Favor in Aurelle. You have ${balance}. Serve the Crown to earn more.`;
 const leavesKinward = (nationId: string | null | undefined, from: string, to: string) => nationId === 'aurelle' && from === 'kinward-rite' && to !== 'kinward-rite';
 
 export const gameDayOf = (now: number) => Math.floor(now / gameDaySeconds);
@@ -80,7 +83,7 @@ export const devotionPerService = 2;
 
 type FaithRow = { faith_id: FaithChoice; hidden_faith_id: WorshipFaithId | null; chosen_at: number; changed_at: number | null; request_id: string };
 const label = (id: FaithChoice) => id === 'unaffiliated' ? unaffiliatedCopy.name : faithCopy[id].name;
-const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
+const fail = (status: 400 | 403 | 409 | 503, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 
 /** Pure read (GET). The hidden faith is returned only to its holder, labelled private. */
 export async function readFaith(db: GameDatabase, userId: string, now: number, enabled: boolean) {
@@ -94,6 +97,8 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const today = gameDayOf(now);
   const days = worshipFaith ? (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, worshipFaith, row?.chosen_at ?? 0).all<{ game_day: number }>()).results.map(r => Number(r.game_day)) : [];
   const service = worshipFaith ? await serviceDays(db, userId, worshipFaith, row?.chosen_at ?? 0) : [];
+  // #289: leaving the Kinward Rite in Aurelle costs Royal Favor; show the cost and balance, and a visible reason when it can't be paid.
+  const leaving = leavesKinward(nationId, faith, 'unaffiliated'); const favor = leaving ? await royalFavorBalance(db, userId) : 0;
   const joins = supported ? await festivalJoins(db, userId) : [];
   const festivalDays = worshipFaith ? joins.filter(j => j.faith_id === worshipFaith && Number(j.joined_at) >= Number(row?.chosen_at ?? 0)).map(j => Number(j.game_day)) : [];
   const devotion = devotionFromEvents([...days.map(day => ({ day, amount: devotionPerWorship })), ...service.map(day => ({ day, amount: devotionPerService })), ...festivalDays.map(day => ({ day, amount: devotionPerFestival }))], today);
@@ -114,7 +119,8 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
     worship: worshipFaith ? { ...worshipCopy[worshipFaith], gameDay: today, worshippedToday, nextAt: worshippedToday ? (today + 1) * gameDaySeconds : null } : null,
     worshipBlockedReason, changeAvailableAt, changeBlockedReason,
     festivals: calendar?.festivals ?? [], holiday: calendar?.holiday ?? null, banEvents: calendar?.banEvents ?? [], // #68
-    leaveBlockedReason: leavesKinward(nationId, faith, 'unaffiliated') ? kinwardLeaveBlockedReason : null,
+    leaveCost: leaving ? kinwardLeaveFavorCost : null, royalFavor: leaving ? favor : null,
+    leaveBlockedReason: leaving && favor < kinwardLeaveFavorCost ? kinwardLeaveBlockedReason(favor) : null,
   };
 }
 
@@ -145,16 +151,63 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   const sameNation = current?.nation_id === citizen!.nation_id;
   const currentFaith = sameNation ? current!.faith_id : defaultFaith(citizen!.nation_id!);
   if (sameNation && currentFaith === command.faithId && (current?.hidden_faith_id ?? null) === command.hiddenFaithId) return fail(409, 'unchanged', 'That is already your faith.');
-  if (leavesKinward(citizen!.nation_id, currentFaith, command.faithId)) return fail(409, 'royal_favor_unavailable', kinwardLeaveBlockedReason);
+  const leaving = leavesKinward(citizen!.nation_id, currentFaith, command.faithId);
+  if (leaving) {
+    // citizen_faith.request_id only remembers the latest change, so an older leave id is found through its spend row: it may never debit (or leave) twice.
+    if (await spendRowFor(db, command.requestId)) return fail(409, 'request_reused', 'That request id was already used for a Royal Favor spend.');
+    const balance = await royalFavorBalance(db, userId); if (balance < kinwardLeaveFavorCost) return fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance));
+  }
   if (current?.changed_at != null && now < Number(current.changed_at) + faithChangeCooldownSeconds) return fail(409, 'cooldown', `You can change faith once every 60 real days. Next change: ${new Date((Number(current.changed_at) + faithChangeCooldownSeconds) * 1000).toISOString().slice(0, 10)}.`);
   // Guarded upsert: a concurrent change inside the cooldown cannot slip through. A first pick (no row, or Aurelle's recorded default) leaves changed_at NULL.
-  const saved = await db.prepare(`INSERT INTO citizen_faith (user_id,nation_id,faith_id,hidden_faith_id,chosen_at,request_id)
-    SELECT clerk_user_id,nation_id,?,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?
+  // Leaving the Kinward Rite debits Royal Favor in the same transactional batch. The spend row is keyed by the request id (a retry cannot debit twice),
+  // is only written while the balance covers it and the cooldown allows the change, and the faith change only lands if that spend row exists.
+  const cooldownGuard = 'WHERE citizen_faith.changed_at IS NULL OR citizen_faith.changed_at <= ?';
+  const upsert = (guardSpend: boolean) => db.prepare(`INSERT INTO citizen_faith (user_id,nation_id,faith_id,hidden_faith_id,chosen_at,request_id)
+    SELECT clerk_user_id,nation_id,?,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?${guardSpend ? ' AND EXISTS (SELECT 1 FROM aurelle_favor_spends WHERE request_id=? AND clerk_user_id=?)' : ''}
     ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,faith_id=excluded.faith_id,hidden_faith_id=excluded.hidden_faith_id,chosen_at=excluded.chosen_at,
       changed_at=CASE WHEN citizen_faith.request_id LIKE 'default-%' THEN NULL ELSE excluded.chosen_at END,request_id=excluded.request_id
-    WHERE citizen_faith.changed_at IS NULL OR citizen_faith.changed_at <= ?`).bind(command.faithId, command.hiddenFaithId, now, command.requestId, userId, citizen!.nation_id, now - faithChangeCooldownSeconds).run();
-  if (!saved.meta.changes) return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
+    ${cooldownGuard}`).bind(command.faithId, command.hiddenFaithId, now, command.requestId, userId, citizen!.nation_id, ...(guardSpend ? [command.requestId, userId] : []), now - faithChangeCooldownSeconds);
+  let saved;
+  if (leaving) {
+    const spend = db.prepare(`INSERT INTO aurelle_favor_spends (request_id,clerk_user_id,amount,reason,spent_at)
+      SELECT ?,?,?,'leave-kinward',? WHERE (${royalFavorBalanceSql}) >= ?
+        AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id='aurelle')
+        AND NOT EXISTS (SELECT 1 FROM citizen_faith f WHERE f.user_id=? AND f.changed_at IS NOT NULL AND f.changed_at > ?)
+      ON CONFLICT DO NOTHING`).bind(command.requestId, userId, kinwardLeaveFavorCost, now, userId, userId, kinwardLeaveFavorCost, userId, userId, now - faithChangeCooldownSeconds);
+    let results;
+    try { results = await db.batch([spend, upsert(true)]); }
+    catch (error) {
+      if (!isMissingSpendLedger(error)) throw error; // any other failure is not a Favor problem: never report it as insufficient Favor
+      return fail(503, 'favor_ledger_unavailable', 'The Royal Favor ledger is not available yet. Nothing was spent. Try again later.'); // migration 0028 not applied: nothing was changed
+    }
+    const spent = results[0].meta.changes === 1; // only this call's own spend row may be refunded or may carry the change
+    saved = results[1];
+    if (!spent || saved.meta.changes !== 1) {
+      // Undo only a debit this call wrote (never an earlier call's, so a replayed id can't refund a spend that already landed).
+      if (spent) await db.prepare('DELETE FROM aurelle_favor_spends WHERE request_id=? AND clerk_user_id=? AND NOT EXISTS (SELECT 1 FROM citizen_faith WHERE request_id=?)').bind(command.requestId, userId, command.requestId).run();
+      const landed = await db.prepare('SELECT user_id FROM citizen_faith WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
+      if (!spent && landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) }; // a concurrent call with this id already did it
+      if (!spent && await spendRowFor(db, command.requestId)) return fail(409, 'request_reused', 'That request id was already used for a Royal Favor spend.');
+      const balance = await royalFavorBalance(db, userId);
+      return balance < kinwardLeaveFavorCost ? fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance)) : fail(409, 'cooldown', 'You can change faith once every 60 real days.');
+    }
+  } else {
+    saved = await upsert(false).run();
+    if (!saved.meta.changes) return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
+  }
   return { ok: true as const, state: await readFaith(db, userId, now, enabled) };
+}
+
+/** The spend row for a request id (any citizen), or null when there is none or the ledger table does not exist yet. */
+async function spendRowFor(db: GameDatabase, requestId: string) {
+  try { return await db.prepare('SELECT clerk_user_id FROM aurelle_favor_spends WHERE request_id=?').bind(requestId).first<{ clerk_user_id: string }>(); }
+  catch (error) { if (isMissingSpendLedger(error)) return null; throw error; }
+}
+/** True only when the error is the missing aurelle_favor_spends table (SQLite "no such table", Postgres "relation ... does not exist"). */
+export function isMissingSpendLedger(error: unknown): boolean {
+  const text = (e: unknown) => String((e as { message?: unknown } | null)?.message ?? e);
+  const message = `${text(error)} ${text((error as { cause?: unknown } | null)?.cause ?? '')}`;
+  return /aurelle_favor_spends/.test(message) && /no such table|does not exist/i.test(message);
 }
 
 export async function attendWorship(db: GameDatabase, userId: string, requestId: string, now: number, enabled: boolean) {
