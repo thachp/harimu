@@ -42,3 +42,11 @@ test('archive pagination preserves older transcripts and access failures never p
  assert.equal((await read(r,'alice','?beforeWeek=-1')).status,400);
  assert.equal((await r.call('addresses','alice',{action:'react'},'https://foreign.invalid')).status,403);
 });
+const voice={kindle:/Forgehaven|spark/i,korund:/brigade|One hammer, one heart/,aurelle:/Hear ye|by leave of the Crown/i};
+for(const nationId of Object.keys(voice))test(`#118 ${nationId} weekly addresses speak in nation voice without announcing outcomes`,async t=>{
+ const r=await fixture();t.after(()=>r.close());await r.db.prepare('UPDATE citizens SET nation_id=?').bind(nationId).run();
+ const first=await read(r,'alice');r.setNow(first.data.nextAddressAt*1000);
+ const seen=(await read(r,'alice')).data.addresses.map(a=>a.transcript);assert.equal(seen.length,2);assert.notEqual(seen[0],seen[1]);
+ for(const text of seen){assert.match(text,voice[nationId]);assert.match(text,/\bno\b|\bnot\b/i);assert.doesNotMatch(text,/Notable|\d+%|guarantee/);}
+ if(nationId!=='korund')assert.match(seen.join(' '),/simulated leaders/);
+});
