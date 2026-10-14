@@ -18,6 +18,9 @@ import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
+import { FirstWeekTracker } from './first-week-tracker';
+import { firstWeekTracker, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
+import { firstWeekDay } from '@/lib/first-week';
 import { isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -584,6 +587,8 @@ export default function Home() {
     return () => cancelAnimationFrame(frame);
   }, [tourOpen, viewMode, stopTour]);
   const [guideNow, setGuideNow] = useState(0);
+  // First-week progress (#134): STUB store in this browser until server-side tracking (#135).
+  const [weekDone, setWeekDone] = useState<{key:string;ids:string[]}>({key:'',ids:[]});
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -740,6 +745,9 @@ export default function Home() {
     [locationSearch, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
+  const weekStoreKey = citizenNationId && citizenshipStatus?.enrolledAt ? `${citizenNationId}:${citizenshipStatus.enrolledAt}` : '';
+  // Load the stub progress when the citizen key changes (adjust-state-during-render; the key only exists client-side after the session loads).
+  if (weekStoreKey && weekDone.key !== weekStoreKey) setWeekDone({key:weekStoreKey,ids:stubFirstWeekProgressStore().load(weekStoreKey)});
   const demoGovernmentSnapshot = useMemo(() => citizenNation ? simulateGovernment({
     nationId: citizenNation.id, availableBudgetMinor: 100000,
     foodSecurity: (economy?.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) >= 2 ? 100 : 0,
@@ -1458,6 +1466,13 @@ export default function Home() {
   const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
+  const weekKey = citizenNation ? weekStoreKey : '';
+  const weekTrack = !firstLoop && weekKey && citizenNation ? firstWeekTracker({day:firstWeekDay({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow}),done:weekDone.key===weekKey?weekDone.ids:[]}) : null;
+  function toggleWeekGoal(goalId: string, done: boolean) {
+    const ids = (weekDone.key===weekKey?weekDone.ids:[]).filter(id => id !== goalId).concat(done ? [goalId] : []);
+    setWeekDone({key:weekKey,ids}); stubFirstWeekProgressStore().save(weekKey, ids);
+  }
+  const weekTracker = weekTrack && <FirstWeekTracker tracker={weekTrack} onToggle={toggleWeekGoal} onNavigate={screen=>navigateGame(screen)} />;
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;
@@ -1581,7 +1596,7 @@ export default function Home() {
   const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : viewMode==='square' ? <>
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
-    {firstLoopHint}{dailyLoop}
+    {firstLoopHint}{weekTracker}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
 
