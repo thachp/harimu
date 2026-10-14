@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
-import { createdTables, postgresMigrations, repoTables, isDestructive, migrationProblems, createdObjects, hasReviewMarker, applyPostgresMigrations, assertPostgresMigrationsApplied, destructiveReviewedMarker, backfillThrough } from '../scripts/postgres-migrations.mjs';
+import { createdTables, postgresMigrations, repoTables, isDestructive, migrationProblems, createdObjects, hasReviewMarker, applyPostgresMigrations, bootstrapEmptyPostgres, assertPostgresMigrationsApplied, destructiveReviewedMarker, backfillThrough } from '../scripts/postgres-migrations.mjs';
 
 const adapter = pg => ({ query: (t, p) => pg.query(t, p), exec: t => pg.exec(t) });
 /** A database shaped like preview today: base schema plus every migration through 0010, no schema_migrations. */
@@ -45,7 +45,7 @@ test('destructive SQL is detected, comments ignored', () => {
   assert.ok(!hasReviewMarker(`CREATE TABLE a(x int); -- ${destructiveReviewedMarker}`), 'marker must be on its own line');
   for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql), `${m.file} must stay additive`);
   assert.deepEqual(createdObjects('CREATE TABLE t(a int, "b" text, PRIMARY KEY(a), UNIQUE(a,b), CHECK(a>0)); ALTER TABLE t ADD COLUMN IF NOT EXISTS c int; CREATE UNIQUE INDEX IF NOT EXISTS i_t ON t(a);'),
-    { columns: [['t', 'a'], ['t', 'b'], ['t', 'c']], indexes: ['i_t'] });
+    { columns: [['t', 'a'], ['t', 'b'], ['t', 'c']], indexes: ['i_t'], checks: [['t', 1]] });
 });
 test('first run on preview backfills through backfillThrough (0012) without re-running, then applies newer ones in order', async () => {
   const pg = await previewLike(); const db = adapter(pg);
@@ -80,7 +80,43 @@ test('backfill and guard fail closed on a partial schema (missing column or inde
   }
   const pg = await previewLike(); const db = adapter(pg);
   await applyPostgresMigrations(db); await pg.exec('ALTER TABLE world_squares DROP COLUMN zone');
-  await assert.rejects(assertPostgresMigrationsApplied(db), /0011_world_squares\.sql \(missing column world_squares\.zone\)/);
+  await assert.rejects(assertPostgresMigrationsApplied(db), /0011_world_squares\.sql \(missing column world_squares\.zone/);
+  await pg.close();
+});
+test('#152 bootstrap: empty database gets base schema plus every migration, recorded and guard-clean', async () => {
+  const pg = new PGlite(); await pg.waitReady; const db = adapter(pg);
+  const result = await bootstrapEmptyPostgres(db);
+  assert.deepEqual(result.applied, postgresMigrations().map(m => m.file));
+  assert.deepEqual((await rows(pg, 'SELECT id, backfilled FROM schema_migrations ORDER BY id')).map(r => [r.id, r.backfilled]), postgresMigrations().map(m => [m.id, false]));
+  await assertPostgresMigrationsApplied(db);
+  assert.deepEqual((await applyPostgresMigrations(db)).applied, [], 'normal migrate is a no-op afterwards');
+  await assert.rejects(bootstrapEmptyPostgres(db), /refuses: schema public already has/);
+  await pg.close();
+});
+test('#152 bootstrap failing partway rolls back to an empty database and can be rerun', async () => {
+  const dir = dirWith({ '0950_bad.sql': 'CREATE TABLE IF NOT EXISTS zz_half (id int); SELECT * FROM no_such_table;' });
+  for (const f of ['compatibility.sql', 'schema.sql']) copyFileSync(join('db/postgres', f), join(dir, f));
+  const pg = new PGlite(); await pg.waitReady; const db = adapter(pg);
+  await assert.rejects(bootstrapEmptyPostgres(db, { dir }), /failed at 0950_bad\.sql and was rolled back.*safe to retry/);
+  assert.equal((await rows(pg, "SELECT COUNT(*)::int AS n FROM pg_tables WHERE schemaname='public'"))[0].n, 0, 'zero tables');
+  assert.equal((await rows(pg, "SELECT COUNT(*)::int AS n FROM pg_namespace WHERE nspname='harimu_compat'"))[0].n, 0, 'compat schema rolled back too');
+  const unlocked = await rows(pg, 'SELECT pg_try_advisory_lock(1191280) AS ok'); assert.equal(unlocked[0].ok, true, 'lock released'); await pg.query('SELECT pg_advisory_unlock(1191280)');
+  const result = await bootstrapEmptyPostgres(db);
+  assert.deepEqual(result.applied, postgresMigrations().map(m => m.file));
+  await assertPostgresMigrationsApplied(db);
+  await pg.close();
+});
+test('#152 bootstrap refuses a non-empty database and writes nothing', async () => {
+  const pg = new PGlite(); await pg.waitReady; await pg.exec('CREATE TABLE stray(id int)');
+  await assert.rejects(bootstrapEmptyPostgres(adapter(pg)), /refuses/);
+  assert.deepEqual((await rows(pg, "SELECT tablename FROM pg_tables WHERE schemaname='public'")).map(r => r.tablename), ['stray']);
+  await pg.close();
+});
+test('#152 backfill and guard fail closed on a dropped CHECK constraint', async () => {
+  const pg = await previewLike(); const db = adapter(pg);
+  await pg.exec('ALTER TABLE ai_news_articles DROP CONSTRAINT ai_news_articles_nation_id_check');
+  await assert.rejects(applyPostgresMigrations(db), /Cannot backfill.*CHECK constraints on ai_news_articles/);
+  await assert.rejects(assertPostgresMigrationsApplied(db), /CHECK constraints on ai_news_articles/);
   await pg.close();
 });
 test('a failing migration rolls back, stops later ones, and the guard keeps deploy closed', async () => {
@@ -108,11 +144,14 @@ test('deploy guard and migrate command are wired', async () => {
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
   assert.equal(pkg.scripts['db:postgres:migrate'], 'node scripts/apply-postgres-migrations.mjs');
 });
-test('preview workflow deploys only dev after CI, migrates first, secret names only', async () => {
+test('preview workflow deploys only release, checks then migrates first, secret names only', async () => {
   const wf = await readFile('.github/workflows/deploy-preview.yml', 'utf8');
-  assert.match(wf, /workflow_run:[\s\S]*workflows: \[CI\][\s\S]*branches: \[dev\]/);
-  assert.match(wf, /conclusion == 'success'/);
-  assert.match(wf, /head_branch == 'dev'/);
+  // #177: push to release (+ dispatch on release); never dev, never workflow_run.
+  assert.match(wf, /on:\n  push:\n    branches: \[release\]\n  workflow_dispatch:/);
+  assert.doesNotMatch(wf, /workflow_run|branches: \[dev|refs\/heads\/dev/);
+  assert.match(wf, /github\.ref == 'refs\/heads\/release'/);
+  assert.match(wf, /migrate_only:[\s\S]*?default: false/);
+  assert.ok(wf.indexOf('run: npm run check') > 0 && wf.indexOf('run: npm run check') < wf.indexOf('db:postgres:migrate'), 'check runs before migrating');
   assert.match(wf, /cancel-in-progress: false/); // #163: queue, never cancel mid-migration
   for (const name of ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'PREVIEW_DATABASE_ADMIN_URL']) assert.match(wf, new RegExp(`secrets\\.${name}`));
   assert.doesNotMatch(wf, /pull_request|postgres:\/\/|branches: \[main/);

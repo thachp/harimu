@@ -5,7 +5,7 @@ import ts from 'typescript';
 import {localRuntime} from './helpers/local-runtime.mjs';
 // #140: with the news flag on and budget available, prepareAiNews must call the gateway. No live AI is used.
 const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace('30000','5');
-const {prepareAiNews,readAiNews,aiNewsStaleLeaseSeconds}=await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64')}`);
+const {prepareAiNews,readAiNews,aiNewsStaleLeaseSeconds,aiNewsRetrySeconds}=await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64')}`);
 const now=Math.floor(Date.now()/1000),budget={dailyBudgetMicro:970000,gatewayId:'harimu-test'},day=new Date(now*1000).toISOString().slice(0,10);
 const news={nationId:'kindle',title:'Kindle Press',style:'press',fetchedAt:now*1000,statistics:{citizens:2,completedShifts:3,food:12},items:[]};
 const draft={title:'Ledger record',summary:'The public ledger records settled work and food.',claims:['completedShifts']};
@@ -19,7 +19,7 @@ test('#140 flag on + budget: news calls the gateway and publishes the model arti
  const items=await readAiNews(r.db,'kindle');assert.equal(items.length,1);assert.equal(items[0].source,'model');
 });
 test('#140 a job that failed before reaching the gateway is retried the same day',async t=>{
- for(const code of ['budget-unavailable','not-sent']){const r=await localRuntime();t.after(()=>r.close());await job(r,'failed',code,now-60);const ai=gateway();
+ for(const code of ['budget-unavailable','not-sent']){const r=await localRuntime();t.after(()=>r.close());await job(r,'failed',code,now-aiNewsRetrySeconds-1);const ai=gateway();
   await prepareAiNews(r.db,news,now,ai,{enabled:true,budget});assert.equal(ai.calls.length,3,code);assert.equal((await readAiNews(r.db,'kindle')).length,1);}
 });
 test('#140 a stale running lease is retaken; a fresh one or a job that reached the gateway is not',async t=>{
@@ -39,4 +39,29 @@ test('#140 GET /api/news with the flag on returns the model item first',async t=
  const nation=(await r.db.prepare("SELECT nation_id FROM citizens WHERE clerk_user_id='alice'").first()).nation_id;
  const res=await r.call('news','alice');assert.equal(res.status,200);assert.ok(ai.calls.length>=1,'gateway called');
  assert.equal(ai.calls.length,3);assert.equal(res.data.items[0].source,'model',nation);
+});
+
+test('#160 a pre-gateway failure is retried at most once per aiNewsRetrySeconds, not on every load',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());await job(r,'failed','budget-unavailable',now-60);const ai=gateway();
+ for(let i=0;i<5;i++)await prepareAiNews(r.db,news,now+i,ai,{enabled:true,budget});
+ assert.equal(ai.calls.length,0,'within the retry window: no retake');
+ const row=await r.db.prepare('SELECT started_at,status FROM ai_news_jobs WHERE id=?').bind('kindle:'+day).first();
+ assert.equal(Number(row.started_at),now-60,'the job row is not rewritten on each load');assert.equal(row.status,'failed');
+ await prepareAiNews(r.db,news,now-60+aiNewsRetrySeconds,ai,{enabled:true,budget});assert.equal(ai.calls.length,3,'retried once the window passes');
+});
+test('#160 a run that crashed after the gateway call is not retaken, so the budget is not charged twice',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const started=now-aiNewsStaleLeaseSeconds-1;
+ await job(r,'running',null,started);
+ // The crashed attempt had marked its reservation sent (uncertain) before calling the gateway.
+ await r.db.prepare("INSERT INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,?,?,?,?,?,'uncertain')").bind(`ai-news:kindle:${day}:${started}`,day,day,'news',1000,started).run();
+ const before=(await r.db.prepare('SELECT COUNT(*) AS n FROM harimu_ai_reservations').first()).n;
+ const ai=gateway();await prepareAiNews(r.db,news,now,ai,{enabled:true,budget});
+ assert.equal(ai.calls.length,0);assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM harimu_ai_reservations').first()).n,before,'no second reservation');
+});
+test('#160 a run that crashed before the gateway is retaken and its unsent reservation released',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const started=now-aiNewsStaleLeaseSeconds-1,old=`ai-news:kindle:${day}:${started}`;
+ await job(r,'running',null,started);
+ await r.db.prepare("INSERT INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,?,?,?,?,?,'pending')").bind(old,day,day,'news',1000,started).run();
+ const ai=gateway();await prepareAiNews(r.db,news,now,ai,{enabled:true,budget});
+ assert.equal(ai.calls.length,3);assert.equal(await r.db.prepare('SELECT 1 FROM harimu_ai_reservations WHERE request_id=?').bind(old).first(),null,'old pending row released');
 });

@@ -16,7 +16,7 @@
 .harimu-auth-menu-action {
   min-height: 44px;
   color: #f3ecd8;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale, 1));
 }
 .harimu-auth-menu-icon { color: #b8d5ce; }
 .harimu-auth-menu-action:hover { background: #203b3c; }

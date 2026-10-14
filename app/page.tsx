@@ -18,6 +18,10 @@ import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
+import { FirstWeekTracker } from './first-week-tracker';
+import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
+import { firstWeekDay, visibleGoals, type WeekDay } from '@/lib/first-week';
+const visibleWeekDay = (day: WeekDay | null): WeekDay | null => day && {...day, goals: visibleGoals(day)};
 import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -57,7 +61,7 @@ import {
 } from '@clerk/nextjs';
 import { MORNING_BRIEF_TRIGGER_ID, MorningBrief } from './morning-brief';
 import { Newspaper } from '@phosphor-icons/react';
-import { briefDayKey, claimDailyBrief, morningBriefSections } from '@/lib/morning-brief';
+import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHeadline } from '@/lib/morning-brief';
 import { CityCoResidents } from './city-coresidents';
 import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
@@ -428,6 +432,7 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
+  firstWeek?: { completed: string[] } | null;
   profile: {
     nationId: string | null;
     displayName: string | null;
@@ -587,6 +592,9 @@ export default function Home() {
     return () => cancelAnimationFrame(frame);
   }, [tourOpen, viewMode, stopTour]);
   const [guideNow, setGuideNow] = useState(0);
+  // First-week progress (#134): STUB store in this browser until server-side tracking (#135).
+  const [weekDone, setWeekDone] = useState<{key:string;ids:string[]}>({key:'',ids:[]});
+  const [serverWeekIds, setServerWeekIds] = useState<string[] | null>(null);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -743,6 +751,10 @@ export default function Home() {
     [locationSearch, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
+  const weekStoreKey = citizenNationId && citizenshipStatus?.enrolledAt ? `${citizenNationId}:${citizenshipStatus.enrolledAt}` : '';
+  // Load progress when the citizen key changes (adjust-state-during-render). Signed-in citizens use server progress (#135); the local demo keeps the browser stub.
+  const weekProgressStore = clerkConfigured ? serverFirstWeekProgressStore(serverWeekIds) : stubFirstWeekProgressStore();
+  if (weekStoreKey && weekDone.key !== weekStoreKey) setWeekDone({key:weekStoreKey,ids:weekProgressStore.load(weekStoreKey)});
   const demoGovernmentSnapshot = useMemo(() => citizenNation ? simulateGovernment({
     nationId: citizenNation.id, availableBudgetMinor: 100000,
     foodSecurity: (economy?.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) >= 2 ? 100 : 0,
@@ -1155,6 +1167,7 @@ export default function Home() {
     if ('election' in snapshot)setElection(snapshot.election??null);
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
+    if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
     setDemoStarterGranted(snapshot.demoStarterGranted ?? false);
@@ -1462,6 +1475,16 @@ export default function Home() {
   const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,copy:starterCopyFor(citizenNation.id),enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
+  const weekKey = citizenNation ? weekStoreKey : '';
+  const weekDayInfo = weekKey && citizenNation ? visibleWeekDay(firstWeekDay({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,firstLoopActive:Boolean(firstLoop)})) : null;
+  const weekDayStart = weekDayInfo ? Date.parse(citizenshipStatus?.enrolledAt ?? '') + (weekDayInfo.day - 1) * 86400000 : 0;
+  const weekStored = weekDone.key===weekKey ? [...new Set([...weekDone.ids, ...(clerkConfigured ? serverWeekIds ?? [] : [])])] : [];
+  const weekTrack = !firstLoop && weekDayInfo ? firstWeekTracker({day:weekDayInfo,done:weekStored,signals:{shifts:[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])],dayStart:weekDayStart,
+    mealReadyAt:citizenNation?.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation?.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt}}) : null;
+  const weekNew = newlyDone(weekTrack, weekStored);
+  // Latch detected completions (server progress for signed-in citizens, #135).
+  if (weekNew.length) { const ids = [...weekStored, ...weekNew]; setWeekDone({key:weekKey,ids}); weekProgressStore.save(weekKey, ids); }
+  const weekTracker = weekTrack && <FirstWeekTracker tracker={weekTrack} onNavigate={screen=>navigateGame(screen)} />;
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;
@@ -1595,7 +1618,7 @@ export default function Home() {
   const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
-    {firstLoopHint}{dailyLoop}
+    {firstLoopHint}{weekTracker}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
@@ -1661,9 +1684,21 @@ export default function Home() {
       ] : [];
   const briefInventory = citizenNation?.id === 'aurelle' ? aurellePlan?.foodQuantity : citizenNation?.id === 'korund' ? korundPlan?.foodQuantity : economy ? goods('food') : undefined;
   const briefStorageKey = citizenNation ? `harimu:morning-brief:${citizenNation.id}` : null;
+  // #73: headlines come from the same /api/news edition as the News panel, fetched only while the brief is open.
+  const [briefHeadlines, setBriefHeadlines] = useState<{ nationId: string; items: MorningBriefHeadline[] } | null>(null);
+  useEffect(() => {
+    if (!morningBriefOpen || !citizenNationId || guestActive || !clerkConfigured || citizenSessionStatus !== 'ready') return;
+    const controller = new AbortController();
+    void fetch('/api/news', { cache: 'no-store', signal: controller.signal }).then(async response => {
+      const data = await response.json() as { nationId?: string; items?: MorningBriefHeadline[] };
+      if (response.ok && data.nationId === citizenNationId && Array.isArray(data.items)) setBriefHeadlines({ nationId: data.nationId, items: data.items.slice(0, 3).map(item => ({ id: item.id, title: item.title, source: item.source, kind: item.kind })) });
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [morningBriefOpen, citizenNationId, guestActive, citizenSessionStatus]); // clerkConfigured is a module-level constant (build-time env), so it is not a dependency.
   const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow,
     shift: activeShift ? { title: activeShift.orderName, endsAt: Date.parse(activeShift.completesAt) / 1000 } : null,
-    leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null }) : [];
+    leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null,
+    headlines: briefHeadlines?.nationId === citizenNationId ? briefHeadlines.items : [] }) : [];
   const closeMorningBrief = () => { setMorningBriefOpen(false); if (briefStorageKey) try { window.localStorage.setItem(briefStorageKey, briefDayKey(Date.now())); } catch {} };
   const contextTitle = citizenNation?.id === 'korund' && viewMode === 'market' ? 'State rations' : citizenNation?.id === 'korund' && viewMode === 'workplace' ? 'Assigned work' : viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'

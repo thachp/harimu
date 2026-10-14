@@ -26,7 +26,7 @@ const compiled = ts.transpileModule(await readFile(new URL('../app/morning-brief
 function harness(props) {
   const refs = []; const effects = []; let index = 0;
   const react = { useRef: (initial = null) => refs[index++] ?? (refs[index - 1] = { current: initial }), useEffect: fn => effects.push(fn) };
-  const exports = {}; new Function('exports', 'require', compiled)(exports, name => name === 'react' ? react : require(name));
+  const exports = {}; new Function('exports', 'require', compiled)(exports, name => name === 'react' ? react : name === '@/lib/morning-brief' ? require('../lib/morning-brief.ts') : require(name));
   const tree = exports.MorningBrief(props);
   const all = node => [node, ...[node?.props?.children].flat(Infinity).filter(n => n && typeof n === 'object').flatMap(all)];
   return { exports, tree, nodes: all(tree), refs, effects };

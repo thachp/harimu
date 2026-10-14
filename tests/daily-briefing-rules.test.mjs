@@ -22,3 +22,35 @@ test('full capacity conserves food and unavailable market never suggests meals',
 test('no capacity and meal cooldown directs refresh without promising a new shift', () => {
   assert.equal(dailyPriority({ ...input, capacity: 0, mealReadyAt: new Date(2000).toISOString() }).action, 'refresh');
 });
+
+// #118 voice pass: nation copy changes words only, never the chosen action or the figures.
+import { briefingVoices } from '../lib/daily-briefing.ts';
+const states = [
+  { ...input, activeShift: { completesAt: new Date(1000).toISOString() } },
+  { ...input, food: 1, mealFood: 3 },
+  { ...input, food: 3, mealFood: 3 },
+  { ...input, capacity: 24, activeShift: { completesAt: new Date(5000).toISOString() } },
+  { ...input, capacity: 24 },
+  { ...input, capacity: 0, mealReadyAt: new Date(2000).toISOString() },
+];
+for (const nationId of ['kindle', 'korund', 'aurelle']) test(`${nationId} briefing voice keeps rules, figures and house terms`, () => {
+  const titles = new Set();
+  for (const s of states) {
+    const base = dailyPriority(s), voiced = dailyPriority({ ...s, nationId });
+    assert.equal(voiced.action, base.action);
+    assert.deepEqual(voiced.reason.match(/\d+/g), base.reason.match(/\d+/g));
+    assert.ok(voiced.title && voiced.reason);
+    assert.doesNotMatch(voiced.title + voiced.reason, /Notable|guarantee|bonus|reward(s)? of \d/i);
+    titles.add(voiced.title);
+  }
+  assert.equal(titles.size, states.length);
+  assert.equal(Object.keys(briefingVoices[nationId]).length, 6);
+});
+test('nation voices are distinct and unknown nations fall back to neutral copy', () => {
+  const s = { ...input, capacity: 24 };
+  const titles = ['kindle', 'korund', 'aurelle'].map(nationId => dailyPriority({ ...s, nationId }).title);
+  assert.equal(new Set(titles).size, 3);
+  assert.deepEqual(dailyPriority({ ...s, nationId: 'fulmara' }), dailyPriority(s));
+  assert.deepEqual(dailyPriority({ ...s, nationId: '__proto__' }), dailyPriority(s));
+  assert.match(dailyPriority({ ...input, food: 1, nationId: 'korund' }).reason, /\b2 food\b/);
+});
