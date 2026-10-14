@@ -31,3 +31,14 @@ test('no real-world references, no Notable, no citizen or canon names', () => {
     assert.ok(!/\bNotable\b/i.test(l.text), l.id);
     for (const w of l.text.match(/\b[A-Z][a-z]+\b/g)??[]) assert.ok(!names.has(w), `${l.id} uses citizen name ${w}`); }
 });
+test('80-character hard limit on every line', () => {
+  assert.equal(CHATTER_LINE_MAX,80);
+  for (const l of ambientChatterLines) assert.ok(l.text.length<=80, `${l.id}: ${l.text.length}`);
+});
+test('context tags are optional, valid, and match the line', () => {
+  const ok=/^(day|night|alert-(green|amber|red)|festival:.+)$/;
+  const tagged=ambientChatterLines.filter(l=>l.context);
+  assert.ok(tagged.length>0 && tagged.length<ambientChatterLines.length, 'some lines tagged, rest generic');
+  for (const l of tagged) { assert.match(l.context,ok, l.id);
+    if (l.context.startsWith('festival:')) assert.ok(l.text.includes(l.context.slice(9)), `${l.id} names its festival`); }
+});

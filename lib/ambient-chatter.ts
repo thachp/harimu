@@ -3,11 +3,14 @@
  * nation page (Culture: ethos, food, holidays, etiquette) and culture bible thachp/harimu-docs#3. Every line is spoken by
  * an AI citizen, so it is flagged `aiText: true` with provenance 'deterministic' to match AiTextTag (app/ai-disclosure.tsx):
  * these lines are authored, not model output. All lines are new wording, so `proposal: true`. Opt-out: players can hide
- * ambient AI chatter (citizens-daily-loops "Opt-out of AI chatter"); ambientChatter() returns nothing when hidden.
+ * ambient AI chatter (citizens-daily-loops "Opt-out of AI chatter"). The setting will live in lib/display-preferences.ts
+ * (not wired yet); ambientChatter() returns nothing when hidden. Other 7 nations get chatter when their Early Access wave opens.
  * No real people, no real-world references, no named speakers. */
 
 export type ChatterNation='kindle'|'korund'|'aurelle';
-export type ChatterLine={id:string;nation:ChatterNation;text:string;aiText:true;provenance:'deterministic';proposal:true};
+/** Optional context a line depends on. Untagged lines are generic. Data only: no matching logic yet. */
+export type ChatterContext='day'|'night'|'alert-green'|'alert-amber'|'alert-red'|`festival:${string}`;
+export type ChatterLine={id:string;nation:ChatterNation;text:string;context?:ChatterContext;aiText:true;provenance:'deterministic';proposal:true};
 
 export const CHATTER_NATIONS:readonly ChatterNation[]=['kindle','korund','aurelle'];
 export const CHATTER_MIN_PER_NATION=20;
@@ -77,9 +80,15 @@ const raw:readonly Raw[]=[
  {id:'aurelle-20',nation:'aurelle',text:'The court hears petitions at dawn. Bring patience.'},
 ];
 
-export const ambientChatterLines:readonly ChatterLine[]=raw.map(l=>({...l,aiText:true,provenance:'deterministic',proposal:true}));
+const CONTEXT:Readonly<Record<string,ChatterContext>>={
+ 'kindle-02':'festival:Ballot Night','kindle-12':'day','kindle-20':'day',
+ 'korund-05':'festival:Plan Day','korund-09':'day','korund-11':'festival:Quota Rally','korund-16':'night','korund-19':'day',
+ 'aurelle-01':'night','aurelle-05':'festival:Hearth Night','aurelle-09':'festival:Charter Fair','aurelle-17':'night','aurelle-18':'festival:Heir\'s Naming','aurelle-20':'day',
+};
 
-/** Lines for a nation, or none when the player has hidden AI chatter. */
+export const ambientChatterLines:readonly ChatterLine[]=raw.map(l=>({...l,...(CONTEXT[l.id]?{context:CONTEXT[l.id]}:{}),aiText:true,provenance:'deterministic',proposal:true}));
+
+/** Lines for a nation, or none when the player has hidden AI chatter (future display-preferences setting). */
 export function ambientChatter(nation:string,opts:{hideAiChatter?:boolean}={}):readonly ChatterLine[]{
  if(opts.hideAiChatter)return [];
  return ambientChatterLines.filter(l=>l.nation===nation);
