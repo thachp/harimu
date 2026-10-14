@@ -634,7 +634,7 @@ export default function Home() {
   useEffect(() => {
     if (!walletOpen) return;
     let live = true;
-    fetch('/api/world/registry').then(r => r.ok ? r.json() : null).then((data: { open?: boolean } | null) => { if (live) setKioskOpen(data?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
+    fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean } | null> : null).then((data) => { if (live) setKioskOpen(data?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
     return () => { live = false; };
   }, [walletOpen]);
   const buyTessera = async (tesseraMinor: number): Promise<string | null> => {
