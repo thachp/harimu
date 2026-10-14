@@ -19,7 +19,7 @@ import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
 import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
-import { economySchema, recoverySchema, rewardSchema, fundSchema, employerBudgetMinor, rewards } from './economy';
+import { economySchema, recoverySchema, rewardSchema, fundSchema, incomeTaxSchema, employerBudgetMinor, rewards } from './economy';
 import { shiftSchema, activeShiftIndex } from './work-shifts';
 import { shiftQualitySchema } from './shift-quality';
 import { env } from 'cloudflare:workers';
@@ -190,8 +190,9 @@ async function initialize(database: GameDatabase) {
   await database.batch([database.prepare(shiftSchema), database.prepare(activeShiftIndex)]);
   await database.prepare(shiftQualitySchema).run();
 
-  await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
-    database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
+  await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema), database.prepare(incomeTaxSchema),
+    database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor),
+    database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-treasury', 0)")]);
   await database.batch([
     ...addressSchemas.map(sql=>database.prepare(sql)),
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
@@ -241,6 +242,14 @@ async function initialize(database: GameDatabase) {
       database.prepare('DROP VIEW IF EXISTS citizen_inventory_balances'),
       database.prepare(walletViewSql), database.prepare(inventoryViewSql),
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('market-orders-v1')"),
+    ]);
+  }
+  // #86: balances net out withheld Kindle income tax. Same atomic view swap as market-orders-v1.
+  const incomeTaxInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'kindle-income-tax-v1'").first();
+  if (!incomeTaxInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('kindle-income-tax-v1')"),
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));

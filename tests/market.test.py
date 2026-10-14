@@ -22,7 +22,7 @@ class MarketTests(unittest.TestCase):
           CREATE TABLE work_contributions(clerk_user_id TEXT, work_order_id TEXT, capacity_spent INTEGER, created_at TEXT);
           INSERT INTO citizens VALUES ('alice','kindle',18,''),('bob','kindle',18,''),('carl','korund',18,''),('visitor',NULL,18,'');
           INSERT INTO work_orders VALUES ('harvest');''')
-        for name in ['worldClockSchema','worldTickSchema','worldSupplySchema','policyExecutionSchema','shiftSchema','activeShiftIndex','economySchema','recoverySchema','rewardSchema','fundSchema',
+        for name in ['worldClockSchema','worldTickSchema','worldSupplySchema','policyExecutionSchema','shiftSchema','activeShiftIndex','economySchema','recoverySchema','rewardSchema','fundSchema','incomeTaxSchema',
                      'marketItemsSchema','starterSchema','marketEventsSchema','listingSchema','fillSchema','cancelSchema','playerReceiptView','openLotsView','marketGoodsSchema','marketOrdersSchema','marketCancellationsSchema','marketTradesSchema','marketOpenOrdersView','walletViewSql','inventoryViewSql','merchantViewSql','merchantCashSql']:
             self.db.execute(sql(name))
         self.db.execute("INSERT INTO economy_funds VALUES ('kindle-merchant',10000)")

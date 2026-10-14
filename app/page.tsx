@@ -69,6 +69,7 @@ import { CityCoResidents } from './city-coresidents';
 import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { clerkConfigured } from './providers';
+import { describeKindlePay, withholdIncomeTax } from '@/lib/income-tax';
 
 type ViewMode = SceneView;
 type PlanHorizon = 'today' | 'week' | 'season';
@@ -859,7 +860,7 @@ export default function Home() {
             const item = eligible.rewardItem;
             const inventory = economy.inventory.filter((entry) => entry.item !== item);
             if (item) inventory.push({ item, quantity: (economy.inventory.find((entry) => entry.item === item)?.quantity ?? 0) + (eligible.rewardQuantity ?? 0) });
-            setEconomy({ ...economy, walletMinor: economy.walletMinor + (eligible.wageMinor ?? 0), inventory });
+            setEconomy({ ...economy, walletMinor: economy.walletMinor + withholdIncomeTax(eligible.wageMinor ?? 0).netMinor, inventory });
           }
           setWorkShifts((current) => current.map((shift) => shift.id === shiftId
             && !shift.claimedAt && Date.parse(shift.completesAt) <= Date.now()
@@ -1571,7 +1572,7 @@ export default function Home() {
         <section className="scene-work-orders"><h2>Available contributions</h2>
           {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <ActionButton key={order.id} type="button"
             reason={pendingActionReason(workPending, Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)) ?? firstActionReason([hasActiveShift, 'Finish and collect your active shift first.'], [capacity < order.cost, `You need ${order.cost} WC. Prepare a meal or wait for recovery.`])} onClick={() => void commitWork(order)}>
-            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></ActionButton>)}
+            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${describeKindlePay(rewards[order.id].wageMinor)} + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></ActionButton>)}
         {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length === 0 && <p>No shifts are available for this nation yet. Kindle has the first supported work and wage programme; other national workplaces are planned.</p>}
         </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
       </>}
@@ -1680,7 +1681,7 @@ export default function Home() {
     })) : viewMode === 'workplace' ? availableWorkOrders
       .filter(order => Boolean(citizenNation) && (!order.nationId || order.nationId === citizenNation?.id))
       .map(order => ({ id: order.id, label: order.name,
-        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${dockStatus(order)}`,
+        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${describeKindlePay(rewards[order.id].wageMinor)} + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${dockStatus(order)}`,
       })) : viewMode === 'market' ? [
         ...(market?.quotes ?? []).map(quote => ({ id: quote.item, label: quote.label,
           detail: `Buy ${(quote.buyMinor / 100).toFixed(2)} · Sell ${(quote.sellMinor / 100).toFixed(2)} SPK · ${quote.stock} in stock`,

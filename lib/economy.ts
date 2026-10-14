@@ -61,6 +61,24 @@ export const settleSql = `INSERT OR IGNORE INTO shift_settlements
     AND r.wage_minor <= (SELECT initial_minor FROM economy_funds WHERE id = 'kindle-employer')
       - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements), 0)
       - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions), 0)`;
+// #86: Kindle income tax is withheld in the same batch as settleSql. Keyed by shift_id and limited to the
+// settlement written at this timestamp, so a retried or repeated claim never taxes twice. Integer division floors.
+export const incomeTaxSchema = `CREATE TABLE IF NOT EXISTS shift_income_tax (
+  shift_id TEXT PRIMARY KEY REFERENCES shift_settlements(shift_id) ON DELETE CASCADE,
+  clerk_user_id TEXT NOT NULL,
+  gross_minor INTEGER NOT NULL CHECK(gross_minor >= 0),
+  tax_minor INTEGER NOT NULL CHECK(tax_minor >= 0 AND tax_minor <= gross_minor),
+  rate_percent INTEGER NOT NULL CHECK(rate_percent BETWEEN 0 AND 50),
+  settled_at TEXT NOT NULL
+)`;
+export const withholdIncomeTaxSql = `INSERT OR IGNORE INTO shift_income_tax
+  (shift_id, clerk_user_id, gross_minor, tax_minor, rate_percent, settled_at)
+  SELECT s.shift_id, s.clerk_user_id, s.wage_minor, (s.wage_minor * ?) / 100, ?, s.settled_at
+  FROM shift_settlements s
+  WHERE s.shift_id = ? AND s.clerk_user_id = ? AND s.settled_at = ?
+    AND EXISTS (SELECT 1 FROM citizens c WHERE c.clerk_user_id = s.clerk_user_id AND c.nation_id = 'kindle')`;
+export const kindleTreasuryBalanceSql = `SELECT COALESCE((SELECT initial_minor FROM economy_funds WHERE id = 'kindle-treasury'), 0)
+  + COALESCE((SELECT SUM(tax_minor) FROM shift_income_tax), 0) AS balance`;
 export const settledContributionSql = `INSERT INTO work_contributions
   (clerk_user_id, work_order_id, capacity_spent, created_at)
   SELECT clerk_user_id, work_order_id, capacity_spent, ? FROM work_shifts
@@ -119,7 +137,7 @@ export async function readEconomy(db: GameDatabase, userId: string, interval: nu
   if (!options.readOnly) await db.prepare(starterGrantSql).bind(userId).run();
   // One SQLite read snapshot keeps wallet and goods consistent during another tab's claim.
   // Wallet history is read in the same statement so the balance and the listed movements always agree (#49 review).
-  const row = await db.prepare(economyWalletSnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId).first<{
+  const row = await db.prepare(economyWalletSnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId, userId).first<{
     wallet_minor: number; inventory_json: string; recovered_at: number | null; history_json: string | null;
   }>();
   const history = sortHistory(JSON.parse(row?.history_json ?? '[]') as WalletHistoryRow[]);

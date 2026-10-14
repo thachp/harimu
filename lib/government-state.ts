@@ -51,8 +51,10 @@ type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;s
 /** Completed UTC days are reviewed once. By default this persists bounded, idempotent reviews (POST and world-tick paths).
  *  With readOnly (#205, GET /api/citizen) the same reviews are projected in memory and nothing is written. */
 export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean } = {}) {
-  const [budget, needs, days] = await Promise.all([
+  const [budget, treasury, needs, days] = await Promise.all([
     db.prepare("SELECT initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number }>(),
+    // #86: withheld Kindle income tax accumulates in kindle-treasury and joins the available budget.
+    db.prepare("SELECT COALESCE((SELECT initial_minor FROM economy_funds WHERE id='kindle-treasury'),0) + COALESCE((SELECT SUM(tax_minor) FROM shift_income_tax),0) AS balance").first<{ balance: number }>(),
     db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN CASE WHEN c.nation_id='korund' THEN COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=c.clerk_user_id),0) WHEN c.nation_id='aurelle' THEN COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=c.clerk_user_id),0) ELSE COALESCE(i.quantity,0) END >= 2 THEN 1 ELSE 0 END) AS supplied
       FROM citizens c LEFT JOIN citizen_inventory_balances i ON i.clerk_user_id=c.clerk_user_id AND i.item='food'
       WHERE c.nation_id=?`).bind(nationId).first<{ households: number; supplied: number }>(),
@@ -63,7 +65,7 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       ORDER BY p.period_start ASC LIMIT 30`)
       .bind(nationId, Math.floor(now/86400)*86400).all<{ period_start: number }>(),
   ]);
-  const inputs = { nationId, availableBudgetMinor: nationId === 'kindle' ? Math.max(0,budget?.balance ?? 0) : 0,
+  const inputs = { nationId, availableBudgetMinor: nationId === 'kindle' ? Math.max(0,budget?.balance ?? 0) + Math.max(0,treasury?.balance ?? 0) : 0,
     foodSecurity: needs?.households ? Math.floor(100*(needs.supplied ?? 0)/needs.households) : 100 };
   const projected = new Map<number, ReviewRow & { selected_topic: string }>();
   for (const day of days.results) {

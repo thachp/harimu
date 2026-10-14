@@ -10,7 +10,8 @@ import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/li
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { applyQuality, validQualityInput, type QualityInput } from '@/lib/shift-quality';
 import { gradeShift } from '@/lib/shift-quality-key';
-import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
+import { kindleIncomeTaxPercent } from '@/lib/income-tax';
+import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
 import {readCollectivePetitions,recordVerifiedHumanVisit} from '@/lib/collective-petitions';
@@ -540,6 +541,8 @@ async function handlePost(request: Request) {
     // Budget guard is in the insert itself, so concurrent settlements cannot overdraw the pool.
     await database.batch([
       database.prepare(settleSql).bind(now, shiftId, userId, now),
+      // #86: Kindle income tax is withheld from this settlement in the same transaction.
+      database.prepare(withholdIncomeTaxSql).bind(kindleIncomeTaxPercent, kindleIncomeTaxPercent, shiftId, userId, now),
       database.prepare(settledContributionSql)
         .bind(now, shiftId, userId, now),
       database.prepare(finishSettledShiftSql)
