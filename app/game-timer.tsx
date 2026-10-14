@@ -5,7 +5,7 @@ import {useDisplayTimestamp} from './display-preferences';
 import styles from './game-timer.module.css';
 
 /** Presentation only. Local countdown never grants rewards or changes authoritative deadlines. */
-export function GameTimer({endsAt,label='Remaining',compact=false}: {endsAt:string|number;label?:string;compact?:boolean}) {
+export function GameTimer({endsAt,label='Remaining',compact=false,expiredText='Deadline reached · refresh to confirm.'}: {endsAt:string|number;label?:string;compact?:boolean;expiredText?:string}) {
   const formatTime=useDisplayTimestamp();
   const [now,setNow]=useState<number|null>(null);
   const [offline,setOffline]=useState(false);
@@ -25,7 +25,7 @@ export function GameTimer({endsAt,label='Remaining',compact=false}: {endsAt:stri
       <strong>{label}</strong> · {value.status==='loading' ? 'Checking clock…' : value.status==='invalid' ? 'Deadline unavailable' : <><span>{value.real} real</span><span> · {value.game} game</span></>}
     </span>
     {!compact && deadline && <small>Deadline: <time dateTime={deadline}>{formatTime(deadline)}</time></small>}
-    {value.status==='expired' && <small role="status">Deadline reached · refresh to confirm.</small>}
+    {value.status==='expired' && <small role="status">{expiredText}</small>}
     {offline && <small>Offline · countdown uses your device clock; reconnect to confirm.</small>}
   </span>;
 }
