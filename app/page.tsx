@@ -1,5 +1,6 @@
 'use client';
 import {NotableControl} from './notable-control';
+import { fetchWithRetry } from '@/lib/fetch-retry';
 
 import type { VerificationState } from '@/lib/verification';
 import type { SimulationState } from '@/lib/world-simulation';
@@ -17,7 +18,7 @@ import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
-import { isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
+import { isGamePopstate, isSceneTraversal, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -44,6 +45,9 @@ import { CitizenMarket } from './citizen-market';
 import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
+import { workOrderDockStatus } from '@/lib/work-dock';
+import { fetchIdempotent } from '@/lib/retry-fetch';
+import { shiftDeadlineText, shiftDeadlineDelay } from '@/lib/shift-deadline';
 import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
 import {
   Show,
@@ -384,8 +388,9 @@ function subscribeToLocation(onStoreChange: () => void) {
     window.history.replaceState(sceneHistoryState(window.history.state, pathname), '');
   }
   const onPopState = (event: PopStateEvent) => {
-    if (window.location.pathname === pathname && isSceneTraversal(event.state, pathname)) {
+    if (isGamePopstate(pathname, window.location.pathname)) {
       event.stopImmediatePropagation();
+      if (!isSceneTraversal(window.history.state, pathname)) window.history.replaceState(sceneHistoryState(window.history.state, pathname), '');
       window.dispatchEvent(new Event('harimu-scenechange'));
     } else onStoreChange();
   };
@@ -495,7 +500,7 @@ function ClerkCitizenSession({
 
     async function loadCitizen() {
       try {
-        const response = await fetch('/api/citizen', { signal: controller.signal });
+        const response = await fetchWithRetry('/api/citizen', { signal: controller.signal });
         if (controller.signal.aborted) return;
         if (!response.ok) {
           onStatus('error');
@@ -597,6 +602,18 @@ export default function Home() {
   const workLock = useRef(false);
   const [demoLoaded, setDemoLoaded] = useState(false);
   const hasActiveShift = workShifts.some((shift) => !shift.claimedAt);
+  const [dockNow, setDockNow] = useState(() => Date.now());
+  const activeCompletesAt = workShifts.find((shift) => !shift.claimedAt)?.completesAt;
+  // Re-render the jobs dock when the active shift reaches its deadline (#54).
+  useEffect(() => {
+    if (!activeCompletesAt) return;
+    const wait = Date.parse(activeCompletesAt) - Date.now();
+    const timer = window.setTimeout(() => setDockNow(Date.now()), Math.min(Math.max(0, wait + 250), 2147483647));
+    return () => window.clearTimeout(timer);
+  }, [activeCompletesAt]);
+  const dockStatus = (order: { id: string; name: string; cost: number }) => { const status = workOrderDockStatus(order, workShifts, capacity, dockNow); return status ? ` · ${status}` : ''; };
+  const [deadlineConfirmedId, setDeadlineConfirmedId] = useState<string | null>(null);
+  const runWorkRef = useRef<((action: 'refresh-work') => Promise<void>) | null>(null);
   const [influence, setInfluence] = useState(1240);
   const [waterSecurity, setWaterSecurity] = useState(71);
   const [wardStability, setWardStability] = useState(86);
@@ -756,10 +773,13 @@ export default function Home() {
     setWorkError(null);
     try {
       if (clerkConfigured) {
-        const response = await fetch('/api/citizen', {
+        const init: RequestInit = {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
           body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
-        });
+        };
+        // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
+        // Starting a shift has no request id, so it is never retried automatically.
+        const response = action === 'commit-work' ? await fetch('/api/citizen', init) : await fetchIdempotent(fetch, '/api/citizen', init);
         const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; profile?: CitizenSnapshot['profile'] };
       if (epoch !== citizenEpoch.current) return;
         if (result.simulation) setSimulation(result.simulation);
@@ -819,6 +839,8 @@ export default function Home() {
       setWorkPending(false);
     }
   }
+
+  useEffect(() => { runWorkRef.current = (action) => runWork(action); });
 
   async function runMarket(command: MarketCommand) {
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
@@ -1558,6 +1580,17 @@ export default function Home() {
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
       workOrders={availableWorkOrders.filter(order => order.nationId !== 'korund')} /> : citizenScene;
+  const deadlineShift = [...workShifts, ...(korundPlan?.shifts ?? []), ...(aurellePlan?.shifts ?? [])].find(shift => !shift.claimedAt);
+  const deadlineShiftId = deadlineShift?.id, deadlineShiftEnds = deadlineShift?.completesAt;
+  // One-time deadline timer: when the active shift's deadline passes, refresh the citizen snapshot
+  // automatically so the banner stops asking the player to refresh (client-side only; same GET as Refresh).
+  useEffect(() => {
+    if (!deadlineShiftId || !deadlineShiftEnds) return;
+    const delay = shiftDeadlineDelay(deadlineShiftEnds, Date.now());
+    if (delay === null) return;
+    const timer = window.setTimeout(() => { void runWorkRef.current?.('refresh-work').finally(() => setDeadlineConfirmedId(deadlineShiftId)); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [deadlineShiftId, deadlineShiftEnds]);
   const activeShift = priorNationShift ?? (citizenNation?.id === 'aurelle' ? aurellePlan?.shifts ?? [] : citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
   const nextDeadlineCandidates = [
     activeShift ? {label:'Work',endsAt:activeShift.completesAt} : null,
@@ -1566,7 +1599,8 @@ export default function Home() {
       : market?.mealReadyAt ? {label:'Meal',endsAt:market.mealReadyAt} : null,
     capacity < 24 && economy?.nextRecoveryAt ? {label:'Recovery',endsAt:economy.nextRecoveryAt} : null,
   ].filter((event):event is {label:string;endsAt:string} => Boolean(event && Number.isFinite(Date.parse(event.endsAt))));
-  const nextDeadline = activeShift ? {label:'Work',endsAt:activeShift.completesAt} : nextDeadlineCandidates.filter(event=>Date.parse(event.endsAt)>guideNow).sort((a,b)=>Date.parse(a.endsAt)-Date.parse(b.endsAt))[0];
+  const shiftExpiredText = activeShift ? shiftDeadlineText(activeShift.id, deadlineConfirmedId) : undefined;
+  const nextDeadline = activeShift ? {label:'Work',endsAt:activeShift.completesAt,expiredText:shiftExpiredText} : nextDeadlineCandidates.filter(event=>Date.parse(event.endsAt)>guideNow).sort((a,b)=>Date.parse(a.endsAt)-Date.parse(b.endsAt))[0];
   const contextItems: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[] =
     viewMode === 'country' ? [{id:'current-city',label:'Open City',detail:countryOwnNation ? activeCity?.name ?? 'Loading your city' : cityForNation(selected.id,countryCityId ?? '')?.name ?? 'City preview',onSelect:()=>changeView('square')}] : citizenNation?.id === 'aurelle' && ['household','workplace','market'].includes(viewMode) ? [
       {id:'aurelle-service',label:'Chartered service',detail:'4 WC · 8 CRN · 2 Favor',onSelect:()=>changeView('workplace')},
@@ -1582,7 +1616,7 @@ export default function Home() {
     })) : viewMode === 'workplace' ? availableWorkOrders
       .filter(order => Boolean(citizenNation) && (!order.nationId || order.nationId === citizenNation?.id))
       .map(order => ({ id: order.id, label: order.name,
-        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${hasActiveShift ? ' · Shift in progress' : capacity < order.cost ? ' · More capacity needed' : ''}`,
+        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${dockStatus(order)}`,
       })) : viewMode === 'market' ? [
         ...(market?.quotes ?? []).map(quote => ({ id: quote.item, label: quote.label,
           detail: `Buy ${(quote.buyMinor / 100).toFixed(2)} · Sell ${(quote.sellMinor / 100).toFixed(2)} SPK · ${quote.stock} in stock`,
@@ -1611,7 +1645,7 @@ export default function Home() {
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
     <GameShell nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
-      shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000} : undefined}
+      shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onOpenWallet={clerkConfigured && !guestActive && citizenNation?.id === 'kindle' ? () => setWalletOpen(true) : undefined}
