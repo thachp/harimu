@@ -86,7 +86,15 @@ export function GameViewport({ mode, nationId, cityName, nations, selectedNation
       labelLayer.appendChild(button);
       return { ...anchor, button };
     });
-    const render = () => {
+    // Coalesce redraws into one animation frame. Synchronous back-to-back
+    // renderer.render() calls outside rAF (resize + focus + highlight on a
+    // scene change) force the compositor into a synchronous drawing-buffer
+    // readback, which Chrome reports as "GPU stall due to ReadPixels" (#38).
+    let frame = 0;
+    const render = () => { if (!frame && !cancelled) frame = requestAnimationFrame(draw); };
+    const draw = () => {
+      frame = 0;
+      if (cancelled) return;
       saveCameraSnapshot(cameraKey, { x: target.x, z: target.z, zoom }, bounds);
       const w = Math.max(1, container.clientWidth), h = Math.max(1, container.clientHeight);
       const ratio = w / h;
@@ -176,7 +184,7 @@ export function GameViewport({ mode, nationId, cityName, nations, selectedNation
     canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', cancel);
     canvas.addEventListener('wheel', wheel, { passive: false });
     return () => {
-      cancelled = true; controls.current = null; observer.disconnect();
+      cancelled = true; controls.current = null; observer.disconnect(); if (frame) cancelAnimationFrame(frame);
       canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', up); canvas.removeEventListener('pointercancel', cancel); canvas.removeEventListener('wheel', wheel);
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
@@ -189,7 +197,7 @@ export function GameViewport({ mode, nationId, cityName, nations, selectedNation
         material.dispose();
       });
       textures.forEach(texture => texture.dispose());
-      sun.shadow.map?.dispose(); renderer.dispose(); labelLayer.remove(); canvas.remove();
+      sun.shadow.map?.dispose(); renderer.dispose(); renderer.forceContextLoss(); labelLayer.remove(); canvas.remove();
     };
   }, [mode, nationId, cityName, nationSignature, graphics]);
   useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, nationSignature, graphics]);
