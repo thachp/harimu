@@ -18,6 +18,12 @@ test('#75 co-residents: player listed, city-scoped, refreshed on travel, public 
  // Working status from an active shift.
  assert.equal((await r.call('citizen','alice',{action:'commit-work',workOrderId:'harvest'})).status,200);
  assert.equal((await r.call('city','alice')).data.coResidents.find(x=>x.you).status,'working');
+ // Ended but uncollected shift is idle, not working.
+ const shift=(await r.call('citizen','alice')).data.shifts[0];r.setNow(Date.parse(shift.completesAt)+1000);
+ assert.equal((await r.call('city','alice')).data.coResidents.find(x=>x.you).status,'idle');
+ // AI sample: only the live Notable, never #148's inactive roster.
+ const {notableProfiles}=await import('../lib/notable-profiles.ts');
+ assert.deepEqual((await r.call('city','alice')).data.coResidents.filter(x=>x.kind==='ai').map(x=>x.name),[notableProfiles.kindle.name]);
  // Travel refreshes the list for the new city.
  const moved=(await r.call('city','alice',{action:'travel',cityId:other.id})).data;
  assert.deepEqual(moved.coResidents.filter(x=>x.kind==='human').map(x=>x.you),[true]);
@@ -30,5 +36,6 @@ test('#75 empty state component and roster rendering',async()=>{
  const text=n=>n==null||n===false?'':typeof n!=='object'?String(n):Array.isArray(n)?n.map(text).join(''):text(n.props?.children);
  assert.equal(exports.CityCoResidents({residents:null,cityName:'X'}),null);
  assert.match(text(exports.CityCoResidents({residents:[],cityName:'Forgehaven'})),/Living in Forgehaven.*No one else is here yet/);
+ assert.match(text(exports.CityCoResidents({residents:[{key:'h:0',name:'Ada',nationId:'kindle',kind:'human',status:'idle',you:true}],cityName:'F'})),/No one else is here yet.*Ada \(you\)/);
  assert.match(text(exports.CityCoResidents({residents:[{key:'h:0',name:'Ada',nationId:'kindle',kind:'human',status:'idle',you:true},{key:'ai:x',name:'Mara Vale',nationId:'kindle',kind:'ai',status:'working',you:false}],cityName:'F'})),/Ada \(you\) · Citizen · idle.*Mara Vale · AI citizen · working/);
 });

@@ -42,7 +42,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/world-simulation.ts','lib/stability.ts',
-    'lib/notable-profiles.ts','lib/notable-roster.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
+    'lib/notable-profiles.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
     'lib/citizenship.ts',
     'app/api/citizen/route.ts', 'app/api/square/route.ts', 'app/api/world/route.ts',
