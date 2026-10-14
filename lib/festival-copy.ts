@@ -45,7 +45,6 @@ export const nationFestivalCopy:Readonly<Record<FestivalNationId,readonly Festiv
   f('exam-day','Exam Day','Ranks are announced, and results go up in the plazas.'),
   f('turbine-day','Turbine Day','The anniversary of the national grid.')],
  ilmar:[f('stilldays','Stilldays','The weekly rest. Currency trading pauses until it ends.'),
-  f('daily-vigil','Daily Vigil','The daily hour of vigil kept across Ilmar.'),
   f('feast-of-first-light','Feast of First Light','Held when a new Oracle is chosen or a solstice falls.'),
   f('assembly-election','Assembly Election','Election day for the Assembly.'),
   f('great-pilgrimage','Great Pilgrimage','Once per game year the faithful are called to Mirrorhall.')],

@@ -5,7 +5,7 @@ import { faithCopy } from '../lib/faith-copy.ts';
 
 const nations={ kindle:['Ballot Night',"Founders' Forge Day",'Market Bell'], korund:['Plan Day','Quota Rally',"Chairman's Birthday","People's Congress"],
   aurelle:['Coronation Day','Hearth Night','Charter Fair',"Heir's Naming"], confluence:['Congress Lanterns','Canal Festival','Quota Day'],
-  meridian:['Congress Week','Exam Day','Turbine Day'], ilmar:['Stilldays','Daily Vigil','Feast of First Light','Assembly Election','Great Pilgrimage'],
+  meridian:['Congress Week','Exam Day','Turbine Day'], ilmar:['Stilldays','Feast of First Light','Assembly Election','Great Pilgrimage'],
   hoarvale:['Opening of the Moot','Honors List Day','Aurora Night','Election Night'], varkand:['Muster Day','Rotation Day','Mandate Plebiscite','Lantern Watch'],
   veldwood:['Vote Days','Dividend Day','Glade Festival','Initiative Night'], fulmara:['Exchange Bell','Grand Regatta','Charter Day','Fair-Wind Blessing','Dock Strike'] };
 const faithFests=['Long Light','Clearing','Night of Names','Oath Day','Turning Days','Launching','Safe Return','Still Week','Lantern of Attention','Bread Day','Day of the Open Door'];
@@ -29,5 +29,6 @@ test('ids unique, proposals marked, length limits', () => {
 test('no real-world religion terms, no Notable, Korund stays secular', () => {
   const banned=['christ','jesus','bible','church','catholic','pope','islam','muslim','allah','quran','mosque','imam','jew','torah','rabbi','synagogue','hindu','buddh','dharma','sikh','shinto','pagan','wicca','druid','zoroast','heathen','infidel','heretic','cult','saint','amen','messiah','prophet','easter','christmas','diwali','ramadan','eid','hanukkah','passover','yule','solstice mass'];
   for (const x of every()) { const s=fold(`${x.name} ${x.text}`); for (const b of banned) assert.ok(!s.includes(b), `${x.id}: ${b}`); assert.ok(!/\bNotable\b/.test(`${x.name} ${x.text}`)); }
+  assert.ok(!nationFestivalCopy.ilmar.some(x=>x.id==='daily-vigil'));
   for (const x of nationFestivalCopy.korund) assert.ok(!/faith|shrine|worship|prayer/i.test(x.text), x.id);
 });
