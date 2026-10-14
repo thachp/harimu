@@ -4,12 +4,11 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { harvestAnswerVariants, ANSWER_VARIANT_MIN, ANSWER_VARIANT_MAX_CHARS } from '../lib/shift-quality-variants.ts';
 import { harvestQuestions } from '../lib/shift-quality.ts';
 
-test('matches harvestQuestions: same prompts, same option count, variant 0 is the current text', () => {
+test('matches harvestQuestions: same prompts and option count (ARC #276: variant 0 may differ from the current text)', () => {
   assert.equal(harvestAnswerVariants.length,harvestQuestions.length);
   harvestAnswerVariants.forEach((q,qi)=>{
     assert.equal(q.prompt,harvestQuestions[qi].prompt);
     assert.equal(q.options.length,harvestQuestions[qi].options.length);
-    q.options.forEach((opt,oi)=>assert.equal(opt.variants[0],harvestQuestions[qi].options[oi], `q${qi} o${oi}`));
   });
 });
 test('3+ unique variants per option, within length, proposal', () => {
@@ -44,15 +43,21 @@ test('ARC #274: at least 3 variants per answer; figures and outcomes unchanged',
   assert.match(key,/multiplierPct: Record<QualityGrade, number> = \{ poor: 100, fair: 110, good: 125, excellent: 150 \}/);
 });
 import { shiftOptionOrder, shiftAnswerKey } from '../lib/shift-quality-key.ts';
-test('ARC #276: best option mean variant length within ~15% of the other two options', async () => {
+test('ARC #276 / QA3: every wording combination a player can see keeps the best answer within ~15% of each other answer', async () => {
+  // Worst case, not averages: one wording per answer is shown, so check every combination of chosen variants.
   const secret='test-secret-0123456789', shiftId='00000000-0000-4000-8000-000000000000';
   const [order,key]=[await shiftOptionOrder(secret,shiftId,harvestQuestions),await shiftAnswerKey(secret,shiftId,harvestQuestions)];
   const best=key.map((pos,qi)=>order[qi][pos]); // canonical index of the best option, from the server key
-  const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const fails=[];
   harvestAnswerVariants.forEach((q,qi)=>{
-    const m=q.options.map(o=>mean(o.variants.map(v=>v.length)));
-    const others=mean(m.filter((_,i)=>i!==best[qi]));
-    const ratio=m[best[qi]]/others;
-    assert.ok(ratio>=0.85&&ratio<=1.15, `q${qi}: best ${m[best[qi]].toFixed(1)} vs others ${others.toFixed(1)} (ratio ${ratio.toFixed(2)})`);
+    const combos=q.options.reduce((acc,o)=>acc.flatMap(c=>o.variants.map((_,vi)=>[...c,vi])),[[]]);
+    for (const c of combos) {
+      const len=c.map((vi,oi)=>q.options[oi].variants[vi].length);
+      for (let oi=0;oi<len.length;oi++) if (oi!==best[qi]) {
+        const ratio=len[best[qi]]/len[oi];
+        if (ratio<0.85||ratio>1.15) fails.push(`q${qi} v[${c}] best ${len[best[qi]]} vs o${oi} ${len[oi]} (${ratio.toFixed(2)})`);
+      }
+    }
   });
+  assert.deepEqual(fails,[], `${fails.length} failing combinations:\n${fails.slice(0,20).join('\n')}`);
 });
