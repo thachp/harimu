@@ -16,7 +16,7 @@ const out=join(mkdtempSync(join(tmpdir(),'assembly-copy-')),'assembly-copy.mjs')
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 const { ballotExplainer, resultsCaption, assemblyPress, assemblyStage, ASSEMBLY_STAGES, ASSEMBLY_PLACEHOLDERS, ASSEMBLY_NAME_MAX, ASSEMBLY_LABEL_MAX, ASSEMBLY_BODY_MAX, ASSEMBLY_BYLINE } = await import(pathToFileURL(out).href);
 
-const lines=()=>[...ballotExplainer.lines,ballotExplainer.aiNote,resultsCaption.humanAndBloc,resultsCaption.districtCounts];
+const lines=()=>[...ballotExplainer.lines,ballotExplainer.aiNote,resultsCaption.humanAndSimulatedPublic,resultsCaption.districtCounts];
 const pressTexts=()=>assemblyPress.flatMap(s=>s.items.flatMap(i=>[i.headline,i.body]));
 const all=()=>[ballotExplainer.title,...lines().map(l=>l.text),...pressTexts()];
 const fill=t=>ASSEMBLY_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(ASSEMBLY_NAME_MAX)),t);
@@ -37,6 +37,12 @@ test('re-exports the shared name cap and fits 40/140 with every placeholder fill
   for (const l of lines()) assert.ok(fill(l.text).length<=ASSEMBLY_BODY_MAX, l.text);
   for (const s of assemblyPress) for (const i of s.items) { assert.ok(fill(i.headline).length<=ASSEMBLY_LABEL_MAX, i.headline); assert.ok(fill(i.body).length<=ASSEMBLY_BODY_MAX, i.body); }
 });
+test('{seats} reads as seats held after the count: no change figure, no "won"/"gained N" wording', () => {
+  for (const s of ['results-gain','results-hold','results-loss']) for (const i of assemblyStage(s).items) {
+    if (i.body.includes('{seats}')) assert.match(i.body,/(Seats held now|It now holds|kept its seats): \{seats\}|It now holds \{seats\}/, i.id);
+    assert.doesNotMatch(i.body,/\{seats\} (seats|more|fewer|new)|won \{seats\}|gained \{seats\}|lost \{seats\}|by \{seats\}/, i.id);
+  }
+});
 test('placeholders: only known ones; results stages use all three; no party hard-coded', () => {
   for (const t of all()) for (const m of t.matchAll(/\{[^}]+\}/g)) assert.ok(ASSEMBLY_PLACEHOLDERS.includes(m[0]), m[0]);
   const res=['results-gain','results-hold','results-loss'].flatMap(k=>assemblyStage(k).items.map(i=>i.body)).join(' ');
@@ -51,18 +57,18 @@ test('no figures: seat counts only through {seats}; "half" and "one list" are do
     assert.doesNotMatch(t.replace('Half the','').replace('Half the','').replace(/\bone (party )?list\b/gi,'').replace('One list per voter',''),/\b(half|one)\b/i, t);
   }
 });
-test('docs-supported claims: half the seats, one list per own district, proportional, secret, bloc shown separately', () => {
+test('docs-supported claims: half the seats, one list per own district, proportional, secret, Simulated Public shown separately (§9.3)', () => {
   const e=ballotExplainer.lines.map(l=>l.text).join(' ');
   assert.match(e,/Half the Assembly seats/); assert.match(e,/one party list, in your own district/); assert.match(e,/in proportion to votes in each district/);
   assert.match(e,/ballot is secret/); assert.match(e,/hidden until voting closes/);
-  assert.match(resultsCaption.humanAndBloc.text,/Human votes and the AI bloc are counted and shown separately/);
+  assert.match(resultsCaption.humanAndSimulatedPublic.text,/Human votes and the Simulated Public are counted and shown separately/); assert.doesNotMatch(resultsCaption.humanAndSimulatedPublic.text,/AI bloc/);
   assert.match(ballotExplainer.aiNote.text,/AI candidates/);
   assert.doesNotMatch(all().join(' '),/D'Hondt|Hare|Sainte|Droop|first-past/i);
 });
 test('AI honesty: parties not quoted, no AI citizens voting as individuals, no endorsing body', () => {
   const t=all().join(' ');
   assert.doesNotMatch(t,/["“”]|\bsaid\b|\bsays\b|spokes/i);
-  assert.doesNotMatch(t,/AI citizens?|simulated public/i); assert.doesNotMatch(t,/endors|backed by|union|guild|church|bank/i);
+  assert.doesNotMatch(t,/AI citizens?|AI bloc/i); assert.equal(t.match(/Simulated Public/g).length,1); assert.doesNotMatch(t,/endors|backed by|union|guild|church|bank/i);
 });
 test('no real-world references and no Notable', () => {
   const t=all().join(' ');
