@@ -1,4 +1,5 @@
 import type { GameDatabase } from './database-contract';
+import { isMissingRelation, tolerate } from './db-errors';
 import { presidiumConfig, presidiumSeats, resolveSession, seat, sessionReady, unrestSustainedSeconds, type Seat, type SeatId } from './korund-presidium-rules';
 export * from './korund-presidium-rules';
 
@@ -33,7 +34,7 @@ export type PresidiumState = {
 /** Read-only. Works whether or not the flag is on: with no sessions it is the authored roster. */
 export async function readPresidium(db: GameDatabase): Promise<PresidiumState> {
   const rows = (await db.prepare('SELECT id, opened_at, resolves_at, resolved_at, outcome, chairman_before, successor, purged_seat, decision_json FROM korund_presidium_sessions ORDER BY opened_at, id')
-    .all<Row>().catch(() => ({ results: [] as Row[] }))).results;
+    .all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] }))).results;
   let chairman: SeatId = 'voss'; const purged = new Set<SeatId>();
   for (const r of rows) if (r.outcome === 'purged' && r.successor && r.purged_seat) { purged.add(chairman); purged.add(r.purged_seat as SeatId); chairman = r.successor as SeatId; }
   const chair = seat(chairman)!;
@@ -54,7 +55,7 @@ export const currentChairmanName = async (db: GameDatabase) => (await readPresid
 
 async function korundScores(db: GameDatabase) {
   const rows = await db.prepare("SELECT scheduled_at, unrest FROM nation_stability_scores WHERE nation_id = 'korund' ORDER BY tick DESC LIMIT 120")
-    .all<{ scheduled_at: number; unrest: number }>().catch(() => ({ results: [] as { scheduled_at: number; unrest: number }[] }));
+    .all<{ scheduled_at: number; unrest: number }>().catch(tolerate(isMissingRelation, { results: [] as { scheduled_at: number; unrest: number }[] }));
   return rows.results.map(r => ({ scheduledAt: Number(r.scheduled_at), unrest: Number(r.unrest) }));
 }
 async function weeklyQuotaPct(db: GameDatabase, now: number) {

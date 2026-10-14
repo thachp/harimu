@@ -127,7 +127,8 @@ export async function pendingStarterFood(db: GameDatabase, userId: string): Prom
 }
 
 /** #205 (QA1 note 2 on #208): only a missing ledger table (not yet migrated) reads as 0; any other error surfaces. */
-export const isMissingRelation = (error: unknown) => /no such table|does not exist|42P01/i.test(String((error as { code?: string })?.code ?? '') + ' ' + String((error as Error)?.message ?? error));
+import { isMissingRelation } from './db-errors';
+export { isMissingRelation };
 export async function readTesseraBalance(db: GameDatabase, userId: string): Promise<number> {
   try {
     const row = await db.prepare('SELECT COALESCE(SUM(delta_minor),0) AS balance FROM citizen_tessera_ledger WHERE clerk_user_id=?').bind(userId).first<{ balance: number }>();
