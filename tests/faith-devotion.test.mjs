@@ -92,32 +92,89 @@ test('a first pick of Unaffiliated is free and starts no cooldown (Kindle and Ko
   assert.equal((await choose(r, 'kai', 'unaffiliated', 'open-hand')).status, 200, 'Korund can add a hidden faith right after a first pick');
 });
 
-test('Aurelle: leaving the Kinward Rite is blocked with a visible Royal Favor reason (14.2), even after worship records the default', async t => {
+/** Royal Favor comes from settled Aurelle estate shifts (2 each). Local ledger fixture, as in aurelle-integration.test.mjs. */
+async function giveFavor(r, user, shifts) {
+  const iso = new Date(r.now - 86400000).toISOString();
+  for (let n = 0; n < shifts; n++) {
+    const id = randomUUID();
+    await r.db.batch([
+      r.db.prepare('INSERT INTO work_shifts VALUES (?,?,?,?,?,?,?,?,?)').bind(id, user, 'aurelle-food-estate', 'Estate fixture', '4 state food', 4, iso, iso, iso),
+      r.db.prepare('INSERT INTO aurelle_settlements VALUES (?,?,?,?,?,?)').bind(id, user, 800, 4, 2, Math.floor(r.now / 1000)),
+    ]);
+  }
+}
+const spends = async (r, user) => (await r.db.prepare('SELECT request_id,amount,reason FROM aurelle_favor_spends WHERE clerk_user_id=?').bind(user).all()).results.map(x => ({ ...x }));
+const favorOf = async (r, user) => (await r.call('citizen', user)).data.aurellePlan.favor;
+
+test('Aurelle: leaving the Kinward Rite is refused with a visible reason when Royal Favor cannot cover it (14.2), even after worship records the default', async t => {
   const r = await runtime(t);
   await citizen(r, 'ava', 'aurelle'); await citizen(r, 'bo', 'aurelle');
-  const ava = await read(r, 'ava'); assert.match(ava.leaveBlockedReason, /costs Royal Favor/);
+  const ava = await read(r, 'ava'); assert.equal(ava.leaveCost, 10); assert.equal(ava.royalFavor, 0); assert.match(ava.leaveBlockedReason, /costs 10 Royal Favor.*You have 0/);
+  await giveFavor(r, 'ava', 4); // 8 Favor, still short
+  assert.match((await read(r, 'ava')).leaveBlockedReason, /You have 8/);
   for (const to of ['open-hand', 'fair-wind-vow', 'unaffiliated']) {
     const res = await choose(r, 'ava', to);
-    assert.equal(res.status, 409); assert.equal(res.data.reason, 'royal_favor_unavailable'); assert.match(res.data.error, /Royal Favor/);
+    assert.equal(res.status, 409); assert.equal(res.data.reason, 'insufficient_royal_favor'); assert.match(res.data.error, /Royal Favor/);
   }
+  assert.deepEqual(await spends(r, 'ava'), [], 'a refused change spends nothing');
   assert.equal((await worship(r, 'bo')).status, 200);
-  assert.equal((await choose(r, 'bo', 'open-hand')).data.reason, 'royal_favor_unavailable');
+  assert.equal((await choose(r, 'bo', 'open-hand')).data.reason, 'insufficient_royal_favor');
   assert.equal((await read(r, 'bo')).faith.id, 'kinward-rite');
-  assert.equal((await read(r, 'alice')).leaveBlockedReason, null, 'Kindle has no Favor cost');
+  const alice = await read(r, 'alice'); assert.equal(alice.leaveBlockedReason, null, 'Kindle has no Favor cost'); assert.equal(alice.leaveCost, null);
 });
 
-test('Aurelle: a citizen who moves in with a non-Kinward faith row from another nation cannot skip the Royal Favor check', async t => {
+test('Aurelle: leaving the Kinward Rite spends 10 Royal Favor once, records it, and a retry or later change cannot spend again', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'ava', 'aurelle');
+  await giveFavor(r, 'ava', 7); // 14 Favor
+  assert.equal(await favorOf(r, 'ava'), 14);
+  const ava = await read(r, 'ava'); assert.equal(ava.leaveBlockedReason, null); assert.equal(ava.leaveCost, 10);
+  const requestId = randomUUID();
+  const left = await choose(r, 'ava', 'open-hand', undefined, requestId);
+  assert.equal(left.status, 200, JSON.stringify(left.data)); assert.equal(left.data.state.faith.id, 'open-hand'); assert.equal(left.data.state.leaveCost, null);
+  assert.deepEqual(await spends(r, 'ava'), [{ request_id: requestId, amount: 10, reason: 'leave-kinward' }]);
+  assert.equal(await favorOf(r, 'ava'), 4, 'the Aurelle plan shows the balance after the spend');
+  const replay = await choose(r, 'ava', 'open-hand', undefined, requestId);
+  assert.equal(replay.status, 200); assert.equal(replay.data.replay, true);
+  assert.equal((await spends(r, 'ava')).length, 1, 'a retry with the same request id does not debit twice');
+  assert.equal(await favorOf(r, 'ava'), 4);
+  // Leaving the default Kinward Rite is Aurelle's first pick (free of cooldown, per #279); the next change starts the 60-day cooldown. Neither debits again.
+  assert.equal((await choose(r, 'ava', 'fair-wind-vow')).status, 200);
+  assert.equal((await choose(r, 'ava', 'open-hand')).data.reason, 'cooldown');
+  assert.equal((await spends(r, 'ava')).length, 1); assert.equal(await favorOf(r, 'ava'), 4);
+});
+
+test('Aurelle: Royal Favor never goes negative: the balance is earned (capped at 100) minus spent, and a second leave cannot overspend', async t => {
+  const r = await runtime(t);
+  await citizen(r, 'ava', 'aurelle'); await citizen(r, 'bo', 'aurelle');
+  await giveFavor(r, 'ava', 60); // 120 earned, capped at 100
+  assert.equal(await favorOf(r, 'ava'), 100);
+  assert.equal((await choose(r, 'ava', 'unaffiliated')).status, 200);
+  assert.equal(await favorOf(r, 'ava'), 90, 'cap applies before the spend');
+  await giveFavor(r, 'bo', 5); // exactly 10
+  assert.equal((await choose(r, 'bo', 'open-hand')).status, 200);
+  assert.equal(await favorOf(r, 'bo'), 0);
+  // A same-day concurrent pair with different request ids: only one debit can land, the other is refused.
+  await citizen(r, 'cy', 'aurelle'); await giveFavor(r, 'cy', 5);
+  const [one, two] = await Promise.all([choose(r, 'cy', 'open-hand'), choose(r, 'cy', 'fair-wind-vow')]);
+  assert.equal([one, two].filter(x => x.status === 200).length, 1, JSON.stringify([one.data, two.data]));
+  assert.equal((await spends(r, 'cy')).length, 1); assert.equal(await favorOf(r, 'cy'), 0);
+});
+
+test('Aurelle: a citizen who moves in with a non-Kinward faith row from another nation still pays Royal Favor to leave', async t => {
   const r = await runtime(t);
   await citizen(r, 'mo', 'kindle');
   assert.equal((await choose(r, 'mo', 'open-hand')).status, 200);
   await r.db.prepare("UPDATE citizens SET nation_id='aurelle' WHERE clerk_user_id='mo'").run();
-  const mo = await read(r, 'mo'); assert.equal(mo.faith.id, 'kinward-rite'); assert.match(mo.leaveBlockedReason, /costs Royal Favor/);
+  const mo = await read(r, 'mo'); assert.equal(mo.faith.id, 'kinward-rite'); assert.match(mo.leaveBlockedReason, /costs 10 Royal Favor/);
   for (const to of ['open-hand', 'fair-wind-vow', 'unaffiliated']) {
     const res = await choose(r, 'mo', to);
-    assert.equal(res.status, 409, to); assert.equal(res.data.reason, 'royal_favor_unavailable', to);
+    assert.equal(res.status, 409, to); assert.equal(res.data.reason, 'insufficient_royal_favor', to);
   }
   assert.equal((await read(r, 'mo')).faith.id, 'kinward-rite');
-  assert.equal((await choose(r, 'mo', 'kinward-rite')).status, 200, 'confirming the Kinward Rite is allowed');
+  assert.deepEqual(await spends(r, 'mo'), []);
+  await giveFavor(r, 'mo', 5);
+  assert.equal((await choose(r, 'mo', 'open-hand')).status, 200); assert.equal((await spends(r, 'mo')).length, 1);
 });
 
 test('GET /api/faith makes no writes', async t => {
