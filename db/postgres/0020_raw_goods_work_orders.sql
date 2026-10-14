@@ -1,0 +1,3 @@
+-- Issue #196 (Market MVP): Kindle jobs that produce fruit, meat and wood. Data only (no tables); additive and idempotent.
+-- Skipped where the kindle nation row doesn't exist yet (empty bootstrap before data import).
+INSERT INTO work_orders (id, nation_id, name, detail, capacity_cost, status, sort_order) SELECT * FROM (SELECT 'orchard','kindle','Pick the savanna orchards','+3 fruit · resolves in 2h',4,'open',6 UNION ALL SELECT 'herding','kindle','Drive the grassland herds','+2 meat · resolves in 3h',5,'open',7 UNION ALL SELECT 'logging','kindle','Cut timber for the city','+3 wood · resolves in 4h',6,'open',8) v WHERE EXISTS (SELECT 1 FROM nations WHERE id='kindle') ON CONFLICT (id) DO NOTHING;

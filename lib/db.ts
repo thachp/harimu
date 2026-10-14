@@ -21,6 +21,7 @@ import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsVie
 import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
 import { economySchema, recoverySchema, rewardSchema, fundSchema, employerBudgetMinor, rewards } from './economy';
 import { shiftSchema, activeShiftIndex } from './work-shifts';
+import { shiftQualitySchema } from './shift-quality';
 import { env } from 'cloudflare:workers';
 import { isolateOnce } from './postgres/readiness';
 
@@ -43,6 +44,9 @@ const workOrderSeeds = [
   ['harvest', 'kindle', 'Support the savanna harvest', '+480 food · resolves in 2h', 4, 'open', 1],
   ['freight', 'kindle', 'Move a foundry convoy', '+210 materials · resolves in 4h', 6, 'open', 2],
   ['archive', 'kindle', 'Catalogue the civic archive', '+95 knowledge · resolves in 3h', 3, 'open', 3],
+  ['orchard', 'kindle', 'Pick the savanna orchards', '+3 fruit · resolves in 2h', 4, 'open', 6],
+  ['herding', 'kindle', 'Drive the grassland herds', '+2 meat · resolves in 3h', 5, 'open', 7],
+  ['logging', 'kindle', 'Cut timber for the city', '+3 wood · resolves in 4h', 6, 'open', 8],
 ] as const;
 
 const planningTaskSeeds = [
@@ -184,6 +188,7 @@ async function initialize(database: GameDatabase) {
   ]);
 
   await database.batch([database.prepare(shiftSchema), database.prepare(activeShiftIndex)]);
+  await database.prepare(shiftQualitySchema).run();
 
   await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
