@@ -1,5 +1,6 @@
 'use client';
 import {useDisplayTimestamp} from './display-preferences';
+import { disabledReasonProps } from '@/lib/action-reasons';
 import { GameTimer } from './game-timer';
 
 import { useEffect, useState } from 'react';
@@ -56,7 +57,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
           <p>Public contribution target: {active.output} · {active.capacitySpent} WC committed</p>
           <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>
           <GameTimer endsAt={active.completesAt} label="Shift ready" />
-          <button disabled={Boolean(claimReason)} aria-describedby={claimReason ? "work-claim-reason" : undefined} onClick={() => onClaim(active.id)} type="button">
+          <button {...disabledReasonProps(claimReason, "work-claim-reason")} onClick={() => { if (!claimReason) onClaim(active.id); }} type="button">
             {pending ? 'Recording…' : 'Collect wages and goods'}
           </button>
           {claimReason && <small id="work-claim-reason">{claimReason}</small>}

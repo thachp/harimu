@@ -18,10 +18,10 @@ export function nationFromSearch(search: string, validNationIds: readonly string
   const requested = new URLSearchParams(search).get('nation');
   return requested && validNationIds.includes(requested) ? requested : fallbackId;
 }
-export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string): string {
+export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false): string {
   const url = new URL(href);
   url.searchParams.set('view', scene);
-  if (scene === 'nation' || scene === 'world' || scene === 'country' || Boolean(cityId)) {
+  if (scene === 'nation' || scene === 'world' || scene === 'country' || Boolean(cityId) || (keepNation && scene === 'government')) {
     if (nationId) url.searchParams.set('nation', nationId);
   } else url.searchParams.delete('nation');
   // A city belongs to one nation; never carry a previous nation's city forward (#55).
@@ -55,4 +55,8 @@ export function normalizeSceneSearch(search: string, nationIds: readonly string[
   if (city !== null && (validNation ? !cityInNation(validNation, city) : !nationIds.some(id => cityInNation(id, city)))) params.delete('city');
   const out = params.toString();
   return out ? `?${out}` : '';
+}
+/** Civic for a nation the player is not a citizen of renders read-only (#91). */
+export function isForeignCivic(view: SceneView, nationParam: string | null, viewedNationId: string, citizenNationId: string | null | undefined): boolean {
+  return view === 'government' && Boolean(nationParam) && viewedNationId === nationParam && viewedNationId !== citizenNationId;
 }
