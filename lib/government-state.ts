@@ -1,3 +1,4 @@
+import { readCrown } from './aurelle-rising';
 import type {GameDatabase} from './database-contract';
 import { simulateGovernment, rebaseGovernmentBudget } from './government';
 export const petitionSchema = `CREATE TABLE IF NOT EXISTS government_petitions (
@@ -124,5 +125,6 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       reason:!r.eligibility_receipt ? 'Legacy prototype petition retained for your records; it has no Tier 1 receipt and is not counted in new reviews.' : r.snapshot_json ? `${r.status === 'accepted' ? 'Accepted as the reviewed policy priority.' : 'Deferred because another priority took precedence.'} ${JSON.parse(r.snapshot_json).decision.reason}`
         : 'Pending until the UTC day ends; the next government visit records the daily review.'}));
   }
+  if (nationId === 'aurelle') { const crown = await readCrown(db); if (crown) snapshot.crown = crown; } // #71
   return snapshot;
 }
