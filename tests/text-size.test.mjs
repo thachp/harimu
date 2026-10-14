@@ -64,10 +64,20 @@ test('HUD, mobile top bar, resources, context strip and dock size to their conte
   assert.match(tail, /\.game-hud\{height:auto;min-height:calc\(62px\*var\(--text-scale,1\)\)\}/);
   const mobile = tail.slice(tail.indexOf('@media(max-width:760px)'));
   for (const sel of ['game-hud', 'game-resources', 'game-context-strip']) assert.match(mobile, new RegExp(`\\.${sel}\\{height:auto;min-height:calc\\(`), sel);
-  assert.match(mobile, /\.harimu-game\{overflow-x:clip\}/, 'no horizontal page scroll on mobile');
   assert.match(mobile, /\.game-dockbuttonspan\{overflow-wrap:anywhere/, 'dock labels wrap instead of overflowing');
   for (const rows of css.match(/grid-template-rows:[^;}]*/g).filter(r => r.includes('260px') || r.includes('620px'))) {
     assert.ok(rows.startsWith('grid-template-rows:autominmax(calc(40px*var(--text-scale,1)),auto)'), rows);
     assert.doesNotMatch(rows, /\)\s*calc\(\d+px/, `${rows}: fixed context row`);
   }
+});
+
+test('mobile HUD wraps instead of clipping, and the context strip grows with its text (QA3 #131 review)', async () => {
+  const css = (await read('game-shell.css')).replace(/\s+/g, '');
+  const tail = css.slice(css.lastIndexOf('/*Textsize(#80'));
+  assert.doesNotMatch(css, /\.harimu-game\{overflow-x:clip\}/, 'overflow must not be hidden with overflow-x:clip');
+  assert.match(tail, /\.game-resources\{[^}]*flex-wrap:wrap/);
+  assert.match(tail, /\.game-resources>\*,\.game-resources>\.game-hud-help\{min-width:0;flex:11calc\(72px\*var\(--text-scale,1\)\)\}/);
+  assert.match(tail, /\.harimu-game:has\(\.citizen-dock\)\.game-context-strip,\.game-mode-world\.game-context-strip\{height:auto;min-height:calc\(120px\*var\(--text-scale,1\)\)/);
+  assert.match(tail, /\.game-context-heading:is\(h2,small,span\)[^{]*\{overflow-wrap:normal;word-break:normal;hyphens:manual\}/);
+  assert.doesNotMatch(css, /word-break:break-all/);
 });

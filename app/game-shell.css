@@ -156,12 +156,20 @@ body:has(.harimu-game){overflow:auto}
 .game-hud{height:auto;min-height:calc(62px * var(--text-scale, 1))}
 .game-identity strong{white-space:nowrap}
 @media(max-width:760px){
- .harimu-game{overflow-x:clip}
- .game-hud{height:auto;min-height:calc(110px * var(--text-scale, 1))}
- .game-resources{height:auto;min-height:calc(32px * var(--text-scale, 1));flex-wrap:wrap;row-gap:4px}
- .game-resources>*{min-width:0;flex:1 1 auto}
- .game-context-strip{height:auto;min-height:calc(120px * var(--text-scale, 1))}
- .game-context-items{flex-wrap:nowrap;min-width:0}
+ .game-hud{height:auto;min-height:calc(110px * var(--text-scale, 1));max-width:100%}
+ /* Resource row really wraps (QA3 #131 review): each item keeps a scaled basis so a row that no longer fits breaks onto a second line instead of colliding or clipping. */
+ .game-resources{height:auto;min-height:calc(32px * var(--text-scale, 1));min-width:0;max-width:100%;flex-wrap:wrap;row-gap:4px}
+ .game-resources>*,.game-resources>.game-hud-help{min-width:0;flex:1 1 calc(72px * var(--text-scale, 1))}
+ .game-resources>.game-hud-help>summary{min-width:0}
+ .game-resources :is(strong,span){min-width:0;overflow-wrap:normal;white-space:nowrap}
+ /* Context strip grows with its content: no fixed height, heading on its own row, words never split mid-word. */
+ .harimu-game .game-context-strip,.harimu-game:has(.citizen-dock) .game-context-strip,.game-mode-world .game-context-strip{height:auto;min-height:calc(120px * var(--text-scale, 1));flex-wrap:wrap}
+ .game-context-strip>.game-context-heading{flex:1 1 100%;border-right:0;border-bottom:1px solid #2c4651;padding:10px 12px}
+ .game-context-heading :is(h2,small,span),.game-context-items :is(strong,span){overflow-wrap:normal;word-break:normal;hyphens:manual}
+ .game-context-items{flex:1 1 100%;flex-wrap:nowrap;min-width:0}
+ .game-nation-strip .game-context-heading,.game-nation-strip .game-context-items{grid-column:1/-1}
+ .game-nation-strip .game-context-items{grid-row:3}
+ .game-identity span:not(.game-crest){white-space:normal;overflow:visible;max-width:none;overflow-wrap:normal}
  .game-dock{flex-wrap:wrap}
  .game-dock button span{overflow-wrap:anywhere;text-align:center;line-height:1.15}
 }
