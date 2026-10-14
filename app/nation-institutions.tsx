@@ -3,15 +3,16 @@
 import { useState } from 'react';
 import { rewards } from '@/lib/economy';
 import './nation-institutions.css';
+import { describeKindlePay } from '@/lib/income-tax';
 
 export type InspectedNation = {
   id: string; name: string; shortName: string; capital: string; government: string; economy: string;
   currency: string; religion: string; population: string; treasury: string; stability: number; motto: string; tradeStatus: string;
 };
 type InstitutionWork = { id: string; name: string; detail: string; cost: number; nationId?: string | null };
-export function NationInstitutions({ nation, citizenNation, capacity, workOrders, workPending,
+export function NationInstitutions({ incomeTaxPercent = 0, nation, citizenNation, capacity, workOrders, workPending,
   onWorldView, onHousehold, onWorkplace, onCommitWork }: {
-  nation: InspectedNation; nations?: InspectedNation[]; citizenNation?: InspectedNation; capacity: number;
+  incomeTaxPercent?: number; nation: InspectedNation; nations?: InspectedNation[]; citizenNation?: InspectedNation; capacity: number;
   workOrders: InstitutionWork[]; workPending: boolean; onSelectNation?: (id: string) => void;
   onWorldView: () => void; onHousehold: () => void; onWorkplace: () => void;
   onCommitWork: (order: InstitutionWork) => void | Promise<void>;
@@ -39,7 +40,7 @@ export function NationInstitutions({ nation, citizenNation, capacity, workOrders
     {jobs.length > 0 && <details className="nation-inspector-jobs"><summary>Paid contributions</summary>
       {!ownNation && <p>Kindle citizens only. Your citizenship remains {citizenNation?.shortName ?? 'unselected'}.</p>}
       {jobs.map(order => <article key={order.id}><h4>{order.name}</h4><p>{order.detail} · {order.cost} WC
-        {rewards[order.id] && ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}`}</p>
+        {rewards[order.id] && ` · ${describeKindlePay(rewards[order.id].wageMinor, incomeTaxPercent)} + ${rewards[order.id].quantity} ${rewards[order.id].item}`}</p>
         {ownNation && <button type="button" disabled={workPending || capacity < order.cost} aria-describedby={workPending || capacity < order.cost ? `institution-work-${order.id}-reason` : undefined} onClick={() => { if (!workPending && capacity >= order.cost) void onCommitWork(order); }}>Start shift · {order.cost} WC</button>}
         {ownNation && (workPending || capacity < order.cost) && <small id={`institution-work-${order.id}-reason`}>{workPending ? 'An action is being saved. Please wait.' : `You need ${order.cost} WC. Prepare a meal or wait for recovery.`}</small>}
       </article>)}
