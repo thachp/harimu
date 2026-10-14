@@ -82,3 +82,20 @@ test('#195 migration 0016 matches the runtime schema, is additive on Postgres, a
   assert.equal(await wallet(r, 'alice'), before);
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM market_goods').first()).n, 3);
 });
+
+test('#195 0016 applies after 0017 is already recorded (out-of-order merge), and the guard passes', async t => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { mkdtempSync, copyFileSync } = await import('node:fs'); const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+  const { bootstrapEmptyPostgres, applyPostgresMigrations, assertPostgresMigrationsApplied } = await import('../scripts/postgres-migrations.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'pg0016-'));
+  for (const f of ['compatibility.sql', 'schema.sql']) copyFileSync(join('db/postgres', f), join(dir, f));
+  for (const m of postgresMigrations().filter(m => m.number !== '0016')) copyFileSync(join('db/postgres', m.file), join(dir, m.file));
+  const pg = new PGlite(); await pg.waitReady; t.after(() => pg.close());
+  const db = { query: (q, p) => pg.query(q, p), exec: q => pg.exec(q) };
+  await bootstrapEmptyPostgres(db, { dir });
+  assert.ok((await pg.query("SELECT 1 FROM schema_migrations WHERE id LIKE '0017%'")).rows.length, '0017 recorded first');
+  await assert.rejects(assertPostgresMigrationsApplied(db), /0016_market_orders\.sql \(not applied\)/);
+  assert.deepEqual((await applyPostgresMigrations(db)).applied, ['0016_market_orders.sql']);
+  await assertPostgresMigrationsApplied(db);
+  assert.equal((await pg.query('SELECT COUNT(*)::int AS n FROM market_goods')).rows[0].n, 3);
+});
