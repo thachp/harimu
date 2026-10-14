@@ -22,7 +22,8 @@ export type WalletSummary = {
 export const walletHistoryLimit = 25;
 
 // Every row that changes citizen_wallet_balances appears here, so the list
-// always reconciles with the server balance. Meals move no money (wallet_delta = 0).
+// always reconciles with the server balance. Every market purchase is listed, including
+// food bought for meals; eating stored food moves no SPK (wallet_delta = 0) and adds no row.
 // Within the same second a wage sorts as older, since spending follows earning.
 export const walletHistorySql = `SELECT id, kind, amount_minor, item, quantity, occurred_at FROM (
   SELECT 'wage:' || s.shift_id AS id, 'wage' AS kind, s.wage_minor AS amount_minor, w.order_name AS item, s.quantity AS quantity,

@@ -31,8 +31,12 @@ test('every wage and market purchase appears in history and reconciles with the 
  assert.equal(sum(e),e.walletMinor,'balance after purchase matches history');
  assert.ok(e.transactions.every(x=>!Number.isNaN(Date.parse(x.occurredAt))));
  r.reopen();const read=(await r.call('citizen','alice')).data.economy;assert.deepEqual(read.transactions,e.transactions);assert.equal(read.walletMinor,650);
- const meal=await r.call('citizen','alice',{action:'household-meal',requestId:randomUUID()});
- if(meal.status===200)assert.equal(meal.data.economy.transactions.length,2,'meals move no money and add no wallet rows');
+ // Food bought for a meal is a market purchase and must be listed; eating stored food moves no SPK and adds no row.
+ await r.db.prepare('UPDATE citizens SET capacity=10 WHERE clerk_user_id=?').bind('alice').run();
+ r.setNow(r.now+60000);const mealFood=await r.call('citizen','alice',{action:'market-trade',requestId:randomUUID(),side:'buy',item:'food',quantity:2});assert.equal(mealFood.status,200,mealFood.data.error);
+ const meal=await r.call('citizen','alice',{action:'household-meal',requestId:randomUUID()});assert.equal(meal.status,200,meal.data.error);
+ const m=meal.data.economy;assert.deepEqual(m.transactions.map(x=>[x.kind,x.amountMinor,x.reason]),[['market-buy',-300,'Market purchase · 2 food'],['market-buy',-150,'Market purchase · 1 food'],['wage',800,m.transactions[2].reason]]);
+ assert.equal(sum(m),m.walletMinor,'balance after buying meal food and eating matches history');
 });
 
 const compile=async file=>ts.transpileModule(await readFile(new URL(file,import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText;
