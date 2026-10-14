@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { additionalNotableProfiles, proposedNationTopics, notableRosterStatus } from '../lib/notable-roster.ts';
 import { notableProfiles, notableProfile, notableTopics } from '../lib/notable-profiles.ts';
 
-test('additional MVP Notables are inactive and do not replace the primary profile', () => {
-  assert.equal(notableRosterStatus, 'inactive');
+test('additional Notables are active (#151) and do not replace the primary profile', () => {
+  assert.equal(notableRosterStatus, 'active');
   assert.deepEqual(Object.keys(additionalNotableProfiles).sort(), ['aurelle','kindle','korund']);
   const ids = new Set(Object.values(notableProfiles).map(profile=>profile.id));
   for (const [nation, profiles] of Object.entries(additionalNotableProfiles)) {

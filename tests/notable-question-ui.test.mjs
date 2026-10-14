@@ -8,7 +8,7 @@ import ts from 'typescript';
 import {notableProfile} from '../lib/notable-profiles.ts';
 const require=createRequire(import.meta.url),exports={};
 const source=ts.transpileModule(await readFile(new URL('../app/notable-control.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-new Function('exports','require',source)(exports,name=>name==='react'?{...React,useState:value=>[value,()=>{}]}:name==='../lib/notable-profiles'?require('../lib/notable-profiles.ts'):name==='./action-button'?{ActionButton:'button'}:require(name));
+new Function('exports','require',source)(exports,name=>name==='react'?{...React,useState:value=>[value,()=>{}]}:name==='../lib/notable-profiles'?require('../lib/notable-profiles.ts'):name==='../lib/notable-roster'?require('../lib/notable-roster.ts'):name==='./action-button'?{ActionButton:'button'}:require(name));
 const view={profile:notableProfile('kindle'),enabled:true,reason:'Isolated fixture',dailyLimit:20,source:'authored'};
 const all=node=>[node,...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child=>typeof child==='object'?all(child):[child])];
 test('explicit textarea has accessible label, length and transmission disclosure; native Enter remains a newline',()=>{
