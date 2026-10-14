@@ -2184,8 +2184,21 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
   .national-agenda::before { top: 0; }
 }
 
+/* Reduced motion (#83): the OS setting, or Settings > Motion = Reduce, stops toast, panel and dialog
+   transitions and animations everywhere, including Clerk portals and native dialogs outside the game shell. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  html:not([data-harimu-motion="reduce"]) *, html:not([data-harimu-motion="reduce"]) *::before, html:not([data-harimu-motion="reduce"]) *::after,
+  html:not([data-harimu-motion="reduce"]) ::backdrop {
+    scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay: 0s !important;
+    animation-duration: .01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important;
+  }
+}
+
+/* Focus-visible baseline (#83): every keyboard-reachable control in the top bar, dock, panels and dialogs
+   shows a ring, including inputs and summaries outside the inspector. Component rules may restyle it. */
+:is(button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"]), [role="button"]):focus-visible {
+  outline: 2px solid #80d8ce;
+  outline-offset: 2px;
 }
 
 .work-shift-status { margin: 16px 0; padding: 16px; border: 1px solid #526560; background: #11272b; color: #f3ecd8; }
