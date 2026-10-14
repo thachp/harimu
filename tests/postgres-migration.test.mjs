@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {DatabaseSync} from 'node:sqlite';
 import {localRuntime} from './helpers/local-runtime.mjs';
-import {snapshotManifest,orderedSchema,replayJournalSqlite,importSnapshot} from '../scripts/postgres-migration.mjs';
+import {snapshotSqlite,snapshotManifest,orderedSchema,replayJournalSqlite,importSnapshot} from '../scripts/postgres-migration.mjs';
 import {postgresSql} from '../lib/postgres/sql.ts';
 import {assertPostgresApplicationRole,selectStorageBackend} from '../lib/storage-selection.ts';
 const identifier=name=>`"${name}"`;
@@ -57,4 +57,10 @@ test('unverified backup manifests and nonempty targets are refused before a migr
  const options={backupSha256:'a'.repeat(64),expectedManifest:snapshotManifest(snapshot),compatibilitySql:'CREATE SCHEMA IF NOT EXISTS harimu_compat;'};
  await assert.rejects(importSnapshot(connection,snapshot,{...options,expectedManifest:{}}),/independently verified/);assert.equal(queries,0);
  await assert.rejects(importSnapshot(connection,snapshot,options),/Target must be empty/);assert.equal(queries,1);
+});
+
+test('Cloudflare service metadata remains outside the PostgreSQL game snapshot',()=>{
+ const source=new DatabaseSync(':memory:');try{source.exec("CREATE TABLE _cf_KV(key TEXT PRIMARY KEY,value BLOB); CREATE INDEX cf_metadata_key ON _cf_KV(key); CREATE TABLE game_fixture(id TEXT PRIMARY KEY)");
+ const snapshot=snapshotSqlite(source);assert.ok(snapshot.schema.every(entry=>entry.tbl_name!=='_cf_KV'));assert.equal(snapshot.data._cf_KV,undefined);assert.deepEqual(Object.keys(snapshot.data),['game_fixture']);
+ }finally{source.close();}
 });

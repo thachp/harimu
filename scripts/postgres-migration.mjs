@@ -7,7 +7,8 @@ import {postgresSql,sqlTokens} from '../lib/postgres/sql.ts';
 const identifier=name=>{if(!/^[a-z_][a-z_0-9]*$/i.test(name))throw Error('Unsafe schema identifier.');return `"${name}"`;};
 const stable=value=>JSON.stringify(value,(_key,item)=>typeof item==='bigint'?String(item):item instanceof Uint8Array?{binary:Buffer.from(item).toString('base64')}:item);
 export function snapshotSqlite(db){
- const schema=db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all();
+ // Cloudflare's service-owned KV metadata stays in D1 and is never read/exported.
+ const schema=db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND tbl_name!='_cf_KV' ORDER BY type,name").all();
  if(schema.some(entry=>!['table','view','index'].includes(entry.type)))throw Error('Unreviewed source schema object.');
  const tables=schema.filter(entry=>entry.type==='table');const data={};
  for(const table of tables){data[table.name]=db.prepare(`SELECT * FROM ${identifier(table.name)}`).all().map(row=>({...row}));}
