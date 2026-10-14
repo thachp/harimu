@@ -55,21 +55,35 @@ const probes:Probe[]=[
 ];
 export const derivableGoal=(goal:WeekGoal)=>probes.some(p=>p.match(goal));
 
-/** Completed goal ids for the citizen: stored rows plus newly derived ledger goals (latched). */
-export async function readFirstWeekProgress(db:GameDatabase,userId:string,nationId:string|null,enrolledAt:string,now:number):Promise<{completed:string[]}>{
- const stored=new Set((await db.prepare('SELECT goal_id FROM citizen_first_week_goals WHERE clerk_user_id=?').bind(userId).all<{goal_id:string}>()).results.map(r=>r.goal_id));
- const today=nationId?arcDay(enrolledAt,now):null;const enrolled=Math.floor(Date.parse(enrolledAt)/1000);
- if(nationId&&today!==null){
-  for(const {goal,day} of arcGoals(nationId)){
-   if(stored.has(goal.id)||day>today)continue;
-   const probe=probes.find(p=>p.match(goal));if(!probe)continue;
-   const start=enrolled+(day-1)*daySec,end=start+daySec;
-   const row=await db.prepare(probe.sql).bind(...probe.bind(userId,start,end)).first<{n:number}>();
-   if(Number(row?.n??0)>0){
-    await db.prepare(`INSERT INTO citizen_first_week_goals(clerk_user_id,goal_id,completed_at,source) VALUES (?,?,?,'ledger') ON CONFLICT(clerk_user_id,goal_id) DO NOTHING`).bind(userId,goal.id,now).run();
-    stored.add(goal.id);
-   }
+/** Completed goal ids for the citizen. Read-only (#194): GET never derives or writes; write paths latch. */
+export async function readFirstWeekProgress(db:GameDatabase,userId:string):Promise<{completed:string[]}>{
+ const rows=(await db.prepare('SELECT goal_id FROM citizen_first_week_goals WHERE clerk_user_id=?').bind(userId).all<{goal_id:string}>()).results??[];
+ return {completed:rows.map(r=>r.goal_id).sort()};
+}
+
+/** Derive event-backed goals from the ledgers and latch them (source='ledger'). Called after successful
+ *  writes that can create evidence (shift claim, sell/meal, trade, Korund queue/coupons, square post, ballot). */
+export async function latchFirstWeekGoals(db:GameDatabase,userId:string,now:number):Promise<string[]>{
+ const citizen=await db.prepare('SELECT nation_id,created_at FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null;created_at:string}>();
+ if(!citizen?.nation_id)return [];
+ const today=arcDay(citizen.created_at,now);if(today===null)return [];
+ const stored=new Set((await readFirstWeekProgress(db,userId)).completed);const enrolled=Math.floor(Date.parse(citizen.created_at)/1000);const latched:string[]=[];
+ for(const {goal,day} of arcGoals(citizen.nation_id)){
+  if(stored.has(goal.id)||day>today)continue;
+  const probe=probes.find(p=>p.match(goal));if(!probe)continue;
+  const start=enrolled+(day-1)*daySec,end=start+daySec;
+  const row=await db.prepare(probe.sql).bind(...probe.bind(userId,start,end)).first<{n:number}>();
+  if(Number(row?.n??0)>0){
+   await db.prepare(`INSERT INTO citizen_first_week_goals(clerk_user_id,goal_id,completed_at,source) VALUES (?,?,?,'ledger') ON CONFLICT(clerk_user_id,goal_id) DO NOTHING`).bind(userId,goal.id,now).run();
+   stored.add(goal.id);latched.push(goal.id);
   }
  }
- return {completed:[...stored].sort()};
+ return latched;
+}
+
+/** Best-effort latch after a successful write; never fails the write's response. */
+export async function latchAfterWrite(db:GameDatabase,response:Response,userIds:readonly (string|null|undefined)[],now:number):Promise<Response>{
+ if(!response.ok)return response;
+ for(const id of new Set(userIds.filter((u):u is string=>Boolean(u)))){try{await latchFirstWeekGoals(db,id,now);}catch{/* guidance only */}}
+ return response;
 }

@@ -18,6 +18,7 @@ import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
+import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { FirstWeekTracker } from './first-week-tracker';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, type WeekDay } from '@/lib/first-week';
@@ -37,6 +38,8 @@ import { starterCopyFor } from '@/lib/starter-copy';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { WalletPanel } from './wallet-panel';
+import { ShiftQualityStep } from './shift-quality-step';
+import { qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
@@ -61,7 +64,7 @@ import {
 } from '@clerk/nextjs';
 import { MORNING_BRIEF_TRIGGER_ID, MorningBrief } from './morning-brief';
 import { Newspaper } from '@phosphor-icons/react';
-import { briefDayKey, claimDailyBrief, morningBriefSections } from '@/lib/morning-brief';
+import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHeadline } from '@/lib/morning-brief';
 import { CityCoResidents } from './city-coresidents';
 import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
@@ -87,6 +90,8 @@ type Nation = {
   motto: string;
   tradeStatus: string;
   position: { x: number; y: number };
+  /** #81: band only (server never sends counts). Absent in the static fallback. */
+  populationBand?: PopulationBand;
 };
 
 type WorkOrder = {
@@ -537,6 +542,7 @@ export default function Home() {
   const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [qualityOrder, setQualityOrder] = useState<WorkOrder | null>(null);
   const [aurellePlan, setAurellePlan] = useState<AurellePlanView | null>(null);
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
   const aurelleIntent = useRef<AurelleCommand | null>(null);
@@ -787,7 +793,7 @@ export default function Home() {
     return () => controller.abort();
   }, [citizenSessionStatus]);
 
-  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string) {
+  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string, quality?: QualityInput) {
     if (enrollmentLock.current) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
@@ -802,7 +808,7 @@ export default function Home() {
       if (clerkConfigured) {
         const init: RequestInit = {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
-          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
+          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId, quality }),
         };
         // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
         // Starting a shift has no request id, so it is never retried automatically.
@@ -836,9 +842,12 @@ export default function Home() {
           const rule = shiftRules[order.id];
           if (!rule) throw new Error('Work order unavailable.');
           const startedAt = new Date().toISOString();
-          setWorkShifts((current) => [{ id: crypto.randomUUID(), orderName: order.name,
+          // Local demo has no server and no answer key, so it never grades: every demo shift pays the base reward.
+          void quality;
+          const demoReward = rewards[order.id];
+          setWorkShifts((current) => [{ id: crypto.randomUUID(), workOrderId: order.id, orderName: order.name,
             output: rule.output, capacitySpent: order.cost, startedAt,
-            wageMinor: rewards[order.id]?.wageMinor, rewardItem: rewards[order.id]?.item, rewardQuantity: rewards[order.id]?.quantity,
+            wageMinor: demoReward?.wageMinor, rewardItem: demoReward?.item, rewardQuantity: demoReward?.quantity,
             completesAt: new Date(Date.now() + rule.hours * 3600000).toISOString(), claimedAt: null }, ...current]);
           setCapacity((current) => current - order.cost);
         } else {
@@ -1005,7 +1014,8 @@ export default function Home() {
       if (epoch !== citizenEpoch.current) return; workLock.current=false; setGovernmentPending(false); }
   }
 
-  function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
+  // #40: the quality job opens the quality step first; WC is only spent when the player starts from it.
+  function commitWork(order: WorkOrder) { if (order.id === qualityWorkOrderId && rewards[order.id]) { setQualityOrder(order); return Promise.resolve(); } return runWork('commit-work', order); }
 
   async function runKorundCommand(command: KorundCommand) {
     const confirmingKorundIntent=korundIntent.current?.requestId===command.requestId;
@@ -1588,7 +1598,8 @@ export default function Home() {
     <p className="eyebrow">Exploring · {selected.shortName}</p>
     {guestEntry}
     <NationComparison nations={worldNations} />
-    <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
+    <dl>{selected.populationBand && <><dt>Population</dt><dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd></>}<dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
+    {selected.populationBand === 'needs-citizens' && <details className="pioneer-note"><summary>Pioneer nation · bonuses planned</summary><p>{pioneerNote}</p></details>}
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>
     <details><summary>Rules and limits</summary><p>Each nation keeps its own rules. Computer-controlled leaders (AI/SI) follow fixed game rules: the same situation produces the same decision. No live AI model is connected. Petitions require a verified phone number to count, but phone verification has not been set up yet, so petition submission is unavailable. Territory ownership and foreign trade are not built yet.</p></details>
@@ -1675,7 +1686,7 @@ export default function Home() {
       ] : viewMode === 'government' ? (government?.roles ?? []).map(role => ({
         id: role.name, label: role.name, detail: role.controller,
       })) : viewMode === 'world' || viewMode === 'nation' ? worldNations.map(nation => ({
-        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
+        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, badge: nation.populationBand && populationBandLabel[nation.populationBand], detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
       })) : viewMode === 'square' ? [
         { id: 'household', label: 'Household', detail: 'Belongings and recovery', onSelect: () => changeView('household') },
         { id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings', onSelect: () => changeView('workplace') },
@@ -1684,9 +1695,21 @@ export default function Home() {
       ] : [];
   const briefInventory = citizenNation?.id === 'aurelle' ? aurellePlan?.foodQuantity : citizenNation?.id === 'korund' ? korundPlan?.foodQuantity : economy ? goods('food') : undefined;
   const briefStorageKey = citizenNation ? `harimu:morning-brief:${citizenNation.id}` : null;
+  // #73: headlines come from the same /api/news edition as the News panel, fetched only while the brief is open.
+  const [briefHeadlines, setBriefHeadlines] = useState<{ nationId: string; items: MorningBriefHeadline[] } | null>(null);
+  useEffect(() => {
+    if (!morningBriefOpen || !citizenNationId || guestActive || !clerkConfigured || citizenSessionStatus !== 'ready') return;
+    const controller = new AbortController();
+    void fetch('/api/news', { cache: 'no-store', signal: controller.signal }).then(async response => {
+      const data = await response.json() as { nationId?: string; items?: MorningBriefHeadline[] };
+      if (response.ok && data.nationId === citizenNationId && Array.isArray(data.items)) setBriefHeadlines({ nationId: data.nationId, items: data.items.slice(0, 3).map(item => ({ id: item.id, title: item.title, source: item.source, kind: item.kind })) });
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [morningBriefOpen, citizenNationId, guestActive, citizenSessionStatus]); // clerkConfigured is a module-level constant (build-time env), so it is not a dependency.
   const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow,
     shift: activeShift ? { title: activeShift.orderName, endsAt: Date.parse(activeShift.completesAt) / 1000 } : null,
-    leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null }) : [];
+    leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null,
+    headlines: briefHeadlines?.nationId === citizenNationId ? briefHeadlines.items : [] }) : [];
   const closeMorningBrief = () => { setMorningBriefOpen(false); if (briefStorageKey) try { window.localStorage.setItem(briefStorageKey, briefDayKey(Date.now())); } catch {} };
   const contextTitle = citizenNation?.id === 'korund' && viewMode === 'market' ? 'State rations' : citizenNation?.id === 'korund' && viewMode === 'workplace' ? 'Assigned work' : viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
@@ -1704,6 +1727,8 @@ export default function Home() {
       accountControls={<>{citizenNation && !guestActive && <button id={MORNING_BRIEF_TRIGGER_ID} type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief" aria-haspopup="dialog" aria-expanded={morningBriefOpen} aria-controls={morningBriefOpen ? 'morning-brief' : undefined}><Newspaper size={17} aria-hidden="true" /><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
       {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
+      {qualityOrder && rewards[qualityOrder.id] && <ShiftQualityStep orderId={qualityOrder.id} orderName={qualityOrder.name} cost={qualityOrder.cost} base={rewards[qualityOrder.id]}
+        onCancel={() => setQualityOrder(null)} onStart={(quality) => { const order = qualityOrder; setQualityOrder(null); void runWork('commit-work', order, undefined, quality); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}

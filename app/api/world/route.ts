@@ -1,6 +1,8 @@
 import { shiftRules } from '@/lib/work-shifts';
 import { advanceWorld } from '@/lib/world-simulation';
 import { getDatabase } from '@/lib/db';
+import { populationBands } from '@/lib/population-bands';
+import { nationIsPreview } from '@/lib/nation-discovery';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,7 +60,7 @@ type WorldEventRow = {
 export async function GET() {
   const database = await getDatabase();
   const simulation = await advanceWorld(database);
-  const [nationResult, workOrderResult, planningTaskResult, eventResult] = await Promise.all([
+  const [nationResult, workOrderResult, planningTaskResult, eventResult, enrollmentResult] = await Promise.all([
     database.prepare('SELECT * FROM nations ORDER BY sort_order').all<NationRow>(),
     database.prepare("SELECT id, nation_id, name, detail, capacity_cost FROM work_orders WHERE status = 'open' ORDER BY sort_order").all<WorkOrderRow>(),
     database.prepare(`SELECT
@@ -77,7 +79,10 @@ export async function GET() {
     INNER JOIN planning_task_effects ON planning_task_effects.task_id = planning_tasks.id
     ORDER BY planning_tasks.sort_order`).all<PlanningTaskRow>(),
     database.prepare('SELECT id, kind, headline, detail, location, occurred_at FROM world_events ORDER BY sort_order').all<WorldEventRow>(),
+    // Population bands (#81): only the band leaves the server, never the counts.
+    database.prepare('SELECT nation_id, COUNT(*) AS citizens FROM citizens WHERE nation_id IS NOT NULL GROUP BY nation_id').all<{ nation_id: string; citizens: number }>(),
   ]);
+  const bands = populationBands(nationResult.results.map(nation => nation.id), Object.fromEntries(enrollmentResult.results.map(row => [row.nation_id, Number(row.citizens)])), undefined, id => !nationIsPreview(id));
 
   return Response.json(
     {
@@ -99,6 +104,7 @@ export async function GET() {
         motto: nation.motto,
         tradeStatus: nation.trade_status,
         position: { x: nation.position_x, y: nation.position_y },
+        populationBand: bands[nation.id],
       })),
       workOrders: workOrderResult.results.map((order) => ({
         id: order.id,
