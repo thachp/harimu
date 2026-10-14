@@ -1,5 +1,5 @@
 import type {GameDatabase} from './database-contract';
-import {aiNotableQuestionOperation} from './ai-budget';
+import {aiNotableQuestionOperation,aiNewsSequenceOperation,aiNewsSequenceReservation,reserveAiSequence} from './ai-budget';
 // Actual 2026-10-14 provider attempts: conservative full reservations, never
 // reported-token estimates. Synthetic gameplay records remain in local fixtures.
 export const aiAcceptanceCharges=[
@@ -25,4 +25,16 @@ export async function reconcileAiAcceptanceCharges(db:GameDatabase){
   rows=(await db.prepare(query).bind(...ids).all<Row>()).results;
  }
  for(const c of aiAcceptanceCharges){const row=rows.find(r=>r.request_id===c.id);if(!row||row.utc_day!==day||row.next_utc_day!==next||row.model!==c.model||row.reserved_micro!==c.cost||row.status!==c.status)throw Error('AI acceptance accounting mismatch; inference must remain unavailable.');}
+}
+
+export const newsAcceptanceId='acceptance:2026-10-14:news-final';
+export const newsAcceptanceOutcome:'pending'|'finished'|'uncertain'='pending';
+/** This single new attempt uses the normal atomic shared-budget predicate. */
+export async function prebookNewsAcceptance(db:GameDatabase,now:number,priceReviewedUntil:number){
+ const read=()=>db.prepare('SELECT utc_day,next_utc_day,model,reserved_micro,status FROM harimu_ai_reservations WHERE request_id=?').bind(newsAcceptanceId).first<{utc_day:string;next_utc_day:string;model:string;reserved_micro:number;status:string}>();
+ let row=await read();
+ if(!row){if(new Date(now*1000).toISOString().slice(0,10)!==day)return false;if(!await reserveAiSequence(db,newsAcceptanceId,now,priceReviewedUntil)){row=await read();if(!row)return false;}else row=await read();}
+ if(!row||row.utc_day!==day||row.next_utc_day!==next||row.model!==aiNewsSequenceOperation||row.reserved_micro!==aiNewsSequenceReservation||!['pending','finished','uncertain'].includes(row.status))throw Error('News acceptance reservation mismatch.');
+ if(newsAcceptanceOutcome!=='pending'&&row.status==='pending')await db.prepare("UPDATE harimu_ai_reservations SET status=? WHERE request_id=? AND status='pending'").bind(newsAcceptanceOutcome,newsAcceptanceId).run();
+ return true;
 }

@@ -1,4 +1,4 @@
-import {reconcileAiAcceptanceCharges} from './ai-acceptance-charges';
+import {reconcileAiAcceptanceCharges,prebookNewsAcceptance} from './ai-acceptance-charges';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
 import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
@@ -335,7 +335,7 @@ async function initialize(database: GameDatabase) {
 }
 
 export async function getDatabase():Promise<GameDatabase> {
-  const bindings=env as unknown as {HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
+  const bindings=env as unknown as {HARIMU_AI_PRICE_REVIEWED_UNTIL?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
   const journalRetentionApproved=bindings.HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED==='true';
   const selected=selectStorageBackend({backend:bindings.HARIMU_STORAGE_BACKEND,implementationEnabled:postgresRuntimeEnabled,developmentPreview:bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,maintenance:bindings.HARIMU_STORAGE_MAINTENANCE,cutoverReady:bindings.HARIMU_POSTGRES_CUTOVER_READY,hyperdriveConfigured:Boolean(bindings.HYPERDRIVE),journalRetentionApproved});
   if(selected==='postgres'){
@@ -348,7 +348,7 @@ export async function getDatabase():Promise<GameDatabase> {
     // rewrite an imported world using the old SQLite compatibility migrations.
     const marker=await database.prepare("SELECT validated,backup_sha256 FROM harimu_storage_migrations WHERE id='d1-to-postgres-v1'").first<{validated:number;backup_sha256:string}>();
     if(marker?.validated!==1||!/^[a-f0-9]{64}$/.test(marker.backup_sha256))throw Error('PostgreSQL import has not been validated.');
-    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true')await reconcileAiAcceptanceCharges(database);
+    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true'){await reconcileAiAcceptanceCharges(database);await prebookNewsAcceptance(database,Math.floor(Date.now()/1000),Math.floor(Date.parse(bindings.HARIMU_AI_PRICE_REVIEWED_UNTIL??'')/1000));}
     return database;
   }
   const database = databaseBinding();
