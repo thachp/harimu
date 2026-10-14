@@ -75,7 +75,8 @@ export async function readShifts(database: GameDatabase, userId: string): Promis
   })).map((shift) => {
     // #40 / QA1: a graded result is revealed only once the shift is complete (the reward also encodes the multiplier).
     if (!shift.qualityGrade || shift.claimedAt || Date.parse(shift.completesAt) <= Date.now()) return shift;
-    const { qualityGrade: _g, qualityMultiplierPct: _m, wageMinor: _w, rewardQuantity: _q, ...hidden } = shift;
-    return { ...hidden, qualityPending: true };
+    const hidden: WorkShift = { ...shift, qualityPending: true };
+    delete hidden.qualityGrade; delete hidden.qualityMultiplierPct; delete hidden.wageMinor; delete hidden.rewardQuantity;
+    return hidden;
   });
 }

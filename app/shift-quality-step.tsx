@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { harvestQuestions, type QualityInput } from '@/lib/shift-quality';
 
 /**
@@ -12,9 +12,9 @@ export function ShiftQualityStep({ orderName, cost, base, onStart, onCancel }: {
 }) {
   const [answers, setAnswers] = useState<(number | null)[]>(() => harvestQuestions.map(() => null));
   const [sent, setSent] = useState(false);
-  const [lock] = useState(() => ({ sent: false })); // synchronous guard: a double click before re-render still submits once
+  const lock = useRef(false); // synchronous guard: a double click before re-render still submits once
   const complete = answers.every((a) => a !== null);
-  const start = (quality: QualityInput) => { if (lock.sent) return; lock.sent = true; setSent(true); onStart(quality); };
+  const start = (quality: QualityInput) => { if (lock.current) return; lock.current = true; setSent(true); onStart(quality); };
   return <div className="wallet-panel-backdrop">
     <section className="wallet-panel shift-quality" role="dialog" aria-modal="true" aria-labelledby="shift-quality-title"
       onKeyDown={(event) => { if (event.key === 'Escape' && !sent) onCancel(); }}>

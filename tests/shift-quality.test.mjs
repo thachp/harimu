@@ -75,7 +75,7 @@ test('UI: no grade preview, answers are final, a double click or retry cannot re
   const nodes = n => !n || typeof n !== 'object' ? [n] : [n, ...[n.props?.children].flat(Infinity).flatMap(nodes)];
   const text = t => t.filter(n => typeof n === 'string' || typeof n === 'number').join(' ');
   let state = []; let cursor = 0;
-  const react = { useState: init => { const i = cursor++; if (!(i in state)) state[i] = typeof init === 'function' ? init() : init; return [state[i], v => { state[i] = typeof v === 'function' ? v(state[i]) : v; }]; } };
+  const react = { useState: init => { const i = cursor++; if (!(i in state)) state[i] = typeof init === 'function' ? init() : init; return [state[i], v => { state[i] = typeof v === 'function' ? v(state[i]) : v; }]; }, useRef: init => { const i = cursor++; if (!(i in state)) state[i] = { current: init }; return state[i]; } };
   const exports = {}; new Function('exports', 'require', await compile('../app/shift-quality-step.tsx'))(exports, n => n === 'react' ? react : n === '@/lib/shift-quality' ? require('../lib/shift-quality.ts') : require(n));
   const started = [];
   const render = () => { cursor = 0; return nodes(exports.ShiftQualityStep({ orderId: 'harvest', orderName: 'Savanna harvest', cost: 4, base: { wageMinor: 800, quantity: 4, item: 'food' }, onStart: q => { started.push(q); }, onCancel() {} })); };
