@@ -68,3 +68,17 @@ test('GET /api/petitions writes nothing, including a petition filed on a past da
   r.setNow(r.now + 8 * 86400 * 1000); eligible(r, 'bob');
   assert.equal((await readOnly(r, 'petitions', 'bob')).petitions.find(p => p.id === pastDay.id).status, 'awaiting-response');
 });
+
+test('GET /api/citizen past the close shows the closed result without closing or counting (#221 on #217)', async t => {
+  const r = await localRuntime({ ballotPrivacyReady: true }); t.after(() => r.close());
+  eligible(r, 'alice');
+  const { candidateIds, electionId } = await r.importModule('lib/elections.ts');
+  const voted = await r.call('election', 'alice', { action: 'vote', electionId, requestId: randomUUID(), ranking: [...candidateIds] });
+  assert.equal(voted.status, 200, JSON.stringify(voted.data));
+  r.setNow(voted.data.closesAt * 1000 + 1000); eligible(r, 'alice');
+  const citizen = await readOnly(r, 'citizen', 'alice');
+  assert.equal(citizen.election.status, 'closed'); assert.equal(citizen.election.result.humanBallots, 1);
+  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM civic_elections WHERE closed_at IS NOT NULL OR result_json IS NOT NULL').first()).n), 0);
+  await (await r.importModule('lib/world-simulation.ts')).advanceWorld(r.db, Math.floor(r.now / 1000));
+  assert.deepEqual((await readOnly(r, 'citizen', 'alice')).election.result, citizen.election.result);
+});

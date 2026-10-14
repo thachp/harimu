@@ -70,6 +70,17 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       .bind(maximumCatchupTicks+scoreRepairTicks).all<{tick:number;scheduled_at:number}>();
     for (const row of missing.results) await db.batch(await stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now));
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
+  return readWorldSimulation(db, now);
+
+}
+
+/** #205: the same snapshot advanceWorld returns, computed without any write. Due-but-unprocessed ticks show as
+ *  pendingTicks; the next write path (or GET /api/world) processes them. */
+export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000)): Promise<SimulationState> {
+  if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
+  const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
+  const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
+  const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
   const [latest,execution,supply,stability] = await Promise.all([
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')

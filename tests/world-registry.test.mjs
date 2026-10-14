@@ -78,3 +78,33 @@ test('pure site check and shipped default', async t => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   assert.deepEqual([...cfg.matchAll(/"HARIMU_SQUARE_PURCHASE_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
 });
+
+test('#205 (QA1 on #208): a rejected first purchase pays out no starter grant', async t => {
+  const r = await runtime(t);
+  const grants = async () => Number((await r.db.prepare("SELECT COUNT(*) AS n FROM citizen_tessera_ledger WHERE reason='starter-grant'").first()).n);
+  for (const [x, y] of [[0, 0], [5, 5], [12, 6]]) assert.notEqual((await buy(r, 'alice', x, y)).status, 200);
+  assert.equal(await grants(), 0, 'no grant row after rejections');
+  assert.equal(await tessera(r, 'alice'), 5000, 'the pending grant is still shown as spendable');
+  assert.equal((await r.call('citizen', 'alice')).data.economy.tesseraMinor, 0, 'the ledger holds nothing yet');
+  assert.equal((await buy(r, 'alice', 9, 8)).status, 200);
+  assert.equal(await grants(), 1); assert.equal(await tessera(r, 'alice'), 2500);
+});
+
+test('#205 (QA1 on #208): two concurrent purchases that together overdraw the balance: exactly one succeeds', async t => {
+  const r = await runtime(t);
+  assert.equal((await buy(r, 'alice', 9, 8)).status, 200); // 25.00 TSR left: room for one more square
+  const results = await Promise.all([buy(r, 'alice', 10, 9), buy(r, 'alice', 8, 9)]);
+  assert.deepEqual(results.map(x => x.status).sort(), [200, 409], JSON.stringify(results.map(x => x.data)));
+  assert.match(results.find(x => x.status === 409).data.reason, /insufficient_tessera|square_taken/);
+  assert.equal(await tessera(r, 'alice'), 0, 'never negative');
+  assert.equal(Number((await r.db.prepare("SELECT COUNT(*) AS n FROM world_square_purchases WHERE clerk_user_id='alice'").first()).n), 2);
+});
+
+test('#205 (QA1 on #208): only a missing Tessera ledger reads as 0; other errors surface', async t => {
+  const r = await runtime(t);
+  const economy = await r.importModule('lib/economy.ts');
+  const failing = message => ({ prepare: () => ({ bind: () => ({ first: async () => { throw new Error(message); } }) }) });
+  assert.equal(await economy.readTesseraBalance(failing('no such table: citizen_tessera_ledger'), 'alice'), 0);
+  assert.equal(await economy.readTesseraBalance(failing('relation "citizen_tessera_ledger" does not exist'), 'alice'), 0);
+  await assert.rejects(economy.readTesseraBalance(failing('database is locked'), 'alice'), /database is locked/);
+});

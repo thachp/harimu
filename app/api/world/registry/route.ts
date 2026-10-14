@@ -12,7 +12,7 @@ const enabled = () => (env as unknown as { HARIMU_SQUARE_PURCHASE_ENABLED?: stri
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  return privateJson({ open: enabled(), priceMinor: squarePriceMinor, currency: 'TSR', tesseraMinor: await readTessera(await getDatabase(), userId) });
+  return privateJson({ open: enabled(), priceMinor: squarePriceMinor, currency: 'TSR', tesseraMinor: await readTessera(await getDatabase(), userId, enabled()) });
 }
 
 export async function POST(request: Request) {
