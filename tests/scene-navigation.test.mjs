@@ -67,3 +67,24 @@ assert.equal(new URL(cityVisit).searchParams.get('nation'),'korund','Sample city
   assert.equal(isGamePopstate('/', '/'), true);
   assert.equal(isGamePopstate('/', '/sign-in'), false);
 }
+
+// #90: stale or invalid deep-link params are dropped instead of crashing.
+{
+  const { normalizeSceneSearch } = await import('../lib/scene-navigation.ts');
+  const { cityForNation } = await import('../lib/cities.ts');
+  const nations = ['kindle', 'confluence', 'korund'];
+  const inNation = (n, c) => Boolean(cityForNation(n, c));
+  // City that does not belong to the nation (the pre-#59 bookmark).
+  assert.equal(normalizeSceneSearch('?view=government&nation=confluence&city=forgehaven', nations, inNation), '?view=government&nation=confluence');
+  // Unknown nation drops nation, and a city that then belongs to no nation is dropped too.
+  assert.equal(normalizeSceneSearch('?view=country&nation=atlantis&city=nowhere', nations, inNation), '?view=country');
+  // Unknown nation keeps a real city; it is resolved against the citizen's nation later.
+  assert.equal(normalizeSceneSearch('?nation=atlantis&city=forgehaven', nations, inNation), '?city=forgehaven');
+  // Unknown view falls back to the default scene.
+  assert.equal(normalizeSceneSearch('?view=bogus&preview=1', nations, inNation), '?preview=1');
+  assert.equal(sceneFromSearch(normalizeSceneSearch('?view=bogus', nations, inNation)), 'square');
+  // Valid links and legacy aliases are untouched.
+  assert.equal(normalizeSceneSearch('?view=square&nation=kindle&city=forgehaven', nations, inNation), '?view=square&nation=kindle&city=forgehaven');
+  assert.equal(normalizeSceneSearch('?view=planning', nations, inNation), '?view=planning');
+  assert.equal(normalizeSceneSearch('', nations, inNation), '');
+}

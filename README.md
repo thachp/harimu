@@ -26,6 +26,10 @@ From this directory:
 
 Commit/push source through Git and use the guarded Cloudflare deploy command. Do not upload `.env*`, local database state, or authentication tokens. Development must not deploy to Sites, apex/www, or docs.
 
+## Wrangler version (required)
+
+Preview deploys require **wrangler 4.92.0**, pinned exactly in `package.json` devDependencies and in `package-lock.json`. Newer releases (4.151 and later) reject the `legacy_env` key in the vinext-built `dist/server/wrangler.json`. The deploy script therefore removes `legacy_env: true`, which was the old default; wrangler states that removing it does not change the deployment. Both 4.92.0 and 4.151.0 then pass `wrangler deploy --dry-run`. `npm run deploy:cloudflare` refuses to run unless the project-local wrangler matches the pin. Run `npm ci` and never deploy with a global or `npx` wrangler. Before bumping the pin, check `npm run deploy -- --dry-run` (bundles with `wrangler deploy --dry-run`, without remote D1 access or upload) on the new version.
+
 ## Timed citizen work milestone
 
 The Kindle work board starts harvest (2h), freight (4h), or archive (3h) shifts.
