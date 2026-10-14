@@ -18,6 +18,8 @@ export type LeaderPanelStatus={label:string;line:string;proposal:true};
 export type CoupStageCopy={stage:CoupStage;gazette:readonly GazetteItem[];leaderPanel:LeaderPanelStatus;proposal:true};
 
 export const COUP_GAZETTE_BYLINE={name:'Court Gazette',proposal:false} as const;
+/** Worst-case length of any runtime name filled into a placeholder (ARC #288). #281 enforces this cap on leader and house names. */
+export const COUP_NAME_MAX=24;
 export const COUP_LABEL_MAX=40;
 export const COUP_BODY_MAX=140;
 export const COUP_STAGES:readonly CoupStage[]=['plot-rumours','crisis-window-open','coup-succeeded','coup-failed'];
@@ -46,9 +48,9 @@ export const palaceCoupCopy:readonly CoupStageCopy[]=[
  st('coup-succeeded',[
   g('success-proclaimed','A new house takes the Sky Throne',
    'Be it known: {newLeader} of {house} takes the Sky Throne. The Crown endures.',true),
-  g('success-realm','The court bows to {house}',
+  g('success-realm','Court bows to {house}',
    'The palace coup succeeded. {house} is the new royal house, and the monarchy stands as before.',false),
-  g('success-decree','{newLeader} issues a first decree',
+  g('success-decree','First decree of {newLeader}',
    'Be it known: {newLeader} of {house} now rules by royal decree. Every thread keeps its place.',true),
  ],panel('New royal house','{newLeader} of {house} now holds the Sky Throne.')),
  st('coup-failed',[

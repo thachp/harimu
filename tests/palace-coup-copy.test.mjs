@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { palaceCoupCopy, coupStage, COUP_STAGES, COUP_PLACEHOLDERS, COUP_LABEL_MAX, COUP_BODY_MAX, COUP_GAZETTE_BYLINE } from '../lib/palace-coup-copy.ts';
+import { palaceCoupCopy, coupStage, COUP_STAGES, COUP_PLACEHOLDERS, COUP_LABEL_MAX, COUP_BODY_MAX, COUP_GAZETTE_BYLINE, COUP_NAME_MAX } from '../lib/palace-coup-copy.ts';
 
 const texts=s=>[...s.gazette.flatMap(i=>[i.headline,i.body]),s.leaderPanel.label,s.leaderPanel.line];
 const all=()=>palaceCoupCopy.flatMap(texts);
@@ -21,6 +21,14 @@ test('length limits: headlines and panel labels <= 40, bodies and panel lines <=
   for (const s of palaceCoupCopy) {
     for (const i of s.gazette) { assert.ok(i.headline.length<=COUP_LABEL_MAX, i.headline); assert.ok(i.body.length<=COUP_BODY_MAX, i.body); }
     assert.ok(s.leaderPanel.label.length<=COUP_LABEL_MAX); assert.ok(s.leaderPanel.line.length<=COUP_BODY_MAX);
+  }
+});
+test('filled limits: every placeholder at the 24-char name cap still fits 40/140 (ARC #288)', () => {
+  assert.equal(COUP_NAME_MAX,24);
+  const fill=t=>COUP_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(COUP_NAME_MAX)),t);
+  for (const s of palaceCoupCopy) {
+    for (const i of s.gazette) { assert.ok(fill(i.headline).length<=COUP_LABEL_MAX, i.headline); assert.ok(fill(i.body).length<=COUP_BODY_MAX, i.body); }
+    assert.ok(fill(s.leaderPanel.label).length<=COUP_LABEL_MAX, s.leaderPanel.label); assert.ok(fill(s.leaderPanel.line).length<=COUP_BODY_MAX, s.leaderPanel.line);
   }
 });
 test('items that speak for the Crown are AI-badged', () => {
