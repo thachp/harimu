@@ -50,6 +50,13 @@ test('canvassing never changes votes; no rewards or currency language', () => {
   }
   for (const t of all()) assert.doesNotMatch(t,/reward|earn|bonus|prize|coin|Spark|Crown|currency|money|payout|\bpay\b|dues|donat|cosmetic/i, t);
 });
+test('canvassing placeholders (ARC #305): tasks use {party}; the visibility line uses {candidate}; not members-only', () => {
+  for (const l of C.tasks) assert.doesNotMatch(l.text,/\{(candidate|hopeful|district)\}/, l.text);
+  assert.ok(C.tasks.some(l=>l.text.includes('{party}')));
+  assert.equal(C.questTitle,'Canvass for {party}');
+  assert.ok(C.completion.text.includes('{candidate}')); assert.doesNotMatch(C.completion.text,/\{party\}/);
+  for (const t of [C.questTitle,...C.tasks.map(l=>l.text),C.note.text,C.completion.text]) assert.doesNotMatch(t,/members?\b|only|join|dues|enrol/i, t);
+});
 test('AI citizens never vote in primaries; primaries are members-only', () => {
   const e=P.explainer.map(l=>l.text).join(' ');
   assert.match(e,/for party members/); assert.match(e,/AI citizens do not vote in primaries/); assert.match(e,/Only human party members do/);

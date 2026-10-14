@@ -67,10 +67,10 @@ export const townHallCopy={
 } as const;
 
 export const canvassingCopy={
- questTitle:'Canvass for your party',
+ questTitle:'Canvass for {party}',
  tasks:[
   L('Walk your district and meet your neighbors.'),
-  L('Share the platform card of {candidate} and explain its pledges.'),
+  L('Share the platform of {party} and explain what it stands for.'),
   L('Listen to what your neighbors ask of {party}.'),
  ],
  note:L('Canvassing builds visibility, not votes.'),
