@@ -11,7 +11,7 @@ const canonLandmark={'tarrek-foundry':'The Great Crucible','kolt-savanna':'Harve
  'tsenga-sez':'SEZ Exchange Tower','holv-gorge':'Great Turbine Dam','strova-mines':'Ironroot Deep','gren-plateau':'Granary of the People','windrest':'Great Loom Hall',
  'highmere':'Duke\'s Windmill Ring','lume-mesa':'Pilgrim\'s Stair','glassen':'The Great Kiln','fjeldmark':'Frostcore Vaults','isling-springs':'The Great Bath',
  'forgehaven':'Assembly dome','meetwater':'Congress Hall','steamgate':'Steam Palace of the Party','stonehearth':'Mountain Hall','highspire':'Sky Throne',
- 'mirrorhall':'Oracle Dome','rimehall':'Moot Hall','watchfast':'Citadel of Commands','ringhall':'Ring of Groves','arcport':'Arc Exchange',
+ 'mirrorhall':'Oracle Dome','rimehall':'Moot Hall','watchfast':'Citadel of Commands','ringhall':'Federal Ring','arcport':'Arc Exchange',
  'voren-light':'Great Lens Lighthouse','moorhald':'Peat Commons','ashglade':'Heartwood Hall','fernhollow':'The Long Glade','vendezzo':'Grand Slipway','malvara-rods':'The Rod Forest'};
 const sentences=s=>s.split(/(?<=[.!?])\s+/).filter(Boolean);
 
