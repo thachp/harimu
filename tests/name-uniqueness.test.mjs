@@ -6,11 +6,25 @@ import { notableProfiles } from '../lib/notable-profiles.ts';
 import { draftNotableProfiles } from '../lib/notable-drafts.ts';
 import { additionalNotableProfiles } from '../lib/notable-roster.ts';
 
-// Canon example names from the ten nation pages (harimu-docs content/world/nations/*.mdx, Culture > Language flavor).
-const canon = ['Kaya Tarrek','Odo Brasswell','Rennek Ashby','Mira Kolt','Lanu Meesa','Oalin Tov','Ninaé Ruel','Maon Liss','Tsenga Holv','Shirun Dao-7','Galev Tsu','Imra Shen',
-  'Strova Gren','Vardo Krel','Gruna Toss','Ilvo Brask','Aelis of Windrest','Corwen Highmere','Sieran Vale','Lirae Dunmorrow','Sorath Clearwell','Anoa Thessaly','Ithar Lume','Saveth Glassen',
-  'Ingrid Fjeldmark','Aalo Rimehald','Sørne Vakk','Teodor Isling','Dask "Lantern" Voren','Kira Moorhald','Brann Vett','Yssa Dunkar','Wenna of Ashglade','Felwyn Torr','Ivel Marrow','Oskar Fernhollow',
-  'Zara Vendezzo','Chiro Malvara','Talia Brine','Enzo Corvel'];
+import { existsSync, readFileSync } from 'node:fs';
+
+// Canon example names by nation, copied exactly from harimu-docs content/world/nations/<page>.mdx (Culture > Language flavor > Examples).
+const canonByNation = {
+  'kindle-republic': ['Kaya Tarrek','Odo Brasswell','Rennek Ashby','Mira Kolt'],
+  'the-confluence': ['Lanu Meesa','Oalin Tov','Ninaé Ruel','Maon Liss'],
+  'meridian': ['Tsenga Holv','Shirun Dao-7','Galev Tsu','Imra Shen'],
+  'korund': ['Strova Gren','Vardo Krel','Gruna Toss','Ilvo Brask'],
+  'aurelle': ['Aelis of Windrest','Corwen Highmere','Sieran Vale','Lirae Dunmorrow'],
+  'ilmar-sanctum': ['Sorath Clearwell','Anoa Thessaly','Ithar Lume','Saveth Glassen'],
+  'hoarvale': ['Ingrid Fjeldmark','Aalo Rimehald','Sørne Vakk','Teodor Isling'],
+  'varkand': ['Dask "Lantern" Voren','Kira Moorhald','Brann Vett','Yssa Dunkar'],
+  'veldwood': ['Wenna of Ashglade','Felwyn Torr','Ivel Marrow','Oskar Fernhollow'],
+  'fulmara': ['Zara Vendezzo','Chiro Malvara','Talia Brine','Enzo Corvel'],
+};
+const canon = Object.values(canonByNation).flat();
+// Shipped personas (live Notables and leaders) are canon in code.
+const shipped = [...Object.values(notableProfiles).map(p => p.name), ...Object.values(leaderPersonas).map(p => p.name)];
+const canonical = new Set([...canon, ...shipped]);
 const draftNames = Object.values(draftNotableProfiles).flat().map(p => p.name);
 const rosterNames = Object.values(additionalNotableProfiles).flat().map(p => p.name);
 // Surname: last token, minus a rank-year suffix (-7) and call sign; "X of Y" -> Y.
@@ -35,9 +49,13 @@ test('leader and claimant names are unique across all name sources', () => {
 test('Notable modules do not collide with each other or with live personas', () => {
   const groups = [Object.values(notableProfiles).map(p => p.name), Object.values(leaderPersonas).map(p => p.name),
     draftNames, rosterNames];
-  const seen = new Map();
-  groups.forEach((group, index) => { for (const name of group) for (const key of [name, surname(name)]) {
-    assert.ok(!seen.has(key) || seen.get(key) === index, `cross-module collision: ${name}`); seen.set(key, index);
+  const fullNames = new Map(), surnames = new Map();
+  groups.forEach((group, index) => { for (const name of group) {
+    assert.ok(!fullNames.has(name) || fullNames.get(name) === index, `full-name collision: ${name}`); fullNames.set(name, index);
+    const last = surname(name), prior = surnames.get(last);
+    // A shared surname across modules is allowed only when both names are canon (e.g. Sieran Vale and Mara Vale).
+    assert.ok(!prior || prior.index === index || (canonical.has(prior.name) && canonical.has(name)), `surname collision: ${name} / ${prior?.name}`);
+    if (!prior) surnames.set(last, { index, name });
   } });
 });
 test('leaders avoid surnames and given names flagged in review', () => {
@@ -52,4 +70,23 @@ test('naming conventions: Meridian rank-year suffix, Varkand call sign, claimant
   for (const p of draftLeaderPersonas.fulmara) assert.match(p.name, /(ara|ezzo)$/);
   for (const p of draftLeaderPersonas.hoarvale) assert.match(p.name, /(hald|mark)$/);
   assert.equal(aurelleClaimantHouses.find(h => h.house === 'House Dunmorrow').seat, 'Dunmorrow');
+});
+test('canon names used in code are spelled exactly as on their nation page', () => {
+  const used = [...shipped, ...draftNames, ...rosterNames];
+  for (const [page, names] of Object.entries(canonByNation)) for (const name of names) {
+    const given = name.split(/\s/)[0];
+    for (const other of used) assert.ok(other.split(/\s/)[0] !== given || other === name, `${other} reuses canon given name of ${name}; use the canon spelling or a new given name`);
+  }
+  for (const name of rosterNames.concat(draftNames)) {
+    const near = canon.find(c => c.toLowerCase().normalize('NFD').replace(/[^a-z ]/g, '') === name.toLowerCase().normalize('NFD').replace(/[^a-z ]/g, ''));
+    if (near) assert.equal(name, near, `canon spelling: ${name}`);
+  }
+  // When a harimu-docs checkout is available, verify the fixture against each nation page verbatim.
+  const docs = process.env.HARIMU_DOCS_DIR ?? new URL('../../harimu-docs/content/world/nations/', import.meta.url).pathname;
+  for (const [page, names] of Object.entries(canonByNation)) {
+    const file = `${docs.replace(/\/$/, '')}/${page}.mdx`;
+    if (!existsSync(file)) continue;
+    const text = readFileSync(file, 'utf8');
+    for (const name of names) assert.ok(text.includes(name), `${name} not found verbatim in ${page}.mdx`);
+  }
 });
