@@ -23,6 +23,18 @@ export function createdTables(sql) { return [...new Set([...sql.matchAll(tablePa
 const destructivePattern = /\b(DROP\s+[A-Z]|RENAME\b|TRUNCATE\b|DELETE\s+FROM\b|ALTER\s+COLUMN\s+\S+\s+(SET\s+DATA\s+)?TYPE\b)/i;
 const stripComments = sql => sql.replace(/\/\*[\s\S]*?\*\//g, ' /*c*/ ').split('\n').map(line => line.replace(/--.*$/, '')).join('\n');
 export function isDestructive(sql) { return destructivePattern.test(stripComments(sql)); }
+// #236: the runner wraps each migration in its own transaction. A file must not open, end or roll back a
+// transaction itself (that could record a half-applied migration), and CONCURRENTLY can't run inside one.
+// Dollar-quoted bodies ($$ ... $$, e.g. plpgsql BEGIN ... END) are ignored. No review marker overrides this.
+const transactionControlPattern = /(^|;)\s*((BEGIN|COMMIT|END)(\s+(WORK|TRANSACTION))?\s*(;|$)|START\s+TRANSACTION\b|ROLLBACK\b|ABORT\b|SAVEPOINT\b|RELEASE\b|PREPARE\s+TRANSACTION\b|COMMIT\s+PREPARED\b)/i;
+const stripDollarQuoted = sql => sql.replace(/\$([A-Za-z_]*)\$[\s\S]*?\$\1\$/g, ' $$q$$ ');
+export function transactionProblem(sql) {
+  const body = stripDollarQuoted(stripComments(sql));
+  if (/\bCONCURRENTLY\b/i.test(body)) return 'uses CONCURRENTLY, which cannot run inside the per-migration transaction';
+  if (transactionControlPattern.test(body.replace(/\n/g, ' '))) return 'controls its own transaction (BEGIN/COMMIT/ROLLBACK/SAVEPOINT); the runner owns the transaction';
+  return null;
+}
+const assertNoTransactionControl = migrations => { for (const m of migrations) { const problem = transactionProblem(m.sql); if (problem) throw new Error(`${m.file} ${problem}. Remove it; nothing was applied.`); } };
 /** The review marker counts only on its own line within the first 5 lines. */
 export const hasReviewMarker = sql => sql.split('\n').slice(0, 5).some(line => line.trim() === destructiveReviewedMarker);
 const constraintWords = new Set(['primary', 'unique', 'check', 'foreign', 'constraint', 'exclude']);
@@ -116,6 +128,7 @@ export async function assertPostgresMigrationsApplied(db, migrations = postgresM
  * `db` = { query(text, params?) -> {rows}, exec(text) }.
  */
 export async function applyPostgresMigrations(db, migrations = postgresMigrations(), { dryRun = false, log = () => {} } = {}) {
+  assertNoTransactionControl(migrations);
   for (const m of migrations) if (isDestructive(m.sql) && !hasReviewMarker(m.sql)) throw new Error(`${m.file} looks destructive; add "${destructiveReviewedMarker}" after manual review.`);
   await db.query('SELECT pg_advisory_lock($1)', [lockKey]);
   try {
@@ -181,6 +194,7 @@ const redact = connectionString => { try { const u = new URL(connectionString); 
  */
 export async function bootstrapEmptyPostgres(db, { dir = 'db/postgres', log = () => {} } = {}) {
   const migrations = postgresMigrations(dir);
+  assertNoTransactionControl(migrations);
   for (const m of migrations) if (isDestructive(m.sql) && !hasReviewMarker(m.sql)) throw new Error(`${m.file} looks destructive; add "${destructiveReviewedMarker}" after manual review.`);
   const base = ['compatibility.sql', 'schema.sql'].map(f => ({ file: f, sql: readFileSync(join(dir, f), 'utf8') }));
   await db.query('SELECT pg_advisory_lock($1)', [lockKey]);

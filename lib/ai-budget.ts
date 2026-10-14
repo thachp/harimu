@@ -58,11 +58,33 @@ export const aiPendingExpirySeconds=aiUncertainBlockTtlSeconds;
 export async function releaseAiReservation(db:GameDatabase,id:string){await db.prepare("DELETE FROM harimu_ai_reservations WHERE request_id=? AND status='pending'").bind(id).run();}
 /** #92: persist "handed to the gateway" BEFORE the first gateway call. 'uncertain' = sent, outcome unknown: it never
  * expires and is never released, so a crash mid-call stays charged and keeps its request id (Notable replay guard). */
-/** #141: settle a terminal failure to the metered cost of the calls the gateway actually answered (each priced at its
- * per-call table bound), releasing the rest of the sequence reservation. Never raises a charge; at least 1 micro-USD stays booked.
+/** #141: settle a terminal failure to the metered cost of the calls the gateway actually answered (per-token from provider usage
+ * when valid, else the per-call table bound; #170), releasing the rest of the sequence reservation. Never raises a charge; at least 1 micro-USD stays booked.
  * #169: only an open (pending/uncertain) row is settled; a row another path already finished is left untouched. */
-export function meteredAiCost(models:readonly AiModel[]){return models.reduce((sum,m)=>sum+aiModelReservations[m],0);}
+/** #170: Workers AI list prices in micro-USD per million tokens (developers.cloudflare.com/workers-ai/platform/pricing, checked 2026-10-14). */
+export const aiModelTokenPrices:{readonly [M in AiModel]:{readonly inputPerM:number;readonly outputPerM:number}}={
+ '@cf/meta/llama-3.2-3b-instruct':{inputPerM:51000,outputPerM:335000},
+ '@cf/meta/llama-guard-3-8b':{inputPerM:484000,outputPerM:30000},
+};
+/** One answered gateway call: the model and, when the provider reported it, its token usage. A bare model means no usage. */
+export type AiMeteredCall=AiModel|{readonly model:AiModel;readonly usage?:unknown};
+const tokenCount=(n:unknown,max:number)=>typeof n==='number'&&Number.isSafeInteger(n)&&n>=0&&n<=max?n:null;
+/**
+ * #170: cost of one answered call. Valid provider usage (prompt/completion tokens) is priced per token, rounded up and
+ * capped at the per-call bound; missing or implausible usage falls back to the per-call bound, so it never undercharges.
+ */
+export function meteredAiCallCost(call:AiMeteredCall){
+ const model=typeof call==='string'?call:call.model,bound=aiModelReservations[model];
+ const usage=typeof call==='string'?undefined:call.usage;if(!usage||typeof usage!=='object')return bound;
+ const u=usage as {prompt_tokens?:unknown;completion_tokens?:unknown};const input=tokenCount(u.prompt_tokens,1_000_000),output=tokenCount(u.completion_tokens,256);
+ if(input===null||output===null)return bound;const price=aiModelTokenPrices[model];
+ return Math.min(bound,Math.max(1,Math.ceil((input*price.inputPerM+output*price.outputPerM)/1_000_000)));
+}
+export function meteredAiCost(calls:readonly AiMeteredCall[]){return calls.reduce((sum,c)=>sum+meteredAiCallCost(c),0);}
 export async function settleAiReservation(db:GameDatabase,id:string,actualMicro:number){const micro=Math.max(1,Number.isSafeInteger(actualMicro)?actualMicro:Number.MAX_SAFE_INTEGER);await db.prepare("UPDATE harimu_ai_reservations SET status='finished',reserved_micro=CASE WHEN ?<reserved_micro THEN ? ELSE reserved_micro END WHERE request_id=? AND status IN ('pending','uncertain')").bind(micro,micro,id).run();}
+/** #169 follow-up (QA1 nit on #182): a transport/timeout failure keeps the full charge as 'uncertain', but only on an
+ * open row. A row another path already settled or finished is left untouched. Same SQL on SQLite and Postgres. */
+export async function markAiReservationUncertain(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status IN ('pending','uncertain')").bind(id).run();}
 export async function markAiReservationSent(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status='pending'").bind(id).run();}
 /** #92: ids of the removed preview acceptance ledger/prebook. Written by readiness, never sent through the gateway,
  * some already 'finished'/'uncertain'. Real ids are UUIDs, notable:<sha>: or cabinet:, so this never matches them. */

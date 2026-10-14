@@ -57,7 +57,7 @@ test('transport failure marks the reservation uncertain without publishing',asyn
  assert.equal((await r.db.prepare("SELECT status FROM harimu_ai_reservations WHERE request_id LIKE 'cabinet:%'").first()).status,'uncertain');
 });
 test('collecting petitions below threshold are never answered',async t=>{
- const r=await localRuntime();t.after(()=>r.close());for(const user of ['alice','bob']){r.setVerification(user,tierOne(r,user));await r.call('petitions',user);}
+ const r=await localRuntime();t.after(()=>r.close());for(const user of ['alice','bob']){r.setVerification(user,tierOne(r,user));await (await r.importModule('lib/collective-petitions.ts')).recordVerifiedHumanVisit(r.db,user,Math.floor(r.now/1000));}/* #221: GET no longer records the visit */
  const now=Math.floor(r.now/1000);for(let i=0;i<32;i++){const user=`ai-fixture-${i}`;await r.db.prepare("INSERT INTO citizens(clerk_user_id,nation_id,capacity,influence,standing,created_at,updated_at) VALUES (?,'kindle',18,0,'Fixture',?,?)").bind(user,new Date(r.now).toISOString(),new Date(r.now).toISOString()).run();await r.db.prepare("INSERT INTO civic_human_activity(clerk_user_id,last_seen,policy) VALUES (?,?,'tier1-human-v1')").bind(user,now).run();}
  const id=randomUUID();await r.call('petitions','alice',{action:'create',requestId:id,title:'Fixture pending petition',demand:'Please review this fixture request.'});
  const ai=scripted(good());on(r,ai);assert.equal((await find(r,id)).status,'collecting');assert.equal(ai.seen.length,0);
@@ -101,4 +101,18 @@ test('#169 settle is a no-op on a finished row and settles an open one',async t=
  await settleAiReservation(r.db,'done',4200);await settleAiReservation(r.db,'open',4200);
  const get=id=>r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id=?').bind(id).first();
  assert.deepEqual({...await get('done')},{reserved_micro:72400,status:'finished'});assert.deepEqual({...await get('open')},{reserved_micro:4200,status:'finished'});
+});
+test('#169 follow-up: marking a transport failure uncertain never touches a finished row',async t=>{
+ const {markAiReservationUncertain}=await import('../lib/ai-budget.ts');const r=await localRuntime();t.after(()=>r.close());
+ const insert=(id,status,micro)=>r.db.prepare("INSERT INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,'2026-10-14','2026-10-15','x',?,1,?)").bind(id,micro,status).run();
+ await insert('done','finished',4200);await insert('open','pending',72400);
+ await markAiReservationUncertain(r.db,'done');await markAiReservationUncertain(r.db,'open');
+ const get=id=>r.db.prepare('SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id=?').bind(id).first();
+ assert.deepEqual({...await get('done')},{reserved_micro:4200,status:'finished'});assert.deepEqual({...await get('open')},{reserved_micro:72400,status:'uncertain'});
+});
+test('#170 a Cabinet rejection with reported usage settles to the true token cost',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());await reached(r);const usage={prompt_tokens:600,completion_tokens:120};
+ const ai={seen:[],async run(){this.seen.push(1);return {response:JSON.stringify({response:'bad'}),usage};}};
+ assert.equal((await r.prepareAiCabinetResponse(ai,{enabled:true,budget:{dailyBudgetMicro:970000,gatewayId:'harimu-test'}})).status,'failed');
+ assert.deepEqual({...await r.db.prepare("SELECT reserved_micro,status FROM harimu_ai_reservations WHERE request_id LIKE 'cabinet:%'").first()},{reserved_micro:71,status:'finished'});
 });

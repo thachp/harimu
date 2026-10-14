@@ -1,5 +1,8 @@
+import { finalizeDueElection } from './elections';
+import { accountElectionDatabase } from './preview-election';
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
+import { runNpcSupply } from './npc-supply';
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
 export const tickSeconds = 7200;
@@ -40,8 +43,10 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
   supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[] };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000)): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
+  // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
+  for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(() => {});
   await db.prepare("INSERT OR IGNORE INTO world_clock (id,epoch_seconds) VALUES ('main',?)")
     .bind(Math.floor(now/tickSeconds)*tickSeconds).run();
   const epoch = (await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>())!.epoch_seconds;
@@ -66,6 +71,22 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       .bind(maximumCatchupTicks+scoreRepairTicks).all<{tick:number;scheduled_at:number}>();
     for (const row of missing.results) await db.batch(await stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now));
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
+  // #198: NPC farm asks for the current game day, only while the order book is on. Idempotent per tick.
+  if (options.npcSupply) {
+    const current = await db.prepare('SELECT tick,scheduled_at FROM world_ticks ORDER BY tick DESC LIMIT 1').first<{tick:number;scheduled_at:number}>();
+    if (current) await runNpcSupply(db, Number(current.tick), Number(current.scheduled_at), now, tickSeconds);
+  }
+  return readWorldSimulation(db, now);
+
+}
+
+/** #205: the same snapshot advanceWorld returns, computed without any write. Due-but-unprocessed ticks show as
+ *  pendingTicks; the next write path (or GET /api/world) processes them. */
+export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000)): Promise<SimulationState> {
+  if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
+  const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
+  const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
+  const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
   const [latest,execution,supply,stability] = await Promise.all([
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')

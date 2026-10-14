@@ -4,6 +4,7 @@ import type {GameDatabase} from '@/lib/database-contract';
 import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
 import {readVerification} from '@/lib/verification';
+import {latchAfterWrite} from '@/lib/first-week-server';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {validPetitionId} from '@/lib/collective-petitions';
 import {validRanking} from '@/lib/instant-runoff';
@@ -16,10 +17,17 @@ const kindle=async(db:GameDatabase,userId:string)=>(await db.prepare('SELECT nat
 export async function GET(request:Request){
  const userId=await authenticatedUserId(request);if(!userId)return json({error:'Sign in required.'},401);
  const accountLevel=preview(),raw=await getDatabase(),db=accountLevel?accountElectionDatabase(raw):raw;if(!await kindle(db,userId))return json({error:'This preview election is for Kindle citizens only.'},403);
- const verification=await readVerification(userId),now=Math.floor(Date.now()/1000);if(accountLevel||verification.countedActionsEligible)await openPreviewElection(db,userId,now,accountLevel||trustedBallotPrivacyReady());
- return json({...await readElection(db,userId,now,accountLevel||trustedBallotPrivacyReady()),id:accountLevel?accountElectionId:electionId,electionEligibility:{eligible:accountLevel||verification.countedActionsEligible,scope:accountLevel?'preview-citizen':'tier1',reason:accountLevel?'Signed-in Kindle citizens may vote once in this preview PoC.':verification.reason},verification});
+ const verification=await readVerification(userId),now=Math.floor(Date.now()/1000);
+ // #221: read-only. The election opens on POST (and citizen POSTs); a due close/count is recorded by POST and the world tick.
+ return json({...await readElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),accountLevel||verification.countedActionsEligible,true),id:accountLevel?accountElectionId:electionId,electionEligibility:{eligible:accountLevel||verification.countedActionsEligible,scope:accountLevel?'preview-citizen':'tier1',reason:accountLevel?'Signed-in Kindle citizens may vote once in this preview PoC.':verification.reason},verification});
 }
+// #194: a written ballot can complete a first-week goal; latch after a successful vote.
 export async function POST(request:Request){
+ const response=await handleVote(request);if(!response.ok)return response;
+ const userId=await authenticatedUserId(request);if(!userId)return response;
+ return latchAfterWrite(await getDatabase(),response,[userId],Math.floor(Date.now()/1000));
+}
+async function handleVote(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
  // While privacy is unreviewed, refuse before authenticating or parsing a ranking.
  if(!preview()&&!trustedBallotPrivacyReady())return json({error:ballotPrivacyReason,privacyReady:false},403);

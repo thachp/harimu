@@ -23,7 +23,7 @@ test('approved account preview isolates eligibility, window, retries and persist
  assert.equal((await r.call('petitions','alice',{action:'sign',petitionId:randomUUID(),requestId:randomUUID()})).status,403);
  r.reopen();r.setNow(open.data.closesAt*1000-1);assert.equal((await r.call('election','bob')).data.result,null);
  r.setNow(open.data.closesAt*1000);const closed=await r.call('election','bob');assert.equal(closed.data.result.humanBallots,1);assert.equal(closed.data.result.simulatedPublicUnits,1);assert.equal(closed.data.result.winner,'mara-quell');assert.equal((await r.call('election','bob',vote())).status,409);
- r.setNow(open.data.opensAt*1000);assert.equal((await r.call('election','bob',vote())).status,409);
+ await (await r.importModule('lib/world-simulation.ts')).advanceWorld(r.db,Math.floor(r.now/1000));/* #221: the tick records the close GET only shows */r.setNow(open.data.opensAt*1000);assert.equal((await r.call('election','bob',vote())).status,409);
 });
 test('account preview enforces origin, complete rankings, namespace and current citizenship',async t=>{
  const r=await localRuntime({accountElection:true});t.after(()=>r.close());
@@ -43,7 +43,7 @@ test('actual approved PostgreSQL path excludes identity/ranking journals and blo
  await assert.rejects(r.db.prepare('UPDATE civic_voter_receipts SET ballot_written=1').run(),/disabled pending privacy/);
 });
 test('corrupt saved aggregate fails closed against frozen authoritative ballots',async t=>{
- const r=await localRuntime({accountElection:true});t.after(()=>r.close());const saved=await r.call('election','alice',vote());r.setNow(saved.data.closesAt*1000);const closed=await r.call('election','alice');const corrupt={...closed.data.result,winner:'mara-quell'};
+ const r=await localRuntime({accountElection:true});t.after(()=>r.close());const saved=await r.call('election','alice',vote());r.setNow(saved.data.closesAt*1000);const closed=await r.call('election','alice');await (await r.importModule('lib/world-simulation.ts')).advanceWorld(r.db,Math.floor(r.now/1000));/* #221: the tick records the close GET only shows */const corrupt={...closed.data.result,winner:'mara-quell'};
  await r.db.prepare('UPDATE poc_elections SET result_json=? WHERE id=?').bind(JSON.stringify(corrupt),id).run();await assert.rejects(r.call('election','alice'),/aggregate does not match/);
 });
 

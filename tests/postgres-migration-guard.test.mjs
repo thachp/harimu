@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
-import { createdTables, postgresMigrations, repoTables, isDestructive, migrationProblems, createdObjects, hasReviewMarker, applyPostgresMigrations, bootstrapEmptyPostgres, assertPostgresMigrationsApplied, destructiveReviewedMarker, backfillThrough } from '../scripts/postgres-migrations.mjs';
+import { createdTables, postgresMigrations, repoTables, isDestructive, migrationProblems, createdObjects, hasReviewMarker, applyPostgresMigrations, bootstrapEmptyPostgres, assertPostgresMigrationsApplied, destructiveReviewedMarker, backfillThrough, transactionProblem } from '../scripts/postgres-migrations.mjs';
 
 const adapter = pg => ({ query: (t, p) => pg.query(t, p), exec: t => pg.exec(t) });
 /** A database shaped like preview today: base schema plus every migration through 0010, no schema_migrations. */
@@ -27,7 +27,7 @@ const rows = async (pg, sql) => (await pg.query(sql)).rows;
 
 test('inventory lists numbered migrations in order, never schema/compatibility', () => {
   const migrations = postgresMigrations();
-  assert.ok(migrations.length >= 2 && migrations.every(m => /^\d{4}_/.test(m.file) && m.tables.length && m.checksum.length === 64));
+  assert.ok(migrations.length >= 2 && migrations.every(m => /^\d{4}_/.test(m.file) && (m.tables.length || /^\s*INSERT INTO/m.test(m.sql)) && m.checksum.length === 64)); // #196: 0020 is data-only (seed rows)
   assert.deepEqual(migrations.map(m => m.file), [...migrations.map(m => m.file)].sort());
   assert.ok(!migrations.some(m => /schema|compatibility/.test(m.file)));
   assert.deepEqual(createdTables('CREATE TABLE IF NOT EXISTS "a_b"(x int); create table `c` (y int); CREATE TABLE d(z int);'), ['a_b', 'c', 'd']);
@@ -164,4 +164,28 @@ test('preview workflow deploys only release, checks then migrates first, secret 
   const deployStep = wf.slice(wf.indexOf('- name: Deploy'));
   assert.match(deployStep, /if: success\(\) && steps\.migrate\.outcome == 'success'/);
   assert.match(await readFile('scripts/deploy-cloudflare.mjs', 'utf8'), /assertPostgresMigrationsApplied\(db\)[\s\S]*deployArgs\(false\)/);
+});
+
+test('#236 migrations may not control their own transaction or use CONCURRENTLY; repo migrations are clean', async () => {
+  for (const sql of ['BEGIN; CREATE TABLE IF NOT EXISTS x(a int); COMMIT;', 'CREATE TABLE IF NOT EXISTS x(a int);\nCOMMIT;', 'START TRANSACTION;', 'begin work;',
+    'CREATE TABLE IF NOT EXISTS x(a int); ROLLBACK;', 'SAVEPOINT s1;', 'CREATE TABLE IF NOT EXISTS x(a int); END;', 'CREATE INDEX CONCURRENTLY IF NOT EXISTS i ON x(a);',
+    'create unique index concurrently i on x(a);', 'COMMIT', 'ABORT;'])
+    assert.ok(transactionProblem(sql), sql);
+  for (const sql of ['-- BEGIN; COMMIT;\nCREATE TABLE IF NOT EXISTS x(a int);', '/* CONCURRENTLY */ CREATE INDEX IF NOT EXISTS i ON x(a);',
+    "CREATE OR REPLACE FUNCTION f() RETURNS int LANGUAGE plpgsql AS $$ BEGIN RETURN 1; END; $$;", "CREATE OR REPLACE FUNCTION g() RETURNS int LANGUAGE plpgsql AS $body$ BEGIN COMMIT; END $body$;",
+    'CREATE TABLE IF NOT EXISTS begin_log(committed_at int, rollback_reason text);', "INSERT INTO t(note) VALUES ('begin');"])
+    assert.equal(transactionProblem(sql), null, sql);
+  for (const m of postgresMigrations()) assert.equal(transactionProblem(m.sql), null, m.file);
+  // Both entry points refuse before applying anything.
+  for (const [name, sql] of [['0950_tx.sql', 'BEGIN;\nCREATE TABLE IF NOT EXISTS zz_tx (id int);\nCOMMIT;'], ['0950_conc.sql', 'CREATE INDEX CONCURRENTLY IF NOT EXISTS zz_i ON korund_coupon_redemptions(id);']]) {
+    const pg = await previewLike(); const db = adapter(pg);
+    await assert.rejects(applyPostgresMigrations(db, postgresMigrations(dirWith({ [name]: sql }))), new RegExp(`${name.replace('.', '\\.')} (controls its own transaction|uses CONCURRENTLY)`));
+    assert.equal((await rows(pg, "SELECT 1 FROM pg_tables WHERE tablename IN ('schema_migrations','zz_tx')")).length, 0, 'nothing applied or recorded');
+    await pg.close();
+    const dir = dirWith({ [name]: sql }); for (const f of ['compatibility.sql', 'schema.sql']) copyFileSync(join('db/postgres', f), join(dir, f));
+    const empty = new PGlite(); await empty.waitReady;
+    await assert.rejects(bootstrapEmptyPostgres(adapter(empty), { dir }), /controls its own transaction|uses CONCURRENTLY/);
+    assert.equal((await rows(empty, "SELECT COUNT(*)::int AS n FROM pg_tables WHERE schemaname='public'"))[0].n, 0);
+    await empty.close();
+  }
 });
