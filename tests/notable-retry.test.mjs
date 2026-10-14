@@ -46,3 +46,8 @@ test('unknown proxy-shaped failures do not acknowledge or release an original in
  assert.equal(session.finish(attempt.epoch,notableFailureAcknowledged(400,{error:'Proxy error'})),true);
  assert.deepEqual(session.intent,attempt.intent);assert.equal(session.begin('kindle-journalist','work'),null);
 });
+
+test('freeform retries preserve the exact question and topic across close and edited inputs',()=>{
+ const session=new NotableRequest(),first=session.begin('kindle-journalist','news',false,'What public work is recorded?\nPlease explain.');session.invalidate();
+ const retry=session.begin('kindle-journalist','work',true,'Edited replacement question');assert.deepEqual(retry.intent,first.intent);assert.equal(retry.intent.question,'What public work is recorded?\nPlease explain.');assert.equal(retry.intent.topic,'news');assert.equal(session.finish(first.epoch,true),false);session.finish(retry.epoch,false);assert.equal(session.begin('kindle-journalist','work',false,'Another question'),null);
+});

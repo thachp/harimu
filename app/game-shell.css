@@ -127,3 +127,7 @@ html[data-harimu-motion="reduce"] *,html[data-harimu-motion="reduce"] *::before,
 .national-news.nation-document[data-nation-theme] :is(.news-statistics,.national-news-items article,.news-source){border-color:var(--nation-edge);background:transparent;color:var(--nation-ink)}
 .national-news.nation-document[data-nation-theme] time { color:var(--nation-ink); }
 .national-news.nation-document[data-nation-theme] .national-news-items article { border-left:3px solid var(--nation-accent); }
+
+.notable-conversation form { display: grid; gap: 10px; }
+.notable-conversation textarea { width: 100%; max-width: 100%; min-height: 96px; box-sizing: border-box; resize: vertical; }
+.notable-conversation form p { margin: 0; overflow-wrap: anywhere; }
