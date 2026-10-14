@@ -151,4 +151,40 @@ export const korundUndergroundCopy={
   first:{text:'An inspection found a shrine. Suspicion was recorded.',proposal:true},
   repeat:{text:'An inspection found a shrine again. Correction Duty may follow, for up to 7 days.',proposal:true},
  },
+ /* ---- Issue #322 (companion to #295): the private underground worship action, the citizen's raid warning, the
+  * quiet-week line and State Media rumor lines. The raid RESULT for the citizen reuses `discovery.first` / `discovery.repeat`
+  * above; `raidResult.devotionNote` is the one added line, because those notices say nothing about Devotion and #295 gives a
+  * raid a small Devotion hit. Everything is private to the citizen except `stateMediaRumors`, which names no faith, shrine,
+  * person or figure, only {city}. No raid cap, Devotion amount or other number appears (those stay in #295). Player-facing
+  * lines say "inspection", not "raid", to match the §14.6 abstract-discovery rule. */
+ worshipAction:{
+  label:'Worship quietly',
+  confirmation:{text:'You worshipped in private. Nothing is posted.',proposal:true},
+  alreadyToday:{text:'You have already worshipped today. Try again tomorrow.',proposal:true},
+  proposal:true,
+ },
+ raidWarning:[
+  {text:'Word is that an inspection may come to {city}. Keep your practice quiet.',proposal:true},
+  {text:'An inspection may be near. Stay quiet and out of sight.',proposal:true},
+ ],
+ raidResult:{
+  devotionNote:{text:'Your Devotion fell a little.',proposal:true},
+  proposal:true,
+ },
+ quietWeek:[
+  {text:'Your city was quiet this week.',proposal:true},
+  {text:'It was a quiet week in {city}. No inspection came.',proposal:true},
+ ],
+ stateMediaRumors:[
+  {text:'Korund State Media: an inspection in {city} has concluded. Order is kept.',proposal:true},
+  {text:'A routine inspection passed through {city}. The plan advances.',proposal:true},
+  {text:'Korund State Media reports a calm inspection in {city}. All is orderly.',proposal:true},
+ ],
 } as const;
+
+/** #322: length limits, the one placeholder, and the State Media byline (canon, lib/press-templates.ts korundStateMedia.byline).
+ * {city} is a pre-formatted city name, capped at 24 characters (COUP_NAME_MAX in lib/palace-coup-copy.ts; the test fills to it). */
+export const UNDERGROUND_PLACEHOLDERS=['{city}'] as const;
+export const UNDERGROUND_LABEL_MAX=40;
+export const UNDERGROUND_LINE_MAX=140;
+export const UNDERGROUND_BYLINE={name:'Korund State Media',proposal:false} as const;
