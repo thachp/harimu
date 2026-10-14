@@ -2,7 +2,7 @@ import type {GameDatabase} from './database-contract';
 import {publicNewsFacts,validatedNewsDraft,newsDraftText,inferenceText,newsDraftResponseFormat,newsVerificationResponseFormat,supportedNewsDraft,type NewsAiBinding} from './ai-news';
 import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,meteredAiCost,aiGatewayOptions,type AiModel,type AiBudgetConfig} from './ai-budget';
 import {readNationalNews} from './national-news';
-import {notableProfile,notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
+import {notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 import {nationNotables} from './notable-choice';
 export {notableFor,nationNotables} from './notable-choice';
 export {notableProfile,notableTopics,notableDailyLimit,validNotableCommand} from './notable-profiles';
