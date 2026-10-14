@@ -1,4 +1,5 @@
 import type { GameDatabase } from './database-contract';
+import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { claimant, claimants, pledgeThreshold, risingConfig, risingReady, risingSucceeds, unrestSustainedSeconds, type ClaimantId } from './aurelle-rising-rules';
 import { pledgeToasts, risingStage, type RisingStage } from './claimant-copy';
 export * from './aurelle-rising-rules';
@@ -60,7 +61,7 @@ export type AurelleRisingState = {
 
 async function aurelleScores(db: GameDatabase) {
   const rows = await db.prepare("SELECT scheduled_at, unrest, stability FROM nation_stability_scores WHERE nation_id = 'aurelle' ORDER BY tick DESC LIMIT 60")
-    .all<{ scheduled_at: number; unrest: number; stability: number }>().catch(() => ({ results: [] as { scheduled_at: number; unrest: number; stability: number }[] }));
+    .all<{ scheduled_at: number; unrest: number; stability: number }>().catch(tolerate(isMissingRelation, { results: [] as { scheduled_at: number; unrest: number; stability: number }[] }));
   return rows.results.map(r => ({ scheduledAt: Number(r.scheduled_at), unrest: Number(r.unrest), stability: Number(r.stability) }));
 }
 async function counts(db: GameDatabase) {
@@ -72,7 +73,7 @@ export const weeklyAurelleHumans = async (db: GameDatabase, now: number) =>
 
 export async function readCrown(db: GameDatabase): Promise<Crown> {
   const row = await db.prepare("SELECT claimant_id, resolved_at FROM aurelle_risings WHERE outcome = 'succeeded' ORDER BY resolved_at DESC, id DESC LIMIT 1")
-    .first<{ claimant_id: ClaimantId; resolved_at: number }>().catch(() => null);
+    .first<{ claimant_id: ClaimantId; resolved_at: number }>().catch(tolerate(isMissingRelation, null));
   const c = row ? claimant(row.claimant_id) : null;
   return c && row ? { claimantId: c.id, name: c.name, house: c.house, motto: c.motto, color: c.color, crownedAt: Number(row.resolved_at) } : null;
 }
@@ -126,7 +127,8 @@ export async function pledge(db: GameDatabase, userId: string, command: { reques
   if (crown?.claimantId === command.claimantId) return { status: 409, error: `${crown.name} already holds the crown.` };
   const current = await db.prepare('SELECT claimant_id, pledged_at FROM aurelle_pledges WHERE clerk_user_id = ?').bind(userId).first<{ claimant_id: string; pledged_at: number }>();
   if (current?.claimant_id === command.claimantId) return { status: 200 };
-  await db.prepare(pledgeSql).bind(command.claimantId, command.requestId, now, userId).run().catch(() => undefined);
+  await db.prepare(pledgeSql).bind(command.claimantId, command.requestId, now, userId)
+    .run().catch(tolerate(isUniqueViolation, undefined)); // a concurrent identical pledge may win the unique request_id; the read below decides
   const after = await db.prepare('SELECT claimant_id, request_id FROM aurelle_pledges WHERE clerk_user_id = ?').bind(userId).first<{ claimant_id: string; request_id: string }>();
   if (after?.request_id === command.requestId) return { status: 200 };
   return { status: 409, error: pledgeToasts.cooldown.text };
