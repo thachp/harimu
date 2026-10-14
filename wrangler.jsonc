@@ -32,7 +32,9 @@
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",
-    "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false"
+    "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false",
+    // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
+    "HARIMU_QA_TEST_CITIZENS": "false"
   },
   // Isolated preview only; never bind this resource as migrated production.
   "d1_databases": [{
