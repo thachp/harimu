@@ -28,3 +28,7 @@ Live nationality changes, redemption and ballot casting are not stated prerequis
 - #38: no ReadPixels/context warnings captured across twelve read-only scene transitions, with one canvas and no stale open dialogs. Source disposes owned geometry/materials/textures/shadow maps/renderer, removes listeners and disconnects observers. Native GPU tracing is unavailable; captured console/DOM evidence does not disprove the owner’s warning.
 
 No live gameplay submissions, presence opt-in, credentials, access changes, AI activation, production or docs-hosting changes were performed. GitHub closures, where qualified, are made without comments per the owner’s instruction.
+
+## Independent follow-up: civic command ordering
+
+Petition and ballot clients now suppress reads with a synchronous in-flight command guard, reject repeated captured submit handlers, and invalidate read epochs again when a command settles. Deferred-response fixtures prove stale reads/errors cannot replace the acknowledged command snapshot and reads resume afterward. All verification/privacy gates remain unchanged; no live political command is submitted.
