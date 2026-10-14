@@ -2239,3 +2239,6 @@ textarea:focus-visible { outline: 2px solid #8ae2d2; outline-offset: 2px; }
 
 :is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]) :is(table,thead,tbody,tr,th,td){color:var(--nation-ink)}
 .ranked-ballot table{width:100%;border-collapse:collapse;font-size:12px}.ranked-ballot :is(th,td){padding:8px 4px;text-align:left;border-bottom:1px solid var(--nation-edge)}
+
+/* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
+button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
