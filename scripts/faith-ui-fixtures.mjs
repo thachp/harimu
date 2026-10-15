@@ -31,6 +31,7 @@ export function faithState({ nation = 'kindle', faith = nation === 'aurelle' ? '
     festivals, holiday: holidayInfo, banEvents: [],
     leaveCost: leaving ? kinwardLeaveFavorCost : null, royalFavor: leaving ? royalFavor : null,
     leaveBlockedReason: leaving && royalFavor < kinwardLeaveFavorCost ? kinwardLeaveBlockedReason(royalFavor) : null,
+    underground: null, // #295: only a Korund hidden-faith holder gets this block
   };
 }
 
