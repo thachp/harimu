@@ -1777,7 +1777,7 @@ export default function Home() {
     }).catch(() => {});
     return () => controller.abort();
   }, [morningBriefOpen, citizenNationId, guestActive, citizenSessionStatus]); // clerkConfigured is a module-level constant (build-time env), so it is not a dependency.
-  const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow,
+  const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow, nationId: citizenNation.id, marketOpen: marketShown,
     shift: activeShift ? { title: activeShift.orderName, endsAt: Date.parse(activeShift.completesAt) / 1000 } : null,
     leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null,
     headlines: briefHeadlines?.nationId === citizenNationId ? briefHeadlines.items : [] }) : [];
