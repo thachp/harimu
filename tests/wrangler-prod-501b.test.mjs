@@ -67,11 +67,11 @@ test('flag comments copied into wrangler.prod.jsonc equal the preview comments (
 test('Hyperdrive: one binding, id only (no connection string), checked-in id is a detected placeholder', () => {
   assert.equal(prod.hyperdrive.length, 1); assert.deepEqual(Object.keys(prod.hyperdrive[0]).sort(), ['binding', 'id']); assert.equal(prod.hyperdrive[0].binding, 'HYPERDRIVE');
   const previewId = preview.hyperdrive[0].id;
-  assert.match(hyperdriveIdProblem(prod.hyperdrive[0].id, previewId), /placeholder/, 'slice c must refuse to deploy with this id');
+  assert.match(hyperdriveIdProblem(prod.hyperdrive[0].id), /placeholder/, 'slice c must refuse to deploy with this id');
   assert.match(prod.hyperdrive[0].id, /^PLACEHOLDER/);
-  assert.equal(hyperdriveIdProblem('0123456789abcdef0123456789abcdef', previewId), null, 'a real-looking id is accepted');
-  assert.match(hyperdriveIdProblem(previewId, previewId), /must not be the preview/);
-  for (const bad of [undefined, null, '', 'PLACEHOLDER-production-hyperdrive-config-id', 'A1F662C88F3B485190C402D9548AE360', 'abc123', 'a1f662c88f3b485190c402d9548ae36', 'a1f662c88f3b485190c402d9548ae360 ', 42]) assert.match(hyperdriveIdProblem(bad, previewId), /placeholder or not a valid/, String(bad));
+  assert.equal(hyperdriveIdProblem('0123456789abcdef0123456789abcdef'), null, 'a real-looking id is accepted');
+  assert.equal(hyperdriveIdProblem(previewId), null, 'Patrick Oct 15: production may share preview\'s Hyperdrive config for now (a config value only)');
+  for (const bad of [undefined, null, '', 'PLACEHOLDER-production-hyperdrive-config-id', 'A1F662C88F3B485190C402D9548AE360', 'abc123', 'a1f662c88f3b485190c402d9548ae36', 'a1f662c88f3b485190c402d9548ae360 ', 42]) assert.match(hyperdriveIdProblem(bad), /placeholder or not a valid/, String(bad));
   assert.doesNotMatch(readFileSync('wrangler.prod.jsonc', 'utf8'), /postgres(ql)?:\/\/|connectionString|localConnectionString/i);
 });
 
