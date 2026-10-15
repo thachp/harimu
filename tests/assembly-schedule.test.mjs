@@ -40,7 +40,8 @@ test('#351 pure: seats carry over with staggered terms; a district keeps six sea
   const first = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 1, [D]: 1 } });
   const carried = carryIncumbents(first);
   for (const d of first.districts) {
-    assert.deepEqual(carried[d.districtId].up, d.seatsHeld, 'the half that served the whole term goes up next'); assert.deepEqual(carried[d.districtId].held, d.seatsWon, 'the seats just won are held next');
+    if (d.contested) { assert.deepEqual(carried[d.districtId].up, d.seatsHeld, 'the half that served the whole term goes up next'); assert.deepEqual(carried[d.districtId].held, d.seatsWon, 'the seats just won are held next'); }
+    else assert.deepEqual(carried[d.districtId], { up: d.seatsUp, held: d.seatsHeld }, 'a district nobody voted in does not rotate');
     assert.equal(sumOf(carried[d.districtId].up), 3); assert.equal(sumOf(carried[d.districtId].held), 3);
   }
   const second = assemblyResult({ forgehaven: { [D]: 4 } }, carried);
@@ -160,13 +161,36 @@ test(`#351 ${backend}: the next cycle opens a new election and the first count's
   const d = await r.importModule('lib/diplomacy.ts'); assert.deepEqual(await d.kindleSeats(r.db), second.totals.after);
 });
 
-test(`#351 ${backend}: a cycle nobody counted changes nothing: the next one carries the last counted result`, async t => {
+test(`#351 ${backend}: a skipped cycle (never held) does not advance the rotation: the half that was due goes up again`, async t => {
   const c = await setup(t); const { r } = c, id0 = `${base}-cycle-0`, open0 = c.start + 60 * DAY, open2 = open0 + 240 * DAY;
   c.at(open0 + 60); await c.tick(); await c.citizen('v0', 'forgehaven'); assert.equal((await c.vote('v0', S, id0)).status, 200);
   c.at(open0 + W + 5); await c.tick(); await c.tick();
   const first = (await r.call('assembly', 'v0')).data.result;
+  // Cycle 1 passes with no tick, no ballot and no election row: nobody counted.
+  assert.equal(await c.count('assembly_elections'), 1);
   c.at(open2 + 60); const projected = (await r.call('assembly', 'v0')).data; assert.equal(projected.id, `${base}-cycle-2`);
-  const f = projected.districts.find(d => d.id === 'forgehaven'), f0 = first.districts.find(d => d.districtId === 'forgehaven'); assert.deepEqual(f.seatsHeld, f0.seatsWon); assert.deepEqual(f.seatsUp, f0.seatsHeld);
+  const f = projected.districts.find(d => d.id === 'forgehaven'), f0 = first.districts.find(d => d.districtId === 'forgehaven');
+  assert.deepEqual(f.seatsUp, f0.seatsHeld, 'the half that was due in the skipped cycle goes up now (the rotation advanced once, for the one counted election)');
+  assert.deepEqual(f.seatsHeld, f0.seatsWon);
+  await c.tick(); assert.equal(await c.count('assembly_elections'), 2, 'only the held cycles have rows (0 and 2)');
+});
+
+test(`#351 ${backend}: an election nobody voted in is not counted: the same half goes up again next time`, async t => {
+  const c = await setup(t); const { r } = c, open0 = c.start + 60 * DAY, open1 = open0 + 120 * DAY;
+  c.at(open0 + 60); await c.tick(); c.at(open0 + W + 5); await c.tick(); await c.tick();
+  const first = (await r.call('assembly', 'alice')).data; assert.equal(first.status, 'closed'); assert.equal(first.result.humanBallots, 0);
+  for (const d of first.result.districts) { assert.equal(d.contested, false); assert.deepEqual(d.seatsWon, d.seatsUp); }
+  c.at(open1 + 60); const next = (await r.call('assembly', 'alice')).data;
+  for (const d of next.districts) { assert.deepEqual(d.seatsUp, assemblyIncumbents[d.id].up, `${d.id}: the same half goes up again`); assert.deepEqual(d.seatsHeld, assemblyIncumbents[d.id].held); }
+  assert.deepEqual(next.districts.map(d => d.id), assemblyDistricts.map(d => d.id));
+});
+
+test('#351 pure: a district nobody voted in keeps its up and held halves when seats carry over', () => {
+  const result = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 } }), carried = carryIncumbents(result);
+  const forge = result.districts.find(d => d.districtId === 'forgehaven'), tarrek = result.districts.find(d => d.districtId === 'tarrek-foundry');
+  assert.deepEqual(carried.forgehaven, { up: forge.seatsHeld, held: forge.seatsWon }, 'a counted district rotates');
+  assert.deepEqual(carried['tarrek-foundry'], { up: tarrek.seatsUp, held: tarrek.seatsHeld }, 'an uncounted district does not');
+  assert.deepEqual(carried['tarrek-foundry'], assemblyIncumbents['tarrek-foundry']);
 });
 
 test(`#351 ${backend}: the manual open time still works as before when no cycle start is set`, async t => {

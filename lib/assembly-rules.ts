@@ -63,10 +63,11 @@ export function nextAssemblyOpen(timing: AssemblyTiming, now: number): number | 
 }
 
 export type Incumbents = Readonly<Record<string, { up: PartySeats; held: PartySeats }>>;
-/** [ASSUMPTION] Seats carry over with staggered terms: after a count, the seats just won are the ones held for the next election and the seats
- *  held through this one are the ones that go up next. Each district keeps its six seats (three up, three held). */
+/** Seats carry over with staggered terms (ARC final on #351): after a count, the seats just won are the ones held for the next election and the seats
+ *  held through this one are the ones that go up next. Each district keeps its six seats (three up, three held). A district nobody voted in was not
+ *  counted, so the rotation does not advance there: the same half goes up again. */
 export function carryIncumbents(previous: AssemblyResult): Incumbents {
-  return Object.fromEntries(previous.districts.map(d => [d.districtId, { up: { ...d.seatsHeld }, held: { ...d.seatsWon } }]));
+  return Object.fromEntries(previous.districts.map(d => [d.districtId, d.contested ? { up: { ...d.seatsHeld }, held: { ...d.seatsWon } } : { up: { ...d.seatsUp }, held: { ...d.seatsHeld } }]));
 }
 
 const zero = (): PartySeats => Object.fromEntries(assemblyPartyIds.map(id => [id, 0]));
