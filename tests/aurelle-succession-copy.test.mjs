@@ -47,10 +47,10 @@ test('AI badge (#381 / §23.2): the Heir\'s Naming, both accession proclamations
   for (const i of items().filter(x=>!x.aiBadge)) assert.match(i.body,/^The Court Gazette reports/,i.id);
 });
 test('docs facts: the Monarch names the heir, then seniority, then the Great Council elects a new house; citizens change the crown only through a Rising', () => {
-  assert.match(byId('heirs-naming-proclamation').body,/names \{heir\} of House \{house\} as heir/);
+  assert.match(byId('heirs-naming-proclamation').body,/names \{heir\} of \{house\} as heir/);
   assert.match(byId('seniority-report').body,/no heir was named/); assert.match(byId('seniority-report').body,/seniority/);
   assert.match(byId('council-convenes').body,/no eligible heir remains/); assert.match(byId('council-convenes').body,/Great Council of lords convenes to elect a new house/);
-  assert.match(byId('council-elects').body,/^The Great Council declares: House \{house\} is elected/);
+  assert.match(byId('council-elects').body,/^The Great Council declares: \{house\} is elected/);
   assert.match(byId('death-accession').body,/takes the Sky Throne on the passing of \{monarch\}/); assert.match(byId('abdication-accession').body,/lays down the crown/);
   assert.match(CE.hereditary.text,/heredity among the AI of the Royal House/); assert.match(CE.rising.text,/only through a Rising behind a claimant/);
   assert.equal(LP.noHeir.text,'No heir is named.'); assert.match(MO.text,/mourning for \{monarch\}/);

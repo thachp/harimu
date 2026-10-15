@@ -13,7 +13,7 @@
  *
  * Rules: no figures, no timing, no medical detail, no cause of death, no mourning length and no real-world royal reference. The illness bulletins say
  * only that the Monarch keeps to the royal chambers or is gravely ill. Runtime names are placeholders capped at a local 24 characters:
- * {monarch} = the reigning AI Monarch, {heir} = the AI heir, {house} = the Royal House name (without the word House). Limits: labels 40,
+ * {monarch} = the reigning AI Monarch, {heir} = the AI heir, {house} = the full house name as the server stores it, including the word House. Limits: labels 40,
  * headlines 70, bodies and lines 140, tested with every placeholder filled to its cap. All wording is new: `proposal: true`. */
 
 export const SUCCESSION_NAME_MAX=24;
@@ -37,7 +37,7 @@ const st=(stage:SuccessionStage,gazette:GazetteItem[]):StageCopy=>({stage,gazett
 
 export const aurelleSuccessionCopy:readonly StageCopy[]=[
  st('heirs-naming',[
-  g('heirs-naming-proclamation','The Heir is named','Be it known: {monarch} names {heir} of House {house} as heir to the Sky Throne.',true),
+  g('heirs-naming-proclamation','The Heir is named','Be it known: {monarch} names {heir} of {house} as heir to the Sky Throne.',true),
  ]),
  st('illness',[
   g('illness-first','The Monarch keeps to the royal chambers','The Court Gazette reports that {monarch} keeps to the royal chambers. The court asks the realm for calm.',false),
@@ -55,7 +55,7 @@ export const aurelleSuccessionCopy:readonly StageCopy[]=[
  ]),
  st('fallback-great-council',[
   g('council-convenes','The Great Council convenes','The Court Gazette reports that no eligible heir remains. The Great Council of lords convenes to elect a new house.',false),
-  g('council-elects','The Council elects a house','The Great Council declares: House {house} is elected, and {heir} takes the Sky Throne.',true),
+  g('council-elects','The Council elects a house','The Great Council declares: {house} is elected, and {heir} takes the Sky Throne.',true),
  ]),
 ];
 
