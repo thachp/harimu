@@ -3,6 +3,7 @@
 import { X } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { formatMinor, quoteTessera, summarizeWallet, walletHistoryLimit, type WalletTransaction } from '@/lib/wallet';
+import { kioskBuyLabel, kioskClosed, kioskComingSoon, kioskExplainer, kioskHeader, kioskRateLine, kioskReceipt, spk } from '@/lib/kiosk-text';
 
 export type WalletPanelProps = {
   sparkMinor?: number;
@@ -18,14 +19,16 @@ export const kioskOffers = [100, 500, 2500]; // 1, 5 and 25 TSR; 4 SPK per TSR a
 
 function WalletKiosk({ sparkMinor, rate, onBuyTessera }: { sparkMinor: number; rate: number; onBuyTessera: (tesseraMinor: number) => Promise<string | null> }) {
   const [kiosk, setKiosk] = useState<{ pending: boolean; message: string | null }>({ pending: false, message: null });
-  return <section className="wallet-kiosk" aria-label="Clearing House kiosk">
-    <h3>Clearing House kiosk</h3>
-    <p>Buy Tessera with Spark at the official rate. No fee in this preview.</p>
+  return <section className="wallet-kiosk" aria-label={kioskHeader}>
+    <h3>{kioskHeader}</h3>
+    <p>{kioskExplainer}</p>
+    <p>{kioskRateLine(rate)}</p>
     <div>{kioskOffers.map(offer => { const cost = Math.ceil(offer / rate); return <button key={offer} type="button"
-      disabled={kiosk.pending || cost > sparkMinor} title={cost > sparkMinor ? `Needs ${formatMinor(cost)} SPK` : undefined}
-      onClick={async () => { setKiosk({ pending: true, message: null }); const error = await onBuyTessera(offer); setKiosk({ pending: false, message: error ?? `Bought ${formatMinor(offer)} TSR for ${formatMinor(cost)} SPK.` }); }}>
-      Buy {formatMinor(offer)} TSR · {formatMinor(cost)} SPK</button>; })}</div>
+      disabled={kiosk.pending || cost > sparkMinor} title={cost > sparkMinor ? `Needs ${spk(cost)}` : undefined}
+      onClick={async () => { setKiosk({ pending: true, message: null }); const error = await onBuyTessera(offer); setKiosk({ pending: false, message: error ?? kioskReceipt(offer, cost) }); }}>
+      {kioskBuyLabel(offer)} <small>· {spk(cost)}</small></button>; })}</div>
     {kiosk.message && <p role="status">{kiosk.message}</p>}
+    <p><small>{kioskComingSoon}</small></p>
   </section>;
 }
 
@@ -41,7 +44,7 @@ export function WalletPanel({ sparkMinor, tesseraMinor = 0, transactions, onBuyT
         </dl>
         <p className="wallet-quote">1 SPK = {wallet.quote.rate.toFixed(2)} TSR · your SPK ≈ {formatMinor(quoteTessera(wallet.sparkMinor))} TSR<br />
           <small>Official rate, {wallet.quote.source}.</small></p>
-        {onBuyTessera ? <WalletKiosk sparkMinor={wallet.sparkMinor} rate={wallet.quote.rate} onBuyTessera={onBuyTessera} /> : <p><small>The Clearing House kiosk is not open yet.</small></p>}
+        {onBuyTessera ? <WalletKiosk sparkMinor={wallet.sparkMinor} rate={wallet.quote.rate} onBuyTessera={onBuyTessera} /> : <p><small>{kioskClosed}</small></p>}
         <h3>Recent transactions</h3>
         {wallet.transactions.length === 0 ? <p>No wages, purchases or fees recorded yet.</p> :
           <table className="wallet-history"><thead><tr><th scope="col">Date</th><th scope="col">Reason</th><th scope="col">Amount (SPK)</th></tr></thead>

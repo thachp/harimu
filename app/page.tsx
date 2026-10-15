@@ -19,6 +19,7 @@ import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/gu
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
+import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
 import { marketVisible } from '@/lib/market-visibility';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
@@ -639,21 +640,27 @@ export default function Home() {
   const [economy, setEconomy] = useState<Economy | null>(null);
   // #210: the Clearing House kiosk opens with the World Registry (HARIMU_SQUARE_PURCHASE_ENABLED).
   const [kioskOpen, setKioskOpen] = useState(false);
+  const kioskRules = useRef({ minTesseraMinor: 100, maxTesseraMinor: 10000, sparkPerTessera: 4 }); // replaced by the server's kiosk block
+
   useEffect(() => {
     if (!walletOpen) return;
     let live = true;
-    fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean } | null> : null).then((data) => { if (live) setKioskOpen(data?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
+    fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean; kiosk?: { sparkPerTessera: number; minTesseraMinor: number; maxTesseraMinor: number } } | null> : null).then((data) => { if (data?.kiosk) kioskRules.current = data.kiosk; if (live) setKioskOpen(data?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
     return () => { live = false; };
   }, [walletOpen]);
   const buyTessera = async (tesseraMinor: number): Promise<string | null> => {
     try {
       const response = await fetchIdempotent(fetch, '/api/world/registry', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'buy-tessera', tesseraMinor, requestId: crypto.randomUUID() }) });
-      const data = await response.json() as { error?: string; sparkMinor?: number; tesseraMinor?: number };
-      if (!response.ok) return data.error ?? 'The Clearing House kiosk is unavailable.';
+      const data = await response.json() as { error?: string; reason?: string; sparkMinor?: number; tesseraMinor?: number };
+      if (!response.ok) {
+        // #210 follow-up: Content's #325 refusal copy, values pre-formatted with units; the server message stays the fallback.
+        const rules = kioskRules.current;
+        return kioskRefusal(data.reason, { amount: tsr(tesseraMinor), cost: spk(Math.ceil(tesseraMinor * rules.sparkPerTessera)), min: tsr(rules.minTesseraMinor), max: tsr(rules.maxTesseraMinor) }) ?? data.error ?? kioskClosed;
+      }
       setEconomy(current => current && { ...current, walletMinor: data.sparkMinor ?? current.walletMinor, tesseraMinor: data.tesseraMinor ?? current.tesseraMinor });
       return null;
-    } catch { return 'The Clearing House kiosk is unavailable.'; }
+    } catch { return kioskClosed; }
   };
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
   const [workPending, setWorkPending] = useState(false);
