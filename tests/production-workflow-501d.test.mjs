@@ -29,7 +29,7 @@ test('workflow: every step that changes anything is gated on dry_run == false, s
   for (const name of ['Build production', 'Deploy production']) assert.match(step(name), /rollback_version == ''/);
   assert.match(step('Roll back'), /rollback_version != ''/);
   assert.match(step('Refuse a real deploy'), /backup_confirmed != true/);
-  assert.ok(workflow.indexOf('- name: Apply pending Postgres migrations') < workflow.indexOf('- name: Deploy production') && workflow.indexOf('- name: Deploy production') < workflow.indexOf('- name: Smoke checks'));
+  assert.ok(workflow.indexOf('- name: Apply pending Postgres migrations') < workflow.indexOf('- name: Deploy production') && workflow.indexOf('- name: Deploy production') < workflow.indexOf('- name: Smoke checks\n'));
   for (const s of steps) for (const line of (s.match(/run: \|?\n?([^]*?)(?=\n {6,8}\w+:|$)/)?.[1] ?? '').split('\n')) assert.doesNotMatch(line, /\$\{\{/, 'inputs reach shell only through env variables');
   assert.match(workflow, /Smoke checks FAILED: roll back/);
 });
@@ -91,4 +91,21 @@ test('QA3 #644 gaps: main() runs the journal gate, and the driver keeps the jour
   assert.match(readFileSync('scripts/deploy-production.mjs', 'utf8'), /journalProblems\(\);[^]*assertProductionConfig\(readProductionConfigRaw\(\)\)/, 'gate runs before the config assertion');
   const driver = readFileSync('lib/postgres/driver.ts', 'utf8');
   assert.match(driver, /export function postgresConnection\([^)]*journal=true\)/, 'the driver default keeps the journal (preview unchanged)'); assert.match(driver, /\{journalRetentionApproved,allowAccountElectionWrites,journal\}/, 'the switch reaches PostgresDatabase');
+});
+
+test('#501e follow-up (QA2 on #647): the migrate step fails closed, actions are pinned by sha, smoke has timeouts and runs without secrets, the build precedes the database change', async () => {
+  assert.doesNotMatch(workflow, /&&\s*secrets\.[A-Z_]+\s*\|\|/, 'no a && b || c fallback between admin secrets');
+  const production = step('Apply pending Postgres migrations with the production admin secret'), preview = step('Apply pending Postgres migrations with preview');
+  assert.match(production, /inputs\.database_url_env == 'PRODUCTION_DATABASE_ADMIN_URL'/); assert.match(production, /PREVIEW_DATABASE_ADMIN_URL: \$\{\{ secrets\.PRODUCTION_DATABASE_ADMIN_URL \}\}/); assert.doesNotMatch(production, /secrets\.PREVIEW_DATABASE_ADMIN_URL/, 'the production choice can never read preview\'s secret');
+  assert.match(preview, /inputs\.database_url_env == 'PREVIEW_DATABASE_ADMIN_URL'/); assert.doesNotMatch(preview, /secrets\.PRODUCTION_DATABASE_ADMIN_URL/);
+  for (const s of [production, preview]) { assert.match(s, /test -n "\$PREVIEW_DATABASE_ADMIN_URL" \|\| \{[^}]*exit 1; \}\n\s+npm run db:postgres:migrate/, 'an empty secret stops before the migrator'); assert.match(s, /inputs\.dry_run == false/); }
+  const at = name => workflow.indexOf(`- name: ${name}`);
+  assert.ok(at('Build production') < at('Apply pending Postgres migrations') && at('Refuse a real deploy') < at('Build production'), 'backup confirmation, then build, then the first database change');
+  const uses = [...workflow.matchAll(/uses: (\S+)/g)].map(m => m[1]); assert.ok(uses.length >= 2);
+  for (const use of uses) assert.match(use, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/, `${use} is pinned by commit sha`);
+  assert.match(workflow, /persist-credentials: false/); assert.match(workflow, /timeout-minutes: 45/);
+  assert.match(step('Smoke checks after rollback'), /scripts\/smoke-production\.mjs --sha=any/); assert.doesNotMatch(step('Smoke checks after rollback'), /secrets\.|CLOUDFLARE_API_TOKEN/); assert.doesNotMatch(step('Roll back the Worker'), /smoke-production/);
+  const source = readFileSync('scripts/smoke-production.mjs', 'utf8'); assert.match(source, /smokeTimeoutMs = 10_000/);
+  let signal; await smokeProblems(head, async (url, options) => { signal ??= options.signal; return Response.json({ sha: head, nations: [] }); });
+  assert.ok(signal instanceof AbortSignal, 'every smoke request carries a timeout signal');
 });
