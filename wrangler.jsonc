@@ -48,6 +48,8 @@
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
     "HARIMU_FAITH_ENABLED": "false",
     "HARIMU_WAR_ENABLED": "false",
+    // #308: AI treaties PoC (non-aggression pact, trade agreement). Off until QA; treaties are proposed and ratified by server code only.
+    "HARIMU_DIPLOMACY_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

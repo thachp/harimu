@@ -3,6 +3,7 @@ import type { GovernmentSnapshot } from './government';
 import { publicGovernmentSnapshot, governmentDisclosure } from './government-disclosure';
 import { presidiumRumors, readPresidium } from './korund-presidium';
 import { readWars, warNewsItems } from './war'; // #309
+import { readTreaties, treatyNewsItems } from './diplomacy'; // #308
 import { undergroundNewsItems } from './korund-underground'; // #295
 
 export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model';kind?:NewsItemKind};
@@ -12,7 +13,7 @@ export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean}={}):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean;diplomacy?:boolean}={}):Promise<NationalNews|null> {
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
  if(!edition)return null;
@@ -36,6 +37,7 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  if(nationId==='korund'&&options.korundPresidium)for(const r of presidiumRumors(await readPresidium(db)))items.push({...r,source:'deterministic',kind:'template'}); // #70 State Media rumors
  if(nationId==='korund'&&options.faith)items.push(...await undergroundNewsItems(db,Math.floor(now/1000))); // #295 State Media inspection rumors, derived on read (no faith, shrine or person named)
  if(options.war)items.push(...warNewsItems((await readWars(db,Math.floor(now/1000))).wars,nationId)); // #309 declaration, mobilization end and war end lines, derived on read
+ if(options.diplomacy)items.push(...treatyNewsItems((await readTreaties(db,Math.floor(now/1000))).treaties,nationId)); // #308 ratification and broken-pact lines, derived on read
  if(tick){
   const proposals=JSON.parse(tick.proposals_json) as (GovernmentSnapshot|null)[];
   const snapshot=publicGovernmentSnapshot(proposals.find(proposal=>proposal?.nationId===nationId)??null);
