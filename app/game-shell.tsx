@@ -13,6 +13,7 @@ import type { WorldClock } from '@/lib/world-simulation';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { LocationId, ViewportSelection } from '@/lib/game-viewport';
 import './game-shell.css';
+import { NationCrest } from './nation-crest';
 import { NationSymbol } from './nation-symbol';
 import { nationIsPreview } from '@/lib/nation-discovery';
 import { locationVisible, marketVisible } from '@/lib/market-visibility';
@@ -154,7 +155,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
     </header>
     {view !== 'country' && <div className="game-stage-overlay">{breadcrumbs}{shiftChip}</div>}
     {noticeVisible && <div className="game-notice" role={noticeKind === 'error' ? 'alert' : 'status'}><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setDismissedNotice(notice)}><X size={16} /></button></div>}
-    {hasPanel ? <aside id="game-details" className="game-inspector" aria-label={sceneTitle}><header className="game-inspector-title"><div><small>{shownNationName} / {inspecting ? 'NATION INSPECTION' : 'CITIZEN LIFE'}</small><h1 id="game-panel-title" tabIndex={-1}>{sceneTitle}</h1></div><button type="button" aria-label="Collapse details" aria-expanded="true" aria-controls="game-details" onClick={close}><CaretRight size={20} /></button></header><div className="game-inspector-body">
+    {hasPanel ? <aside id="game-details" className="game-inspector" aria-label={sceneTitle}><header className="game-inspector-title">{!identityLoading && <NationCrest id={nation.id} size={44} />}<div><small>{shownNationName} / {inspecting ? 'NATION INSPECTION' : 'CITIZEN LIFE'}</small><h1 id="game-panel-title" tabIndex={-1}>{sceneTitle}</h1></div><button type="button" aria-label="Collapse details" aria-expanded="true" aria-controls="game-details" onClick={close}><CaretRight size={20} /></button></header><div className="game-inspector-body">
       {selection?.kind === 'tile' && <section className="game-selection"><small>SELECTED SQUARE</small><h2>{selection.label}</h2><p>{selection.detail}</p></section>}{panel}
     </div></aside> : <button id="game-reopen" className="game-reopen-panel" type="button" aria-expanded="false" aria-controls="game-details" onClick={() => { setCollapsed(false); requestAnimationFrame(() => document.getElementById('game-panel-title')?.focus()); }}><Compass size={18} /><span>Show {sceneTitle} details</span><CaretRight size={16} /></button>}
     <nav id="game-location-dock" className="game-dock" aria-label="Game locations">{places.filter(({id}) => locationVisible(id, resourceNation.id, marketOpen)).map(({id,name,icon:Icon}) => { const label = resourceNation.id === 'korund' && id === 'market' ? 'State store' : resourceNation.id === 'korund' && id === 'workplace' ? 'Assignment' : name; return <button key={id} type="button" aria-label={`Open ${label}`} aria-current={view === id || view === 'nation' && id === 'government' ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={20} weight={view === id || view === 'nation' && id === 'government' ? 'fill' : 'regular'} /><span>{label}</span>{(view === id || view === 'nation' && id === 'government') && <i />}</button>; })}</nav>
