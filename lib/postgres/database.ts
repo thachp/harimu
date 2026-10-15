@@ -27,14 +27,14 @@ class Statement implements DatabaseStatement{
  * No query caching/read replica may sit in front of authoritative gameplay reads.
  */
 export class PostgresDatabase implements GameDatabase{
- constructor(private readonly connect:()=>Promise<QueryConnection>,private readonly options:{allowBallotFixtureWrites?:boolean;allowAccountElectionWrites?:boolean;journalRetentionApproved?:boolean}={}){ }
+ constructor(private readonly connect:()=>Promise<QueryConnection>,private readonly options:{allowBallotFixtureWrites?:boolean;allowAccountElectionWrites?:boolean;journalRetentionApproved?:boolean;journal?:boolean}={}){ }
  prepare(sql:string){return new Statement(this,sql);}
  async batch(statements:DatabaseStatement[]){if(statements.some(s=>!(s instanceof Statement)||s.owner!==this))throw Error('Foreign database statement.');return this.execute(statements as Statement[],true);}
  async execute(statements:Statement[],transaction:boolean){
   const ballot=statements.some(statement=>targetsBallot(statement.sql));
   if(ballot&&statements.some(statement=>!targetsBallot(statement.sql)))throw Error('Ballot writes require a dedicated transaction; unrelated writes must remain journaled.');
   if(ballot&&!this.options.allowBallotFixtureWrites&&!(this.options.allowAccountElectionWrites&&statements.every(statement=>targetsBallot(statement.sql)&&/\bpoc_(anonymous_ballots|voter_receipts)\b/i.test(statement.sql)&&!/\bcivic_(anonymous_ballots|voter_receipts)\b/i.test(statement.sql))))throw Error('Ballot transitions remain disabled pending privacy review.');
-  if(transaction&&this.options.journalRetentionApproved!==true)throw Error('Rollback journal retention is not approved.');
+  if(transaction&&this.options.journal!==false&&this.options.journalRetentionApproved!==true)throw Error('Rollback journal retention is not approved.');
   let connection:QueryConnection;try{connection=await this.connect();}catch{throw Error('PostgreSQL connection unavailable.');}let begun=false;const results:DatabaseResult[]=[];let changes=0;
   try{
    await connection.query(transaction?'BEGIN':'BEGIN READ ONLY');begun=true;await connection.query('SET LOCAL search_path TO public,pg_catalog');await connection.query("SET LOCAL TIME ZONE 'UTC'");
@@ -45,8 +45,8 @@ export class PostgresDatabase implements GameDatabase{
     results.push({success:true,meta:{changes:statementChanges},results:normalize(result.rows) as Record<string,unknown>[]});
    }
    // A ranking-free boundary makes journal-only rollback fail closed after a ballot.
-   if(transaction&&ballot&&results.some(result=>result.meta.changes>0))await connection.query('INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ($1)',[JSON.stringify([{ballotBoundary:'separated-ballots-v1'}])]);
-   if(transaction&&!ballot&&results.some(result=>result.meta.changes>0))await connection.query('INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ($1)',[JSON.stringify(statements.filter(statement=>/^\s*(INSERT|UPDATE|DELETE)\b/i.test(statement.sql)).map(statement=>({sql:statement.sql,values:statement.values})))]);
+   if(this.options.journal!==false&&transaction&&ballot&&results.some(result=>result.meta.changes>0))await connection.query('INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ($1)',[JSON.stringify([{ballotBoundary:'separated-ballots-v1'}])]);
+   if(this.options.journal!==false&&transaction&&!ballot&&results.some(result=>result.meta.changes>0))await connection.query('INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ($1)',[JSON.stringify(statements.filter(statement=>/^\s*(INSERT|UPDATE|DELETE)\b/i.test(statement.sql)).map(statement=>({sql:statement.sql,values:statement.values})))]);
    await connection.query('COMMIT');return results;
   }catch(error){if(begun)await connection.query('ROLLBACK').catch(()=>{});const code=error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?` (${error.code})`:'';// #179: keep only the relation name of an undefined-table error (no values or SQL) so callers can tell which table is missing.
    const relation=code===' (42P01)'&&typeof (error as {message?:unknown}).message==='string'?/relation "([\w.]+)" does not exist/.exec((error as {message:string}).message)?.[1]:undefined;
