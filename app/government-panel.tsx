@@ -7,6 +7,7 @@ import { AiBadge } from './ai-disclosure';
 import { GameTimer } from './game-timer';
 import { StabilityPanel } from './stability-panel';
 import { WarBanner } from './war-banner';
+import { ForeignAffairsPanel } from './foreign-affairs-panel'; // #308
 
 import type { SimulationState } from '@/lib/world-simulation';
 import type { VerificationState } from '@/lib/verification';
@@ -34,6 +35,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     {!localDemo && <section aria-label="Civic verification"><h4>Phone verification for petitions</h4><p>Petitions need a verified phone number to help protect each citizen’s voice. You can read policy previews while petition submission is unavailable.</p><p role="status">{verification?.reason ?? 'Checking whether your petitions can count…'}</p></section>}
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> <AiBadge /> · {role.controller}</li>)}</ul>
     {!localDemo && simulation?.wars && <WarBanner wars={simulation.wars.wars} nationId={snapshot.nationId} />}
+    {!localDemo && simulation?.treaties && <ForeignAffairsPanel treaties={simulation.treaties.treaties} nationId={snapshot.nationId} />}
     {!localDemo && simulation?.stability && <StabilityPanel score={simulation.stability.find(score => score.nationId === snapshot.nationId)} />}
     {!localDemo && simulation && <section aria-label="Durable world simulation">
       <h4>World day {simulation.clock.gameDay} · 12× time</h4>

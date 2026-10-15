@@ -10,6 +10,7 @@ import { runKorundPresidium } from './korund-presidium';
 import { runNpcSupply } from './npc-supply';
 import { holidayNationsOn } from './festivals';
 import { readWars, type WarState } from './war'; // #309
+import { readTreaties, runDiplomacy, type TreatyState } from './diplomacy'; // #308
 import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
@@ -48,10 +49,10 @@ export type WorldClock = {
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
 export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecution | null;
-  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState };
+  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; treaties?: TreatyState };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; kindleAssembly?: { scope: AssemblyScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; war?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; kindleAssembly?: { scope: AssemblyScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; war?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
@@ -98,14 +99,16 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   if (options.korundPresidium) await runKorundPresidium(db, now);
   // #295: Korund underground inspections (capped), only while HARIMU_FAITH_ENABLED is on (write paths only).
   if (options.faithFestivals) await runKorundRaids(db, now).catch(error => { console.warn('[world] Korund inspection tick failed', error instanceof Error ? error.name : 'unknown'); });
-  return readWorldSimulation(db, now, { war: options.war });
+  // #308: AI treaties (decide proposals, expire terms), only while HARIMU_DIPLOMACY_ENABLED is on (write paths only).
+  if (options.diplomacy) await runDiplomacy(db, now).catch(error => { console.warn('[world] diplomacy tick failed', error instanceof Error ? error.name : 'unknown'); });
+  return readWorldSimulation(db, now, { war: options.war, diplomacy: options.diplomacy });
 
 }
 
 /** #205: the same snapshot advanceWorld returns, computed without any write. Due-but-unprocessed ticks show as
  *  pendingTicks; the next write path (or GET /api/world) processes them. */
 /** #309: `war` (HARIMU_WAR_ENABLED) adds the derived war state; with it off nothing is queried or returned. */
-export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { war?: boolean } = {}): Promise<SimulationState> {
+export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { war?: boolean; diplomacy?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
   const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
@@ -122,5 +125,5 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation'},
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:await readWars(db,now)}:{})};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:await readWars(db,now)}:{}),...(options.diplomacy?{treaties:await readTreaties(db,now)}:{})};
 }
