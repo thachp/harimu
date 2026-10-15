@@ -83,7 +83,7 @@ test('voices stay distinct; no real-world country, treaty or leader; no Notable;
   assert.doesNotMatch(pressFor('korund').report.imposed.text,/Be it known|Gazette/);
   for (const l of lines()) assert.doesNotMatch(l,/\b(punish|crush|starve|destroy|revenge|enemy|you will pay)\b/i, l);
 });
-test('unwired: nothing in app/ or components/ imports embargo-copy', () => {
+test('wired by #363 only: the Foreign affairs panel is the one app/ importer of embargo-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/embargo-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/foreign-affairs-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/embargo-copy/, f);
 });
