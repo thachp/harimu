@@ -19,7 +19,7 @@ export function AccountMenu(){
   useEffect(()=>{
     const element=menu.current;
     if(!open||!element)return;
-    clerk.mountUserButton(element,{defaultOpen:true,__experimental_asStandalone:opened=>{if(!opened){dialog.current?.close();setOpen(false);trigger.current?.focus();}},appearance:{elements:{userButtonPopoverCard:styles.menu,userButtonPopoverFooter:styles.footer}}});
+    clerk.mountUserButton(element,{defaultOpen:true,__experimental_asStandalone:opened=>{if(!opened){dialog.current?.close();setOpen(false);trigger.current?.focus();}},appearance:{elements:{userButtonPopoverCard:styles.menu,userButtonPopoverFooter:styles.footer,userPreviewTextContainer:styles.previewText,userPreviewMainIdentifier:styles.previewIdentifier,userPreviewSecondaryIdentifier:styles.previewIdentifier}}});
     const user=clerk.user;
     const label=`${user?.fullName?.trim()||user?.username||user?.primaryEmailAddress?.emailAddress||'Account'} avatar`;
     const fixAlt=()=>labelAvatars(element,label);
