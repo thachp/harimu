@@ -126,6 +126,17 @@ export const mobilizationStatus={
  proposal:true,
 } as const;
 
+/** Active-war banner (#339, follow-up to #334/#335): the Country-view banner once the 48 real hours are up and the war is active.
+ * Same other-nation-only naming as `warBanner.header` (`ours` is the nation that declared and names {defender}; `againstUs` is the
+ * nation declared upon and names {attacker}); never both. It is a system banner, so it has no byline and no AI badge. `status` and
+ * `detail` are the existing `mobilizationStatus.active` lines, reused word for word, so this adds no wording or figures of its own. */
+export const activeWarBanner={
+ header:{ours:'Active war with {defender}',againstUs:'Active war with {attacker}'},
+ status:mobilizationStatus.active[1],
+ detail:mobilizationStatus.active[0],
+ proposal:true,
+} as const;
+
 /** Reasons a declaration was refused, for the AI-leader log and news. Reasons, not threats. */
 export const blockedDeclaration={
  foundingPeriod:L('The declaration was not made. War cannot be declared during the Founding Period, a shard\'s first 30 days.'),
