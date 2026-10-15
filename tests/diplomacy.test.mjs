@@ -171,8 +171,8 @@ test('foreign affairs panel: this nation\'s treaties with their terms; empty sta
   const require = createRequire(import.meta.url);
   const load = async (file, stubs) => { const exports = {}; const src = await readFile(new URL(file, import.meta.url), 'utf8');
     new Function('exports', 'require', ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText)(exports, name => name in stubs ? stubs[name] : require(name)); return exports; };
-  const rules = await rt.importModule('lib/diplomacy-rules.ts'), copy = await rt.importModule('lib/diplomacy-copy.ts');
-  const { ForeignAffairsPanel } = await load('../app/foreign-affairs-panel.tsx', { '@/lib/diplomacy-copy': copy, '@/lib/diplomacy-rules': rules, './display-preferences': { useDisplayTimestamp: () => value => `T${value}` } });
+  const rules = await rt.importModule('lib/diplomacy-rules.ts'), copy = await rt.importModule('lib/diplomacy-copy.ts'); const embargoCopy = await rt.importModule('lib/embargo-copy.ts');
+  const { ForeignAffairsPanel } = await load('../app/foreign-affairs-panel.tsx', { '@/lib/diplomacy-copy': copy, '@/lib/diplomacy-rules': rules, '@/lib/embargo-copy': embargoCopy, './display-preferences': { useDisplayTimestamp: () => value => `T${value}` } });
   const base = { id: 't1', kind: 'non-aggression', proposer: 'kindle', other: 'korund', proposedBy: 'AI President', proposedAt: 1, status: 'in-force', ratifiedAt: 2, endsAt: 5000, brokenAt: null, ratifications: [] };
   const html = (treaties, nation) => renderToStaticMarkup(ForeignAffairsPanel({ treaties, nationId: nation }));
   assert.match(html([base], 'kindle'), /Foreign affairs/); assert.match(html([base], 'kindle'), /In force until T5000000: non-aggression pact between Kindle and Korund/); assert.match(html([base], 'kindle'), /No war declarations between the signatories/);

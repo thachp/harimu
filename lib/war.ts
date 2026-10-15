@@ -172,7 +172,7 @@ export function warNewsItems(wars: PublicWar[], readerNation: string): WarNewsIt
     if (war.endedAt === null || war.endedAt >= war.mobilizationEndsAt) {
       if (war.status !== 'mobilizing') {
         const over = endedNoticesFor(readerNation)!.notices[side];
-        items.push({ id: `war:${war.id}:mobilized`, title: fill(over.headline, names), text: fill(over.body, names), occurredAt: war.mobilizationEndsAt * 1000, source: 'deterministic', kind: over.aiBadge ? 'decree' : 'template' });
+        items.push({ id: `war:${war.id}:mobilized`, title: fill(over.headline, names), text: fill(over.body, names), occurredAt: war.mobilizationEndsAt * 1000, source: 'deterministic', kind: over.aiBadge && readerNation === 'aurelle' ? 'decree' : 'template' });
       }
     }
     if (war.endedAt !== null) {

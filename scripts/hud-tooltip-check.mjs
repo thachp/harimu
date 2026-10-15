@@ -22,10 +22,10 @@ export async function bundleShell(contents = shellEntry, env = {}) {
     define: { 'process.env.NODE_ENV': '"production"', ...Object.fromEntries(Object.entries(env).map(([k, v]) => [`process.env.${k}`, JSON.stringify(v)])) }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
     plugins: [
       { name: 'stubs', setup(b) {
-        const stubs = { './game-viewport': 'export default function V(){return null}', './game-timer': 'export function GameTimer(){return null}', './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useClerk=()=>({mountUserButton(){},unmountUserButton(){}})' };
+        const stubs = { './game-viewport': 'export default function V(){return null}', './game-timer': 'export function GameTimer({label}){return <span className="game-timer-stub"><strong>{label}</strong> · 1h 52m 10s real · 2d 19h game</span>}', './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useClerk=()=>({mountUserButton(){},unmountUserButton(){}})' };
         b.onResolve({ filter: /^(\.\/game-viewport|\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ }, a => ({ path: a.path, namespace: 'stub' }));
         b.onResolve({ filter: /\.module\.css$/ }, () => ({ path: 'css-module', namespace: 'stub' }));
-        b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.path === 'css-module' ? 'export default new Proxy({}, { get: (_, k) => String(k) })' : stubs[a.path], loader: 'jsx' }));
+        b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.path === 'css-module' ? 'export default new Proxy({}, { get: (_, k) => String(k) })' : stubs[a.path], loader: 'jsx', resolveDir: root }));
       } },
     ],
   });

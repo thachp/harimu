@@ -66,9 +66,15 @@ async function openWarBetween(db: GameDatabase, a: string, b: string): Promise<b
   return Boolean(row);
 }
 
+/** #363: an in-force embargo between the pair (either direction). A direct query so this module does not import lib/embargo.ts (which imports this one); a database without the table reads as none. */
+async function embargoInForce(db: GameDatabase, a: string, b: string): Promise<boolean> {
+  const row = await db.prepare("SELECT 1 AS found FROM embargoes WHERE pair_key=? AND status='in_force'").bind(treatyPairKey(a, b)).first().catch(tolerate(isMissingRelation, null));
+  return Boolean(row);
+}
+
 export type ProposeTreatyCommand = { proposer: string; other: string; kind: string; proposedBy: string; requestId: string };
 /** Server-side only (the AI leadership path calls this; no route does). Writes one `proposed` row; the world tick decides it. Idempotent per requestId. */
-export async function proposeTreaty(db: GameDatabase, command: ProposeTreatyCommand, now: number, options: { enabled: boolean }) {
+export async function proposeTreaty(db: GameDatabase, command: ProposeTreatyCommand, now: number, options: { enabled: boolean; embargo?: boolean }) {
   if (!options.enabled) return fail(403, 'disabled', 'Treaties are not open yet.');
   if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid authoritative world time.');
   if (!treatyRequestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
@@ -80,6 +86,8 @@ export async function proposeTreaty(db: GameDatabase, command: ProposeTreatyComm
   if (prior) return prior.proposer_nation === command.proposer && prior.other_nation === command.other && prior.kind === command.kind
     ? { ok: true as const, replay: true as const, treaty: publicTreaty(prior, now) } : fail(409, 'request_reused', 'That request id was already used for a different proposal.');
   await expireDueTreaties(db, now);
+  // #363: no new trade agreement while an embargo is in force between the pair, in either direction. `embargo` is the HARIMU_EMBARGO_ENABLED flag the caller passes (off: not checked).
+  if (options.embargo === true && command.kind === 'trade' && await embargoInForce(db, command.proposer, command.other)) return fail(409, 'embargo', 'An embargo is in force between these nations, so a trade agreement cannot be proposed.');
   if (await openWarBetween(db, command.proposer, command.other)) return fail(409, 'at_war', 'These nations are at war; a ceasefire or peace treaty is not part of this proposal path.');
   const id = `treaty-${command.requestId}`;
   // The unique live-per-pair-and-kind index and the request id make concurrent proposals safe: only one insert can land.
@@ -155,7 +163,7 @@ export function treatyNewsItems(treaties: PublicTreaty[], readerNation: string):
     const other = treaty.proposer === readerNation ? treaty.other : treaty.proposer;
     const values = { nationA: cap(treatyNationNames[readerNation]), nationB: cap(treatyNationNames[other]), treaty: treatyKindNames[treaty.kind], endsAt: treaty.endsAt === null ? '' : new Date(treaty.endsAt * 1000).toISOString().slice(0, 10) };
     const key: RatificationKey = readerNation === 'kindle' ? (treaty.kind === 'trade' ? 'kindle:trade' : 'kindle:treaty') : `${readerNation}:any` as RatificationKey;
-    const news = ratificationFor(key)!, kind = news.aiBadge ? 'decree' as const : 'template' as const;
+    const news = ratificationFor(key)!, kind = news.aiBadge && news.nationId === 'aurelle' ? 'decree' as const : 'template' as const;
     items.push({ id: `treaty:${treaty.id}:ratified`, title: ratificationHeadlines[key], text: fill(news.body, values), occurredAt: treaty.ratifiedAt * 1000, source: 'deterministic', kind });
     if (treaty.status === 'broken' && treaty.brokenAt !== null) items.push({ id: `treaty:${treaty.id}:broken`, title: 'A treaty was broken', text: fill(treaty.kind === 'non-aggression' ? brokenPactLine.text : treatyStatusLines.broken[0].text, values), occurredAt: treaty.brokenAt * 1000, source: 'deterministic', kind });
   }

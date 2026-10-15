@@ -10,8 +10,9 @@
  * only through {endsAt}. Out of scope: multilateral sanctions, Clearing House suspension, smuggling and evasion, non-MVP nations.
  * No official is named: {office} is a runtime value. Placeholders ({nation}, {actor}, {target}, {good}, {office}, {endsAt}) are
  * pre-formatted strings capped by the shared name cap, which this module re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts).
- * Press headlines are fixed text (no placeholder), as in lib/diplomacy-copy.ts. Only "Be it known" Crown lines are AI-badged;
- * bylined reports are not. Limits: labels and headlines 40, lines 80 (ARC's number for this batch), tested with every placeholder
+ * Press headlines are fixed text (no placeholder), as in lib/diplomacy-copy.ts. Crown "Be it known" lines are AI-badged, and so, since #381 (docs ui-ux 23.2), are Korund `chairman` lines, which speak for the AI
+ * Chairman when the Korund state itself acts. `{actor}` can be any nation, so the generic Korund `report` lines (like Kindle and Gazette
+ * bylined reports) are not badged: they report an act, they do not speak for an AI leader. Limits: labels and headlines 40, lines 80 (ARC's number for this batch), tested with every placeholder
  * filled to 24 characters. All wording is new: `proposal: true`. */
 
 export { COUP_NAME_MAX as EMBARGO_NAME_MAX } from './palace-coup-copy';
@@ -23,9 +24,9 @@ export const EMBARGO_LINE_MAX=80;
 export type Line={text:string;proposal:true};
 export type EmbargoNation='kindle'|'korund'|'aurelle';
 export type EmbargoEvent='imposed'|'lifted';
-/** A press line with its canon byline. `aiBadge` is true only where the Crown speaks in its own voice ("Be it known"). */
+/** A press line with its canon byline. `aiBadge` is true where the Crown speaks in its own voice ("Be it known") or Korund State Media speaks for the Chairman (#381: the `chairman` lines; generic reports are not badged). */
 export type PressLine={text:string;aiBadge:boolean;proposal:true};
-export type EmbargoPress={nationId:EmbargoNation;byline:{name:string;proposal:boolean};headline:Readonly<Record<EmbargoEvent,string>>;report:Readonly<Record<EmbargoEvent,PressLine>>;crown?:Readonly<Record<EmbargoEvent,PressLine>>;proposal:true};
+export type EmbargoPress={nationId:EmbargoNation;byline:{name:string;proposal:boolean};headline:Readonly<Record<EmbargoEvent,string>>;report:Readonly<Record<EmbargoEvent,PressLine>>;chairman?:Readonly<Record<EmbargoEvent,PressLine>>;crown?:Readonly<Record<EmbargoEvent,PressLine>>;proposal:true};
 
 export const EMBARGO_NATIONS:readonly EmbargoNation[]=['kindle','korund','aurelle'];
 export const EMBARGO_EVENTS:readonly EmbargoEvent[]=['imposed','lifted'];
@@ -69,7 +70,8 @@ export const embargoPress:readonly EmbargoPress[]=[
   report:{imposed:P('Embargo: {actor} ends all trade with {target}.'),lifted:P('Lifted: {actor} reopens trade with {target}.')}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,
   headline:{imposed:'State Media: embargo imposed',lifted:'State Media: embargo lifted'},
-  report:{imposed:P('State Media: {actor} embargoes {target}.'),lifted:P('State Media: {actor} lifts embargo on {target}.')}},
+  report:{imposed:P('State Media: {actor} embargoes {target}.'),lifted:P('State Media: {actor} lifts embargo on {target}.')},
+  chairman:{imposed:P('State Media: the Chairman embargoes {target}.',true),lifted:P('State Media: the Chairman lifts the embargo on {target}.',true)}},
  {nationId:'aurelle',byline:{name:'Court Gazette',proposal:false},proposal:true,
   headline:{imposed:'The Court notes an embargo',lifted:'The Court notes an embargo ended'},
   report:{imposed:P('Court Gazette: {actor} embargoes {target}.'),lifted:P('Court Gazette: {actor} reopens {target} trade.')},
