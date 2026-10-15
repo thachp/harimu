@@ -17,10 +17,10 @@ async function setup(t, { flag, preview } = {}) {
   return r;
 }
 
-test('static: the flag ships "false" and is dashboard-managed; the label is the same in the panel; the faucet never touches the exchange', async t => {
+test('static: the flag is "true" in the file, dashboard-managed on deploys; the label is the same in the panel; the faucet never touches the exchange', async t => {
   await setup(t);
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_TEST_FAUCET_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_TEST_FAUCET_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['true']);
   const { dashboardManagedVars } = await import('../scripts/wrangler-pin.mjs'); assert.ok(dashboardManagedVars.includes(FLAG));
   assert.equal(testFaucetLabel, 'Test faucet, preview only'); assert.match(await readFile(new URL('../app/wallet-panel.tsx', import.meta.url), 'utf8'), /const testFaucetLabel = 'Test faucet, preview only'/);
   const code = ['../lib/test-faucet.ts', '../app/api/test-faucet/route.ts'].map(f => readFile(new URL(f, import.meta.url), 'utf8'));

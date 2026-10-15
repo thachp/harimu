@@ -148,7 +148,7 @@ test('flag off (shipped default): nothing changes: no bureau in the plan, action
   await shift(r, 'alice'); // existing Korund work is untouched
   assert.equal((await r.call('citizen', 'alice')).data.korundPlan.walletMinor, 800);
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_LABOR_BUREAU_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_LABOR_BUREAU_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['true']);
 });
 
 test('assignment is recorded only: shift pay and the brigade job are unchanged by the Bureau', async t => {

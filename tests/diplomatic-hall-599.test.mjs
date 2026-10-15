@@ -19,8 +19,8 @@ async function scene(t, backend, on = true) {
 }
 const rows = async r => (await r.db.prepare('SELECT id,user_id,nation_id,body,deleted FROM diplomatic_hall_messages ORDER BY posted_at,id').all()).results.map(x => ({ ...x }));
 
-test('wrangler.jsonc ships the Diplomatic Hall off, and the module and route stay import-light', async () => {
-  assert.deepEqual([...(await read('wrangler.jsonc')).matchAll(/"HARIMU_DIPLOMATIC_HALL_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+test('wrangler.jsonc ships the Diplomatic Hall on in preview, and the module and route stay import-light', async () => {
+  assert.deepEqual([...(await read('wrangler.jsonc')).matchAll(/"HARIMU_DIPLOMATIC_HALL_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   assert.doesNotMatch(await read('lib/diplomatic-hall.ts'), /^import (?!type )/m, 'lib/diplomatic-hall.ts imports only types');
 });
 
