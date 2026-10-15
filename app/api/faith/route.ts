@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
-import { attendWorship, chooseFaith, joinFestival, parseFaithCommand, readFaith } from '@/lib/faith';
+import { attendWorship, chooseFaith, joinFestival, parseFaithCommand, readFaith, worshipUnderground } from '@/lib/faith';
 import { travelBlock } from '@/lib/travel';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send a faith command.', reason: 'bad_request' }, 400); }
   const command = parseFaithCommand(body);
-  if (!command) return privateJson({ error: 'Send action "choose-faith" with faithId, "attend-worship", or "join-festival" with festivalId, and a requestId.', reason: 'bad_request' }, 400);
+  if (!command) return privateJson({ error: 'Send action "choose-faith" with faithId, "attend-worship", "worship-underground", or "join-festival" with festivalId, and a requestId.', reason: 'bad_request' }, 400);
   const db = await getDatabase(); const now = Math.floor(Date.now() / 1000);
   if (command.action === 'attend-worship' || command.action === 'join-festival') {
     // Worship and festivals happens at the city temple/meeting house, so it waits for arrival like other location-bound actions (#123).
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
   }
   const result = command.action === 'attend-worship' ? await attendWorship(db, userId, command.requestId, now, faithEnabled())
     : command.action === 'join-festival' ? await joinFestival(db, userId, command, now, faithEnabled()) // #68
+    : command.action === 'worship-underground' ? await worshipUnderground(db, userId, command.requestId, now, faithEnabled()) // #295: at home, so no travel wait
     : await chooseFaith(db, userId, command, now, faithEnabled());
   return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }
