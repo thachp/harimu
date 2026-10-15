@@ -176,7 +176,7 @@ async function undergroundState(db: GameDatabase, userId: string, faithId: Worsh
     blockedReason: worshippedToday ? korundUndergroundCopy.worshipAction.alreadyToday.text : null,
     nextAt: worshippedToday ? (today + 1) * gameDaySeconds : null,
     confirmation: korundUndergroundCopy.worshipAction.confirmation.text,
-    lastRaid: view.lastRaid, quietWeek: view.quietWeek,
+    lastRaid: view.lastRaid, quietWeek: view.quietWeek, suspicion: view.suspicion, // #382: private indicator (a band word, never the number)
   };
 }
 

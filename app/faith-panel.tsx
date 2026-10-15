@@ -127,6 +127,7 @@ export function FaithPanel({ api, initialPick = null }: { api: FaithApi; initial
       <ActionButton type="button" reason={busy ? 'Saving…' : faith.underground.blockedReason} onClick={() => api.worshipUnderground()}>{faith.underground.label}</ActionButton>
       {faith.underground.lastRaid && <p className="faith-note" role="status">{faith.underground.lastRaid.text} {faith.underground.lastRaid.devotionNote}</p>}
       {faith.underground.quietWeek && <p className="faith-note">{faith.underground.quietWeek}</p>}
+      {faith.underground.suspicion && <p className="faith-note faith-suspicion" title={faith.underground.suspicion.tooltip.join(' ')}>{faith.underground.suspicion.line} <small>({faith.underground.suspicion.privateTag})</small></p>}
     </div>}
 
     {faith.missionary && <MissionaryBlock missionary={faith.missionary} busy={busy} api={api} />}
