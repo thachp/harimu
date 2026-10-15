@@ -26,7 +26,7 @@ import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
 import { worldSquaresSchema, worldSquaresSeedSql, bootNationSquaresSql } from './map-zones';
 import { worldCitiesSchema } from './city-founding';
-import { aurelleSchemas, royalFavorSchemas } from './aurelle';
+import { aurelleFavorIndexes, aurelleSchemas, royalFavorSchemas } from './aurelle';
 import { warSchemas } from './war'; // #309
 import { siegeSchemas } from './siege'; // #419
 import { treatySchemas } from './diplomacy'; // #308
@@ -300,6 +300,7 @@ async function initialize(database: GameDatabase) {
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));
+  await database.batch(aurelleFavorIndexes.map(sql => database.prepare(sql))); // #616: both tables exist by now (royalFavorSchemas ran in the batch above)
   await database.prepare("INSERT OR IGNORE INTO aurelle_resources(id,initial_food,initial_minor) VALUES ('estate',40,100000)").run();
   await database.prepare("INSERT OR IGNORE INTO world_supply (id,initial_food,unit_minor) VALUES ('kindle-food-supplier',40,100)").run();
   await database.prepare("INSERT OR IGNORE INTO korund_resources(id,initial_food,initial_minor) VALUES ('state',40,100000)").run();

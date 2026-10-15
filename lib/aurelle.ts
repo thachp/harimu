@@ -38,6 +38,14 @@ const fadeBinds=(decayAt:number)=>[decayAt-favorDecaySeconds,decayAt,decayAt-fav
 export const royalFavorBinds=(userId:string,decayAt?:number):unknown[]=>decayAt===undefined?[userId,userId]:[...fadeBinds(decayAt),userId,...fadeBinds(decayAt),userId];
 /** The binds of royalFavorSql(decayAt, column): the two fade windows and no user. */
 export const royalFavorColumnBinds=(decayAt:number):unknown[]=>[...fadeBinds(decayAt),...fadeBinds(decayAt)];
+/** #585/#616: the average Royal Favor over settling citizens, each citizen's balance by the rule above (read by the Aurelle coup while HARIMU_FAVOR_DECAY_ENABLED is on; binds: royalFavorColumnBinds). */
+export const royalFavorAverageSql=(decayAt:number)=>`SELECT AVG(f) AS favor FROM (SELECT ${royalFavorSql(decayAt,'u.clerk_user_id')} AS f FROM (SELECT DISTINCT clerk_user_id FROM aurelle_settlements) u) t`;
+/** #616: the decayed balance reads one citizen's settlements and spends by clerk_user_id (the spend charge also by settled_at <= spent_at), once per settling citizen. Without these the coup average scans both tables
+ *  for every citizen (quadratic: 12 s at 3,000 citizens). Covering, so the sums never touch the table rows. The same statements are in migration 0051 (drizzle and db/postgres). */
+export const aurelleFavorIndexes=[
+ 'CREATE INDEX IF NOT EXISTS idx_aurelle_settlements_user_settled ON aurelle_settlements(clerk_user_id, settled_at, favor)',
+ 'CREATE INDEX IF NOT EXISTS idx_aurelle_favor_spends_user_spent ON aurelle_favor_spends(clerk_user_id, spent_at, amount)',
+] as const;
 /** Flag off: the SQL the balance has always used (the first `?` twice: earned, spent). Kept as a constant for the guarded leave-kinward spend. */
 export const royalFavorBalanceSql=royalFavorSql();
 /** Spendable Royal Favor; decayAt (seconds) applies the #529 decay. A database without migration 0028 yet has nothing spent, but nothing can be spent either (see faith.ts). */
