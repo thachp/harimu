@@ -73,7 +73,8 @@ test('scope: Kindle and Spark only; no Korund or Aurelle money, banks, loans, st
   assert.doesNotMatch(t,/\b(bank|banks|loan|loans|interest|stimulus|redenominat\w*|exchange rate|debase\w*)\b|Notable|@/i);
   assert.match(t,/Spark/); assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia)\b/);
 });
-test('unwired: nothing in app/, components/ or lib/ imports reserve-board-copy', () => {
+test('wired: only app/reserve-board-line.tsx and lib/reserve-board-view.ts import reserve-board-copy (#431)', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('reserve-board-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/reserve-board-copy/, f);
+  assert.match(readFileSync('app/reserve-board-line.tsx','utf8'),/from '@\/lib\/reserve-board-copy'/,'the line component imports the copy');
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('reserve-board-copy.ts')&&!['app/reserve-board-line.tsx','lib/reserve-board-view.ts'].includes(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/reserve-board-copy/, f);
 });
