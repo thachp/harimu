@@ -37,7 +37,7 @@ export async function citySquares(db: GameDatabase, nationId: string): Promise<P
   const capital = citiesForNation(nationId).find(c => c.role === 'capital'); const outpost = outpostCityForNation(nationId);
   const places: Place[] = [
     { ...seed.capital, cityId: capital?.id ?? null, label: capital?.name ?? 'Capital' },
-    { ...seed.outpost, cityId: outpost?.role === 'frontier' ? outpost.id : null, label: outpost?.name ?? 'Border outpost' },
+    ...(seed.outpost ? [{ ...seed.outpost, cityId: outpost?.role === 'frontier' ? outpost.id : null, label: outpost?.name ?? 'Border outpost' }] : []),
   ];
   try {
     const founded = await db.prepare('SELECT id,name,center_x,center_y FROM world_cities WHERE nation_id=?').bind(nationId).all<{ id: string; name: string; center_x: number; center_y: number }>();
