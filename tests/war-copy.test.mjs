@@ -99,7 +99,7 @@ test('nation voices stay distinct: Kindle plain, Korund collective, Aurelle cere
   assert.doesNotMatch(noticesFor('korund').notices['against-us'].body,/Be it known/);
   for (const nt of Object.values(noticesFor('aurelle').notices)) assert.doesNotMatch(nt.body,/One hammer|Wire Service/);
 });
-test('unwired: nothing in app/ or components/ imports war-copy', () => {
+test('war-copy is imported only by the #309 war banner (flagged off); nothing else in app/ or components/ uses it', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/war-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/war-banner.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/war-copy/, f);
 });
