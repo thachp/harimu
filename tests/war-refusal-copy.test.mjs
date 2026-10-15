@@ -77,16 +77,16 @@ test('tone: nothing glorifies war; no violence, no real-world names, no Notable,
 });
 const { REFUSAL_CODES, refusalForCode } = R;
 test('server refusal codes (#426 ruling) are pinned and map one to one onto the refusal copy', () => {
-  assert.deepEqual(Object.keys(REFUSAL_CODES),['rate_limit_declarations','rate_limit_active_wars','casus_belli_insufficient']);
-  assert.deepEqual(REFUSAL_CODES,{rate_limit_declarations:'rate_limit',rate_limit_active_wars:'active_war_cap',casus_belli_insufficient:'casus_belli'});
+  assert.deepEqual(Object.keys(REFUSAL_CODES),['rate_limit_declarations','rate_limit_active_wars','no_casus_belli']);
+  assert.deepEqual(REFUSAL_CODES,{rate_limit_declarations:'rate_limit',rate_limit_active_wars:'active_war_cap',no_casus_belli:'casus_belli'});
   assert.deepEqual(Object.values(REFUSAL_CODES).sort(),[...REFUSAL_KEYS].sort());
   assert.equal(refusalForCode('rate_limit_declarations'),refusalFor('rate_limit'));
   assert.equal(refusalForCode('rate_limit_active_wars'),refusalFor('active_war_cap'));
-  assert.equal(refusalForCode('casus_belli_insufficient'),refusalFor('casus_belli'));
-  for (const bad of ['rate_limit','casus_belli','war_not_allowed','toString','__proto__','']) assert.equal(refusalForCode(bad),undefined,bad);
+  assert.equal(refusalForCode('no_casus_belli'),refusalFor('casus_belli'));
+  for (const bad of ['rate_limit','casus_belli','casus_belli_insufficient','war_not_allowed','toString','__proto__','']) assert.equal(refusalForCode(bad),undefined,bad);
 });
 test('the casus belli refusal leaks nothing of the grievance gate: no score, weights, threshold, inputs or counts', () => {
-  const x=refusalForCode('casus_belli_insufficient');
+  const x=refusalForCode('no_casus_belli');
   for (const t of [x.label,...x.lines.map(l=>l.text)]) {
     assert.doesNotMatch(t,/\d|score|weight|threshold|point|pact|embargo|sanction|trade treaty|border|incident|commons|dispute|\bAI\b|model/i,t);
   }

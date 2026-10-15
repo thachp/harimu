@@ -63,14 +63,14 @@ export const mobilizationCountdown:Readonly<Record<RefusalNation,Line>>={
 };
 export const mobilizationCountdownLabel={text:'Mobilization countdown',proposal:true} as const;
 
-/** The server refusal codes for the declare path (ARC's ruling on #426, issue #561), mapped to the refusal copy above. `declareWar` refuses
+/** The server refusal codes for the declare path (ARC's ruling on #426 for the two rate limits, and the casus belli code the #426 build PR uses, `no_casus_belli`; issue #561 first called it `casus_belli_insufficient`), mapped to the refusal copy above. `declareWar` refuses
  * with one of these codes and the caller shows `refusalForCode(code)`. The casus belli code covers the whole grievance gate: the player is
  * never told the score, its inputs, their weights or the threshold. The rate-limit codes are checked first, then the gate. */
-export type RefusalCode='rate_limit_declarations'|'rate_limit_active_wars'|'casus_belli_insufficient';
+export type RefusalCode='rate_limit_declarations'|'rate_limit_active_wars'|'no_casus_belli';
 export const REFUSAL_CODES:Readonly<Record<RefusalCode,RefusalKey>>={
  rate_limit_declarations:'rate_limit',
  rate_limit_active_wars:'active_war_cap',
- casus_belli_insufficient:'casus_belli',
+ no_casus_belli:'casus_belli',
 };
 export function refusalForCode(code:string){
  const key=(REFUSAL_CODES as Readonly<Record<string,RefusalKey|undefined>>)[code];
