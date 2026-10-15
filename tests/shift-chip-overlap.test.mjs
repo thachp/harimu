@@ -53,10 +53,10 @@ test('Country puts breadcrumbs and the shift chip in the stage flow, before the 
   assert.match(css, /\.game-country-header>\.game-location-banner,\.game-country-header>\.game-shift-chip\{position:static;/);
   assert.match(css, /\.harimu-game \.game-country-stage\{padding-top:14px\}/, 'no 76px gap reserved for floating chrome');
 });
-test('other scenes keep the floating breadcrumbs and chip', async () => {
+test('other scenes float the breadcrumbs and chip together in one stacked overlay (#346)', async () => {
   const d = await render('square');
   assert.equal(d.querySelector('.game-country-header'), null);
-  assert.ok(d.querySelector('main > .game-shift-chip')); assert.ok(d.querySelector('main > .game-breadcrumbs'));
+  assert.ok(d.querySelector('main > .game-stage-overlay > .game-shift-chip')); assert.ok(d.querySelector('main > .game-stage-overlay > .game-breadcrumbs'));
 });
 test('Zone overlay choice survives a remount within the session (behavioural, #194)', async () => {
   const { WorldZones, zoneOverlayKey } = await load('world-zones');
