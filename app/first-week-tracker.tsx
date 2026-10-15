@@ -12,6 +12,6 @@ export function FirstWeekTracker({tracker,onNavigate}:{tracker:Tracker;onNavigat
    <p><span className="first-week-status">{done?'Done':tracked?'To do':'Not tracked yet'}:</span> {goal.text}</p>
    <button type="button" onClick={()=>onNavigate(goal.screen)} aria-label={`Go to ${screenLabel[goal.screen]}: ${goal.text}`}>Go to {screenLabel[goal.screen]}</button>
   </li>)}</ul>
-  <p className="first-week-note">Guidance only, with no rewards. Goals complete from your game records (shifts, meals); others are not tracked yet. Progress is saved in this browser only for now.</p>
+  <p className="first-week-note">Guidance only, with no rewards. Goals complete from your game records (shifts, meals); others are not tracked yet.</p>
  </details>;
 }
