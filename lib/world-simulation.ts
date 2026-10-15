@@ -1,4 +1,5 @@
 import { finalizeDueElection } from './elections';
+import { runPrimaries, type PrimaryScope } from './primaries';
 import { accountElectionDatabase } from './preview-election';
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
@@ -48,7 +49,7 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
   supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[] };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; korundPresidium?: boolean; faithFestivals?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
@@ -89,6 +90,8 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   if (options.aurelleRising) await runAurelleRising(db, now);
   // #281: Aurelle AI palace coup, only while HARIMU_AURELLE_COUP_ENABLED is on (write paths only).
   if (options.aurelleCoup) await runAurelleCoup(db, now);
+  // #307: Kindle party primaries open at their configured time and are counted when due, only while HARIMU_PRIMARIES_ENABLED is on and the privacy gate is open (write paths only).
+  if (options.primaries) await runPrimaries(db, now, options.primaries).catch(error => { console.warn('[world] primaries tick failed', error instanceof Error ? error.name : 'unknown'); });
   // #70: Korund emergency Presidium session and succession, only while HARIMU_KORUND_PRESIDIUM_ENABLED is on (write paths only).
   if (options.korundPresidium) await runKorundPresidium(db, now);
   return readWorldSimulation(db, now);

@@ -72,7 +72,7 @@ test('hopefuls and candidates are never quoted; no endorsing body, no Notable, n
   assert.doesNotMatch(t,/["“”]|\bsaid\b|\bsays\b|spokes/i); assert.doesNotMatch(t,/endors|journalist|newspaper|union|guild|church|bank/i);
   assert.doesNotMatch(t,/\b(Earth|America|Congress|Senate|Parliament|Democrat|Republican|Labour|Tory|London|Washington)\b/); assert.doesNotMatch(t,/Notable/);
 });
-test('unwired: nothing in app/ or components/ imports campaign-copy', () => {
+test('wired by #307 only: the primary card is the one UI importer of campaign-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/campaign-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/primary-card.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/campaign-copy/, f);
 });

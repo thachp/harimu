@@ -88,7 +88,7 @@ export async function replayJournalD1(db,entries,{maintenanceConfirmed=false}={}
   if(!Array.isArray(statements)||!statements.length)throw Error('Invalid write journal.');
   if(statements.some(statement=>statement.ballotBoundary))throw Error('Separated ballots require a verified private snapshot before rollback; journal-only replay refused.');
   for(const statement of statements){
-   if(typeof statement.sql!=='string'||!Array.isArray(statement.values)||!/^\s*(INSERT|UPDATE|DELETE)\b/i.test(statement.sql)||sqlTokens(statement.sql).some(token=>token===';'||token.startsWith('--')||token.startsWith('/*'))||/\b(civic_voter_receipts|civic_anonymous_ballots)\b/i.test(statement.sql))throw Error('Invalid rollback statement.');
+   if(typeof statement.sql!=='string'||!Array.isArray(statement.values)||!/^\s*(INSERT|UPDATE|DELETE)\b/i.test(statement.sql)||sqlTokens(statement.sql).some(token=>token===';'||token.startsWith('--')||token.startsWith('/*'))||/\b(civic_voter_receipts|civic_anonymous_ballots|primary_voter_receipts|primary_anonymous_ballots)\b/i.test(statement.sql))throw Error('Invalid rollback statement.');
   }
   return {id,statements,sha256:createHash('sha256').update(entry.statements_json).digest('hex')};
  });
