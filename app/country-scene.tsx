@@ -28,7 +28,7 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
         style={{left:`${pins[index].x}%`,top:`${pins[index].y}%`}} aria-pressed={destination?.id === city.id}
         onClick={() => { if (!pending) setDestinationId(city.id); }} disabled={pending} aria-describedby={pending ? "city-travel-pending-reason" : undefined}>
         <span>{city.name}</span><small>{[city.capital ? 'Capital' : '',city.id === currentCityId ? 'Current' : '',city.id === homeCityId ? 'Home' : ''].filter(Boolean).join(' · ')}</small>
-        <small>{knownCount ? `${count} sharing presence` : 'Online count unavailable'}</small>
+        <small>{knownCount ? `${count} sharing presence` : preview ? 'Presence shows in your own nation' : 'Online count unavailable'}</small>
       </button>; })}
     </div>
     {pending && <p id="city-travel-pending-reason" role="status">Your travel is being confirmed. Please wait before changing the destination.</p>}

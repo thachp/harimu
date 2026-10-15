@@ -22,6 +22,7 @@ import { checkDevelopmentPreviewNote } from './hud-preview-note-check.mjs';
 import { checkNationSymbols } from './nation-symbols-check.mjs';
 import { checkTopBarEmblem } from './hud-emblem-check.mjs';
 import { checkShiftQualityStep } from './shift-quality-layout-check.mjs';
+import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
@@ -173,6 +174,7 @@ try {
   await checkShiftQualityStep({ browser, css, preflight, failures, rows }); // #347: shift quality dialog is styled, spaced, reachable
   await checkDevelopmentPreviewNote({ browser, css, preflight, failures, rows }); // #366: no "Development preview" label in the top bar; note lives in Game settings
   await checkHudTooltips({ browser, css, preflight, failures, rows }); // #366: one top-bar tooltip at a time, on-screen, closed by leave / blur / Escape
+  await checkVisitorWording({ browser, css, preflight, failures, rows }); // #379: visitor wording (VISITOR PREVIEW, Household) and guide/pin text fit
 } finally { await browser.close(); }
 console.log(rows.join('\n'));
 if (failures.length) { console.error(`\nHUD layout check FAILED:\n${failures.join('\n')}`); process.exit(1); }
