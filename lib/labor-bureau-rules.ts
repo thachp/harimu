@@ -2,7 +2,8 @@
 // (utility model weighing skills, Standing and quota gaps). Reassignment request every 30 real days."
 // Bounded, explainable PoC rule: pure and deterministic, no randomness, no model call. No imports (tests load it directly).
 export type BureauJob = { id: string; name: string; minShifts: number; goodStandingOnly: boolean; seats: number };
-/** The plan's posts. 'korund-food-production' is the existing brigade and the fallback post. Seats are the plan's quota. [ASSUMPTION] */
+/** PROPOSAL (not from the docs): the post list, minimum shifts and seat counts are proposed values for review (ARC ruling on #389).
+ * The plan's posts. 'korund-food-production' is the existing brigade and the fallback post. Seats are the plan's quota. [ASSUMPTION] */
 export const bureauJobs: readonly BureauJob[] = [
   { id: 'korund-food-production', name: 'State food brigade', minShifts: 0, goodStandingOnly: false, seats: 6 },
   { id: 'korund-quarry-gang', name: 'Stonehearth quarry gang', minShifts: 1, goodStandingOnly: false, seats: 5 },

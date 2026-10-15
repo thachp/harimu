@@ -13,9 +13,6 @@ export const bureauText = {
   reassignButton: reassignment.requestButton,
   nextRequest: reassignment.nextRequest.text,
   refusal: reassignment.refusal.text,
-  // [not in #329] The first assignment is a separate request from filing preferences in this build; see the PR's open questions.
-  requestButton: 'Request assignment',
-  noPreferences: 'File three preferences first.',
 } as const;
 
 /** Where each post is and the Korund city the notices name ("at {workplace}", "in {city}"). Pre-formatted, within the 24-character cap. */

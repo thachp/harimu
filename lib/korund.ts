@@ -88,7 +88,7 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  if(command.action==='korund-set-preferences'||command.action==='korund-request-assignment'){
   // #235: the Labor Bureau ships off; with the flag off these actions change nothing.
   if(!options.laborBureau)return {status:403,reason:'disabled',error:'The Labor Bureau is not open yet.'};
-  return command.action==='korund-set-preferences'?setPreferences(db,userId,command.preferences,now):requestAssignment(db,userId,command.requestId!.toLowerCase(),now);
+  return command.action==='korund-set-preferences'?setPreferences(db,userId,command.preferences,now,command.requestId!.toLowerCase()):requestAssignment(db,userId,command.requestId!.toLowerCase(),now);
  }
  const iso=new Date(now*1000).toISOString();
  const id=(command.action==='korund-claim-work'?command.shiftId!:command.requestId!).toLowerCase();

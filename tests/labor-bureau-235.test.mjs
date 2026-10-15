@@ -57,64 +57,84 @@ test('rule: preferences must be exactly three distinct known jobs; the 30-day wi
   assert.equal(nextRequestAt(null, 1000), null); assert.equal(nextRequestAt(1000, 1000 + reassignmentSeconds - 1), 1000 + reassignmentSeconds); assert.equal(nextRequestAt(1000, 1000 + reassignmentSeconds), null);
 });
 
-test('a Korund citizen files 3 preferences; invalid lists are refused; filing replaces the previous list', async t => {
+const rows = async (r, where = '') => Number((await r.db.prepare(`SELECT COUNT(*) AS n FROM korund_job_assignments ${where}`).first()).n);
+const bureauOf = async (r, user) => (await r.call('citizen', user)).data.korundPlan.bureau;
+
+test('the FIRST filing of three preferences stores them and runs the assignment in the same action; invalid lists change nothing', async t => {
   const r = await bureau(t);
-  const empty = (await r.call('citizen', 'alice')).data.korundPlan.bureau;
+  const empty = await bureauOf(r, 'alice');
   assert.equal(empty.preferences, null); assert.equal(empty.assignment, null); assert.equal(empty.canRequest, false);
   assert.deepEqual(empty.jobs.map(j => j.id), bureauJobs.map(j => j.id));
   for (const bad of [[FOOD, QUARRY], [FOOD, FOOD, QUARRY], [FOOD, QUARRY, 'nope']]) { const res = await prefs(r, 'alice', bad); assert.equal(res.status, 400); assert.equal(res.data.reason, 'bad_preferences'); }
   assert.equal((await r.call('citizen', 'alice', { action: 'korund-set-preferences', requestId: 'x', preferences: [FOOD, QUARRY, FOUNDRY] })).status, 400, 'bad request id');
-  assert.equal((await prefs(r, 'alice', [QUARRY, FOUNDRY, FOOD])).status, 200);
-  assert.deepEqual((await r.call('citizen', 'alice')).data.korundPlan.bureau.preferences, [QUARRY, FOUNDRY, FOOD]);
-  assert.equal((await prefs(r, 'alice', [FOOD, RAIL, CLERK])).status, 200);
-  assert.deepEqual((await r.call('citizen', 'alice')).data.korundPlan.bureau.preferences, [FOOD, RAIL, CLERK]);
-  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM korund_job_preferences').first()).n), 1);
+  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM korund_job_preferences').first()).n), 0); assert.equal(await rows(r), 0, 'nothing written by refused filings');
+  const first = await prefs(r, 'alice', [QUARRY, FOUNDRY, FOOD]);
+  assert.equal(first.status, 200, JSON.stringify(first.data));
+  const view = first.data.korundPlan.bureau;
+  assert.deepEqual(view.preferences, [QUARRY, FOUNDRY, FOOD]);
+  assert.ok(view.assignment, 'assigned by the same action, no separate request'); assert.equal(view.assignment.jobId, FOOD, 'no settled shifts yet, so the brigade');
+  assert.equal(await rows(r), 1);
   r.setFixtureEnv('HARIMU_LABOR_BUREAU_ENABLED', 'true');
   await r.db.prepare("UPDATE citizens SET nation_id='kindle' WHERE clerk_user_id='bob'").run();
   assert.equal((await prefs(r, 'bob', [FOOD, QUARRY, FOUNDRY])).status, 409, 'Korund citizenship required');
 });
 
+test('re-filing only updates the preferences: the job does not change', async t => {
+  const r = await bureau(t);
+  assert.equal((await prefs(r, 'alice', [QUARRY, FOUNDRY, FOOD])).status, 200);
+  const before = (await bureauOf(r, 'alice')).assignment;
+  await shift(r, 'alice'); await shift(r, 'alice'); await shift(r, 'alice'); // now eligible for more posts
+  const refiled = await prefs(r, 'alice', [FOUNDRY, RAIL, CLERK]);
+  assert.equal(refiled.status, 200);
+  const view = await bureauOf(r, 'alice');
+  assert.deepEqual(view.preferences, [FOUNDRY, RAIL, CLERK], 'preferences replaced');
+  assert.deepEqual(view.assignment, before, 'job, outcome, reasons and time unchanged');
+  assert.equal(await rows(r), 1); assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM korund_job_preferences').first()).n), 1);
+  assert.equal(view.nextRequestAt, (await bureauOf(r, 'alice')).nextRequestAt, 'the 30-day clock is not restarted by re-filing');
+});
+
 test('the AI Bureau assigns from skills, Standing and quota gaps; a replayed request id changes nothing', async t => {
   const r = await bureau(t);
   assert.equal((await assign(r, 'alice')).data.reason, 'no_preferences');
-  await prefs(r, 'alice', [CLERK, RAIL, QUARRY]);
-  const id = randomUUID(); const res = await assign(r, 'alice', id);
+  const id = randomUUID();
+  const res = await r.call('citizen', 'alice', { action: 'korund-set-preferences', requestId: id, preferences: [CLERK, RAIL, QUARRY] });
   assert.equal(res.status, 200, JSON.stringify(res.data));
   const a = res.data.korundPlan.bureau.assignment;
   assert.equal(a.jobId, FOOD, 'no shifts yet: the posts listed need experience, the plan places the citizen in the brigade'); assert.equal(a.outcome, 'quota-posting'); assert.ok(a.reasons.includes('not-listed'));
-  assert.equal((await assign(r, 'alice', id)).data.replayed, true);
-  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM korund_job_assignments').first()).n), 1);
-  assert.equal((await assign(r, 'bob', id)).data.reason, 'request_reused', "another citizen cannot reuse alice's request id");
-  await prefs(r, 'bob', [QUARRY, FOOD, FOUNDRY]);
+  const replay = await r.call('citizen', 'alice', { action: 'korund-set-preferences', requestId: id, preferences: [CLERK, RAIL, QUARRY] });
+  assert.equal(replay.status, 200); assert.equal(replay.data.replayed, true);
+  assert.equal(await rows(r), 1);
+  assert.equal((await r.call('citizen', 'bob', { action: 'korund-set-preferences', requestId: id, preferences: [FOOD, QUARRY, FOUNDRY] })).data.reason, 'request_reused', "another citizen cannot reuse alice's request id");
   // Skills: after one settled shift the quarry post opens to bob.
   await shift(r, 'bob');
-  const bob = await assign(r, 'bob'); assert.equal(bob.status, 200);
+  const bob = await prefs(r, 'bob', [QUARRY, FOOD, FOUNDRY]); assert.equal(bob.status, 200);
   assert.equal(bob.data.korundPlan.bureau.assignment.jobId, QUARRY); assert.equal(bob.data.korundPlan.bureau.assignment.outcome, 'first-choice');
-  // Standing changes the answer for the same history.
-  await r.db.prepare("UPDATE citizens SET standing='Under review' WHERE clerk_user_id='alice'").run();
-  const info = (await r.call('citizen', 'alice')).data.korundPlan.bureau; assert.ok(info.jobs.find(j => j.id === QUARRY).filled >= 1, 'headcount counts current assignments');
+  const info = await bureauOf(r, 'alice'); assert.ok(info.jobs.find(j => j.id === QUARRY).filled >= 1, 'headcount counts current assignments');
+  // Concurrent first filings by one citizen: both succeed, exactly one assignment is recorded.
+  const racing = await bureau(t);
+  const both = await Promise.all([prefs(racing, 'alice', [FOOD, QUARRY, FOUNDRY]), prefs(racing, 'alice', [FOOD, QUARRY, FOUNDRY])]);
+  assert.deepEqual(both.map(x => x.status), [200, 200]); assert.equal(await rows(racing), 1);
 });
 
-test('reassignment: allowed once every 30 real days, enforced by the server', async t => {
+test('reassignment: the job changes only through a request, allowed once every 30 real days, enforced by the server', async t => {
   const r = await bureau(t);
-  await prefs(r, 'alice', [FOOD, QUARRY, FOUNDRY]);
-  const first = await assign(r, 'alice'); assert.equal(first.status, 200);
-  const bureauView = first.data.korundPlan.bureau; assert.equal(bureauView.canRequest, false); assert.ok(bureauView.nextRequestAt);
-  const assignedAt = Date.parse(bureauView.assignment.assignedAt);
-  assert.equal(Date.parse(bureauView.nextRequestAt) - assignedAt, 30 * 86400 * 1000);
-  const early = await assign(r, 'alice'); assert.equal(early.status, 409); assert.equal(early.data.reason, 'too_soon'); assert.equal(early.data.nextRequestAt, bureauView.nextRequestAt);
+  const first = await prefs(r, 'alice', [FOOD, QUARRY, FOUNDRY]); assert.equal(first.status, 200);
+  const view = first.data.korundPlan.bureau; assert.equal(view.canRequest, false); assert.ok(view.nextRequestAt);
+  const assignedAt = Date.parse(view.assignment.assignedAt);
+  assert.equal(Date.parse(view.nextRequestAt) - assignedAt, 30 * 86400 * 1000);
+  const early = await assign(r, 'alice'); assert.equal(early.status, 409); assert.equal(early.data.reason, 'too_soon'); assert.equal(early.data.nextRequestAt, view.nextRequestAt);
   r.setNow(assignedAt + (30 * 86400 - 1) * 1000); assert.equal((await assign(r, 'alice')).status, 409, 'one second early');
-  await prefs(r, 'alice', [FOUNDRY, RAIL, CLERK]); // preferences can be updated meanwhile; they apply at the next assignment
-  assert.equal((await r.call('citizen', 'alice')).data.korundPlan.bureau.assignment.jobId, FOOD, 'current assignment unchanged');
+  await prefs(r, 'alice', [FOUNDRY, RAIL, CLERK]); // re-filing meanwhile only updates the list; it applies at the next assignment
+  assert.equal((await bureauOf(r, 'alice')).assignment.jobId, FOOD, 'current assignment unchanged');
   r.setNow(assignedAt + 30 * 86400 * 1000);
   const again = await assign(r, 'alice'); assert.equal(again.status, 200, JSON.stringify(again.data));
   assert.equal(again.data.korundPlan.bureau.assignment.outcome, 'quota-posting'); assert.equal(again.data.korundPlan.bureau.nextRequestAt !== null, true);
-  assert.equal(Number((await r.db.prepare("SELECT COUNT(*) AS n FROM korund_job_assignments WHERE clerk_user_id='alice'").first()).n), 2, 'history is kept');
-  // Concurrent duplicate requests in the same window: exactly one assignment is recorded.
-  const racing = await bureau(t); await prefs(racing, 'alice', [FOOD, QUARRY, FOUNDRY]);
-  const both = await Promise.all([assign(racing, 'alice'), assign(racing, 'alice')]);
+  assert.equal(await rows(r, "WHERE clerk_user_id='alice'"), 2, 'history is kept');
+  // Concurrent duplicate reassignment requests in one window: exactly one assignment is recorded.
+  r.setNow(Date.parse((await bureauOf(r, 'alice')).nextRequestAt));
+  const both = await Promise.all([assign(r, 'alice'), assign(r, 'alice')]);
   assert.deepEqual(both.map(x => x.status).sort(), [200, 409]);
-  assert.equal(Number((await racing.db.prepare('SELECT COUNT(*) AS n FROM korund_job_assignments').first()).n), 1);
+  assert.equal(await rows(r, "WHERE clerk_user_id='alice'"), 3);
 });
 
 test('flag off (shipped default): nothing changes: no bureau in the plan, actions refused, no rows written', async t => {
@@ -133,7 +153,7 @@ test('flag off (shipped default): nothing changes: no bureau in the plan, action
 
 test('assignment is recorded only: shift pay and the brigade job are unchanged by the Bureau', async t => {
   const r = await bureau(t);
-  await prefs(r, 'alice', [QUARRY, FOUNDRY, RAIL]); await assign(r, 'alice');
+  await prefs(r, 'alice', [QUARRY, FOUNDRY, RAIL]); // first filing assigns
   await shift(r, 'alice');
   const plan = (await r.call('citizen', 'alice')).data.korundPlan;
   assert.equal(plan.walletMinor, 800); assert.equal(plan.assignment.wageMinor, 800);
@@ -142,7 +162,10 @@ test('assignment is recorded only: shift pay and the brigade job are unchanged b
 test('the panel shows the Bureau only when the server sends it, wired to Content\'s #329 strings', async () => {
   const panel = await readFile(new URL('../app/korund-plan-panel.tsx', import.meta.url), 'utf8');
   assert.match(panel, /plan\.bureau \? <LaborBureau/); assert.match(panel, /bureauText\.fileButton/); assert.match(panel, /bureauText\.refusal/); assert.match(panel, /outcomeNotice\(/);
+  assert.doesNotMatch(panel, /requestButton|noPreferences|korund-request-assignment'\)\}>\{bureauText\.requestButton/, 'no separate first-assignment button (ARC on #389)');
+  assert.match(panel, /bureau\.assignment && <ActionButton[^>]*korund-request-assignment/, 'only reassignment, and only once assigned');
   const text = await readFile(new URL('../lib/labor-bureau-text.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(text, /Request assignment|File three preferences first/);
   assert.match(text, /from '\.\/labor-bureau-copy'/); assert.doesNotMatch(text, /30/, 'the 30-day rule is never written as a number in the copy');
   assert.doesNotMatch(text, /Your preferences are filed|The AI Labor Bureau assigned you/, 'the #329 wording lives only in labor-bureau-copy.ts');
 });

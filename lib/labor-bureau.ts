@@ -54,16 +54,25 @@ export async function readBureau(db: GameDatabase, userId: string, now: number):
   };
 }
 
-export async function setPreferences(db: GameDatabase, userId: string, preferences: unknown, now: number): Promise<BureauResult> {
+/** Files the three preferences. The FIRST filing also runs the assignment in the same action (ARC on #389); the request id is the
+ * assignment id, so a retry replays. Re-filing afterwards only updates the preferences: the job changes only through requestAssignment
+ * (the 30-day reassignment). */
+export async function setPreferences(db: GameDatabase, userId: string, preferences: unknown, now: number, requestId: string): Promise<BureauResult> {
   const prefs = validPreferences(preferences);
   if (!prefs) return { status: 400, reason: 'bad_preferences', error: 'List exactly three different jobs from the Labor Bureau list.' };
+  const prior = await db.prepare('SELECT clerk_user_id FROM korund_job_assignments WHERE id=?').bind(requestId).first<{ clerk_user_id: string }>();
+  if (prior) return prior.clerk_user_id === userId ? { status: 200, replayed: true } : { status: 409, reason: 'request_reused', error: 'Request identifier already used.' };
+  const assigned = await db.prepare('SELECT 1 AS yes FROM korund_job_assignments WHERE clerk_user_id=? LIMIT 1').bind(userId).first<{ yes: number }>();
   await db.prepare(`INSERT INTO korund_job_preferences(clerk_user_id, first_job, second_job, third_job, filed_at) VALUES (?,?,?,?,?)
     ON CONFLICT(clerk_user_id) DO UPDATE SET first_job=excluded.first_job, second_job=excluded.second_job, third_job=excluded.third_job, filed_at=excluded.filed_at`)
     .bind(userId, prefs[0], prefs[1], prefs[2], now).run();
-  return { status: 200 };
+  if (assigned) return { status: 200 };
+  const first = await requestAssignment(db, userId, requestId, now);
+  // A concurrent first filing may have assigned already: the preferences are filed, the one assignment stands.
+  return first.reason === 'too_soon' ? { status: 200 } : first;
 }
 
-/** First assignment, or a reassignment request: allowed once per 30 real days (the guard is inside the insert). */
+/** The assignment itself: run by the first filing, and by every reassignment request. Allowed once per 30 real days (the guard is inside the insert). */
 export async function requestAssignment(db: GameDatabase, userId: string, requestId: string, now: number): Promise<BureauResult> {
   const prior = await db.prepare('SELECT clerk_user_id FROM korund_job_assignments WHERE id=?').bind(requestId).first<{ clerk_user_id: string }>();
   if (prior) return prior.clerk_user_id === userId ? { status: 200, replayed: true } : { status: 409, reason: 'request_reused', error: 'Request identifier already used.' };

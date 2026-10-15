@@ -129,7 +129,7 @@ function LaborBureau({ bureau, pending, uncertain, formatTime, onCommand }: { bu
   const [draft, setDraft] = useState<string[]>(() => bureau.preferences ?? Array(preferenceCount).fill(''));
   const complete = draft.length === preferenceCount && draft.every(Boolean) && new Set(draft).size === preferenceCount;
   const nextAt = bureau.nextRequestAt ? formatTime(bureau.nextRequestAt) : '';
-  const requestReason = pendingActionReason(pending, uncertain) ?? firstActionReason([!bureau.preferences, bureauText.noPreferences],
+  const requestReason = pendingActionReason(pending, uncertain) ?? firstActionReason(
     [Boolean(bureau.nextRequestAt), fillText(bureauText.refusal, { nextRequestAt: nextAt })]);
   return <section aria-label="Labor Bureau">
     <h4>{bureauText.header}</h4><p>{bureauText.explainer}</p>
@@ -141,7 +141,7 @@ function LaborBureau({ bureau, pending, uncertain, formatTime, onCommand }: { bu
     {bureau.preferences && <p>{bureauText.filed}</p>}
     {bureau.assignment && (() => { const notice = outcomeNotice(bureau.assignment.outcome, { id: bureau.assignment.jobId, name: bureau.assignment.jobName }); return <><p><strong>{notice.headline}</strong> · {notice.body}</p>
       <ul>{bureau.assignment.reasons.map(reason => <li key={reason}>{reasonText[reason]}</li>)}</ul></>; })()}
-    <ActionButton type="button" reason={requestReason} onClick={() => onCommand('korund-request-assignment')}>{bureau.assignment ? bureauText.reassignButton : bureauText.requestButton}</ActionButton>
+    {bureau.assignment && <ActionButton type="button" reason={requestReason} onClick={() => onCommand('korund-request-assignment')}>{bureauText.reassignButton}</ActionButton>}
     {bureau.nextRequestAt && <p>{fillText(bureauText.nextRequest, { nextRequestAt: nextAt })}</p>}
   </section>;
 }
