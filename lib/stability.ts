@@ -24,8 +24,10 @@ export type StabilityInputs = {
  promisesKept: number; promisesBroken: number; petitionBacklog: number;
  /** #291: 1 on a game day that is an endorsed festival public holiday in this nation (docs 14.4). Absent otherwise. */
  festivalHoliday?: 1;
+ /** #423: Unrest points the nation's active wars have added (war weariness, lib/war-rules.ts), only while HARIMU_WAR_WEARINESS_ENABLED is on. Absent when zero. */
+ warWeariness?: number;
 };
-export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival';
+export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war';
 export type ScoreTerm = {input: StabilityInputId; points: number; detail: string};
 export type StabilityScore = {stability: number; unrest: number; breakdown: {stability: ScoreTerm[]; unrest: ScoreTerm[]}};
 export type StabilityRecord = StabilityScore & {nationId: StabilityNation; tick: number; scheduledAt: number; inputs: StabilityInputs};
@@ -71,13 +73,16 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
   {input:'food',points:food.unrest,detail:foodDetail},{input:'work',points:work.unrest,detail:workDetail},
   {input:'promises',points:promise.unrest,detail:promiseDetail},{input:'petitions',points:petitions.unrest,detail:petitionDetail}];
  const sum = (terms: ScoreTerm[]) => terms.reduce((total, term) => total+term.points, 0);
+ // #423: the other Unrest terms can already reach 100 together, so the war term only takes what is left under 100 (the one place a term is clamped); the breakdown still sums exactly to the score.
+ const war = Math.min(count(raw.warWeariness), Math.max(0, 100-sum(unrest)));
+ if (war > 0) unrest.push({input:'war',points:war,detail:'Weeks at war add Unrest'});
  return {stability: sum(stability), unrest: sum(unrest), breakdown: {stability, unrest}};
 }
 
 const iso = (seconds: number) => new Date(seconds*1000).toISOString();
 /** Reads the inputs for one nation as of `at` (unix seconds). Every input is windowed on `at`, so a catch-up tick
  * reads that game day's records: a petition resolved after `at` still counts as backlog for that tick (#142). */
-export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>} = {}): Promise<StabilityInputs> {
+export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>} = {}): Promise<StabilityInputs> {
  const since = at-signalWindowSeconds;
  const meals = nationId === 'kindle' ? "SELECT clerk_user_id FROM citizen_economy_events WHERE kind='meal' AND occurred_at>? AND occurred_at<=?"
   : nationId === 'korund' ? 'SELECT clerk_user_id FROM korund_meals WHERE occurred_at>? AND occurred_at<=?'
@@ -93,11 +98,12 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
   .first<{citizens:number;fed:number;worked:number;kept:number;broken:number;backlog:number}>();
  // #291: the caller (world tick, only while HARIMU_FAITH_ENABLED is on) names the nations whose game day is an endorsed festival holiday (lib/festivals.ts).
  const holiday = options.holidayNations?.has(nationId) ?? false;
- return {citizens: Number(row?.citizens ?? 0), fed: Number(row?.fed ?? 0), worked: Number(row?.worked ?? 0), promisesKept: Number(row?.kept ?? 0), promisesBroken: Number(row?.broken ?? 0), petitionBacklog: Number(row?.backlog ?? 0), ...(holiday ? {festivalHoliday: 1 as const} : {})};
+ const war = Math.floor(Number(options.warWeariness?.[nationId] ?? 0)); // #423: precomputed by the world tick from the wars table (lib/war-weariness.ts)
+ return {citizens: Number(row?.citizens ?? 0), fed: Number(row?.fed ?? 0), worked: Number(row?.worked ?? 0), promisesKept: Number(row?.kept ?? 0), promisesBroken: Number(row?.broken ?? 0), petitionBacklog: Number(row?.backlog ?? 0), ...(holiday ? {festivalHoliday: 1 as const} : {}), ...(war > 0 ? {warWeariness: war} : {})};
 }
 
 /** Statements that record one game day's scores. INSERT OR IGNORE makes retries no-ops. */
-export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>} = {}) {
+export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>} = {}) {
  return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); const score = computeStability(inputs);
   return db.prepare('INSERT OR IGNORE INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)')
    .bind(nationId, tick, scheduledAt, now, score.stability, score.unrest, JSON.stringify(inputs), JSON.stringify(score.breakdown)); }));

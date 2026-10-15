@@ -2,13 +2,14 @@
 import type { DefenseWindowState, PublicWar } from '@/lib/war';
 import { citizenSafety, defenseWindow, mobilizationStatus, noticesFor, warBanner, type WarNation } from '@/lib/war-copy';
 import { defenseWindowLocal, fillWarText, isWarNation, warNationNames } from '@/lib/war-rules';
+import { wearinessBanners, wearinessStrip, type WearinessLevel } from '@/lib/war-weariness-copy'; // #423
 import { useSyncExternalStore } from 'react';
 import { GameTimer } from './game-timer';
 import { useDisplayTimestamp } from './display-preferences';
 
 /** #309: war banner on the nation's government view while a declared war is mobilizing or active (HARIMU_WAR_ENABLED; the server sends no wars while it is off).
  *  Presentation only: the countdown is the shared GameTimer (real and game time, #29). Copy comes from lib/war-copy.ts (#315). */
-export function WarBanner({ wars, nationId }: { wars: PublicWar[] | undefined; nationId: string }) {
+export function WarBanner({ wars, nationId, weariness }: { wars: PublicWar[] | undefined; nationId: string; weariness?: WearinessLevel | null }) {
   const formatTime = useDisplayTimestamp();
   if (!isWarNation(nationId)) return null;
   const mine = (wars ?? []).filter(war => war.status !== 'ended' && (war.attacker === nationId || war.defender === nationId));
@@ -26,7 +27,7 @@ export function WarBanner({ wars, nationId }: { wars: PublicWar[] | undefined; n
         : <p>{mobilizationStatus.active[1].text} {mobilizationStatus.active[0].text}</p>}
       <p>{citizenSafety.lines[0].text}</p>
     </article>;
-  })}</section>;
+  })}{weariness && <p role="status" aria-label={nationId === 'korund' ? wearinessStrip.korundLabel : wearinessStrip.label}>{wearinessBanners[nationId as WarNation][weariness]}</p>}</section>;
 }
 
 const subscribeNever = () => () => {};
