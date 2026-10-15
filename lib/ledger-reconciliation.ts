@@ -1,6 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { tesseraBalanceSql } from './tessera-exchange';
+import { laborNoteSql } from './korund-wallet';
 import { firstMismatches, reconciliationCurrencies, reconciliationGameDay, type CurrencyTotals, type Mismatch, type ReconciliationCurrency } from './ledger-reconciliation-rules';
 export * from './ledger-reconciliation-rules';
 
@@ -64,17 +65,20 @@ const SPK: CurrencySpec = {
   ],
 };
 
-// The LN and CRN balance formulas below are written out the way the app computes them (lib/korund.ts wallet = wages - coupon redemptions; lib/aurelle.ts privateWallet =
-// wages - purchases), because the app keeps those inline rather than in a shared view. tests/ledger-reconciliation.test.mjs checks they agree with what the citizen route returns.
+// The CRN balance formula below is written out the way the app computes it (lib/aurelle.ts privateWallet = wages - purchases), because the app keeps it inline rather than in a shared view.
+// The LN balance is NOT restated here: it is the shared function lib/korund-wallet `laborNoteSql` (wages - coupon redemptions + gray-market LN bought - LN sold, #43), the same
+// expression the Korund wallet and the coupon guard use, so a gray trade's LN legs are in the totals. tests/ledger-reconciliation.test.mjs checks the balances agree with the citizen route.
 const LN: CurrencySpec = {
   currency: 'LN',
   legs: `SELECT clerk_user_id AS acct, wage_minor AS delta FROM korund_settlements
-    UNION ALL SELECT clerk_user_id, -price_minor FROM korund_coupon_redemptions`,
-  appBalances: `SELECT c.clerk_user_id AS acct, COALESCE((SELECT SUM(wage_minor) FROM korund_settlements WHERE clerk_user_id = c.clerk_user_id), 0)
-    - COALESCE((SELECT SUM(price_minor) FROM korund_coupon_redemptions WHERE clerk_user_id = c.clerk_user_id), 0) AS balance FROM citizens c`,
+    UNION ALL SELECT clerk_user_id, -price_minor FROM korund_coupon_redemptions
+    UNION ALL SELECT buyer_id, amount_minor FROM gray_trades
+    UNION ALL SELECT seller_id, -amount_minor FROM gray_trades`,
+  appBalances: `SELECT c.clerk_user_id AS acct, ${laborNoteSql('c.clerk_user_id')} AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('LN', 'korund_settlements', 'clerk_user_id', 'wage_minor', true),
     ...integerAndSign('LN', 'korund_coupon_redemptions', 'clerk_user_id', 'price_minor', true),
+    ...integerAndSign('LN', 'gray_trades', 'buyer_id', 'amount_minor', true),
     { currency: 'LN', check: 'fund_negative:korund-state', sql: `SELECT r.id AS acct FROM korund_resources r WHERE r.id = 'state' AND r.initial_minor - COALESCE((SELECT SUM(wage_minor) FROM korund_settlements), 0) < 0` },
   ],
 };

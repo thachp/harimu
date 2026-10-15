@@ -45,7 +45,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/qa-tools.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
     'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts','lib/war-authority.ts','lib/war-actions.ts','lib/war-weariness.ts','lib/war-weariness-copy.ts', // #309, #350, #423
-    'lib/labor-bureau-rules.ts','lib/labor-bureau-text.ts','lib/labor-bureau-copy.ts','lib/labor-bureau.ts','lib/diplomacy.ts','lib/diplomacy-rules.ts','lib/diplomacy-copy.ts','lib/game-time.ts', // #308
+    'lib/labor-bureau-rules.ts','lib/labor-bureau-text.ts','lib/labor-bureau-copy.ts','lib/labor-bureau.ts','lib/korund-wallet.ts','lib/gray-market.ts','lib/gray-market-rules.ts','lib/gray-market-text.ts','lib/gray-market-copy.ts','lib/diplomacy.ts','lib/diplomacy-rules.ts','lib/diplomacy-copy.ts','lib/game-time.ts', // #308
     'lib/embargo.ts','lib/embargo-rules.ts','lib/embargo-copy.ts', // #363
     'lib/crown-debasement.ts','lib/crown-debasement-rules.ts','lib/press-templates.ts', // #362
     'lib/canvassing.ts','lib/canvassing-rules.ts','app/api/canvassing/route.ts', // #442
