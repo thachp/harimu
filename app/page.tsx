@@ -68,7 +68,7 @@ import { FaithPanel, HolidayBanner, useFaith } from './faith-panel';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
-import { shiftDeadlineText, shiftDeadlineDelay } from '@/lib/shift-deadline';
+import { shiftDeadlineText, shiftDeadlineDelay, deadlineNeedsRefresh } from '@/lib/shift-deadline';
 import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
 import {
   Show,
@@ -515,7 +515,7 @@ function ClerkCitizenSession({
   onIdentity,
   retryKey,
 }: {
-  onHydrate: (snapshot: CitizenSnapshot) => void;
+  onHydrate: (snapshot: CitizenSnapshot, requestedAtMs?: number) => void;
   onStatus: (status: CitizenSessionStatus) => void;
   onIdentity: (userId: string | null) => void;
   retryKey: number;
@@ -538,6 +538,7 @@ function ClerkCitizenSession({
 
     async function loadCitizen() {
       try {
+        const requestedAt = Date.now(); // #596: when this snapshot's request started
         const response = await fetchWithRetry('/api/citizen', { signal: controller.signal });
         if (controller.signal.aborted) return;
         if (!response.ok) {
@@ -546,7 +547,7 @@ function ClerkCitizenSession({
         }
         const snapshot = await response.json() as CitizenSnapshot;
         if (controller.signal.aborted) return;
-        onHydrate(snapshot);
+        onHydrate(snapshot, requestedAt);
         onStatus('ready');
       } catch (error) {
         if (!controller.signal.aborted && (error as Error).name !== 'AbortError') onStatus('error');
@@ -690,6 +691,7 @@ export default function Home() {
   }, [activeCompletesAt]);
   const dockStatus = (order: { id: string; name: string; cost: number }) => { const status = workOrderDockStatus(order, workShifts, capacity, dockNow); return status ? ` · ${status}` : ''; };
   const [deadlineConfirmedId, setDeadlineConfirmedId] = useState<string | null>(null);
+  const [snapshotRequestedAt, setSnapshotRequestedAt] = useState<number | null>(null); // #596: when the request behind the shift list started
   const runWorkRef = useRef<((action: 'refresh-work') => Promise<void>) | null>(null);
   const [influence, setInfluence] = useState(1240);
   const [waterSecurity, setWaterSecurity] = useState(71);
@@ -872,6 +874,7 @@ export default function Home() {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
           body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId, quality }),
         };
+        const requestedAt = Date.now();
         // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
         // Starting a shift has no request id, so it is never retried automatically.
         const response = action === 'commit-work' ? await fetch('/api/citizen', init) : await fetchIdempotent(fetch, '/api/citizen', init);
@@ -880,7 +883,7 @@ export default function Home() {
         if (result.simulation) setSimulation(result.simulation);
         if ('korundPlan' in result) setKorundPlan(result.korundPlan ?? null);
         if ('aurellePlan' in result) setAurellePlan(result.aurellePlan ?? null);
-        if (result.shifts) setWorkShifts(result.shifts);
+        if (result.shifts) { setWorkShifts(result.shifts); setSnapshotRequestedAt(requestedAt); }
         if (result.economy) setEconomy(result.economy);
         if (result.market) setMarket(result.market);
         if (result.playerMarket) setPlayerMarket(result.playerMarket);
@@ -1247,7 +1250,8 @@ export default function Home() {
     finally { if (epoch === citizenEpoch.current) setDecisionPending(false); }
   }
 
-  const hydrateCitizen = useCallback((snapshot: CitizenSnapshot) => {
+  const hydrateCitizen = useCallback((snapshot: CitizenSnapshot, requestedAtMs?: number) => {
+    setSnapshotRequestedAt(requestedAtMs ?? null);
     setKorundPlan(snapshot.korundPlan ?? null);
     setAurellePlan(snapshot.aurellePlan ?? null);
     if (snapshot.simulation) setSimulation(snapshot.simulation);
@@ -1746,12 +1750,12 @@ export default function Home() {
   // One-time deadline timer: when the active shift's deadline passes, refresh the citizen snapshot
   // automatically so the banner stops asking the player to refresh (client-side only; same GET as Refresh).
   useEffect(() => {
-    if (!deadlineShiftId || !deadlineShiftEnds) return;
+    if (!deadlineShiftId || !deadlineShiftEnds || !deadlineNeedsRefresh(deadlineShiftEnds, snapshotRequestedAt)) return;
     const delay = shiftDeadlineDelay(deadlineShiftEnds, Date.now());
     if (delay === null) return;
     const timer = window.setTimeout(() => { void runWorkRef.current?.('refresh-work').finally(() => setDeadlineConfirmedId(deadlineShiftId)); }, delay);
     return () => window.clearTimeout(timer);
-  }, [deadlineShiftId, deadlineShiftEnds]);
+  }, [deadlineShiftId, deadlineShiftEnds, snapshotRequestedAt]);
   const activeShift = priorNationShift ?? (citizenNation?.id === 'aurelle' ? aurellePlan?.shifts ?? [] : citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
   const nextDeadlineCandidates = [
     activeShift ? {label:'Work',endsAt:activeShift.completesAt} : null,
@@ -1760,7 +1764,7 @@ export default function Home() {
       : market?.mealReadyAt ? {label:'Meal',endsAt:market.mealReadyAt} : null,
     capacity < 24 && economy?.nextRecoveryAt ? {label:'Recovery',endsAt:economy.nextRecoveryAt} : null,
   ].filter((event):event is {label:string;endsAt:string} => Boolean(event && Number.isFinite(Date.parse(event.endsAt))));
-  const shiftExpiredText = activeShift ? shiftDeadlineText(activeShift.id, deadlineConfirmedId) : undefined;
+  const shiftExpiredText = activeShift ? shiftDeadlineText(activeShift.id, deadlineConfirmedId ?? (deadlineNeedsRefresh(activeShift.completesAt, snapshotRequestedAt) ? null : activeShift.id)) : undefined;
   const nextDeadline = activeShift ? {label:'Work',endsAt:activeShift.completesAt,expiredText:shiftExpiredText} : nextDeadlineCandidates.filter(event=>Date.parse(event.endsAt)>guideNow).sort((a,b)=>Date.parse(a.endsAt)-Date.parse(b.endsAt))[0];
   const contextItems: { id: string; label: string; detail: string; selected?: boolean; onSelect?: () => void }[] =
     viewMode === 'country' ? [{id:'current-city',label:'Open City',detail:countryOwnNation ? activeCity?.name ?? 'Loading your city' : cityForNation(selected.id,countryCityId ?? '')?.name ?? 'City preview',onSelect:()=>changeView('square')}] : citizenNation?.id === 'aurelle' && ['household','workplace','market'].includes(viewMode) ? [
