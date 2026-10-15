@@ -25,7 +25,7 @@ import { marketVisible } from '@/lib/market-visibility';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
-import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, nationForNavigation, identityHold, identityHoldTimeoutMs, signedInHint, viewedNationHeld, sceneUrl, isVisitorSession, viewedNationAfterLoad, type SceneView, type SignedInHint } from '@/lib/scene-navigation';
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, nationForNavigation, identityHold, identityHoldTimeoutMs, readSignedInHint, viewedNationHeld, sceneUrl, isVisitorSession, viewedNationAfterLoad, type SceneView, type SignedInHint } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -506,7 +506,7 @@ type CitizenSessionStatus = 'loading' | 'anonymous' | 'ready' | 'error';
 
 // #533: Clerk's __client_uat cookie says whether a session exists before Clerk loads. The server snapshot is 'unknown', so hydration matches the server render.
 const subscribeNever = () => () => {};
-const readSignedInHint = (): SignedInHint => signedInHint(document.cookie);
+const readCookieHint = (): SignedInHint => readSignedInHint(() => document.cookie);
 const serverSignedInHint = (): SignedInHint => 'unknown';
 
 function ClerkCitizenSession({
@@ -712,7 +712,7 @@ export default function Home() {
   const citizenIdentity = useRef<string | null>(null);
   const citizenEpoch = useRef(0);
   const [citizenSessionKey, setCitizenSessionKey] = useState(0);
-  const signedHint = useSyncExternalStore(subscribeNever, readSignedInHint, serverSignedInHint);
+  const signedHint = useSyncExternalStore(subscribeNever, readCookieHint, serverSignedInHint);
   const [holdExpiredFor, setHoldExpiredFor] = useState<string | null>(null);
   const sessionLoading = clerkConfigured && citizenSessionStatus === 'loading';
   const holdEpisode = `${citizenSessionKey}:${sessionRetry}`;
