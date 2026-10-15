@@ -36,6 +36,8 @@ async function writesDuring(r, fn) {
 
 test('pure rules: one inspection per city per 14 real days (exact gap), deterministic low chance, hash is stable', () => {
   assert.equal(cfg.raidMinGapSeconds, 14 * 86400); assert.equal(cfg.devotionHit, 5); assert.equal(cfg.holderLookbackSeconds, WEEK);
+  // Pin the two [ASSUMPTION] numbers (docs 14.6 gives neither): changing one must be a deliberate edit of undergroundConfig and of this test.
+  assert.equal(cfg.raidChancePerMille, 42); assert.equal(cfg.devotionHit, 5);
   assert.equal(raidAllowed(1000, null), true);
   assert.equal(raidAllowed(1000 + cfg.raidMinGapSeconds - 1, 1000), false, 'one second inside the gap');
   assert.equal(raidAllowed(1000 + cfg.raidMinGapSeconds, 1000), true, 'exactly 14 days after');
