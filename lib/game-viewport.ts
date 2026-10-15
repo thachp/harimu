@@ -9,11 +9,13 @@ export const cityLocations: { id: LocationId; label: string; detail: string; x: 
 ];
 export function clampCamera(value: number, limit = 10) { return Math.max(-limit, Math.min(limit, Number.isFinite(value) ? value : 0)); }
 export function clampZoom(value: number) { return Math.max(0.65, Math.min(2.8, Number.isFinite(value) ? value : 1)); }
-export function locationSelection(id: LocationId, nationId?: string): ViewportSelection {
+/** #379: a visitor has no household of their own, so "Your household" reads "Household" for them; citizens keep the label. */
+export function locationLabel(id: LocationId, label: string, visitor = false) { return visitor && id === 'home' ? 'Household' : label; }
+export function locationSelection(id: LocationId, nationId?: string, visitor = false): ViewportSelection {
   const place = cityLocations.find((entry) => entry.id === id)!;
   if (nationId === 'korund' && id === 'market') return { kind: 'building', label: 'State ration store', detail: 'Redeem your non-transferable ration coupons while supply lasts.', location: id };
   if (nationId === 'korund' && id === 'workplace') return { kind: 'building', label: 'Assignment board', detail: 'Complete your assigned brigade shift and collect Labor Notes.', location: id };
-  return { kind: 'building', label: place.label, detail: place.detail, location: id };
+  return { kind: 'building', label: locationLabel(id, place.label, visitor), detail: place.detail, location: id };
 }
 
 export type CameraSnapshot = { x: number; z: number; zoom: number };

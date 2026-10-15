@@ -40,12 +40,18 @@ test('limits: labels 40, countdown captions 80, refusal lines 140, with every pl
 });
 test('only known placeholders, in the right lines', () => {
   for (const t of all()) for (const m of t.match(/\{[^}]*\}/g)??[]) assert.ok(REFUSAL_PLACEHOLDERS.includes(m),`${m} in ${t}`);
-  assert.match(refusalFor('rate_limit').lines[1].text,/\{nextAt\}/); assert.match(refusalFor('rate_limit').lines[0].text,/every \{days\} real days/); for (const n of REFUSAL_NATIONS) assert.match(MC[n].text,/\{endsAt\}/);
+  assert.match(refusalFor('rate_limit').lines[1].text,/\{nextAt\}/); assert.match(refusalFor('rate_limit').lines[0].text,/every \{days\}\.$/); for (const n of REFUSAL_NATIONS) assert.match(MC[n].text,/\{endsAt\}/);
   for (const t of [...refusalFor('active_war_cap').lines,...refusalFor('casus_belli').lines].map(l=>l.text)) assert.doesNotMatch(t,/\{/,t);
   for (const t of labels()) assert.doesNotMatch(t,/\{/,t);
 });
+test('{days} is a pre-formatted string that carries its unit, so the line reads right for one day and for many; the line itself writes no unit', () => {
+  const line=refusalFor('rate_limit').lines[0].text;
+  assert.doesNotMatch(line.replace('{days}',''),/\breal days?\b|\bdays?\b/i);
+  for (const [days,expected] of [['1 real day','every 1 real day.'],['14 real days','every 14 real days.']]) assert.ok(line.replace('{days}',days).endsWith(expected),days);
+  assert.ok(!line.replace('{days}','1 real day').includes('1 real days'));
+});
 test('figures: only the docs\' 1 and 2 (rate limits), and the interval is the {days} placeholder; no other digits or number words anywhere', () => {
-  assert.match(refusalFor('rate_limit').lines[0].text,/at most 1 new offensive war every \{days\} real days/); assert.match(refusalFor('active_war_cap').lines[0].text,/at most 2 active offensive wars/);
+  assert.match(refusalFor('rate_limit').lines[0].text,/at most 1 new offensive war every \{days\}\.$/); assert.match(refusalFor('active_war_cap').lines[0].text,/at most 2 active offensive wars/);
   for (const t of all()) { const bare=t.replace(/\{[^}]*\}/g,'').replace(/\bat most 1 new\b|\bat most 2 active\b|\balready has 2 active\b/g,''); assert.doesNotMatch(bare,/\d|%|percent|\b(one|two|three|four|five|six|seven|ten|twice|once|half)\b|\b(hours?|weeks?|months?|years?)\b/i,t); }
   for (const t of captions()) assert.doesNotMatch(t.replace(/\{[^}]*\}/g,''),/\d/,t);
 });
@@ -74,6 +80,27 @@ test('tone: nothing glorifies war; no violence, no real-world names, no Notable,
   assert.doesNotMatch(t,/\b(kill\w*|blood|glor\w*|victor\w*|conquer\w*|crush\w*|army|armies|battle\w*|casualt\w*|loot\w*)\b/i);
   assert.doesNotMatch(t,/Notable|@|\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia)\b/);
+});
+const { REFUSAL_CODES, refusalForCode } = R;
+test('server refusal codes (#426 ruling) are pinned and map one to one onto the refusal copy', () => {
+  assert.deepEqual(Object.keys(REFUSAL_CODES),['rate_limit_declarations','rate_limit_active_wars','casus_belli_insufficient']);
+  assert.deepEqual(REFUSAL_CODES,{rate_limit_declarations:'rate_limit',rate_limit_active_wars:'active_war_cap',casus_belli_insufficient:'casus_belli'});
+  assert.deepEqual(Object.values(REFUSAL_CODES).sort(),[...REFUSAL_KEYS].sort());
+  assert.equal(refusalForCode('rate_limit_declarations'),refusalFor('rate_limit'));
+  assert.equal(refusalForCode('rate_limit_active_wars'),refusalFor('active_war_cap'));
+  assert.equal(refusalForCode('casus_belli_insufficient'),refusalFor('casus_belli'));
+  for (const bad of ['rate_limit','casus_belli','no_casus_belli','war_not_allowed','toString','__proto__','']) assert.equal(refusalForCode(bad),undefined,bad);
+});
+test('the refusal codes match the ones the war rules emit (DeclarationLimitBlock), so a rename there fails here', () => {
+  const m=readFileSync('lib/war-rules.ts','utf8').match(/export type DeclarationLimitBlock = ([^;]+);/);
+  assert.ok(m,'DeclarationLimitBlock found');
+  assert.deepEqual([...m[1].matchAll(/'([a-z_]+)'/g)].map(x=>x[1]).sort(),Object.keys(REFUSAL_CODES).sort());
+});
+test('the casus belli refusal leaks nothing of the grievance gate: no score, weights, threshold, inputs or counts', () => {
+  const x=refusalForCode('casus_belli_insufficient');
+  for (const t of [x.label,...x.lines.map(l=>l.text)]) {
+    assert.doesNotMatch(t,/\d|score|weight|threshold|point|pact|embargo|sanction|trade treaty|border|incident|commons|dispute|\bAI\b|model/i,t);
+  }
 });
 test('unwired: nothing in app/, components/ or lib/ imports war-refusal-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };

@@ -46,8 +46,8 @@ test('the war flag defaults to "false" in wrangler.jsonc and migration 0031 only
   for (const file of await walk(new URL('../app/', import.meta.url))) if (/\.(ts|tsx)$/.test(file.pathname)) assert.doesNotMatch(await readFile(file, 'utf8'), /declareWar|endWar/, file.pathname);
 });
 
-async function setup(t, { flag = true, shardDaysAgo = 31 } = {}) {
-  const r = await localRuntime(); t.after(() => r.close());
+async function setup(t, { flag = true, shardDaysAgo = 31, backend } = {}) {
+  const r = await localRuntime({ backend }); t.after(() => r.close());
   const nowS = () => Math.floor(r.now / 1000);
   if (shardDaysAgo !== null) r.setFixtureEnv('HARIMU_SHARD_STARTED_AT', String(nowS() - shardDaysAgo * D));
   const war = await r.importModule('lib/war.ts');
@@ -247,11 +247,12 @@ test('#402 no pact, a proposed, rejected, expired or broken pact, or a term that
   assert.equal((await lock.declare()).reason, 'peace_lock', 'the peace lock still applies without a pact');
 });
 
+// #584: pinned to SQLite: the DROP TABLE below fails on the PGlite fixture, which `npm run test:postgres` (HARIMU_TEST_STORAGE=postgres) would otherwise select.
 test('#402 a database without the treaties table reads as no pact; other read errors still surface', async t => {
-  const { r, declare } = await setup(t);
+  const { r, declare } = await setup(t, { backend: 'sqlite' });
   await r.db.prepare('DROP TABLE treaties').run();
   assert.equal((await declare()).ok, true, 'missing table: fails open');
-  const { r: r2, declare: declare2 } = await setup(t); const prepare = r2.db.prepare.bind(r2.db);
+  const { r: r2, declare: declare2 } = await setup(t, { backend: 'sqlite' }); const prepare = r2.db.prepare.bind(r2.db);
   r2.db.prepare = sql => { if (/FROM treaties/.test(sql)) throw new Error('disk on fire'); return prepare(sql); };
   await assert.rejects(declare2(), /disk on fire/);
 });

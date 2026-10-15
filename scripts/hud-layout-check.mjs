@@ -31,6 +31,7 @@ import { checkShiftQualityStep } from './shift-quality-layout-check.mjs';
 import { checkPhoneLabels } from './phone-labels-check.mjs';
 import { checkAccountMenu } from './account-menu-layout-check.mjs';
 import { checkPhoneTapTargets } from './phone-tap-targets-check.mjs';
+import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
@@ -187,6 +188,7 @@ try {
   await checkPhoneLabels({ browser, css, preflight, failures, rows }); // #377: phone city labels inside the canvas and apart, destination cards and nation strip fit the width
   await checkAccountMenu({ browser, css, preflight, failures, rows }); // #452: the account menu shows the whole email at every text size
   await checkPhoneTapTargets({ browser, css, preflight, failures, rows }); // #528: phone controls are at least 44x44; the camera bar sits under the canvas
+  await checkVisitorWording({ browser, css, preflight, failures, rows }); // #379: visitor wording (VISITOR PREVIEW, Household) and guide/pin text fit
 } finally { await browser.close(); }
 console.log(rows.join('\n'));
 if (failures.length) { console.error(`\nHUD layout check FAILED:\n${failures.join('\n')}`); process.exit(1); }

@@ -16,6 +16,10 @@ export const assemblyCycleSeconds = 120 * 86400;
 export const assemblyMidtermOffsetSeconds = 60 * 86400;
 /** #351 (ARC, #356 item 2): a party needs at least this share of the district's human ballots to take part in the D'Hondt award. No separate turnout floor. */
 export const assemblyMinSharePercent = 5;
+/** #463 (ARC ruling): a district counts only with at least this many human ballots. An absolute count floor, not a turnout share, applied before the
+ *  5% party share. Under it the district takes the zero-ballot path: the seats up stay with their incumbents and the rotation does not advance. [ASSUMPTION]
+ *  The number lives here only; ARC may change it. */
+export const assemblyMinBallotsPerDistrict = 5;
 
 export const assemblyDistricts = citiesForNation('kindle').map(city => ({ id: city.id, name: city.name }));
 export const assemblyPartyIds = kindleParties.map(party => party.id);
@@ -81,13 +85,13 @@ export function dHondt(weights: PartySeats, seats: number, order: readonly strin
 }
 
 export type DistrictResult = {
-  districtId: string; name: string; humanBallots: number; contested: boolean; belowThreshold: string[];
+  districtId: string; name: string; humanBallots: number; contested: boolean; belowMinimum: boolean; belowThreshold: string[];
   human: PartySeats;
   seatsUp: PartySeats; seatsHeld: PartySeats; seatsWon: PartySeats; seatsAfter: PartySeats;
 };
 export type AssemblyResult = { humanBallots: number; districts: DistrictResult[]; totals: { before: PartySeats; after: PartySeats } };
 
-/** One district, counted from human ballots only (#449, Decision 65: no AI ballots, no simulated bloc). Without a human ballot nothing is contested and the seats up stay with their incumbents. */
+/** One district, counted from human ballots only (#449, Decision 65: no AI ballots, no simulated bloc). Under `assemblyMinBallotsPerDistrict` human ballots (none included) nothing is contested and the seats up stay with their incumbents (#463). */
 export function districtResult(districtId: string, humanVotes: PartySeats, carried: Incumbents = assemblyIncumbents): DistrictResult {
   const incumbents = carried[districtId];
   if (!incumbents) throw new RangeError('Unknown Assembly district.');
@@ -95,12 +99,13 @@ export function districtResult(districtId: string, humanVotes: PartySeats, carri
   const humanBallots = sum(human);
   const weighted = zero(); // the D'Hondt weights: each party's human ballots
   // #351: a party under the minimum share of the human ballots takes no part in the award. Integers only.
-  const belowThreshold = humanBallots > 0 ? assemblyPartyIds.filter(id => human[id] * 100 < assemblyMinSharePercent * humanBallots) : [];
+  const contested = humanBallots >= assemblyMinBallotsPerDistrict;
+  const belowMinimum = humanBallots > 0 && !contested; // some ballots, too few to count: published, but they award nothing
+  const belowThreshold = contested ? assemblyPartyIds.filter(id => human[id] * 100 < assemblyMinSharePercent * humanBallots) : [];
   for (const id of assemblyPartyIds) weighted[id] = belowThreshold.includes(id) ? 0 : human[id];
-  const contested = humanBallots > 0;
   const seatsWon = contested ? dHondt(weighted, assemblySeatsUp) : { ...incumbents.up };
   const seatsAfter = zero(); for (const id of assemblyPartyIds) seatsAfter[id] = incumbents.held[id] + seatsWon[id];
-  return { districtId, name: districtName(districtId), humanBallots, contested, belowThreshold, human, seatsUp: { ...incumbents.up }, seatsHeld: { ...incumbents.held }, seatsWon, seatsAfter };
+  return { districtId, name: districtName(districtId), humanBallots, contested, belowMinimum, belowThreshold, human, seatsUp: { ...incumbents.up }, seatsHeld: { ...incumbents.held }, seatsWon, seatsAfter };
 }
 
 export function assemblyResult(byDistrict: Readonly<Record<string, PartySeats>>, carried: Incumbents = assemblyIncumbents): AssemblyResult {

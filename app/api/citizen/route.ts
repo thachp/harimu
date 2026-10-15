@@ -5,6 +5,7 @@ import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, en
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
 import { readCrownMint } from '@/lib/crown-debasement';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
+import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
@@ -38,9 +39,18 @@ async function readAurelleView(database: Awaited<ReturnType<typeof getDatabase>>
   const plan = await readAurelle(database, userId, decayOn ? { favorDecayAt: Math.floor(Date.now() / 1000) } : {});
   return crownMintOn() && plan.available ? { ...plan, mint: await readCrownMint(database, Math.floor(Date.now() / 1000)) } : plan;
 }
+/** #490: the generic nation wage plan, only while HARIMU_NATION_WORK_ENABLED is on and the citizen's nation has a wage ledger and is playable for the account. Otherwise no key at all. */
+async function nationWorkPlanPart(database: Awaited<ReturnType<typeof getDatabase>>, userId: string) {
+  const options = nationWorkOptions();
+  if (!options.enabled) return {};
+  const plan = await readNationWork(database, userId, options);
+  return plan ? { nationWorkPlan: plan } : {};
+}
 const laborBureauOn = () => (env as unknown as { HARIMU_LABOR_BUREAU_ENABLED?: string }).HARIMU_LABOR_BUREAU_ENABLED === 'true';
 // #43: the Korund gray market ships off (HARIMU_GRAY_MARKET_ENABLED).
 const grayMarketOn = () => (env as unknown as { HARIMU_GRAY_MARKET_ENABLED?: string }).HARIMU_GRAY_MARKET_ENABLED === 'true';
+// #490: the generic per-nation wage ledger and work commands ship off (HARIMU_NATION_WORK_ENABLED).
+const nationWorkOptions = () => ({ enabled: (env as unknown as { HARIMU_NATION_WORK_ENABLED?: string }).HARIMU_NATION_WORK_ENABLED === 'true', bindings: env as never });
 const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
@@ -168,6 +178,7 @@ export async function GET(request: Request) {
     election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true),...(accountLevel?{id:accountElectionId}:{})}:null,
     collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
     korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000),korundOptions()),
+    ...await nationWorkPlanPart(database,userId),
     firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
     flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED) }, // #344: the UI hides Market entry points while this is false
     simulation,
@@ -234,7 +245,8 @@ async function handlePost(request: Request) {
   }
   const now = new Date().toISOString();
   // #123: while travelling, location-bound actions wait for arrival (only when HARIMU_TRAVEL_ENABLED=true).
-  if (typeof body.action === 'string' && locationBoundActions.has(body.action)) {
+  // #490: nation-start-work is location-bound only while its flag is on, so flag off stays a plain 404 below.
+  if (typeof body.action === 'string' && (locationBoundActions.has(body.action) || (body.action === 'nation-start-work' && nationWorkOptions().enabled))) {
     const blocked = await travelBlock(database, userId, Math.floor(Date.parse(now) / 1000), (env as unknown as { HARIMU_TRAVEL_ENABLED?: string }).HARIMU_TRAVEL_ENABLED === 'true');
     if (blocked) return privateJson({ error: blocked, reason: 'traveling' }, { status: 409 });
   }
@@ -255,6 +267,16 @@ async function handlePost(request: Request) {
     const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000));
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
     return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundOptions()),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
+  }
+
+  if (body.action === 'nation-start-work' || body.action === 'nation-claim-work') {
+    // #490: flag off (the shipped default) is 404 before anything else, validation included.
+    const options = nationWorkOptions();
+    if (!options.enabled) return privateJson({ error: 'Not found.', reason: 'disabled' }, { status: 404 });
+    if (!validNationWorkCommand(body)) return privateJson({ error: 'Use a valid request or shift identifier and a job id.' }, { status: 400 });
+    const result = await executeNationWork(database, userId, body, Math.floor(Date.parse(now) / 1000), options);
+    const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ capacity: number }>();
+    return privateJson({ ...result, ok: result.status === 200, ...await nationWorkPlanPart(database, userId), shifts: await readShifts(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
   if (typeof body.action === 'string' && body.action.startsWith('korund-')) {
