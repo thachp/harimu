@@ -31,7 +31,12 @@ export async function POST(request: Request) {
   try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send a buy-square or buy-tessera command.', reason: 'bad_request' }, 400); }
   if (body.action === 'buy-tessera') {
     const exchange = parseExchangeCommand(body);
-    if (!exchange) return privateJson({ error: `Send action "buy-tessera", an integer tesseraMinor between ${kioskMinTesseraMinor} and ${kioskMaxTesseraMinor} and a requestId.`, reason: 'bad_request' }, 400);
+    if (!exchange) {
+      // Distinct reasons so the UI can word them: an amount outside the kiosk range is `out_of_range`; a missing or malformed requestId stays `bad_request`.
+      const amount = body.tesseraMinor;
+      const inRange = Number.isSafeInteger(amount) && (amount as number) >= kioskMinTesseraMinor && (amount as number) <= kioskMaxTesseraMinor;
+      return privateJson({ error: `Send action "buy-tessera", an integer tesseraMinor between ${kioskMinTesseraMinor} and ${kioskMaxTesseraMinor} and a requestId.`, reason: inRange ? 'bad_request' : 'out_of_range' }, 400);
+    }
     const bought = await buyTessera(await getDatabase(), userId, exchange, Math.floor(Date.now() / 1000), enabled());
     return bought.ok ? privateJson(bought) : privateJson({ error: bought.error, reason: bought.reason }, bought.status);
   }
