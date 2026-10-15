@@ -32,6 +32,32 @@ export function treatyStatus(row: { status: TreatyDbStatus; endsAt: number | nul
   return row.status === 'proposed' ? 'proposed' : row.status === 'expired' ? 'expired' : row.status === 'broken' ? 'broken' : 'rejected';
 }
 
+/** #400 [ASSUMPTION, awaiting a Design ruling]: what breaking an in-force treaty costs the BREAKING nation. Docs 13.2 says a non-aggression pact
+ *  costs Legitimacy and global Reputation and gives no figure; a trade agreement has no stated cost, so it carries none here beyond the news line.
+ *  These are placeholders, recorded with the break and returned to the caller. Nothing debits them yet: Legitimacy and Reputation have no store
+ *  (lib/aurelle-coup-rules.ts: "neutral until #69 grows one"). Negative numbers are losses. */
+export const treatyBreakPenalty: Readonly<Record<TreatyKind, { legitimacy: number; reputation: number }>> = {
+  'non-aggression': { legitimacy: -5, reputation: -10 },
+  trade: { legitimacy: 0, reputation: 0 },
+};
+export type TreatyBreakPenalty = { nation: TreatyNationId; legitimacy: number; reputation: number; applied: false };
+export const treatyBreakPenaltyFor = (kind: TreatyKind, breaker: TreatyNationId): TreatyBreakPenalty => ({ nation: breaker, ...treatyBreakPenalty[kind], applied: false });
+
+/** #400 [ASSUMPTION]: scheduled AI-leader proposals. A deterministic stand-in for the utility model (not a simulation): at most one proposal per
+ *  real-time slot (one day, 12 game days at the 12x clock), rotating through the six pair-and-kind candidates, the proposer alternating each full
+ *  rotation. A refused proposal of the same pair and kind is not repeated for `treatyProposalCooldownSlots` slots. */
+export const treatyProposalSlotSeconds = 86400;
+export const treatyProposalCooldownSlots = 3;
+export const treatyAiLeaders: Readonly<Record<TreatyNationId, string>> = { kindle: "Kindle's AI Cabinet", korund: "Korund's AI Chairman", aurelle: "Aurelle's AI Crown" };
+export const treatySlot = (now: number) => Math.floor(now / treatyProposalSlotSeconds);
+export const treatyProposalRequestId = (slot: number) => `ai-slot-${slot}`;
+const treatyPairs: ReadonlyArray<readonly [TreatyNationId, TreatyNationId]> = [['kindle', 'korund'], ['kindle', 'aurelle'], ['korund', 'aurelle']];
+export function treatyCandidates(slot: number): Array<{ proposer: TreatyNationId; other: TreatyNationId; kind: TreatyKind }> {
+  const all = treatyPairs.flatMap(pair => treatyKinds.map(kind => ({ pair, kind })));
+  const start = ((slot % all.length) + all.length) % all.length, flip = Math.floor(slot / all.length) % 2 === 1;
+  return all.map((_, i) => all[(start + i) % all.length]).map(({ pair, kind }) => ({ proposer: flip ? pair[1] : pair[0], other: flip ? pair[0] : pair[1], kind }));
+}
+
 export type PartySeats = Record<string, number>;
 const partyIds = ['steady-hand', 'open-ledger', 'dockside-builders'] as const;
 /** [ASSUMPTION] Fixed stand-in for the AI Assembly: each Kindle party votes yes or no by the kind of treaty and the other signatory.
