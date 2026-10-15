@@ -37,17 +37,18 @@ export type LabelBox = { x: number; y: number; w: number; h: number };
  */
 export function placeLabels(boxes: LabelBox[], area: { w: number; h: number }, gap = 4): LabelBox[] {
   const placed: LabelBox[] = [];
-  const clampX = (b: LabelBox) => b.w + gap * 2 > area.w ? area.w / 2 : Math.max(b.w / 2 + gap, Math.min(area.w - b.w / 2 - gap, b.x));
+  const clampX = (b: LabelBox, x: number) => b.w + gap * 2 > area.w ? area.w / 2 : Math.max(b.w / 2 + gap, Math.min(area.w - b.w / 2 - gap, x));
   const clampY = (b: LabelBox, y: number) => Math.max(b.h + gap, Math.min(area.h - gap, y));
-  const clash = (a: LabelBox, b: LabelBox) => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + gap && Math.abs((a.y - a.h / 2) - (b.y - b.h / 2)) < (a.h + b.h) / 2 + gap;
+  const clashes = (a: LabelBox) => placed.filter(b => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + gap && Math.abs((a.y - a.h / 2) - (b.y - b.h / 2)) < (a.h + b.h) / 2 + gap).length;
   for (const box of boxes) {
-    const x = clampX(box), start = { ...box, x, y: clampY(box, box.y) };
-    let best = start;
-    for (let step = 0; step <= 6 && placed.some(other => clash(best, other)); step++) {
-      const dy = Math.ceil(step / 2) * (box.h + gap) * (step % 2 ? -1 : 1);
-      best = { ...start, y: clampY(box, start.y + dy) };
-      if (!placed.some(other => clash(best, other))) break;
-      if (step === 6) best = start;
+    const start = { ...box, x: clampX(box, box.x), y: clampY(box, box.y) };
+    // Try the spot itself, then steps up or down by one label height (and sideways by half a label), nearest first; keep the least-crowded spot if none is clear.
+    const tries = [0, 1, -1, 2, -2, 3, -3, 4, -4].flatMap(row => [0, 1, -1, 2, -2].map(col => ({ row, col }))).sort((a, b) => Math.abs(a.row) * 2 + Math.abs(a.col) - Math.abs(b.row) * 2 - Math.abs(b.col));
+    let best = start, fewest = clashes(start);
+    for (const { row, col } of tries) {
+      if (!fewest) break;
+      const spot = { ...box, x: clampX(box, start.x + col * (box.w / 2 + gap)), y: clampY(box, start.y + row * (box.h + gap)) }, n = clashes(spot);
+      if (n < fewest) { best = spot; fewest = n; }
     }
     placed.push(best);
   }
