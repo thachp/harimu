@@ -78,3 +78,8 @@ test('wired: only app/reserve-board-line.tsx and lib/reserve-board-view.ts impor
   assert.match(readFileSync('app/reserve-board-line.tsx','utf8'),/from '@\/lib\/reserve-board-copy'/,'the line component imports the copy');
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('reserve-board-copy.ts')&&!['app/reserve-board-line.tsx','lib/reserve-board-view.ts'].includes(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/reserve-board-copy/, f);
 });
+test('polish (QA1): issuance news says "game month", and no line forecasts the Price Index', () => {
+  for (const x of notices()) if (/month/.test(x.n.body+x.n.headline)) assert.match(x.n.body+x.n.headline,/game month/,x.n.id);
+  for (const t of all()) assert.doesNotMatch(t.replace(/game month/g,''),/\bmonth\b/,t);
+  for (const t of all()) assert.doesNotMatch(t,/Critics|\bwarn\w*|\b(expect|forecast|predict|inflation|soar|surge|spike)\w*/i,t);
+});
