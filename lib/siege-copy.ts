@@ -3,7 +3,7 @@
  * Canon: harimu-docs territory-cities-warfare §15.3 (capturing a city takes at least two successful assaults on two different days inside
  * the defender's defense window; Heartland squares cannot be captured), cities §capture rules (capitals and other Heartland cities can
  * never be captured; Frontier outposts and cities founded on Frontier squares can be), §15.4 (citizens are never killed; evacuation is
- * covered by lib/war-protections-copy.ts, #421) and the three press voices: Kindle (#237, Republic Wire Service, plain and argumentative),
+ * covered by the separate war-protections copy, #421) and the three press voices: Kindle (#237, Republic Wire Service, plain and argumentative),
  * Korund State Media (#238/#244) and the Aurelle Court Gazette (#239, "Be it known"). Bylines are checked against lib/press-templates.ts.
  *
  * Each nation has two variants of every siege event: a `report` (a bylined report about a siege between other nations, or about one in
