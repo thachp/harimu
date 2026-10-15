@@ -1,5 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
+import type { CrownMint } from './crown-debasement'; // #362 (type only: tests/aurelle.test.py loads this file straight into Node, so it needs no runtime import of a module)
 // Bounded prototype tuning; no gold backing, issuance, ranks or charter allocation model.
 export const aurelleJob = {id:'aurelle-food-estate',name:'Chartered food-estate service',capacityCost:4,hours:2,wageMinor:800,foodOutput:4,favorReward:2} as const;
 export const aurelleFoodPriceMinor=150;
@@ -63,7 +64,9 @@ export const aurelleMealSql=`INSERT OR IGNORE INTO aurelle_meals(id,clerk_user_i
 export const aurelleMealCapacitySql=`UPDATE citizens SET capacity=MIN(24,capacity+4),updated_at=? WHERE clerk_user_id=? AND EXISTS(
  SELECT 1 FROM aurelle_receipts r JOIN aurelle_meals m ON m.id=r.id WHERE r.id=? AND r.clerk_user_id=citizens.clerk_user_id AND r.action='aurelle-household-meal' AND r.capacity_applied=0)`;
 export type AurellePlan={available:boolean;mode:'bounded charter economy';charter:{id:string;name:string;active:boolean};job:typeof aurelleJob;
- walletMinor:number;foodQuantity:number;favor:number;publicFoodRemaining:number;publicFundMinor:number;mealReadyAt:string|null;shifts:WorkShift[]};
+ walletMinor:number;foodQuantity:number;favor:number;publicFoodRemaining:number;publicFundMinor:number;mealReadyAt:string|null;shifts:WorkShift[];
+ /** #362: read-only mint parity, Currency Confidence and official rate strip; present only while HARIMU_CROWN_DEBASEMENT_ENABLED is on. */
+ mint?:CrownMint};
 export type AurelleCommand={action:'aurelle-start-work'|'aurelle-claim-work'|'aurelle-buy-food'|'aurelle-household-meal';requestId:string;shiftId?:string;quantity?:number};
 const uuid=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export function validAurelleCommand(body:Record<string,unknown>):body is Record<string,unknown>&AurelleCommand {

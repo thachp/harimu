@@ -35,7 +35,7 @@ test('#283 rules: two districts against hand-computed tables; half the seats up,
   // Tarrek Foundry: humans S0 O1 D1 (N=2). Bloc = 2 x 25/20/55 = S50 O40 D110. Weighted S 50, O 100+40=140, D 100+110=210.
   // Quotients: D 210 105 70 | O 140 70 | S 50. Top three: 210 (D), 140 (O), 105 (D) -> D2 O1 S0.
   const t = districtResult('tarrek-foundry', { [O]: 1, [D]: 1 });
-  assert.deepEqual(t.weighted, { [S]: 50, [O]: 140, [D]: 210 }); assert.deepEqual(t.seatsWon, { [S]: 0, [O]: 1, [D]: 2 });
+  assert.deepEqual(t.weighted, { [S]: 0, [O]: 140, [D]: 210 }, '#351: Steady Hand has no human ballot here, under the 5% share, so its bloc weight (50) takes no part'); assert.deepEqual(t.belowThreshold, [S]); assert.deepEqual(t.seatsWon, { [S]: 0, [O]: 1, [D]: 2 });
   assert.deepEqual(t.seatsAfter, { [S]: 1, [O]: 2, [D]: 3 });
   // A district nobody voted in contests nothing: the seats up stay with their incumbents.
   const k = districtResult('kolt-savanna', {});
@@ -199,6 +199,8 @@ test(`#283 ${backend}: Tier-1 scope needs the certified privacy gate and a verif
   r.setVerification('alice', { userId: 'alice', emailVerified: true, phoneVerified: true, phoneUnique: true, revoked: false, checkedAt: r.now, expiresAt: r.now + 60000 });
   const ok = await r.call('assembly', 'alice', { ...cmd, requestId: randomUUID() }); assert.equal(ok.status, 200, JSON.stringify(ok.data));
   assert.equal(ok.data.scope, 'tier1'); assert.equal((await r.db.prepare('SELECT policy FROM assembly_anonymous_ballots').first()).policy, 'tier1-human-v1');
+  // #356: the Tier-1 scope never shows the account-preview wording (operators may correlate submissions); the certified gate has nothing to explain.
+  const tier1 = await r.call('assembly', 'alice'); assert.equal(tier1.data.privacyReady, true); assert.equal(tier1.data.privacyReason, ''); assert.doesNotMatch(JSON.stringify(tier1.data), /correlate/i);
 });
 
 test('#283 migration 0034 is additive, matches the runtime schema and passes the guard', async () => {

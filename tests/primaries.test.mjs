@@ -204,6 +204,8 @@ test(`#307 ${backend}: Tier-1 scope needs the certified privacy gate and a verif
   r.setVerification('alice', { userId: 'alice', emailVerified: true, phoneVerified: true, phoneUnique: true, revoked: false, checkedAt: r.now, expiresAt: r.now + 60000 });
   const ok = await r.call('primaries', 'alice', cmd()); assert.equal(ok.status, 200, JSON.stringify(ok.data)); assert.equal(ok.data.scope, 'tier1');
   assert.equal((await r.db.prepare('SELECT policy FROM primary_anonymous_ballots').first()).policy, 'tier1-human-v1');
+  // #356: the Tier-1 scope never shows the account-preview wording (operators may correlate submissions).
+  const tier1 = await r.call('primaries', 'alice'); assert.equal(tier1.data.privacyReady, true); assert.equal(tier1.data.privacyReason, ''); assert.doesNotMatch(JSON.stringify(tier1.data), /correlate/i);
   r.setNow((open + W + 1) * 1000); assert.equal((await r.call('primaries', 'alice')).data.result.parties[1].ballots, 1);
   await r.db.prepare('DELETE FROM primary_anonymous_ballots').run();
   await assert.rejects(r.call('primaries', 'alice'), /could not be confirmed/);

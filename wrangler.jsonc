@@ -40,7 +40,7 @@
     "HARIMU_AURELLE_RISING_ENABLED": "false",
     // #281: Aurelle AI palace coup (plot, Power Weight, Crisis Window). Off until QA.
     "HARIMU_AURELLE_COUP_ENABLED": "false",
-    // #283: Kindle mid-term Assembly election (D'Hondt per district). Off until QA. Opening is manual: set HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) to open the 72-hour vote.
+    // #283: Kindle mid-term Assembly election (D'Hondt per district, 5% district share). Off until QA. #351: the real calendar is driven by the world clock: set HARIMU_KINDLE_CYCLE_START_AT (epoch seconds, start of day 0 of the first 120-day cycle) and the vote opens at day 60 of every cycle for 72 hours. Without it, HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) is a manual one-off open. Neither set: it never opens.
     "HARIMU_KINDLE_ASSEMBLY_ENABLED": "false",
     // #307: Kindle party membership and human primaries. Off until QA. Opening is manual: set HARIMU_PRIMARIES_OPEN_AT (epoch seconds) to open the 72-hour primary.
     "HARIMU_PRIMARIES_ENABLED": "false",
@@ -53,6 +53,8 @@
     "HARIMU_DIPLOMACY_ENABLED": "false",
     // #363: embargo PoC (bilateral trade cut). Off until QA; embargoes are proposed and ratified by server code only.
     "HARIMU_EMBARGO_ENABLED": "false",
+    // #362: Aurelle Crown debasement PoC (mint parity, Currency Confidence, Monarch decree). Off until QA; decrees are written only by the scheduled Worker.
+    "HARIMU_CROWN_DEBASEMENT_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

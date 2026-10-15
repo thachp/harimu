@@ -10,6 +10,12 @@ import { assemblyStage, ASSEMBLY_NAME_MAX } from './assembly-copy';
 export const assemblySeatsPerDistrict = 6; // [ASSUMPTION]
 export const assemblySeatsUp = 3; // half
 export const assemblyWindowSeconds = 72 * 3600; // same 72 real hours as the presidential PoC
+/** #351: the real calendar (docs politics/elections §9.1). A cycle is 120 real days (4 game years at 12x) and the mid-term Assembly election opens
+ *  at day 60 of each cycle for the same 72-hour window. Real seconds on the world clock, not game time. */
+export const assemblyCycleSeconds = 120 * 86400;
+export const assemblyMidtermOffsetSeconds = 60 * 86400;
+/** #351 (ARC, #356 item 2): a party needs at least this share of the district's human ballots to take part in the D'Hondt award. No separate turnout floor. */
+export const assemblyMinSharePercent = 5;
 /** Human ballots weigh this many units each; the AI bloc gets the same total as the humans (a 1:1 split), spread by fixed shares. */
 export const assemblyHumanUnit = 100;
 
@@ -34,6 +40,36 @@ export const assemblyBlocShares: Readonly<Record<string, PartySeats>> = {
   'kolt-savanna': { 'steady-hand': 30, 'open-ledger': 50, 'dockside-builders': 20 },
 };
 
+export type AssemblyTiming = { openAt: number | null; cycleStartAt: number | null };
+export type AssemblyPlan = { id: string; cycle: number | null; opensAt: number; closesAt: number };
+/** The election the clock points at, or null when nothing is configured (never opens). `cycleStartAt` (the start of day 0 of cycle 0, epoch seconds) drives
+ *  the real schedule: the latest cycle whose day-60 open has come, or cycle 0 while it is still ahead. Without it, `openAt` is the manual trigger
+ *  for one election (the #283 behaviour, id unchanged). With both set the schedule wins. */
+export function planAssembly(baseId: string, timing: AssemblyTiming, now: number): AssemblyPlan | null {
+  if (timing.cycleStartAt !== null) {
+    const opensAtOf = (cycle: number) => timing.cycleStartAt! + cycle * assemblyCycleSeconds + assemblyMidtermOffsetSeconds;
+    let cycle = Math.max(0, Math.floor((now - timing.cycleStartAt) / assemblyCycleSeconds));
+    if (cycle > 0 && now < opensAtOf(cycle)) cycle--;
+    const opensAt = opensAtOf(cycle);
+    return { id: `${baseId}-cycle-${cycle}`, cycle, opensAt, closesAt: opensAt + assemblyWindowSeconds };
+  }
+  return timing.openAt === null ? null : { id: baseId, cycle: null, opensAt: timing.openAt, closesAt: timing.openAt + assemblyWindowSeconds };
+}
+/** The next open strictly after `now`, or null. */
+export function nextAssemblyOpen(timing: AssemblyTiming, now: number): number | null {
+  if (timing.cycleStartAt === null) return timing.openAt !== null && timing.openAt > now ? timing.openAt : null;
+  const first = timing.cycleStartAt + assemblyMidtermOffsetSeconds;
+  return now < first ? first : first + (Math.floor((now - first) / assemblyCycleSeconds) + 1) * assemblyCycleSeconds;
+}
+
+export type Incumbents = Readonly<Record<string, { up: PartySeats; held: PartySeats }>>;
+/** Seats carry over with staggered terms (ARC final on #351): after a count, the seats just won are the ones held for the next election and the seats
+ *  held through this one are the ones that go up next. Each district keeps its six seats (three up, three held). A district nobody voted in was not
+ *  counted, so the rotation does not advance there: the same half goes up again. */
+export function carryIncumbents(previous: AssemblyResult): Incumbents {
+  return Object.fromEntries(previous.districts.map(d => [d.districtId, d.contested ? { up: { ...d.seatsHeld }, held: { ...d.seatsWon } } : { up: { ...d.seatsUp }, held: { ...d.seatsHeld } }]));
+}
+
 const zero = (): PartySeats => Object.fromEntries(assemblyPartyIds.map(id => [id, 0]));
 const sum = (v: PartySeats) => Object.values(v).reduce((a, b) => a + b, 0);
 
@@ -54,28 +90,30 @@ export function dHondt(weights: PartySeats, seats: number, order: readonly strin
 }
 
 export type DistrictResult = {
-  districtId: string; name: string; humanBallots: number; contested: boolean;
+  districtId: string; name: string; humanBallots: number; contested: boolean; belowThreshold: string[];
   human: PartySeats; bloc: PartySeats; weighted: PartySeats;
   seatsUp: PartySeats; seatsHeld: PartySeats; seatsWon: PartySeats; seatsAfter: PartySeats;
 };
 export type AssemblyResult = { humanBallots: number; districts: DistrictResult[]; totals: { before: PartySeats; after: PartySeats } };
 
 /** One district. Without a human ballot the AI bloc is zero too, nothing is contested, and the seats up stay with their incumbents. */
-export function districtResult(districtId: string, humanVotes: PartySeats): DistrictResult {
-  const incumbents = assemblyIncumbents[districtId], shares = assemblyBlocShares[districtId];
+export function districtResult(districtId: string, humanVotes: PartySeats, carried: Incumbents = assemblyIncumbents): DistrictResult {
+  const incumbents = carried[districtId], shares = assemblyBlocShares[districtId];
   if (!incumbents || !shares) throw new RangeError('Unknown Assembly district.');
   const human = zero(); for (const id of assemblyPartyIds) { const n = humanVotes[id] ?? 0; if (!Number.isSafeInteger(n) || n < 0) throw new RangeError('Invalid ballot count.'); human[id] = n; }
   const humanBallots = sum(human);
   const bloc = zero(), weighted = zero();
-  for (const id of assemblyPartyIds) { bloc[id] = humanBallots * shares[id]; weighted[id] = human[id] * assemblyHumanUnit + bloc[id]; }
+  // #351: a party under the minimum share of the human ballots takes no part in the award (its bloc weight goes with it). Integers only.
+  const belowThreshold = humanBallots > 0 ? assemblyPartyIds.filter(id => human[id] * 100 < assemblyMinSharePercent * humanBallots) : [];
+  for (const id of assemblyPartyIds) { bloc[id] = humanBallots * shares[id]; weighted[id] = belowThreshold.includes(id) ? 0 : human[id] * assemblyHumanUnit + bloc[id]; }
   const contested = humanBallots > 0;
   const seatsWon = contested ? dHondt(weighted, assemblySeatsUp) : { ...incumbents.up };
   const seatsAfter = zero(); for (const id of assemblyPartyIds) seatsAfter[id] = incumbents.held[id] + seatsWon[id];
-  return { districtId, name: districtName(districtId), humanBallots, contested, human, bloc, weighted, seatsUp: { ...incumbents.up }, seatsHeld: { ...incumbents.held }, seatsWon, seatsAfter };
+  return { districtId, name: districtName(districtId), humanBallots, contested, belowThreshold, human, bloc, weighted, seatsUp: { ...incumbents.up }, seatsHeld: { ...incumbents.held }, seatsWon, seatsAfter };
 }
 
-export function assemblyResult(byDistrict: Readonly<Record<string, PartySeats>>): AssemblyResult {
-  const districts = assemblyDistricts.map(d => districtResult(d.id, byDistrict[d.id] ?? {}));
+export function assemblyResult(byDistrict: Readonly<Record<string, PartySeats>>, carried: Incumbents = assemblyIncumbents): AssemblyResult {
+  const districts = assemblyDistricts.map(d => districtResult(d.id, byDistrict[d.id] ?? {}, carried));
   const before = zero(), after = zero();
   for (const d of districts) for (const id of assemblyPartyIds) { before[id] += d.seatsHeld[id] + d.seatsUp[id]; after[id] += d.seatsAfter[id]; }
   return { humanBallots: districts.reduce((a, d) => a + d.humanBallots, 0), districts, totals: { before, after } };
