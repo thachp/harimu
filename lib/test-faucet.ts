@@ -1,5 +1,5 @@
 import type { GameDatabase } from './database-contract';
-import { tesseraBalanceSql } from './tessera-exchange';
+import { tesseraBalanceBinds, tesseraBalanceSql } from './tessera-exchange';
 
 /**
  * #631: a preview-only Tessera TEST faucet, so testers can try Tessera features (squares) while the Spark-to-Tessera exchange stays disabled (Decision 111, #626).
@@ -18,7 +18,8 @@ export type TestFaucetResult = (TestFaucetState & { ok: true; grantedMinor: numb
 const refuse = (status: 403 | 404 | 409, reason: string, error: string): TestFaucetResult => ({ ok: false, test: true, label: testFaucetLabel, status, reason, error });
 
 async function readState(db: GameDatabase, userId: string, available: boolean): Promise<TestFaucetState> {
-  const row = await db.prepare(`SELECT ${tesseraBalanceSql} AS tessera, (SELECT COUNT(*) FROM citizen_tessera_ledger WHERE clerk_user_id=? AND reason='starter-grant') AS grants`).bind(userId, userId, userId).first<{ tessera: number; grants: number }>();
+  const row = await db.prepare(`SELECT ${tesseraBalanceSql} AS tessera, (SELECT COUNT(*) FROM citizen_tessera_ledger WHERE clerk_user_id=? AND reason='starter-grant') AS grants`)
+    .bind(...tesseraBalanceBinds(userId), userId).first<{ tessera: number; grants: number }>();
   return { test: true, label: testFaucetLabel, available, grantMinor: testFaucetGrantMinor, currency: 'TSR', granted: Number(row?.grants ?? 0) > 0, tesseraMinor: Number(row?.tessera ?? 0) };
 }
 export const readTestFaucet = (db: GameDatabase, userId: string, bindings?: TestFaucetBindings) => readState(db, userId, testFaucetOpen(bindings));
