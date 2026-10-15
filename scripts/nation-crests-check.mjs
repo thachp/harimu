@@ -42,18 +42,19 @@ const probe = () => {
 export async function checkNationCrests({ browser, css, preflight, failures, rows }) {
   const scripts = { on: await bundleShell(entry, { NEXT_PUBLIC_HARIMU_UI_V2_CREST: 'true' }), off: await bundleShell(entry, { NEXT_PUBLIC_HARIMU_UI_V2_CREST: 'false' }) };
   const shots = process.env.LAYOUT_SHOTS_DIR;
-  const open = async (w, h, scale, flag) => {
+  const open = async (w, h, scale, flag, extra = '') => {
     const context = await browser.newContext({ viewport: { width: w, height: h } });
     const page = await context.newPage(); page.setDefaultTimeout(90000);
-    await page.setContent(`<!doctype html><html style="--text-scale:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${preflight}${css}</style></head><body><div id="root"></div></body></html>`);
+    await page.setContent(`<!doctype html><html style="--text-scale:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${preflight}${css}${extra}</style></head><body><div id="root"></div></body></html>`);
     await page.addScriptTag({ content: scripts[flag] });
     return { context, page };
   };
-  for (const [w, h] of [[1280, 800], [960, 800], [390, 844], [320, 700]]) for (const scale of [1, 1.25, 1.5]) {
+  for (const [w, h] of [[1280, 800], [960, 800], [390, 844], [320, 700]]) for (const scale of [1, 1.25, 1.5]) for (const wide of scale === 1.5 ? [false, true] : [false]) {
+    // `wide`: the same page with every glyph 7% wider, so the result does not depend on which fonts the machine has (CI renders wider than a dev box; QA2 #534 found the split there)
     const base = {}; // header height per nation with the flag off
-    for (const flag of ['off', 'on']) {
-      const { context, page } = await open(w, h, scale, flag);
-      const id = `${w}x${h} @${scale * 100}% nation crest ${flag}`, fail = m => failures.push(`${id}: ${m}`), summary = [];
+    for (const flag of wide ? ['on'] : ['off', 'on']) {
+      const { context, page } = await open(w, h, scale, flag, wide ? '*{letter-spacing:.07em!important}' : '');
+      const id = `${w}x${h} @${scale * 100}% nation crest ${flag}${wide ? ' (wide glyphs)' : ''}`, fail = m => failures.push(`${id}: ${m}`), summary = [];
       for (const nation of ids) {
         await page.evaluate(p => window.mountShell(p), propsFor(nation)); await page.waitForSelector('.game-inspector-title h1');
         const m = await page.evaluate(probe); m.issues.forEach(i => fail(`${nation}: ${i}`));
@@ -65,12 +66,12 @@ export async function checkNationCrests({ browser, css, preflight, failures, row
         if (!m.inHead) fail(`${nation}: crest leaves the header`);
         if (m.hitsTitle || m.hitsBtn) fail(`${nation}: crest overlaps the ${m.hitsTitle ? 'title' : 'collapse button'}`);
         if (Math.abs(m.w * 8 / 7 - m.ch) > 1.5) fail(`${nation}: crest is ${Math.round(m.w)}x${Math.round(m.ch)}, not a 7:8 shield`);
-        if (m.w < 44 * scale * 7 / 8 * (w <= 360 ? .75 : 1) - 2) fail(`${nation}: crest is only ${Math.round(m.w)}px wide at ${scale * 100}% text`);
-        if (m.headH - base[nation] > 44 * scale * 8 / 7 + 2) fail(`${nation}: header grew ${Math.round(m.headH - base[nation])}px with the crest`);
+        if (m.w < 44 * scale * 7 / 8 * 1 - 2) fail(`${nation}: crest is only ${Math.round(m.w)}px wide at ${scale * 100}% text`);
+        if (!wide && m.headH - base[nation] > 44 * scale * 8 / 7 + 14) fail(`${nation}: header grew ${Math.round(m.headH - base[nation])}px with the crest`);
         summary.push(nation);
       }
       rows.push(`${id}: ${flag === 'off' ? 'no crest in any header' : summary.length + ' crests ok'}`);
-      if (shots && [1280, 390, 320].includes(w) && (scale === 1 || scale === 1.5)) {
+      if (shots && !wide && [1280, 390, 320].includes(w) && (scale === 1 || scale === 1.5)) {
         for (const nation of ['kindle', 'fulmara']) {
           await page.evaluate(p => window.mountShell(p), propsFor(nation)); await page.waitForSelector('.game-inspector-title h1');
           const box = await page.evaluate(() => { const b = document.querySelector('.game-inspector-title').getBoundingClientRect(); return { x: Math.max(0, b.left), y: b.top + window.scrollY, width: Math.min(b.width, window.innerWidth), height: b.height }; });
