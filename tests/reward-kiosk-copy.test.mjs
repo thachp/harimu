@@ -65,7 +65,8 @@ test('system chrome: no byline, no AI badge, no pressure', () => {
   for (const o of [CL,LB,CM,HS,NT,...KIOSK_NATIONS.map(n=>NV[n])]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
   for (const t of all()) assert.doesNotMatch(t,/\b(hurry|last chance|must|expire\w*|lose|lost|regret\w*|punish\w*)\b/i,t);
 });
-test('unwired: nothing in app/, components/ or lib/ imports reward-kiosk-copy', () => {
+test('wired only into the #466 kiosk: just app/wallet-panel.tsx imports reward-kiosk-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('reward-kiosk-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/reward-kiosk-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('reward-kiosk-copy.ts')&&f!=='app/wallet-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/reward-kiosk-copy/, f);
+  assert.match(readFileSync('app/wallet-panel.tsx','utf8'),/@\/lib\/reward-kiosk-copy/);
 });
