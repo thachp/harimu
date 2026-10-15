@@ -109,7 +109,7 @@ export function warWeeksAtWar(war: { mobilizationEndsAt: number; endedAt: number
   return Math.floor((asOf - war.mobilizationEndsAt) / WEARINESS_WEEK_SECONDS);
 }
 const wholeCount = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-/** Unrest a nation's war has added so far: weeks at war x base x nation multiplier, plus capped bonuses for lost squares and casualties. Zero with no full active week
+/** Unrest a nation's war has added so far: weeks at war x base x nation multiplier, plus capped add-ons for lost squares and casualties. Zero with no full active week
  *  (during mobilization or after the war ends), whatever the counts. An unknown nation adds nothing (fails closed). */
 export function warWearinessUnrest(nation: string, weeksAtWar: number, extra: { lostSquares?: number; casualties?: number } = {}): number {
   if (!isWarNation(nation)) return 0;
