@@ -25,7 +25,7 @@ import { marketVisible } from '@/lib/market-visibility';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
-import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, viewedNationAfterLoad, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -593,6 +593,7 @@ export default function Home() {
   const [guestMode, setGuestMode] = useState(false);
   const [guestState, setGuestState] = useState(createGuestDemo);
   const [citizenNationId, setCitizenNationId] = useState<string | null>(null);
+  const seededNationId = useRef<string | null>(null); // #411: the citizen nation the viewed nation was last seeded from
   const [citizenshipStatus, setCitizenshipStatus] = useState<CitizenshipStatus | null>(null);
   const [enrollmentExpectedNation, setEnrollmentExpectedNation] = useState<string | null>(null);
   const enrollmentLock = useRef(false);
@@ -743,7 +744,7 @@ export default function Home() {
     setCitizenSessionKey(value => value + 1);
     cityTravelLock.current = false; setCityTravelPending(false); setCityAccount(null); setCityError('');
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
-    setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
+    setCitizenNationId(null); seededNationId.current = null; setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
     setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setVerification(null); setWorkShifts([]);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
@@ -1248,6 +1249,8 @@ export default function Home() {
     }
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
+      // #411: an existing citizen's own nation is the viewed nation unless the URL names one (once per citizen nation, so a later visit elsewhere is kept).
+      if (seededNationId.current !== snapshot.profile.nationId) { seededNationId.current = snapshot.profile.nationId; setSelectedId(current => viewedNationAfterLoad(window.location.search, fallbackNations.map(nation => nation.id), snapshot.profile!.nationId, current)); }
       setCitizenshipStatus(snapshot.profile.citizenship);
       setCapacity(snapshot.profile.capacity);
       setInfluence(snapshot.profile.influence);
