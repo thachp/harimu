@@ -19,6 +19,8 @@ Scores are deterministic rules over records the game already keeps. Exact weight
 - **Petition backlog:** petitions still awaiting review, relative to population. A larger backlog lowers Stability and raises Unrest.
 - **Festival holiday (#291, only while `HARIMU_FAITH_ENABLED` is on):** on the game day of an endorsed festival (today Aurelle's Night of Names and Oath Day) the nation gets a small Stability bonus, and a work-turnout shortfall is not counted against it ("one fewer shift", GDD 14.4). The bonus size is an [ASSUMPTION]. The `festival` term appears in the breakdown only on those days.
 
+- **War weariness (#423, only while `HARIMU_WAR_ENABLED` and `HARIMU_WAR_WEARINESS_ENABLED` are on):** each full game week a nation's war has been active adds Unrest (more in Kindle, less in Korund). The `war` term appears in the Unrest breakdown only while a war adds something, and it is clamped to what is left under 100 (the other Unrest terms can already reach 100). Nothing is stored for it beyond the daily score: it is derived from the `wars` table at the tick's time. Numbers are [ASSUMPTION]s in `lib/war-rules.ts`.
+
 Each factor has a bounded contribution, so both scores always stay within 0–100 without clamping, and **the stored breakdown always sums exactly to the score**.
 
 ## Storage
