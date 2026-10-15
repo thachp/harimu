@@ -6,11 +6,14 @@
  *  (#280) The clock's "Public holiday" line is checked like every other clock label, and the faith card, congregation block and
  *  holiday banner are rendered in the inspector for Kindle, Aurelle (holiday) and Korund at the same sizes: no text may leave its
  *  card, no word may break mid-word, every control is at least 44px tall, and the page never scrolls sideways.
+ *  (#366) The top-bar help tooltips are driven with a real mouse, keyboard and touch (scripts/hud-tooltip-check.mjs).
  *  Run: npm run test:layout   (CI installs Chromium for it; `npm test` stays browser-free). */
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { chromium } from 'playwright';
+import { checkHudTooltips } from './hud-tooltip-check.mjs';
+import { checkDevelopmentPreviewNote } from './hud-preview-note-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
@@ -156,6 +159,8 @@ try {
       await page.close();
     }
   }
+  await checkDevelopmentPreviewNote({ browser, css, preflight, failures, rows }); // #366: no "Development preview" label in the top bar; note lives in Game settings
+  await checkHudTooltips({ browser, css, preflight, failures, rows }); // #366: one top-bar tooltip at a time, on-screen, closed by leave / blur / Escape
 } finally { await browser.close(); }
 console.log(rows.join('\n'));
 if (failures.length) { console.error(`\nHUD layout check FAILED:\n${failures.join('\n')}`); process.exit(1); }

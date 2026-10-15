@@ -15,6 +15,9 @@ export type TutorialDay={
  day:1|2|3|4|5|6|7;kind:TutorialKind;title:string;objective:string;briefing:readonly string[];completion:string;
  /** Shown instead of the objective when its target is unavailable (e.g. an empty player market). */
  fallback?:string;proposal:true;
+ /** #365: replacement lines used while the market flag is off (lib/market-visibility.ts), so no line sends the citizen to a Market that is hidden.
+  * Only fields that point at the Market are replaced; read the day through tutorialDayFor(). */
+ marketOff?:Partial<Pick<TutorialDay,'objective'|'briefing'|'completion'|'fallback'>>;
 };
 export type FirstWeekScript={nationId:TutorialNation;voice:string;days:readonly TutorialDay[]};
 
@@ -24,7 +27,15 @@ export const TUTORIAL_LINE_MAX=140;
 export const TUTORIAL_BRIEFING_MIN=2;
 export const TUTORIAL_BRIEFING_MAX=4;
 
-const d=(day:TutorialDay['day'],title:string,objective:string,briefing:readonly string[],completion:string,fallback?:string):TutorialDay=>({day,kind:day<=GUIDED_DAYS?'guided':'optional-tip',title,objective,briefing,completion,...(fallback?{fallback}:{}),proposal:true});
+const d=(day:TutorialDay['day'],title:string,objective:string,briefing:readonly string[],completion:string,fallback?:string,marketOff?:TutorialDay['marketOff']):TutorialDay=>({day,kind:day<=GUIDED_DAYS?'guided':'optional-tip',title,objective,briefing,completion,...(fallback?{fallback}:{}),proposal:true,...(marketOff?{marketOff}:{})});
+
+/** #365: the day as the citizen should read it. With the market open (or a day with no variant) the day is returned unchanged; with the
+ * market flag off, the day's `marketOff` lines replace the Market-pointing ones. `marketOpen` is marketVisible(nationId, flag). */
+export function tutorialDayFor(day:TutorialDay,marketOpen:boolean):TutorialDay{
+ if(marketOpen||!day.marketOff)return day;
+ const {marketOff,...rest}=day;
+ return {...rest,...marketOff};
+}
 
 export const kindleFirstWeek:FirstWeekScript={nationId:'kindle',
  voice:'Plain, quick and a little proud: "Strike your own spark." Prices out loud, arguments in the open.',
@@ -44,7 +55,13 @@ export const kindleFirstWeek:FirstWeekScript={nationId:'kindle',
     'Prices rise and fall with supply and demand. Booms come, and so do busts.',
     'Shake on a deal and keep it. Rigging a scale is taboo.'],
    'Order placed at a fair price. That\'s how the market works.',
-   'No orders on the market yet? Buy from a stall at its posted price instead.'),
+   'No orders on the market yet? Buy from a stall at its posted price instead.',
+   {objective:'Buy food from the starter merchant at its posted price.',
+    briefing:['Every price is posted. Showing your number is the Kindle way, and hiding it is rude.',
+     'Prices rise and fall with supply and demand. Booms come, and so do busts.',
+     'Shake on a deal and keep it. Rigging a scale is taboo.'],
+    completion:'Food bought at a fair price. Your household will thank you.',
+    fallback:'The merchant is out of food today? Return after your next shift.'}),
   d(4,'Many Voices, One Plaza','Read the free press, then post in the city square.',
    ['Kindle has a free press and free speech. Read more than one side.',
     'Say your piece in the square. Speak plainly; boast only if you can back it up.'],
@@ -63,7 +80,10 @@ export const kindleFirstWeek:FirstWeekScript={nationId:'kindle',
    ['Your civic rank starts at Resident, then Citizen, then Emberwarden. Wealth, reputation and taking part all count.',
     'Some get rich here and some don\'t. Inequality is a real cost of an open market.',
     'Missed a step this week? Second chances are a Kindle tradition. Come back when you like.'],
-   'First week done. The Republic is yours to argue with.'),
+   'First week done. The Republic is yours to argue with.',undefined,
+   {briefing:['Your civic rank starts at Resident, then Citizen, then Emberwarden. Wealth, reputation and taking part all count.',
+     'Some get rich here and some don\'t. Inequality is a real cost of a free economy.',
+     'Missed a step this week? Second chances are a Kindle tradition. Come back when you like.']}),
  ]};
 
 export const korundFirstWeek:FirstWeekScript={nationId:'korund',
