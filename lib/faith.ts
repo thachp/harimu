@@ -12,7 +12,7 @@ import { devotionTier, faithCopy, unaffiliatedCopy } from './faith-copy';
 import { devotionPerFestival, festivalCalendar, festivalJoins, festivalSchemas } from './festivals';
 import { mvpFestival } from './mvp-festival-copy';
 import { royalFavorBalance, royalFavorBinds, royalFavorSql } from './aurelle';
-import { holderCity, readUndergroundView, undergroundHits, undergroundSchemas } from './korund-underground'; // #295
+import { appealCorrectionDuty, dutyDevotionEvents, holderCity, readUndergroundView, undergroundHits, undergroundSchemas } from './korund-underground'; // #295, #382
 import { korundUndergroundCopy } from './faith-copy';
 import { missionarySchemas, readMissionary, isMissionNation } from './missionaries'; // #225
 
@@ -144,7 +144,8 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const hiddenFaith: WorshipFaithId | null = enabled && nationId === 'korund' && faith === 'unaffiliated' ? row?.hidden_faith_id ?? null : null;
   const undergroundDays = hiddenFaith ? (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, hiddenFaith, row?.chosen_at ?? 0).all<{ game_day: number }>()).results.map(r => Number(r.game_day)) : [];
   const undergroundHitEvents = hiddenFaith ? await undergroundHits(db, userId, Number(row?.chosen_at ?? 0)) : [];
-  const undergroundDevotion = hiddenFaith ? devotionFromEvents([...undergroundDays.map(day => ({ day, amount: devotionPerWorship })), ...undergroundHitEvents], today) : null;
+  const dutyEvents = hiddenFaith ? await dutyDevotionEvents(db, userId) : []; // #382 PR B: Correction Duty costs Devotion (social standing) only
+  const undergroundDevotion = hiddenFaith ? devotionFromEvents([...undergroundDays.map(day => ({ day, amount: devotionPerWorship })), ...undergroundHitEvents, ...dutyEvents], today) : null;
   const underground = hiddenFaith ? await undergroundState(db, userId, hiddenFaith, undergroundDays.includes(today), Number(row?.chosen_at ?? 0), today, now) : null;
   // #225: cross-border missionaries (derived on read; null with the flag off or in an unsupported nation).
   // #404: Korund has no public faith (docs 14.6), so it gets no missionary state or block.
@@ -176,7 +177,7 @@ async function undergroundState(db: GameDatabase, userId: string, faithId: Worsh
     blockedReason: worshippedToday ? korundUndergroundCopy.worshipAction.alreadyToday.text : null,
     nextAt: worshippedToday ? (today + 1) * gameDaySeconds : null,
     confirmation: korundUndergroundCopy.worshipAction.confirmation.text,
-    lastRaid: view.lastRaid, quietWeek: view.quietWeek, suspicion: view.suspicion, // #382: private indicator (a band word, never the number)
+    lastRaid: view.lastRaid, quietWeek: view.quietWeek, suspicion: view.suspicion, duty: view.duty, // #382: private indicator (a band word, never the number) and any Correction Duty
   };
 }
 
@@ -190,6 +191,7 @@ export function parseFaithCommand(body: Record<string, unknown>) {
     return { action: 'answer-mission' as const, requestId: body.requestId, missionId: body.missionId, answer: body.answer as 'accept' | 'decline' };
   if (body.action === 'mute-missionaries' && typeof body.muted === 'boolean') return { action: 'mute-missionaries' as const, requestId: body.requestId, muted: body.muted };
   if (body.action === 'worship-underground') return { action: 'worship-underground' as const, requestId: body.requestId };
+  if (body.action === 'appeal-duty') return { action: 'appeal-duty' as const, requestId: body.requestId }; // #382 PR B
   if (body.action === 'attend-worship') return { action: 'attend-worship' as const, requestId: body.requestId };
   if (body.action === 'choose-faith' && typeof body.faithId === 'string' && (body.hiddenFaithId === undefined || body.hiddenFaithId === null || typeof body.hiddenFaithId === 'string'))
     return { action: 'choose-faith' as const, requestId: body.requestId, faithId: body.faithId, hiddenFaithId: (body.hiddenFaithId as string | null | undefined) ?? null };
@@ -318,6 +320,16 @@ export async function worshipUnderground(db: GameDatabase, userId: string, reque
   const saved = await db.prepare('SELECT user_id FROM citizen_worship WHERE request_id=?').bind(requestId).first<{ user_id: string }>();
   if (!saved) return fail(409, 'already_worshipped', korundUndergroundCopy.worshipAction.alreadyToday.text);
   return { ok: true as const, completion: korundUndergroundCopy.worshipAction.confirmation.text, state: await readFaith(db, userId, now, enabled) };
+}
+
+/** #382 PR B: a Korund hidden-faith holder's one automatic appeal of their Correction Duty (docs 8.18: an automatic rule, not staff). Granted when they had no discovery in the 14 days before the one that started the duty. */
+export async function appealDuty(db: GameDatabase, userId: string, requestId: string, now: number, enabled: boolean) {
+  if (!enabled) return fail(403, 'disabled', 'Faith is not open yet.');
+  const state = await readFaith(db, userId, now, enabled);
+  if (state.nationId !== 'korund' || !state.underground) return fail(403, 'unsupported_nation', 'There is no Correction Duty to appeal.');
+  const result = await appealCorrectionDuty(db, userId, requestId, now);
+  if (!result.ok) return fail(result.status, result.reason, result.error);
+  return { ok: true as const, ...(result.replay ? { replay: true as const } : {}), completion: result.text, state: await readFaith(db, userId, now, enabled) };
 }
 
 /** #68: join an active festival of your faith, once per festival occurrence (+Devotion). Not in a banning nation. */
