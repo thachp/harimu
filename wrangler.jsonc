@@ -39,6 +39,8 @@
     "HARIMU_AURELLE_RISING_ENABLED": "false",
     // #281: Aurelle AI palace coup (plot, Power Weight, Crisis Window). Off until QA.
     "HARIMU_AURELLE_COUP_ENABLED": "false",
+    // #283: Kindle mid-term Assembly election (D'Hondt per district). Off until QA. Opening is manual: set HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) to open the 72-hour vote.
+    "HARIMU_KINDLE_ASSEMBLY_ENABLED": "false",
     "HARIMU_TRAVEL_ENABLED": "false",
     "HARIMU_KORUND_PRESIDIUM_ENABLED": "false",
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.

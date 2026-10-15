@@ -195,6 +195,38 @@ body:has(.harimu-game){overflow:auto}
 /* #229: dock labels never break mid-word. On phones each button is at least as wide as its longest word (labels wrap only between
    words, e.g. "State / store"); above 100% text the seven places don't fit across, so the dock becomes two even rows (4 + 3) instead. */
 @media(max-width:760px){.game-dock button{min-width:min-content;flex:1 1 clamp(calc(100% / 7), calc((var(--text-scale, 1) - 1) * 1000%), 25%)}.game-dock button span{overflow-wrap:normal;word-break:normal;hyphens:manual}}
+/* #200 city market board. Sizes scale with --text-scale; words wrap only between words; controls are at least 44px tall (#131, #186, #229). */
+.market-board{margin:14px 0;padding:12px 14px;border:1px solid #37515b;border-radius:8px;background:#0f2630;color:#dce7e8;min-width:0;overflow-wrap:normal;word-break:normal;hyphens:manual}
+.market-board h3{margin:0;font-size:calc(17px * var(--text-scale, 1))}.market-board h4{margin:14px 0 6px;font-size:calc(14px * var(--text-scale, 1))}.market-board h5{margin:8px 0 4px;font-size:calc(12px * var(--text-scale, 1));color:#a1bdc5;font-weight:600}
+.market-board h4 small{font-weight:400;color:#a1bdc5;font-size:calc(12px * var(--text-scale, 1))}
+.market-board p,.market-board li,.market-board dd,.market-board dt,.market-board td,.market-board th,.market-board label{font-size:calc(13px * var(--text-scale, 1));line-height:1.5;min-width:0}
+.market-board small,.market-board caption{font-size:calc(12px * var(--text-scale, 1));line-height:1.5}
+.board-heading{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px 12px}
+.board-note{color:#a1bdc5;margin:6px 0}.board-goods{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(210px * var(--text-scale, 1))),1fr));gap:10px}
+.board-good{border:1px solid #2f4a54;border-radius:6px;padding:10px 12px;min-width:0;background:#12303a}.board-good h4{margin-top:0}
+.board-stats{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0}.board-stats>div{min-width:0}.board-stats dt{color:#a1bdc5;font-size:calc(12px * var(--text-scale, 1))}.board-stats dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+.board-spoil{color:#f3dca6;margin:6px 0}
+.board-depth{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,calc(120px * var(--text-scale, 1))),1fr));gap:8px}
+.board-levels{border-collapse:collapse;width:100%;min-width:0;font-variant-numeric:tabular-nums}.board-levels caption{text-align:left;color:#a1bdc5;padding-bottom:2px}
+.board-levels th{text-align:left;font-weight:600;color:#a1bdc5;border-bottom:1px solid #2f4a54;padding:2px 6px 2px 0}.board-levels td{padding:2px 6px 2px 0;vertical-align:top}
+.board-npc{display:inline-block;padding:0 6px;border:1px solid #5d8f98;border-radius:10px;font-size:calc(12px * var(--text-scale, 1));color:#bcd3d8;white-space:normal}
+.board-orders{list-style:none;margin:6px 0;padding:0;display:grid;gap:8px}.board-order{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:8px 10px;border:1px solid #2f4a54;border-radius:6px;background:#12303a;min-width:0}
+.board-order>span{flex:1 1 calc(180px * var(--text-scale, 1));min-width:0}.board-order>small{flex:1 1 100%;color:#a1bdc5}
+.board-form fieldset{margin:14px 0 0;padding:10px 12px;border:1px solid #37515b;border-radius:6px;min-width:0;display:grid;gap:10px}.board-form legend{padding:0 6px;font-weight:600;font-size:calc(13px * var(--text-scale, 1))}
+.board-form label{display:grid;gap:4px;min-width:0}.board-form .board-side{display:flex;flex-wrap:wrap;gap:6px 18px}.board-form .board-side label{display:flex;align-items:center;gap:8px;min-height:44px}
+.board-form input[type=radio]{width:20px;height:20px;accent-color:#80d8ce;flex:none}
+.board-form input:not([type=radio]),.board-form select{width:100%;min-width:0;min-height:44px;max-width:100%;box-sizing:border-box;font-size:calc(13px * var(--text-scale, 1))}
+.board-form small[id]{color:#a1bdc5}.board-escrow{margin:0;padding:8px 10px;border-left:3px solid #80d8ce;background:#12303a}
+.game-inspector-body .market-board button:not(.market-item){min-height:44px;padding:8px 14px;font-size:calc(12px * var(--text-scale, 1));max-width:100%;overflow-wrap:normal;word-break:normal}
+.market-board :is(input,select,button):focus-visible{outline:2px solid #80d8ce;outline-offset:2px}
+.market-board span:has(>button)>small{font-size:calc(12px * var(--text-scale, 1));color:#f3dca6;line-height:1.45}
+.board-status p{margin:8px 0 0}.board-status [role=alert]{color:#f3b3a6}
+/* #200: the inspector's own section/article/dl/ul rules are more specific than the board's; restate what the board needs. */
+.game-inspector-body section.market-board{margin:14px 0;padding:12px 14px;border:1px solid #37515b;border-radius:8px;background:#0f2630}
+.game-inspector-body .market-board article.board-good{margin:0;padding:10px 12px;border:1px solid #2f4a54;border-radius:6px;background:#12303a}
+.game-inspector-body .market-board dl.board-stats{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0}
+.game-inspector-body .market-board .board-stats dt{font-size:calc(12px * var(--text-scale, 1))}.game-inspector-body .market-board .board-stats dd{text-align:left;font-size:calc(13px * var(--text-scale, 1));font-weight:600}
+.game-inspector-body .market-board ul.board-orders{padding-left:0;margin:6px 0}
 /* #280 faith card, congregation, holiday banner. Sizes scale with --text-scale; words wrap only between words (#131, #229); rows reflow (#186). */
 .faith-panel,.holiday-banner{margin:14px 0;padding:12px 14px;border:1px solid #37515b;border-radius:8px;background:#0f2630;color:#dce7e8;overflow-wrap:normal;word-break:normal;hyphens:manual}
 .faith-panel h2{margin:0 0 8px;font-size:calc(17px * var(--text-scale, 1))}.faith-panel h3{margin:12px 0 4px;font-size:calc(14px * var(--text-scale, 1))}
