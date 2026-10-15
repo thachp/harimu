@@ -24,7 +24,7 @@ const bodies=()=>news().map(x=>x.n.body);
 const all=()=>[...labels(),...lines(),...bodies()];
 const fill=t=>WEARINESS_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(WEARINESS_NAME_MAX)),t);
 // Everything a Korund citizen can see.
-const korundFacing=()=>[ST.korundLabel,...Object.values(ST.levelNames),...WEARINESS_LEVELS.map(l=>BN.korund[l]),...WEARINESS_LEVELS.flatMap(l=>[wearinessNewsFor('korund').notices[l].headline,wearinessNewsFor('korund').notices[l].body]),...ST.tooltip.map(l=>l.text),...ST.weekly.map(l=>l.text)];
+const korundFacing=()=>[ST.korundLabel,...Object.values(ST.levelNames),...WEARINESS_LEVELS.map(l=>BN.korund[l]),...WEARINESS_LEVELS.flatMap(l=>[wearinessNewsFor('korund').notices[l].headline,wearinessNewsFor('korund').notices[l].body]),...ST.tooltip.map(l=>l.text),...ST.weekly.map(l=>l.text),...RL.map(l=>l.text)];
 
 test('shared name cap re-exported; limits 40/80/140; placeholder set', () => {
   assert.equal(WEARINESS_NAME_MAX,COUP_NAME_MAX); assert.equal(WEARINESS_NAME_MAX,24); assert.equal(WEARINESS_LABEL_MAX,40); assert.equal(WEARINESS_LINE_MAX,80); assert.equal(WEARINESS_BODY_MAX,140);
@@ -94,4 +94,9 @@ test('tone: no violence, no casualties named, no Notable, no other nations, no r
 test('unwired: nothing in app/, components/ or lib/ imports war-weariness-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-weariness-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/war-weariness-copy/, f);
+});
+test('QA3 fixes: the tooltip does not claim the weekly step grows; Kindle officials are weighing, not obliged; relief lines carry no weariness wording', () => {
+  assert.doesNotMatch(ST.tooltip[1].text,/each (game )?week|every (game )?week|faster|grows? (each|every)/i); assert.match(ST.tooltip[1].text,/in all/);
+  assert.doesNotMatch(wearinessNewsFor('kindle').notices.high.body,/must|obliged|required/i); assert.match(wearinessNewsFor('kindle').notices.high.body,/weighing/);
+  for (const l of RL) assert.doesNotMatch(l.text,/weari|weary/i,l.text);
 });

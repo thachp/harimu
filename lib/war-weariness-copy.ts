@@ -4,7 +4,7 @@
  * §13 (Kindle's AI legislature weighs war-weariness polls), the Kindle, Korund and Aurelle press voices (Republic Wire Service, Korund
  * State Media, Court Gazette; bylines are checked against lib/press-templates.ts) and ai-leadership (the Crown and the Chairman speak
  * for the state). The docs give only the weekly addition and what speeds it up, so no band, threshold or amount is written, and the
- * relief line says only that weariness no longer grows once the war is over.
+ * relief lines say only that the war adds no more Unrest once it is over (no weariness wording, because they are system lines a Korund citizen sees).
  *
  * Voice: Kindle is frank (press and polls). Korund State Media never admits weariness: it frames the strain as "resolve being tested", and
  * no Korund-facing line (banners, news, the "Resolve" label, the weekly notices and the tooltip, which all avoid the word) says the
@@ -46,7 +46,7 @@ export const wearinessStrip={
  levelNames:{rising:'Rising',high:'High',severe:'Severe'} as Readonly<Record<WearinessLevel,string>>,
  tooltip:[
   L('Each game week at war adds Unrest. Losses and lost squares speed it up.'),
-  L('The longer a war goes on, the more Unrest it adds each game week.'),
+  L('The longer a war goes on, the more Unrest it adds in all.'),
  ],
  weekly:[
   L('Another week of war. Unrest rose by {amount}.'),
@@ -66,7 +66,7 @@ export const wearinessBanners:Readonly<Record<WearinessNation,Readonly<Record<We
 export const wearinessNews:readonly WearinessNationNews[]=[
  {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
   rising:w('kindle-rising','War weariness is rising','Republic Wire Service: war weariness is rising. Citizens ask how long the war must last.'),
-  high:w('kindle-high','Calls to end the war grow','Republic Wire Service: polls show doubt about the war. Officials must answer the calls to end it.'),
+  high:w('kindle-high','Calls to end the war grow','Republic Wire Service: polls show doubt about the war. Officials are weighing the calls to end it.'),
   severe:w('kindle-severe','The war weighs on the Republic','Republic Wire Service: weariness is severe. Pressure on officials to end the war is hard to ignore.')}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
   rising:w('korund-rising','Resolve is being tested','Korund State Media reports: the war tests the resolve of Korund. Brigades hold the plan.',true),
@@ -81,6 +81,6 @@ export function wearinessNewsFor(nationId:WearinessNation){return wearinessNews.
 
 /** War-ended relief (system lines): says only that the weekly addition stops, as the docs give no relief amount. */
 export const wearinessRelief=[
- L('The war is over. War weariness no longer grows.'),
+ L('The war is over. The war adds no more Unrest.'),
  L('The war has ended, so no more Unrest is added by war each week.'),
 ] as const;
