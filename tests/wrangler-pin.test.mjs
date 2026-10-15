@@ -29,7 +29,7 @@ test('legacy_env=true is stripped for current wrangler; false is refused', async
 });
 test('#394: dashboard-managed QA vars are left out of the deploy config so --keep-vars preserves them', async () => {
   const { withoutDashboardVars, dashboardManagedVars, withoutLegacyEnv } = await import('../scripts/wrangler-pin.mjs');
-  assert.deepEqual([...dashboardManagedVars], ['HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_TEST_FAUCET_ENABLED']); // #627, #631
+  assert.deepEqual([...dashboardManagedVars], ['HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_EXCHANGE_ENABLED']); // #627; the test faucet (#631) is deliberately not dashboard-managed
   const built = { name: 'w', vars: { A: '1', HARIMU_QA_TEST_CITIZENS: 'false', HARIMU_QA_TEST_CITIZEN_IDS: 'x', HARIMU_FAITH_ENABLED: 'false' } };
   assert.deepEqual(withoutDashboardVars(built), { name: 'w', vars: { A: '1', HARIMU_FAITH_ENABLED: 'false' } }, 'every other var is still deployed');
   assert.equal(built.vars.HARIMU_QA_TEST_CITIZENS, 'false', 'the input is not mutated');
