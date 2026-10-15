@@ -43,7 +43,8 @@ test('destructive SQL is detected, comments ignored', () => {
   assert.ok(!isDestructive('/* DROP TABLE x */ CREATE INDEX IF NOT EXISTS i ON x(a);'));
   assert.ok(hasReviewMarker(`${destructiveReviewedMarker}\nDROP TABLE x;`));
   assert.ok(!hasReviewMarker(`CREATE TABLE a(x int); -- ${destructiveReviewedMarker}`), 'marker must be on its own line');
-  for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql), `${m.file} must stay additive`);
+  // #490: 0049 swaps the citizen_faith nation CHECK for a foreign key (a DROP CONSTRAINT), reviewed and marked; every other migration stays additive.
+  for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql) || (m.file === '0049_nation_wage_ledger.sql' && hasReviewMarker(m.sql)), `${m.file} must stay additive`);
   assert.deepEqual(createdObjects('CREATE TABLE t(a int, "b" text, PRIMARY KEY(a), UNIQUE(a,b), CHECK(a>0)); ALTER TABLE t ADD COLUMN IF NOT EXISTS c int; CREATE UNIQUE INDEX IF NOT EXISTS i_t ON t(a);'),
     { columns: [['t', 'a'], ['t', 'b'], ['t', 'c']], indexes: ['i_t'], checks: [['t', 1]] });
 });

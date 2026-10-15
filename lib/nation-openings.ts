@@ -19,6 +19,11 @@ export type NationOpening = {
   outpost?: { x: number; y: number };
   /** Heartland terrain mix, used to seed the nation's squares. Present exactly when `capital` is. */
   biome?: readonly string[];
+  /** #490 (Stage 0d): the nation's wage currency, wage fund and jobs for the generic wage ledger (lib/nation-work.ts). Absent for every nation today:
+   *  the opening PR for a nation fills these in, and until then HARIMU_NATION_WORK_ENABLED has nothing to run. Kindle, Korund and Aurelle keep their own ledgers. */
+  currency?: { code: string; name: string };
+  wage?: { fundMinor: number };
+  jobs?: readonly NationJob[];
 };
 type MapSeed = { capital: { x: number; y: number }; outpost: { x: number; y: number }; biome: readonly string[] };
 /** The three live nations' capitals, outposts and biomes (moved from lib/map-zones.ts `mvpNations`, values unchanged; docs 6.1/6.2 reduced-scale map, #66). */
@@ -27,6 +32,8 @@ const liveMapSeeds: Readonly<Partial<Record<NationId, MapSeed>>> = {
   korund: { capital: { x: 18, y: 4 }, outpost: { x: 15, y: 7 }, biome: ['mountains', 'cliff/plateau', 'hills'] },
   aurelle: { capital: { x: 12, y: 14 }, outpost: { x: 12, y: 11 }, biome: ['cliff/plateau', 'plains', 'coast'] },
 };
+/** One job a nation offers. `id` must start with the nation id (it is also the work-order id, so ids never collide across nations). `wageMinor` is paid once per claimed shift. */
+export type NationJob = { id: string; name: string; capacityCost: number; hours: number; wageMinor: number; output: string };
 
 export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED`, ...liveMapSeeds[id] }));
 
