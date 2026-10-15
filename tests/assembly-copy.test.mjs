@@ -74,7 +74,7 @@ test('no real-world references and no Notable', () => {
   const t=all().join(' ');
   assert.doesNotMatch(t,/\b(Earth|America|Congress|Senate|Parliament|Democrat|Republican|Labour|Tory|London|Washington|Brexit)\b/); assert.doesNotMatch(t,/Notable/);
 });
-test('unwired: nothing in app/ or components/ imports assembly-copy', () => {
+test('wired by #283 only: the Assembly ballot panel is the one UI importer of assembly-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/assembly-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/assembly-ballot.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/assembly-copy/, f);
 });
