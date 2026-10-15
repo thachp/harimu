@@ -44,3 +44,10 @@ test('the restyle adds no copy: no new text content in the S2 block, and the Acc
 test('the S2 check is wired into the layout run', async () => {
   assert.match(await read('scripts/hud-layout-check.mjs'), /checkUiV2Topbar\(\{ browser, css, preflight, failures, rows \}\)/);
 });
+
+test('every esbuild harness that bundles the shell defines the top-bar flag (topBarEmblemEnabled reads it, so a missing define throws "process is not defined" in the browser; same class as #571)', async () => {
+  const { readdir } = await import('node:fs/promises'), dir = new URL('../scripts/', import.meta.url), bundlers = [];
+  for (const f of await readdir(dir)) { if (!f.endsWith('.mjs')) continue; const src = await readFile(new URL(f, dir), 'utf8'); if (/from 'esbuild'/.test(src) && /define:\s*\{/.test(src)) bundlers.push([f, src]); }
+  assert.ok(bundlers.length >= 2, 'found the shell bundlers');
+  for (const [f, src] of bundlers) assert.match(src, /'process\.env\.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR'/, `${f} must define NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR`);
+});
