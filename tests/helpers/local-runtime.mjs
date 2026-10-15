@@ -34,7 +34,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const path = join(directory, 'fixture.sqlite');
   const modules = [
     'lib/storage-selection.ts','lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
-    'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'lib/map-zones.ts', 'lib/city-founding.ts', 'app/api/world/found-city/route.ts', 'app/api/city/route.ts',
+    'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'lib/map-zones.ts', 'lib/map-zone-labels.ts', 'lib/city-founding.ts', 'app/api/world/found-city/route.ts', 'app/api/city/route.ts',
     'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
     'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',

@@ -111,3 +111,14 @@ test('the shipped local runtime still seeds exactly the original grid (boot step
   const { squares, source } = await z.readWorldSquares(r.db);
   assert.equal(source, 'table'); assert.equal(sha(squares), golden.squares);
 });
+
+test('plain-Node importers: the zone vocabulary lives in an import-free file, so a component test that loads app/world-zones.tsx never needs the registry (CI regression on #550)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const read = f => readFile(new URL(`../${f}`, import.meta.url), 'utf8');
+  assert.doesNotMatch(await read('lib/map-zone-labels.ts'), /^\s*import\s/m);
+  const zones = await read('app/world-zones.tsx');
+  assert.match(zones, /from '@\/lib\/map-zone-labels'/);
+  assert.doesNotMatch(zones, /^import (?!type)[^\n]*from '@\/lib\/map-zones'/m, 'only a type import of map-zones (erased) is allowed in the component');
+  const labels = await import('../lib/map-zone-labels.ts'), zonesLib = await localRuntime().then(async r => { try { return await r.importModule('lib/map-zones.ts'); } finally { await r.close(); } });
+  assert.deepEqual([zonesLib.zoneOrder, zonesLib.zoneLabels, zonesLib.acquisitionRules], [labels.zoneOrder, labels.zoneLabels, labels.acquisitionRules], 'map-zones still re-exports the same values');
+});

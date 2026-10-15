@@ -1,4 +1,5 @@
 import type { GameDatabase } from './database-contract';
+import type { Zone } from './map-zone-labels';
 import { nationOpenings } from './nation-openings';
 
 /**
@@ -6,19 +7,12 @@ import { nationOpenings } from './nation-openings';
  * square grid for the three MVP nations. Read-only: no buying, founding,
  * capture or sea lanes.
  */
-export type Zone = 'heartland' | 'frontier' | 'wildlands' | 'commons';
 export type WorldSquare = { x: number; y: number; zone: Zone; owner: string | null; terrain: string; resource: string | null; feature: string | null };
 
 export const mapWidth = 24;
 export const mapHeight = 18;
-export const zoneOrder: readonly Zone[] = ['heartland', 'frontier', 'wildlands', 'commons'];
-export const zoneLabels: Record<Zone, string> = { heartland: 'Heartland', frontier: 'Frontier', wildlands: 'Wildlands', commons: 'The Commons' };
-export const acquisitionRules: Record<Zone, string> = {
-  heartland: 'Never capturable',
-  frontier: 'Purchasable when unclaimed; transferable by treaty; capturable in war',
-  wildlands: 'Purchasable when unclaimed from the World Registry, or claimed by founding a city',
-  commons: 'Cannot be bought. Claimed only by war or treaty (or a joint-development agreement)',
-};
+export { zoneOrder, zoneLabels, acquisitionRules } from './map-zone-labels';
+export type { Zone } from './map-zone-labels';
 
 type Point = { x: number; y: number };
 export type MapNation = { id: string; capital: Point; outpost?: Point; biome: readonly string[] };
