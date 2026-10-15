@@ -43,7 +43,7 @@ for (const backend of ['sqlite', 'postgres']) {
     const cap = await c.one('SELECT attacker_nation,defender_nation,squares_transferred,squares_kept_private FROM city_captures'); assert.deepEqual({ ...cap }, { attacker_nation: 'korund', defender_nation: 'kindle', squares_transferred: 1, squares_kept_private: 0 });
     const before = await c.owners();
     fail(await c.assault({}, DAY1 + 2 * D * 1000), 409, 'already_captured'); assert.equal(await c.owners(), before);
-    assert.deepEqual(await c.all('SELECT request_id FROM siege_assaults WHERE assault_day <> assaulted_at / 86400'), [], 'every assault_day is the UTC day of its assaulted_at');
+    assert.deepEqual(await c.all('SELECT request_id FROM siege_assaults WHERE assault_day NOT BETWEEN assaulted_at / 86400 - 1 AND assaulted_at / 86400'), [], 'every assault_day is the UTC day of its assaulted_at, or the day before for the tail of a window that began the day before (#577)');
     assert.deepEqual(await c.all('SELECT c.id FROM city_captures c JOIN city_sieges s ON s.id=c.siege_id WHERE c.war_id <> s.war_id OR c.attacker_nation <> s.attacker_nation OR c.defender_nation <> s.defender_nation'), [], 'a capture carries its siege war and sides');
     const replay = await c.assault({ requestId: 'req-capture-1' }); assert.equal(replay.replay, true); assert.equal((await c.counts()).city_captures, 1);
   });
@@ -77,7 +77,7 @@ test('refusals fail closed, in order, and write nothing', async t => {
   fail(await c.assault({ cityId: 'nowhere' }), 409, 'not_a_city');
   fail(await c.assault({ cityKind: 'founded', cityId: 'missing' }), 409, 'not_a_city');
   fail(await c.assault({ cityKind: 'capital' }), 400, 'bad_request'); fail(await c.assault({ requestId: 'x' }), 400, 'bad_request'); fail(await c.assault({ nation: 'atlantis' }), 400, 'bad_request');
-  fail(await c.assault({ cityKind: 'founded', cityId: 'c'.repeat(73) }), 400, 'bad_request');
+  fail(await c.assault({ cityKind: 'founded', cityId: 'c'.repeat(73) }), 409, 'city_id_too_long');
   fail(await c.siege.resolveCityAssault(c.r.db, { nation: 'korund', warId: 'w1', cityKind: 'outpost', cityId: 'kindle', requestId: 'req-ms-1' }, c.r.now, true), 400, 'bad_request'); // milliseconds, not seconds
   fail(await c.siege.resolveCityAssault(c.r.db, { nation: 'korund', warId: 'w1', cityKind: 'outpost', cityId: 'kindle', requestId: 'req-nan-1' }, NaN, true), 400, 'bad_request');
   fail(await c.assault({}, Date.UTC(2026, 9, 10, 12, 0)), 409, 'outside_window');
