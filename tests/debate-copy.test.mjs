@@ -60,7 +60,8 @@ test('no endorsing body, no Notable, no real-world references', () => {
   assert.doesNotMatch(t,/endors|Notable|journalist/i);
   assert.doesNotMatch(t,/\b(Earth|America|Congress|Senate|Democrat|Republican|Labour|Tory|London|Washington)\b/);
 });
-test('unwired: nothing in app/ or components/ imports debate-copy', () => {
+// #282 wires the debate panel (app/debate.tsx); any other UI importer still fails this guard.
+test('wired by #282 only: nothing in app/ or components/ imports debate-copy except the debate panel', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/debate-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f!=='app/debate.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/debate-copy/, f);
 });

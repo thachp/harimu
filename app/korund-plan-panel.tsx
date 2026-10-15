@@ -38,7 +38,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
   const queue=plan.queue;
   const mealReady = now > 0 && (!plan.mealReadyAt || Date.parse(plan.mealReadyAt) <= now);
   return <NationDocument nationId="korund" className="citizen-market korund-plan" label="Korund assignment and ration account">
-    <h3>{scene === 'workplace' ? 'Labor Bureau assignment' : scene === 'market' ? 'State ration counter' : 'Korund household account'}</h3>
+    <h3>{scene === 'workplace' ? (plan.bureau ? 'Labor Bureau assignment' : 'Brigade assignment') /* #453: the Bureau name only when HARIMU_LABOR_BUREAU_ENABLED sends plan.bureau */ : scene === 'market' ? 'State ration counter' : 'Korund household account'}</h3>
     <p>Bounded state planning · AI/SI roles follow deterministic rules. Labor Notes are non-convertible; Korund has no legal private market.</p>
     <p>Labor Note wages are recorded in a separate ledger. Labor Notes are spent only on weekly clothing and goods coupons at fixed prices; food comes from free food coupons.</p>
     <dl><dt>Labor Notes</dt><dd>{(plan.walletMinor / 100).toFixed(2)} LN</dd><dt>Household food</dt><dd>{plan.foodQuantity}</dd>

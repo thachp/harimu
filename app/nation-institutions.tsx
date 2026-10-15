@@ -45,7 +45,7 @@ export function NationInstitutions({ incomeTaxPercent = 0, nation, citizenNation
         {ownNation && (workPending || capacity < order.cost) && <small id={`institution-work-${order.id}-reason`}>{workPending ? 'An action is being saved. Please wait.' : `You need ${order.cost} WC. Prepare a meal or wait for recovery.`}</small>}
       </article>)}
     </details>}
-    {ownNation && nation.id === 'korund' && <button type="button" onClick={onWorkplace}>Open your Labor Bureau assignment</button>}
+    {ownNation && nation.id === 'korund' && <button type="button" onClick={onWorkplace}>Open your assignment</button>}
     <div className="nation-inspector-links"><button type="button" onClick={onWorldView}>World globe</button>
       <button type="button" onClick={onHousehold}>{citizenNation ? `Household · ${citizenNation.shortName}` : 'Household and citizenship'}</button></div>
   </section>;
