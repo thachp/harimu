@@ -279,6 +279,32 @@ body:has(.harimu-game){overflow:auto}
 @media(max-width:1100px) and (min-width:761px){.game-context-heading{flex-basis:calc(200px * var(--text-scale, 1))}}
 /* #346 very narrow screens (320px, or a phone at big text): the account group wraps inside the top bar instead of pushing Account off-screen. */
 @media(max-width:420px){.game-hud>.game-account{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;min-width:0;max-width:100%}.game-hud>.game-identity{flex:1 1 0;min-width:0}}
+/* #528 phones (<=760px): every control in the game frame is at least 44x44 CSS px (the phone target of #131 and #464). Only sizes and the placement of the camera bar change, nothing is behind a flag and nothing above 760px changes.
+   The .harimu-game prefix keeps these ahead of the older per-control rules (e.g. the 30px settings button at <=420px) whatever their order. */
+@media(max-width:760px){
+  .harimu-game .game-account .game-glossary{min-width:44px;min-height:44px;justify-content:center}
+  .harimu-game .game-account>.game-settings-button{width:44px;min-width:44px;min-height:44px}
+  .harimu-game .game-account .account-sign-in{min-width:44px;min-height:44px}
+  .harimu-game .game-account .game-notifications{min-width:44px;min-height:44px;justify-content:center}
+  .harimu-game .game-account>.game-hud-help>summary{display:flex;align-items:center;min-width:44px;min-height:44px}
+  .harimu-game .game-resources>.game-hud-help>summary,.harimu-game .game-resources>.game-wallet-button{min-height:44px}
+  /* The identity column keeps a floor (the <=420px rule above lets it shrink to 0), so the wider 44px account controls wrap to a second row instead of squeezing it under the clock text (QA3 on #552). */
+  .harimu-game .game-hud>.game-identity{min-width:calc(120px * var(--text-scale, 1))}
+  .harimu-game .game-breadcrumbs button{min-width:44px;min-height:44px}
+  .harimu-game .game-shift-chip{min-height:44px}
+  .harimu-game .game-dock button{min-height:max(44px,calc(39px * var(--text-scale, 1)))}
+  .harimu-game .citizen-dock{height:45px}.harimu-game .citizen-dock>button{min-height:44px}.harimu-game:has(.citizen-dock){padding-bottom:45px}
+  .harimu-game .game-inspector-body summary{min-height:44px}
+  /* The breadcrumb and shift chip stack in the stage's own grid cell instead of at fixed top offsets (148/160/194px) that assumed a 110px top bar: with 44px controls the top bar and the chip grow, and the old offsets put the chip on top of the breadcrumb. */
+  .harimu-game .game-stage-overlay{grid-row:3;grid-column:1;align-self:start;position:relative;z-index:3;display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:10px 12px;min-width:0;pointer-events:none}
+  .harimu-game .game-stage-overlay>*{position:static;top:auto;left:auto;max-width:100%;pointer-events:auto}
+  /* Camera bar: a strip under the globe/city canvas rather than an overlay on it, so it can never cover a globe label (QA2: at 320px the wrapped bar covered "Ilmar Sanctum"). */
+  .game-stage .game-viewport{display:flex;flex-direction:column}
+  .game-stage .viewport-canvas{flex:1 1 0;height:auto!important;min-height:0!important}
+  .game-stage .viewport-controls,.has-inspector .game-stage .viewport-controls{position:static;flex:none;justify-content:center;max-width:none;gap:4px;padding:4px;border-width:1px 0 0;border-radius:0}
+  .game-stage .viewport-controls button{min-width:44px;min-height:44px;padding:5px 8px}
+  .game-stage .viewport-controls>span{min-width:44px}
+}
 /* #347 shift quality step: card per question, whole-row options, spaced buttons (all >= 44px, text scales). */
 .shift-quality{width:min(560px,calc(100vw - 32px));font-size:calc(14px * var(--text-scale, 1));line-height:1.45}
 .shift-quality h2{margin:0 0 8px;font:600 calc(20px * var(--text-scale, 1))/1.25 Georgia,serif;color:#efd69c}
