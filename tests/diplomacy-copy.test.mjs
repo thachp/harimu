@@ -88,7 +88,7 @@ test('no violence, no real-world treaties/countries/leaders, no Notable, no emba
 test('nation voices stay distinct', () => {
   assert.doesNotMatch(ratificationFor('kindle:treaty').body,/Be it known|State Media/); assert.doesNotMatch(ratificationFor('korund:any').body,/Be it known|Wire Service/); assert.doesNotMatch(ratificationFor('aurelle:any').body,/State Media|Wire Service|reports/);
 });
-test('unwired: nothing in app/ or components/ imports diplomacy-copy', () => {
+test('wired by #308 only: the Foreign affairs panel is the one app/ importer of diplomacy-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/diplomacy-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/foreign-affairs-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/diplomacy-copy/, f);
 });
