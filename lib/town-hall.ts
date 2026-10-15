@@ -121,6 +121,9 @@ export async function askInHall(db: GameDatabase, userId: string, now: number, o
 export async function voteQuestion(db: GameDatabase, userId: string, now: number, input: { questionId: unknown; requestId: string }, scope: 'town-hall' | 'debate' = 'town-hall') {
   const noun = scope === 'debate' ? 'debate' : 'town hall';
   if (typeof input.questionId !== 'string' || input.questionId.length > 64) return fail(400, 'Pick a question.');
+  // The scope comes first: a question of the other scope (a debate question through the town hall path, or the reverse) does not exist here, whether this is a first vote, a repeat or a replayed receipt.
+  const home = await db.prepare('SELECT h.candidate_id FROM town_hall_questions q JOIN town_halls h ON h.id=q.hall_id WHERE q.id=?').bind(input.questionId).first<{ candidate_id: string }>();
+  if (home && (home.candidate_id === debateHallCandidateId) !== (scope === 'debate')) return fail(404, 'That question does not exist.');
   const prior = await db.prepare('SELECT question_id,voter_id FROM town_hall_votes WHERE request_id=?').bind(input.requestId).first<{ question_id: string; voter_id: string }>();
   if (prior) return prior.voter_id === userId && prior.question_id === input.questionId ? { ok: true as const, alreadyRecorded: true } : fail(409, 'Vote receipt already used.');
   const written = await db.prepare(`INSERT INTO town_hall_votes (question_id,voter_id,request_id,voted_at)

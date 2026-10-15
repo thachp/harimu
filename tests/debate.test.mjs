@@ -300,3 +300,55 @@ test(`#282: the panel renders the Content copy, the AI label, the fallback notic
   assert.equal(closed.includes(copyModule.questionIntakeCopy.submitButton), false, 'no question form once closed');
   assert.ok(html(base({ stage: 'waiting' })).includes('not opened'));
 });
+
+// #517 (follow-ups to #282).
+test(`#517 ${backend}: a repeat vote on the other scope is a 404 in both directions, by question or by receipt, and writes nothing`, async t => {
+  const c = await setup(t); const { r } = c; await c.citizen('carol');
+  r.setNow((c.open + 5) * 1000);
+  const th = (user, body) => r.call('town-hall', user, body); r.setFixtureEnv('HARIMU_TOWN_HALLS_ENABLED', 'true'); r.setFixtureEnv('HARIMU_TOWN_HALL_OPEN_AT', String(c.open));
+  assert.equal((await c.ask('alice', Q(0))).status, 200); assert.equal((await th('alice', { action: 'ask', candidateId: 'ines-varro', requestId: randomUUID(), text: Q(1) })).status, 200);
+  const debateQuestion = (await c.view('bob')).questions[0].id, townQuestion = (await th('bob')).data.halls.find(h => h.candidateId === 'ines-varro').questions[0].id;
+  const debateReceipt = randomUUID(), townReceipt = randomUUID();
+  assert.equal((await c.vote('bob', debateQuestion, { requestId: debateReceipt })).status, 200); assert.equal((await th('bob', { action: 'vote', questionId: townQuestion, requestId: townReceipt })).status, 200);
+  assert.equal(await c.count('town_hall_votes'), 2);
+  const townVote = (user, questionId, requestId = randomUUID()) => th(user, { action: 'vote', questionId, requestId });
+  // Bob already voted on each question in its own scope; the same ids through the other scope are not found, however the receipt is chosen.
+  for (const [label, res] of [
+    ['town hall vote on a debate question, new receipt', await townVote('bob', debateQuestion)], ['town hall vote on a debate question, the debate receipt', await townVote('bob', debateQuestion, debateReceipt)],
+    ['debate vote on a town hall question, new receipt', await c.vote('bob', townQuestion)], ['debate vote on a town hall question, the town hall receipt', await c.vote('bob', townQuestion, { requestId: townReceipt })],
+  ]) { assert.equal(res.status, 404, label); assert.match(res.data.error, /does not exist/, label); }
+  assert.equal(await c.count('town_hall_votes'), 2, 'nothing was written');
+  // The right scope still answers a repeat as the no-op it is.
+  assert.equal((await c.vote('bob', debateQuestion)).data.alreadyRecorded, true); assert.equal((await c.vote('bob', debateQuestion, { requestId: debateReceipt })).data.alreadyRecorded, true);
+  assert.equal((await townVote('bob', townQuestion)).data.alreadyRecorded, true); assert.equal((await townVote('bob', townQuestion, townReceipt)).data.alreadyRecorded, true);
+  // A first cross-scope vote is still a 404, and a missing question is too.
+  assert.equal((await townVote('carol', debateQuestion)).status, 404); assert.equal((await c.vote('carol', townQuestion)).status, 404); assert.equal((await c.vote('carol', 'no-such-question')).status, 404); assert.equal((await townVote('carol', 'no-such-question')).status, 404);
+  assert.equal(await c.count('town_hall_votes'), 2);
+});
+
+test(`#517 ${backend}: the AI answer insert itself checks the question is in the debate's top 5: a question that has dropped out gets no answer`, async t => {
+  const c = await setup(t); const { r } = c;
+  for (const u of ['u6']) await c.citizen(u);
+  const ids = await c.seed(6, { 0: 2 });
+  const q = i => ids[Q(i)];
+  r.setNow((c.open + DAY + 5) * 1000);
+  // While the first answer (the top-ranked question 0) is being generated, the ranking changes under it: questions 1 to 5 each gain three votes, so question 0 is no longer one of the five.
+  let injected = false;
+  const shifting = { seen: [], async run(model, input, options) {
+    if (!injected) { injected = true; let n = 0; for (const i of [1, 2, 3, 4, 5]) for (const voter of ['alice', 'bob', 'u6']) await r.db.prepare('INSERT INTO town_hall_votes (question_id,voter_id,request_id,voted_at) VALUES (?,?,?,?)').bind(q(i), voter, `inject-${n++}`, Math.floor(r.now / 1000)).run(); }
+    return gateway().run.call(this, model, input, options);
+  } };
+  const first = await c.cron(c.aiEnv(shifting));
+  assert.equal(first.status, 'ran');
+  const answered = async id => Number((await r.db.prepare('SELECT COUNT(*) AS n FROM debate_answers WHERE question_id=?').bind(id).first()).n);
+  assert.equal(await answered(q(0)), 0, 'question 0 is no longer in the top 5, so it is not published');
+  assert.ok(first.results.includes('not-selected'), JSON.stringify(first.results));
+  assert.ok(first.results.every(x => ['recorded', 'not-selected', 'idle'].includes(x)), JSON.stringify(first.results));
+  // The rest of the run and later runs answer exactly the new top 5 (questions 1 to 5), three candidates each.
+  const ai = gateway(); const env = c.aiEnv(ai); let last = [];
+  for (let day = 0; day < 5 && last.at(-1) !== 'idle'; day++) { r.setNow((c.open + DAY + 5 + day * DAY) * 1000); for (let i = 0; i < 8; i++) { last = (await c.cron(env)).results; if (last.includes('idle') || last.includes('budget-unavailable')) break; } }
+  assert.equal(last.at(-1), 'idle');
+  assert.equal(await answered(q(0)), 0); for (const i of [1, 2, 3, 4, 5]) assert.equal(await answered(q(i)), 3, `question ${i}`);
+  assert.equal(await c.count('debate_answers'), 15);
+  const view = await c.view('u0'); assert.deepEqual(view.transcript.map(x => x.questionId).sort(), [1, 2, 3, 4, 5].map(q).sort(), 'the transcript shows the same five');
+});
