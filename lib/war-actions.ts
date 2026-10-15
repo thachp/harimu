@@ -88,10 +88,15 @@ export async function acceptEnd(db: GameDatabase, command: AcceptEndCommand, now
 
 export type WarCommandInput = { enabled: boolean; secret: string | undefined; authorization: string | null; body: Record<string, unknown>; now: number };
 const text = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max ? value : '';
-/** The server-only entry point: flag first (403, nothing read or written), then the bearer secret (HARIMU_WAR_ADMIN_SECRET; missing or wrong never authorizes), then the command. */
-export async function handleWarCommand(db: GameDatabase, input: WarCommandInput) {
+/** `authorizeWarCaller` is also called by the route before it parses the body, so a bad body without credentials is 401, not 400. The server-only entry point: flag first (403, nothing read or written), then the bearer secret (HARIMU_WAR_ADMIN_SECRET; missing or wrong never authorizes), then the command. */
+export async function authorizeWarCaller(input: { enabled: boolean; secret: string | undefined; authorization: string | null }) {
   if (!input.enabled) return disabled();
   if (!(await bearerMatches(input.authorization, input.secret))) return fail(401, 'unauthorized', 'A server credential is required.');
+  return null;
+}
+export async function handleWarCommand(db: GameDatabase, input: WarCommandInput) {
+  const denied = await authorizeWarCaller(input);
+  if (denied) return denied;
   const { body, now } = input;
   const base = { nation: text(body.nation, 20), role: text(body.role, 40), requestId: text(body.requestId, 64) };
   if (body.action === 'declare') return declareByAuthority(db, { ...base, defender: text(body.defender, 20), casusBelli: typeof body.casusBelli === 'string' ? body.casusBelli : undefined, declaredBy: typeof body.declaredBy === 'string' ? body.declaredBy : undefined }, now, true);

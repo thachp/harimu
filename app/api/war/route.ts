@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
 import { readCommandObject } from '@/lib/command-request';
-import { handleWarCommand } from '@/lib/war-actions';
+import { authorizeWarCaller, handleWarCommand } from '@/lib/war-actions';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -12,8 +12,12 @@ const privateJson = (data: unknown, status = 200) => Response.json(data, { statu
 export async function POST(request: Request) {
   const bindings = env as unknown as { HARIMU_WAR_ENABLED?: string; HARIMU_WAR_ADMIN_SECRET?: string };
   if (bindings.HARIMU_WAR_ENABLED !== 'true') return privateJson({ error: 'War is not open yet.', reason: 'disabled' }, 403);
+  const authorization = request.headers.get('Authorization');
+  // Credential before the body: a caller without it learns nothing about what a valid body looks like (401, never 400).
+  const denied = await authorizeWarCaller({ enabled: true, secret: bindings.HARIMU_WAR_ADMIN_SECRET, authorization });
+  if (denied) return privateJson({ error: denied.error, reason: denied.reason }, denied.status);
   let body: Record<string, unknown>;
   try { body = await readCommandObject(request, 2048); } catch { return privateJson({ error: 'Send a war command.', reason: 'bad_request' }, 400); }
-  const result = await handleWarCommand(await getDatabase(), { enabled: true, secret: bindings.HARIMU_WAR_ADMIN_SECRET, authorization: request.headers.get('Authorization'), body, now: Math.floor(Date.now() / 1000) });
+  const result = await handleWarCommand(await getDatabase(), { enabled: true, secret: bindings.HARIMU_WAR_ADMIN_SECRET, authorization, body, now: Math.floor(Date.now() / 1000) });
   return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }

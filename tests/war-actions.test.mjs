@@ -136,6 +136,19 @@ test('accept is idempotent and finishes an accepted end that did not complete; t
   assert.equal((await b.actionRows()).filter(x => x.action === 'accept-end').length, 1);
 });
 
+test('credential before body: a bad body without credentials is 401 (flag off still 403 first), with credentials it is 400', async t => {
+  const { r, actions, cmd } = await setup(t);
+  const call = (input) => actions.authorizeWarCaller({ enabled: true, secret: SECRET, ...input });
+  assert.equal((await call({ authorization: null }))?.status, 401);
+  assert.equal((await call({ authorization: 'Bearer wrong-wrong-wrong-wrong' }))?.status, 401);
+  assert.equal((await actions.authorizeWarCaller({ enabled: false, secret: SECRET, authorization: null })).status, 403, 'flag off is 403 even without credentials');
+  assert.equal(await call({ authorization: bearer }), null);
+  for (const body of [{}, { action: 'nope' }, { action: 5 }]) {
+    assert.equal((await actions.handleWarCommand(r.db, { enabled: true, secret: SECRET, authorization: null, body, now: 1 })).status, 401, 'bad body without credentials');
+    assert.equal((await cmd(body)).status, 400, 'bad body with credentials');
+  }
+});
+
 test('GETs write nothing: war reads and the world snapshot are read-only; the route has no GET and no citizen session, and checks the flag first', async t => {
   const { r, war, declare, nowS } = await setup(t); await declare();
   const writes = await writesDuring(r, async () => { await war.readWars(r.db, nowS()); await r.call('world', 'alice'); });
@@ -143,6 +156,7 @@ test('GETs write nothing: war reads and the world snapshot are read-only; the ro
   const route = await readFile(new URL('../app/api/war/route.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(route, /export (async )?function GET/); assert.doesNotMatch(route, /authenticatedUserId|@clerk/); assert.match(route, /export async function POST/);
   assert.ok(route.indexOf("HARIMU_WAR_ENABLED !== 'true'") < route.indexOf('readCommandObject('), 'the flag is checked before the body is read');
+  assert.ok(route.indexOf("HARIMU_WAR_ENABLED !== 'true'") < route.indexOf('authorizeWarCaller(') && route.indexOf('authorizeWarCaller(') < route.indexOf('readCommandObject('), 'flag first, then the credential, then the body is read');
   assert.doesNotMatch(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'), /HARIMU_WAR_ADMIN_SECRET/, 'the secret never goes in the repo config');
 });
 
