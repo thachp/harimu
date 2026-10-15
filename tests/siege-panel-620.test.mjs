@@ -127,7 +127,7 @@ test('panel: caption from the copy module, next window or captured line, rules l
 
 test('the government view mounts the panel from simulation.sieges, and the war flag stays off in wrangler.jsonc', async () => {
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
-  assert.match(page, /\{simulation\?\.sieges && <SiegePanel sieges=\{simulation\.sieges\} nationId=\{citizenNation\.id\} \/>\}\s*<GovernmentPanel /);
+  assert.match(page, /\{simulation\?\.sieges && <SiegePanel sieges=\{simulation\.sieges\} nationId=\{citizenNation\.id\} \/>\}\s*<FoundingBanner /);
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
 });
