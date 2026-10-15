@@ -6,12 +6,12 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { cleanLabel, declarationBlock, foundingPeriodEnd, inFoundingPeriod, mobilizationEnd, pairKey, peaceLockEnd, warConfig, warStatus } from '../lib/war-rules.ts';
+import { PEACE_LOCK_SECONDS, cleanLabel, declarationBlock, foundingPeriodEnd, inFoundingPeriod, mobilizationEnd, pairKey, peaceLockEnd, warConfig, warStatus } from '../lib/war-rules.ts';
 
 const H = 3600, D = 86400;
 
 test('pure rules: 48 real hours, 30-day Founding Period, 10-day peace lock, each boundary exact', () => {
-  assert.equal(warConfig.mobilizationSeconds, 48 * H); assert.equal(warConfig.foundingPeriodSeconds, 30 * D); assert.equal(warConfig.peaceLockSeconds, 10 * D);
+  assert.equal(warConfig.mobilizationSeconds, 48 * H); assert.equal(warConfig.foundingPeriodSeconds, 30 * D); assert.equal(warConfig.peaceLockSeconds, 10 * D); assert.equal(PEACE_LOCK_SECONDS, 10 * D);
   const war = { declaredAt: 1000, mobilizationEndsAt: mobilizationEnd(1000), endedAt: null };
   assert.equal(war.mobilizationEndsAt, 1000 + 48 * H);
   assert.equal(warStatus(war, 1000), 'mobilizing'); assert.equal(warStatus(war, 1000 + 48 * H - 1), 'mobilizing', 'one second early');
@@ -185,4 +185,16 @@ test('war banner: both nations see a mobilization countdown; the third nation an
   assert.match(renderToStaticMarkup(WarBanner({ wars: [{ ...base, status: 'active' }], nationId: 'kindle' })), /war is active/i);
   assert.equal(renderToStaticMarkup(WarBanner({ wars: [{ ...base, status: 'ended', endedAt: 5000, endKind: 'other' }], nationId: 'kindle' })), '');
   assert.equal(renderToStaticMarkup(WarBanner({ wars: undefined, nationId: 'kindle' })), '', 'flag off: no wars are sent, nothing renders');
+});
+
+test('the NAP check fails open: no pact is assumed without a treaty system, and a missing treaty table does not block', async t => {
+  const { r, declare, nowS } = await setup(t);
+  const war = await r.importModule('lib/war.ts');
+  assert.equal(await war.nonAggressionInForce(r.db, 'kindle', 'korund', nowS()), false, 'the stub reports no pact');
+  const missing = await declare({}, nowS(), { nonAggression: async () => { throw new Error('PostgreSQL operation failed (42P01): relation "treaties" does not exist.'); } });
+  assert.equal(missing.ok, true, 'a treaty table that does not exist yet means no pact');
+  const sqlite = await declare({ attacker: 'aurelle', defender: 'kindle' }, nowS(), { nonAggression: async () => { throw new Error('no such table: treaties'); } });
+  assert.equal(sqlite.ok, true);
+  await assert.rejects(declare({ attacker: 'aurelle', defender: 'korund' }, nowS(), { nonAggression: async () => { throw new Error('disk on fire'); } }), /disk on fire/, 'other errors are not swallowed');
+  assert.equal((await declare({ attacker: 'aurelle', defender: 'korund' }, nowS(), { nonAggression: async () => true })).reason, 'non_aggression', 'a real pact still blocks');
 });

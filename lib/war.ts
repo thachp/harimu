@@ -50,9 +50,13 @@ export async function shardStartedAt(db: GameDatabase, configured: string | unde
   return clock ? Number(clock.epoch_seconds) : null;
 }
 
-/** Non-aggression pact between the two nations. The treaty system has not landed, so this is the stub the issue asks for: it returns false.
- *  Callers that know better (the diplomacy work, tests) pass their own check to declareWar. */
+/** Non-aggression pact between the two nations (docs 13.2: a pact bars declarations between its signatories).
+ *  TODO(#308): wire this to the treaty store when the diplomacy PoC (#308, docs 13.2) lands. Until then there are no treaties, so it FAILS OPEN:
+ *  no pact is assumed and the declaration is not blocked. The same holds if a supplied check reads a treaty table that does not exist yet. */
 export const nonAggressionInForce = async (_db: GameDatabase, _a: WarNationId, _b: WarNationId, _now: number) => false;
+async function pactInForce(check: NonNullable<DeclareWarOptions['nonAggression']>, db: GameDatabase, a: WarNationId, b: WarNationId, now: number): Promise<boolean> {
+  try { return (await check(db, a, b, now)) === true; } catch (error) { if (isMissingRelation(error)) return false; throw error; }
+}
 
 export type DeclareWarCommand = { attacker: string; defender: string; casusBelli?: string; declaredBy: string; requestId: string };
 export type DeclareWarOptions = { enabled: boolean; shardStartedAt?: number | null; nonAggression?: (db: GameDatabase, a: WarNationId, b: WarNationId, now: number) => Promise<boolean> | boolean };
@@ -78,7 +82,7 @@ export async function declareWar(db: GameDatabase, command: DeclareWarCommand, n
     ? { ok: true as const, replay: true as const, war: publicWar(prior, now) } : fail(409, 'request_reused', 'That request id was already used for a different declaration.');
   const pair = pairKey(command.attacker, command.defender);
   const started = options.shardStartedAt !== undefined ? options.shardStartedAt : await shardStartedAt(db);
-  const nonAggression = await (options.nonAggression ?? nonAggressionInForce)(db, command.attacker, command.defender, now);
+  const nonAggression = await pactInForce(options.nonAggression ?? nonAggressionInForce, db, command.attacker, command.defender, now);
   const lastPeace = await db.prepare("SELECT MAX(ended_at) AS ended_at FROM wars WHERE pair_key=? AND end_kind='treaty'").bind(pair).first<{ ended_at: number | null }>();
   const block = declarationBlock({ now, shardStartedAt: started, nonAggression, lastTreatyEndedAt: lastPeace?.ended_at == null ? null : Number(lastPeace.ended_at) });
   if (block) return fail(409, block, blockedText[block](warNationNames[command.defender]));

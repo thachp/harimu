@@ -5,10 +5,13 @@
 export const warNations = ['kindle', 'korund', 'aurelle'] as const;
 export type WarNationId = typeof warNations[number];
 export const warNationNames: Readonly<Record<WarNationId, string>> = { kindle: 'Kindle', korund: 'Korund', aurelle: 'Aurelle' };
+/** [ASSUMPTION] Peace lock: a ceasefire or peace treaty locks new declarations between the pair for 10 real days. Docs 13.2 give a lock,
+ *  13.5 marks the number as an assumption. The single place to change it. */
+export const PEACE_LOCK_SECONDS = 10 * 86400;
 export const warConfig = {
   mobilizationSeconds: 48 * 3600, // docs 15.3
   foundingPeriodSeconds: 30 * 86400, // docs 15.4
-  peaceLockSeconds: 10 * 86400, // docs 13.2 (13.5 marks the number [ASSUMPTION])
+  peaceLockSeconds: PEACE_LOCK_SECONDS, // docs 13.2 (13.5 marks the number [ASSUMPTION])
   casusBelliMax: 40, // WAR_LABEL_MAX in lib/war-copy.ts
   actorMax: 60,
 } as const;
