@@ -3,6 +3,7 @@ import { wearinessEnabled, type WearinessBindings } from '@/lib/war-weariness'; 
 import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
+import { charterMealSeconds } from '@/lib/aurelle-charters'; // #531
 import { readCrownMint } from '@/lib/crown-debasement';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
@@ -33,10 +34,12 @@ import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true'; // #362
 /** #362: the Aurelle plan plus, while HARIMU_CROWN_DEBASEMENT_ENABLED is on, the read-only Royal Mint strip. Flag off: exactly readAurelle. */
+const chartersOn = () => (env as unknown as { HARIMU_AURELLE_CHARTERS_ENABLED?: string }).HARIMU_AURELLE_CHARTERS_ENABLED === 'true'; // #531
 async function readAurelleView(database: Awaited<ReturnType<typeof getDatabase>>, userId: string) {
   // #529: Royal Favor decay is evaluated at the current time only while HARIMU_FAVOR_DECAY_ENABLED is on (off: the flat rule, as before).
   const decayOn = (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true';
-  const plan = await readAurelle(database, userId, decayOn ? { favorDecayAt: Math.floor(Date.now() / 1000) } : {});
+  const mealSeconds = await charterMealSeconds(database, userId, Math.floor(Date.now() / 1000), chartersOn()); // #531: undefined unless HARIMU_AURELLE_CHARTERS_ENABLED and an active charter
+  const plan = await readAurelle(database, userId, { ...(decayOn ? { favorDecayAt: Math.floor(Date.now() / 1000) } : {}), ...(mealSeconds === undefined ? {} : { mealSeconds }) });
   return crownMintOn() && plan.available ? { ...plan, mint: await readCrownMint(database, Math.floor(Date.now() / 1000)) } : plan;
 }
 /** #490: the generic nation wage plan, only while HARIMU_NATION_WORK_ENABLED is on and the citizen's nation has a wage ledger and is playable for the account. Otherwise no key at all. */
@@ -280,7 +283,7 @@ async function handlePost(request: Request) {
   }
   if (typeof body.action === 'string' && body.action.startsWith('aurelle-')) {
     if (!validAurelleCommand(body)) return privateJson({error:'Use a valid request identifier, shift identifier and food quantity of 1 or 2.'},{status:400});
-    const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000));
+    const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000),await charterMealSeconds(database,userId,Math.floor(Date.parse(now)/1000),chartersOn())); // #531
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
     return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundOptions()),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
   }
