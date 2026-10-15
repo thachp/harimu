@@ -28,3 +28,28 @@ export function saveCameraSnapshot(key: string, snapshot: CameraSnapshot, bounds
   cameras.set(key, { x: clampCamera(snapshot.x, bounds), z: clampCamera(snapshot.z, bounds), zoom: clampZoom(snapshot.zoom) });
   if (cameras.size > 11) cameras.delete(cameras.keys().next().value!);
 }
+
+export type LabelBox = { x: number; y: number; w: number; h: number };
+/**
+ * #377: keep scene labels readable on a phone. Each box is anchored at its bottom centre (x, y), the way the viewport draws it. Returns the same boxes
+ * moved so that none leaves the area (a label at the edge was cut off) and, when two would overlap, the later one is stepped up or down by one label
+ * height until it is clear (a label was hidden behind others). Boxes that already fit are returned unchanged, so uncrowded desktop scenes do not move.
+ */
+export function placeLabels(boxes: LabelBox[], area: { w: number; h: number }, gap = 4): LabelBox[] {
+  const placed: LabelBox[] = [];
+  const clampX = (b: LabelBox) => b.w + gap * 2 > area.w ? area.w / 2 : Math.max(b.w / 2 + gap, Math.min(area.w - b.w / 2 - gap, b.x));
+  const clampY = (b: LabelBox, y: number) => Math.max(b.h + gap, Math.min(area.h - gap, y));
+  const clash = (a: LabelBox, b: LabelBox) => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + gap && Math.abs((a.y - a.h / 2) - (b.y - b.h / 2)) < (a.h + b.h) / 2 + gap;
+  for (const box of boxes) {
+    const x = clampX(box), start = { ...box, x, y: clampY(box, box.y) };
+    let best = start;
+    for (let step = 0; step <= 6 && placed.some(other => clash(best, other)); step++) {
+      const dy = Math.ceil(step / 2) * (box.h + gap) * (step % 2 ? -1 : 1);
+      best = { ...start, y: clampY(box, start.y + dy) };
+      if (!placed.some(other => clash(best, other))) break;
+      if (step === 6) best = start;
+    }
+    placed.push(best);
+  }
+  return placed;
+}

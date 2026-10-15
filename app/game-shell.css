@@ -188,6 +188,9 @@ body:has(.harimu-game){overflow:auto}
  .game-dock{flex-wrap:wrap}
  .game-dock button span{overflow-wrap:anywhere;text-align:center;line-height:1.15}
 }
+/* #377: on a phone the destination cards and the nation strip wrap into a grid inside the page width instead of a row that scrolls sideways (text such as
+   "Goods and citizen listings" and "Stability 81" was cut off at the right edge). Cards are at least 44px tall; at big text they drop to one column. */
+@media(max-width:760px){.game-context-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(150px * var(--text-scale, 1))),1fr));overflow:visible}.game-context-items>button{flex:none;min-width:0;max-width:none;min-height:44px}.game-context-items>p{grid-column:1/-1}}
 /* #186: at 150% the clock's <details> shrank below its text (115px box, 142px clock), so the clock ran under the Glossary link. Keep the clock at its content width so the account row's gap holds at every text size. */
 .game-account>.game-hud-help{flex:none;min-width:max-content}
 /* #186 (QA3 on #220): on phones the clock had a fixed 65px box with nowrap text, so at 125/150% the text ran under Glossary.

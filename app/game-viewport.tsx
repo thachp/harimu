@@ -5,7 +5,7 @@ import {useDisplayPreferences} from './display-preferences';
 import {graphicsOptions} from '../lib/display-preferences';
 import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
-import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, type LocationId, type ViewportSelection } from '../lib/game-viewport';
+import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 import { nationSymbolElement } from './nation-symbol';
 
 export type GameViewportProps = {
@@ -119,6 +119,11 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
         button.style.left = `${(point.x + 1) * w / 2}px`;
         button.style.top = `${(1 - point.y) * h / 2}px`;
       });
+      if (mode === 'city') { // #377: labels stay inside the canvas and out of each other's way (a phone has little room)
+        const shown = labels.filter(({ button }) => !button.hidden && button.offsetWidth > 0);
+        const spots = placeLabels(shown.map(({ button }) => ({ x: parseFloat(button.style.left), y: parseFloat(button.style.top), w: button.offsetWidth, h: button.offsetHeight })), { w, h });
+        shown.forEach(({ button }, index) => { button.style.left = `${spots[index].x}px`; button.style.top = `${spots[index].y}px`; });
+      }
       if (highlight.visible) highlight.update();
       renderer.render(scene, camera);
     };
