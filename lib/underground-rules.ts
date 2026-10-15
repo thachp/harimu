@@ -41,4 +41,6 @@ export const raidDue = (cityId: string, gameDay: number) => raidRoll(cityId, gam
 export const pickIndex = (seed: string, count: number) => count <= 0 ? 0 : hash32(seed) % count;
 
 /** True when a new inspection of a city at `now` is allowed given the time of its previous one (null: none). Exact boundary: the gap itself is allowed. */
+/** #382, docs 14.6: the first time an inspection finds a holder only Suspicion is recorded (the "first" notice); any later discovery is a "repeat", the only kind that may lead to Correction Duty (capped at 7 real days). `earlier` is how many inspections found the holder before this one. */
+export const discoveryKind = (earlier: number): 'first' | 'repeat' => earlier > 0 ? 'repeat' : 'first';
 export const raidAllowed = (now: number, lastRaidAt: number | null) => lastRaidAt === null || now - lastRaidAt >= undergroundConfig.raidMinGapSeconds;
