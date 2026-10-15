@@ -1,6 +1,7 @@
 /** Founding Period PoC, slice A (#612; docs coups-transitions §10.6, territory-cities-warfare §15.4). One helper over the existing war clock (shardStartedAt, inFoundingPeriod, foundingPeriodEnd:
  *  no new clock logic, an unknown shard start stays fail-closed = active) and the idempotent day-30 event the world tick records, one row per MVP nation. Everything is behind
  *  HARIMU_FOUNDING_PERIOD_ENABLED ("false"): with the flag off nothing here runs. The war block (lib/war-rules.ts, lib/war.ts) is not changed. */
+import { isMissingRelation, tolerate } from './db-errors';
 import type { GameDatabase } from './database-contract';
 import { claimants } from './aurelle-rising-rules';
 import { FOUNDING_NATIONS, dayThirtyPreviewFor, type FoundingNation } from './founding-period-copy';
@@ -33,7 +34,9 @@ export async function runFoundingDay30(db: GameDatabase, now: number): Promise<v
 
 export type FoundingEvent = { nationId: FoundingNation; kind: FoundingEventKind; occurredAt: number };
 export async function readFoundingEvents(db: GameDatabase): Promise<FoundingEvent[]> {
-  const rows = await db.prepare('SELECT nation_id,kind,occurred_at FROM founding_day30_events ORDER BY nation_id').all<{ nation_id: FoundingNation; kind: FoundingEventKind; occurred_at: number }>();
+  type EventRow = { nation_id: FoundingNation; kind: FoundingEventKind; occurred_at: number };
+  // A database without migration 0053 reads as no events (like readWars).
+  const rows = await db.prepare('SELECT nation_id,kind,occurred_at FROM founding_day30_events ORDER BY nation_id').all<EventRow>().catch(tolerate(isMissingRelation, { results: [] as EventRow[] }));
   return rows.results.map(row => ({ nationId: row.nation_id, kind: row.kind, occurredAt: Number(row.occurred_at) }));
 }
 
