@@ -26,8 +26,10 @@ export type GameShellProps = {
   view: SceneView;
   nation: GameNation;
   citizenNation?: GameNation;
-  /** #455: the citizen row is still loading and the URL names no nation: show a neutral line, never the default nation. */
-  identityLoading?: boolean;
+  /** #455/#533: the top bar while the citizen row loads: `loading` says so, `neutral` shows no nation or status, `none` is the normal line. */
+  identityHold?: 'none' | 'neutral' | 'loading';
+  /** #533: hold the viewed-nation labels (breadcrumb nation and city, inspector label) too: the URL names no nation of its own. */
+  viewedNationHeld?: boolean;
   nations: readonly GameNation[];
   capacity: number;
   currencyCode?: 'SPK' | 'LN' | 'CRN';
@@ -80,7 +82,7 @@ function HudHelp({ label, children, help, open = false }: { label: string; child
   return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ worldClock, holidayName, nextDeadline, view, nation, citizenNation, identityLoading = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ worldClock, holidayName, nextDeadline, view, nation, citizenNation, identityHold = 'none', viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -95,7 +97,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   }, [notice, noticeKind]);
   const sceneTitle = view === 'world' ? nation.name : nation.id === 'korund' && view === 'market' ? 'State ration store' : nation.id === 'korund' && view === 'workplace' ? 'Assignment board' : titles[view];
   const resourceNation = citizenNation ?? nation;
-  const shownNationName = identityLoading ? 'Your nation' : nation.name; // #455
+  const shownNationName = viewedNationHeld ? 'Your nation' : nation.name; // #455, #533
   const emblemOn = topBarEmblemEnabled(), topbarV2 = uiV2TopbarEnabled(); // #392 S2: topbarV2 adds the restyle (class game-hud-v2); it implies emblemOn
   const inspecting = view === 'world' || view === 'nation' || view === 'country';
   const hasPanel = !collapsed;
@@ -131,14 +133,14 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
     onBlur: (event: FocusEvent) => { const id = helpOf(event.target); if (id && helpOf(event.relatedTarget ?? document.body) !== id) dispatchHelp({ type: 'blur', id }); },
     onClick: (event: MouseEvent) => { const id = helpOf(event.target); if (id && (event.target as Element).closest('summary')) { event.preventDefault(); dispatchHelp({ type: 'click', id }); } },
   };
-  const breadcrumbs = <nav className="game-location-banner game-breadcrumbs" aria-label="Current location"><button type="button" onClick={() => navigate('world')}>World</button>{view !== 'world' && <><span>›</span><button type="button" onClick={() => navigate('country')}>{shownNationName}</button></>}{view === 'nation' && <><span>›</span><span>{nation.capital ?? 'Capital'}</span></>}{!['world','country','nation'].includes(view) && <><span>›</span><button type="button" onClick={() => navigate('square')}>{currentCityName ?? nation.capital ?? 'City'}</button>{view !== 'square' && <><span>›</span><span>{sceneTitle}</span></>}</>}</nav>;
+  const breadcrumbs = <nav className="game-location-banner game-breadcrumbs" aria-label="Current location"><button type="button" onClick={() => navigate('world')}>World</button>{view !== 'world' && <><span>›</span><button type="button" onClick={() => navigate('country')}>{shownNationName}</button></>}{view === 'nation' && <><span>›</span><span>{nation.capital ?? 'Capital'}</span></>}{!['world','country','nation'].includes(view) && <><span>›</span><button type="button" onClick={() => navigate('square')}>{viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City'}</button>{view !== 'square' && <><span>›</span><span>{sceneTitle}</span></>}</>}</nav>;
   // #189: in Country the stage scrolls, so the location row and shift chip sit in its flow instead of floating over the heading and controls.
   const shiftChip = shiftSummary ? <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong>{shiftSummary.endsAt !== undefined ? <GameTimer compact endsAt={shiftSummary.endsAt * 1000} label="Shift" expiredText={shiftSummary.expiredText} /> : <span>Active shift</span>}<CaretRight /></button> : null;
   return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}`}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
     <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
     <header className={topbarV2 ? 'game-hud game-hud-v2' : 'game-hud'} {...hudHelpHandlers}>
-      <div className="game-identity"><span className="game-crest" aria-hidden="true">H</span><div><strong>HARIMU</strong><span>{identityLoading ? 'Loading your citizen…' : <>{emblemOn && <NationEmblemMark id={resourceNation.id} name={resourceNation.name} />}{resourceNation.name}<i />{identityStatus({ guestDemo, localDemo, hasCitizenNation: Boolean(citizenNation) }, emblemOn)}</>}</span></div></div>
+      <div className="game-identity"><span className="game-crest" aria-hidden="true">H</span><div><strong>HARIMU</strong><span>{identityHold === 'loading' ? <span role="status">Loading your citizen…</span> : identityHold === 'neutral' ? null : <>{emblemOn && <NationEmblemMark id={resourceNation.id} name={resourceNation.name} />}{resourceNation.name}<i />{identityStatus({ guestDemo, localDemo, hasCitizenNation: Boolean(citizenNation) }, emblemOn)}</>}</span></div></div>
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>
         {guestDemo ? <span>No account · sample actions only</span> : !citizenNation && !localDemo ? <HudHelp label="Resources" open={isOpen("Resources")} help="Work capacity, money, food, materials and knowledge unlock after citizenship. Exploring nations does not create a citizen."><span>Resources unlock after citizenship</span></HudHelp> : <>
         <HudHelp label="Work capacity" open={isOpen("Work capacity")} help="Work capacity (WC) is energy available for jobs and civic actions. Meals restore it. Jobs use real-time timers."><Lightning size={19} weight="fill" aria-hidden="true" /><strong>{capacity}</strong><span>WC</span></HudHelp>

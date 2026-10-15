@@ -12,6 +12,7 @@
  *  (#392 S2) The UI v2 top bar restyle: flag off pin, emblem-only pin, v2 on (scripts/ui-v2-topbar-check.mjs).
  *  (#347) The shift quality dialog is rendered with the real component (scripts/shift-quality-layout-check.mjs).
  *  (#366) The top-bar help tooltips are driven with a real mouse, keyboard and touch (scripts/hud-tooltip-check.mjs).
+ *  (#528) Every phone control is at least 44x44 and the camera bar never covers the canvas (scripts/phone-tap-targets-check.mjs).
  *  Run: npm run test:layout   (CI installs Chromium for it; `npm test` stays browser-free). */
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -24,6 +25,7 @@ import { checkNationSymbols } from './nation-symbols-check.mjs';
 import { checkUiV2Topbar } from './ui-v2-topbar-check.mjs';
 import { checkTopBarEmblem } from './hud-emblem-check.mjs';
 import { checkShiftQualityStep } from './shift-quality-layout-check.mjs';
+import { checkPhoneTapTargets } from './phone-tap-targets-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
@@ -176,6 +178,7 @@ try {
   await checkShiftQualityStep({ browser, css, preflight, failures, rows }); // #347: shift quality dialog is styled, spaced, reachable
   await checkDevelopmentPreviewNote({ browser, css, preflight, failures, rows }); // #366: no "Development preview" label in the top bar; note lives in Game settings
   await checkHudTooltips({ browser, css, preflight, failures, rows }); // #366: one top-bar tooltip at a time, on-screen, closed by leave / blur / Escape
+  await checkPhoneTapTargets({ browser, css, preflight, failures, rows }); // #528: phone controls are at least 44x44; the camera bar sits under the canvas
 } finally { await browser.close(); }
 console.log(rows.join('\n'));
 if (failures.length) { console.error(`\nHUD layout check FAILED:\n${failures.join('\n')}`); process.exit(1); }
