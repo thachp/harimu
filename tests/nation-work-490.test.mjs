@@ -102,6 +102,21 @@ test('start and claim: one shift pays once, wallet and fund are sums, capacity i
   assert.equal(await count(r, 'nation_wage_starts'), 2);
 });
 
+test('a claim replay that finds a settlement but no claimed_at (crash between the two writes) finishes the shift, pays nothing more, and frees the next start', async t => {
+  const { r, m } = await setup(t);
+  const id = randomUUID();
+  assert.equal((await start(m, r, 'alice', id)).status, 200);
+  r.setNow(r.now + 2 * 3600 * 1000);
+  assert.deepEqual(await claim(m, r, 'alice', id), { status: 200 });
+  await r.db.prepare('UPDATE work_shifts SET claimed_at=NULL WHERE id=?').bind(id).run(); // the crash: settlement written, claimed_at not
+  assert.equal((await start(m, r, 'alice', randomUUID())).reason, 'cannot_start', 'stuck before the replay');
+  assert.deepEqual(await claim(m, r, 'alice', id), { status: 200, replayed: true });
+  assert.ok((await r.db.prepare('SELECT claimed_at FROM work_shifts WHERE id=?').bind(id).first()).claimed_at, 'the replay sets claimed_at');
+  assert.equal(await count(r, 'nation_wage_settlements'), 1, 'still one payout');
+  assert.equal((await m.readNationWork(r.db, 'alice', live())).walletMinor, 800);
+  assert.deepEqual(await start(m, r, 'alice', randomUUID()), { status: 200 }, 'the next shift can start');
+});
+
 test('parallel starts with one request id charge capacity once and make one shift', async t => {
   const { r, m } = await setup(t);
   const cap = await capacity(r, 'alice'), id = randomUUID();

@@ -110,7 +110,11 @@ export async function executeNationWork(db: GameDatabase, userId: string, comman
   const shift = await db.prepare(`SELECT s.clerk_user_id,s.completes_at,s.claimed_at,k.job_id,k.capacity_applied,t.shift_id AS settled FROM work_shifts s JOIN nation_wage_starts k ON k.shift_id=s.id
     LEFT JOIN nation_wage_settlements t ON t.shift_id=s.id WHERE s.id=? AND s.clerk_user_id=? AND k.nation_id=?`).bind(shiftId, userId, nationId).first<{ completes_at: string; claimed_at: string | null; job_id: string; capacity_applied: number; settled: string | null }>();
   if (!shift) return notFound('no_shift');
-  if (shift.settled) return { status: 200, replayed: true };
+  if (shift.settled) {
+    // A crash between writing the settlement and setting claimed_at would otherwise leave this shift open forever (start refuses 409 cannot_start), so the replay finishes it.
+    if (shift.claimed_at == null) await db.prepare('UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM nation_wage_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)').bind(iso, shiftId, userId, userId).run();
+    return { status: 200, replayed: true };
+  }
   const job = opening.jobs.find(j => j.id === shift.job_id);
   if (!job || !shift.capacity_applied) return notFound('no_shift');
   if (shift.completes_at > iso) return { status: 409, reason: 'underway', error: 'Your shift is still underway.' };
