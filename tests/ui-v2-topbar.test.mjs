@@ -5,10 +5,11 @@ import { readFile } from 'node:fs/promises';
 import { uiV2TopbarEnabled, topBarEmblemEnabled } from '../lib/nation-emblem.ts';
 const read = p => readFile(new URL(`../${p}`, import.meta.url), 'utf8');
 
-test('the flag is off unless it is exactly "true", and wrangler ships it off', async () => {
+test('the flag is off unless it is exactly "true", and wrangler has it on in preview and off in production', async () => {
   assert.equal(uiV2TopbarEnabled('true'), true);
   for (const v of [undefined, 'false', '', '1', 'TRUE', 'yes']) assert.equal(uiV2TopbarEnabled(v), false);
-  assert.match(await read('wrangler.jsonc'), /"NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR":\s*"false"/);
+  assert.match(await read('wrangler.jsonc'), /"NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR":\s*"true"/);
+  assert.match(await read('wrangler.prod.jsonc'), /"NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR":\s*"false"/);
 });
 
 test('one code path with #78: the v2 flag implies the emblem and bell, the emblem flag never implies v2', () => {
