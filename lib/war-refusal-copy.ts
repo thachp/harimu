@@ -11,7 +11,7 @@
  * not made. ..."): reasons, never threats, no byline, no officials and no AI badge. The countdown lines are short system captions with a
  * hint of each nation's voice (Kindle plain, Korund calm and collective, Aurelle formal); they carry no byline and no badge, because a
  * banner caption is a system line (#381 / ui-ux §23.2). {endsAt} and {nextAt} are pre-formatted strings filled at runtime. The refusal
- * keys below are proposed names; the server has no keys for these refusals yet.
+ * keys below are the copy's own names; REFUSAL_CODES at the end of this module maps the server's refusal codes (ARC's ruling on #426) to them.
  *
  * Rules: figures come only from the docs: 1, 14 and 2 (rate limits) and 48 (mobilization hours), each real; nothing else is written. The
  * threshold of the grievance score is not given by the docs and is never named. The placeholders are runtime values capped by the shared name cap,
@@ -62,3 +62,17 @@ export const mobilizationCountdown:Readonly<Record<RefusalNation,Line>>={
  aurelle:L('The realm musters until {endsAt}. No attack before then.'),
 };
 export const mobilizationCountdownLabel={text:'Mobilization countdown',proposal:true} as const;
+
+/** The server refusal codes for the declare path (ARC's ruling on #426, issue #561), mapped to the refusal copy above. `declareWar` refuses
+ * with one of these codes and the caller shows `refusalForCode(code)`. The casus belli code covers the whole grievance gate: the player is
+ * never told the score, its inputs, their weights or the threshold. The rate-limit codes are checked first, then the gate. */
+export type RefusalCode='rate_limit_declarations'|'rate_limit_active_wars'|'casus_belli_insufficient';
+export const REFUSAL_CODES:Readonly<Record<RefusalCode,RefusalKey>>={
+ rate_limit_declarations:'rate_limit',
+ rate_limit_active_wars:'active_war_cap',
+ casus_belli_insufficient:'casus_belli',
+};
+export function refusalForCode(code:string){
+ const key=(REFUSAL_CODES as Readonly<Record<string,RefusalKey|undefined>>)[code];
+ return key?refusalFor(key):undefined;
+}

@@ -13,7 +13,7 @@ const src=readFileSync('lib/war-refusal-copy.ts','utf8').replace("from './palace
 const out=join(mkdtempSync(join(tmpdir(),'war-refusal-copy-')),'war-refusal-copy.mjs');
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 const R = await import(pathToFileURL(out).href);
-const { declarationRefusals:DR, refusalFor, mobilizationCountdown:MC, mobilizationCountdownLabel:ML, REFUSAL_KEYS, REFUSAL_NATIONS, REFUSAL_PLACEHOLDERS, REFUSAL_NAME_MAX, REFUSAL_LABEL_MAX, REFUSAL_CAPTION_MAX, REFUSAL_LINE_MAX, OFFENSIVE_WAR_INTERVAL_DAYS, ACTIVE_OFFENSIVE_WARS_MAX, MOBILIZATION_HOURS } = R;
+const { declarationRefusals:DR, refusalFor, mobilizationCountdown:MC, mobilizationCountdownLabel:ML, REFUSAL_KEYS, REFUSAL_CODES, refusalForCode, REFUSAL_NATIONS, REFUSAL_PLACEHOLDERS, REFUSAL_NAME_MAX, REFUSAL_LABEL_MAX, REFUSAL_CAPTION_MAX, REFUSAL_LINE_MAX, OFFENSIVE_WAR_INTERVAL_DAYS, ACTIVE_OFFENSIVE_WARS_MAX, MOBILIZATION_HOURS } = R;
 
 const labels=()=>[...DR.map(x=>x.label),ML.text];
 const refusalLines=()=>DR.flatMap(x=>x.lines.map(l=>l.text));
@@ -74,6 +74,21 @@ test('tone: nothing glorifies war; no violence, no real-world names, no Notable,
   assert.doesNotMatch(t,/\b(kill\w*|blood|glor\w*|victor\w*|conquer\w*|crush\w*|army|armies|battle\w*|casualt\w*|loot\w*)\b/i);
   assert.doesNotMatch(t,/Notable|@|\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia)\b/);
+});
+test('server refusal codes (#426 ruling) are pinned and map one to one onto the refusal copy', () => {
+  assert.deepEqual(Object.keys(REFUSAL_CODES),['rate_limit_declarations','rate_limit_active_wars','casus_belli_insufficient']);
+  assert.deepEqual(REFUSAL_CODES,{rate_limit_declarations:'rate_limit',rate_limit_active_wars:'active_war_cap',casus_belli_insufficient:'casus_belli'});
+  assert.deepEqual(Object.values(REFUSAL_CODES).sort(),[...REFUSAL_KEYS].sort());
+  assert.equal(refusalForCode('rate_limit_declarations'),refusalFor('rate_limit'));
+  assert.equal(refusalForCode('rate_limit_active_wars'),refusalFor('active_war_cap'));
+  assert.equal(refusalForCode('casus_belli_insufficient'),refusalFor('casus_belli'));
+  for (const bad of ['rate_limit','casus_belli','war_not_allowed','toString','__proto__','']) assert.equal(refusalForCode(bad),undefined,bad);
+});
+test('the casus belli refusal leaks nothing of the grievance gate: no score, weights, threshold, inputs or counts', () => {
+  const x=refusalForCode('casus_belli_insufficient');
+  for (const t of [x.label,...x.lines.map(l=>l.text)]) {
+    assert.doesNotMatch(t,/\d|score|weight|threshold|point|pact|embargo|sanction|trade treaty|border|incident|commons|dispute|\bAI\b|model/i,t);
+  }
 });
 test('unwired: nothing in app/, components/ or lib/ imports war-refusal-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
