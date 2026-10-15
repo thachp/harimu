@@ -52,6 +52,16 @@ test('capture needs successful assaults on two different UTC days', () => {
   assert.equal(s.siegeProgress([1, 2]).captured, true);
 });
 
+test('timestamps must be unix seconds: NaN, fractions, negatives and milliseconds are rejected (QA2 on #559)', () => {
+  for (const bad of [NaN, Infinity, -1, 1.5, T * 1000, '20000', null, undefined]) {
+    assert.equal(s.validSeconds(bad), false, String(bad)); assert.ok(Number.isNaN(s.utcDay(bad)), `utcDay(${String(bad)})`);
+    assert.equal(s.recordAssault([20_000], bad).outcome, 'invalid_time', String(bad));
+  }
+  assert.equal(s.validSeconds(T), true); assert.equal(s.validSeconds(0), true);
+  assert.deepEqual(s.recordAssault([20_000], Date.now()).days, [20_000], 'a millisecond clock never counts as a far-future day');
+  assert.equal(s.maxCityIdLength + 'outpost:'.length <= 80, true, 'the longest key fits city_sieges.city_key');
+});
+
 test('claim squares: an outpost is one square, a founded city its radius-2 block, clipped to the grid', () => {
   const bounds = { width: 24, height: 18 };
   assert.deepEqual(s.claimSquares('outpost', { x: 5, y: 6 }, bounds), [{ x: 5, y: 6 }]);
