@@ -139,9 +139,31 @@ test('assignment is recorded only: shift pay and the brigade job are unchanged b
   assert.equal(plan.walletMinor, 800); assert.equal(plan.assignment.wageMinor, 800);
 });
 
-test('the panel shows the Bureau only when the server sends it, with placeholder copy that Content can swap', async () => {
+test('the panel shows the Bureau only when the server sends it, wired to Content\'s #329 strings', async () => {
   const panel = await readFile(new URL('../app/korund-plan-panel.tsx', import.meta.url), 'utf8');
-  assert.match(panel, /plan\.bureau \? <LaborBureau/); assert.match(panel, /bureauText\.fileButton/); assert.match(panel, /bureauText\.refusal/);
+  assert.match(panel, /plan\.bureau \? <LaborBureau/); assert.match(panel, /bureauText\.fileButton/); assert.match(panel, /bureauText\.refusal/); assert.match(panel, /outcomeNotice\(/);
   const text = await readFile(new URL('../lib/labor-bureau-text.ts', import.meta.url), 'utf8');
-  assert.match(text, /Content's strings \(#321/); assert.doesNotMatch(text, /30/, 'the 30-day rule is never written as a number in the copy');
+  assert.match(text, /from '\.\/labor-bureau-copy'/); assert.doesNotMatch(text, /30/, 'the 30-day rule is never written as a number in the copy');
+  assert.doesNotMatch(text, /Your preferences are filed|The AI Labor Bureau assigned you/, 'the #329 wording lives only in labor-bureau-copy.ts');
+});
+
+test('#329 strings: preference form, notices for each outcome with {job}/{workplace}/{city} filled, reassignment lines with {nextRequestAt}', async () => {
+  const { componentModule } = await import('./helpers/component-module.mjs');
+  const T = await import(await componentModule(new URL('../lib/labor-bureau-text.ts', import.meta.url).pathname));
+  const C = await import(await componentModule(new URL('../lib/labor-bureau-copy.ts', import.meta.url).pathname));
+  assert.equal(T.bureauText.header, C.preferenceForm.header); assert.equal(T.bureauText.header, 'Job preferences');
+  assert.deepEqual([...T.bureauText.slotLabels], ['First choice', 'Second choice', 'Third choice']);
+  assert.equal(T.bureauText.fileButton, 'File preferences');
+  assert.equal(T.bureauText.filed, 'Your preferences are filed. The AI Labor Bureau will assign your job.');
+  assert.equal(T.bureauText.reassignButton, 'Request reassignment');
+  assert.equal(T.fillText(T.bureauText.nextRequest, { nextRequestAt: '1 Nov, 12:00' }), 'Next request available on 1 Nov, 12:00.');
+  assert.equal(T.fillText(T.bureauText.refusal, { nextRequestAt: '1 Nov, 12:00' }), 'Reassignment is not available yet. Your next request opens on 1 Nov, 12:00.');
+  for (const outcome of ['first-choice', 'lower-choice', 'quota-posting']) for (const job of bureauJobs) {
+    const notice = T.outcomeNotice(outcome, job);
+    assert.doesNotMatch(notice.headline + notice.body, /\{/, `${outcome} ${job.id}`);
+    assert.ok(notice.body.includes('The AI Labor Bureau') && notice.body.includes(job.name === 'x' ? '' : 'Bureau'));
+    for (const v of [job.name, T.workplaceFor[job.id], T.bureauCity]) assert.ok(v.length <= C.LABOR_BUREAU_NAME_MAX, `${v} within the ${C.LABOR_BUREAU_NAME_MAX}-character placeholder cap`);
+  }
+  assert.equal(T.outcomeNotice('first-choice', bureauJobs[1]).body, 'The AI Labor Bureau assigned you Stonehearth quarry gang at Stonehearth Quarry. Your skills and Standing fit the posting.');
+  assert.equal(T.outcomeNotice('quota-posting', bureauJobs[2]).headline, 'A posting outside your list');
 });

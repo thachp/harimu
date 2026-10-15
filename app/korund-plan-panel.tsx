@@ -11,7 +11,7 @@ import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
 import { quotaPercent } from '@/lib/korund-coupons';
-import { bureauText, outcomeText, reasonText, fillText } from '@/lib/labor-bureau-text';
+import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
 
 export type KorundPlanView = KorundPlan;
@@ -123,7 +123,7 @@ export function CouponBook({ now, coupons, walletMinor, clothing, goods, reason,
   </section>;
 }
 
-/** #235 Labor Bureau (flag HARIMU_LABOR_BUREAU_ENABLED): rendered only when the server sends plan.bureau. Placeholder copy from lib/labor-bureau-text. */
+/** #235 Labor Bureau (flag HARIMU_LABOR_BUREAU_ENABLED): rendered only when the server sends plan.bureau. Copy is Content's #329 via lib/labor-bureau-text. */
 function LaborBureau({ bureau, pending, uncertain, formatTime, onCommand }: { bureau: NonNullable<KorundPlanView['bureau']>; pending: boolean; uncertain: boolean;
   formatTime: (iso: string) => string; onCommand: (action: KorundAction, shiftId?: string, preferences?: string[]) => void }) {
   const [draft, setDraft] = useState<string[]>(() => bureau.preferences ?? Array(preferenceCount).fill(''));
@@ -139,8 +139,8 @@ function LaborBureau({ bureau, pending, uncertain, formatTime, onCommand }: { bu
       </select></label>)}
     <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!complete, 'Choose three different jobs.'])} onClick={() => onCommand('korund-set-preferences', undefined, draft)}>{bureauText.fileButton}</ActionButton>
     {bureau.preferences && <p>{bureauText.filed}</p>}
-    {bureau.assignment && <><p><strong>{bureau.assignment.jobName}</strong> · {fillText(outcomeText[bureau.assignment.outcome], { job: bureau.assignment.jobName })}</p>
-      <ul>{bureau.assignment.reasons.map(reason => <li key={reason}>{reasonText[reason]}</li>)}</ul></>}
+    {bureau.assignment && (() => { const notice = outcomeNotice(bureau.assignment.outcome, { id: bureau.assignment.jobId, name: bureau.assignment.jobName }); return <><p><strong>{notice.headline}</strong> · {notice.body}</p>
+      <ul>{bureau.assignment.reasons.map(reason => <li key={reason}>{reasonText[reason]}</li>)}</ul></>; })()}
     <ActionButton type="button" reason={requestReason} onClick={() => onCommand('korund-request-assignment')}>{bureau.assignment ? bureauText.reassignButton : bureauText.requestButton}</ActionButton>
     {bureau.nextRequestAt && <p>{fillText(bureauText.nextRequest, { nextRequestAt: nextAt })}</p>}
   </section>;
