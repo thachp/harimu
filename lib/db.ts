@@ -29,6 +29,7 @@ import { warSchemas } from './war'; // #309
 import { treatySchemas } from './diplomacy'; // #308
 import { embargoSchemas } from './embargo'; // #363
 import { crownDecreeSchemas } from './crown-debasement'; // #362
+import { sparkIssuanceSchemas } from './spark-supply'; // #431
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
@@ -216,7 +217,7 @@ async function initialize(database: GameDatabase) {
     database.prepare(travelSchema),
     ...faithSchemas.map(sql=>database.prepare(sql)),
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
-    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362
+    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), ...sparkIssuanceSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362, #431
     ...congregationSchemas.map(sql=>database.prepare(sql)),
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
