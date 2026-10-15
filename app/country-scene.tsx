@@ -25,7 +25,7 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
         const count = presence?.find(entry => entry.cityId === city.id)?.present;
         const knownCount = Number.isInteger(count) && count! >= 0;
         return <button type="button" key={city.id} className={styles.pin}
-        style={{left:`${pins[index].x}%`,top:`${pins[index].y}%`}} aria-pressed={destination?.id === city.id}
+        style={{left:`clamp(calc(var(--pin-max) / 2), ${pins[index].x}%, calc(100% - var(--pin-max) / 2))`,top:`${pins[index].y}%`}} aria-pressed={destination?.id === city.id}
         onClick={() => { if (!pending) setDestinationId(city.id); }} disabled={pending} aria-describedby={pending ? "city-travel-pending-reason" : undefined}>
         <span>{city.name}</span><small>{[city.capital ? 'Capital' : '',city.id === currentCityId ? 'Current' : '',city.id === homeCityId ? 'Home' : ''].filter(Boolean).join(' · ')}</small>
         <small>{knownCount ? `${count} sharing presence` : 'Online count unavailable'}</small>

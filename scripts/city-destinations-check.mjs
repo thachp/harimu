@@ -4,21 +4,23 @@
  *  - Korund cards read Household / Assignment / State store / Government, never "Market" or "Workplace"; the dock tab labels and the 3D building labels agree with the cards
  *  - Kindle with the market off still has no Market card (#344), and Kindle keeps "Workplace"
  *  - the card text stays inside each card and the page never scrolls sideways
+ *  - on the country map (390 wide, 150% text) every city name stays inside its pin and every pin inside the map ("Forgehaven" was wider than its 100px pin)
  *  Used by hud-layout-check.mjs (npm run test:layout). Screenshots: LAYOUT_SHOTS_DIR=docs/screenshots/378 (CITY_DESTINATIONS_BEFORE=1 names them "before"). */
 import { build } from 'esbuild';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const entry = `
   import React from 'react'; import { createRoot } from 'react-dom/client';
-  import { GameShell } from './app/game-shell.tsx'; import { cityDestinations } from './lib/city-destinations.ts';
-  window.mount = ({ cards: { nationId, showMarket }, ...props }) => { window.__root?.unmount(); window.__root = createRoot(document.getElementById('root'));
-    window.__root.render(<GameShell {...props} contextItems={cityDestinations(nationId, showMarket).map(c => ({ ...c }))} onNavigate={() => {}} panel={<p>Panel</p>} />); };`;
+  import { GameShell } from './app/game-shell.tsx'; import { cityDestinations } from './lib/city-destinations.ts'; import { CountryScene } from './app/country-scene.tsx';
+  window.mount = ({ cards: { nationId, showMarket }, country, ...props }) => { window.__root?.unmount(); window.__root = createRoot(document.getElementById('root'));
+    window.__root.render(<GameShell {...props} countryMap={country ? <CountryScene nationId={nationId} currentCityId="forgehaven" homeCityId={null} onTravel={() => {}} preview travelEnabled={false} /> : null} contextItems={cityDestinations(nationId, showMarket).map(c => ({ ...c }))} onNavigate={() => {}} panel={<p>Panel</p>} />); };`;
 
 async function bundle() {
   const result = await build({
     stdin: { resolveDir: root, loader: 'tsx', contents: entry }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', target: 'es2022', logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"' }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
+    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"' }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
     plugins: [{ name: 'stubs', setup(b) {
       const stubs = { './game-timer': 'export function GameTimer(){return null}', './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useClerk=()=>({mountUserButton(){},unmountUserButton(){}})' };
       b.onResolve({ filter: /^(\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ }, a => ({ path: a.path, namespace: 'stub' }));
@@ -36,12 +38,26 @@ const scene = (id, who) => {
     marketOpen: false, cards: { nationId: id, showMarket: id === 'korund' } }; // market flag off: only Korund's State store stays (marketVisible)
   return { name: `${nation.shortName} ${who}`, slug: `${id}-${who}`, nationId: id, props };
 };
-const scenes = [scene('korund', 'visitor'), scene('korund', 'citizen'), scene('kindle', 'visitor')];
+const countryScene = id => { const s = scene(id, 'visitor'); return { ...s, name: `${s.props.nation.shortName} country map`, slug: `${id}-country`, country: true, props: { ...s.props, view: 'country', contextTitle: 'Country travel', country: true } }; };
+const scenes = [scene('korund', 'visitor'), scene('korund', 'citizen'), scene('kindle', 'visitor'), countryScene('kindle'), countryScene('korund')];
 
 /** Runs in the page. */
 const probe = scene => {
   const issues = [], vw = document.documentElement.clientWidth, rect = e => e.getBoundingClientRect(), text = e => e.textContent.trim();
   if (document.documentElement.scrollWidth > vw + 1) issues.push(`page scrolls sideways by ${document.documentElement.scrollWidth - vw}px`);
+  if (scene.country) {
+    const map = document.querySelector('[aria-label="Illustrative country map"]'), pins = [...(map?.querySelectorAll('button') ?? [])];
+    if (!pins.length) issues.push('no city pins on the country map');
+    for (const pin of pins) {
+      const b = rect(pin), m = rect(map);
+      if (b.left < m.left - 0.5 || b.right > m.right + 0.5) issues.push(`pin "${text(pin).slice(0, 20)}" leaves the map`);
+      for (const part of pin.querySelectorAll('span, small')) {
+        const r = document.createRange(); r.selectNodeContents(part);
+        if ([...r.getClientRects()].some(x => x.width > 0 && (x.right > b.right + 0.5 || x.left < b.left - 0.5))) issues.push(`"${text(part).slice(0, 24)}" is wider than its pin`);
+      }
+    }
+    return { issues, cards: `${pins.length} pins`, tabs: '' };
+  }
   const cards = [...document.querySelectorAll('.game-context-items > button')].map(b => text(b.querySelector('strong')));
   const tabs = [...document.querySelectorAll('#game-location-dock button span')].map(text);
   const labels = [...document.querySelectorAll('.viewport-world-label')].map(text);
@@ -65,16 +81,16 @@ const probe = scene => {
 };
 
 export async function checkCityDestinations({ browser, css, preflight, failures, rows }) {
-  const script = await bundle();
+  const script = await bundle(), countryCss = await readFile(new URL('app/country-scene.module.css', `file://${root}`), 'utf8');
   const shots = process.env.LAYOUT_SHOTS_DIR, tag = process.env.CITY_DESTINATIONS_BEFORE === '1' ? 'before' : 'after';
   for (const [w, h] of [[1280, 800], [390, 844]]) for (const scale of [1, 1.25, 1.5]) for (const s of scenes) {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
     const id = `${w}x${h} @${scale * 100}% ${s.name} destination cards`;
-    await page.setContent(`<!doctype html><html style="--text-scale:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${preflight}${css}</style></head><body><div id="root"></div></body></html>`);
+    await page.setContent(`<!doctype html><html style="--text-scale:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${preflight}${css}${countryCss}</style></head><body><div id="root"></div></body></html>`);
     await page.addScriptTag({ content: script });
     await page.evaluate(p => window.mount(p), s.props);
     await page.waitForSelector('.game-hud');
-    await page.waitForSelector('.viewport-world-label:not([hidden])');
+    if (!s.country) await page.waitForSelector('.viewport-world-label:not([hidden])');
     const r = await page.evaluate(probe, s);
     const issues = [...new Set(r.issues)];
     for (const i of issues) failures.push(`${id}: ${i}`);

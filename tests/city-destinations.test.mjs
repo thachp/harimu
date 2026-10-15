@@ -45,3 +45,12 @@ test('#378: the page builds the cards for the nation on screen (a visitor previe
   assert.equal(marketVisible('kindle', false), false);
   assert.doesNotMatch(page, /label: citizenNation\?\.id === 'korund' \? 'State store' : 'Market'/, 'the old citizen-only wording is gone');
 });
+
+test('#378: country map pins grow with the text size, size to their text and stay inside the map (Forgehaven was wider than its 100px pin at 390 wide and 150% text)', async () => {
+  const css = (await readFile(new URL('../app/country-scene.module.css', import.meta.url), 'utf8')).replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(css, /\.pin \{ --pin-max: 145px;[^}]*width: max-content; max-width: var\(--pin-max\);/);
+  assert.match(css, /@media \(max-width: 440px\) \{[^\n]*\.pin \{ --pin-max: calc\(100px \* var\(--text-scale, 1\)\);/, 'the phone pin cap scales with the text size');
+  assert.doesNotMatch(css, /max-width: 100px/, 'no fixed 100px pin cap');
+  const scene = await readFile(new URL('../app/country-scene.tsx', import.meta.url), 'utf8');
+  assert.match(scene, /left:`clamp\(calc\(var\(--pin-max\) \/ 2\), \$\{pins\[index\]\.x\}%, calc\(100% - var\(--pin-max\) \/ 2\)\)`/, 'the pin centre keeps half a pin from the map edges');
+});
