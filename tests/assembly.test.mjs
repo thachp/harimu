@@ -201,15 +201,15 @@ test(`#283 ${backend}: Tier-1 scope needs the certified privacy gate and a verif
   assert.equal(ok.data.scope, 'tier1'); assert.equal((await r.db.prepare('SELECT policy FROM assembly_anonymous_ballots').first()).policy, 'tier1-human-v1');
 });
 
-test('#283 migration 0032 is additive, matches the runtime schema and passes the guard', async () => {
-  const d1 = await readFile('drizzle/0032_kindle_assembly.sql', 'utf8'), pg = await readFile('db/postgres/0032_kindle_assembly.sql', 'utf8'), src = await readFile('lib/assembly.ts', 'utf8');
+test('#283 migration 0034 is additive, matches the runtime schema and passes the guard', async () => {
+  const d1 = await readFile('drizzle/0034_kindle_assembly.sql', 'utf8'), pg = await readFile('db/postgres/0034_kindle_assembly.sql', 'utf8'), src = await readFile('lib/assembly.ts', 'utf8');
   for (const name of ['assemblyElectionSchema', 'assemblyReceiptSchema', 'assemblyBallotSchema']) {
     const schema = src.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1].replace(/\s*\n\s*/g, ' ').trim()
       .replace('${districtList}', "'forgehaven','tarrek-foundry','kolt-savanna'").replace('${partyList}', assemblyPartyIds.map(id => `'${id}'`).join(','));
     assert.ok(d1.includes(schema), `${name} matches the D1 migration`);
   }
   assert.deepEqual(assemblyDistricts.map(d => d.id), ['forgehaven', 'tarrek-foundry', 'kolt-savanna']);
-  const m = postgresMigrations().find(x => x.file === '0032_kindle_assembly.sql'); assert.ok(m);
+  const m = postgresMigrations().find(x => x.file === '0034_kindle_assembly.sql'); assert.ok(m);
   assert.deepEqual([...m.tables].sort(), ['assembly_anonymous_ballots', 'assembly_elections', 'assembly_voter_receipts']);
   assert.ok(!isDestructive(pg) && !isDestructive(d1)); assert.equal(transactionProblem(pg), null);
   assert.doesNotMatch(src.match(/export const assemblyBallotSchema = `([\s\S]*?)`;/)[1], /(_at|time|clerk|request)/i, 'the ballot table has no time, citizen or receipt column');
