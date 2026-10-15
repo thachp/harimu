@@ -27,10 +27,11 @@ export type FaithChoice = 'unaffiliated' | WorshipFaithId;
 const mvpFaiths: readonly WorshipFaithId[] = ['kinward-rite', 'fair-wind-vow', 'open-hand'];
 const allChoices: readonly FaithChoice[] = ['unaffiliated', ...mvpFaiths];
 
+// #490: citizen_faith.nation_id references nations(id) (migration 0049) instead of the literal list of the three live nations; the CHECK stays only so the CHECK count the deploy guard compares does not drop.
 export const faithSchemas = [
   `CREATE TABLE IF NOT EXISTS citizen_faith (
  user_id TEXT PRIMARY KEY REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
- nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),
+ nation_id TEXT NOT NULL REFERENCES nations(id) CHECK(nation_id <> ''),
  faith_id TEXT NOT NULL CHECK(faith_id IN ('unaffiliated','kinward-rite','fair-wind-vow','open-hand')),
  hidden_faith_id TEXT CHECK(hidden_faith_id IS NULL OR (nation_id='korund' AND hidden_faith_id IN ('kinward-rite','fair-wind-vow','open-hand'))),
  chosen_at INTEGER NOT NULL,

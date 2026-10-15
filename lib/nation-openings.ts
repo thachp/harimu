@@ -15,7 +15,14 @@ export type NationOpening = {
   openingFlag: string | null;
   /** Filled in by the PR that opens the nation; none yet. */
   capital?: { x: number; y: number };
+  /** #490 (Stage 0d): the nation's wage currency, wage fund and jobs for the generic wage ledger (lib/nation-work.ts). Absent for every nation today:
+   *  the opening PR for a nation fills these in, and until then HARIMU_NATION_WORK_ENABLED has nothing to run. Kindle, Korund and Aurelle keep their own ledgers. */
+  currency?: { code: string; name: string };
+  wage?: { fundMinor: number };
+  jobs?: readonly NationJob[];
 };
+/** One job a nation offers. `id` must start with the nation id (it is also the work-order id, so ids never collide across nations). `wageMinor` is paid once per claimed shift. */
+export type NationJob = { id: string; name: string; capacityCost: number; hours: number; wageMinor: number; output: string };
 
 export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED` }));
 

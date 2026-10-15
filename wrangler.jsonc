@@ -43,6 +43,8 @@
     "HARIMU_VELDWOOD_ENABLED": "false",
     "HARIMU_FULMARA_ENABLED": "false",
     "HARIMU_GRAY_MARKET_ENABLED": "false",
+    // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts, which none has yet.
+    "HARIMU_NATION_WORK_ENABLED": "false",
     "HARIMU_KINDLE_INCOME_TAX_ENABLED": "false",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "false",
