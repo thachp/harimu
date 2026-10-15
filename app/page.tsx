@@ -33,6 +33,7 @@ import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
 import { SceneNews } from './world-scene';
+import { noticeboardEvents } from '@/lib/noticeboard'; // #375
 import { firstLoopStep } from '@/lib/first-loop';
 import { starterCopyFor } from '@/lib/starter-copy';
 import { CitizenshipDialog } from './citizenship-dialog';
@@ -1672,7 +1673,7 @@ export default function Home() {
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
 
-    {(!clerkConfigured || !citizenNationId) && <SceneNews events={worldEvents} title="City noticeboard" />}
+    {(!clerkConfigured || !citizenNationId) && <SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
     <NationInstitutions incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
