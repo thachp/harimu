@@ -196,7 +196,7 @@ export async function GET(request: Request) {
     korundPlan,
     ...nationWork,
     firstWeek,
-    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED) }, // #344: the UI hides Market entry points while this is false
+    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true' }, // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
     simulation,
     verification,
     economy,
