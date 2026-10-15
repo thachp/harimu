@@ -23,7 +23,7 @@ import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
 import { travelBlock } from '@/lib/travel';
 import { checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
-import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
+import { qaTestCitizenAllowed, qaTestNationSql } from '@/lib/qa-tools';
 import { isLiveNation } from '@/lib/nation-discovery'; // #485
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
@@ -311,7 +311,7 @@ async function handlePost(request: Request) {
   if (body.action === 'qa-test-nation') {
     if (!qaTestCitizenAllowed(env as never, userId)) return privateJson({ error: 'Not found.' }, { status: 404 });
     const nationId = typeof body.nationId === 'string' ? body.nationId : '';
-    if (!(qaTestNations as readonly string[]).includes(nationId)) return privateJson({ error: 'Choose kindle, korund or aurelle.' }, { status: 400 });
+    if (!isLiveNation(nationId)) return privateJson({ error: 'Choose kindle, korund or aurelle.' }, { status: 400 });
     const result = await database.prepare(qaTestNationSql).bind(nationId, now, userId).run();
     if (!result.meta.changes) return privateJson({ error: 'Enroll in any nation first.' }, { status: 409 });
     return privateJson({ ok: true, nationId, qa: true });
