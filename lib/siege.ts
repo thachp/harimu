@@ -10,7 +10,12 @@ export const assaultsToCapture = 2; // docs 15.3: two successful assaults on two
 export const claimRadius = 2; // a founded city claims the radius-2 block around its centre (lib/city-founding.ts, #124)
 const DAY = 86400;
 /** The real UTC day number of a unix second (day 0 = 1970-01-01). The "different days" of docs 15.3 are real UTC days. */
-export const utcDay = (at: number): number => Math.floor(at / DAY);
+export const utcDay = (at: number): number => validSeconds(at) ? Math.floor(at / DAY) : NaN;
+/** #577 item 5 [ASSUMPTION, docs 15.3 "different days"]: the day an assault counts on is the UTC day its defender window STARTED, so one window that spans midnight UTC (Kindle 22:00 to 02:00) is one day, not two.
+ *  Inside the window this is floor((at - startHour*3600) / 86400); with start hour 0 it is the plain UTC day. NaN for a bad time or start hour. */
+export const windowDay = (startHourUtc: number, at: number): number => validSeconds(at) && Number.isInteger(startHourUtc) && startHourUtc >= 0 && startHourUtc <= 23 && at >= startHourUtc * 3600 ? Math.floor((at - startHourUtc * 3600) / DAY) : NaN;
+/** A usable unix timestamp in SECONDS: a finite non-negative integer below the year 3000. Rejects NaN, fractions and millisecond timestamps (about 1.8e12), which would otherwise land on a day far in the future. */
+export const validSeconds = (at: unknown): at is number => typeof at === 'number' && Number.isSafeInteger(at) && at >= 0 && at < 32_503_680_000;
 
 export type CityKind = 'outpost' | 'founded';
 export type Point = { x: number; y: number };
@@ -40,9 +45,10 @@ export function assaultRefusal(check: AssaultCheck): AssaultRefusal | null {
   return null;
 }
 
-/** Outcome of recording one successful assault at `at` against the UTC days already recorded for the siege. One success counts per UTC day; the second distinct day captures. */
-export function recordAssault(recordedDays: readonly number[], at: number): { outcome: 'duplicate_day' | 'recorded' | 'captured'; days: number[]; distinctDays: number } {
-  const day = utcDay(at), days = [...new Set(recordedDays)].sort((a, b) => a - b);
+/** Outcome of recording one successful assault at `at` against the days already recorded for the siege (windowDay of the defender's start hour; the default 0 is the plain UTC day). One success counts per day; the second distinct day captures. */
+export function recordAssault(recordedDays: readonly number[], at: number, startHourUtc = 0): { outcome: 'invalid_time' | 'duplicate_day' | 'recorded' | 'captured'; days: number[]; distinctDays: number } {
+  const day = windowDay(startHourUtc, at), days = [...new Set(recordedDays)].sort((a, b) => a - b);
+  if (Number.isNaN(day)) return { outcome: 'invalid_time', days, distinctDays: days.length };
   if (days.includes(day)) return { outcome: 'duplicate_day', days, distinctDays: days.length };
   const next = [...days, day].sort((a, b) => a - b);
   return { outcome: next.length >= assaultsToCapture ? 'captured' : 'recorded', days: next, distinctDays: next.length };
@@ -67,7 +73,8 @@ export function planCapture(squares: readonly SquareFact[], privateKeys: Readonl
   return { transfer, keptPrivate };
 }
 
-/** City id for a siege: the outpost of a nation, or a founded city's id. */
+/** City key for a siege: the outpost of a nation, or a founded city's id. city_sieges.city_key allows 80 characters: callers must keep the id within `maxCityIdLength`. */
+export const maxCityIdLength = 72;
 export const siegeCityKey = (kind: CityKind, id: string) => kind === 'outpost' ? `outpost:${id}` : `city:${id}`;
 
 /** Additive tables (migration 0050). Nations are checked by lib/nation-openings and an FK to nations(id), not a literal list, so later nations never need this migration repeated. */
