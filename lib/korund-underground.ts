@@ -1,7 +1,7 @@
 /** #295: Korund underground worship and capped inspections (raids), behind HARIMU_FAITH_ENABLED (default "false"). Docs 14.6 and 27.
  *  - Underground worship is the existing citizen_worship log, written by lib/faith.ts for a Korund citizen's hidden faith (once per game day,
  *    +Devotion, nothing is posted). Public worship in Korund stays refused.
- *  - An inspection is written only by the world tick (runKorundRaids, called from advanceWorld), never by a GET. It is capped to one per city per
+ *  - An inspection is written only by the world tick (runKorundRaids, called from advanceWorld, which GET /api/world also triggers); GET /api/faith, /api/news and /api/citizen never write one. It is capped to one per city per
  *    14 real days (see underground-rules.ts), costs each found holder a small Devotion hit, and leaves a State Media rumor that names no faith,
  *    shrine or person. It has no wage, production, market or combat effect: nothing here reads or writes those tables (a test covers it).
  *  - Everything a citizen or the news sees is derived on read from korund_raids / korund_raid_hits. Strings come from Content's lib/faith-copy.ts (#322). */
@@ -9,7 +9,7 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation } from './db-errors';
 import { capitalCityForNation, cityForNation } from './cities';
 import { korundUndergroundCopy as copy } from './faith-copy';
-import { pickIndex, raidDue, raidId, undergroundConfig as cfg, undergroundGameDay } from './underground-rules';
+import { discoveryKind, pickIndex, raidDue, raidId, undergroundConfig as cfg, undergroundGameDay } from './underground-rules';
 
 export * from './underground-rules';
 
@@ -78,14 +78,20 @@ export async function undergroundHits(db: GameDatabase, userId: string, since: n
   } catch (error) { if (isMissingRelation(error)) return []; throw error; }
 }
 
-export type UndergroundView = { lastRaid: { at: number; text: string; devotionNote: string } | null; quietWeek: string | null };
+/** `repeat` and `discoveries` are private to the holder (#382): the notice is the repeat line once the holder has been found before; `discoveries` counts every inspection that found them. */
+export type UndergroundView = { lastRaid: { at: number; text: string; devotionNote: string; repeat: boolean; discoveries: number } | null; quietWeek: string | null };
 /** What a hidden-faith holder sees (private, derived on read). A recent inspection of them shows the existing "found a shrine" notice and the Devotion note;
  *  otherwise a quiet-week line when their city has had no inspection this week. */
 export async function readUndergroundView(db: GameDatabase, userId: string, cityId: string, since: number, now: number): Promise<UndergroundView> {
   const recentFrom = now - cfg.recentSeconds;
   try {
     const hit = await db.prepare('SELECT raided_at FROM korund_raid_hits WHERE user_id=? AND raided_at>=? AND raided_at>=? ORDER BY raided_at DESC LIMIT 1').bind(userId, since, recentFrom).first<{ raided_at: number }>();
-    if (hit) return { lastRaid: { at: Number(hit.raided_at), text: copy.discovery.first.text, devotionNote: copy.raidResult.devotionNote.text }, quietWeek: null };
+    if (hit) {
+      // #382 / docs 14.6: a first discovery is "Suspicion only"; a repeat discovery is the one that may lead to Correction Duty. Real history decides which notice shows.
+      const found = await db.prepare('SELECT COUNT(*) AS n FROM korund_raid_hits WHERE user_id=? AND raided_at>=? AND raided_at<=?').bind(userId, since, Number(hit.raided_at)).first<{ n: number }>();
+      const discoveries = Number(found?.n ?? 1), kind = discoveryKind(discoveries - 1);
+      return { lastRaid: { at: Number(hit.raided_at), text: copy.discovery[kind].text, devotionNote: copy.raidResult.devotionNote.text, repeat: kind === 'repeat', discoveries }, quietWeek: null };
+    }
     const cityRaid = await db.prepare('SELECT id FROM korund_raids WHERE city_id=? AND raided_at>=? LIMIT 1').bind(cityId, recentFrom).first<{ id: string }>();
     if (cityRaid) return { lastRaid: null, quietWeek: null };
   } catch (error) { if (!isMissingRelation(error)) throw error; return { lastRaid: null, quietWeek: null }; }
