@@ -25,6 +25,18 @@ export function viewedNationAfterLoad(search: string, validNationIds: readonly s
   if (requested && validNationIds.includes(requested)) return currentId;
   return citizenNationId && validNationIds.includes(citizenNationId) ? citizenNationId : currentId;
 }
+const inspectingViews: readonly string[] = ['world', 'country', 'nation'];
+// A new personal scene must be added to personalViews (and a new inspecting scene to inspectingViews), or it silently inherits the inspected nation.
+const personalViews: readonly string[] = ['square', 'household', 'workplace', 'market'];
+/** #527: which nation a navigation to `nextView` shows. A citizen inspecting another nation on World, Country or Nation keeps it there; the inspection ends when they
+ *  open a personal scene (City, Household, Work, Market), or Country or Civic from a personal scene, which are their own nation again. Otherwise a stale inspected
+ *  nation survived the walk and Civic opened that nation's government and the URLs dropped nation and city. Civic opened straight from an inspection stays read-only (#91). */
+export function nationForNavigation(nextView: string, currentView: string, viewedNationId: string, citizenNationId: string | null | undefined): string {
+  if (!citizenNationId) return viewedNationId;
+  if (personalViews.includes(nextView)) return citizenNationId;
+  if ((nextView === 'country' || nextView === 'government') && !inspectingViews.includes(currentView)) return citizenNationId;
+  return viewedNationId;
+}
 /** #533 (follow-up to #455/#523): what the top bar says while the citizen row loads.
  *  `hint` is what the browser knows before Clerk loads, read from Clerk's non-HttpOnly `__client_uat` cookie (see `signedInHint`); `unknown` only until the first client effect (server render, hydration).
  *  - session not loading, citizen known, signed-out hint, or the hold timed out (`expired`): `none`, the normal identity line (an anonymous visitor never sees a loading line, and a stalled Clerk or /api/citizen ends the hold).

@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
-import { seedWorldSquares, mvpNations, mapWidth, mapHeight, acquisitionRules, worldSquaresSchema, worldSquaresSeedSql, postgresWorldSquaresMigration, readWorldSquares } from '../lib/map-zones.ts';
+import { localRuntime } from './helpers/local-runtime.mjs';
+// lib/map-zones.ts imports the registry (extensionless), so it loads through the test runtime (#491).
+const zones = await (async () => { const r = await localRuntime(); try { return await r.importModule('lib/map-zones.ts'); } finally { await r.close(); } })();
+const { seedWorldSquares, mvpNations, mapWidth, mapHeight, acquisitionRules, worldSquaresSchema, worldSquaresSeedSql, postgresWorldSquaresMigration, readWorldSquares } = zones;
 
 const at = (squares, x, y) => squares.find(s => s.x === x && s.y === y);
 const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
@@ -61,7 +64,7 @@ test('reads seeded table rows (idempotent seed) and falls back to the seed witho
   assert.deepEqual(read.squares, seedWorldSquares());
 });
 test('committed D1 migration matches the generator and applies idempotently', async () => {
-  const { sqliteWorldSquaresMigration } = await import('../lib/map-zones.ts');
+  const { sqliteWorldSquaresMigration } = zones;
   const file = await readFile(new URL('../drizzle/0011_world_squares.sql', import.meta.url), 'utf8');
   assert.equal(file, sqliteWorldSquaresMigration());
   const sqlite = new DatabaseSync(':memory:'); sqlite.exec(file); sqlite.exec(file);

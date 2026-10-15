@@ -41,6 +41,50 @@ export function declarationBlock(input: { now: number; shardStartedAt: number | 
   if (input.lastTreatyEndedAt !== null && input.now < peaceLockEnd(input.lastTreatyEndedAt)) return 'peace_lock';
   return null;
 }
+/** #426: declaration rate limits and the casus belli gate (docs 13.5 / 15; ARC final ruling on #426, Oct 14 2026). Behind HARIMU_WAR_DECLARATION_LIMITS_ENABLED (default "false")
+ *  on top of HARIMU_WAR_ENABLED. The single place to change the numbers. The docs mark the two limits [ASSUMPTION]; ARC confirmed them for the PoC. */
+export const declarationLimits = {
+  /** At most 1 new offensive declaration per nation per 14 real days (measured from the nation's last declaration, whether or not that war has ended). */
+  intervalSeconds: 14 * 86400,
+  /** At most 2 active offensive wars per nation: wars this nation declared that have not ended (mobilizing counts). */
+  activeOffensiveMax: 2,
+} as const;
+/** Deterministic grievance score (ARC ruling): a declaration may proceed only at or above the threshold. No other inputs in this PoC. */
+export const grievanceConfig = {
+  threshold: 40,
+  /** In-force non-aggression pact broken by the target against us. Alone it clears the gate. */
+  napBrokenByTarget: 40,
+  /** Active embargo by the target against us. */
+  embargoAgainstUs: 20,
+  /** In-force trade treaty broken by the target. */
+  tradeTreatyBrokenByTarget: 15,
+  /** Each recorded border incident with the target in the last 30 real days, capped. No border-incident store exists yet, so callers pass 0. */
+  borderIncidentEach: 10, borderIncidentCap: 30, borderIncidentWindowSeconds: 30 * 86400,
+  /** An open Commons dispute with the target. No Commons dispute store exists yet, so callers pass false. */
+  openCommonsDispute: 10,
+} as const;
+export type GrievanceInputs = { napBrokenByTarget: boolean; embargoAgainstUs: boolean; tradeTreatyBrokenByTarget: boolean; borderIncidents: number; openCommonsDispute: boolean };
+/** Integer grievance score from the inputs. Missing or invalid counts contribute 0 (fail closed: a bad input never raises the score). */
+export function grievanceScore(input: GrievanceInputs): number {
+  const g = grievanceConfig;
+  const incidents = typeof input.borderIncidents === 'number' && Number.isFinite(input.borderIncidents) && input.borderIncidents > 0 ? Math.floor(input.borderIncidents) : 0;
+  return (input.napBrokenByTarget === true ? g.napBrokenByTarget : 0) + (input.embargoAgainstUs === true ? g.embargoAgainstUs : 0)
+    + (input.tradeTreatyBrokenByTarget === true ? g.tradeTreatyBrokenByTarget : 0) + Math.min(incidents * g.borderIncidentEach, g.borderIncidentCap)
+    + (input.openCommonsDispute === true ? g.openCommonsDispute : 0);
+}
+export type DeclarationLimitBlock = 'rate_limit_declarations' | 'rate_limit_active_wars' | 'casus_belli_insufficient';
+/** Why the limits or the gate refuse a declaration, in the order the refusal copy lists them (declaration interval, active wars, grievance); null when none applies.
+ *  An unreadable count or score fails closed (blocked). */
+export function declarationLimitBlock(input: { now: number; lastDeclaredAt: number | null; activeOffensiveWars: number; grievance: number }): DeclarationLimitBlock | null {
+  if (input.lastDeclaredAt !== null && !(Number.isFinite(input.lastDeclaredAt) && input.now >= input.lastDeclaredAt + declarationLimits.intervalSeconds)) return 'rate_limit_declarations';
+  if (!Number.isFinite(input.activeOffensiveWars) || input.activeOffensiveWars >= declarationLimits.activeOffensiveMax) return 'rate_limit_active_wars';
+  if (!Number.isFinite(input.grievance) || input.grievance < grievanceConfig.threshold) return 'casus_belli_insufficient';
+  return null;
+}
+export const declarationNextAt = (lastDeclaredAt: number) => lastDeclaredAt + declarationLimits.intervalSeconds;
+/** The first UTC midnight at or after the moment a nation can declare again. The refusal line says "on {date}" with this day, so a nation that reads the date is never told it
+ *  can declare on a day it still cannot (it may be able to declare a few hours earlier than midnight; the check itself uses the exact second). */
+export const declarationNextDay = (lastDeclaredAt: number) => Math.ceil(declarationNextAt(lastDeclaredAt) / 86400) * 86400;
 /** Plain-text label: control characters and markup are dropped, whitespace collapsed, length capped. */
 export const cleanLabel = (value: unknown, max: number) => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max).trim() : '';
 /** Fills {placeholder} slots of the war copy (lib/war-copy.ts); unknown slots are left as they are. */

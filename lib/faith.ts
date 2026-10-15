@@ -11,7 +11,7 @@ import { worshipCopy, type WorshipFaithId } from './worship-copy';
 import { devotionTier, faithCopy, unaffiliatedCopy } from './faith-copy';
 import { devotionPerFestival, festivalCalendar, festivalJoins, festivalSchemas } from './festivals';
 import { mvpFestival } from './mvp-festival-copy';
-import { royalFavorBalance, royalFavorBalanceSql } from './aurelle';
+import { royalFavorBalance, royalFavorBinds, royalFavorSql } from './aurelle';
 import { holderCity, readUndergroundView, undergroundHits, undergroundSchemas } from './korund-underground'; // #295
 import { korundUndergroundCopy } from './faith-copy';
 import { missionarySchemas, readMissionary, isMissionNation } from './missionaries'; // #225
@@ -118,7 +118,7 @@ const label = (id: FaithChoice) => id === 'unaffiliated' ? unaffiliatedCopy.name
 const fail = (status: 400 | 403 | 409 | 503, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 
 /** Pure read (GET). The hidden faith is returned only to its holder, labelled private. */
-export async function readFaith(db: GameDatabase, userId: string, now: number, enabled: boolean) {
+export async function readFaith(db: GameDatabase, userId: string, now: number, enabled: boolean, favorDecayAt?: number) {
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id ?? null;
   const options = faithOptions(nationId ?? '');
@@ -130,7 +130,7 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const days = worshipFaith ? (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, worshipFaith, row?.chosen_at ?? 0).all<{ game_day: number }>()).results.map(r => Number(r.game_day)) : [];
   const service = worshipFaith ? await serviceDays(db, userId, worshipFaith, row?.chosen_at ?? 0) : [];
   // #289: leaving the Kinward Rite in Aurelle costs Royal Favor; show the cost and balance, and a visible reason when it can't be paid.
-  const leaving = leavesKinward(nationId, faith, 'unaffiliated'); const favor = leaving ? await royalFavorBalance(db, userId) : 0;
+  const leaving = leavesKinward(nationId, faith, 'unaffiliated'); const favor = leaving ? await royalFavorBalance(db, userId, favorDecayAt) : 0; // #529: favorDecayAt is set only while HARIMU_FAVOR_DECAY_ENABLED is on
   const joins = supported ? await festivalJoins(db, userId) : [];
   const festivalDays = worshipFaith ? joins.filter(j => j.faith_id === worshipFaith && Number(j.joined_at) >= Number(row?.chosen_at ?? 0)).map(j => Number(j.game_day)) : [];
   const devotion = devotionFromEvents([...days.map(day => ({ day, amount: devotionPerWorship })), ...service.map(day => ({ day, amount: devotionPerService })), ...festivalDays.map(day => ({ day, amount: devotionPerFestival }))], today);
@@ -195,12 +195,12 @@ export function parseFaithCommand(body: Record<string, unknown>) {
   return null;
 }
 
-export async function chooseFaith(db: GameDatabase, userId: string, command: { requestId: string; faithId: string; hiddenFaithId: string | null }, now: number, enabled: boolean) {
+export async function chooseFaith(db: GameDatabase, userId: string, command: { requestId: string; faithId: string; hiddenFaithId: string | null }, now: number, enabled: boolean, favorDecayAt?: number) {
   if (!enabled) return fail(403, 'disabled', 'Faith is not open yet.');
   const prior = await db.prepare('SELECT user_id,faith_id,hidden_faith_id FROM citizen_faith WHERE request_id=?').bind(command.requestId).first<{ user_id: string; faith_id: string; hidden_faith_id: string | null }>();
   if (prior) {
     if (prior.user_id !== userId || prior.faith_id !== command.faithId || (prior.hidden_faith_id ?? null) !== command.hiddenFaithId) return fail(409, 'request_reused', 'That request id was already used for a different choice.');
-    return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) };
+    return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled, favorDecayAt) };
   }
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const options = faithOptions(citizen?.nation_id ?? '');
@@ -216,7 +216,7 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   if (leaving) {
     // citizen_faith.request_id only remembers the latest change, so an older leave id is found through its spend row: it may never debit (or leave) twice.
     if (await spendRowFor(db, command.requestId)) return fail(409, 'request_reused', 'That request id was already used for a Royal Favor spend.');
-    const balance = await royalFavorBalance(db, userId); if (balance < kinwardLeaveFavorCost) return fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance));
+    const balance = await royalFavorBalance(db, userId, favorDecayAt); if (balance < kinwardLeaveFavorCost) return fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance));
   }
   if (current?.changed_at != null && now < Number(current.changed_at) + faithChangeCooldownSeconds) return fail(409, 'cooldown', `You can change faith once every 60 real days. Next change: ${new Date((Number(current.changed_at) + faithChangeCooldownSeconds) * 1000).toISOString().slice(0, 10)}.`);
   // Guarded upsert: a concurrent change inside the cooldown cannot slip through. A first pick (no row, or Aurelle's recorded default) leaves changed_at NULL.
@@ -232,10 +232,10 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   let saved;
   if (leaving) {
     const spend = db.prepare(`INSERT INTO aurelle_favor_spends (request_id,clerk_user_id,amount,reason,spent_at)
-      SELECT ?,?,?,'leave-kinward',? WHERE (${royalFavorBalanceSql}) >= ?
+      SELECT ?,?,?,'leave-kinward',? WHERE (${royalFavorSql(favorDecayAt)}) >= ?
         AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id='aurelle')
         AND NOT EXISTS (SELECT 1 FROM citizen_faith f WHERE f.user_id=? AND f.changed_at IS NOT NULL AND f.changed_at > ?)
-      ON CONFLICT DO NOTHING`).bind(command.requestId, userId, kinwardLeaveFavorCost, now, userId, userId, kinwardLeaveFavorCost, userId, userId, now - faithChangeCooldownSeconds);
+      ON CONFLICT DO NOTHING`).bind(command.requestId, userId, kinwardLeaveFavorCost, now, ...royalFavorBinds(userId, favorDecayAt), kinwardLeaveFavorCost, userId, userId, now - faithChangeCooldownSeconds);
     let results;
     try { results = await db.batch([spend, upsert(true)]); }
     catch (error) {
@@ -248,20 +248,20 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
       // Undo only a debit this call wrote (never an earlier call's, so a replayed id can't refund a spend that already landed).
       if (spent) await db.prepare('DELETE FROM aurelle_favor_spends WHERE request_id=? AND clerk_user_id=? AND NOT EXISTS (SELECT 1 FROM citizen_faith WHERE request_id=?)').bind(command.requestId, userId, command.requestId).run();
       const landed = await db.prepare('SELECT user_id FROM citizen_faith WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
-      if (!spent && landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) }; // a concurrent call with this id already did it
+      if (!spent && landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled, favorDecayAt) }; // a concurrent call with this id already did it
       if (!spent && await spendRowFor(db, command.requestId)) return fail(409, 'request_reused', 'That request id was already used for a Royal Favor spend.');
-      const balance = await royalFavorBalance(db, userId);
+      const balance = await royalFavorBalance(db, userId, favorDecayAt);
       return balance < kinwardLeaveFavorCost ? fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance)) : fail(409, 'cooldown', 'You can change faith once every 60 real days.');
     }
   } else {
     saved = await upsert(false).run();
     if (!saved.meta.changes) {
       const landed = await db.prepare('SELECT user_id FROM citizen_faith WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
-      if (landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) }; // a concurrent call with this id already did it
+      if (landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled, favorDecayAt) }; // a concurrent call with this id already did it
       return fail(409, 'cooldown', 'You can change faith once every 60 real days.');
     }
   }
-  return { ok: true as const, state: await readFaith(db, userId, now, enabled) };
+  return { ok: true as const, state: await readFaith(db, userId, now, enabled, favorDecayAt) };
 }
 
 /** The spend row for a request id (any citizen), or null when there is none or the ledger table does not exist yet. */
