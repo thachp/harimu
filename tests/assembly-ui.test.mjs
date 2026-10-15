@@ -1,4 +1,4 @@
-/** #283: the Assembly panel renders the Content #299 ballot copy, a party-list picker, and the published count with human votes and the AI bloc in separate columns. */
+/** #283: the Assembly panel renders the Content #299 ballot copy, a party-list picker, and the published count of human votes only (#449). */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -32,11 +32,11 @@ test('voted: badge shown and no ballot form', () => {
   const out = html({ snapshot: { ...base(), voted: true } }); assert.ok(out.includes('I Voted')); assert.equal(out.includes('type="radio"'), false);
 });
 
-test('closed: per-district count with human votes and the AI bloc in separate columns, and the wire headlines', () => {
+test('closed: per-district count of human votes only (no AI bloc column), and the wire headlines', () => {
   const result = rules.assemblyResult({ forgehaven: { 'steady-hand': 3, 'open-ledger': 1, 'dockside-builders': 2 } });
   const out = html({ snapshot: { ...base(), status: 'closed', result, headlines: rules.assemblyHeadlines(result) } });
-  assert.ok(out.includes('<th>Human votes</th><th>AI bloc</th>')); assert.ok(out.includes(copy.resultsCaption.humanAndBloc.text)); assert.ok(out.includes('Republic Wire Service'));
-  assert.ok(out.includes('<td>Steady Hand Party</td><td>3</td><td>240</td><td>1</td><td>2</td>'), 'S: 3 human, 240 bloc, 1 won, 2 seats now');
+  assert.ok(out.includes('<th>Human votes</th><th>Seats won</th>')); assert.equal(out.includes('AI bloc'), false); assert.ok(out.includes(copy.resultsCaption.humanVotesOnly.text)); assert.ok(out.includes('Republic Wire Service'));
+  assert.ok(out.includes('<td>Steady Hand Party</td><td>3</td><td>2</td><td>3</td>'), 'S: 3 human, 2 won, 3 seats now');
   assert.ok(out.includes('No ballots were cast here'), 'uncontested districts say so'); assert.equal(out.includes('Cast ballot'), false);
 });
 
