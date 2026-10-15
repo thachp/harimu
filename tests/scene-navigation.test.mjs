@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, nationFromSearch, viewModes } from '../lib/scene-navigation.ts';
+import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, nationFromSearch, viewModes, identityPending } from '../lib/scene-navigation.ts';
 assert.equal(sceneFromSearch(''), 'square');
 assert.equal(sceneFromSearch('?view=unknown'), 'square');
 for (const view of viewModes) {
@@ -105,4 +105,20 @@ assert.equal(new URL(cityVisit).searchParams.get('nation'),'korund','Sample city
   assert.equal(isForeignCivic('government', 'kindle', 'kindle', 'kindle'), false);
   // Personal scenes never carry a foreign nation.
   assert.equal(new URL(sceneUrl(country, 'household', 'confluence', undefined, true)).searchParams.get('nation'), null);
+}
+
+// #455: the top bar holds a neutral line while a signed-in citizen's row loads and the URL names no nation.
+{
+  const ids = ['kindle', 'korund', 'aurelle'];
+  assert.equal(identityPending('', ids, true, false), true);
+  assert.equal(identityPending('?view=workplace', ids, true, false), true);
+  assert.equal(identityPending('?view=nation&nation=korund', ids, true, false), false, 'a valid ?nation= is shown at once');
+  assert.equal(identityPending('?nation=atlantis', ids, true, false), true, 'an unknown nation does not count');
+  assert.equal(identityPending('', ids, false, false), false, 'anonymous, error or local demo: no hold');
+  assert.equal(identityPending('', ids, true, true), false, 'the citizen is known');
+  // Every nation's citizen link carries nation and city, Aurelle included (#455).
+  for (const [nation, city] of [['kindle', 'forgehaven'], ['korund', 'stonehearth'], ['aurelle', 'highspire']]) {
+    const url = new URL(sceneUrl('https://harimu.com/', 'workplace', nation, city));
+    assert.equal(url.searchParams.get('nation'), nation); assert.equal(url.searchParams.get('city'), city); assert.equal(url.searchParams.get('view'), 'workplace');
+  }
 }

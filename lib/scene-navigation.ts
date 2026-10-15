@@ -25,6 +25,13 @@ export function viewedNationAfterLoad(search: string, validNationIds: readonly s
   if (requested && validNationIds.includes(requested)) return currentId;
   return citizenNationId && validNationIds.includes(citizenNationId) ? citizenNationId : currentId;
 }
+/** #455: while a signed-in visitor's citizen row is still loading and the URL names no nation, the top bar must not claim the default (Kindle) nation:
+ *  it holds a neutral loading line until the row is read, then shows the citizen's own nation. A valid `?nation=` is shown at once (a visitor view). */
+export function identityPending(search: string, validNationIds: readonly string[], sessionLoading: boolean, hasCitizenNation: boolean): boolean {
+  if (!sessionLoading || hasCitizenNation) return false;
+  const requested = new URLSearchParams(search).get('nation');
+  return !(requested && validNationIds.includes(requested));
+}
 export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false): string {
   const url = new URL(href);
   url.searchParams.set('view', scene);
