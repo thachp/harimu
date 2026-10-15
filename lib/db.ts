@@ -23,7 +23,7 @@ import {assemblySchemas} from './assembly';
 import {primarySchemas} from './primaries';
 import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
-import { worldSquaresSchema, worldSquaresSeedSql } from './map-zones';
+import { worldSquaresSchema, worldSquaresSeedSql, bootNationSquaresSql } from './map-zones';
 import { worldCitiesSchema } from './city-founding';
 import { aurelleSchemas, royalFavorSchemas } from './aurelle';
 import { warSchemas } from './war'; // #309
@@ -235,6 +235,7 @@ async function initialize(database: GameDatabase) {
     database.prepare(cityLocationSchema),
     database.prepare(worldSquaresSchema),
     ...worldSquaresSeedSql().map(sql => database.prepare(sql)),
+    ...bootNationSquaresSql().map(sql => database.prepare(sql)), // #491: nothing today; adds a new nation's squares once it has a capital
     database.prepare(worldCitiesSchema),
     ...squareSchema.map(sql => database.prepare(sql)),
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),

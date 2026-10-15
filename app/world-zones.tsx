@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { acquisitionRules, zoneLabels, zoneOrder, type WorldSquare, type Zone } from '@/lib/map-zones';
+import { acquisitionRules, zoneLabels, zoneOrder, type Zone } from '@/lib/map-zone-labels';
+import type { WorldSquare } from '@/lib/map-zones';
 import styles from './world-zones.module.css';
 
 export const zoneOverlayKey = 'harimu:zone-overlay';
