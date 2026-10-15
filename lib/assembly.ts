@@ -2,7 +2,7 @@ import type { GameDatabase } from './database-contract';
 import { accountElectionEnabled } from './preview-election';
 import { trustedBallotPrivacyReady, ballotPrivacyReason } from './ballot-privacy';
 import { kindleParties } from './kindle-parties';
-import { assemblyDistricts, assemblyIncumbents, assemblyPartyIds, assemblyResult, assemblyHeadlines, assemblySeatsPerDistrict, assemblySeatsUp, assemblyWindowSeconds, capitalDistrict, isDistrict, type AssemblyResult, type PartySeats } from './assembly-rules';
+import { assemblyDistricts, assemblyIncumbents, assemblyPartyIds, assemblyResult, assemblyHeadlines, assemblySeatsPerDistrict, assemblySeatsUp, capitalDistrict, carryIncumbents, isDistrict, nextAssemblyOpen, planAssembly, type AssemblyPlan, type AssemblyResult, type AssemblyTiming, type Incumbents, type PartySeats } from './assembly-rules';
 export * from './assembly-rules';
 
 /** #283: Kindle mid-term Assembly election (party list, D'Hondt per district; the AI bloc is a fixed separate block).
@@ -45,7 +45,7 @@ export const assemblySchemas = [assemblyElectionSchema, assemblyReceiptSchema, a
 
 export const assemblyElectionId = 'kindle-assembly-midterm-1';
 export const assemblyAccountElectionId = 'kindle-assembly-account-poc-1';
-export type AssemblyBindings = { HARIMU_KINDLE_ASSEMBLY_ENABLED?: string; HARIMU_KINDLE_ASSEMBLY_OPEN_AT?: string; NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?: string; HARIMU_ACCOUNT_ELECTION_POC_ENABLED?: string };
+export type AssemblyBindings = { HARIMU_KINDLE_ASSEMBLY_ENABLED?: string; HARIMU_KINDLE_ASSEMBLY_OPEN_AT?: string; HARIMU_KINDLE_CYCLE_START_AT?: string; NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?: string; HARIMU_ACCOUNT_ELECTION_POC_ENABLED?: string };
 export type AssemblyScope = { id: string; policy: 'tier1-human-v1' | 'preview-citizen-v1'; scope: 'tier1' | 'preview-citizen' };
 
 export const assemblyEnabled = (b: AssemblyBindings) => b.HARIMU_KINDLE_ASSEMBLY_ENABLED === 'true';
@@ -55,6 +55,14 @@ export function assemblyOpenAt(b: AssemblyBindings): number | null {
   if (typeof raw !== 'string' || !/^\d{1,12}$/.test(raw)) return null;
   return Number(raw);
 }
+/** #351: the start of day 0 of Kindle's first 120-day cycle (epoch seconds). Set: the mid-term Assembly election opens at day 60 of every cycle on the world clock.
+ *  Unset (and no manual open time): never opens. The presidential election is not wired to it yet. */
+export function assemblyCycleStartAt(b: AssemblyBindings): number | null {
+  const raw = b.HARIMU_KINDLE_CYCLE_START_AT;
+  if (typeof raw !== 'string' || !/^\d{1,12}$/.test(raw)) return null;
+  return Number(raw);
+}
+export const assemblyTiming = (b: AssemblyBindings): AssemblyTiming => ({ openAt: assemblyOpenAt(b), cycleStartAt: assemblyCycleStartAt(b) });
 /** Same privacy gate as the presidential PoC: the certified Tier-1 gate (hard-false today) or the owner-approved account preview. Null means closed. */
 export function assemblyScope(b: AssemblyBindings, privacyReady = trustedBallotPrivacyReady()): AssemblyScope | null {
   if (!assemblyEnabled(b)) return null;
@@ -63,9 +71,10 @@ export function assemblyScope(b: AssemblyBindings, privacyReady = trustedBallotP
   return null;
 }
 /** What the world tick needs, or null (flag off, privacy gate closed): a complete no-op. */
-export function assemblyTickConfig(b: AssemblyBindings): { scope: AssemblyScope; openAt: number | null } | null {
+export type AssemblyTickConfig = AssemblyTiming & { scope: AssemblyScope };
+export function assemblyTickConfig(b: AssemblyBindings): AssemblyTickConfig | null {
   const scope = assemblyScope(b);
-  return scope ? { scope, openAt: assemblyOpenAt(b) } : null;
+  return scope ? { scope, ...assemblyTiming(b) } : null;
 }
 
 export const assemblyReceiptSql = `INSERT INTO assembly_voter_receipts (election_id,clerk_user_id,district_id,request_id,checked_at,policy)
@@ -83,39 +92,57 @@ export async function citizenDistrict(db: GameDatabase, userId: string): Promise
   return row && isDistrict(row.home_city_id) ? row.home_city_id : capitalDistrict;
 }
 
-/** Opens the election once its configured time has come and while its 72-hour window is still running. Write paths only. */
-export async function ensureAssemblyElection(db: GameDatabase, scope: AssemblyScope, openAt: number | null, now: number) {
-  if (openAt === null || now < openAt || now >= openAt + assemblyWindowSeconds) return;
-  await db.prepare(`INSERT INTO assembly_elections (id,nation_id,policy,opens_at,closes_at) VALUES (?,'kindle',?,?,?) ON CONFLICT(id) DO NOTHING`).bind(scope.id, scope.policy, openAt, openAt + assemblyWindowSeconds).run();
+/** The election id the clock points at (the plan's, else the scope's base id, which never has a row). */
+export const assemblyElectionIdFor = (scope: AssemblyScope, timing: AssemblyTiming, now: number) => planAssembly(scope.id, timing, now)?.id ?? scope.id;
+
+/** The seats up and held for one election: the placeholder tables for the first or manual election, else carried from the last counted election of this
+ *  scope that opened before it (a cycle nobody counted changes nothing). */
+async function incumbentsFor(db: GameDatabase, scope: AssemblyScope, opensAt: number, electionId: string): Promise<Incumbents> {
+  const prior = await db.prepare("SELECT result_json FROM assembly_elections WHERE (id=? OR id LIKE ?) AND id<>? AND opens_at<? AND result_json IS NOT NULL ORDER BY opens_at DESC LIMIT 1")
+    .bind(scope.id, `${scope.id}-cycle-%`, electionId, opensAt).first<{ result_json: string }>();
+  if (!prior) return assemblyIncumbents;
+  try { return carryIncumbents(JSON.parse(prior.result_json) as AssemblyResult); } catch { return assemblyIncumbents; }
 }
 
-async function counted(db: GameDatabase, scope: AssemblyScope): Promise<AssemblyResult> {
-  const rows = await db.prepare('SELECT district_id,party_id,COUNT(*) AS count FROM assembly_anonymous_ballots WHERE election_id=? AND policy=? GROUP BY district_id,party_id').bind(scope.id, scope.policy).all<{ district_id: string; party_id: string; count: number }>();
+/** Opens the election the clock points at once its time has come and while its 72-hour window is still running. Write paths only. */
+export async function ensureAssemblyElection(db: GameDatabase, scope: AssemblyScope, timing: AssemblyTiming, now: number) {
+  const plan = planAssembly(scope.id, timing, now);
+  if (!plan || now < plan.opensAt || now >= plan.closesAt) return;
+  await db.prepare(`INSERT INTO assembly_elections (id,nation_id,policy,opens_at,closes_at) VALUES (?,'kindle',?,?,?) ON CONFLICT(id) DO NOTHING`).bind(plan.id, scope.policy, plan.opensAt, plan.closesAt).run();
+}
+
+async function counted(db: GameDatabase, scope: AssemblyScope, electionId: string, incumbents: Incumbents): Promise<AssemblyResult> {
+  const rows = await db.prepare('SELECT district_id,party_id,COUNT(*) AS count FROM assembly_anonymous_ballots WHERE election_id=? AND policy=? GROUP BY district_id,party_id').bind(electionId, scope.policy).all<{ district_id: string; party_id: string; count: number }>();
   const byDistrict: Record<string, PartySeats> = {};
   for (const row of rows.results) { (byDistrict[row.district_id] ??= {})[row.party_id] = Number(row.count); }
-  const receipts = await db.prepare('SELECT district_id,COUNT(*) AS count FROM assembly_voter_receipts WHERE election_id=? AND ballot_written=1 AND policy=? GROUP BY district_id').bind(scope.id, scope.policy).all<{ district_id: string; count: number }>();
+  const receipts = await db.prepare('SELECT district_id,COUNT(*) AS count FROM assembly_voter_receipts WHERE election_id=? AND ballot_written=1 AND policy=? GROUP BY district_id').bind(electionId, scope.policy).all<{ district_id: string; count: number }>();
   for (const d of assemblyDistricts) {
     const ballots = Object.values(byDistrict[d.id] ?? {}).reduce((a, b) => a + b, 0), receipt = Number(receipts.results.find(r => r.district_id === d.id)?.count ?? 0);
     if (ballots !== receipt) throw Error('Assembly count could not be confirmed. No result published.');
   }
-  return assemblyResult(byDistrict);
+  return assemblyResult(byDistrict, incumbents);
 }
 
-/** Closes a due election and records its count. Write paths only: the world tick and POST /api/assembly. */
+/** Closes every due election of this scope (oldest first, so seats carry over in order) and records its count. Write paths only: the world tick and POST /api/assembly. */
 export async function finalizeAssembly(db: GameDatabase, scope: AssemblyScope, now: number) {
-  await db.prepare('UPDATE assembly_elections SET closed_at=? WHERE id=? AND closed_at IS NULL AND closes_at<=?').bind(now, scope.id, now).run();
-  const row = await db.prepare('SELECT result_json FROM assembly_elections WHERE id=? AND closed_at IS NOT NULL').bind(scope.id).first<{ result_json: string | null }>();
-  if (row && !row.result_json) await db.prepare('UPDATE assembly_elections SET result_json=? WHERE id=? AND closed_at IS NOT NULL AND result_json IS NULL').bind(JSON.stringify(await counted(db, scope)), scope.id).run();
+  const due = await db.prepare('SELECT id,opens_at FROM assembly_elections WHERE (id=? OR id LIKE ?) AND closes_at<=? AND (closed_at IS NULL OR result_json IS NULL) ORDER BY opens_at,id')
+    .bind(scope.id, `${scope.id}-cycle-%`, now).all<{ id: string; opens_at: number }>();
+  for (const election of due.results) {
+    await db.prepare('UPDATE assembly_elections SET closed_at=? WHERE id=? AND closed_at IS NULL AND closes_at<=?').bind(now, election.id, now).run();
+    const row = await db.prepare('SELECT result_json FROM assembly_elections WHERE id=? AND closed_at IS NOT NULL').bind(election.id).first<{ result_json: string | null }>();
+    if (row && !row.result_json) await db.prepare('UPDATE assembly_elections SET result_json=? WHERE id=? AND closed_at IS NOT NULL AND result_json IS NULL')
+      .bind(JSON.stringify(await counted(db, scope, election.id, await incumbentsFor(db, scope, Number(election.opens_at), election.id))), election.id).run();
+  }
 }
-/** World tick (flag on, gate open): open at the configured time, close and count when due. */
-export async function runKindleAssembly(db: GameDatabase, now: number, config: { scope: AssemblyScope; openAt: number | null }) {
-  await ensureAssemblyElection(db, config.scope, config.openAt, now);
+/** World tick (flag on, gate open): open on the clock, close and count when due. */
+export async function runKindleAssembly(db: GameDatabase, now: number, config: AssemblyTickConfig) {
+  await ensureAssemblyElection(db, config.scope, config, now);
   await finalizeAssembly(db, config.scope, now);
 }
 
 export type AssemblySnapshot = {
   enabled: true; nationId: 'kindle'; id: string; scope: 'tier1' | 'preview-citizen' | null;
-  status: 'waiting' | 'open' | 'closed'; opensAt: number | null; closesAt: number | null;
+  status: 'waiting' | 'open' | 'closed'; opensAt: number | null; closesAt: number | null; nextOpensAt: number | null;
   seats: { perDistrict: number; up: number };
   districts: { id: string; name: string; seatsUp: PartySeats; seatsHeld: PartySeats }[];
   parties: { id: string; name: string; ideology: string; color: string; blurb: string; ai: true }[];
@@ -123,30 +150,40 @@ export type AssemblySnapshot = {
   result: AssemblyResult | null; headlines: ReturnType<typeof assemblyHeadlines>;
 };
 
+function legacyResult(json: string): AssemblyResult | null {
+  try { const parsed = JSON.parse(json) as AssemblyResult; return Array.isArray(parsed?.districts) && parsed.districts.length > 0 && parsed.districts.every(d => !Array.isArray(d.belowThreshold)) ? parsed : null; } catch { return null; }
+}
+
 /** Read-only (GETs write nothing, not even the election row): a due open or close is shown as the write path will record it. */
-export async function readAssembly(db: GameDatabase, userId: string, now: number, scope: AssemblyScope | null, openAt: number | null): Promise<AssemblySnapshot> {
+export async function readAssembly(db: GameDatabase, userId: string, now: number, scope: AssemblyScope | null, timing: AssemblyTiming): Promise<AssemblySnapshot> {
+  const plan: AssemblyPlan | null = scope ? planAssembly(scope.id, timing, now) : null;
+  const incumbents = scope && plan ? await incumbentsFor(db, scope, plan.opensAt, plan.id) : assemblyIncumbents;
+  const nextOpensAt = scope ? nextAssemblyOpen(timing, now) : null;
   const base = {
     enabled: true as const, nationId: 'kindle' as const, scope: scope?.scope ?? null, seats: { perDistrict: assemblySeatsPerDistrict, up: assemblySeatsUp },
-    districts: assemblyDistricts.map(d => ({ id: d.id, name: d.name, seatsUp: assemblyIncumbents[d.id].up, seatsHeld: assemblyIncumbents[d.id].held })),
+    districts: assemblyDistricts.map(d => ({ id: d.id, name: d.name, seatsUp: incumbents[d.id].up, seatsHeld: incumbents[d.id].held })),
     parties: kindleParties.map(p => ({ id: p.id, name: p.name, ideology: p.ideology, color: p.color, blurb: p.blurb, ai: true as const })),
     privacyReady: scope !== null, privacyReason: scope === null ? ballotPrivacyReason : scope.scope === 'preview-citizen' ? 'Account-level preview privacy: operators may correlate submissions.' : '',
   };
   const district = await citizenDistrict(db, userId);
   const yourDistrict = { id: district, name: assemblyDistricts.find(d => d.id === district)!.name };
-  const id = scope?.id ?? assemblyElectionId;
+  const id = plan?.id ?? scope?.id ?? assemblyElectionId;
   const empty = { id, yourDistrict, voted: false, result: null, headlines: [] as ReturnType<typeof assemblyHeadlines> };
-  if (!scope) return { ...base, ...empty, status: 'waiting', opensAt: null, closesAt: null };
-  const election = await db.prepare('SELECT opens_at,closes_at,closed_at,result_json FROM assembly_elections WHERE id=?').bind(scope.id).first<{ opens_at: number; closes_at: number; closed_at: number | null; result_json: string | null }>();
+  if (!scope) return { ...base, ...empty, status: 'waiting', opensAt: null, closesAt: null, nextOpensAt };
+  const election = await db.prepare('SELECT opens_at,closes_at,closed_at,result_json FROM assembly_elections WHERE id=?').bind(id).first<{ opens_at: number; closes_at: number; closed_at: number | null; result_json: string | null }>();
   if (!election) {
-    if (openAt !== null && now >= openAt && now < openAt + assemblyWindowSeconds) return { ...base, ...empty, status: 'open', opensAt: openAt, closesAt: openAt + assemblyWindowSeconds };
-    return { ...base, ...empty, status: 'waiting', opensAt: openAt !== null && openAt > now ? openAt : null, closesAt: null };
+    if (plan && now >= plan.opensAt && now < plan.closesAt) return { ...base, ...empty, status: 'open', opensAt: plan.opensAt, closesAt: plan.closesAt, nextOpensAt };
+    return { ...base, ...empty, status: 'waiting', opensAt: plan && plan.opensAt > now ? plan.opensAt : null, closesAt: null, nextOpensAt };
   }
-  const own = await db.prepare('SELECT ballot_written FROM assembly_voter_receipts WHERE election_id=? AND clerk_user_id=?').bind(scope.id, userId).first<{ ballot_written: number }>();
+  const own = await db.prepare('SELECT ballot_written FROM assembly_voter_receipts WHERE election_id=? AND clerk_user_id=?').bind(id, userId).first<{ ballot_written: number }>();
   const closed = election.closed_at !== null || now >= election.closes_at;
   let result: AssemblyResult | null = null;
   if (closed) {
-    result = await counted(db, scope);
-    if (election.result_json && election.result_json !== JSON.stringify(result)) throw Error('Saved Assembly count does not match the confirmed count.');
+    result = await counted(db, scope, id, incumbents);
+    // A count saved before #351 has no `belowThreshold` (it was made without the 5% share): it stays as published, not recounted under the new rule.
+    const legacy = election.result_json ? legacyResult(election.result_json) : null;
+    if (legacy) result = legacy;
+    else if (election.result_json && election.result_json !== JSON.stringify(result)) throw Error('Saved Assembly count does not match the confirmed count.');
   }
-  return { ...base, ...empty, voted: Number(own?.ballot_written) === 1, status: closed ? 'closed' : 'open', opensAt: election.opens_at, closesAt: election.closes_at, result, headlines: result ? assemblyHeadlines(result) : [] };
+  return { ...base, ...empty, voted: Number(own?.ballot_written) === 1, status: closed ? 'closed' : 'open', opensAt: election.opens_at, closesAt: election.closes_at, nextOpensAt, result, headlines: result ? assemblyHeadlines(result) : [] };
 }
