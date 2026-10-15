@@ -173,8 +173,9 @@ for (const backend of [undefined, 'postgres']) {
   });
 }
 
+// #584: pinned to SQLite: the DROP TABLE below fails on the PGlite fixture, which `npm run test:postgres` (HARIMU_TEST_STORAGE=postgres) would otherwise select.
 test('missing treaty and embargo tables read as no grievance (fail closed), not as an error', async t => {
-  const { limited, r } = await setup(t);
+  const { limited, r } = await setup(t, { backend: 'sqlite' });
   await r.db.prepare('DROP TABLE treaties').run(); await r.db.prepare('DROP TABLE embargoes').run();
   const refused = await limited(); assert.equal(refused.ok, false); assert.equal(refused.reason, 'casus_belli_insufficient');
 });
