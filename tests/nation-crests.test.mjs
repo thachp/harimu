@@ -48,7 +48,7 @@ test('the crest component renders nothing with the flag off, and a named svg wit
 });
 test('the inspector header is the only consumer, every pattern has crest CSS, and the layout stays clipped to the shield',async()=>{
  const shell=await read('app/game-shell.tsx'),css=await read('app/game-shell.css');
- assert.match(shell,/<header className="game-inspector-title">\{!identityLoading && <NationCrest id=\{nation\.id\} size=\{44\} \/>\}/); // not while the identity is still loading (#455)
+ assert.match(shell,/<header className="game-inspector-title">\{identityHold === .none. && !viewedNationHeld && <NationCrest id=\{nation\.id\} size=\{44\} \/>\}/); // not while the identity is loading or the viewed nation is held (#455, #533)
  assert.equal((shell.match(/<NationCrest /g)||[]).length,1);
  for(const mark of Object.values(nationMarks))assert.match(css,new RegExp(`\\.nation-crest\\[data-nation-pattern="${mark.pattern}"\\]`),mark.pattern);
  assert.match(css,/\.nation-crest\{[^}]*clip-path:polygon\(/);
