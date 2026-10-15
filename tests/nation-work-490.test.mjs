@@ -196,14 +196,17 @@ const wageMigration = readFileSync(new URL('../drizzle/0049_nation_wage_ledger.s
 test('migration 0049 on SQLite (mutation check): before it confluence is refused, after it is accepted, old rows are kept exactly, bad nations and hidden faiths are still refused', () => {
   const db = new DatabaseSync(':memory:'); db.exec('PRAGMA foreign_keys=ON');
   db.exec(`CREATE TABLE nations (id TEXT PRIMARY KEY); INSERT INTO nations VALUES ('kindle'),('korund'),('aurelle'),('confluence');
-    CREATE TABLE citizens (clerk_user_id TEXT PRIMARY KEY, nation_id TEXT REFERENCES nations(id)); INSERT INTO citizens VALUES ('u1','kindle'),('u2','korund'),('u3','confluence'),('u4','aurelle');
+    CREATE TABLE citizens (clerk_user_id TEXT PRIMARY KEY, nation_id TEXT REFERENCES nations(id)); INSERT INTO citizens VALUES ('u1','kindle'),('u2','korund'),('u3','confluence'),('u4','aurelle'),('u5','aurelle');
     CREATE TABLE work_shifts (id TEXT PRIMARY KEY);`);
   db.exec(faithMigration);
-  db.exec("INSERT INTO citizen_faith VALUES ('u1','kindle','open-hand',NULL,10,20,'r1'),('u2','korund','unaffiliated','kinward-rite',11,NULL,'r2')");
+  // one existing row per live nation: Kindle, Korund (with a hidden faith) and Aurelle (its state church, a public faith legal there)
+  db.exec("INSERT INTO citizen_faith VALUES ('u1','kindle','open-hand',NULL,10,20,'r1'),('u2','korund','unaffiliated','kinward-rite',11,NULL,'r2'),('u5','aurelle','kinward-rite',NULL,12,NULL,'r0')");
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM citizen_faith').get().n, 3);
   assert.throws(() => db.exec("INSERT INTO citizen_faith VALUES ('u3','confluence','unaffiliated',NULL,1,NULL,'r3')"), /CHECK/, 'before: the literal list refuses it');
   const before = db.prepare('SELECT * FROM citizen_faith ORDER BY user_id').all();
   db.exec(wageMigration); db.exec(wageMigration.replace(/^[\s\S]*?(?=DROP TABLE IF EXISTS citizen_faith_old)/, '')); // and a second run of the rebuild keeps the rows too
-  assert.deepEqual(db.prepare('SELECT * FROM citizen_faith ORDER BY user_id').all(), before, 'rows copied unchanged');
+  assert.deepEqual(db.prepare('SELECT * FROM citizen_faith ORDER BY user_id').all(), before, 'rows copied unchanged (Kindle, Korund and Aurelle)');
+  assert.deepEqual(before.map(x => x.nation_id), ['kindle', 'korund', 'aurelle']);
   db.exec("INSERT INTO citizen_faith VALUES ('u3','confluence','unaffiliated',NULL,1,NULL,'r3')");
   assert.throws(() => db.exec("INSERT INTO citizen_faith VALUES ('u4','atlantis','unaffiliated',NULL,1,NULL,'r4')"), /FOREIGN KEY/);
   assert.throws(() => db.exec("INSERT INTO citizen_faith VALUES ('u4','aurelle','unaffiliated','open-hand',1,NULL,'r5')"), /CHECK/);
@@ -222,11 +225,13 @@ test('migration 0049 on Postgres (PGlite, mutation check): every earlier migrati
   const exec = sql => pg.exec(sql), tryExec = async sql => { try { await pg.exec(sql); return null; } catch (e) { return String(e.message); } };
   const nation = id => `INSERT INTO nations (id,name,short_name,government,economy,currency,religion,capital,population,treasury,stability,color,soft_color,motto,trade_status,position_x,position_y,sort_order) VALUES ('${id}','${id}','${id}','g','e','c','r','cap','1','1',1,'#000','#000','m','open',0,0,1)`;
   for (const id of ['kindle', 'korund', 'aurelle', 'confluence']) await exec(nation(id));
-  for (const [u, n] of [['u1', 'kindle'], ['u2', 'korund'], ['u3', 'confluence']]) await exec(`INSERT INTO citizens (clerk_user_id,nation_id,created_at,updated_at) VALUES ('${u}','${n}','t','t')`);
-  await exec("INSERT INTO citizen_faith VALUES ('u1','kindle','open-hand',NULL,10,20,'r1'),('u2','korund','unaffiliated','kinward-rite',11,NULL,'r2')");
+  for (const [u, n] of [['u1', 'kindle'], ['u2', 'korund'], ['u3', 'confluence'], ['u5', 'aurelle']]) await exec(`INSERT INTO citizens (clerk_user_id,nation_id,created_at,updated_at) VALUES ('${u}','${n}','t','t')`);
+  await exec("INSERT INTO citizen_faith VALUES ('u1','kindle','open-hand',NULL,10,20,'r1'),('u2','korund','unaffiliated','kinward-rite',11,NULL,'r2'),('u5','aurelle','kinward-rite',NULL,12,NULL,'r0')"); // Kindle, Korund (hidden faith) and Aurelle (state church)
+  const rowsBefore = (await pg.query('SELECT * FROM citizen_faith ORDER BY user_id')).rows; assert.equal(rowsBefore.length, 3);
   assert.match(await tryExec("INSERT INTO citizen_faith VALUES ('u3','confluence','unaffiliated',NULL,1,NULL,'r3')"), /citizen_faith_nation_id_check/, 'before: refused by the literal list');
   const file = migrations.find(m => m.number === '0049'); await exec(file.sql);
-  assert.deepEqual((await pg.query('SELECT user_id,nation_id,faith_id,hidden_faith_id,chosen_at,changed_at,request_id FROM citizen_faith ORDER BY user_id')).rows.map(r => `${r.user_id}/${r.nation_id}/${r.faith_id}/${r.hidden_faith_id}/${r.request_id}`), ['u1/kindle/open-hand/null/r1', 'u2/korund/unaffiliated/kinward-rite/r2']);
+  assert.deepEqual((await pg.query('SELECT * FROM citizen_faith ORDER BY user_id')).rows, rowsBefore, 'every column of every existing row is identical');
+  assert.deepEqual(rowsBefore.map(r => `${r.user_id}/${r.nation_id}/${r.faith_id}/${r.hidden_faith_id}/${r.request_id}`), ['u1/kindle/open-hand/null/r1', 'u2/korund/unaffiliated/kinward-rite/r2', 'u5/aurelle/kinward-rite/null/r0']);
   assert.equal(await tryExec("INSERT INTO citizen_faith VALUES ('u3','confluence','unaffiliated',NULL,1,NULL,'r3')"), null);
   assert.match(await tryExec("INSERT INTO citizens (clerk_user_id,nation_id,created_at,updated_at) VALUES ('u4','atlantis','t','t')"), /foreign key|violates/i);
   await exec("INSERT INTO citizens (clerk_user_id,nation_id,created_at,updated_at) VALUES ('u4','kindle','t','t')");
