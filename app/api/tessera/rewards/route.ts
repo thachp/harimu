@@ -27,6 +27,8 @@ export async function POST(request: Request) {
   try { body = await readCommandObject(request, 512); } catch { return privateJson({ error: 'Send a claim command.', reason: 'bad_request' }, 400); }
   const command = parseClaimCommand(body);
   if (!command) return privateJson({ error: 'Send action "claim" with an entryId and a valid requestId.', reason: 'bad_request' }, 400);
-  const result = await claimReward(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), verify);
+  let result: Awaited<ReturnType<typeof claimReward>>;
+  try { result = await claimReward(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), verify); }
+  catch { return privateJson({ error: 'The reward could not be claimed right now. Try again.', reason: 'unavailable' }, 503); } // a database failure is a server error, never a 409
   return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }

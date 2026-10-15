@@ -16,7 +16,34 @@ const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTG
 // Vars production adds, with their required values.
 const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
-const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AURELLE_SUCCESSION_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'] };
+// Feature flags the preview turns on for QA (the preview-flags-on change). Production keeps every one "false". Adding a flag here is a deliberate preview-only decision.
+const previewOnFlags = [
+  'HARIMU_TEST_FAUCET_ENABLED',
+  'HARIMU_LABOR_BUREAU_ENABLED',
+  'HARIMU_GRAY_MARKET_ENABLED',
+  'HARIMU_FAVOR_DECAY_ENABLED',
+  'HARIMU_KINDLE_INCOME_TAX_ENABLED',
+  'HARIMU_ORDER_BOOK_ENABLED',
+  'HARIMU_AURELLE_RISING_ENABLED',
+  'HARIMU_AURELLE_COUP_ENABLED',
+  'HARIMU_AURELLE_CHARTERS_ENABLED',
+  'HARIMU_TRAVEL_ENABLED',
+  'HARIMU_KORUND_PRESIDIUM_ENABLED',
+  'HARIMU_FAITH_ENABLED',
+  'HARIMU_DIPLOMATIC_HALL_ENABLED',
+  'HARIMU_FOUNDING_PERIOD_ENABLED',
+  'HARIMU_WAR_ENABLED',
+  'HARIMU_WAR_WEARINESS_ENABLED',
+  'HARIMU_WAR_DECLARATION_LIMITS_ENABLED',
+  'HARIMU_DIPLOMACY_ENABLED',
+  'HARIMU_EMBARGO_ENABLED',
+  'HARIMU_CROWN_DEBASEMENT_ENABLED',
+  'HARIMU_SPARK_SUPPLY_ENABLED',
+  'HARIMU_LEDGER_RECONCILIATION_ENABLED',
+];
+// Flags that stay "false" in preview on purpose: Decision 111 exchange, QA1's square-purchase objection, the unset-secret (fail-closed) flags, the paid-AI flags, and the PoCs or scaffolding listed in the PR.
+const previewOffFlags = ['HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_AURELLE_SUCCESSION_ENABLED', 'HARIMU_TESSERA_REWARDS_ENABLED', 'HARIMU_AI_NEWS_ENABLED', 'HARIMU_NOTABLES_ENABLED', 'HARIMU_AI_CABINET_RESPONSES_ENABLED', 'HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED', 'HARIMU_AI_DEBATE_ANSWERS_ENABLED', 'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_NATION_WORK_ENABLED', 'HARIMU_CONFLUENCE_ENABLED', 'HARIMU_MERIDIAN_ENABLED', 'HARIMU_ILMAR_ENABLED', 'HARIMU_HOARVALE_ENABLED', 'HARIMU_VARKAND_ENABLED', 'HARIMU_VELDWOOD_ENABLED', 'HARIMU_FULMARA_ENABLED'];
+const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'], ...Object.fromEntries(previewOnFlags.map(name => [name, ['true', 'false']])) };
 // The only non-"false" values production may carry.
 const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
 
@@ -54,6 +81,17 @@ test('vars: same names as preview except the listed differences; every flag fals
   assert.ok(flags(prod).length > 40); for (const flag of flags(prod)) assert.equal(prod.vars[flag], 'false', flag);
   assert.equal(prod.vars.HARIMU_STORAGE_MAINTENANCE, 'false');
   assert.strictEqual(prod.vars.HARIMU_PRODUCTION_STORAGE, 'true', 'exactly "true": TRUE, 1 or "" silently take the old (non-production) path in selectStorageBackend');
+});
+
+test('preview flags: exactly the previewOnFlags are "true", the deliberate exceptions stay "false", and production is "false" for every one', () => {
+  const flags = config => Object.keys(config.vars).filter(n => /_ENABLED$/.test(n));
+  const previewTrue = flags(preview).filter(n => preview.vars[n] === 'true').sort();
+  assert.deepEqual(previewTrue, [...previewOnFlags, 'HARIMU_ACCOUNT_ELECTION_POC_ENABLED'].sort(), 'a new "true" preview flag must be added to previewOnFlags on purpose');
+  for (const name of previewOffFlags) assert.equal(preview.vars[name], 'false', `${name} must stay "false" in preview`);
+  for (const name of [...previewOnFlags, ...previewOffFlags]) assert.equal(prod.vars[name], 'false', `${name} must be "false" in production`);
+  assert.equal(preview.vars.HARIMU_QA_TEST_CITIZENS, 'false'); assert.equal(preview.vars.HARIMU_QA_TEST_CITIZEN_IDS, undefined);
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW, 'true', 'the test faucet needs the preview marker too');
+  for (const name of previewOnFlags) assert.ok(name in preview.vars, name);
 });
 
 test('flag comments copied into wrangler.prod.jsonc equal the preview comments (they cannot drift unnoticed)', () => {
