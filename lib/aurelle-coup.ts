@@ -1,7 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { aurelleScores, readCrown } from './aurelle-rising';
-import { royalFavorColumnBinds, royalFavorSql } from './aurelle';
+import { royalFavorAverageSql, royalFavorColumnBinds } from './aurelle';
 import { boundedName, coupConfig, coupSucceeds, formationOdds, plotForms, plotRuler, plotState, pressureSeconds, roll } from './aurelle-coup-rules';
 import { coupStage, type CoupStage } from './palace-coup-copy';
 import { leaderPersonas } from './leader-personas';
@@ -60,8 +60,7 @@ function gazette(stage: CoupStage, seed: string, names: { leader: string; newLea
 const flatFavorAverageSql = `SELECT AVG(CASE WHEN f > 100 THEN 100 ELSE f END) AS favor FROM (SELECT SUM(favor) AS f FROM aurelle_settlements GROUP BY clerk_user_id) t`;
 /** #585: the average Royal Favor the plot odds read. Flag off (decayAt undefined): the flat query of before, byte for byte. With HARIMU_FAVOR_DECAY_ENABLED on: the average of each
  *  settling citizen's balance by the one shared rule (royalFavorSql in lib/aurelle.ts), so the plot odds and the Favor a citizen sees can never disagree. */
-const decayedFavorAverageSql = (decayAt: number) => `SELECT AVG(f) AS favor FROM (SELECT ${royalFavorSql(decayAt, 'u.clerk_user_id')} AS f FROM (SELECT DISTINCT clerk_user_id FROM aurelle_settlements) u) t`;
-const readFavorAverage = async (db: GameDatabase, decayAt?: number) => Number((await (decayAt === undefined ? db.prepare(flatFavorAverageSql) : db.prepare(decayedFavorAverageSql(decayAt)).bind(...royalFavorColumnBinds(decayAt))).first<{ favor: number | string | null }>())?.favor ?? 0);
+export const readFavorAverage = async (db: GameDatabase, decayAt?: number) => Number((await (decayAt === undefined ? db.prepare(flatFavorAverageSql) : db.prepare(royalFavorAverageSql(decayAt)).bind(...royalFavorColumnBinds(decayAt))).first<{ favor: number | string | null }>())?.favor ?? 0);
 const unresolvedRisingSql = '(SELECT 1 FROM aurelle_risings WHERE resolved_at IS NULL)';
 
 /**
