@@ -8,6 +8,18 @@ import { firstMismatches, isMinorUnit, reconciliationConfig, reconciliationGameD
 const DAY = reconciliationConfig.gameDaySeconds;
 const TOKEN = 'unit-test-admin-token-0123456789';
 
+// Backend-neutral way to let a test write rows that the table checks would refuse (simulated corruption).
+// SQLite: PRAGMA ignore_check_constraints. Postgres (HARIMU_TEST_STORAGE=postgres): drop the CHECK constraints of the named tables for this test's database.
+const onPostgres = process.env.HARIMU_TEST_STORAGE === 'postgres';
+async function allowCorruption(r, tables) {
+  if (!onPostgres) { await r.db.prepare('PRAGMA ignore_check_constraints = ON').run(); return; }
+  for (const table of tables) {
+    const { results } = await r.db.prepare("SELECT conname FROM pg_constraint WHERE contype = 'c' AND conrelid::regclass::text = ?").bind(table).all();
+    for (const { conname } of results) r.db.sqlite.exec(`ALTER TABLE ${table} DROP CONSTRAINT "${conname}"`);
+  }
+  await r.db.prepare('SELECT 1 AS settled').first(); // the queued DDL has run before the next statement
+}
+
 test('pure rules: game day, integer minor units, and the report keeps only the first 10 mismatches', () => {
   assert.equal(DAY, 7200);
   assert.equal(reconciliationGameDay(0, 0), 1); assert.equal(reconciliationGameDay(DAY - 1, 0), 1); assert.equal(reconciliationGameDay(DAY, 0), 2); assert.equal(reconciliationGameDay(5, 100), 1);
@@ -143,8 +155,8 @@ test('a completed gray-market trade (#43): its LN legs are in the LN totals, wit
 
 test('a deliberately corrupted entry or balance is reported with its account id, nothing is corrected, and the log line appears once', async t => {
   const { r, m, epoch, reports } = await setup(t); await seedClean(r);
-  await r.db.prepare('PRAGMA ignore_check_constraints = ON').run(); // simulate corruption that got past the table checks
-  await r.db.prepare("UPDATE shift_settlements SET wage_minor = 812.5 WHERE shift_id = 's-alice'").run();               // non-integer SPK
+  await allowCorruption(r, ['shift_settlements', 'shift_income_tax', 'citizen_economy_events', 'korund_coupon_redemptions', 'aurelle_purchases', 'citizen_tessera_ledger']); // simulate corruption that got past the table checks
+  if (!onPostgres) await r.db.prepare("UPDATE shift_settlements SET wage_minor = 812.5 WHERE shift_id = 's-alice'").run();   // non-integer SPK (SQLite only: a Postgres BIGINT column cannot hold it)
   await r.db.prepare("UPDATE shift_income_tax SET tax_minor = 900 WHERE shift_id = 's-alice'").run();                    // tax over gross
   await r.db.prepare("INSERT INTO citizen_economy_events(id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES ('bad-1','bob','buy','food',1,-50000,1)").run(); // bob goes negative
   await r.db.prepare("UPDATE korund_coupon_redemptions SET price_minor = -200 WHERE id = 'c-1'").run();                  // negative LN entry
@@ -153,9 +165,9 @@ test('a deliberately corrupted entry or balance is reported with its account id,
   const before = await dump(r);
   const spy = []; const original = console.error; console.error = (...args) => spy.push(args.join(' ')); let run;
   try { run = await m.runLedgerReconciliationCron(r.db, epoch + 20, { enabled: true }); } finally { console.error = original; }
-  assert.equal(run.status, 'reported'); assert.ok(run.report.mismatchCount >= 6, String(run.report.mismatchCount));
+  assert.equal(run.status, 'reported'); assert.ok(run.report.mismatchCount >= (onPostgres ? 5 : 6), String(run.report.mismatchCount));
   const hit = (currency, check, account) => run.report.firstMismatches.some(x => x.currency === currency && x.check.startsWith(check) && x.account === account);
-  assert.ok(hit('SPK', 'non_integer:shift_settlements.wage_minor', 'alice'), JSON.stringify(run.report.firstMismatches));
+  if (!onPostgres) assert.ok(hit('SPK', 'non_integer:shift_settlements.wage_minor', 'alice'), JSON.stringify(run.report.firstMismatches));
   assert.ok(hit('SPK', 'tax_over_gross', 'alice')); assert.ok(hit('SPK', 'negative_wallet', 'bob')); assert.ok(hit('LN', 'negative:korund_coupon_redemptions', 'korund1'));
   assert.ok(hit('CRN', 'purchase_not_quantity_times_price', 'aur1')); assert.ok(hit('TSR', 'square_ledger_debit_without_purchase', 'bob'));
   assert.ok(run.report.totals.SPK.mismatches > 0 && run.report.totals.LN.mismatches > 0 && run.report.totals.CRN.mismatches > 0 && run.report.totals.TSR.mismatches > 0);
@@ -166,8 +178,8 @@ test('a deliberately corrupted entry or balance is reported with its account id,
 
 test('wallet drift is caught: a wallet view that disagrees with its entries names every drifting account', async t => {
   const { r, m } = await setup(t); await seedClean(r);
-  await r.db.prepare('DROP VIEW citizen_wallet_balances').run();
-  await r.db.prepare('CREATE VIEW citizen_wallet_balances AS SELECT clerk_user_id, 1 AS balance FROM citizens').run();
+  r.db.sqlite.exec('DROP VIEW citizen_wallet_balances'); r.db.sqlite.exec('CREATE VIEW citizen_wallet_balances AS SELECT clerk_user_id, 1 AS balance FROM citizens'); // raw DDL on both backends
+  await r.db.prepare('SELECT 1 AS settled').first();
   const result = await m.reconcileLedger(r.db);
   const drift = result.mismatches.filter(x => x.check === 'wallet_not_sum_of_entries').map(x => x.account);
   assert.ok(drift.includes('alice') && drift.includes('bob'), JSON.stringify(result.mismatches));
@@ -176,15 +188,18 @@ test('wallet drift is caught: a wallet view that disagrees with its entries name
 
 test('the report keeps only the first 10 mismatching ids while the count stays exact', async t => {
   const { r, m } = await setup(t); await seedClean(r);
-  await r.db.prepare('PRAGMA ignore_check_constraints = ON').run();
-  for (let i = 0; i < 14; i++) await r.db.prepare("INSERT INTO citizen_economy_events(id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,'alice','sell','food',-1,?,1)").bind(`frac-${i}`, 0.5).run();
+  const ids = Array.from({ length: 14 }, (_, i) => `neg-${i}`); // 14 citizens whose wallets end up negative: 14 exact mismatches, and the rows are valid on both backends
+  for (const id of ids) {
+    await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'kindle',?,18,0,'Good standing',?,?)").bind(id, `Citizen ${id}`, iso(Date.now()), iso(Date.now())).run();
+    await r.db.prepare("INSERT INTO citizen_economy_events(id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'buy','food',1,-50000,1)").bind(`neg-${id}`, id).run();
+  }
   const result = await m.reconcileLedger(r.db);
   assert.ok(result.mismatchCount >= 14, String(result.mismatchCount)); assert.equal(result.mismatches.length, 10);
 });
 
 test('idempotent per game day: repeats and racing runs write one report; the next game day writes the next; one log line only', async t => {
   const { r, m, epoch, reports } = await setup(t); await seedClean(r);
-  await r.db.prepare('PRAGMA ignore_check_constraints = ON').run();
+  await allowCorruption(r, ['citizen_economy_events']);
   await r.db.prepare("INSERT INTO citizen_economy_events(id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES ('bad-1','bob','buy','food',1,-50000,1)").run();
   const spy = []; const original = console.error; console.error = (...args) => spy.push(args.join(' '));
   try {
