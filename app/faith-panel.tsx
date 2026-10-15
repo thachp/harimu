@@ -10,6 +10,7 @@ import { faithCopy, korundFaithCopy, unaffiliatedCopy, type FaithId } from '../l
 import { clergyGateHelp } from '../lib/clergy-gate-copy';
 import { ActionButton } from './action-button';
 import { GameTimer } from './game-timer';
+import { AiBadge } from './ai-disclosure';
 
 export type FaithState = Awaited<ReturnType<typeof readFaith>>;
 export type CongregationState = Awaited<ReturnType<typeof readCongregations>>;
@@ -64,6 +65,7 @@ export function useFaith(active: boolean) {
     chooseFaith: (faithId: string) => post('/api/faith', { action: 'choose-faith', faithId }),
     attendWorship: () => post('/api/faith', { action: 'attend-worship' }),
     worshipUnderground: () => post('/api/faith', { action: 'worship-underground' }), // #295
+    appealDuty: () => post('/api/faith', { action: 'appeal-duty' }), // #382 PR B
     requestMission: (hostNation: string) => post('/api/faith', { action: 'request-mission', hostNation }), // #225
     acceptMission: () => post('/api/faith', { action: 'accept-mission' }),
     answerMission: (missionId: string, answer: 'accept' | 'decline') => post('/api/faith', { action: 'answer-mission', missionId, answer }),
@@ -127,6 +129,13 @@ export function FaithPanel({ api, initialPick = null }: { api: FaithApi; initial
       <ActionButton type="button" reason={busy ? 'Saving…' : faith.underground.blockedReason} onClick={() => api.worshipUnderground()}>{faith.underground.label}</ActionButton>
       {faith.underground.lastRaid && <p className="faith-note" role="status">{faith.underground.lastRaid.text} {faith.underground.lastRaid.devotionNote}</p>}
       {faith.underground.quietWeek && <p className="faith-note">{faith.underground.quietWeek}</p>}
+      {faith.underground.duty && <div className="faith-duty" role="status" aria-label={faith.underground.duty.label}>
+        {faith.underground.duty.banner && <p className="faith-note"><strong>{faith.underground.duty.label}</strong> <AiBadge /> {faith.underground.duty.banner}</p>}
+        {faith.underground.duty.daysLeft && <p className="faith-note">{faith.underground.duty.daysLeft}</p>}
+        {faith.underground.duty.lines.map(line => <p key={line} className="faith-note">{line}</p>)}
+        {faith.underground.duty.appeal.statusLine && <p className="faith-note">{faith.underground.duty.appeal.statusLine}</p>}
+        {faith.underground.duty.appeal.available && <><p className="faith-note">{faith.underground.duty.appeal.explainer}</p><ActionButton type="button" reason={busy ? 'Saving…' : null} onClick={() => api.appealDuty()}>Appeal</ActionButton></>}
+      </div>}
       {faith.underground.suspicion && <p className="faith-note faith-suspicion" title={faith.underground.suspicion.tooltip.join(' ')}>{faith.underground.suspicion.line} <small>({faith.underground.suspicion.privateTag})</small></p>}
     </div>}
 

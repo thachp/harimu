@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { hash32, isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionWord, pickIndex, raidAllowed, raidDue, raidId, raidRoll, undergroundConfig as cfg, undergroundGameDay } from '../lib/underground-rules.ts';
+import { appealGranted, deriveDuties, dutyDays, hash32, isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionWord, pickIndex, raidAllowed, raidDue, raidId, raidRoll, undergroundConfig as cfg, undergroundGameDay } from '../lib/underground-rules.ts';
 
 const DAY = 7200, WEEK = 7 * 86400;
 const choose = (r, user, faithId, hiddenFaithId, requestId = randomUUID()) => r.call('faith', user, { action: 'choose-faith', faithId, ...(hiddenFaithId ? { hiddenFaithId } : {}), requestId });
@@ -166,16 +166,16 @@ test('#382: the first inspection shows the first-discovery line and a private Su
   r.setNow(t1 * 1000); await r.db.prepare('UPDATE citizen_worship SET worshipped_at=?').bind(t1 - 100).run();
   assert.deepEqual(await mod.runKorundRaids(r.db, t1), [capital]);
   const first = (await read(r, 'kai')).underground;
-  assert.equal(first.lastRaid.text, 'An inspection found a shrine. Suspicion was recorded.'); assert.equal(first.lastRaid.repeat, false); assert.equal(first.lastRaid.discoveries, 1);
+  assert.equal(first.lastRaid.text, 'An inspection found a shrine. Suspicion was recorded.'); assert.equal(first.lastRaid.repeat, false);
   assert.deepEqual(first.suspicion, { line: 'Suspicion: Low', privateTag: 'Private to you', tooltip: ['State Security keeps a private record. Only you can see it.', 'Each inspection that finds a shrine adds to it. Nobody else sees it.'] });
   assert.doesNotMatch(JSON.stringify(first.suspicion), /\b10\b/, 'the number is never sent');
   r.setNow((t2 - 200) * 1000); await hold(r, 'kay'); assert.equal((await underground(r, 'kay')).status, 200); assert.equal((await underground(r, 'kai')).status, 200);
   r.setNow(t2 * 1000); assert.deepEqual(await mod.runKorundRaids(r.db, t2), [capital]);
   const again = (await read(r, 'kai')).underground;
-  assert.equal(again.lastRaid.text, 'An inspection found a shrine again. Correction Duty may follow, for up to 7 days.'); assert.equal(again.lastRaid.repeat, true); assert.equal(again.lastRaid.discoveries, 2);
+  assert.equal(again.lastRaid.text, 'An inspection found a shrine again. Correction Duty may follow, for up to 7 days.'); assert.equal(again.lastRaid.repeat, true);
   assert.equal(again.suspicion.line, 'Suspicion: Low');
   const newcomer = (await read(r, 'kay')).underground;
-  assert.equal(newcomer.lastRaid.repeat, false); assert.equal(newcomer.lastRaid.discoveries, 1, "another holder's history does not count"); assert.equal(newcomer.suspicion.line, 'Suspicion: Low');
+  assert.equal(newcomer.lastRaid.repeat, false); assert.equal(newcomer.suspicion.line, 'Suspicion: Low', "another holder's history does not count"); assert.equal(newcomer.suspicion.line, 'Suspicion: Low');
   // Re-choosing the faith (chosen_at moves forward) keeps Suspicion: it is keyed to the citizen and counted from stored discoveries.
   await r.db.prepare("UPDATE citizen_faith SET chosen_at=? WHERE user_id='kai'").bind(t2 + 60).run(); r.setNow((t2 + 120) * 1000);
   const rechosen = (await read(r, 'kai')).underground;
@@ -185,7 +185,8 @@ test('#382: the first inspection shows the first-discovery line and a private Su
   r.setNow((t2 + 6 * 86400) * 1000); assert.equal((await read(r, 'kai')).underground.suspicion, null, 'decayed to 0');
   // The news rumor carries none of it.
   const rumor = (await r.call('news', 'kai')).data.items.find(i => i.id === `korund:inspection:${raidId(capital, Math.floor(t2 / DAY))}`);
-  assert.ok(rumor); assert.doesNotMatch(JSON.stringify(rumor), /repeat|discoveries|Correction|Suspicion|kai|kay/);
+  assert.ok(rumor); assert.doesNotMatch(JSON.stringify(rumor), /repeat|Correction|Suspicion|kai|kay/);
+  assert.equal('discoveries' in first.lastRaid, false, 'the exact count is not sent');
 });
 
 test('#382: more discoveries raise the band (Raised, then High) from stored rows, and a GET writes nothing', async t => {
@@ -200,6 +201,68 @@ test('#382: more discoveries raise the band (Raised, then High) from stored rows
   await r.db.prepare('DELETE FROM korund_raid_hits').run(); await r.db.prepare('DELETE FROM korund_raids').run();
   await seed(25, 86400 / 2); // twelve-hour steps: +5 each and no real decay between them
   assert.equal((await read(r, 'kai')).underground.suspicion.line, 'Suspicion: High');
+});
+
+test('#382 PR B pure rules: a repeat starts a 3-day duty (longer by band, 7-day cap), a repeat during it extends it without stacking, and the automatic appeal rule', () => {
+  const D = 86400, t = 5_000_000, days = d => deriveDuties(d).map(x => [x.startAt, x.endsAt, dutyDays(x)]);
+  assert.deepEqual(deriveDuties([]), []); assert.deepEqual(deriveDuties([t]), [], 'a first discovery starts no duty');
+  assert.deepEqual(days([t, t + 14 * D]), [[t + 14 * D, t + 17 * D, 3]], 'a repeat starts the default 3-day duty (Suspicion Low)');
+  assert.deepEqual(days([t, t + 40 * D]), [], 'outside the 30-day repeat window it is a first discovery again');
+  const climb = Array.from({ length: 12 }, (_, i) => t + i * 12 * 3600); // twelve-hour steps: +5 each, no real decay: High after the 11th
+  assert.equal(dutyDays(deriveDuties(climb.slice(0, 2)).at(-1)), 3, 'Low'); assert.equal(deriveDuties(climb).length, 1, 'repeats during an active duty extend it; they never stack');
+  assert.equal(deriveDuties(climb)[0].endsAt - deriveDuties(climb)[0].startAt, 7 * D, 'capped at 7 real days from its start');
+  assert.deepEqual(days([t, t + 14 * D, t + 15 * D]).map(x => x[2]), [6], 'a second repeat 1 day in extends the 3-day duty by 3 more: 6 days from its start, still under the 7-day cap, and still one duty');
+  assert.equal(appealGranted([t, t + 14 * D], t + 14 * D), true, 'no discovery inside the 14 days before the duty began: exactly 14 days earlier is outside');
+  assert.equal(appealGranted([t, t + 14 * D - 1], t + 14 * D - 1), false, 'a discovery 14 days minus a second earlier: denied');
+  assert.equal(cfg.dutyMaxSeconds, 7 * D); assert.deepEqual(cfg.dutyDaysByBand, { none: 3, low: 3, raised: 5, high: 7 }); assert.equal(cfg.dutyDevotionPerDay, 1); assert.equal(cfg.appealWindowSeconds, 14 * D); // pin the [ASSUMPTION] numbers
+});
+
+test('#382 PR B: Correction Duty shows from stored repeat discoveries, costs Devotion only, has one automatic appeal (granted lifts it and the cost), and nobody else can use it', async t => {
+  const { r, mod, nowS } = await setup(t);
+  const D = 86400, id = (suffix, n) => `duty-${suffix}-${n}`;
+  const seed = async (user, agoDays) => { for (const [i, ago] of agoDays.entries()) { const at = nowS() - Math.round(ago * D), rid = id(user, i);
+    await r.db.prepare('INSERT INTO korund_raids (id,city_id,game_day,raided_at) VALUES (?,?,?,?)').bind(rid, 'stonehearth', -5000 - i - user.length * 100 - Math.floor(Math.random() * 1e4), at).run();
+    await r.db.prepare('INSERT INTO korund_raid_hits (raid_id,user_id,game_day,raided_at,devotion_hit) VALUES (?,?,?,?,?)').bind(rid, user, -1, at, 0).run(); } };
+  const appeal = (user, requestId = randomUUID()) => r.call('faith', user, { action: 'appeal-duty', requestId });
+  await hold(r, 'kai'); await hold(r, 'kay'); await hold(r, 'ova'); await citizen(r, 'kim', 'kindle');
+  assert.equal((await read(r, 'kai')).underground.duty, null, 'no discovery, no duty');
+  await seed('kai', [15, 1]); // found 15 days ago and again 1 day ago: a repeat 14 days apart; the duty began 1 day ago, 3 days long
+  const duty = (await read(r, 'kai')).underground.duty;
+  assert.equal(duty.active, true); assert.equal(duty.daysLeft, 'Days left: 2'); assert.equal(duty.banner, 'State Security: you are on Correction Duty.');
+  assert.deepEqual(duty.lines, ['Correction Duty lasts at most 7 real days.', 'You can still play and work while on Correction Duty.']);
+  assert.deepEqual(duty.appeal, { available: true, explainer: 'Correction Duty can be appealed once. The result is decided automatically.', status: null, statusLine: null });
+  assert.doesNotMatch(JSON.stringify(duty), /staff/i, 'the appeal is automatic, not staff');
+  assert.deepEqual(await mod.dutyDevotionEvents(r.db, 'kai'), [{ day: undergroundGameDay(nowS() - D), amount: -3 }], 'Devotion only: 1 per duty day');
+  // Others cannot see or use it.
+  assert.equal((await read(r, 'kay')).underground.duty, null); assert.equal((await appeal('kay')).status, 409);
+  assert.equal((await appeal('kim')).status, 403, 'only Korund hidden-faith holders');
+  // The automatic appeal: no discovery in the 14 days before the one that started the duty, so it is granted, once.
+  const reqId = randomUUID(), done = await appeal('kai', reqId);
+  assert.equal(done.status, 200); assert.equal(done.data.completion, 'Your appeal was decided automatically. Correction Duty is lifted.');
+  assert.equal(done.data.state.underground.duty.active, false); assert.equal(done.data.state.underground.duty.appeal.status, 'granted'); assert.equal(done.data.state.underground.duty.appeal.available, false);
+  assert.deepEqual(await mod.dutyDevotionEvents(r.db, 'kai'), [], 'lifted: no Devotion cost');
+  assert.equal((await appeal('kai', reqId)).data.replay, true, 'a replayed request id is a no-op'); const second = await appeal('kai'); assert.equal(second.status, 409); assert.equal(second.data.reason, 'no_duty', 'a lifted duty cannot be appealed again');
+  assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM korund_duty_appeals WHERE user_id='kai'").first()).n, 1);
+  // A holder found twice within 14 days (moved city): the appeal is denied, the duty stands, and a second appeal is refused.
+  await seed('ova', [6, 2]);
+  assert.equal((await read(r, 'ova')).underground.duty.active, true);
+  const denied = await appeal('ova'); assert.equal(denied.status, 200); assert.equal(denied.data.completion, 'Your appeal was decided automatically. Correction Duty stands.');
+  assert.equal(denied.data.state.underground.duty.active, true); assert.equal(denied.data.state.underground.duty.appeal.available, false);
+  const again = await appeal('ova'); assert.equal(again.status, 409); assert.equal(again.data.reason, 'already_appealed');
+  assert.equal((await mod.dutyDevotionEvents(r.db, 'ova')).length, 1, 'a denied appeal keeps the cost');
+  // The duty ends on its own and the Devotion effect is the only one: no wage, production or market table is touched.
+  r.setNow((nowS() + 5 * D) * 1000); assert.equal((await read(r, 'ova')).underground.duty, null, 'ended');
+  assert.deepEqual(await writesDuring(r, () => read(r, 'ova')), [], 'reading a duty writes nothing');
+});
+
+test('#382 PR B: with the flag off the appeal is refused and nothing is stored; migration 0056 is additive in both copies', async t => {
+  const { r } = await setup(t, { flag: false });
+  assert.equal((await r.call('faith', 'kai', { action: 'appeal-duty', requestId: randomUUID() })).status, 403);
+  for (const dir of ['drizzle', 'db/postgres']) {
+    const sql = await readFile(new URL(`../${dir}/0056_korund_duty_appeals.sql`, import.meta.url), 'utf8');
+    assert.doesNotMatch(sql.replace(/--[^\n]*/g, '').replace(/ON DELETE CASCADE/g, ''), /\b(DROP|ALTER|DELETE|UPDATE|TRUNCATE)\b/i, `${dir} 0056 is additive`);
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS korund_duty_appeals/);
+  }
 });
 
 test('no wage, production, market or combat effect: an inspection writes only its own two tables and Devotion stays social', async t => {
