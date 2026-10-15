@@ -36,12 +36,12 @@ test('re-exports the shared name cap; labels 40, lines 80, with every placeholde
   for (const t of labels()) assert.ok(fill(t).length<=PRIMARY_LABEL_MAX, `${t} (${fill(t).length})`);
   for (const t of lines()) assert.ok(fill(t).length<=PRIMARY_LINE_MAX, `${t} (${fill(t).length})`);
 });
-test('placeholders: only {party} and {district}; {district} only where a district is the point; party only via {party}', () => {
-  assert.deepEqual([...PRIMARY_PLACEHOLDERS],['{party}','{district}']);
+test('placeholders: only {party} (no district, ARC #357); party names only via {party}', () => {
+  assert.deepEqual([...PRIMARY_PLACEHOLDERS],['{party}']);
   const t=all().join(' ');
   for (const m of t.matchAll(/\{[^}]+\}/g)) assert.ok(PRIMARY_PLACEHOLDERS.includes(m[0]), m[0]);
   for (const p of PRIMARY_PLACEHOLDERS) assert.ok(t.includes(p), p);
-  assert.deepEqual(all().filter(x=>x.includes('{district}')),[B.scope.text,R.summary.text]);
+  assert.doesNotMatch(all().join(' '),/\{district\}|district/i);
   for (const p of kindleParties) { assert.ok(!t.includes(p.name), p.name); assert.ok(!t.includes(p.id)); }
   assert.doesNotMatch(M.inOtherParty.text,/\{/); assert.doesNotMatch(B.otherPartyBlock.text,/\{/);
 });
@@ -52,7 +52,7 @@ test('no invented figures: no digits, counts, shares, turnout or winner in the r
 test('Republic Wire Service headline: canon byline, plain wire report, no quotes or AI persona', () => {
   assert.deepEqual(R.byline,kindlePress.byline);
   for (const t of [R.headline,R.summary.text]) { assert.doesNotMatch(t,/["“”]|\bsaid\b|\bsays\b|Be it known|State Media|Gazette/i, t); }
-  assert.ok(R.headline.includes('{party}')); assert.ok(R.summary.text.includes('{party}')&&R.summary.text.includes('{district}'));
+  assert.ok(R.headline.includes('{party}')); assert.ok(R.summary.text.includes('{party}')&&B.scope.text.includes('{party}'));
 });
 test('members only: non-members and other parties are refused with reasons; AI citizens are not named as voters', () => {
   assert.match(B.notMemberBlock.text,/Only \{party\} members/); assert.match(B.otherPartyBlock.text,/your own party's primary/);

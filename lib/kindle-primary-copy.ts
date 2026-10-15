@@ -7,7 +7,7 @@
  * (human citizens join AI parties as members and vote in primaries), MVP Scope Politics row, and the Kindle press voice (#237, Republic
  * Wire Service).
  *
- * Rules: placeholders are only {party} and {district}, pre-formatted strings; party names never appear in the copy (they come only
+ * Rules: the only placeholder is {party}, a pre-formatted string (ARC #357: §9.1 describes one party-wide primary, so no {district}); party names never appear in the copy (they come only
  * from {party}). No figure is written: no vote counts, shares or turnout, and no winner is named in the headline. The count method
  * stays out of the copy, as in #300. One party at a time is a #307 rule, so lines say "one party at a time" without a number
  * anywhere else. No dues, rewards or campaign money. The headline is a plain wire report: no AI persona speaks, so there is no AI
@@ -17,7 +17,7 @@
 
 export { COUP_NAME_MAX as PRIMARY_NAME_MAX } from './palace-coup-copy';
 
-export const PRIMARY_PLACEHOLDERS=['{party}','{district}'] as const;
+export const PRIMARY_PLACEHOLDERS=['{party}'] as const;
 export const PRIMARY_LABEL_MAX=40;
 export const PRIMARY_LINE_MAX=80;
 
@@ -38,10 +38,10 @@ export const partyMembershipCopy={
  proposal:true,
 } as const;
 
-/** Primary ballot chrome. {district} appears only in the scope line. Members only, one ballot each. */
+/** Primary ballot chrome. One party-wide ballot, so no district. Members only, one ballot each. */
 export const primaryBallotCopy={
  title:'Your {party} ballot',
- scope:L('{party} members in {district} rank the hopefuls.'),
+ scope:L('{party} members rank the party\'s hopefuls here.'),
  instructions:L('Put your first choice at the top and your last at the bottom.'),
  submitButton:'Submit ranking',
  submitConfirm:L('Submit your ranking? You cannot change it after.'),
@@ -55,7 +55,7 @@ export const primaryBallotCopy={
 export const primaryResultCopy={
  byline:{name:'Republic Wire Service',proposal:true},
  headline:'{party} has a nominee',
- summary:L('{party}, {district}: the primary is closed.'),
+ summary:L('The {party} primary is closed. Members have made their choice.'),
  aiBadge:false,
  proposal:true,
 } as const;
