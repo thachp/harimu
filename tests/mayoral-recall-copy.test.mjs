@@ -15,7 +15,7 @@ test('shape: ballot chrome, a three-line instant-runoff explainer and the recall
   for (const l of lineObjs()) { assert.equal(l.proposal,true); assert.ok(l.text.length>0); }
   assert.equal(X.lines.length,3);
   assert.equal(new Set(all()).size,all().length);
-  assert.equal(B.submitButton,'Submit ranking'); assert.equal(B.title,'Mayor of {city}'); assert.equal(R.progress,'{signed} of {needed} signatures');
+  assert.equal(B.submitButton,'Cast your ranking'); assert.equal(B.title,'Mayor of {city}'); assert.equal(R.progress,'{signed} of {needed} signatures');
 });
 test('limits: local caps 24 and 6, labels 40, lines 100, with {city} and {name} filled to 24 and the numbers to six characters', () => {
   assert.equal(MAYORAL_NAME_MAX,24); assert.equal(MAYORAL_NUMBER_MAX,6); assert.equal(MAYORAL_LABEL_MAX,40); assert.equal(MAYORAL_LINE_MAX,100);
@@ -75,6 +75,10 @@ test('calm and neutral: no urgency, pressure or blame, no real-world party, pers
   assert.doesNotMatch(t,/\b(Earth|America|Congress|Senate|Parliament|Democrat|Republican|Labour|Tory|London|Washington|Brexit)\b|!/);
   assert.doesNotMatch(t,/endors|Tessera|chain|NFT|token|wallet|Spark|reward|badge|XP|prize/i);
   assert.doesNotMatch(t,/Kindle|Aurelle|Korund|Assembly of|President/);
+});
+test('no string here repeats a string from another lib module, so a screen never shows the same line from two sources', () => {
+  const others=readdirSync('lib').filter(f=>/\.ts$/.test(f)&&f!=='mayoral-recall-copy.ts').map(f=>readFileSync(`lib/${f}`,'utf8')).join('\n');
+  for (const t of all()) assert.ok(!others.includes(`'${t}'`)&&!others.includes(`"${t}"`)&&!others.includes(`\`${t}\``), t);
 });
 test('unwired: nothing in app/, components/ or lib/ imports mayoral-recall-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
