@@ -34,7 +34,7 @@ test('behaviour is identical for all ten ids: nationIsPreview, isLiveNation, ope
   assert.equal(reg.nationOpening('korund').openingFlag, null);
 });
 
-test('wiring: one direction only, the list file stays import-free, gates read it, onboarding order is unchanged, no flag is defined', async t => {
+test('wiring: one direction only, the list file stays import-free, gates read it, onboarding order is unchanged, the opening flags are all off', async t => {
   const { r } = await load(t);
   const onboarding = await r.importModule('lib/onboarding-preferences.ts');
   assert.deepEqual(onboarding.suggestNations({}), ['kindle', 'korund', 'aurelle']);
@@ -46,8 +46,8 @@ test('wiring: one direction only, the list file stays import-free, gates read it
   assert.doesNotMatch(await read('lib/qa-tools.ts'), /qaTestNations/);
   assert.match(await read('lib/onboarding-preferences.ts'), /from '\.\/nation-discovery'/);
   assert.match(await read('app/government-panel.tsx'), /from '@\/lib\/nation-discovery'/);
-  assert.match(await read('app/api/citizen/route.ts'), /if \(!isLiveNation\(nationId\)\) return privateJson\(\{ error: 'Choose kindle/, 'the QA switch reads the shared list');
+  assert.match(await read('app/api/citizen/route.ts'), /if \(!nationPlayable\(nationId, env as never, userId\)\) return privateJson\(\{ error: 'Choose a nation/, 'the QA switch uses nationPlayable');
   assert.match(await read('app/api/world/route.ts'), /populationBands\([^;]*nationIsPreview/s, 'population bands treat exactly the non-live nations as Coming soon, through nationIsPreview');
   for (const file of ['app/government-panel.tsx', 'lib/onboarding-preferences.ts']) assert.doesNotMatch(await read(file), /\['kindle','korund','aurelle'\]/, file);
-  assert.doesNotMatch(await read('wrangler.jsonc'), /HARIMU_(CONFLUENCE|MERIDIAN|ILMAR|HOARVALE|VARKAND|VELDWOOD|FULMARA)_ENABLED/, 'no opening flag is defined yet');
+  assert.equal([...(await read('wrangler.jsonc')).matchAll(/"HARIMU_(CONFLUENCE|MERIDIAN|ILMAR|HOARVALE|VARKAND|VELDWOOD|FULMARA)_ENABLED"\s*:\s*"false"/g)].length, 7, 'the seven opening flags are defined and off (#489)');
 });

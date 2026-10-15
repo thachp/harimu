@@ -1,7 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { electionCandidates, electionId as campaignId } from './elections';
 import { townHallCopy } from './campaign-copy';
-import { rankQuestions, topQuestions, townHallStage, townHallWindowSeconds, validQuestionText, type TownHallStage } from './town-hall-rules';
+import { debateHallCandidateId, rankQuestions, topQuestions, townHallStage, townHallWindowSeconds, validQuestionText, type TownHallStage } from './town-hall-rules';
 export * from './town-hall-rules';
 
 /** #441: Kindle town hall PoC behind HARIMU_TOWN_HALLS_ENABLED (default "false"). Flag off: the route answers 404 before auth and nothing is read or written.
@@ -11,10 +11,8 @@ export * from './town-hall-rules';
 export type TownHallBindings = { HARIMU_TOWN_HALLS_ENABLED?: string; HARIMU_TOWN_HALL_OPEN_AT?: string; NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?: string; HARIMU_ACCOUNT_ELECTION_POC_ENABLED?: string };
 export const townHallsEnabled = (b: TownHallBindings) => b.HARIMU_TOWN_HALLS_ENABLED === 'true';
 /** [ASSUMPTION] No real calendar here (#351 owns it): an operator sets HARIMU_TOWN_HALL_OPEN_AT (epoch seconds) and every candidate's town hall opens then for 24 hours. Unset or invalid: it never opens. */
-export function townHallOpenAt(b: TownHallBindings): number | null {
-  const raw = b.HARIMU_TOWN_HALL_OPEN_AT ?? '';
-  return /^[1-9][0-9]{0,11}$/.test(raw) && Number.isSafeInteger(Number(raw)) ? Number(raw) : null;
-}
+export const epochSeconds = (raw: string | undefined): number | null => /^[1-9][0-9]{0,11}$/.test(raw ?? '') && Number.isSafeInteger(Number(raw)) ? Number(raw) : null;
+export const townHallOpenAt = (b: TownHallBindings): number | null => epochSeconds(b.HARIMU_TOWN_HALL_OPEN_AT);
 export const townHallIdFor = (candidateId: string) => `${campaignId}-town-hall-${candidateId}`;
 const knownCandidate = (id: unknown): id is string => typeof id === 'string' && electionCandidates.some(c => c.id === id);
 export const isTownHallCandidate = knownCandidate;
@@ -59,6 +57,14 @@ export type TownHall = { id: string; candidateId: string; candidateName: string;
 export type TownHallSnapshot = { enabled: true; electionId: string; halls: TownHall[]; ai: { disclosure: string; badge: true } };
 type HallRow = { id: string; candidate_id: string; opens_at: number; closes_at: number };
 
+type QuestionRow = { id: string; body: string; author_id: string; created_at: number; votes: number; mine_vote: number; answer_text: string | null; answered_at: number | null };
+/** One hall's questions with their vote counts, the caller's own vote and (town halls only) the saved answer. Read-only; shared by the town halls and the #282 debate. */
+export async function loadHallQuestions(db: GameDatabase, userId: string, hallId: string): Promise<QuestionRow[]> {
+  return (await db.prepare(`SELECT q.id,q.body,q.author_id,q.created_at,(SELECT COUNT(*) FROM town_hall_votes v WHERE v.question_id=q.id) AS votes,
+ (SELECT COUNT(*) FROM town_hall_votes v WHERE v.question_id=q.id AND v.voter_id=?) AS mine_vote,a.answer_text,a.answered_at
+ FROM town_hall_questions q LEFT JOIN town_hall_answers a ON a.question_id=q.id WHERE q.hall_id=?`).bind(userId, hallId).all<QuestionRow>()).results;
+}
+
 /** Read-only. An unopened hall (no row yet) is projected from the configured open time; no row is created. */
 export async function readTownHalls(db: GameDatabase, userId: string, now: number, openAt: number | null): Promise<TownHallSnapshot> {
   const rows = (await db.prepare('SELECT id,candidate_id,opens_at,closes_at FROM town_halls WHERE election_id=?').bind(campaignId).all<HallRow>()).results;
@@ -69,9 +75,7 @@ export async function readTownHalls(db: GameDatabase, userId: string, now: numbe
     const stage = townHallStage(now, opensAt, closesAt);
     let questions: TownHallQuestion[] = [], asked = false;
     if (row) {
-      const found = (await db.prepare(`SELECT q.id,q.body,q.author_id,q.created_at,(SELECT COUNT(*) FROM town_hall_votes v WHERE v.question_id=q.id) AS votes,
- (SELECT COUNT(*) FROM town_hall_votes v WHERE v.question_id=q.id AND v.voter_id=?) AS mine_vote,a.answer_text,a.answered_at
- FROM town_hall_questions q LEFT JOIN town_hall_answers a ON a.question_id=q.id WHERE q.hall_id=?`).bind(userId, id).all<{ id: string; body: string; author_id: string; created_at: number; votes: number; mine_vote: number; answer_text: string | null; answered_at: number | null }>()).results;
+      const found = await loadHallQuestions(db, userId, id);
       const ranked = rankQuestions(found.map(q => ({ ...q, votes: Number(q.votes), createdAt: Number(q.created_at) })));
       const top = new Set(stage === 'closed' ? topQuestions(ranked).map(q => q.id) : []);
       asked = found.some(q => q.author_id === userId);
@@ -90,39 +94,48 @@ const fail = (status: 400 | 403 | 404 | 409, error: string) => ({ ok: false as c
  *  one question per citizen per hall. The citizen is Kindle-checked by the caller; ids and the hall come from the server, never the request body. */
 export async function askQuestion(db: GameDatabase, userId: string, now: number, openAt: number | null, input: { candidateId: unknown; requestId: string; text: unknown }) {
   if (!knownCandidate(input.candidateId)) return fail(400, 'Pick one of the candidates.');
+  return askInHall(db, userId, now, openAt, { id: townHallIdFor(input.candidateId), candidateId: input.candidateId, noun: 'town hall' }, input);
+}
+/** The one question path, shared by the town halls and the #282 debate (a hall row whose candidate_id is `debateHallCandidateId`): same text rule, same window, same one-question-per-citizen
+ *  and request-id idempotency. `hall` comes from the server, never from the request body. */
+export async function askInHall(db: GameDatabase, userId: string, now: number, openAt: number | null, hall: { id: string; candidateId: string; noun: string }, input: { requestId: string; text: unknown }) {
   if (!validQuestionText(input.text)) return fail(400, 'Keep the question between 10 and 200 characters, as plain text without links.');
-  const id = townHallIdFor(input.candidateId);
+  const id = hall.id;
   const prior = await db.prepare('SELECT hall_id,author_id FROM town_hall_questions WHERE request_id=?').bind(input.requestId).first<{ hall_id: string; author_id: string }>();
   if (prior) return prior.author_id === userId && prior.hall_id === id ? { ok: true as const, alreadyRecorded: true } : fail(409, 'Question receipt already used.');
-  if (openAt === null || townHallStage(now, openAt, openAt + townHallWindowSeconds) !== 'open') return fail(409, 'This town hall is not taking questions.');
-  await db.prepare('INSERT INTO town_halls (id,election_id,candidate_id,opens_at,closes_at) VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING').bind(id, campaignId, input.candidateId, openAt, openAt + townHallWindowSeconds).run();
-  const hall = await db.prepare('SELECT opens_at,closes_at FROM town_halls WHERE id=?').bind(id).first<{ opens_at: number; closes_at: number }>();
-  if (!hall || townHallStage(now, Number(hall.opens_at), Number(hall.closes_at)) !== 'open') return fail(409, 'This town hall is not taking questions.');
+  if (openAt === null || townHallStage(now, openAt, openAt + townHallWindowSeconds) !== 'open') return fail(409, `This ${hall.noun} is not taking questions.`);
+  await db.prepare('INSERT INTO town_halls (id,election_id,candidate_id,opens_at,closes_at) VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING').bind(id, campaignId, hall.candidateId, openAt, openAt + townHallWindowSeconds).run();
+  const row = await db.prepare('SELECT opens_at,closes_at FROM town_halls WHERE id=?').bind(id).first<{ opens_at: number; closes_at: number }>();
+  if (!row || townHallStage(now, Number(row.opens_at), Number(row.closes_at)) !== 'open') return fail(409, `This ${hall.noun} is not taking questions.`);
   const written = await db.prepare('INSERT INTO town_hall_questions (id,hall_id,author_id,request_id,body,created_at) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING').bind(crypto.randomUUID(), id, userId, input.requestId, input.text, now).run();
   if (written.meta.changes !== 1) {
     // Lost a race: if the winner is this same request (a parallel retry), report it as the replay it is; otherwise this citizen already asked here.
     const same = await db.prepare('SELECT hall_id,author_id FROM town_hall_questions WHERE request_id=?').bind(input.requestId).first<{ hall_id: string; author_id: string }>();
     if (same) return same.author_id === userId && same.hall_id === id ? { ok: true as const, alreadyRecorded: true } : fail(409, 'Question receipt already used.');
-    return fail(409, 'You have already asked a question at this town hall.');
+    return fail(409, `You have already asked a question at this ${hall.noun}.`);
   }
   return { ok: true as const, alreadyRecorded: false };
 }
 
 /** Server-side write. One up-vote per citizen per question, never on your own question, only while the hall is open. A repeat (same or new request id) is a no-op that reports the first vote. */
-export async function voteQuestion(db: GameDatabase, userId: string, now: number, input: { questionId: unknown; requestId: string }) {
+export async function voteQuestion(db: GameDatabase, userId: string, now: number, input: { questionId: unknown; requestId: string }, scope: 'town-hall' | 'debate' = 'town-hall') {
+  const noun = scope === 'debate' ? 'debate' : 'town hall';
   if (typeof input.questionId !== 'string' || input.questionId.length > 64) return fail(400, 'Pick a question.');
+  // The scope comes first: a question of the other scope (a debate question through the town hall path, or the reverse) does not exist here, whether this is a first vote, a repeat or a replayed receipt.
+  const home = await db.prepare('SELECT h.candidate_id FROM town_hall_questions q JOIN town_halls h ON h.id=q.hall_id WHERE q.id=?').bind(input.questionId).first<{ candidate_id: string }>();
+  if (home && (home.candidate_id === debateHallCandidateId) !== (scope === 'debate')) return fail(404, 'That question does not exist.');
   const prior = await db.prepare('SELECT question_id,voter_id FROM town_hall_votes WHERE request_id=?').bind(input.requestId).first<{ question_id: string; voter_id: string }>();
   if (prior) return prior.voter_id === userId && prior.question_id === input.questionId ? { ok: true as const, alreadyRecorded: true } : fail(409, 'Vote receipt already used.');
   const written = await db.prepare(`INSERT INTO town_hall_votes (question_id,voter_id,request_id,voted_at)
- SELECT q.id,?,?,? FROM town_hall_questions q JOIN town_halls h ON h.id=q.hall_id WHERE q.id=? AND q.author_id<>? AND h.opens_at<=? AND h.closes_at>? ON CONFLICT DO NOTHING`).bind(userId, input.requestId, now, input.questionId, userId, now, now).run();
+ SELECT q.id,?,?,? FROM town_hall_questions q JOIN town_halls h ON h.id=q.hall_id WHERE q.id=? AND q.author_id<>? AND h.opens_at<=? AND h.closes_at>? AND h.candidate_id${scope === 'debate' ? '=' : '<>'}? ON CONFLICT DO NOTHING`).bind(userId, input.requestId, now, input.questionId, userId, now, now, debateHallCandidateId).run();
   if (written.meta.changes === 1) return { ok: true as const, alreadyRecorded: false };
   const existing = await db.prepare('SELECT 1 AS yes FROM town_hall_votes WHERE question_id=? AND voter_id=?').bind(input.questionId, userId).first<{ yes: number }>();
   if (existing) return { ok: true as const, alreadyRecorded: true };
   // Lost a race on the request id to a different voter or question: say so, not "not taking votes".
   const taken = await db.prepare('SELECT 1 AS yes FROM town_hall_votes WHERE request_id=?').bind(input.requestId).first<{ yes: number }>();
   if (taken) return fail(409, 'Vote receipt already used.');
-  const question = await db.prepare('SELECT author_id FROM town_hall_questions WHERE id=?').bind(input.questionId).first<{ author_id: string }>();
-  if (!question) return fail(404, 'That question does not exist.');
-  return fail(409, question.author_id === userId ? 'You cannot vote for your own question.' : 'This town hall is not taking votes.');
+  const question = await db.prepare('SELECT q.author_id,h.candidate_id FROM town_hall_questions q JOIN town_halls h ON h.id=q.hall_id WHERE q.id=?').bind(input.questionId).first<{ author_id: string; candidate_id: string }>();
+  if (!question || (question.candidate_id === debateHallCandidateId) !== (scope === 'debate')) return fail(404, 'That question does not exist.');
+  return fail(409, question.author_id === userId ? 'You cannot vote for your own question.' : `This ${noun} is not taking votes.`);
 }
 
