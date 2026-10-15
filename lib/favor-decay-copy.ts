@@ -29,7 +29,7 @@ export const favorDecayExplainer={
 } as const;
 
 /** A short tip for the court screen, one line. */
-export const favorDecayTip=L('Royal Favor fades over time. Serve the Crown to earn more.');
+export const favorDecayTip=L('Royal Favor fades over time. Service to the Crown earns more.');
 
 /** The notice shown when the balance went down because of decay. Two variants; {favor} is the new balance. */
 export const favorDecayNotice=[

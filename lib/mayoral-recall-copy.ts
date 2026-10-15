@@ -30,7 +30,7 @@ export const mayoralBallotCopy={
  whoVotes:L('Only verified human citizens can vote in this election.'),
  oneBallot:L('Each verified person gets one ballot.'),
  instructions:L('Rank the candidates in the order you prefer.'),
- submitButton:'Submit ranking',
+ submitButton:'Cast your ranking',
  submitConfirm:L('Submit your ranking for {city}?'),
  submitted:L('Your ranking for {city} is submitted.'),
  notEligible:L('You cannot vote in this election yet.'),
