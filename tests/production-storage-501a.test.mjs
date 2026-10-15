@@ -6,13 +6,13 @@ import { PGlite } from '@electric-sql/pglite';
 import { assertPostgresApplicationRole, assertStorageMarker, freshWorldMarker, importedWorldMarker, selectStorageBackend, storageMarkerIds } from '../lib/storage-selection.ts';
 import { bootstrapEmptyPostgres, checksum, freshWorldManifest, postgresMigrations } from '../scripts/postgres-migrations.mjs';
 
-const production = { backend: 'postgres', implementationEnabled: true, productionStorage: 'true', cutoverReady: 'true', hyperdriveConfigured: true, journalRetentionApproved: true };
+const production = { backend: 'postgres', implementationEnabled: true, productionStorage: 'true', cutoverReady: 'true', hyperdriveConfigured: true };
 const preview = { backend: 'postgres', implementationEnabled: true, developmentPreview: 'true', cutoverReady: 'true', hyperdriveConfigured: true, journalRetentionApproved: true };
 
 test('production path: postgres only, every condition mandatory, none falls back to D1', () => {
   assert.equal(selectStorageBackend(production), 'postgres');
   for (const broken of [{ backend: undefined }, { backend: 'd1' }, { backend: 'unexpected' }, { implementationEnabled: false }, { implementationEnabled: undefined }, { cutoverReady: undefined }, { cutoverReady: 'false' },
-    { hyperdriveConfigured: false }, { journalRetentionApproved: false }, { journalRetentionApproved: undefined }, { developmentPreview: 'true' }, { temporaryAdminApproved: 'true' }, { accountElectionEnabled: true }, { maintenance: 'true' }])
+    { hyperdriveConfigured: false }, { developmentPreview: 'true' }, { temporaryAdminApproved: 'true' }, { accountElectionEnabled: true }, { maintenance: 'true' }])
     assert.throws(() => selectStorageBackend({ ...production, ...broken }), /not approved and ready|paused/, JSON.stringify(broken));
   assert.equal(selectStorageBackend({ ...production, developmentPreview: 'false', temporaryAdminApproved: 'false', accountElectionEnabled: false }), 'postgres');
 });
@@ -56,7 +56,7 @@ test('--fresh-world bootstrap writes fresh-world-v1 bound to the migration manif
   assert.equal(rows.length, 1); assert.equal(rows[0].id, 'fresh-world-v1'); assert.equal(rows[0].validated, 1);
   assert.equal(rows[0].manifest_json, freshWorldManifest(postgresMigrations())); assert.equal(rows[0].backup_sha256, checksum(rows[0].manifest_json));
   assertStorageMarker(rows, true); assert.throws(() => assertStorageMarker(rows, false));
-  assert.equal((await pg.query('SELECT COUNT(*)::int AS n FROM harimu_postgres_write_journal')).rows[0].n, 0);
+  assert.equal((await pg.query("SELECT COUNT(*)::int AS n FROM pg_tables WHERE tablename='harimu_postgres_write_journal'")).rows[0].n, 0, '#501c: production keeps no write journal table');
   assert.match(logs.join('\n'), /fresh-world-v1 written/);
   await assert.rejects(bootstrapEmptyPostgres(adapter(pg), { freshWorld: true }), /refuses: schema public already has/, 'never re-run on a live world');
   await plain.close(); await pg.close();

@@ -7,7 +7,7 @@ import {connectWithRetry} from './readiness';
 export const connectBudgetMillis=3000;
 const connectionTimeoutMillis=connectBudgetMillis;
 /** Hyperdrive owns the pool. Clients are never reused across Worker requests. */
-export function postgresConnection(connectionString:string,journalRetentionApproved:boolean,allowAccountElectionWrites=false){
+export function postgresConnection(connectionString:string,journalRetentionApproved:boolean,allowAccountElectionWrites=false,journal=true){
  return new PostgresDatabase(()=>connectWithRetry(async(timeoutMs)=>{
   const client=new Client({connectionString,connectionTimeoutMillis:timeoutMs,types:{getTypeParser(oid:number,format?:'text'|'binary'){
    if(format!=='binary'&&(oid===20||oid===1700))return (value:string)=>{const number=Number(value);if(!Number.isSafeInteger(number))throw Error('Database integer exceeds safe application range.');return number;};
@@ -15,7 +15,7 @@ export function postgresConnection(connectionString:string,journalRetentionAppro
   }}});
   try{await client.connect();}catch{await client.end().catch(()=>{});throw Error('PostgreSQL connection unavailable.');}
   return {query:async(text:string,values?:unknown[])=>{const result=await client.query(text,values);return {rows:result.rows,rowCount:result.rowCount};},release:async()=>{await client.end();}};
- },{budgetMs:connectBudgetMillis}),{journalRetentionApproved,allowAccountElectionWrites});
+ },{budgetMs:connectBudgetMillis}),{journalRetentionApproved,allowAccountElectionWrites,journal});
 }
 
 /** Narrow additive migration under the already approved preview admin role.

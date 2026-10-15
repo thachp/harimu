@@ -30,8 +30,6 @@
     // #501a: the explicit production storage path (lib/storage-selection.ts): Postgres only, never D1, fails closed. Needs the preview marker and the temporary admin waiver to be absent.
     "HARIMU_PRODUCTION_STORAGE": "true",
     "HARIMU_POSTGRES_CUTOVER_READY": "true",
-    // Required today: lib/postgres/database.ts refuses write transactions without it and records each one in harimu_postgres_write_journal, which grows without bound. GATE before any production go (#501): make the journal optional or pruned in production.
-    "HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED": "true",
     "HARIMU_AI_NEWS_ENABLED": "false",
     "HARIMU_NOTABLES_ENABLED": "false",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
@@ -62,6 +60,8 @@
     "HARIMU_AURELLE_RISING_ENABLED": "false",
     // #281: Aurelle AI palace coup (plot, Power Weight, Crisis Window). Off until QA.
     "HARIMU_AURELLE_COUP_ENABLED": "false",
+    // #531: Aurelle guild charter PoC (request/renew a market-stall charter for Royal Favor). Off: the charter route is a 404 and nothing is written.
+    "HARIMU_AURELLE_CHARTERS_ENABLED": "false",
     // #283: Kindle mid-term Assembly election (D'Hondt per district, 5% district share). Off until QA. #351: the real calendar is driven by the world clock: set HARIMU_KINDLE_CYCLE_START_AT (epoch seconds, start of day 0 of the first 120-day cycle) and the vote opens at day 60 of every cycle for 72 hours. Without it, HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) is a manual one-off open. Neither set: it never opens.
     "HARIMU_KINDLE_ASSEMBLY_ENABLED": "false",
     // #307: Kindle party membership and human primaries. Off until QA. Opening is manual: set HARIMU_PRIMARIES_OPEN_AT (epoch seconds) to open the 72-hour primary.

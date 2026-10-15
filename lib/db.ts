@@ -16,7 +16,7 @@ import {travelSchema} from './travel';
 import {faithSchemas} from './faith';
 import {congregationSchemas} from './congregations';
 import {stabilitySchemas} from './stability';
-import {selectStorageBackend,assertPostgresApplicationRole,assertStorageMarker,storageMarkerIds,postgresRuntimeEnabled} from './storage-selection';
+import {selectStorageBackend,assertPostgresApplicationRole,assertStorageMarker,storageMarkerIds,postgresRuntimeEnabled,productionKeepsWriteJournal} from './storage-selection';
 import type {GameDatabase} from './database-contract';
 import {addressSchemas} from './weekly-addresses';
 import {electionSchemas} from './elections';
@@ -465,7 +465,7 @@ export async function getDatabase():Promise<GameDatabase> {
   const selected=selectStorageBackend({backend:bindings.HARIMU_STORAGE_BACKEND,implementationEnabled:postgresRuntimeEnabled,developmentPreview:bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,maintenance:bindings.HARIMU_STORAGE_MAINTENANCE,cutoverReady:bindings.HARIMU_POSTGRES_CUTOVER_READY,hyperdriveConfigured:Boolean(bindings.HYPERDRIVE),journalRetentionApproved,productionStorage:bindings.HARIMU_PRODUCTION_STORAGE,temporaryAdminApproved:bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED,accountElectionEnabled:accountElectionEnabled(bindings)});
   if(selected==='postgres'){
     const {postgresConnection}=await import('./postgres/driver');
-    const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved,accountElectionEnabled(bindings));
+    const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved,accountElectionEnabled(bindings),bindings.HARIMU_PRODUCTION_STORAGE!=='true'||productionKeepsWriteJournal); // #501c: production keeps no rollback journal (there is no D1 to roll back to)
     const key=await readinessKey(bindings);
     await postgresReady(key,database,bindings);
     return database;
