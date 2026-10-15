@@ -8,7 +8,7 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { mapHeight, mapWidth, mvpNations } from './map-zones';
 import { assaultRefusal, capturableCity, claimSquares, maxCityIdLength, planCapture, recordAssault, siegeCityKey, validSeconds, windowDay, type CityKind, type SquareFact } from './siege';
-import { canResolveCityAssault, isWarNation, requestIdOk, warStatus } from './war-rules';
+import { canResolveCityAssault, defenseWindowConfig, isWarNation, requestIdOk, warStatus } from './war-rules';
 import { defenseStartHours, readDefenseWindows } from './war';
 
 const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
@@ -34,6 +34,8 @@ export async function resolveCityAssault(db: GameDatabase, command: AssaultComma
   if (!enabled) return fail(403, 'disabled', 'War is not open yet.');
   if (!requestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
   if (!validSeconds(now)) return fail(400, 'bad_request', 'The time must be unix seconds.');
+  // #620: a direct caller can pass a missing or non-string id; refuse before the length check would throw a TypeError.
+  if (typeof command.cityId !== 'string') return fail(400, 'bad_request', 'Name the war, the attacking nation and the city.');
   if (command.cityId.length > maxCityIdLength) return fail(409, 'city_id_too_long', 'That city id is too long.');
   if (!isWarNation(command.nation) || (command.cityKind !== 'outpost' && command.cityKind !== 'founded') || !command.cityId || !command.warId) return fail(400, 'bad_request', 'Name the war, the attacking nation and the city.');
   const kind = command.cityKind as CityKind, key = siegeCityKey(kind, command.cityId);
@@ -60,7 +62,10 @@ export async function resolveCityAssault(db: GameDatabase, command: AssaultComma
   if (!existing) await db.prepare('INSERT INTO city_sieges (id,war_id,city_key,city_kind,center_x,center_y,attacker_nation,defender_nation,created_at) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING')
     .bind(siegeId, war.id, key, kind, centre!.x, centre!.y, war.attacker_nation, war.defender_nation, now).run();
   const siege = (await db.prepare(`SELECT ${siegeColumns} FROM city_sieges WHERE war_id=? AND city_key=?`).bind(war.id, key).first<SiegeRow>())!;
-  const days = await progress(db, siege.id), startHour = startHours[war.defender_nation as keyof typeof startHours], step = recordAssault(days, now, startHour);
+  const days = await progress(db, siege.id), startHour = startHours[war.defender_nation as keyof typeof startHours];
+  let step = recordAssault(days, now, startHour);
+  // #620 item 3 [ASSUMPTION]: days stored under an earlier saved window may differ from today's numbering. An assault does not count when an earlier one falls in the SAME real window of the window in force now (re-dated by assaulted_at), so changing the window mid-siege can never speed up a capture. The reverse (one stored number reused across two real windows) is refused by UNIQUE(siege_id, assault_day): it fails safe and the attacker retries in the next window. No migration.
+  if ((step.outcome === 'recorded' || step.outcome === 'captured') && await assaultedInSameWindow(db, siege.id, startHour, now)) step = { ...step, outcome: 'duplicate_day' };
   if (step.outcome === 'duplicate_day') {
     // #577 item 1: simultaneous calls with the same request id replay instead of being refused as a second assault today.
     const same = await replayFor(db, command, key, now);
@@ -132,4 +137,40 @@ async function view(db: GameDatabase, s: SiegeRow): Promise<SiegeView> {
 export async function readSieges(db: GameDatabase, warId: string): Promise<SiegeView[]> {
   const rows = (await db.prepare(`SELECT ${siegeColumns} FROM city_sieges WHERE war_id=? ORDER BY created_at DESC,id LIMIT 50`).bind(warId).all<SiegeRow>().catch(tolerate(isMissingRelation, { results: [] as SiegeRow[] }))).results;
   return Promise.all(rows.map(r => view(db, r)));
+}
+
+/** #620 item 3: true when an assault already recorded for this siege falls in the same real window as `now`, numbering both by the window in force now. */
+async function assaultedInSameWindow(db: GameDatabase, siegeId: string, startHour: number, now: number) {
+  const today = windowDay(startHour, now);
+  return (await db.prepare('SELECT assaulted_at FROM siege_assaults WHERE siege_id=?').bind(siegeId).all<{ assaulted_at: number }>()).results.some(r => windowDay(startHour, Number(r.assaulted_at)) === today);
+}
+
+/** The start (unix seconds) of the next window in which an assault would still count: this window if it is open or still ahead and has no counted assault, else the next day's. */
+export function nextAssaultWindowAt(startHour: number, assaultTimes: readonly number[], now: number): number | null {
+  const today = windowDay(startHour, now);
+  if (Number.isNaN(today)) return null;
+  const counted = assaultTimes.some(at => windowDay(startHour, at) === today), end = (day: number) => day * 86400 + startHour * 3600 + defenseWindowConfig.windowSeconds;
+  const day = counted || now >= end(today) ? today + 1 : today;
+  return day * 86400 + startHour * 3600;
+}
+
+export type SiegeSnapshotItem = SiegeView & { cityKind: CityKind; cityName: string | null; nextWindowAt: number | null };
+/** #620: read-only snapshot of the sieges that are live or captured (sieges of an ended war that never fell are left out), newest first, with the count of assault days and when the next assault could count.
+ *  Served only while HARIMU_WAR_ENABLED is on (readWorldSimulation `war`). One query for the sieges, one for their assaults, one for founded-city names; a database without migration 0050 or 0014 reads as none. */
+export async function readSiegeSnapshot(db: GameDatabase, now: number): Promise<SiegeSnapshotItem[]> {
+  const rows = (await db.prepare(`SELECT ${siegeColumns.split(',').map(c => `s.${c}`).join(',')} FROM city_sieges s JOIN wars w ON w.id=s.war_id WHERE w.ended_at IS NULL OR s.captured_at IS NOT NULL ORDER BY s.created_at DESC,s.id LIMIT 50`).all<SiegeRow>().catch(tolerate(isMissingRelation, { results: [] as SiegeRow[] }))).results;
+  if (!rows.length) return [];
+  const marks = rows.map(() => '?').join(',');
+  const assaults = (await db.prepare(`SELECT siege_id,assault_day,assaulted_at FROM siege_assaults WHERE siege_id IN (${marks})`).bind(...rows.map(r => r.id)).all<{ siege_id: string; assault_day: number; assaulted_at: number }>()).results;
+  const founded = rows.filter(r => r.city_kind === 'founded').map(r => r.city_key.slice('city:'.length));
+  const names = new Map(founded.length ? (await db.prepare(`SELECT id,name FROM world_cities WHERE id IN (${founded.map(() => '?').join(',')})`).bind(...founded).all<{ id: string; name: string }>().catch(tolerate(isMissingRelation, { results: [] as { id: string; name: string }[] }))).results.map(c => [c.id, c.name] as const) : []);
+  const windows = await readDefenseWindows(db), startHours = defenseStartHours(windows);
+  return rows.map(r => {
+    const mine = assaults.filter(a => a.siege_id === r.id), captured = r.captured_at !== null;
+    return {
+      id: r.id, warId: r.war_id, cityKey: r.city_key, attacker: r.attacker_nation, defender: r.defender_nation, days: new Set(mine.map(a => Number(a.assault_day))).size, needed: 2, capturedAt: captured ? Number(r.captured_at) : null,
+      cityKind: r.city_kind, cityName: r.city_kind === 'founded' ? names.get(r.city_key.slice('city:'.length)) ?? null : null,
+      nextWindowAt: captured ? null : nextAssaultWindowAt(startHours[r.defender_nation as keyof typeof startHours], mine.map(a => Number(a.assaulted_at)), now),
+    };
+  });
 }
