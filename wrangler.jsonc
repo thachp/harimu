@@ -87,6 +87,7 @@
     "HARIMU_REALTIME_PRESENCE": "false",
     "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false",
     "NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_CREST": "false",
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"

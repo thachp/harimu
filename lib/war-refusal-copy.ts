@@ -1,6 +1,6 @@
 /** War declaration refusals for the rate limits and the casus belli gate, plus a per-nation mobilization countdown line (issue #461,
  * companion to #350 / #426). Content only: the war routes own declarations and no UI imports this. Canon: harimu-docs
- * trade-diplomacy-sanctions §13.5 (at most 1 new offensive war declaration per nation per 14 real days and at most 2 active offensive wars per
+ * trade-diplomacy-sanctions §13.5 (at most 1 new offensive war declaration per nation per interval of real days, and at most 2 active offensive wars per
  * nation; the rules engine only offers a declaration when a deterministic grievance score passes its threshold, so an AI cannot start a war
  * "because the model felt like it") and territory-cities-warfare §15.3 (a formal declaration with a 48-real-hour mobilization period before
  * any attack). The refusals for the Founding Period, a non-aggression pact and the peace lock already exist in the war copy module, and the
@@ -13,7 +13,7 @@
  * banner caption is a system line (#381 / ui-ux §23.2). {endsAt} and {nextAt} are pre-formatted strings filled at runtime. The refusal
  * keys below are proposed names; the server has no keys for these refusals yet.
  *
- * Rules: figures come only from the docs: 1, 14 and 2 (rate limits) and 48 (mobilization hours), each real; nothing else is written. The
+ * Rules: figures come only from the docs: 1 and 2 (rate limits) and 48 (mobilization hours), each real; nothing else is written. The length of the rate-limit interval is not written: the docs mark it as an assumption, so the line takes it as {days}, a runtime value from the rules. The
  * threshold of the grievance score is not given by the docs and is never named. The placeholders are runtime values capped by the shared name cap,
  * which this module re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts). Limits: labels 40, lines 140 (refusal lines are full
  * sentences, like the existing refusals), countdown captions 80, tested with every placeholder filled to 24 characters. All wording is
@@ -21,12 +21,12 @@
 
 export { COUP_NAME_MAX as REFUSAL_NAME_MAX } from './palace-coup-copy';
 
-export const REFUSAL_PLACEHOLDERS=['{endsAt}','{nextAt}'] as const;
+/** {days}: the rate-limit interval in real days, a runtime value (the docs treat the figure as an assumption, so it is not written into a line). */
+export const REFUSAL_PLACEHOLDERS=['{endsAt}','{nextAt}','{days}'] as const;
 export const REFUSAL_LABEL_MAX=40;
 export const REFUSAL_CAPTION_MAX=80;
 export const REFUSAL_LINE_MAX=140;
-/** The docs' figures (§13.5, §15.3). */
-export const OFFENSIVE_WAR_INTERVAL_DAYS=14;
+/** The docs' figures (§13.5, §15.3); the interval in days is the {days} placeholder, not a constant. */
 export const ACTIVE_OFFENSIVE_WARS_MAX=2;
 export const MOBILIZATION_HOURS=48;
 
@@ -44,7 +44,7 @@ const L=(text:string):Line=>({text,proposal:true});
 /** Refusals, two variants each. Plain system lines: reasons, not threats. */
 export const declarationRefusals:readonly Refusal[]=[
  {key:'rate_limit',label:'Declaration limit',proposal:true,lines:[
-  L('The declaration was not made. A nation may declare at most 1 new offensive war every 14 real days.'),
+  L('The declaration was not made. A nation may declare at most 1 new offensive war every {days} real days.'),
   L('The declaration was not made. This nation declared a war recently. It can declare again on {nextAt}.')]},
  {key:'active_war_cap',label:'War limit reached',proposal:true,lines:[
   L('The declaration was not made. A nation may have at most 2 active offensive wars.'),
