@@ -7,7 +7,7 @@ import { readDevelopmentConfig } from '../scripts/development-config.mjs';
 test('readDevelopmentConfig() parses the real wrangler.jsonc', () => {
   const config = readDevelopmentConfig();
   assert.equal(config.name, 'harimu-preview');
-  assert.equal(config.vars.HARIMU_DIPLOMATIC_HALL_ENABLED, 'false');
+  assert.equal(config.vars.HARIMU_DIPLOMATIC_HALL_ENABLED, 'true');
 });
 
 test('wrangler.jsonc has only full-line // comments: no line carries a trailing comment or a block comment', () => {

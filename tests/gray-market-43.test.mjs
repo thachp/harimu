@@ -75,7 +75,7 @@ test('rumored rate is clamped to the offer rate range, even for trades at the li
   }
 });
 
-test('flag off (shipped default): nothing visible, actions 404, no rows, wrangler says false', async t => {
+test('flag off (code default; the preview wrangler value is "true"): nothing visible, actions 404, no rows', async t => {
   const r = await gray(t, false);
   const plan = await view(r, 'alice');
   assert.equal(plan.gray, undefined); assert.equal(plan.available, true);
@@ -85,7 +85,7 @@ test('flag off (shipped default): nothing visible, actions 404, no rows, wrangle
   for (const table of ['gray_offers', 'gray_trades', 'gray_cash_grants']) assert.equal(await count(r, table), 0, table);
   await shift(r, 'alice'); assert.equal((await view(r, 'alice')).walletMinor, 800, 'Korund work and wallet are untouched');
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_GRAY_MARKET_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_GRAY_MARKET_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['true']);
 });
 
 test('Korund citizens only: a Kindle citizen sees no gray market and is rejected', async t => {
