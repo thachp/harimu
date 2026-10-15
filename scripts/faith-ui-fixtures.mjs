@@ -3,6 +3,8 @@
  *  so these cannot drift. Used by the layout check (npm run test:layout) and the screenshot script. */
 import { faithCopy, unaffiliatedCopy, devotionTier } from '../lib/faith-copy.ts';
 import { worshipCopy } from '../lib/worship-copy.ts';
+import { hostPermissionNotices, invitationCopy, muteCopy, acceptStepLines } from '../lib/missionary-copy.ts';
+import { hostDecision, missionaryConfig, missionaryLabels, missionNations } from '../lib/missionary-rules.ts';
 import { mvpFestivalCopy, festivalStanceCopy } from '../lib/mvp-festival-copy.ts';
 export const kinwardLeaveFavorCost = 10; // lib/faith.ts
 export const kinwardLeaveBlockedReason = balance => `Leaving the Kinward Rite costs ${kinwardLeaveFavorCost} Royal Favor in Aurelle. You have ${balance}. Serve the Crown to earn more.`;
@@ -10,8 +12,30 @@ const publicOptions = { kindle: ['kinward-rite', 'fair-wind-vow', 'open-hand', '
 const label = id => id === 'unaffiliated' ? unaffiliatedCopy.name : faithCopy[id].name;
 const festival = (id, extra) => { const c = mvpFestivalCopy.find(f => f.id === id); return { id, faithId: c.faithId, name: c.name, description: c.description, stance: 'tolerated', stanceLine: null, occurrence: 2, gameDay: 1000, gameYear: 2, dayOfYear: 280, startsAt: '2026-10-14T00:00:00.000Z', endsAt: '2026-10-14T02:00:00.000Z', active: false, publicHoliday: false, banner: null, joined: false, joinBlockedReason: `Only followers of this faith can join ${c.name}.`, ...extra }; };
 
+const nationNames = { kindle: 'Kindle', korund: 'Korund', aurelle: 'Aurelle' };
+const refusal = (home, host, faith) => { const d = hostDecision(home, host, faith); return d.allowed ? null : d.reason === 'host_banned' ? hostPermissionNotices.korund[0].text : d.reason === 'host_private_only' ? hostPermissionNotices.aurelle[0].text : 'A missionary preaches abroad. Pick another nation.'; };
+/** #225: mirrors readMissionary(). mission: null | { status, host }; offer: a faith id a host-city citizen is invited to; here: faith ids of badges in the viewer's city. */
+export function missionaryState({ nation = 'kindle', faith = 'fair-wind-vow', devotion = 34, mission = null, offer = null, here = [], muted = false, notice = null } = {}) {
+  const publicFaith = faith !== 'unaffiliated' ? faith : null;
+  const devotionReason = !publicFaith ? 'Choose a public faith before you can send a missionary.' : devotion < missionaryConfig.minDevotion ? `Reach ${missionaryConfig.minDevotion} Devotion before you can send a missionary abroad. You have ${devotion}.` : null;
+  const at = 1_800_000_000;
+  const m = mission && { id: 'mission-fixture', faithId: faith, faithName: label(faith), hostNation: mission.host, hostName: nationNames[mission.host], status: mission.status, statusText: missionaryLabels.statusText(mission.status, nationNames[mission.host]),
+    requestedAt: at, expiresAt: at + 86400, arrivesAt: mission.status === 'invited' ? null : at + 600, endsAt: mission.status === 'invited' ? null : at + 600 + 3 * 7200, travelSeconds: 600 };
+  const card = offer && invitationCopy[offer];
+  return {
+    minDevotion: missionaryConfig.minDevotion, presenceGameDays: missionaryConfig.presenceGameDays, mission: m,
+    request: { blockedReason: m ? 'You already have a mission. Finish it before you start another.' : devotionReason,
+      hosts: missionNations.filter(n => n !== nation).map(host => { const reason = publicFaith ? refusal(nation, host, publicFaith) : null; return { nationId: host, name: nationNames[host], allowed: reason === null, reason }; }) },
+    here: here.map((id, i) => ({ missionId: `mission-here-${i}`, faithId: id, faithName: label(id), until: at + 3600, line: missionaryLabels.here(label(id)) })),
+    offer: card ? { missionId: 'mission-offer', faithId: offer, faithName: label(offer), pitch: card.pitch, body: card.body, buttons: { ...card.buttons }, warnings: acceptStepLines(nation, publicFaith, offer).map(l => l.text) } : null,
+    notice, muted,
+    labels: { heading: missionaryLabels.heading, intro: missionaryLabels.intro, setOut: missionaryLabels.setOut, send: Object.fromEntries(missionNations.map(n => [n, missionaryLabels.send(nationNames[n])])) },
+    mute: { label: muteCopy.label.text, muted: muteCopy.muted.text, unmuted: muteCopy.unmuted.text },
+  };
+}
+
 /** nation: kindle|aurelle|korund. Options: faith, devotion, chosen, worshippedToday, locked (cooldown), holiday (oath-day in Aurelle), festival (a joinable banner). */
-export function faithState({ nation = 'kindle', faith = nation === 'aurelle' ? 'kinward-rite' : nation === 'korund' ? 'unaffiliated' : 'fair-wind-vow', devotion = 34, chosen = true, worshippedToday = false, locked = false, holiday = false, festivalBanner = false, royalFavor = 14 } = {}) {
+export function faithState({ nation = 'kindle', faith = nation === 'aurelle' ? 'kinward-rite' : nation === 'korund' ? 'unaffiliated' : 'fair-wind-vow', devotion = 34, chosen = true, missionary: missionaryOptions = {}, worshippedToday = false, locked = false, holiday = false, festivalBanner = false, royalFavor = 14 } = {}) {
   const leaving = nation === 'aurelle' && faith === 'kinward-rite'; // lib/faith.ts leavesKinward
   const w = faith !== 'unaffiliated' ? worshipCopy[faith] : null;
   const festivals = [];
@@ -32,6 +56,7 @@ export function faithState({ nation = 'kindle', faith = nation === 'aurelle' ? '
     leaveCost: leaving ? kinwardLeaveFavorCost : null, royalFavor: leaving ? royalFavor : null,
     leaveBlockedReason: leaving && royalFavor < kinwardLeaveFavorCost ? kinwardLeaveBlockedReason(royalFavor) : null,
     underground: null, // #295: only a Korund hidden-faith holder gets this block
+    missionary: missionaryState({ nation, faith, devotion, ...missionaryOptions }), // #225 (the live read is null only when the flag is off or the nation is unsupported)
   };
 }
 

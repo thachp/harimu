@@ -7,13 +7,13 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { loadApp } from './helpers/component-module.mjs';
-import { faithState, congregationState } from '../scripts/faith-ui-fixtures.mjs';
+import { faithState, congregationState, missionaryState } from '../scripts/faith-ui-fixtures.mjs';
 import { faithCopy, korundFaithCopy, unaffiliatedCopy } from '../lib/faith-copy.ts';
 import { worshipCopy } from '../lib/worship-copy.ts';
 
 const { FaithPanel, HolidayBanner } = await loadApp('faith-panel');
 const noop = () => {};
-const api = (faith, congregations = null, extra = {}) => ({ faith, congregations, busy: false, message: '', error: '', chooseFaith: noop, attendWorship: noop, worshipUnderground: noop, joinFestival: noop, congregation: noop, ...extra });
+const api = (faith, congregations = null, extra = {}) => ({ faith, congregations, busy: false, message: '', error: '', chooseFaith: noop, attendWorship: noop, worshipUnderground: noop, joinFestival: noop, congregation: noop, requestMission: noop, acceptMission: noop, answerMission: noop, muteMissionaries: noop, ...extra });
 const text = html => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&apos;/g, "'").replace(/\s+/g, ' ');
 const daySec = 7200, year = 360;
 async function runtime(t) { const r = await localRuntime(); t.after(() => r.close()); r.setFaith(true); return r; }
@@ -46,6 +46,10 @@ test('layout fixtures have the same shape as the live /api/faith and /api/congre
   assert.equal(live.holiday.name, fx.holiday.name); assert.equal(live.holiday.line, fx.holiday.line);
   const kor = (await r.call('faith', 'kai')).data, kfx = faithState({ nation: 'korund' });
   assert.deepEqual(keys(kfx), keys(kor)); assert.deepEqual(kfx.options.public.map(o => o.id), kor.options.public.map(o => o.id)); assert.equal(kor.worship, null);
+  assert.deepEqual(keys(kfx.missionary), keys(kor.missionary)); assert.deepEqual(keys(fx.missionary.labels), keys(live.missionary.labels)); assert.deepEqual(keys(fx.missionary.request), keys(live.missionary.request));
+  assert.deepEqual(keys(fx.missionary.request.hosts[0]), keys(live.missionary.request.hosts[0])); assert.deepEqual(keys(fx.missionary.mute), keys(live.missionary.mute));
+  assert.deepEqual(fx.missionary.request.hosts.map(h => [h.nationId, h.allowed, h.reason]), live.missionary.request.hosts.map(h => [h.nationId, h.allowed, h.reason]), 'fixture host stances match the server');
+  assert.deepEqual(kfx.missionary.labels, kor.missionary.labels);
   const cong = (await r.call('congregations', 'ava')).data, cfx = congregationState({ nation: 'aurelle', faith: 'kinward-rite' });
   assert.deepEqual(keys(cfx), keys(cong)); assert.deepEqual(keys(cfx.you), keys(cong.you)); assert.deepEqual(keys(cfx.congregations[0]), keys(cong.congregations[0]));
   assert.equal(cfx.congregations.length, cong.congregations.length);
@@ -170,4 +174,21 @@ test('#295 Korund hidden-faith holder: a quiet private button and the inspection
   const done = renderToStaticMarkup(React.createElement(FaithPanel, { api: api({ ...faithState({ nation: 'korund' }), underground: { ...underground, lastRaid: null, worshippedToday: true, blockedReason: 'You have already worshipped today. Try again tomorrow.' } }) }));
   assert.match(done, /<button[^>]*disabled=""[^>]*>Worship quietly/); assert.ok(text(done).includes('You have already worshipped today. Try again tomorrow.'));
   assert.ok(!renderToStaticMarkup(React.createElement(FaithPanel, { api: api(faithState({ nation: 'korund' })) })).includes('Worship quietly'), 'no underground block for a citizen without a hidden faith');
+});
+
+test('#225 missionary block: server strings only, request/accept/answer/mute call the API, the badge never names anyone', () => {
+  const calls = [];
+  const spy = Object.fromEntries(['requestMission', 'acceptMission', 'answerMission', 'muteMissionaries'].map(n => [n, (...args) => calls.push([n, ...args])]));
+  const render = (missionary, nation = 'kindle', faith = 'fair-wind-vow', devotion = 45) => renderToStaticMarkup(React.createElement(FaithPanel, { api: api(faithState({ nation, faith, devotion, missionary }), null, spy) }));
+  const idle = text(render({}));
+  assert.match(idle, /Missionaries/); assert.match(idle, /Send a missionary to Aurelle/); assert.match(idle, /Send a missionary to Korund/); assert.ok(!idle.includes('Send a missionary to Kindle'), 'no button for your own nation');
+  const low = render({}, 'kindle', 'fair-wind-vow', 20); assert.match(low, /Reach 40 Devotion[^<]*You have 20/);
+  const invited = text(render({ mission: { status: 'invited', host: 'aurelle' } })); assert.match(invited, /Accept the invitation and set out/); assert.match(invited, /Invitation lapses/);
+  const away = text(render({ mission: { status: 'traveling', host: 'aurelle' } })); assert.match(away, /on the way to Aurelle/); assert.doesNotMatch(away, /Send a missionary to/);
+  assert.match(text(render({ mission: { status: 'present', host: 'aurelle' } })), /preaching in Aurelle/);
+  const guest = text(render({ here: ['kinward-rite'], offer: 'kinward-rite' }, 'aurelle', 'unaffiliated', 0));
+  assert.match(guest, /A missionary of Kinward Rite is in your city\./); assert.match(guest, /invites you/); assert.match(guest, /Accept/); assert.match(guest, /Not now/); assert.match(guest, /Mute missionaries/);
+  assert.match(text(render({ notice: 'No new invitation until 2026-11-01. You may be invited then.' })), /No new invitation until 2026-11-01/);
+  assert.match(text(render({ muted: true })), new RegExp(missionaryState({ muted: true }).mute.muted.slice(0, 20)));
+  const api2 = faithState({ missionary: {} }).missionary; assert.equal(api2.here.length, 0);
 });
