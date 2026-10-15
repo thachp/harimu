@@ -10,7 +10,12 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 const { WalletPanel } = await loadApp('wallet-panel');
 const claim = async () => null;
 const forbidden = /buy|bought|sell|purchase|exchange|swap|convert|cash|withdraw|price|worth|\$|kindle/i; // ARC's words plus Kindle (a reward is never linked to Kindle currency)
-const sectionText = (html) => { const start = html.indexOf('<section class="wallet-rewards"'); assert.ok(start >= 0, 'rewards section rendered'); return html.slice(start, html.indexOf('</section>', start)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '); };
+const sectionText = (html) => { // the visible text plus every aria-label, title, alt and placeholder value of the section
+  const start = html.indexOf('<section class="wallet-rewards"'); assert.ok(start >= 0, 'rewards section rendered');
+  const markup = html.slice(start, html.indexOf('</section>', start));
+  const attributes = [...markup.matchAll(/\s(?:aria-label|aria-describedby|title|alt|placeholder)="([^"]*)"/g)].map(match => match[1]);
+  return `${markup.replace(/<[^>]+>/g, ' ')} ${attributes.join(' ')}`.replace(/\s+/g, ' ');
+};
 const rewards = { claimableMinor: 50, claimedMinor: 25, claimableCount: 2, claimedCount: 1,
   claimable: [{ entryId: 'trw-20000-aaa', epochDay: 20000, amountMinor: 25 }, { entryId: 'trw-20001-bbb', epochDay: 20001, amountMinor: 25 }],
   history: [{ entryId: 'trw-19999-ccc', epochDay: 19999, amountMinor: 25, claimedAt: '2026-10-15T00:00:00.000Z' }], claim };
@@ -50,6 +55,16 @@ test('the copy guard catches wording injected into the section (so it is a real 
   }
 });
 
+test('the copy guard also reads attribute text (aria-label, title)', () => {
+  const html = render({ rewards });
+  assert.match(sectionText(html), /Claim 0\.25 TSR for shift work/, 'the accessible name is scanned');
+  for (const bad of ['aria-label="Buy Tessera"', 'title="Cash out"', 'aria-label="Exchange for Spark"']) {
+    const mutated = html.replace('<section class="wallet-rewards"', `<section class="wallet-rewards" ${bad}`);
+    assert.match(sectionText(mutated), forbidden, bad);
+  }
+  assert.doesNotMatch(sectionText(html), forbidden);
+});
+
 test('no purchase, exchange or cash-out control: the only button in the section is the claim button', () => {
   const html = render({ rewards });
   const section = html.slice(html.indexOf('<section class="wallet-rewards"'), html.indexOf('</section>', html.indexOf('<section class="wallet-rewards"')));
@@ -72,6 +87,9 @@ test('wiring: the page asks the flag-gated route only while the wallet is open, 
   const page = await read('app/page.tsx');
   assert.match(page, /fetch\('\/api\/tessera\/rewards'\)/); assert.match(page, /rewards=\{rewardsView \? \{ \.\.\.rewardsView, claim: claimReward \} : undefined\}/);
   assert.match(page, /action: 'claim', entryId, requestId: crypto\.randomUUID\(\)/);
+  assert.match(page, /setEconomy\(null\); setRewardsView\(null\); setMarket\(null\);.*setWorkShifts\(\[\]\);/, 'the session-change reset clears the reward view (no previous-account flash)');
+  assert.match(page, /const view = await fetchRewards\(\); if \(view\) setRewardsView\(view\);/, 'a null post-claim refetch keeps the previous view');
+  assert.doesNotMatch(page, /setRewardsView\(await fetchRewards\(\)\)/, 'the post-claim refetch never writes a null view over the section');
   for (const file of ['app/wallet-panel.tsx', 'lib/tessera-rewards.ts', 'lib/tessera-rewards-rules.ts', 'app/api/tessera/rewards/route.ts']) assert.doesNotMatch(await read(file), /tessera-exchange|buy-tessera/, file);
   const panel = await read('app/wallet-panel.tsx'), kiosk = panel.slice(panel.indexOf('function WalletRewardKiosk'), panel.indexOf('export function WalletPanel'));
   assert.doesNotMatch(kiosk, /onBuyTessera|kiosk-text|sparkMinor/);
