@@ -19,26 +19,31 @@ export const aurelleSchemas=[
 export const royalFavorSchemas=[
  `CREATE TABLE IF NOT EXISTS aurelle_favor_spends(request_id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,amount INTEGER NOT NULL CHECK(amount>0),reason TEXT NOT NULL CHECK(reason IN ('leave-kinward')),spent_at INTEGER NOT NULL)`,
 ] as const;
-/** #529: the one Royal Favor rule. Favor is earned at settlement (aurelle_settlements.favor), capped at 100, and spent (aurelle_favor_spends); no balance is stored.
+/** #529 and #585: the one Royal Favor rule. Favor is earned at settlement (aurelle_settlements.favor), capped at 100, and spent (aurelle_favor_spends); no balance is stored.
  *  With the decay flag off (decayAt undefined) the rule is exactly the pre-#529 one. With HARIMU_FAVOR_DECAY_ENABLED on, decayAt is the current time in seconds and each
- *  settled Favor point fades linearly to nothing over favorDecaySeconds: earned = SUM(favor x max(0, window - age)) / window, truncated to a whole number, then capped at
- *  100, then spends are subtracted at face value and the result is floored at 0, so a spend can never take the decayed balance below zero. Read-time only: no cron, no write.
- *  [ASSUMPTION, for ARC to rule] the window is 14 real days; the docs only say Favor "decays over time". New service restores the balance because it is new, undecayed Favor. */
+ *  settled Favor point fades linearly to nothing over favorDecaySeconds (ARC accepted 14 real days on #567). All of it is scaled by the window W so there is one truncation:
+ *  earned = SUM(favor x max(0, W - age)); a spend counts only against Favor earned before it (ARC on #585: earn 20, spend 10, wait 14 days, earn 10 reads 10, not 0), so each
+ *  spend is charged MIN(amount x W, the faded Favor earned at or before its spent_at); balance = trunc(max(0, min(100 x W, earned) - charged) / W). Read-time only: no cron, no write.
+ *  A spend still can never take the balance below zero. Fresh spends (made while their Favor has not faded) cost their full amount, exactly as the flat rule. */
 export const favorCap=100;
 export const favorDecaySeconds=14*86400;
-const favorSpent='COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=?),0)';
-const favorEarnedFlat='COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0)';
-// the cutoff (decayAt - window) is bound twice and decayAt once; MIN(settled_at,decayAt) keeps a future-dated row from counting for more than its Favor
-const favorEarnedDecayed=`CAST(COALESCE((SELECT SUM(favor*(CASE WHEN settled_at>? THEN MIN(settled_at,?)-? ELSE 0 END)) FROM aurelle_settlements WHERE clerk_user_id=?),0)/${favorDecaySeconds} AS INTEGER)`;
-/** SQL for the spendable Favor of one citizen and its binds, in order (see royalFavorBinds). */
-export const royalFavorSql=(decayAt?:number)=>`MAX(0,MIN(${favorCap},${decayAt===undefined?favorEarnedFlat:favorEarnedDecayed})-${favorSpent})`;
-export const royalFavorBinds=(userId:string,decayAt?:number):unknown[]=>decayAt===undefined?[userId,userId]:[decayAt-favorDecaySeconds,decayAt,decayAt-favorDecaySeconds,userId,userId];
+const fadedFavor=(table:string)=>`SUM(${table}favor*(CASE WHEN ${table}settled_at>? THEN MIN(${table}settled_at,?)-? ELSE 0 END))`; // binds: cutoff, decayAt, cutoff
+const favorSpentFlat=(user:string)=>`COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=${user}),0)`;
+const favorEarnedFlat=(user:string)=>`COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=${user}),0)`;
+const favorEarnedDecayed=(user:string)=>`COALESCE((SELECT ${fadedFavor('')} FROM aurelle_settlements WHERE clerk_user_id=${user}),0)`;
+const favorChargedDecayed=(user:string)=>`COALESCE((SELECT SUM(MIN(s.amount*${favorDecaySeconds},COALESCE((SELECT ${fadedFavor('r.')} FROM aurelle_settlements r WHERE r.clerk_user_id=s.clerk_user_id AND r.settled_at<=s.spent_at),0))) FROM aurelle_favor_spends s WHERE s.clerk_user_id=${user}),0)`;
+/** SQL for the spendable Favor of one citizen and its binds, in order (see royalFavorBinds). `user` is `?` (the default) or a column of an outer query (then no user bind). */
+export const royalFavorSql=(decayAt?:number,user='?')=>decayAt===undefined?`MAX(0,MIN(${favorCap},${favorEarnedFlat(user)})-${favorSpentFlat(user)})`:`CAST(MAX(0,MIN(${favorCap*favorDecaySeconds},${favorEarnedDecayed(user)})-${favorChargedDecayed(user)})/${favorDecaySeconds} AS INTEGER)`;
+const fadeBinds=(decayAt:number)=>[decayAt-favorDecaySeconds,decayAt,decayAt-favorDecaySeconds];
+export const royalFavorBinds=(userId:string,decayAt?:number):unknown[]=>decayAt===undefined?[userId,userId]:[...fadeBinds(decayAt),userId,...fadeBinds(decayAt),userId];
+/** The binds of royalFavorSql(decayAt, column): the two fade windows and no user. */
+export const royalFavorColumnBinds=(decayAt:number):unknown[]=>[...fadeBinds(decayAt),...fadeBinds(decayAt)];
 /** Flag off: the SQL the balance has always used (the first `?` twice: earned, spent). Kept as a constant for the guarded leave-kinward spend. */
 export const royalFavorBalanceSql=royalFavorSql();
 /** Spendable Royal Favor; decayAt (seconds) applies the #529 decay. A database without migration 0028 yet has nothing spent, but nothing can be spent either (see faith.ts). */
 export async function royalFavorBalance(db:GameDatabase,userId:string,decayAt?:number):Promise<number>{
  try{const row=await db.prepare(`SELECT ${royalFavorSql(decayAt)} AS favor`).bind(...royalFavorBinds(userId,decayAt)).first<{favor:number}>();return Number(row?.favor??0);}
- catch(error){if(!/no such table|does not exist|42P01/i.test(String((error as {code?:string})?.code??'')+' '+String((error as Error)?.message??error)))throw error;/* only a missing aurelle_favor_spends falls back: any other failure must not read as a balance (inline: tests/aurelle.test.py loads this file without a resolver, so no ./db-errors import) */const row=decayAt===undefined?await db.prepare('SELECT MIN(100,COALESCE(SUM(favor),0)) AS favor FROM aurelle_settlements WHERE clerk_user_id=?').bind(userId).first<{favor:number}>():await db.prepare(`SELECT MIN(${favorCap},${favorEarnedDecayed}) AS favor`).bind(...royalFavorBinds(userId,decayAt).slice(0,4)).first<{favor:number}>();return Number(row?.favor??0);}
+ catch(error){if(!/no such table|does not exist|42P01/i.test(String((error as {code?:string})?.code??'')+' '+String((error as Error)?.message??error)))throw error;/* only a missing aurelle_favor_spends falls back: any other failure must not read as a balance (inline: tests/aurelle.test.py loads this file without a resolver, so no ./db-errors import) */const row=decayAt===undefined?await db.prepare('SELECT MIN(100,COALESCE(SUM(favor),0)) AS favor FROM aurelle_settlements WHERE clerk_user_id=?').bind(userId).first<{favor:number}>():await db.prepare(`SELECT CAST(MIN(${favorCap*favorDecaySeconds},${favorEarnedDecayed('?')})/${favorDecaySeconds} AS INTEGER) AS favor`).bind(...fadeBinds(decayAt),userId).first<{favor:number}>();return Number(row?.favor??0);}
 }
 const publicFood=`initial_food+COALESCE((SELECT SUM(food_output) FROM aurelle_settlements),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_purchases),0)`;
 const publicFunds=`initial_minor+COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements),0)`;

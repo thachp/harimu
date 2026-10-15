@@ -34,7 +34,7 @@ test('static: the flag ships "false"; one decay constant and one rule used by re
   assert.equal(royalFavorBalanceSql, "MAX(0,MIN(100,COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0))-COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=?),0))");
   assert.equal(royalFavorSql(), royalFavorBalanceSql); assert.deepEqual(royalFavorBinds('u'), ['u', 'u']);
   assert.equal(favorDecaySeconds, 14 * 86400); assert.equal(favorCap, 100);
-  assert.match(royalFavorSql(1_000_000), new RegExp(`/${favorDecaySeconds} AS INTEGER`)); assert.deepEqual(royalFavorBinds('u', 1_000_000), [1_000_000 - favorDecaySeconds, 1_000_000, 1_000_000 - favorDecaySeconds, 'u', 'u']);
+  assert.match(royalFavorSql(1_000_000), new RegExp(`/${favorDecaySeconds} AS INTEGER`)); { const w = [1_000_000 - favorDecaySeconds, 1_000_000, 1_000_000 - favorDecaySeconds]; assert.deepEqual(royalFavorBinds('u', 1_000_000), [...w, 'u', ...w, 'u']); }
   const strip = f => readFile(new URL(f, import.meta.url), 'utf8').then(x => x.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, ''));
   const aurelle = await strip('../lib/aurelle.ts'), faithSrc = await strip('../lib/faith.ts');
   const readPlan = aurelle.slice(aurelle.indexOf('export async function readAurelle'), aurelle.indexOf('export async function executeAurelle'));
