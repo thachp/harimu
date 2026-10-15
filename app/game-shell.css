@@ -268,3 +268,9 @@ body:has(.harimu-game){overflow:auto}
 .shift-quality-actions button:focus-visible{outline:2px solid #f7d080;outline-offset:2px}
 .shift-quality-actions button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:480px){.shift-quality-actions button,.shift-quality-actions button.shift-quality-cancel{flex:1 1 100%}}
+
+/* #78 nation emblem in the top bar (behind NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM): a small outlined glyph in the nation's accent next to its name. */
+.nation-emblem{display:inline-grid;place-items:center;flex:none;width:calc(20px * var(--text-scale, 1));height:calc(20px * var(--text-scale, 1));margin-right:6px;border:1px solid #738b88;border-radius:3px;color:#c8d7c4;font:600 calc(13px * var(--text-scale, 1))/1 system-ui,sans-serif;letter-spacing:0;vertical-align:middle}
+.game-identity span:has(>.nation-emblem){display:flex;align-items:center;flex-wrap:wrap}
+.game-identity .nation-emblem{font-size:calc(13px * var(--text-scale, 1));overflow:visible;max-width:none;white-space:nowrap;text-overflow:clip}
+@media(max-width:420px){.game-identity span:has(>.nation-emblem){max-width:calc(110px + 28px * var(--text-scale, 1))}}
