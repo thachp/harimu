@@ -52,3 +52,45 @@ test('#73 model-written headlines carry the AI-generated label the News panel us
   assert.doesNotMatch(news.items[2].detail, /AI-generated/);
   assert.equal(headlineDetail({}), 'Read in the news feed');
 });
+
+// #413: nation-aware food and shift lines. Kindle's wording is unchanged.
+const needsOf = (input) => morningBriefSections({ capacity: 12, now, food: 2, ...input }).find(x => x.id === 'needs').items;
+const detail = (items, id) => items.find(i => i.id === id).detail;
+const finished = { title: 'Brigade shift', endsAt: now / 1000 - 1 }, underway = { title: 'Brigade shift', endsAt: now / 1000 + 600 };
+test('#413 Kindle keeps the market and work board wording', () => {
+  for (const input of [{}, { nationId: 'kindle' }, { nationId: 'kindle', marketOpen: true }]) {
+    assert.equal(detail(needsOf(input), 'food'), 'Household food · buy or eat at the market');
+    assert.equal(needsOf(input).find(i => i.id === 'food').target, 'market');
+    assert.equal(detail(needsOf({ ...input, shift: finished }), 'shift'), 'Shift finished · collect at the work board');
+    assert.equal(detail(needsOf({ ...input, shift: underway }), 'shift'), 'Shift underway');
+    assert.equal(detail(needsOf(input), 'shift'), 'Choose a shift at the work board');
+  }
+});
+test('#413 Kindle with the market flag off no longer sends the citizen to a market', () => {
+  const food = needsOf({ nationId: 'kindle', marketOpen: false }).find(i => i.id === 'food');
+  assert.doesNotMatch(food.detail, /market/i); assert.equal(food.target, 'square');
+});
+test('#413 Korund brief names the State store, ration coupons, brigade and Labor Notes, never the market or work board', () => {
+  const lines = [needsOf({ nationId: 'korund' }), needsOf({ nationId: 'korund', shift: finished }), needsOf({ nationId: 'korund', shift: underway })].flat();
+  assert.equal(detail(needsOf({ nationId: 'korund' }), 'food'), 'Household food · redeem ration coupons at the State store');
+  assert.equal(needsOf({ nationId: 'korund' }).find(i => i.id === 'food').target, 'market', 'the State store lives on the market tab');
+  assert.match(detail(needsOf({ nationId: 'korund' }), 'shift'), /brigade/);
+  assert.match(detail(needsOf({ nationId: 'korund', shift: finished }), 'shift'), /Labor Notes/);
+  assert.match(detail(needsOf({ nationId: 'korund', shift: underway }), 'shift'), /underway/);
+  for (const item of lines) assert.doesNotMatch(item.detail, /at the market|work board/i);
+  assert.equal(needsOf({ nationId: 'korund', marketOpen: false }).find(i => i.id === 'food').target, 'market', 'Korund keeps its State store when the flag is off');
+});
+test('#413 Aurelle brief names the chartered food counter, service and Crowns, never the market or work board', () => {
+  const lines = [needsOf({ nationId: 'aurelle' }), needsOf({ nationId: 'aurelle', shift: finished }), needsOf({ nationId: 'aurelle', shift: underway })].flat();
+  assert.equal(detail(needsOf({ nationId: 'aurelle' }), 'food'), 'Household food · buy at the chartered food counter');
+  assert.equal(needsOf({ nationId: 'aurelle' }).find(i => i.id === 'food').target, 'market', 'the chartered counter lives on the market tab');
+  assert.match(detail(needsOf({ nationId: 'aurelle' }), 'shift'), /royal estate service/);
+  assert.match(detail(needsOf({ nationId: 'aurelle', shift: finished }), 'shift'), /Crowns/);
+  for (const item of lines) assert.doesNotMatch(item.detail, /at the market|work board/i);
+  assert.equal(needsOf({ nationId: 'aurelle', marketOpen: false }).find(i => i.id === 'food').target, 'market');
+});
+test('#413 page.tsx passes the citizen nation and market visibility to the brief', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /morningBriefSections\(\{[^}]*nationId: citizenNation\.id, marketOpen: marketShown/);
+});
