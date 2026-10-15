@@ -3,8 +3,8 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { activeNonAggressionPact } from './diplomacy'; // #402
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
-import { cleanLabel, declarationBlock, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
-  type DeclarationBlock, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
+import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, grievanceConfig, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
+  type DeclarationBlock, type DeclarationLimitBlock, type GrievanceInputs, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
 export * from './war-rules';
 
 /** #309: formal war declarations behind HARIMU_WAR_ENABLED (default "false"). Canon: harimu-docs 15.3, 15.4, 13.2 (see lib/war-rules.ts).
@@ -83,8 +83,37 @@ async function pactInForce(check: NonNullable<DeclareWarOptions['nonAggression']
   try { return (await check(db, a, b, now)) === true; } catch (error) { if (isMissingRelation(error)) return false; throw error; }
 }
 
+/** #426: the grievance inputs the stores can answer today, read-only. A database without a table reads as 0 for that input (fail closed: nothing invented).
+ *  Border incidents and Commons disputes have no store yet, so they are always 0 / false. A pact or trade treaty counts when the TARGET broke it (treaties.broken_by);
+ *  an embargo counts while the target's embargo against the attacker is in force. [ASSUMPTION] Broken treaties carry no age limit (ARC gave a window only for border incidents).
+ *  The ruling's "(or vice-versa while we still hold a grievance)" for the pact is not scored: it is ambiguous, so only the target's break counts (question on the PR). */
+export async function readGrievanceInputs(db: GameDatabase, attacker: WarNationId, defender: WarNationId): Promise<GrievanceInputs> {
+  const broken = async (kind: 'non-aggression' | 'trade') => Boolean(await db.prepare("SELECT 1 AS found FROM treaties WHERE pair_key=? AND kind=? AND status='broken' AND broken_by=? LIMIT 1")
+    .bind(pairKey(attacker, defender), kind, defender).first().catch(tolerate(isMissingRelation, null)));
+  const embargo = Boolean(await db.prepare("SELECT 1 AS found FROM embargoes WHERE actor_nation=? AND target_nation=? AND status='in_force' LIMIT 1")
+    .bind(defender, attacker).first().catch(tolerate(isMissingRelation, null)));
+  return { napBrokenByTarget: await broken('non-aggression'), embargoAgainstUs: embargo, tradeTreatyBrokenByTarget: await broken('trade'), borderIncidents: 0, openCommonsDispute: false };
+}
+/** #426: player-facing refusal lines. Same sentences as the proposed second variants in Content's declaration refusal copy module (it is deliberately kept unwired, so it is
+ *  not imported here); Content can move these into the copy module and wire them later. Only the docs' figures: 2 active offensive wars; the interval appears as a date. */
+const limitLines: Record<DeclarationLimitBlock, string> = {
+  rate_limit_declarations: 'The declaration was not made. This nation declared a war recently. It can declare again on {nextAt}.',
+  rate_limit_active_wars: 'The declaration was not made. This nation already has 2 active offensive wars. An active war has to end first.',
+  no_casus_belli: 'The declaration was not made. A declaration is offered only when real grievances warrant it.',
+};
+const limitText = (block: DeclarationLimitBlock, lastDeclaredAt: number | null) =>
+  fillWarText(limitLines[block], { nextAt: lastDeclaredAt === null ? '' : new Date(declarationNextAt(lastDeclaredAt) * 1000).toISOString().slice(0, 10) });
+/** #426: the declaration rate limits and the casus belli gate. Read-only; null when the declaration may go ahead. */
+async function declarationLimit(db: GameDatabase, attacker: WarNationId, defender: WarNationId, now: number) {
+  const last = await db.prepare('SELECT MAX(declared_at) AS last FROM wars WHERE attacker_nation=?').bind(attacker).first<{ last: number | null }>();
+  const open = await db.prepare('SELECT COUNT(*) AS n FROM wars WHERE attacker_nation=? AND ended_at IS NULL').bind(attacker).first<{ n: number }>();
+  const lastDeclaredAt = last?.last == null ? null : Number(last.last);
+  const block = declarationLimitBlock({ now, lastDeclaredAt, activeOffensiveWars: Number(open?.n ?? 0), grievance: grievanceScore(await readGrievanceInputs(db, attacker, defender)) });
+  return block ? fail(409, block, limitText(block, lastDeclaredAt)) : null;
+}
+
 export type DeclareWarCommand = { attacker: string; defender: string; casusBelli?: string; declaredBy: string; requestId: string };
-export type DeclareWarOptions = { enabled: boolean; shardStartedAt?: number | null; nonAggression?: (db: GameDatabase, a: WarNationId, b: WarNationId, now: number) => Promise<boolean> | boolean };
+export type DeclareWarOptions = { enabled: boolean; limits?: boolean; shardStartedAt?: number | null; nonAggression?: (db: GameDatabase, a: WarNationId, b: WarNationId, now: number) => Promise<boolean> | boolean };
 const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 const blockedText: Record<DeclarationBlock, (defender: string) => string> = {
   founding_period: () => blockedDeclaration.foundingPeriod.text,
@@ -111,13 +140,19 @@ export async function declareWar(db: GameDatabase, command: DeclareWarCommand, n
   const lastPeace = await db.prepare("SELECT MAX(ended_at) AS ended_at FROM wars WHERE pair_key=? AND end_kind='treaty'").bind(pair).first<{ ended_at: number | null }>();
   const block = declarationBlock({ now, shardStartedAt: started, nonAggression, lastTreatyEndedAt: lastPeace?.ended_at == null ? null : Number(lastPeace.ended_at) });
   if (block) return fail(409, block, blockedText[block](warNationNames[command.defender]));
+  if (options.limits) { const limited = await declarationLimit(db, command.attacker, command.defender, now); if (limited) return limited; }
   const id = `war-${command.requestId}`;
   // The unique open-war-per-pair index and the request id make concurrent declarations safe: only one insert can land.
   await db.prepare(`INSERT INTO wars (id,request_id,pair_key,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at)
-    SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM wars WHERE pair_key=? AND ended_at IS NULL) ON CONFLICT DO NOTHING`)
-    .bind(id, command.requestId, pair, command.attacker, command.defender, casusBelli, declaredBy, now, mobilizationEnd(now), pair).run();
+    SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM wars WHERE pair_key=? AND ended_at IS NULL)${options.limits
+      ? ' AND NOT EXISTS (SELECT 1 FROM wars WHERE attacker_nation=? AND declared_at>?) AND (SELECT COUNT(*) FROM wars WHERE attacker_nation=? AND ended_at IS NULL)<?' : ''} ON CONFLICT DO NOTHING`)
+    .bind(id, command.requestId, pair, command.attacker, command.defender, casusBelli, declaredBy, now, mobilizationEnd(now), pair,
+      ...(options.limits ? [command.attacker, now - declarationLimits.intervalSeconds, command.attacker, declarationLimits.activeOffensiveMax] : [])).run();
   const saved = await db.prepare(`SELECT ${columns} FROM wars WHERE request_id=?`).bind(command.requestId).first<Row>();
-  return saved ? { ok: true as const, war: publicWar(saved, now) } : fail(409, 'war_exists', 'These nations are already at war.');
+  if (saved) return { ok: true as const, war: publicWar(saved, now) };
+  // A concurrent declaration may have used the allowance between the check and the insert: say which limit it was.
+  if (options.limits) { const limited = await declarationLimit(db, command.attacker, command.defender, now); if (limited) return limited; }
+  return fail(409, 'war_exists', 'These nations are already at war.');
 }
 
 /** Test or admin path: ends an unfinished war. `treaty` (ceasefire or peace) starts the 10-day declaration lock; `other` does not [ASSUMPTION]. */
