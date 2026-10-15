@@ -33,7 +33,7 @@ export const PEACE_EVENTS:readonly PeaceEvent[]=['signed','ceasefireBroken'];
 const L=(text:string):Line=>({text,proposal:true});
 const P=(text:string,aiBadge=false):PressLine=>({text,aiBadge,proposal:true});
 
-/** Private UI: offer, answer and result lines, nation-neutral. */
+/** Private UI: offer, answer and result lines, nation-neutral. The Offer, Accept and Decline labels and prompts are for the AI negotiator's actions, not a citizen control (MVP negotiators are all AI, §13.1). */
 export const peaceOffer={
  offerButton:'Offer peace',
  acceptButton:'Accept',
