@@ -136,6 +136,20 @@ test(`#441 ${backend}: intake: one question per citizen per hall, replay is a no
   r.setNow((c.open + DAY) * 1000); assert.equal((await c.ask('carol', Q(6))).status, 409, 'closed at exactly 24 hours');
 });
 
+test(`#441 ${backend}: parallel retries: the same request id is one question and one vote with the replays reported as such; a receipt shared by two citizens says so`, async t => {
+  const c = await setup(t); const { r } = c; for (const u of ['carol', 'dave', 'erin']) await c.citizen(u);
+  r.setNow((c.open + 5) * 1000);
+  const id = randomUUID(); const asks = await Promise.all([1, 2, 3, 4].map(() => c.ask('alice', Q(0), { requestId: id })));
+  assert.deepEqual(asks.map(x => x.status), [200, 200, 200, 200], JSON.stringify(asks.map(x => x.data.error))); assert.equal(asks.filter(x => x.data.alreadyRecorded === false).length, 1, 'exactly one writer'); assert.equal(await c.count('town_hall_questions'), 1); assert.equal(await c.count('town_halls'), 1);
+  const other = await Promise.all([1, 2, 3].map(() => c.ask('bob', Q(1)))); assert.equal(other.filter(x => x.status === 200).length, 1, 'different request ids, same citizen: one question'); assert.ok(other.filter(x => x.status !== 200).every(x => x.status === 409 && /already asked/.test(x.data.error)));
+  const bobQuestion = (await c.hall('alice')).questions.find(q => q.text === Q(1)).id; const qid = (await c.hall('bob')).questions.find(q => q.mine).id;
+  const rid = randomUUID(); const votes = await Promise.all([1, 2, 3, 4].map(() => c.vote('carol', qid, { requestId: rid })));
+  assert.deepEqual(votes.map(x => x.status), [200, 200, 200, 200]); assert.equal(votes.filter(x => x.data.alreadyRecorded === false).length, 1); assert.equal(await c.count('town_hall_votes'), 1);
+  const shared = randomUUID(); const two = await Promise.all([c.vote('dave', qid, { requestId: shared }), c.vote('erin', qid, { requestId: shared })]);
+  assert.deepEqual(two.map(x => x.status).sort(), [200, 409]); const loser = two.find(x => x.status === 409); assert.match(loser.data.error, /receipt already used/i); assert.doesNotMatch(loser.data.error, /not taking votes/); assert.equal(await c.count('town_hall_votes'), 2);
+  assert.ok(bobQuestion);
+});
+
 test(`#441 ${backend}: only verified Kindle humans take part; a preview-off caller needs Tier 1`, async t => {
   const c = await setup(t, { preview: false }); const { r } = c;
   r.setNow((c.open + 5) * 1000);

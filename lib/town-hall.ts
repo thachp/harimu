@@ -99,7 +99,12 @@ export async function askQuestion(db: GameDatabase, userId: string, now: number,
   const hall = await db.prepare('SELECT opens_at,closes_at FROM town_halls WHERE id=?').bind(id).first<{ opens_at: number; closes_at: number }>();
   if (!hall || townHallStage(now, Number(hall.opens_at), Number(hall.closes_at)) !== 'open') return fail(409, 'This town hall is not taking questions.');
   const written = await db.prepare('INSERT INTO town_hall_questions (id,hall_id,author_id,request_id,body,created_at) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING').bind(crypto.randomUUID(), id, userId, input.requestId, input.text, now).run();
-  if (written.meta.changes !== 1) return fail(409, 'You have already asked a question at this town hall.');
+  if (written.meta.changes !== 1) {
+    // Lost a race: if the winner is this same request (a parallel retry), report it as the replay it is; otherwise this citizen already asked here.
+    const same = await db.prepare('SELECT hall_id,author_id FROM town_hall_questions WHERE request_id=?').bind(input.requestId).first<{ hall_id: string; author_id: string }>();
+    if (same) return same.author_id === userId && same.hall_id === id ? { ok: true as const, alreadyRecorded: true } : fail(409, 'Question receipt already used.');
+    return fail(409, 'You have already asked a question at this town hall.');
+  }
   return { ok: true as const, alreadyRecorded: false };
 }
 
@@ -113,6 +118,9 @@ export async function voteQuestion(db: GameDatabase, userId: string, now: number
   if (written.meta.changes === 1) return { ok: true as const, alreadyRecorded: false };
   const existing = await db.prepare('SELECT 1 AS yes FROM town_hall_votes WHERE question_id=? AND voter_id=?').bind(input.questionId, userId).first<{ yes: number }>();
   if (existing) return { ok: true as const, alreadyRecorded: true };
+  // Lost a race on the request id to a different voter or question: say so, not "not taking votes".
+  const taken = await db.prepare('SELECT 1 AS yes FROM town_hall_votes WHERE request_id=?').bind(input.requestId).first<{ yes: number }>();
+  if (taken) return fail(409, 'Vote receipt already used.');
   const question = await db.prepare('SELECT author_id FROM town_hall_questions WHERE id=?').bind(input.questionId).first<{ author_id: string }>();
   if (!question) return fail(404, 'That question does not exist.');
   return fail(409, question.author_id === userId ? 'You cannot vote for your own question.' : 'This town hall is not taking votes.');
