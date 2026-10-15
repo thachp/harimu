@@ -83,7 +83,7 @@ test('Kindle voice only: plain words, no Korund or Aurelle market, no gray marke
   assert.doesNotMatch(t,/\b(Earth|America|Europe|China|Russia|Wall Street|NYSE|Nasdaq|bitcoin|crypto|dollar|euro|stock)\b|Notable|@/i);
   assert.doesNotMatch(t,/\b(shares?|equity)\b/i);
 });
-test('unwired: nothing in app/ or components/ imports market-board-copy', () => {
+test('wired only into the market board (#200): nothing else in app/ or components/ imports market-board-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/market-board-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/market-board.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/market-board-copy/, f);
 });

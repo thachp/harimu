@@ -47,6 +47,7 @@
     "HARIMU_KORUND_PRESIDIUM_ENABLED": "false",
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
     "HARIMU_FAITH_ENABLED": "false",
+    "HARIMU_WAR_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

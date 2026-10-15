@@ -11,10 +11,12 @@ import { nextDailyAction } from './daily-loop-choice';
 
 type Job = { id: string; name: string; cost: number; detail: string };
 export function DailyLoop({ nationName, supported, localDemo, view, economy, market, shifts, capacity,
-  jobs, busy, uncertain, onNavigate, onStart, onClaim, onBuyFood, onMeal, onRefresh }: {
+  jobs, busy, uncertain, marketOpen = true, onNavigate, onStart, onClaim, onBuyFood, onMeal, onRefresh }: {
   nationName: string; supported: boolean; localDemo: boolean; view: SceneView;
   economy: Economy | null; market: MarketState | null; shifts: WorkShift[]; capacity: number;
   jobs: Job[]; busy: boolean; uncertain: boolean;
+  /** #344: false while the market flag is off: no Market prompts or navigation; the food step buys in place instead. */
+  marketOpen?: boolean;
   onNavigate: (view: SceneView) => void; onStart: (id: string) => void; onClaim: (id: string) => void;
   onBuyFood: (quantity: number) => void; onMeal: () => void; onRefresh: () => void;
 }) {
@@ -47,7 +49,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
   if (supported && economy) {
     if ((nextAction === 'collect' || nextAction === 'waiting') && active) {
       title = readyToCollect ? 'Your wages and goods are ready' : `${active.orderName} is underway`;
-      detail = readyToCollect ? 'Collect the agreed reward once, then take your earnings to market.'
+      detail = readyToCollect ? (marketOpen ? 'Collect the agreed reward once, then take your earnings to market.' : 'Collect the agreed reward once.')
         : now ? `About ${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remain. Your shift continues while you are away.` : 'Checking the shift timer…';
       label = readyToCollect && view === 'workplace' ? 'Collect wages and goods' : 'Open work board';
       action = readyToCollect && view === 'workplace' ? () => onClaim(active.id) : () => onNavigate('workplace');
@@ -59,8 +61,9 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
     } else if (nextAction === 'buy') {
       title = 'Use your earnings for household food';
       detail = `${food} food owned; a meal needs ${mealFood}. ${quantity} food costs ${((quote!.buyMinor * quantity) / 100).toFixed(2)} SPK at the starter merchant.`;
-      label = view === 'market' ? `Buy ${quantity} food` : 'Open food market';
-      action = view === 'market' ? () => onBuyFood(quantity) : () => onNavigate('market');
+      const buyHere = view === 'market' || !marketOpen; // flag off: buy in place from any view, same trade checks server-side
+      label = buyHere ? `Buy ${quantity} food` : 'Open food market';
+      action = buyHere ? () => onBuyFood(quantity) : () => onNavigate('market');
     } else if (nextAction === 'meal') {
       title = 'Feed your household and recover';
       detail = `${mealFood} food restores up to ${market!.mealCapacity} WC. Your current capacity is ${capacity} / 24.`;

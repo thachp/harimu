@@ -10,6 +10,7 @@ import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/li
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
 import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket, shiftAnswerKey } from '@/lib/shift-quality-key';
+import { marketFlagOn } from '@/lib/market-visibility';
 import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
@@ -113,7 +114,7 @@ export async function GET(request: Request) {
   // verified-human visit are written by the write paths (POST); here they are projected so players see the same values.
   const database = await getDatabase();
   const readNow = Math.floor(Date.now() / 1000);
-  const simulation = await readWorldSimulation(database, readNow);
+  const simulation = await readWorldSimulation(database, readNow, { war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true' });
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   const [capacity, starterFood] = await Promise.all([readCapacityProjection(database, userId, readNow, interval), pendingStarterFood(database, userId)]);
   const [profile, plan, itemResult, decision, politicalAction] = await Promise.all([
@@ -152,6 +153,7 @@ export async function GET(request: Request) {
     collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
     korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
     firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
+    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED) }, // #344: the UI hides Market entry points while this is false
     simulation,
     verification,
     economy: await readEconomy(database, userId, interval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
@@ -205,7 +207,7 @@ async function handlePost(request: Request) {
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
-  const simulation = await advanceWorld(database, undefined, { npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true', aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true', aurelleCoup: (env as unknown as { HARIMU_AURELLE_COUP_ENABLED?: string }).HARIMU_AURELLE_COUP_ENABLED === 'true', kindleAssembly: assemblyTickConfig(env as unknown as AssemblyBindings), primaries: primaryTickConfig(env as unknown as PrimaryBindings), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true' });
+  const simulation = await advanceWorld(database, undefined, { npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true', aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true', aurelleCoup: (env as unknown as { HARIMU_AURELLE_COUP_ENABLED?: string }).HARIMU_AURELLE_COUP_ENABLED === 'true', kindleAssembly: assemblyTickConfig(env as unknown as AssemblyBindings), primaries: primaryTickConfig(env as unknown as PrimaryBindings), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true' });
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   await recoverCapacity(database, userId, new Date().toISOString(), interval);
   let body: Record<string, unknown>;
