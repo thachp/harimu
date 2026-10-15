@@ -49,3 +49,13 @@ test('empty context copy reflects open and collapsed details without inventing i
   stateOverrides={0:true};
   try {assert.match(text(render({view:'household'})),/Show details to view available actions/);assert.doesNotMatch(text(render({view:'household'})),/Details are open/);} finally {stateOverrides={};}
 });
+
+test('#551: the live region is always present in the top bar and only its text changes; the normal identity line is never inside it',()=>{
+  const status=extra=>render(extra).filter(n=>n&&typeof n==='object'&&n.props?.role==='status');
+  for(const hold of ['none','neutral','loading']){assert.equal(status({identityHold:hold}).length,1,`one status container while hold is ${hold}`);}
+  const words=extra=>nodes(status(extra)[0]).filter(n=>typeof n==='string').join('');
+  assert.equal(words({identityHold:'loading'}),'Loading your citizen…');
+  assert.equal(words({identityHold:'neutral'}),'','neutral: empty, so nothing is announced');
+  assert.equal(words({identityHold:'none',citizenNation:{id:'korund',name:'Korund'}}),'','the normal line is outside the live region: it is not announced twice');
+  assert.match(text(render({identityHold:'none',citizenNation:{id:'korund',name:'Korund'}})),/Your citizen/);
+});

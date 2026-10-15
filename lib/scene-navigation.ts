@@ -44,6 +44,11 @@ export function signedInHint(cookie: string | null | undefined): SignedInHint {
   }
   return 'signed-out';
 }
+/** #551: the cookie hint read, safe where `document.cookie` throws (a sandboxed iframe without allow-same-origin, or cookies blocked by the browser: SecurityError). It runs during render, so a throw
+ *  left the page blank. On any error the hint is `unknown`; the hold then ends by the Clerk status or the timeout, as for any unknown hint. `read` is `() => document.cookie`. */
+export function readSignedInHint(read: () => string | null | undefined): SignedInHint {
+  try { return signedInHint(read()); } catch { return 'unknown'; }
+}
 export function validNationInSearch(search: string, validNationIds: readonly string[]): boolean {
   const requested = new URLSearchParams(search).get('nation');
   return Boolean(requested && validNationIds.includes(requested));
