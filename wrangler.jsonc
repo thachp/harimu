@@ -50,6 +50,8 @@
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
     "HARIMU_FAITH_ENABLED": "false",
     "HARIMU_WAR_ENABLED": "false",
+    // #423: war weariness PoC (weekly Unrest from an active war, docs 15.3). Needs HARIMU_WAR_ENABLED too. Off until QA.
+    "HARIMU_WAR_WEARINESS_ENABLED": "false",
     // #308: AI treaties PoC (non-aggression pact, trade agreement). Off until QA; treaties are proposed and ratified by server code only.
     "HARIMU_DIPLOMACY_ENABLED": "false",
     // #363: embargo PoC (bilateral trade cut). Off until QA; embargoes are proposed and ratified by server code only.

@@ -84,3 +84,43 @@ export function defenseWindowLocal(startHourUtc: number, viewerOffsetMinutes: nu
   const start = startHourUtc * 60 + offset;
   return { start: clock(start), end: clock(start + defenseWindowConfig.windowSeconds / 60) };
 }
+
+/** #423: war weariness (docs 15.3 "War weariness": every game week at war adds Unrest, more in Kindle, less in Korund; casualties and lost squares accelerate it).
+ *  Pure and import-free. The docs give no numbers, so every figure below is an [ASSUMPTION] (the issue's placeholders); this block is the single place to change them.
+ *  One game week = 7 game days of 7200 real seconds = 50400 real seconds (mirrors gameWeekSeconds in lib/korund.ts, repeated here to keep this file import-free).
+ *  Mobilization does not count: weeks run from `mobilizationEndsAt` (the war turns `active`) and stop the moment the war ends. */
+export const WEARINESS_WEEK_SECONDS = 50400;
+export const wearinessConfig = {
+  /** [ASSUMPTION] Unrest added per full game week at war, before the nation multiplier. */
+  baseUnrestPerWeek: 2,
+  /** [ASSUMPTION] Docs: more in Kindle, less in Korund; Aurelle sits between. Hoarvale, Veldwood, Varkand and Fulmara are not MVP nations and have no entry. */
+  nationMultiplier: { kindle: 1.5, aurelle: 1, korund: 0.5 } as Readonly<Record<WarNationId, number>>,
+  /** [ASSUMPTION] Lost frontier squares and casualties speed it up: +1 per lost square and +1 per 10 casualties, each capped. Nothing tracks either yet, so callers pass zero. */
+  perLostSquare: 1, lostSquareCap: 10, casualtiesPerPoint: 10, casualtyCap: 10,
+  /** [ASSUMPTION] One war can add at most this much Unrest in total (the stability score also clamps to what is left under 100). */
+  totalCap: 40,
+  /** [ASSUMPTION] Level names for the strip and banners (the copy module for war weariness names the levels and no numbers): rising from 1, high from 8, severe from 20 Unrest points. */
+  highAt: 8, severeAt: 20,
+} as const;
+export type WearinessLevelId = 'rising' | 'high' | 'severe';
+/** Full game weeks the war has been `active` as of `asOf`: 0 while mobilizing, 0 once it has ended (endedAt <= asOf).
+ *  [ASSUMPTION] Relief on war end is immediate: the war adds nothing from the next daily score on, with no fade-out. Docs 15.3 say only that each week at war adds Unrest and
+ *  give no decay, so this is a tuning choice (ARC ruled on #484 that it stays; a fade would change only this function and the `ended_at` filter in lib/war-weariness.ts). */
+export function warWeeksAtWar(war: { mobilizationEndsAt: number; endedAt: number | null }, asOf: number): number {
+  if (!Number.isFinite(asOf) || asOf < war.mobilizationEndsAt || (war.endedAt !== null && war.endedAt <= asOf)) return 0;
+  return Math.floor((asOf - war.mobilizationEndsAt) / WEARINESS_WEEK_SECONDS);
+}
+const wholeCount = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+/** Unrest a nation's war has added so far: weeks at war x base x nation multiplier, plus capped add-ons for lost squares and casualties. Zero with no full active week
+ *  (during mobilization or after the war ends), whatever the counts. An unknown nation adds nothing (fails closed). */
+export function warWearinessUnrest(nation: string, weeksAtWar: number, extra: { lostSquares?: number; casualties?: number } = {}): number {
+  if (!isWarNation(nation)) return 0;
+  const weeks = wholeCount(weeksAtWar);
+  if (weeks === 0) return 0;
+  const c = wearinessConfig;
+  const squares = Math.min(wholeCount(extra.lostSquares) * c.perLostSquare, c.lostSquareCap);
+  const losses = Math.min(Math.floor(wholeCount(extra.casualties) / c.casualtiesPerPoint), c.casualtyCap);
+  return Math.min(Math.round(weeks * c.baseUnrestPerWeek * c.nationMultiplier[nation]) + squares + losses, c.totalCap);
+}
+/** The level name for an amount of added Unrest; null when the war has added none. Names only: the amounts are never shown with them. */
+export const wearinessLevel = (points: number): WearinessLevelId | null => points >= wearinessConfig.severeAt ? 'severe' : points >= wearinessConfig.highAt ? 'high' : points > 0 ? 'rising' : null;
