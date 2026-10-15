@@ -33,24 +33,30 @@ export type LabelBox = { x: number; y: number; w: number; h: number };
 /**
  * #377: keep scene labels readable on a phone. Each box is anchored at its bottom centre (x, y), the way the viewport draws it. Returns the same boxes
  * moved so that none leaves the area (a label at the edge was cut off) and, when two would overlap, the later one is stepped up or down by one label
- * height until it is clear (a label was hidden behind others). Boxes that already fit are returned unchanged, so uncrowded desktop scenes do not move.
+ * height until it is clear (a label was hidden behind others). `blocked` boxes (same anchor convention) are fixed obstacles that labels also keep clear of. Boxes that already fit are returned unchanged, so uncrowded desktop scenes do not move.
  */
-export function placeLabels(boxes: LabelBox[], area: { w: number; h: number }, gap = 4): LabelBox[] {
-  const placed: LabelBox[] = [];
+export function placeLabels(boxes: LabelBox[], area: { w: number; h: number }, gap = 4, blocked: LabelBox[] = []): LabelBox[] {
+  const placed: LabelBox[] = [...blocked]; // fixed obstacles (the breadcrumb and shift chip over the canvas) that labels keep clear of; not returned
   const clampX = (b: LabelBox, x: number) => b.w + gap * 2 > area.w ? area.w / 2 : Math.max(b.w / 2 + gap, Math.min(area.w - b.w / 2 - gap, x));
   const clampY = (b: LabelBox, y: number) => Math.max(b.h + gap, Math.min(area.h - gap, y));
   const clashes = (a: LabelBox) => placed.filter(b => Math.abs(a.x - b.x) < (a.w + b.w) / 2 + gap && Math.abs((a.y - a.h / 2) - (b.y - b.h / 2)) < (a.h + b.h) / 2 + gap).length;
-  for (const box of boxes) {
+  // Labels that start on an obstacle go first, while there is still room to put them somewhere clear; the rest keep their order.
+  const hitsBlocked = (b: LabelBox) => blocked.some(o => Math.abs(b.x - o.x) < (b.w + o.w) / 2 + gap && Math.abs((b.y - b.h / 2) - (o.y - o.h / 2)) < (b.h + o.h) / 2 + gap);
+  const order = boxes.map((box, index) => index).sort((a, b) => Number(hitsBlocked(boxes[b])) - Number(hitsBlocked(boxes[a])) || a - b);
+  const result: LabelBox[] = [];
+  for (const index of order) {
+    const box = boxes[index];
     const start = { ...box, x: clampX(box, box.x), y: clampY(box, box.y) };
-    // Try the spot itself, then steps up or down by one label height (and sideways by half a label), nearest first; keep the least-crowded spot if none is clear.
-    const tries = [0, 1, -1, 2, -2, 3, -3, 4, -4].flatMap(row => [0, 1, -1, 2, -2].map(col => ({ row, col }))).sort((a, b) => Math.abs(a.row) * 2 + Math.abs(a.col) - Math.abs(b.row) * 2 - Math.abs(b.col));
+    // Try the spot itself, then spots half a label height up or down and a quarter label sideways, nearest first, over the whole canvas; keep the least-crowded spot if none is clear.
+    const reach = Math.ceil(area.h / ((box.h + gap) / 2)), tries = Array.from({ length: reach * 2 + 1 }, (_, i) => i - reach).flatMap(row => Array.from({ length: 13 }, (_, i) => i - 6).map(col => ({ row, col })))
+      .sort((a, b) => Math.hypot(a.row * (box.h + gap) / 2, a.col * (box.w / 4 + gap)) - Math.hypot(b.row * (box.h + gap) / 2, b.col * (box.w / 4 + gap)));
     let best = start, fewest = clashes(start);
     for (const { row, col } of tries) {
       if (!fewest) break;
-      const spot = { ...box, x: clampX(box, start.x + col * (box.w / 2 + gap)), y: clampY(box, start.y + row * (box.h + gap)) }, n = clashes(spot);
+      const spot = { ...box, x: clampX(box, start.x + col * (box.w / 4 + gap)), y: clampY(box, start.y + row * (box.h + gap) / 2) }, n = clashes(spot);
       if (n < fewest) { best = spot; fewest = n; }
     }
-    placed.push(best);
+    placed.push(best); result[index] = best;
   }
-  return placed;
+  return result;
 }

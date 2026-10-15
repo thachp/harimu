@@ -2,7 +2,7 @@
  *  Bundles the real GameShell and GameViewport (three.js city and globe) with the shipped CSS in headless Chromium at 1280x800 and 390x844, 100/125/150% text,
  *  for the three playable nations' capitals (Kindle, Korund, Aurelle) and the nation strip, and asserts:
  *  - every visible 3D label sits fully inside the canvas (Kindle's "Your household" was cut off at the left edge) and no two labels overlap
- *    (Korund's "Stonehearth square" was hidden behind other labels), and the page never scrolls sideways
+ *    (Korund's "Stonehearth square" was hidden behind other labels), none sits under the breadcrumb / shift chip, and the page never scrolls sideways
  *  - on the phone, the destination cards and nation strip cards fit the page width with their text inside them: no sideways scroll, no clipped text ("Goods and citizen listings", "Stability 81"); desktop keeps its scrolling row
  *  Used by hud-layout-check.mjs (npm run test:layout). Screenshots: LAYOUT_SHOTS_DIR=docs/screenshots/377 (PHONE_LABELS_BEFORE=1 names them "before"). */
 import { build } from 'esbuild';
@@ -18,7 +18,7 @@ const entry = `
 async function bundle() {
   const result = await build({
     stdin: { resolveDir: root, loader: 'tsx', contents: entry }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', target: 'es2022', logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"' }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
+    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"' }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
     plugins: [{ name: 'stubs', setup(b) {
       const stubs = { './game-timer': 'export function GameTimer(){return null}', './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useClerk=()=>({mountUserButton(){},unmountUserButton(){}})' };
       b.onResolve({ filter: /^(\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ }, a => ({ path: a.path, namespace: 'stub' }));
@@ -57,6 +57,10 @@ const probe = scene => {
   if (canvas) {
     const c = rect(canvas);
     for (const l of labels) { const r = rect(l); if (r.left < c.left - 0.5 || r.right > c.right + 0.5 || r.top < c.top - 0.5 || r.bottom > c.bottom + 0.5) issues.push(`label "${l.textContent}" leaves the canvas (${Math.round(r.left)}..${Math.round(r.right)} of ${Math.round(c.left)}..${Math.round(c.right)})`); }
+  }
+  for (const l of scene.view === 'square' ? labels : []) for (const o of document.querySelectorAll('.game-stage-overlay > *')) {
+    const a = rect(l), b = rect(o);
+    if (b.width > 0 && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) issues.push(`label "${l.textContent}" is covered by the breadcrumb or shift chip`);
   }
   for (let i = 0; scene.view === 'square' && i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) {
     const a = rect(labels[i]), b = rect(labels[j]);

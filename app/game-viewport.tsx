@@ -121,7 +121,10 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
       });
       if (mode === 'city') { // #377: labels stay inside the canvas and out of each other's way (a phone has little room)
         const shown = labels.filter(({ button }) => !button.hidden && button.offsetWidth > 0);
-        const spots = placeLabels(shown.map(({ button }) => ({ x: parseFloat(button.style.left), y: parseFloat(button.style.top), w: button.offsetWidth, h: button.offsetHeight })), { w, h });
+        const here = container.getBoundingClientRect(); // the breadcrumb and shift chip float over the canvas: labels keep clear of them
+        const blocked = [...(container.closest('.harimu-game')?.querySelectorAll('.game-stage-overlay > *') ?? [])].map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0)
+          .map(r => ({ x: r.left - here.left + r.width / 2, y: r.bottom - here.top, w: r.width, h: r.height })).filter(b => b.y > 0 && b.y - b.h < h && b.x + b.w / 2 > 0 && b.x - b.w / 2 < w);
+        const spots = placeLabels(shown.map(({ button }) => ({ x: parseFloat(button.style.left), y: parseFloat(button.style.top), w: button.offsetWidth, h: button.offsetHeight })), { w, h }, 4, blocked);
         shown.forEach(({ button }, index) => { button.style.left = `${spots[index].x}px`; button.style.top = `${spots[index].y}px`; });
       }
       if (highlight.visible) highlight.update();
@@ -155,6 +158,7 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
     controls.current = { zoom: changeZoom, pan, reset: () => { userCamera.current?.(); target.set(0, 0, 0); zoom = 1; setCameraLabel('100%'); highlight.visible = false; render(); }, focus, focusNation };
     const resize = () => { renderer.setSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight), false); render(); };
     const observer = new ResizeObserver(resize); observer.observe(container); resize();
+    container.closest('.harimu-game')?.querySelectorAll('.game-stage-overlay > *').forEach(el => observer.observe(el)); // #377: re-place labels when the breadcrumb or shift chip changes size
     const raycaster = new THREE.Raycaster();
     let dragging: { x: number; y: number; total: number } | null = null;
     const down = (event: PointerEvent) => {

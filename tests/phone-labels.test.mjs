@@ -33,7 +33,7 @@ test('a label wider than the canvas is centred and the result is deterministic',
 
 test('the viewport applies placement in the city scene only, and the phone cards wrap in a grid instead of scrolling sideways', () => {
   const viewport = readFileSync(new URL('../app/game-viewport.tsx', import.meta.url), 'utf8');
-  assert.match(viewport, /if \(mode === 'city'\) \{[\s\S]{0,400}placeLabels\(/);
+  assert.match(viewport, /if \(mode === 'city'\) \{[\s\S]{0,900}placeLabels\(/);
   const css = readFileSync(new URL('../app/game-shell.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const phone = css.split(/@media\(max-width:760px\)\{/).slice(1).find(block => block.startsWith('.game-context-items{display:grid'));
   assert.ok(phone, 'a phone block makes the destination cards a grid');
@@ -41,4 +41,15 @@ test('the viewport applies placement in the city scene only, and the phone cards
   assert.match(phone, /overflow:visible/);
   assert.match(phone, /\.game-context-items>button\{[^}]*min-height:44px/);
   assert.match(css, /\.game-context-items\{display:flex;flex:1;min-width:0;overflow:auto/, 'the desktop row still scrolls');
+});
+
+test('labels keep clear of the breadcrumb / shift chip over the canvas, results stay in input order, and the whole canvas is searched', () => {
+  const area = { w: 390, h: 270 };
+  const blocked = [{ x: 127, y: 72, w: 230, h: 62 }]; // the breadcrumb at the top left
+  const boxes = [{ x: 195, y: 110, w: 171, h: 44 }, { x: 121, y: 102, w: 140, h: 44 }, { x: 192, y: 54, w: 160, h: 44 }, { x: 197, y: 155, w: 151, h: 44 }, { x: 260, y: 96, w: 145, h: 44 }];
+  const placed = placeLabels(boxes, area, 4, blocked);
+  assert.equal(placed.length, boxes.length);
+  placed.forEach((p, i) => assert.equal(p.w, boxes[i].w, 'same order as the input'));
+  for (const p of placed) { assert.ok(!overlap(p, blocked[0]), 'clear of the breadcrumb'); assert.ok(p.y - p.h >= 0 && p.y <= area.h && p.x - p.w / 2 >= 0 && p.x + p.w / 2 <= area.w); }
+  for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) assert.ok(!overlap(placed[i], placed[j]), `${i} and ${j} overlap`);
 });
