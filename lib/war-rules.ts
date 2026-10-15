@@ -103,7 +103,9 @@ export const wearinessConfig = {
   highAt: 8, severeAt: 20,
 } as const;
 export type WearinessLevelId = 'rising' | 'high' | 'severe';
-/** Full game weeks the war has been `active` as of `asOf`: 0 while mobilizing, 0 once it has ended (endedAt <= asOf). */
+/** Full game weeks the war has been `active` as of `asOf`: 0 while mobilizing, 0 once it has ended (endedAt <= asOf).
+ *  [ASSUMPTION] Relief on war end is immediate: the war adds nothing from the next daily score on, with no fade-out. Docs 15.3 say only that each week at war adds Unrest and
+ *  give no decay, so this is a tuning choice (ARC ruled on #484 that it stays; a fade would change only this function and the `ended_at` filter in lib/war-weariness.ts). */
 export function warWeeksAtWar(war: { mobilizationEndsAt: number; endedAt: number | null }, asOf: number): number {
   if (!Number.isFinite(asOf) || asOf < war.mobilizationEndsAt || (war.endedAt !== null && war.endedAt <= asOf)) return 0;
   return Math.floor((asOf - war.mobilizationEndsAt) / WEARINESS_WEEK_SECONDS);
