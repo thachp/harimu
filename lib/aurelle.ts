@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
-import { readCrownMint, type CrownMint } from './crown-debasement'; // #362
+import type { CrownMint } from './crown-debasement'; // #362 (type only: tests/aurelle.test.py loads this file straight into Node, so it needs no runtime import of a module)
 // Bounded prototype tuning; no gold backing, issuance, ranks or charter allocation model.
 export const aurelleJob = {id:'aurelle-food-estate',name:'Chartered food-estate service',capacityCost:4,hours:2,wageMinor:800,foodOutput:4,favorReward:2} as const;
 export const aurelleFoodPriceMinor=150;
@@ -76,7 +76,7 @@ export function validAurelleCommand(body:Record<string,unknown>):body is Record<
  if(body.action==='aurelle-buy-food') return body.quantity===1||body.quantity===2;
  return (body.action==='aurelle-start-work'||body.action==='aurelle-household-meal')&&body.quantity===undefined;
 }
-export async function readAurelle(db:GameDatabase,userId:string,options:{crownMint?:boolean;now?:number}={}):Promise<AurellePlan>{
+export async function readAurelle(db:GameDatabase,userId:string):Promise<AurellePlan>{
  const [citizen,ledger,shifts,favor]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
  db.prepare(`SELECT ${publicFood} AS public_food,${publicFunds} AS funds,
@@ -89,11 +89,10 @@ export async function readAurelle(db:GameDatabase,userId:string,options:{crownMi
  .all<{id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
  royalFavorBalance(db,userId), // #289: earned (capped at 100) minus what was spent
  ]);
- const mint=options.crownMint&&citizen?.nation_id==='aurelle'?await readCrownMint(db,options.now??Math.floor(Date.now()/1000)):null;
  return {available:citizen?.nation_id==='aurelle',mode:'bounded charter economy',charter:{id:'food-estate',name:'Highspire food-estate charter',active:true},job:aurelleJob,
  walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,favor:favor,publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,
  mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),
- shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,rewardItem:'estate food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at})),...(mint?{mint}:{})};
+ shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,rewardItem:'estate food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
 export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number){
  const id=command.requestId.toLowerCase(),shiftId=command.shiftId?.toLowerCase()??null;
