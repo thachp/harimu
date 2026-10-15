@@ -3,7 +3,7 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { activeNonAggressionPact } from './diplomacy'; // #402
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
-import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, grievanceConfig, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
+import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, declarationNextDay, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
   type DeclarationBlock, type DeclarationLimitBlock, type GrievanceInputs, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
 export * from './war-rules';
 
@@ -99,10 +99,10 @@ export async function readGrievanceInputs(db: GameDatabase, attacker: WarNationI
 const limitLines: Record<DeclarationLimitBlock, string> = {
   rate_limit_declarations: 'The declaration was not made. This nation declared a war recently. It can declare again on {nextAt}.',
   rate_limit_active_wars: 'The declaration was not made. This nation already has 2 active offensive wars. An active war has to end first.',
-  no_casus_belli: 'The declaration was not made. A declaration is offered only when real grievances warrant it.',
+  casus_belli_insufficient: 'The declaration was not made. A declaration is offered only when real grievances warrant it.',
 };
 const limitText = (block: DeclarationLimitBlock, lastDeclaredAt: number | null) =>
-  fillWarText(limitLines[block], { nextAt: lastDeclaredAt === null ? '' : new Date(declarationNextAt(lastDeclaredAt) * 1000).toISOString().slice(0, 10) });
+  fillWarText(limitLines[block], { nextAt: lastDeclaredAt === null ? '' : new Date(declarationNextDay(lastDeclaredAt) * 1000).toISOString().slice(0, 10) });
 /** #426: the declaration rate limits and the casus belli gate. Read-only; null when the declaration may go ahead. */
 async function declarationLimit(db: GameDatabase, attacker: WarNationId, defender: WarNationId, now: number) {
   const last = await db.prepare('SELECT MAX(declared_at) AS last FROM wars WHERE attacker_nation=?').bind(attacker).first<{ last: number | null }>();
@@ -143,6 +143,10 @@ export async function declareWar(db: GameDatabase, command: DeclareWarCommand, n
   if (options.limits) { const limited = await declarationLimit(db, command.attacker, command.defender, now); if (limited) return limited; }
   const id = `war-${command.requestId}`;
   // The unique open-war-per-pair index and the request id make concurrent declarations safe: only one insert can land.
+  // #426 RACE SAFETY: the per-nation limit clauses below (one declaration per interval, at most 2 open offensive wars) are NOT atomic on their own. They are race-safe here only because
+  // every write goes through the single Postgres writer lock (and SQLite's single writer). A bare guarded INSERT ... SELECT ... WHERE NOT EXISTS is not safe across several real
+  // Postgres connections: under READ COMMITTED two sessions can both pass the guard (QA2 measured both declarations landing in 356 of 400 tries). Before
+  // HARIMU_WAR_DECLARATION_LIMITS_ENABLED is ever turned on, the limits need a Postgres advisory lock or a unique index, tested on real multi-connection Postgres (follow-up issue #575).
   await db.prepare(`INSERT INTO wars (id,request_id,pair_key,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at)
     SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM wars WHERE pair_key=? AND ended_at IS NULL)${options.limits
       ? ' AND NOT EXISTS (SELECT 1 FROM wars WHERE attacker_nation=? AND declared_at>?) AND (SELECT COUNT(*) FROM wars WHERE attacker_nation=? AND ended_at IS NULL)<?' : ''} ON CONFLICT DO NOTHING`)

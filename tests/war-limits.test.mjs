@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { declarationLimitBlock, declarationLimits, declarationNextAt, grievanceConfig, grievanceScore, pairKey } from '../lib/war-rules.ts';
+import { declarationLimitBlock, declarationLimits, declarationNextAt, declarationNextDay, grievanceConfig, grievanceScore, pairKey } from '../lib/war-rules.ts';
 
 const D = 86400, SECRET = 'a-very-long-server-only-secret';
 const none = { napBrokenByTarget: false, embargoAgainstUs: false, tradeTreatyBrokenByTarget: false, borderIncidents: 0, openCommonsDispute: false };
@@ -23,15 +23,20 @@ test('pure rules: the ruling\'s weights, the 40 threshold, the border-incident c
   assert.equal(grievanceScore({ ...none, napBrokenByTarget: 'yes' }), 0, 'only a real true counts');
   const open = { now: 100 * D, lastDeclaredAt: null, activeOffensiveWars: 0, grievance: 40 };
   assert.equal(declarationLimitBlock(open), null);
-  assert.equal(declarationLimitBlock({ ...open, grievance: 39 }), 'no_casus_belli');
+  assert.equal(declarationLimitBlock({ ...open, grievance: 39 }), 'casus_belli_insufficient');
   assert.equal(declarationLimits.intervalSeconds, 14 * D); assert.equal(declarationLimits.activeOffensiveMax, 2);
   assert.equal(declarationLimitBlock({ ...open, lastDeclaredAt: open.now - 14 * D + 1 }), 'rate_limit_declarations', 'one second early');
   assert.equal(declarationLimitBlock({ ...open, lastDeclaredAt: open.now - 14 * D }), null, '14 real days exactly');
   assert.equal(declarationLimitBlock({ ...open, activeOffensiveWars: 1 }), null); assert.equal(declarationLimitBlock({ ...open, activeOffensiveWars: 2 }), 'rate_limit_active_wars');
   assert.equal(declarationLimitBlock({ now: 100 * D, lastDeclaredAt: 99 * D, activeOffensiveWars: 2, grievance: 0 }), 'rate_limit_declarations', 'declaration interval, then active wars, then grievance');
   assert.equal(declarationLimitBlock({ ...open, activeOffensiveWars: 2, grievance: 0 }), 'rate_limit_active_wars');
-  assert.equal(declarationLimitBlock({ ...open, activeOffensiveWars: NaN }), 'rate_limit_active_wars', 'an unreadable count fails closed'); assert.equal(declarationLimitBlock({ ...open, grievance: NaN }), 'no_casus_belli');
+  assert.equal(declarationLimitBlock({ ...open, activeOffensiveWars: NaN }), 'rate_limit_active_wars', 'an unreadable count fails closed'); assert.equal(declarationLimitBlock({ ...open, grievance: NaN }), 'casus_belli_insufficient');
   assert.equal(declarationNextAt(1000), 1000 + 14 * D);
+  // The refusal date is the first UTC midnight at or after the moment the nation can declare again, so "on {date}" is never a day it still cannot declare.
+  assert.equal(declarationNextDay(1000), 15 * D, 'a few seconds into a day rounds up to the next midnight');
+  assert.equal(declarationNextDay(D), 15 * D, 'exactly midnight stays on that day');
+  assert.equal(declarationNextDay(D + 1), 16 * D, 'one second after midnight rounds up');
+  assert.equal(declarationNextDay(0), 14 * D);
 });
 
 test('the limits flag defaults to "false" in wrangler.jsonc and the route passes it through (no migration)', async () => {
@@ -79,11 +84,11 @@ for (const backend of [undefined, 'postgres']) {
 
   test(`casus belli gate: no grievance is refused; a pact broken by the target alone clears it; ours, a lifted embargo and a below-threshold stack do not${label}`, async t => {
     const { limited, treaty, embargo, rows } = await setup(t, { backend });
-    const none = await limited(); assert.equal(none.ok, false); assert.equal(none.status, 409); assert.equal(none.reason, 'no_casus_belli'); assert.match(none.error, /declaration was not made/i);
+    const none = await limited(); assert.equal(none.ok, false); assert.equal(none.status, 409); assert.equal(none.reason, 'casus_belli_insufficient'); assert.match(none.error, /declaration was not made/i);
     await treaty({ brokenBy: 'kindle' }); await embargo({ status: 'lifted' }); await embargo({ actor: 'kindle', target: 'korund' }); await treaty({ kind: 'non-aggression', status: 'in_force', at: 1_000_000 });
-    assert.equal((await limited()).reason, 'no_casus_belli', 'a pact WE broke, a lifted embargo, our own embargo and an in-force pact are not grievances');
+    assert.equal((await limited()).reason, 'casus_belli_insufficient', 'a pact WE broke, a lifted embargo, our own embargo and an in-force pact are not grievances');
     await treaty({ kind: 'trade', brokenBy: 'korund' }); await embargo();
-    const stack = await limited(); assert.equal(stack.reason, 'no_casus_belli', 'embargo 20 + broken trade treaty 15 = 35, below 40, and no other input exists in this PoC');
+    const stack = await limited(); assert.equal(stack.reason, 'casus_belli_insufficient', 'embargo 20 + broken trade treaty 15 = 35, below 40, and no other input exists in this PoC');
     assert.equal((await rows()).length, 0, 'nothing is written on a refusal');
     await treaty({ kind: 'non-aggression', brokenBy: 'korund' });
     const ok = await limited(); assert.equal(ok.ok, true, 'a non-aggression pact broken by the target alone clears the gate'); assert.equal((await rows()).length, 1);
@@ -92,7 +97,7 @@ for (const backend of [undefined, 'postgres']) {
   test(`grievances toward a different nation do not count${label}`, async t => {
     const { limited, treaty } = await setup(t, { backend });
     await treaty({ a: 'kindle', b: 'aurelle', brokenBy: 'aurelle' });
-    assert.equal((await limited()).reason, 'no_casus_belli', 'Aurelle broke a pact with Kindle; Korund did not');
+    assert.equal((await limited()).reason, 'casus_belli_insufficient', 'Aurelle broke a pact with Kindle; Korund did not');
     assert.equal((await limited({ defender: 'aurelle' })).ok, true);
   });
 
@@ -103,7 +108,11 @@ for (const backend of [undefined, 'postgres']) {
     await war.endWar(r.db, first.war.id, 'other', at + 60, true);
     const again = await limited({ defender: 'aurelle' }, at + 3 * D);
     assert.equal(again.ok, false); assert.equal(again.reason, 'rate_limit_declarations'); assert.equal(again.status, 409);
-    assert.ok(again.error.includes(new Date((at + 14 * D) * 1000).toISOString().slice(0, 10)), 'the line says when Kindle can declare again');
+    const day = ts => new Date(ts * 1000).toISOString().slice(0, 10);
+    assert.ok(again.error.includes(day(declarationNextDay(at))), 'the line says the day Kindle can declare again');
+    assert.ok(declarationNextDay(at) >= at + 14 * D && declarationNextDay(at) < at + 15 * D, 'rounded up to the next UTC midnight, never earlier than the exact moment');
+    const late = await limited({ defender: 'aurelle' }, at + 3 * D + 7); // a different, later refusal reads the same date: it depends on the last declaration, not on now
+    assert.equal(late.error, again.error);
     assert.equal((await limited({ defender: 'aurelle' }, at + 14 * D - 1)).reason, 'rate_limit_declarations', 'one second early');
     assert.equal((await limited({ defender: 'aurelle' }, at + 14 * D)).ok, true, 'exactly 14 real days later');
     assert.equal((await rows()).length, 2);
@@ -155,7 +164,7 @@ for (const backend of [undefined, 'postgres']) {
 
   test(`the server command honours the limits input only when it is on${label}`, async t => {
     const { cmd, treaty, rows } = await setup(t, { backend });
-    const on = await cmd({}); assert.equal(on.ok, false); assert.equal(on.reason, 'no_casus_belli');
+    const on = await cmd({}); assert.equal(on.ok, false); assert.equal(on.reason, 'casus_belli_insufficient');
     assert.equal((await rows()).length, 0);
     const off = await cmd({}, { limits: false }); assert.equal(off.ok, true, 'limits off: no grievance needed');
     const second = await cmd({ defender: 'aurelle' }, { limits: false }); assert.equal(second.ok, true, 'limits off: no interval');
@@ -167,7 +176,7 @@ for (const backend of [undefined, 'postgres']) {
 test('missing treaty and embargo tables read as no grievance (fail closed), not as an error', async t => {
   const { limited, r } = await setup(t);
   await r.db.prepare('DROP TABLE treaties').run(); await r.db.prepare('DROP TABLE embargoes').run();
-  const refused = await limited(); assert.equal(refused.ok, false); assert.equal(refused.reason, 'no_casus_belli');
+  const refused = await limited(); assert.equal(refused.ok, false); assert.equal(refused.reason, 'casus_belli_insufficient');
 });
 
 test('other read errors still surface (a failing grievance read is not silently allowed)', async t => {

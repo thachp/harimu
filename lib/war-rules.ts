@@ -72,16 +72,19 @@ export function grievanceScore(input: GrievanceInputs): number {
     + (input.tradeTreatyBrokenByTarget === true ? g.tradeTreatyBrokenByTarget : 0) + Math.min(incidents * g.borderIncidentEach, g.borderIncidentCap)
     + (input.openCommonsDispute === true ? g.openCommonsDispute : 0);
 }
-export type DeclarationLimitBlock = 'rate_limit_declarations' | 'rate_limit_active_wars' | 'no_casus_belli';
+export type DeclarationLimitBlock = 'rate_limit_declarations' | 'rate_limit_active_wars' | 'casus_belli_insufficient';
 /** Why the limits or the gate refuse a declaration, in the order the refusal copy lists them (declaration interval, active wars, grievance); null when none applies.
  *  An unreadable count or score fails closed (blocked). */
 export function declarationLimitBlock(input: { now: number; lastDeclaredAt: number | null; activeOffensiveWars: number; grievance: number }): DeclarationLimitBlock | null {
   if (input.lastDeclaredAt !== null && !(Number.isFinite(input.lastDeclaredAt) && input.now >= input.lastDeclaredAt + declarationLimits.intervalSeconds)) return 'rate_limit_declarations';
   if (!Number.isFinite(input.activeOffensiveWars) || input.activeOffensiveWars >= declarationLimits.activeOffensiveMax) return 'rate_limit_active_wars';
-  if (!Number.isFinite(input.grievance) || input.grievance < grievanceConfig.threshold) return 'no_casus_belli';
+  if (!Number.isFinite(input.grievance) || input.grievance < grievanceConfig.threshold) return 'casus_belli_insufficient';
   return null;
 }
 export const declarationNextAt = (lastDeclaredAt: number) => lastDeclaredAt + declarationLimits.intervalSeconds;
+/** The first UTC midnight at or after the moment a nation can declare again. The refusal line says "on {date}" with this day, so a nation that reads the date is never told it
+ *  can declare on a day it still cannot (it may be able to declare a few hours earlier than midnight; the check itself uses the exact second). */
+export const declarationNextDay = (lastDeclaredAt: number) => Math.ceil(declarationNextAt(lastDeclaredAt) / 86400) * 86400;
 /** Plain-text label: control characters and markup are dropped, whitespace collapsed, length capped. */
 export const cleanLabel = (value: unknown, max: number) => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max).trim() : '';
 /** Fills {placeholder} slots of the war copy (lib/war-copy.ts); unknown slots are left as they are. */
