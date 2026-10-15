@@ -1,7 +1,7 @@
 /** #392 S1 check: the nation crest (NEXT_PUBLIC_HARIMU_UI_V2_CREST) in the nation inspector header.
  *  Bundles the real GameShell with the flag ON and OFF in headless Chromium with the shipped CSS, at 1280x800 and 390x844 (plus 960x800 and 320x700), 100/125/150% text,
  *  once per nation (all ten):
- *  - flag off: no crest, and the header is exactly as before;  flag on: one crest per header, svg with a text alternative naming the nation and its emblem
+ *  - flag off: no crest, and the header is exactly as before;  flag on: one crest per header, svg with a decorative svg (aria-hidden) whose tooltip names the nation and its emblem; no word in the header splits mid-word (QA2 #534)
  *  - the crest sits inside the header, does not overlap the title or the collapse button, scales with text size, keeps a 7:8 shield box
  *  - the collapse button is still reachable and 44px on phones; the page never scrolls sideways; the header grows by no more than the crest needs
  *  With LAYOUT_SHOTS_DIR: before/after header crops at 1280 and 390, 100% and 150% text, plus a sheet of all ten crests.
@@ -25,11 +25,16 @@ const probe = () => {
   const head = document.querySelector('.game-inspector-title'); if (!head) return { issues: [...issues, 'no inspector header'], crests: 0 };
   const h = head.getBoundingClientRect(), crests = [...head.querySelectorAll('.nation-crest')], title = head.querySelector('h1').getBoundingClientRect(), small = head.querySelector('small').getBoundingClientRect(), btn = head.querySelector('button').getBoundingClientRect();
   const overlaps = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  // QA2 #534: no word may break mid-word (QA3 #131/#229). A word that wraps inside itself has client rects on more than one line.
+  for (const el of head.querySelectorAll('h1, small')) for (const node of [...el.childNodes].filter(n => n.nodeType === 3)) for (const m of node.textContent.matchAll(/\S+/g)) {
+    const range = document.createRange(); range.setStart(node, m.index); range.setEnd(node, m.index + m[0].length);
+    if (new Set([...range.getClientRects()].map(r => Math.round(r.top))).size > 1) issues.push(`"${m[0]}" splits mid-word in the ${el.tagName.toLowerCase()}`);
+  }
   const out = { issues, crests: crests.length, headH: h.height, btnW: btn.width, btnH: btn.height, btnIn: btn.right <= h.right + 0.5 && btn.left >= h.left - 0.5, titleH: title.height };
   if (crests[0]) {
     const c = crests[0], r = c.getBoundingClientRect(), svg = c.querySelector('svg'), cs = getComputedStyle(c);
     Object.assign(out, { w: r.width, ch: r.height, inHead: r.left >= h.left - 0.5 && r.right <= h.right + 0.5 && r.top >= h.top - 0.5 && r.bottom <= h.bottom + 0.5, hitsTitle: overlaps(r, title) || overlaps(r, small), hitsBtn: overlaps(r, btn),
-      label: svg?.getAttribute('aria-label') || '', role: svg?.getAttribute('role'), id: c.dataset.nationCrest, paths: svg?.querySelectorAll('path').length || 0, field: cs.getPropertyValue('--crest-field').trim(), clip: cs.clipPath });
+      label: svg?.getAttribute('aria-label') || '', hidden: svg?.getAttribute('aria-hidden') === 'true', hasRole: svg?.hasAttribute('role') || svg?.hasAttribute('aria-label'), title: c.title, id: c.dataset.nationCrest, paths: svg?.querySelectorAll('path').length || 0, field: cs.getPropertyValue('--crest-field').trim(), clip: cs.clipPath });
   }
   return out;
 };
@@ -55,17 +60,17 @@ export async function checkNationCrests({ browser, css, preflight, failures, row
         if (!m.btnIn || (w < 600 && m.btnH < 43.5)) fail(`${nation}: collapse button is clipped or under 44px (${Math.round(m.btnW)}x${Math.round(m.btnH)})`);
         if (flag === 'off') { base[nation] = m.headH; if (m.crests) fail(`${nation}: crest shows with the flag off`); continue; }
         if (m.crests !== 1) { fail(`${nation}: expected 1 crest in the header, found ${m.crests}`); continue; }
-        if (m.id !== nation || m.role !== 'img' || !m.label.startsWith(names[nation]) || !/crest: /.test(m.label)) fail(`${nation}: crest lacks its text alternative ("${m.label}")`);
+        if (m.id !== nation || !m.hidden || m.hasRole || !m.title.startsWith(names[nation]) || !/crest: /.test(m.title)) fail(`${nation}: crest should be decorative (aria-hidden, no role/label) with the nation and emblem as its tooltip ("${m.title}")`);
         if (m.paths !== 3) fail(`${nation}: crest should draw shield, inset and motif (found ${m.paths} paths)`);
         if (!m.inHead) fail(`${nation}: crest leaves the header`);
         if (m.hitsTitle || m.hitsBtn) fail(`${nation}: crest overlaps the ${m.hitsTitle ? 'title' : 'collapse button'}`);
         if (Math.abs(m.w * 8 / 7 - m.ch) > 1.5) fail(`${nation}: crest is ${Math.round(m.w)}x${Math.round(m.ch)}, not a 7:8 shield`);
-        if (m.w < 44 * scale * 7 / 8 - 2) fail(`${nation}: crest is only ${Math.round(m.w)}px wide at ${scale * 100}% text`);
+        if (m.w < 44 * scale * 7 / 8 * (w <= 340 ? .75 : 1) - 2) fail(`${nation}: crest is only ${Math.round(m.w)}px wide at ${scale * 100}% text`);
         if (m.headH - base[nation] > 44 * scale * 8 / 7 + 2) fail(`${nation}: header grew ${Math.round(m.headH - base[nation])}px with the crest`);
         summary.push(nation);
       }
       rows.push(`${id}: ${flag === 'off' ? 'no crest in any header' : summary.length + ' crests ok'}`);
-      if (shots && [1280, 390].includes(w) && (scale === 1 || scale === 1.5)) {
+      if (shots && [1280, 390, 320].includes(w) && (scale === 1 || scale === 1.5)) {
         for (const nation of ['kindle', 'fulmara']) {
           await page.evaluate(p => window.mountShell(p), propsFor(nation)); await page.waitForSelector('.game-inspector-title h1');
           const box = await page.evaluate(() => { const b = document.querySelector('.game-inspector-title').getBoundingClientRect(); return { x: Math.max(0, b.left), y: b.top + window.scrollY, width: Math.min(b.width, window.innerWidth), height: b.height }; });

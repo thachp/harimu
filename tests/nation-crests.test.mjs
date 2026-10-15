@@ -44,7 +44,7 @@ test('the crest component renders nothing with the flag off, and a named svg wit
  const result=await build({stdin:{contents:entry,resolveDir:new URL('../',import.meta.url).pathname,loader:'tsx'},bundle:true,write:false,format:'cjs',platform:'node',jsx:'automatic',logLevel:'silent',define:{'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST':'"false"','process.env.NODE_ENV':'"production"'}});
  await writeFile(join(dir,'crest.cjs'),result.outputFiles[0].text);const out=createRequire(import.meta.url)(join(dir,'crest.cjs'));
  assert.equal(out.off,'');assert.equal(out.unknown,'');
- assert.match(out.forced,/data-nation-crest="aurelle"/);assert.match(out.forced,/data-nation-pattern="diagonal"/);assert.match(out.forced,/role="img" aria-label="Aurelle crest: a winged crown"/);
+ assert.match(out.forced,/data-nation-crest="aurelle"/);assert.match(out.forced,/data-nation-pattern="diagonal"/);assert.match(out.forced,/title="Aurelle crest: a winged crown"/);assert.match(out.forced,/<svg[^>]*aria-hidden="true"/);assert.doesNotMatch(out.forced,/role="img"|aria-label/);
 });
 test('the inspector header is the only consumer, every pattern has crest CSS, and the layout stays clipped to the shield',async()=>{
  const shell=await read('app/game-shell.tsx'),css=await read('app/game-shell.css');
