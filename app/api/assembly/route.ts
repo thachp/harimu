@@ -5,7 +5,7 @@ import { readVerification } from '@/lib/verification';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { validPetitionId } from '@/lib/collective-petitions';
 import { ballotPrivacyReason } from '@/lib/ballot-privacy';
-import { assemblyBallotSql, assemblyEnabled, assemblyMarkWrittenSql, assemblyOpenAt, assemblyReceiptSql, assemblyScope, citizenDistrict, ensureAssemblyElection, finalizeAssembly, isParty, readAssembly, type AssemblyBindings } from '@/lib/assembly';
+import { assemblyBallotSql, assemblyEnabled, assemblyMarkWrittenSql, assemblyElectionIdFor, assemblyReceiptSql, assemblyScope, assemblyTiming, citizenDistrict, ensureAssemblyElection, finalizeAssembly, isParty, readAssembly, type AssemblyBindings } from '@/lib/assembly';
 
 export const dynamic = 'force-dynamic';
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   const { db, kindle } = await kindleCitizen(userId);
   if (!kindle) return json({ error: 'The Assembly election is for Kindle citizens only.' }, 403);
   const scope = assemblyScope(bindings());
-  return json({ ...await readAssembly(db, userId, Math.floor(Date.now() / 1000), scope, assemblyOpenAt(bindings())), eligibility: await eligibility(scope, userId) });
+  return json({ ...await readAssembly(db, userId, Math.floor(Date.now() / 1000), scope, assemblyTiming(bindings())), eligibility: await eligibility(scope, userId) });
 }
 
 export async function POST(request: Request) {
@@ -47,24 +47,24 @@ export async function POST(request: Request) {
   if (!eligible.eligible) return json({ error: eligible.reason, verification: eligible.verification }, 403);
   let body: Record<string, unknown>;
   try { body = await readCommandObject(request, 1024); } catch { return json({ error: 'Expected a bounded party-list ballot command.' }, 400); }
-  if (body.action !== 'vote' || body.electionId !== scope.id || !validPetitionId(body.requestId) || !isParty(body.partyId)) return json({ error: 'Pick exactly one party list and use a valid ballot receipt.' }, 400);
-  const now = Math.floor(Date.now() / 1000), requestId = body.requestId, partyId = body.partyId, openAt = assemblyOpenAt(bindings());
+  if (body.action !== 'vote' || body.electionId !== assemblyElectionIdFor(scope, assemblyTiming(bindings()), Math.floor(Date.now() / 1000)) || !validPetitionId(body.requestId) || !isParty(body.partyId)) return json({ error: 'Pick exactly one party list and use a valid ballot receipt.' }, 400);
+  const now = Math.floor(Date.now() / 1000), requestId = body.requestId, partyId = body.partyId, timing = assemblyTiming(bindings()), electionId = assemblyElectionIdFor(scope, timing, now);
   const receipt = () => db.prepare('SELECT election_id,clerk_user_id,ballot_written FROM assembly_voter_receipts WHERE request_id=?').bind(requestId).first<{ election_id: string; clerk_user_id: string; ballot_written: number }>();
-  const snapshot = async (extra: Record<string, unknown>) => json({ ...extra, ...await readAssembly(db, userId, now, scope, openAt), eligibility: eligible });
+  const snapshot = async (extra: Record<string, unknown>) => json({ ...extra, ...await readAssembly(db, userId, now, scope, timing), eligibility: eligible });
   const prior = await receipt();
   if (prior) {
-    if (prior.election_id !== scope.id || prior.clerk_user_id !== userId || Number(prior.ballot_written) !== 1) return json({ error: 'Ballot receipt already used.' }, 409);
+    if (prior.election_id !== electionId || prior.clerk_user_id !== userId || Number(prior.ballot_written) !== 1) return json({ error: 'Ballot receipt already used.' }, 409);
     return snapshot({ ok: true, alreadyRecorded: true, message: 'Your original ballot remains recorded. This retry does not change it.' });
   }
-  await ensureAssemblyElection(db, scope, openAt, now);
+  await ensureAssemblyElection(db, scope, timing, now);
   const district = await citizenDistrict(db, userId); // server-derived: the request cannot name a district
   await db.batch([
-    db.prepare(assemblyReceiptSql).bind(district, requestId, now, userId, scope.id, now, now),
-    db.prepare(assemblyBallotSql).bind(crypto.randomUUID(), partyId, requestId, userId, scope.id),
-    db.prepare(assemblyMarkWrittenSql).bind(requestId, userId, scope.id),
+    db.prepare(assemblyReceiptSql).bind(district, requestId, now, userId, electionId, now, now),
+    db.prepare(assemblyBallotSql).bind(crypto.randomUUID(), partyId, requestId, userId, electionId),
+    db.prepare(assemblyMarkWrittenSql).bind(requestId, userId, electionId),
   ]);
   const saved = await receipt();
-  if (!saved || saved.clerk_user_id !== userId || saved.election_id !== scope.id || Number(saved.ballot_written) !== 1) return json({ error: 'Already voted, voting closed or not yet open, or citizenship changed. Refresh your ballot status.' }, 409);
+  if (!saved || saved.clerk_user_id !== userId || saved.election_id !== electionId || Number(saved.ballot_written) !== 1) return json({ error: 'Already voted, voting closed or not yet open, or citizenship changed. Refresh your ballot status.' }, 409);
   await finalizeAssembly(db, scope, now); // a no-op unless the window just closed
   return snapshot({ ok: true });
 }

@@ -40,7 +40,7 @@
     "HARIMU_AURELLE_RISING_ENABLED": "false",
     // #281: Aurelle AI palace coup (plot, Power Weight, Crisis Window). Off until QA.
     "HARIMU_AURELLE_COUP_ENABLED": "false",
-    // #283: Kindle mid-term Assembly election (D'Hondt per district). Off until QA. Opening is manual: set HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) to open the 72-hour vote.
+    // #283: Kindle mid-term Assembly election (D'Hondt per district, 5% district share). Off until QA. #351: the real calendar is driven by the world clock: set HARIMU_KINDLE_CYCLE_START_AT (epoch seconds, start of day 0 of the first 120-day cycle) and the vote opens at day 60 of every cycle for 72 hours. Without it, HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) is a manual one-off open. Neither set: it never opens.
     "HARIMU_KINDLE_ASSEMBLY_ENABLED": "false",
     // #307: Kindle party membership and human primaries. Off until QA. Opening is manual: set HARIMU_PRIMARIES_OPEN_AT (epoch seconds) to open the 72-hour primary.
     "HARIMU_PRIMARIES_ENABLED": "false",
