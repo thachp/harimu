@@ -12,7 +12,7 @@ const cache=new Map();
 async function load(path){
  if(cache.has(path))return cache.get(path);
  let output=ts.transpileModule(await readFile(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
- for(const match of [...output.matchAll(/^import [^\n]*from (['"])([^'"]+)\1/gm)]){
+ for(const match of [...output.matchAll(/^(?:import|export) [^\n]*from (['"])([^'"]+)\1/gm)]){
   const specifier=match[2];let url;
   if(specifier.endsWith('.css'))url='data:text/javascript,export default {}';
   else if(specifier.startsWith('@/')||specifier.startsWith('.')){
