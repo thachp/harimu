@@ -101,8 +101,8 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-for (const backend of ['sqlite', 'postgres']) test(`a database without migration 0053 reads as no events and keeps serving (${backend})`, async t => {
-  const { r, started } = await scene(t, backend, { startedDaysAgo: 31 });
+test('a database without migration 0053 reads as no events and keeps serving (sqlite)', async t => {
+  const { r, started } = await scene(t, 'sqlite', { startedDaysAgo: 31 });
   const mod = await r.importModule('lib/founding-period.ts');
   await tick(r); assert.equal((await mod.readFoundingEvents(r.db)).length, 3);
   await r.db.prepare('DROP TABLE founding_day30_events').run();
@@ -110,4 +110,13 @@ for (const backend of ['sqlite', 'postgres']) test(`a database without migration
   assert.deepEqual((await r.call('news', 'kay')).data.items.filter(i => String(i.id).includes('founding')), []);
   assert.deepEqual((await gov(r, 'kay')).founding, { active: false, endsAt: started + 30 * day, dayOfPeriod: null });
   await r.call('world', null);
+});
+
+test('readFoundingEvents tolerates only a missing table (the SQLite and Postgres error shapes), and rethrows anything else', async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  const { readFoundingEvents } = await r.importModule('lib/founding-period.ts');
+  const failing = error => ({ prepare: () => ({ all: () => Promise.reject(error) }) });
+  assert.deepEqual(await readFoundingEvents(failing(new Error('no such table: founding_day30_events'))), []);
+  assert.deepEqual(await readFoundingEvents(failing(new Error('PostgreSQL operation failed (42P01): relation "founding_day30_events" does not exist.'))), []);
+  await assert.rejects(() => readFoundingEvents(failing(new Error('database is locked'))), /locked/);
 });
