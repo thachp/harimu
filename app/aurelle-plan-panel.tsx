@@ -10,6 +10,7 @@ import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import { aurelleFoodPriceMinor } from '@/lib/aurelle';
+import type { CrownMint } from '@/lib/crown-debasement';
 
 export type AurelleAction = 'aurelle-start-work' | 'aurelle-claim-work' | 'aurelle-buy-food' | 'aurelle-household-meal';
 export type AurelleCommand = { action: AurelleAction; requestId: string; shiftId?: string; quantity?: 1 | 2 };
@@ -23,6 +24,8 @@ export type AurellePlanView = {
   publicFundMinor: number;
   mealReadyAt: string | null;
   shifts: WorkShift[];
+  /** #362: read-only Royal Mint strip; only sent while HARIMU_CROWN_DEBASEMENT_ENABLED is on. */
+  mint?: CrownMint;
 };
 
 const actionStyle = { minHeight: 44, maxWidth: '100%', whiteSpace: 'normal' } as const;
@@ -49,6 +52,7 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
   return <NationDocument nationId="aurelle" className="citizen-market aurelle-plan" label="Aurelle charter account"><div aria-busy={pending}>
     <h3>{scene === 'workplace' ? 'Chartered service' : scene === 'market' ? 'Chartered food counter' : scene === 'household' ? 'Aurelle household' : 'Your Aurelle next step'}</h3>
     <dl><dt>Crowns</dt><dd>{(plan.walletMinor / 100).toFixed(2)} CRN</dd><dt>Food</dt><dd>{plan.foodQuantity}</dd><dt>Royal Favor</dt><dd>{plan.favor} / 100</dd></dl>
+    {plan.mint && scene !== 'workplace' && <RoyalMintStrip mint={plan.mint} />}
     {uncertain && <div role="alert"><p>Confirm your previous action before starting another.</p><ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending)} onClick={onRetry}>Confirm previous action</ActionButton></div>}
     {error && <p role="alert">{error}</p>}
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -69,4 +73,15 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
     </div>
     <details><summary>Prototype rules</summary><p>This seeded charter is a prototype entitlement, not royal charter issuance. Service contributes 4 food to finite public stock. Prices and rewards are prototype tuning; currency backing, mint redemption, charter grants and revocation are not simulated.</p><p>Favor is social standing, not currency. Service grants up to the 100 cap; decay, spending, ranks and estates are planned. Meals have a two-real-hour cooldown. Government uses deterministic rules; no live AI model is connected.</p></details>
   </div></NationDocument>;
+}
+
+/** #362: read-only treasury strip. Plain placeholder wording until Content's Aurelle debasement copy (#408) is wired. The premium is a rumor, never an official rate. */
+export function RoyalMintStrip({ mint }: { mint: CrownMint }) {
+  const rate = (mint.officialRate.tesseraMilliPerCrown / 1000).toFixed(3);
+  return <section aria-label="Royal Mint">
+    <h4>Royal Mint</h4>
+    <dl><dt>Mint parity</dt><dd>{mint.mintParity} CRN per gold bar</dd><dt>Currency Confidence</dt><dd>{mint.currencyConfidence} / 100</dd>
+      <dt>Official rate</dt><dd>1 CRN = {rate} TSR</dd></dl>
+    {mint.rumoredFullWeightPremiumBp !== null && <p>Rumor: full-weight old Crowns are said to fetch about {(mint.rumoredFullWeightPremiumBp / 100).toFixed(1)}% more. This is a rumor, not the official rate.</p>}
+  </section>;
 }
