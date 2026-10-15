@@ -54,12 +54,11 @@ test('#351 pure: seats carry over with staggered terms; a district keeps six sea
 test('#351 pure: a party under 5% of the district human ballots takes no part in the award', () => {
   assert.equal(assemblyMinSharePercent, 5);
   // 20 ballots: S 1 = 5.0% (stays in: the minimum is inclusive), O 19, D 0.
-  const edge = districtResult('forgehaven', { [S]: 1, [O]: 19, [D]: 0 }); assert.deepEqual(edge.belowThreshold, [D]); assert.equal(edge.weighted[S] > 0, true);
+  const edge = districtResult('forgehaven', { [S]: 1, [O]: 19, [D]: 0 }); assert.deepEqual(edge.belowThreshold, [D]); assert.equal(edge.belowThreshold.includes(S), false, 'exactly 5% stays in');
   // 21 ballots: S 1 = 4.76% falls under.
-  const under = districtResult('forgehaven', { [S]: 1, [O]: 20, [D]: 0 }); assert.deepEqual([...under.belowThreshold].sort(), [D, S].sort()); assert.equal(under.weighted[S], 0); assert.equal(under.weighted[D], 0);
+  const under = districtResult('forgehaven', { [S]: 1, [O]: 20, [D]: 0 }); assert.deepEqual([...under.belowThreshold].sort(), [D, S].sort());
   assert.deepEqual(under.seatsWon, { [S]: 0, [O]: 3, [D]: 0 }); assert.equal(sumOf(under.seatsWon), 3);
-  // Without the threshold Steady Hand would have taken a seat on its bloc weight: 140 + 100 vs 21*35 + 2000: check the counterfactual by hand.
-  assert.deepEqual(under.bloc, { [S]: 21 * 40, [O]: 21 * 35, [D]: 21 * 25 }, 'the bloc is still shown for every party');
+  assert.equal('bloc' in under, false, '#449: no AI bloc in the count');
   // Nobody voted: nothing is excluded or contested.
   const none = districtResult('kolt-savanna', {}); assert.deepEqual(none.belowThreshold, []); assert.equal(none.contested, false);
   // Everyone clears it: all three take part, as before.
