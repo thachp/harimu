@@ -7,7 +7,7 @@ function targetsBallot(sql:string){
  const first=tokens[0]?.toUpperCase();let index=first==='INSERT'?tokens.findIndex(token=>token.toUpperCase()==='INTO')+1:first==='UPDATE'?1:first==='DELETE'?tokens.findIndex(token=>token.toUpperCase()==='FROM')+1:-1;
  if(index<0)return false;if(tokens[index]?.toUpperCase()==='ONLY')index++;
  if(tokens[index+1]==='.')index+=2;
- return /^(civic|poc|assembly)_(anonymous_ballots|voter_receipts)$/i.test(tokens[index]?.replace(/^["`]|["`]$/g,'')??'');
+ return /^(civic|poc|assembly|primary)_(anonymous_ballots|voter_receipts)$/i.test(tokens[index]?.replace(/^["`]|["`]$/g,'')??'');
 }
 function normalize(value:unknown):unknown{
  if(typeof value==='bigint'){const number=Number(value);if(!Number.isSafeInteger(number))throw Error('Database integer exceeds safe application range.');return number;}
