@@ -14,8 +14,7 @@ import type { SceneView } from '@/lib/scene-navigation';
 import type { LocationId, ViewportSelection } from '@/lib/game-viewport';
 import './game-shell.css';
 import { NationSymbol } from './nation-symbol';
-import { NationStripFilters } from './nation-strip-filters';
-import { discoverNations, nationLensLabel, nationIsPreview, type NationFamily, type NationLens } from '@/lib/nation-discovery';
+import { nationIsPreview } from '@/lib/nation-discovery';
 import { locationVisible, marketVisible } from '@/lib/market-visibility';
 
 type GameNation = { id: string; name: string; capital?: string; color?: string };
@@ -80,12 +79,7 @@ function HudHelp({ label, children, help, open = false }: { label: string; child
 }
 
 export function GameShell({ worldClock, holidayName, nextDeadline, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
-  const [family, setFamily] = useState<NationFamily>('all');
-  const [lens, setLens] = useState<NationLens>('power');
-  const [shortlistOnly, setShortlistOnly] = useState(false);
-  const familyItems = discoverNations(contextItems, family, lens);
-  const visibleItems = view === 'world' ? shortlistOnly && shortlistIds.length ? familyItems.filter(item => shortlistIds.includes(item.id)) : familyItems : contextItems;
-  const hiddenSelection = view === 'world' && !visibleItems.some(item => item.id === nation.id) ? nation.name : undefined;
+  const visibleItems = contextItems; // all ten nations, default order: no filter, sort or shortlist controls
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -160,7 +154,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
       {selection?.kind === 'tile' && <section className="game-selection"><small>SELECTED SQUARE</small><h2>{selection.label}</h2><p>{selection.detail}</p></section>}{panel}
     </div></aside> : <button id="game-reopen" className="game-reopen-panel" type="button" aria-expanded="false" aria-controls="game-details" onClick={() => { setCollapsed(false); requestAnimationFrame(() => document.getElementById('game-panel-title')?.focus()); }}><Compass size={18} /><span>Show {sceneTitle} details</span><CaretRight size={16} /></button>}
     <nav id="game-location-dock" className="game-dock" aria-label="Game locations">{places.filter(({id}) => locationVisible(id, resourceNation.id, marketOpen)).map(({id,name,icon:Icon}) => { const label = resourceNation.id === 'korund' && id === 'market' ? 'State store' : resourceNation.id === 'korund' && id === 'workplace' ? 'Assignment' : name; return <button key={id} type="button" aria-label={`Open ${label}`} aria-current={view === id || view === 'nation' && id === 'government' ? 'page' : undefined} onClick={() => navigate(id)}><Icon size={20} weight={view === id || view === 'nation' && id === 'government' ? 'fill' : 'regular'} /><span>{label}</span>{(view === id || view === 'nation' && id === 'government') && <i />}</button>; })}</nav>
-    <section className={`game-context-strip${view === 'world' ? ' game-nation-strip' : ''}`} aria-label={contextTitle ?? 'Scene context'}>{view === 'world' && <NationStripFilters family={family} lens={lens} onFamily={value => { setFamily(value); setShortlistOnly(false); }} onLens={setLens} hiddenSelection={hiddenSelection} shortlistCount={shortlistIds.length} shortlistActive={shortlistOnly && shortlistIds.length > 0} onShortlist={() => { setFamily('all'); setShortlistOnly(value => !value); }} />}<div className="game-context-heading"><small>{sceneTitle}</small><h2>{contextTitle ?? 'Scene context'}</h2><span>{guestDemo ? 'Disposable sample' : localDemo ? 'Browser-local demo' : view === 'country' ? 'Static lore · opt-in presence' : 'Citizen snapshot'}</span></div><div className="game-context-items">{visibleItems.length ? visibleItems.map(item => <button type="button" key={item.id} aria-pressed={item.selected} onClick={() => { setCollapsed(false); item.onSelect?.(); }}><strong>{view === 'world' && <NationSymbol id={item.id} />}{item.label}{view === 'world' && shortlistIds.includes(item.id) && <small className="nation-preview-badge">Suggested</small>}{view === 'world' && nationIsPreview(item.id) && item.badge !== 'Coming soon' && <small className="nation-preview-badge">Preview</small>}{item.badge && <small className="population-band-badge" data-band={item.badge}>{item.badge}</small>}</strong><span>{view === 'world' && lens !== 'power' ? `${nationLensLabel(item.id, lens)} · ${item.detail}` : item.detail}</span><CaretRight size={16} /></button>) : <p>{hasPanel ? 'Details are open. Available actions appear in the scene panel.' : 'Show details to view available actions in this scene.'}</p>}</div></section>
+    <section className={`game-context-strip${view === 'world' ? ' game-nation-strip' : ''}`} aria-label={contextTitle ?? 'Scene context'}><div className="game-context-heading"><small>{sceneTitle}</small><h2>{contextTitle ?? 'Scene context'}</h2><span>{guestDemo ? 'Disposable sample' : localDemo ? 'Browser-local demo' : view === 'country' ? 'Static lore · opt-in presence' : 'Citizen snapshot'}</span></div><div className="game-context-items">{visibleItems.length ? visibleItems.map(item => <button type="button" key={item.id} aria-pressed={item.selected} onClick={() => { setCollapsed(false); item.onSelect?.(); }}><strong>{view === 'world' && <NationSymbol id={item.id} />}{item.label}{view === 'world' && shortlistIds.includes(item.id) && <small className="nation-preview-badge">Suggested</small>}{view === 'world' && nationIsPreview(item.id) && item.badge !== 'Coming soon' && <small className="nation-preview-badge">Preview</small>}{item.badge && <small className="population-band-badge" data-band={item.badge}>{item.badge}</small>}</strong><span>{item.detail}</span><CaretRight size={16} /></button>) : <p>{hasPanel ? 'Details are open. Available actions appear in the scene panel.' : 'Show details to view available actions in this scene.'}</p>}</div></section>
     {socialDock}
     <div className="game-world-note">CITY DISTRICTS · CITIZEN VIEW</div>
   </main>;
