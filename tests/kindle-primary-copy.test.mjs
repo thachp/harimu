@@ -41,7 +41,8 @@ test('placeholders: only {party} (no district, ARC #357); party names only via {
   const t=all().join(' ');
   for (const m of t.matchAll(/\{[^}]+\}/g)) assert.ok(PRIMARY_PLACEHOLDERS.includes(m[0]), m[0]);
   for (const p of PRIMARY_PLACEHOLDERS) assert.ok(t.includes(p), p);
-  assert.doesNotMatch(all().join(' '),/\{district\}|district/i);
+  for (const l of all()) assert.ok(!l.includes('{district}'), `no line contains {district}: ${l}`);
+  assert.doesNotMatch(all().join(' '),/district/i);
   for (const p of kindleParties) { assert.ok(!t.includes(p.name), p.name); assert.ok(!t.includes(p.id)); }
   assert.doesNotMatch(M.inOtherParty.text,/\{/); assert.doesNotMatch(B.otherPartyBlock.text,/\{/);
 });

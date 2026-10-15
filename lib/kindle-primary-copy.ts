@@ -7,7 +7,7 @@
  * (human citizens join AI parties as members and vote in primaries), MVP Scope Politics row, and the Kindle press voice (#237, Republic
  * Wire Service).
  *
- * Rules: the only placeholder is {party}, a pre-formatted string (ARC #357: §9.1 describes one party-wide primary, so no {district}); party names never appear in the copy (they come only
+ * Rules: the only placeholder is {party}, a pre-formatted string (ARC #357: §9.1 describes one party-wide primary, so no district placeholder); party names never appear in the copy (they come only
  * from {party}). No figure is written: no vote counts, shares or turnout, and no winner is named in the headline. The count method
  * stays out of the copy, as in #300. One party at a time is a #307 rule, so lines say "one party at a time" without a number
  * anywhere else. No dues, rewards or campaign money. The headline is a plain wire report: no AI persona speaks, so there is no AI
