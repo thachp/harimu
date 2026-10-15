@@ -4,7 +4,11 @@
  * structured list), politics/ai-leadership (ideologies are invented, in-world, never mapped to real parties; e.g. a
  * low-tax Kindle conservative vs a welfare-minded Kindle liberal) and the Kindle Republic page (democracy plus
  * capitalism, progressive income, sales and land tax set by law, palette ember orange, basalt black and brass).
- * Parties and candidates are AI. Pledges carry no figures, so none is invented. All prose is new: `proposal: true`. */
+ * Parties and candidates are AI. Figures (#263, ARC): only two pledges carry one, both from §9.4's examples. The income-tax
+ * pledge says "Lower income tax to 20%", inside the economy docs' Kindle income tax band of 0-50% [ASSUMPTION]; the band
+ * is proposal wording and matches lib/income-tax.ts (#287, kindleIncomeTaxBand). The frontier pledge says "Build 3
+ * frontier cities", the one city count in the docs; no other count is invented, and the sales and land tax pledges stay
+ * figure-free because the docs set no band for them. All prose is new: `proposal: true`. */
 
 export type PledgeCategory='tax'|'jobs'|'housing'|'trade'|'frontier'|'civic';
 export type KindleParty={id:string;name:string;ideology:string;color:string;blurb:string;ai:true;proposal:true};
@@ -17,6 +21,13 @@ export const PARTY_IDEOLOGY_MAX=100;
 export const PARTY_BLURB_MAX=280;
 export const PLEDGES_PER_CANDIDATE_MIN=3;
 export const PLEDGES_PER_CANDIDATE_MAX=5;
+/** [ASSUMPTION] Kindle income tax band in whole percent (economy-currency budget section). Mirrors lib/income-tax.ts. Proposal wording. */
+export const PLEDGE_INCOME_TAX_BAND={min:0,max:50} as const;
+/** The only figures a pledge card may carry, keyed by pledge. Each value appears in that pledge's card and broken-pledge line. */
+export const pledgeFigures={
+ 'tax-lower-income':{kind:'income-tax-percent',value:20},
+ 'frontier-new-cities':{kind:'frontier-city-count',value:3},
+} as const;
 
 const party=(id:string,name:string,ideology:string,color:string,blurb:string):KindleParty=>({id,name,ideology,color,blurb,ai:true,proposal:true});
 const p=(key:string,category:PledgeCategory,card:string,brokenPressLine:string):Pledge=>({key,category,card,brokenPressLine,proposal:true});
@@ -31,7 +42,7 @@ export const kindleParties:readonly KindleParty[]=[
 ];
 
 export const pledgeCatalog:readonly Pledge[]=[
- p('tax-lower-income','tax','Lower the income tax','The promised income tax cut has not come.'),
+ p('tax-lower-income','tax','Lower income tax to 20%','The promised income tax cut to 20% has not come.'),
  p('tax-lower-sales','tax','Cut the sales tax','Shoppers still pay the old sales tax, despite the pledge.'),
  p('tax-fair-land','tax','Review the land tax','The land tax review was promised. It has not begun.'),
  p('jobs-full-employment','jobs','A job for every Resident who wants one','Residents are still looking for work the campaign promised.'),
@@ -41,7 +52,7 @@ export const pledgeCatalog:readonly Pledge[]=[
  p('trade-meridian-deal','trade','Trade deal with Meridian','No trade deal with Meridian has been signed.'),
  p('trade-open-markets','trade','Open the markets to every trader','Markets are no more open than before the vote.'),
  p('trade-careful-deals','trade','No trade deal that costs Kindle jobs','A trade deal went through without a word on jobs.'),
- p('frontier-new-cities','frontier','Found new frontier cities','No new frontier city has been founded.'),
+ p('frontier-new-cities','frontier','Build 3 frontier cities','None of the 3 promised frontier cities has been built.'),
  p('frontier-docks','frontier','Build new docks at Brasswell Port','The new docks at Brasswell Port are not built.'),
  p('civic-open-ballots','civic','Count every ballot in public view','The public count the campaign promised has not happened.'),
  p('civic-fewer-rules','civic','Cut red tape for new companies','Founding a company takes as long as it did.'),

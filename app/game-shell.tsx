@@ -16,6 +16,8 @@ import { discoverNations, nationLensLabel, nationIsPreview, type NationFamily, t
 type GameNation = { id: string; name: string; capital?: string; color?: string };
 export type GameShellProps = {
   worldClock?: WorldClock;
+  /** #280: name of today's public holiday (endorsed festival), when faith is on. */
+  holidayName?: string | null;
   nextDeadline?: {label:string;endsAt:string;expiredText?:string};
   view: SceneView;
   nation: GameNation;
@@ -61,7 +63,7 @@ function HudHelp({ label, children, help }: { label: string; children: ReactNode
   return <details className="game-hud-help"><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ worldClock, nextDeadline, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ worldClock, holidayName, nextDeadline, view, nation, citizenNation, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
   const [family, setFamily] = useState<NationFamily>('all');
   const [lens, setLens] = useState<NationLens>('power');
   const [shortlistOnly, setShortlistOnly] = useState(false);
@@ -114,7 +116,7 @@ export function GameShell({ worldClock, nextDeadline, view, nation, citizenNatio
         <HudHelp label="Materials" help="Materials are supplies held by your citizen for production. Loading means the citizen snapshot has not arrived."><Cube size={18} aria-hidden="true" /><strong>{inventory?.materials ?? 'Loading'}</strong><span>Mat.</span></HudHelp>
         <HudHelp label="Knowledge" help="Knowledge is a resource held by your citizen for learning and production. Loading means the citizen snapshot has not arrived."><BookOpen size={18} aria-hidden="true" /><strong>{inventory?.knowledge ?? 'Loading'}</strong><span>Know.</span></HudHelp></>}
       </div>
-      <div className="game-account"><HudHelp label="World clock" help={guestDemo ? 'This disposable example has no world clock. Its sample actions complete immediately.' : 'Game days start at 1; simulation ticks count completed two-hour intervals from 0. Day 2 with tick 1 means the second game day and one completed tick. World days use 12× real-time compression. This preview processes simulation ticks on visits, not continuously. Work shifts always finish at their real-time deadline.'}><span className="game-clock">{guestDemo ? 'Sample' : worldClock ? `Day ${worldClock.gameDay} · 12×` : citizenNation ? 'Loading world' : 'World preview'}<small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : guestDemo ? 'NO WORLD CHANGES' : citizenNation ? 'AWAITING SNAPSHOT' : '12× · ON VISITS'}</small>{nextDeadline && <span className="game-next-deadline"><GameTimer compact endsAt={nextDeadline.endsAt} label={nextDeadline.label} expiredText={nextDeadline.expiredText} /></span>}</span></HudHelp><a className="game-glossary" href="https://docs.harimu.com/appendices/glossary/" target="_blank" rel="noreferrer" aria-label="Game glossary, official documentation (opens new tab)"><BookOpen size={17} aria-hidden="true" /><span>Glossary</span></a><GameSettings/><div id="game-notification-slot" />{accountControls}</div>
+      <div className="game-account"><HudHelp label="World clock" help={guestDemo ? 'This disposable example has no world clock. Its sample actions complete immediately.' : 'Game days start at 1; simulation ticks count completed two-hour intervals from 0. Day 2 with tick 1 means the second game day and one completed tick. World days use 12× real-time compression. This preview processes simulation ticks on visits, not continuously. Work shifts always finish at their real-time deadline.'}><span className="game-clock">{guestDemo ? 'Sample' : worldClock ? `Day ${worldClock.gameDay} · 12×` : citizenNation ? 'Loading world' : 'World preview'}<small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : guestDemo ? 'NO WORLD CHANGES' : citizenNation ? 'AWAITING SNAPSHOT' : '12× · ON VISITS'}</small>{holidayName && <small className="game-clock-holiday">Public holiday</small>}{nextDeadline && <span className="game-next-deadline"><GameTimer compact endsAt={nextDeadline.endsAt} label={nextDeadline.label} expiredText={nextDeadline.expiredText} /></span>}</span></HudHelp><a className="game-glossary" href="https://docs.harimu.com/appendices/glossary/" target="_blank" rel="noreferrer" aria-label="Game glossary, official documentation (opens new tab)"><BookOpen size={17} aria-hidden="true" /><span>Glossary</span></a><GameSettings/><div id="game-notification-slot" />{accountControls}</div>
     </header>
     {view !== 'country' && breadcrumbs}
     {view !== 'country' && shiftChip}

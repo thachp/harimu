@@ -6,6 +6,7 @@ import { GameTimer } from './game-timer';
 import { AiBadge } from './ai-disclosure';
 import { pledgeCard, risingStage } from '../lib/claimant-copy';
 import { fillClaimantCopy } from '../lib/aurelle-rising';
+import { coupStage } from '../lib/palace-coup-copy';
 
 type Snapshot = AurelleRisingState & { error?: string; ok?: boolean };
 const hours = (seconds: number) => Math.floor(seconds / 3600);
@@ -16,6 +17,12 @@ export function AurelleRisingView({ state, busy, error, onPledge }: { state: Aur
   const byId = (id: string) => state.claimants.find(c => c.id === id) ?? { name: rising?.claimantName ?? '', house: rising?.house ?? '', motto: '' };
   const reason = busy ? 'A pledge is being saved. Please wait.' : state.pledge.reason;
   return <section className="citizen-market" aria-label="Aurelle claimants and the Rising">
+    {state.coup?.status === 'open' && <div role="status" aria-label="Palace coup banner" className="rising-banner">
+      <h4>{coupStage('crisis-window-open')!.leaderPanel.label} <AiBadge /></h4>
+      <p>{coupStage('crisis-window-open')!.leaderPanel.line.replaceAll('{leader}', 'The Crown')}</p>
+      <GameTimer endsAt={state.coup.closesAt * 1000} label="Crisis Window closes" />
+    </div>}
+    {state.coup && state.coup.status !== 'open' && <p role="status" aria-label="Palace coup outcome">{coupStage(state.coup.status === 'succeeded' ? 'coup-succeeded' : 'coup-failed')!.leaderPanel.line.replaceAll('{newLeader}', state.coup.newLeader?.name ?? '').replaceAll('{house}', state.coup.newLeader?.house ?? '').replaceAll('{leader}', 'The Crown')}</p>}
     {rising?.status === 'open' && <div role="status" aria-label="Rising banner" className="rising-banner">
       <h4>{risingStage('crisis-window-open')!.notice}</h4>
       <p>{fillClaimantCopy(risingStage('crisis-window-open')!.claimantVoice, byId(rising.claimantId))}</p>
