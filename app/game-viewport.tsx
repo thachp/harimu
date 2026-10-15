@@ -218,7 +218,8 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       sun.shadow.map?.dispose(); renderer.dispose(); renderer.forceContextLoss(); labelLayer.remove(); canvas.remove();
     };
   }, [mode, nationId, cityName, marketOpen, nationSignature, graphics, visitor]);
-  useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, nationSignature, graphics]);
+  // #618: the scene (and so every label button) is rebuilt when any dependency of the effect above changes, so re-apply the selected nation, its aria-pressed and outline, after any of them: this list must hold every dependency of that effect (tests/globe-label-pressed.test.mjs).
+  useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, cityName, marketOpen, nationSignature, graphics, visitor]);
   useEffect(() => { if (cameraTourNationId && mode === 'world') controls.current?.focusNation(cameraTourNationId, false); }, [cameraTourNationId, mode, nationId, nationSignature, graphics]);
   useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId, cityName, graphics]);
   return <div className={`game-viewport ${className}`} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360 }}>
