@@ -57,6 +57,12 @@ export function identityHold(search: string, validNationIds: readonly string[], 
 export function viewedNationHeld(hold: IdentityHold, search: string, validNationIds: readonly string[]): boolean {
   return hold !== 'none' && !validNationInSearch(search, validNationIds);
 }
+/** #543 (follow-up to #376): is this session a visitor for scene URLs, so every scene keeps the previewed `nation=`? Yes with no citizen when the session is anonymous or the local demo,
+ *  and also when it is `ready` but has no citizen row yet (a new account previewing nations before choosing citizenship). Never while `loading` or `error` (the citizen may exist but is not known yet,
+ *  and pinning the default nation then would defeat #411), and never for a citizen. */
+export function isVisitorSession(hasCitizenNation: boolean, clerkConfigured: boolean, status: 'loading' | 'anonymous' | 'ready' | 'error'): boolean {
+  return !hasCitizenNation && (!clerkConfigured || status === 'anonymous' || status === 'ready');
+}
 /** `visitor` (#376): a guest or signed-out visitor has no citizen nation, so the nation they are previewing is the only one every scene shows; keep it in every scene's URL so a reload or shared link stays on it.
  *  A citizen's personal scenes always show their own nation, so for a citizen it stays out of the URL (`visitor` false). */
 export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false, visitor = false): string {
