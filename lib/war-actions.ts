@@ -1,7 +1,7 @@
 /** #350: server-only commands for declaring a war and ending it (propose, then the other side accepts), behind HARIMU_WAR_ENABLED (default "false").
  *  The caller is a server-only caller (no citizen session; see handleWarCommand), and the acting role is validated against lib/war-authority.ts.
  *  Reuses declareWar / endWar from lib/war.ts, so the Founding Period, the non-aggression pact (#402) and the peace lock are checked there and every command is idempotent by request id.
- *  NOT here (follow-up issues): the section 15 rate limits and casus belli gate, the Kindle Assembly vote, surrender and concession terms. */
+ *  The section 15 declaration rate limits and casus belli gate (#426) are applied in declareWar behind HARIMU_WAR_DECLARATION_LIMITS_ENABLED. NOT here (follow-up issues): the Kindle Assembly vote, surrender and concession terms. */
 import type { GameDatabase } from './database-contract';
 import { declareWar, endWar } from './war';
 import { isWarNation, requestIdOk, warNationNames, type WarNationId } from './war-rules';
@@ -29,12 +29,12 @@ const openWar = (db: GameDatabase, warId: string) => db.prepare('SELECT id,attac
 
 export type DeclareCommand = { nation: string; role: string; defender: string; casusBelli?: string; declaredBy?: string; requestId: string };
 /** The acting nation's authorized office declares war on `defender`. Kindle's declaration is recorded as a President proposal (ratifier "assembly majority" is data only). */
-export async function declareByAuthority(db: GameDatabase, command: DeclareCommand, now: number, enabled: boolean) {
+export async function declareByAuthority(db: GameDatabase, command: DeclareCommand, now: number, enabled: boolean, limits = false) {
   if (!enabled) return disabled();
   if (!requestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
   const who = actor(command.nation, command.role); if (!who.ok) return who;
   const declaredBy = command.declaredBy ?? leaderPersonas[who.nation].name;
-  const declared = await declareWar(db, { attacker: who.nation, defender: command.defender, casusBelli: command.casusBelli, declaredBy, requestId: command.requestId }, now, { enabled });
+  const declared = await declareWar(db, { attacker: who.nation, defender: command.defender, casusBelli: command.casusBelli, declaredBy, requestId: command.requestId }, now, { enabled, limits });
   if (!declared.ok) return declared;
   // The authority record is written on a replay too (ON CONFLICT DO NOTHING), so a crash between the two statements is repaired by the retry.
   await record(db, { requestId: command.requestId, warId: declared.war.id, action: 'declare', nation: who.nation, authority: who.authority, now });
@@ -87,7 +87,7 @@ export async function acceptEnd(db: GameDatabase, command: AcceptEndCommand, now
   return ended.ok ? { ok: true as const, kind: proposal.end_kind, war: ended.war, authority: who.authority } : ended;
 }
 
-export type WarCommandInput = { enabled: boolean; secret: string | undefined; authorization: string | null; body: Record<string, unknown>; now: number };
+export type WarCommandInput = { enabled: boolean; /** #426: HARIMU_WAR_DECLARATION_LIMITS_ENABLED, default off. */ limits?: boolean; secret: string | undefined; authorization: string | null; body: Record<string, unknown>; now: number };
 const text = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max ? value : '';
 /** `authorizeWarCaller` is also called by the route before it parses the body, so a bad body without credentials is 401, not 400. The server-only entry point: flag first (403, nothing read or written), then the bearer secret (HARIMU_WAR_ADMIN_SECRET; missing or wrong never authorizes), then the command. */
 export async function authorizeWarCaller(input: { enabled: boolean; secret: string | undefined; authorization: string | null }) {
@@ -100,7 +100,7 @@ export async function handleWarCommand(db: GameDatabase, input: WarCommandInput)
   if (denied) return denied;
   const { body, now } = input;
   const base = { nation: text(body.nation, 20), role: text(body.role, 40), requestId: text(body.requestId, 64) };
-  if (body.action === 'declare') return declareByAuthority(db, { ...base, defender: text(body.defender, 20), casusBelli: typeof body.casusBelli === 'string' ? body.casusBelli : undefined, declaredBy: typeof body.declaredBy === 'string' ? body.declaredBy : undefined }, now, true);
+  if (body.action === 'declare') return declareByAuthority(db, { ...base, defender: text(body.defender, 20), casusBelli: typeof body.casusBelli === 'string' ? body.casusBelli : undefined, declaredBy: typeof body.declaredBy === 'string' ? body.declaredBy : undefined }, now, true, input.limits === true);
   if (body.action === 'propose-end') return proposeEnd(db, { ...base, warId: text(body.warId, 80), kind: text(body.kind, 20) }, now, true);
   if (body.action === 'accept-end') return acceptEnd(db, { ...base, warId: text(body.warId, 80) }, now, true);
   if (body.action === 'assault') return resolveCityAssault(db, { nation: base.nation, warId: text(body.warId, 80), cityKind: text(body.cityKind, 20), cityId: text(body.cityId, 80), requestId: base.requestId }, now, true); // #419: one successful city assault (siege PoC)
