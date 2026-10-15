@@ -143,10 +143,12 @@ export async function declareWar(db: GameDatabase, command: DeclareWarCommand, n
   if (options.limits) { const limited = await declarationLimit(db, command.attacker, command.defender, now); if (limited) return limited; }
   const id = `war-${command.requestId}`;
   // The unique open-war-per-pair index and the request id make concurrent declarations safe: only one insert can land.
-  // #426 RACE SAFETY: the per-nation limit clauses below (one declaration per interval, at most 2 open offensive wars) are NOT atomic on their own. They are race-safe here only because
-  // every write goes through the single Postgres writer lock (and SQLite's single writer). A bare guarded INSERT ... SELECT ... WHERE NOT EXISTS is not safe across several real
-  // Postgres connections: under READ COMMITTED two sessions can both pass the guard (QA2 measured both declarations landing in 356 of 400 tries). Before
-  // HARIMU_WAR_DECLARATION_LIMITS_ENABLED is ever turned on, the limits need a Postgres advisory lock or a unique index, tested on real multi-connection Postgres (follow-up issue #575).
+  // #426/#575 RACE SAFETY: the per-nation limit clauses below (one declaration per interval, at most 2 open offensive wars) are NOT atomic on their own: a bare guarded
+  // INSERT ... SELECT ... WHERE NOT EXISTS lets two sessions both pass the guard under READ COMMITTED (measured on real Postgres: both landed in 58 of 60 rounds). They are
+  // safe here because this statement goes through the database adapter, whose every write transaction takes `pg_advisory_xact_lock(<writer lock>)` right after BEGIN
+  // (lib/postgres/database.ts), before this INSERT takes its snapshot, and holds it to COMMIT; SQLite/D1 has one writer. That lock is global, so it also covers a per-nation
+  // key. Do NOT run this INSERT on a raw connection, and do not remove that lock without a per-nation replacement: tests/war-limits-postgres.test.mjs pins the lock order
+  // (always runs) and proves exactly-once on real multi-connection Postgres (needs HARIMU_TEST_POSTGRES_URL; CI has no Postgres service, so only the pin runs there).
   await db.prepare(`INSERT INTO wars (id,request_id,pair_key,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at)
     SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM wars WHERE pair_key=? AND ended_at IS NULL)${options.limits
       ? ' AND NOT EXISTS (SELECT 1 FROM wars WHERE attacker_nation=? AND declared_at>?) AND (SELECT COUNT(*) FROM wars WHERE attacker_nation=? AND ended_at IS NULL)<?' : ''} ON CONFLICT DO NOTHING`)
