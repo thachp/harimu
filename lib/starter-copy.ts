@@ -29,4 +29,16 @@ export const starterCopy:readonly StarterCopy[]=[
   {begin:'Sign on for your first shift in Work',underway:'Shift underway. Return to Work when the bell rings',collect:'Collect your Charge in Work. A contract honored',food:'Get food in Market. Haggle hard but fairly',meal:'Prepare a meal in Household. Fair winds for tomorrow'}),
 ];
 
-export function starterCopyFor(nationId:string):StarterCopy|null{return starterCopy.find(entry=>entry.nationId===nationId)??null;}
+/** #365: food-step lines for while the market flag is off (lib/market-visibility.ts), when the Market tab and building are hidden. They point to
+ * the daily-loop "Buy {n} food" step at the starter merchant instead. Only Kindle: Korund's State store and Aurelle's royal store are
+ * separate nation systems that stay open. */
+export const starterFoodMarketOff:Readonly<Record<string,string>>={
+ kindle:'Buy food from the starter merchant in your daily loop. Check the posted price first',
+};
+
+/** `marketOpen` is marketVisible(nationId, flag); it defaults to true, so existing callers see the copy unchanged. */
+export function starterCopyFor(nationId:string,opts:{marketOpen?:boolean}={}):StarterCopy|null{
+ const entry=starterCopy.find(item=>item.nationId===nationId)??null;
+ const food=starterFoodMarketOff[nationId];
+ return entry&&opts.marketOpen===false&&food?{...entry,steps:{...entry.steps,food}}:entry;
+}

@@ -1,7 +1,8 @@
 'use client';
-import type { PublicWar } from '@/lib/war';
-import { citizenSafety, mobilizationStatus, noticesFor, warBanner, type WarNation } from '@/lib/war-copy';
-import { fillWarText, isWarNation, warNationNames } from '@/lib/war-rules';
+import type { DefenseWindowState, PublicWar } from '@/lib/war';
+import { citizenSafety, defenseWindow, mobilizationStatus, noticesFor, warBanner, type WarNation } from '@/lib/war-copy';
+import { defenseWindowLocal, fillWarText, isWarNation, warNationNames } from '@/lib/war-rules';
+import { useSyncExternalStore } from 'react';
 import { GameTimer } from './game-timer';
 import { useDisplayTimestamp } from './display-preferences';
 
@@ -26,4 +27,22 @@ export function WarBanner({ wars, nationId }: { wars: PublicWar[] | undefined; n
       <p>{citizenSafety.lines[0].text}</p>
     </article>;
   })}</section>;
+}
+
+const subscribeNever = () => () => {};
+const browserOffsetMinutes = (): number | null => -new Date().getTimezoneOffset();
+const serverOffset = (): number | null => null;
+/** #310: "Defense window: HH:MM–HH:MM your time" on the nation's Country view (HARIMU_WAR_ENABLED; the server sends no windows while it is off).
+ *  The window is saved in UTC and shown in the viewer's own time: the offset is read in the browser (useSyncExternalStore with a null server snapshot), so nothing renders on the server pass.
+ *  `offsetMinutes` (minutes east of UTC) is for tests and previews. Copy comes from lib/war-copy.ts (#312). */
+export function DefenseWindow({ windows, nationId, offsetMinutes }: { windows: Record<string, DefenseWindowState> | undefined; nationId: string; offsetMinutes?: number }) {
+  const browserOffset = useSyncExternalStore(subscribeNever, browserOffsetMinutes, serverOffset);
+  const offset = offsetMinutes ?? browserOffset;
+  const state = windows?.[nationId];
+  if (!isWarNation(nationId) || !state || offset === null) return null;
+  const { start, end } = defenseWindowLocal(state.startHourUtc, offset);
+  return <section aria-label="Defense window">
+    <p><strong>{fillWarText(defenseWindow.line.text, { start, end })}</strong></p>
+    {defenseWindow.explainer.map(line => <p key={line.text}>{line.text}</p>)}
+  </section>;
 }
