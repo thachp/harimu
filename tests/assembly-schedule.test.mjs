@@ -37,14 +37,14 @@ test('#351 pure: nothing configured never opens; the manual open time keeps its 
 });
 
 test('#351 pure: seats carry over with staggered terms; a district keeps six seats, three up and three held', () => {
-  const first = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 1, [D]: 1 } });
+  const first = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 5, [D]: 5 } });
   const carried = carryIncumbents(first);
   for (const d of first.districts) {
     if (d.contested) { assert.deepEqual(carried[d.districtId].up, d.seatsHeld, 'the half that served the whole term goes up next'); assert.deepEqual(carried[d.districtId].held, d.seatsWon, 'the seats just won are held next'); }
     else assert.deepEqual(carried[d.districtId], { up: d.seatsUp, held: d.seatsHeld }, 'a district nobody voted in does not rotate');
     assert.equal(sumOf(carried[d.districtId].up), 3); assert.equal(sumOf(carried[d.districtId].held), 3);
   }
-  const second = assemblyResult({ forgehaven: { [D]: 4 } }, carried);
+  const second = assemblyResult({ forgehaven: { [D]: 5 } }, carried);
   const f = second.districts.find(d => d.districtId === 'forgehaven');
   assert.deepEqual(f.seatsUp, carried.forgehaven.up); assert.deepEqual(f.seatsHeld, carried.forgehaven.held); assert.equal(sumOf(f.seatsAfter), 6);
   assert.deepEqual(second.totals.before, Object.fromEntries(Object.keys(first.totals.after).map(id => [id, first.totals.after[id]])), 'the seats before the second election are exactly the seats after the first');
@@ -63,11 +63,11 @@ test('#351 pure: a party under 5% of the district human ballots takes no part in
   const none = districtResult('kolt-savanna', {}); assert.deepEqual(none.belowThreshold, []); assert.equal(none.contested, false);
   // Everyone clears it: all three take part, as before.
   const even = districtResult('forgehaven', { [S]: 3, [O]: 1, [D]: 2 }); assert.deepEqual(even.belowThreshold, []);
-  // One ballot: the one party it names has 100% and the other two have none, so they are out (the dominance is accepted for the MVP, #356).
-  const one = districtResult('forgehaven', { [S]: 1 }); assert.deepEqual([...one.belowThreshold].sort(), [D, O].sort()); assert.deepEqual(one.seatsWon, { [S]: 3, [O]: 0, [D]: 0 });
+  // Five ballots for one party (the #463 floor): it has 100% and the other two have none, so they are out (the dominance is accepted for the MVP, #356).
+  const one = districtResult('forgehaven', { [S]: 5 }); assert.deepEqual([...one.belowThreshold].sort(), [D, O].sort()); assert.deepEqual(one.seatsWon, { [S]: 3, [O]: 0, [D]: 0 });
   for (const d of assemblyDistricts) for (let s = 0; s < 8; s++) for (let o = 0; o < 8; o++) for (let dd = 0; dd < 8; dd++) {
     const r = districtResult(d.id, { [S]: s, [O]: o, [D]: dd }); assert.equal(sumOf(r.seatsWon), 3); assert.equal(sumOf(r.seatsAfter), 6);
-    if (r.humanBallots > 0) for (const id of [S, O, D]) assert.equal(r.belowThreshold.includes(id), r.human[id] * 100 < 5 * r.humanBallots, `${d.id} ${s}/${o}/${dd} ${id}`);
+    if (r.contested) for (const id of [S, O, D]) assert.equal(r.belowThreshold.includes(id), r.human[id] * 100 < 5 * r.humanBallots, `${d.id} ${s}/${o}/${dd} ${id}`);
   }
 });
 
@@ -136,7 +136,7 @@ test(`#351 ${backend}: the world tick opens at day 60, closes after 72 hours, co
 test(`#351 ${backend}: the next cycle opens a new election and the first count's seats carry into it`, async t => {
   const c = await setup(t); const { r } = c, id0 = `${base}-cycle-0`, id1 = `${base}-cycle-1`, open0 = c.start + 60 * DAY, open1 = open0 + 120 * DAY;
   c.at(open0 + 60); await c.tick();
-  const plan = [['forgehaven', S, 3], ['forgehaven', O, 1], ['forgehaven', D, 2], ['tarrek-foundry', O, 1], ['tarrek-foundry', D, 1]];
+  const plan = [['forgehaven', S, 3], ['forgehaven', O, 1], ['forgehaven', D, 2], ['tarrek-foundry', O, 5], ['tarrek-foundry', D, 5]]; // #463: 5 ballots is the floor to count
   let n = 0; for (const [district, party, votes] of plan) for (let i = 0; i < votes; i++) { const user = `v${n++}`; await c.citizen(user, district); assert.equal((await c.vote(user, party, id0)).status, 200, user); }
   c.at(open0 + W + 5); await c.tick(); await c.tick();
   const first = (await r.call('assembly', 'v0')).data.result, f0 = first.districts.find(d => d.districtId === 'forgehaven');
@@ -148,12 +148,12 @@ test(`#351 ${backend}: the next cycle opens a new election and the first count's
   const fp = projected.districts.find(d => d.id === 'forgehaven'); assert.deepEqual(fp.seatsUp, f0.seatsHeld, 'the held half goes up'); assert.deepEqual(fp.seatsHeld, f0.seatsWon, 'the seats just won are held');
   assert.equal((await c.vote('v0', S, id0)).status, 400, 'the old election id no longer takes ballots');
   await c.tick(); assert.equal(await c.count('assembly_elections'), 2);
-  assert.equal((await c.vote('v0', D, id1)).status, 200, 'one ballot per election: v0 votes again in the new one');
+  for (let i = 0; i < 5; i++) assert.equal((await c.vote(`v${i}`, D, id1)).status, 200, 'one ballot per election: v0 to v4 vote again in the new one (5 ballots, the #463 floor)');
   c.at(open1 + W + 5); await c.tick(); await c.tick();
   const second = (await r.call('assembly', 'v0')).data.result; const f1 = second.districts.find(d => d.districtId === 'forgehaven');
   assert.deepEqual(f1.seatsUp, f0.seatsHeld); assert.deepEqual(f1.seatsHeld, f0.seatsWon); assert.equal(sumOf(f1.seatsAfter), 6);
   assert.deepEqual(second.totals.before, first.totals.after, 'the seats before the second election are the seats after the first');
-  assert.deepEqual(f1.belowThreshold.sort(), [O, S].sort(), 'one ballot for Dockside: the other two are under 5%');
+  assert.deepEqual(f1.belowThreshold.sort(), [O, S].sort(), 'five ballots for Dockside: the other two are under 5%');
   assert.equal(sumOf(second.totals.after), 18);
   const rows = (await r.db.prepare('SELECT id,closed_at,result_json FROM assembly_elections ORDER BY opens_at').all()).results; assert.deepEqual(rows.map(x => x.id), [id0, id1]); assert.ok(rows.every(x => x.closed_at && x.result_json));
   // The diplomacy ratification seats (#308) read the latest counted result.
@@ -162,7 +162,7 @@ test(`#351 ${backend}: the next cycle opens a new election and the first count's
 
 test(`#351 ${backend}: a skipped cycle (never held) does not advance the rotation: the half that was due goes up again`, async t => {
   const c = await setup(t); const { r } = c, id0 = `${base}-cycle-0`, open0 = c.start + 60 * DAY, open2 = open0 + 240 * DAY;
-  c.at(open0 + 60); await c.tick(); await c.citizen('v0', 'forgehaven'); assert.equal((await c.vote('v0', S, id0)).status, 200);
+  c.at(open0 + 60); await c.tick(); for (let i = 0; i < 5; i++) { await c.citizen(`v${i}`, 'forgehaven'); assert.equal((await c.vote(`v${i}`, S, id0)).status, 200); } // 5 ballots: the #463 floor
   c.at(open0 + W + 5); await c.tick(); await c.tick();
   const first = (await r.call('assembly', 'v0')).data.result;
   // Cycle 1 passes with no tick, no ballot and no election row: nobody counted.

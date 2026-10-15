@@ -32,16 +32,16 @@ test('#283 rules: two districts against hand-computed tables; half the seats up,
   assert.deepEqual(f.seatsWon, { [S]: 2, [O]: 0, [D]: 1 });
   assert.deepEqual(f.seatsUp, { [S]: 2, [O]: 1, [D]: 0 }); assert.deepEqual(f.seatsHeld, { [S]: 1, [O]: 1, [D]: 1 });
   assert.deepEqual(f.seatsAfter, { [S]: 3, [O]: 1, [D]: 2 }); // held + won
-  // Tarrek Foundry: humans S0 O1 D1 (N=2). Steady Hand has no ballot, so it is under the 5% share and out. O and D tie at 1: quotients O 1 .5 | D 1 .5.
+  // Tarrek Foundry: humans S0 O5 D5 (N=10; #463 needs at least 5 ballots to count, the quotients scale with the ballots). Steady Hand has no ballot, so it is under the 5% share and out. O and D tie at 1: quotients O 1 .5 | D 1 .5.
   // Seat 1 goes to O (a tie goes to the declared order), seat 2 to D (1 > .5), seat 3 ties .5 .5 and goes to O -> O2 D1 S0.
-  const t = districtResult('tarrek-foundry', { [O]: 1, [D]: 1 });
-  assert.deepEqual(t.human, { [S]: 0, [O]: 1, [D]: 1 }); assert.deepEqual(t.belowThreshold, [S]); assert.deepEqual(t.seatsWon, { [S]: 0, [O]: 2, [D]: 1 });
+  const t = districtResult('tarrek-foundry', { [O]: 5, [D]: 5 });
+  assert.deepEqual(t.human, { [S]: 0, [O]: 5, [D]: 5 }); assert.deepEqual(t.belowThreshold, [S]); assert.deepEqual(t.seatsWon, { [S]: 0, [O]: 2, [D]: 1 });
   assert.deepEqual(t.seatsAfter, { [S]: 1, [O]: 3, [D]: 2 });
   // A district nobody voted in contests nothing: the seats up stay with their incumbents.
   const k = districtResult('kolt-savanna', {});
   assert.equal(k.contested, false); assert.deepEqual(k.seatsWon, k.seatsUp); assert.deepEqual(k.human, { [S]: 0, [O]: 0, [D]: 0 });
-  const all = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 1, [D]: 1 } });
-  assert.equal(all.humanBallots, 8); assert.deepEqual(all.districts.map(d => d.districtId), assemblyDistricts.map(d => d.id));
+  const all = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 5, [D]: 5 } });
+  assert.equal(all.humanBallots, 16); assert.deepEqual(all.districts.map(d => d.districtId), assemblyDistricts.map(d => d.id));
   assert.equal(sumOf(all.totals.before), 18); assert.equal(sumOf(all.totals.after), 18);
 });
 
@@ -60,7 +60,7 @@ test('#283 rules: invariants hold for every ballot mix', () => {
 test('#283 rules: Content #299 headlines are filled, capped and follow the seat change', () => {
   for (const p of kindleParties) assert.ok(p.name.length <= ASSEMBLY_NAME_MAX, p.name);
   for (const d of assemblyDistricts) assert.ok(d.name.length <= ASSEMBLY_NAME_MAX, d.name);
-  const res = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 1, [D]: 1 } });
+  const res = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 5, [D]: 5 } });
   const lines = assemblyHeadlines(res), pick = (district, party) => lines.find(l => l.districtId === district && l.partyId === party);
   assert.equal(pick('forgehaven', S).stage, 'results-hold'); assert.equal(pick('forgehaven', O).stage, 'results-loss'); assert.equal(pick('forgehaven', D).stage, 'results-gain');
   assert.equal(pick('tarrek-foundry', D).stage, 'results-loss'); assert.equal(pick('tarrek-foundry', O).stage, 'results-gain'); assert.equal(pick('tarrek-foundry', S).stage, 'results-loss');
@@ -173,7 +173,7 @@ test(`#283 ${backend}: a ballot carries no citizen, receipt id or time; the stor
 
 test(`#283 ${backend}: the closed count is recorded once by the tick and matches the hand-computed table; seats up only`, async t => {
   const c = await setup(t); const { r } = c;
-  const plan = [['forgehaven', S, 3], ['forgehaven', O, 1], ['forgehaven', D, 2], ['tarrek-foundry', O, 1], ['tarrek-foundry', D, 1]];
+  const plan = [['forgehaven', S, 3], ['forgehaven', O, 1], ['forgehaven', D, 2], ['tarrek-foundry', O, 5], ['tarrek-foundry', D, 5]]; // #463: Tarrek Foundry has the 5 ballots it needs to count
   let n = 0; for (const [district, party, votes] of plan) for (let i = 0; i < votes; i++) { const user = `v${n++}`; await c.citizen(user, district); assert.equal((await c.vote(user, party)).status, 200, user); }
   assert.equal((await r.call('assembly', 'v0')).data.result, null, 'results stay hidden until close');
   r.setNow((c.open + W + 1) * 1000); await c.tick(); await c.tick();
