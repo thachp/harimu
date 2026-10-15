@@ -34,7 +34,9 @@ import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
 const crownMintOn = () => (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true'; // #362
 /** #362: the Aurelle plan plus, while HARIMU_CROWN_DEBASEMENT_ENABLED is on, the read-only Royal Mint strip. Flag off: exactly readAurelle. */
 async function readAurelleView(database: Awaited<ReturnType<typeof getDatabase>>, userId: string) {
-  const plan = await readAurelle(database, userId);
+  // #529: Royal Favor decay is evaluated at the current time only while HARIMU_FAVOR_DECAY_ENABLED is on (off: the flat rule, as before).
+  const decayOn = (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true';
+  const plan = await readAurelle(database, userId, decayOn ? { favorDecayAt: Math.floor(Date.now() / 1000) } : {});
   return crownMintOn() && plan.available ? { ...plan, mint: await readCrownMint(database, Math.floor(Date.now() / 1000)) } : plan;
 }
 /** #490: the generic nation wage plan, only while HARIMU_NATION_WORK_ENABLED is on and the citizen's nation has a wage ledger and is playable for the account. Otherwise no key at all. */

@@ -45,6 +45,8 @@
     "HARIMU_GRAY_MARKET_ENABLED": "false",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts, which none has yet.
     "HARIMU_NATION_WORK_ENABLED": "false",
+    // #529: Aurelle Royal Favor decays over time (read-time, no stored balance, no cron). Off: the Favor balance is exactly the flat rule of before. The window is an [ASSUMPTION] pending ARC.
+    "HARIMU_FAVOR_DECAY_ENABLED": "false",
     "HARIMU_KINDLE_INCOME_TAX_ENABLED": "false",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "false",
@@ -62,6 +64,8 @@
     "HARIMU_WAR_ENABLED": "false",
     // #423: war weariness PoC (weekly Unrest from an active war, docs 15.3). Needs HARIMU_WAR_ENABLED too. Off until QA.
     "HARIMU_WAR_WEARINESS_ENABLED": "false",
+    // #426: war declaration rate limits (1 per nation per 14 real days, 2 active offensive wars) and the casus belli (grievance score >= 40) gate. Needs HARIMU_WAR_ENABLED too. Off until QA.
+    "HARIMU_WAR_DECLARATION_LIMITS_ENABLED": "false",
     // #308: AI treaties PoC (non-aggression pact, trade agreement). Off until QA; treaties are proposed and ratified by server code only.
     "HARIMU_DIPLOMACY_ENABLED": "false",
     // #363: embargo PoC (bilateral trade cut). Off until QA; embargoes are proposed and ratified by server code only.
@@ -87,7 +91,9 @@
     "HARIMU_REALTIME_PRESENCE": "false",
     "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false",
     "NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_CREST": "false",
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "false",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"
   },
