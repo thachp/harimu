@@ -122,3 +122,21 @@ assert.equal(new URL(cityVisit).searchParams.get('nation'),'korund','Sample city
     assert.equal(url.searchParams.get('nation'), nation); assert.equal(url.searchParams.get('city'), city); assert.equal(url.searchParams.get('view'), 'workplace');
   }
 }
+
+// #376: a guest or signed-out visitor keeps the nation they preview in every scene; a citizen's personal scenes still do not carry a nation.
+{
+  const guest = 'https://harimu.com/?view=city&nation=kindle';
+  for (const view of viewModes) {
+    const url = new URL(sceneUrl(guest, view, 'kindle', undefined, true, true));
+    assert.equal(url.searchParams.get('view'), view); assert.equal(url.searchParams.get('nation'), 'kindle', `visitor ${view} keeps nation`);
+    assert.equal(url.searchParams.get('city'), null);
+  }
+  const work = sceneUrl(guest, 'workplace', 'korund', undefined, true, true), market = sceneUrl(work, 'market', 'korund', undefined, true, true);
+  assert.equal(new URL(market).search, '?view=market&nation=korund', 'Work then Market on a previewed nation');
+  assert.equal(nationFromSearch(new URL(market).search, ['kindle', 'korund', 'aurelle'], 'kindle'), 'korund', 'a reload reads the same nation back');
+  for (const view of ['household', 'workplace', 'market', 'square']) {
+    assert.equal(new URL(sceneUrl(guest, view, 'kindle', undefined, false, false)).searchParams.get('nation'), null, `a citizen's ${view} scene stays out of the URL`);
+    assert.equal(new URL(sceneUrl(guest, view, 'confluence', undefined, true, false)).searchParams.get('nation'), null, `a citizen's ${view} link never carries a foreign nation`);
+  }
+  assert.equal(new URL(sceneUrl(guest, 'workplace', undefined, undefined, true, true)).searchParams.get('nation'), null, 'no nation id, nothing to keep');
+}
