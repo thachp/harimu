@@ -3,7 +3,7 @@ export type GovernmentSnapshot = {
   nationId: string;
   mode: 'rule-bound simulation';
   /** #71: set when a Rising has crowned a claimant; the leader panel shows the new AI royal house. */
-  crown?: { claimantId: string; name: string; house: string; motto: string; color: string; crownedAt: number; how?: 'rising' | 'coup' };
+  crown?: { claimantId: string; name: string; house: string; motto: string; color: string; crownedAt: number; how?: 'rising' | 'coup' | 'succession' };
   /** #70/#74 Korund: current Chairman, Presidium seats and the latest emergency session (State Media rumor view). */
   presidium?: { chairman: { name: string }; seats: { id: string; name: string; role: string; status: 'serving' | 'purged' }[];
     session: { status: 'open' | 'survived' | 'purged'; openedAt: number; resolvesAt: number; resolvedAt: number | null } | null };
@@ -14,6 +14,8 @@ export type GovernmentSnapshot = {
   availableBudgetMinor: number;
   influenceSummary: string;
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
+  /** #613: Aurelle succession state and the named heir (flag HARIMU_AURELLE_SUCCESSION_ENABLED; absent otherwise). */
+  succession?: { status: 'reigning' | 'ailing' | 'vacant' | 'acceded' | 'abdicated'; heir: { name: string; named: boolean } | null };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
 
