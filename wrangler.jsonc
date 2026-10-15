@@ -57,6 +57,10 @@
     "HARIMU_CROWN_DEBASEMENT_ENABLED": "false",
     // #442: Kindle canvassing PoC (party members' ground-game quests; display-only district visibility, never votes). Off until QA.
     "HARIMU_CANVASSING_ENABLED": "false",
+    // #441: Kindle town hall PoC (citizen questions for 24 hours, top 10 answered). Off until QA. An operator sets HARIMU_TOWN_HALL_OPEN_AT (epoch seconds) to open every candidate's hall; unset it never opens.
+    "HARIMU_TOWN_HALLS_ENABLED": "false",
+    // #441: the AI candidates' town hall answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_TOWN_HALLS_ENABLED, the AI binding and a valid AI budget.
+    "HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED": "false",
     // #431: Kindle Spark money supply and Price Index PoC (Reserve Board issuance within the 3% cap and the Charter Limit). Off until QA; issuance is written only by the scheduled Worker.
     "HARIMU_SPARK_SUPPLY_ENABLED": "false",
     // #432: daily ledger reconciliation job and its read-only admin report route. Off until QA. The route also needs the HARIMU_ADMIN_TOKEN Worker secret (set in the dashboard, never in this file); without it the route is a 404.

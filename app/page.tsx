@@ -32,6 +32,7 @@ import {useDisplayTimestamp} from './display-preferences';
 import {RankedBallot} from './ranked-ballot';
 import {AssemblyBallot} from './assembly-ballot';
 import {Canvassing} from './canvassing'; // #442
+import {TownHalls} from './town-hall'; // #441
 import {ReserveBoardLine} from './reserve-board-line'; // #431
 import {PrimaryCard} from './primary-card';
 import type {ElectionSnapshot} from '../lib/elections';
@@ -1658,6 +1659,7 @@ export default function Home() {
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={citizenSessionKey} onSnapshot={setElection}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<Canvassing key={`canvassing:${citizenSessionKey}`}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<TownHalls key={`town-hall:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&simulation?.reserve&&<ReserveBoardLine reserve={simulation.reserve}/>}
         {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={citizenSessionKey}/>}
         {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={citizenSessionKey} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
