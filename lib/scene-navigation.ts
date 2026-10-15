@@ -57,10 +57,12 @@ export function identityHold(search: string, validNationIds: readonly string[], 
 export function viewedNationHeld(hold: IdentityHold, search: string, validNationIds: readonly string[]): boolean {
   return hold !== 'none' && !validNationInSearch(search, validNationIds);
 }
-export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false): string {
+/** `visitor` (#376): a guest or signed-out visitor has no citizen nation, so the nation they are previewing is the only one every scene shows; keep it in every scene's URL so a reload or shared link stays on it.
+ *  A citizen's personal scenes always show their own nation, so for a citizen it stays out of the URL (`visitor` false). */
+export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false, visitor = false): string {
   const url = new URL(href);
   url.searchParams.set('view', scene);
-  if (scene === 'nation' || scene === 'world' || scene === 'country' || Boolean(cityId) || (keepNation && scene === 'government')) {
+  if (scene === 'nation' || scene === 'world' || scene === 'country' || Boolean(cityId) || (keepNation && scene === 'government') || (visitor && Boolean(nationId))) {
     if (nationId) url.searchParams.set('nation', nationId);
   } else url.searchParams.delete('nation');
   // A city belongs to one nation; never carry a previous nation's city forward (#55).
