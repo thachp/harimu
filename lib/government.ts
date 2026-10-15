@@ -13,6 +13,8 @@ export type GovernmentSnapshot = {
   petitions?: { requestId: string; topic: PetitionTopic; submittedAt: number; status: 'pending' | 'accepted' | 'deferred'; reason: string; reviewedAt: number | null }[];
   availableBudgetMinor: number;
   influenceSummary: string;
+  /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
+  founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
 
 const institutions = {
