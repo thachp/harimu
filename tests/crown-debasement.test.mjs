@@ -103,6 +103,15 @@ test('a second debasement in the same game year is rejected; the next game year 
   assert.equal((await rows()).length, 2);
 });
 
+test('two concurrent runs of the same request write one decree and one gazette line, even when their clocks differ', async t => {
+  const { epoch, rows, gazette, decree } = await setup(t);
+  const requestId = randomUUID(), at = epoch + 3600;
+  const results = await Promise.all([decree(1000, at, { requestId }), decree(1000, at + 60, { requestId })]);
+  assert.ok(results.every(res => res.ok), JSON.stringify(results));
+  assert.equal((await rows()).length, 1, 'one decree row');
+  assert.equal((await gazette()).length, 1, 'the run that did not write the decree posts no gazette line');
+});
+
 test('the decree is capped at 15% per game year and needs a request id', async t => {
   const { r, c, epoch, rows, decree } = await setup(t);
   for (const bad of [0, 1501, 2000, -5, 10.5]) { const res = await decree(bad, epoch + 1); assert.equal(res.ok, false); assert.equal(res.status, 400, String(bad)); }

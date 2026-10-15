@@ -79,14 +79,15 @@ export async function decreeDebasement(db: GameDatabase, command: DecreeCommand,
   const gazette = pressPack('aurelle')?.templates.find(template => template.id === 'aurelle-debasement');
   const headline = gazette?.headline ?? 'A decree on the coinage', detail = gazette?.body.join(' ') ?? 'By royal decree, the coinage is reissued at a new weight.';
   const iso = new Date(now * 1000).toISOString();
-  // The unique game-year index and request id make concurrent decrees safe: only one insert lands, and the gazette line exists only if it did.
+  // The unique game-year index and request id make concurrent decrees safe: only one insert lands. The gazette line is guarded by `decreed_at = now`, so a run whose insert
+  // did nothing (a concurrent run of the same request wrote the row at its own `now`) adds no second line.
   await db.batch([
     db.prepare(`INSERT INTO crown_decrees (${columns}) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`)
       .bind(id, command.requestId, year, command.percentBp, parityBefore, parityAfter, confBefore, confidenceAfter(confBefore), decreedBy, now),
     db.prepare(`INSERT INTO world_events (kind, headline, detail, location, occurred_at, sort_order)
       SELECT 'court-gazette', ${sqlText(headline)}, ${sqlText(detail)}, 'Aurelle', ?, ?
-      WHERE EXISTS (SELECT 1 FROM crown_decrees WHERE id = ?) AND NOT EXISTS (SELECT 1 FROM world_events WHERE kind = 'court-gazette' AND headline = ${sqlText(headline)} AND occurred_at = ?)`)
-      .bind(iso, -now, id, iso),
+      WHERE EXISTS (SELECT 1 FROM crown_decrees WHERE id = ? AND decreed_at = ?) AND NOT EXISTS (SELECT 1 FROM world_events WHERE kind = 'court-gazette' AND headline = ${sqlText(headline)} AND occurred_at = ?)`)
+      .bind(iso, -now, id, now, iso),
   ]);
   const saved = await db.prepare(`SELECT ${columns} FROM crown_decrees WHERE request_id=?`).bind(command.requestId).first<Row>();
   if (saved) return { ok: true as const, decree: publicDecree(saved) };
