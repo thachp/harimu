@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   if (!verification.countedActionsEligible) return privateJson({ error: `Only Tier-1 verified citizens can pledge. ${verification.reason}`, verification }, 403);
   const db = await getDatabase();
   const now = Math.floor(Date.now() / 1000);
-  await advanceWorld(db, undefined, { npcSupply: orderBook(), aurelleRising: true, aurelleCoup: coupOn(), faithFestivals: faithOn(), warWeariness: wearinessEnabled(env as unknown as WearinessBindings) });
+  await advanceWorld(db, undefined, { npcSupply: orderBook(), aurelleRising: true, aurelleCoup: coupOn(), favorDecay: (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true', faithFestivals: faithOn(), warWeariness: wearinessEnabled(env as unknown as WearinessBindings) });
   await recordVerifiedHumanVisit(db, userId, now, { aurelleRising: true }); // flag checked above
   const result = await pledge(db, userId, { requestId: body.requestId.toLowerCase(), claimantId: body.claimantId }, now);
   const state = await readAurelleRising(db, userId, now, { tier1: true, reason: verification.reason }, true);
