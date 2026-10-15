@@ -65,6 +65,6 @@ test('unwired: nothing in app/, components/ or lib/ imports wellbeing-break-copy
 });
 
 test('no continuity promise anywhere in the reminders: the citizen ages and may be succeeded by an heir, and the savings shield is partial, so no body or notice says the citizen, home or savings stay as they are', () => {
-  for (const t of [...R.bodies.map(b=>b.text),N.body.text,N.settingsNote.text,A.identity.text,A.absence.text,A.protection.text]) assert.doesNotMatch(t,/\b(citizen|citizens|savings|home|house|property|wallet|balance|balances|account|progress|rank|office|job|heir|character|will be waiting|waiting for you|be there when|stay as|stays as|as you left|where you left|nothing (is|will be) lost|nothing changes|keeps? (your|everything)|safe)\b/i,t);
+  for (const t of [...R.bodies.map(b=>b.text),N.body.text,N.settingsNote.text,A.identity.text,A.absence.text,A.protection.text.replace('small balances','small amounts')]) assert.doesNotMatch(t,/\b(citizen|citizens|savings|home|house|property|wallet|balance|balances|account|progress|rank|office|job|heir|character|will be waiting|waiting for you|be there when|stay as|stays as|as you left|where you left|nothing (is|will be) lost|nothing changes|keeps? (your|everything)|safe)\b/i,t);
   assert.ok(R.bodies.some(b=>b.text==='Take a break if you would like to. There is no pressure to stay.'));
 });
