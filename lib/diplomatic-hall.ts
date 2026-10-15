@@ -1,6 +1,6 @@
 /** Diplomatic Hall proof of concept, slice 1 (#599; docs social-news-media §18.1 global channel, trade-diplomacy-sanctions §13.4): one channel shared by Kindle and Aurelle citizens.
  *  Reuses the square rules (1-280 plain-text characters, one post per 10 seconds, 20 per hour, 7-day expiry, the square handle, soft delete of your own post) in its own table, so the nation-scoped
- *  square (lib/square-chat.ts) is untouched. Korund and every other nation are closed out. Player-facing refusal lines come from lib/diplomatic-hall-copy.ts (#606). Import-free apart from types. */
+ *  square (lib/square-chat.ts) is untouched. Korund and every other nation are closed out. Player-facing refusal lines come from the Diplomatic Hall copy module (#606). Import-free apart from types. */
 import type { GameDatabase } from './database-contract';
 
 /** The nations whose citizens may read and post. Korund citizens cannot see the global channel (docs §18.1); the hidden radio item and trade-delegate exceptions are out of scope. */
