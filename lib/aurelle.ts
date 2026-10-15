@@ -17,7 +17,7 @@ export const aurelleSchemas=[
 /** #289: Royal Favor is spent here (docs 14.2 / daily loops: "spent on petitions, ranks, estates, pardons"; leaving the Kinward Rite costs Royal Favor).
  * Each spend is one immutable row keyed by its request id, so a retry can never debit twice. Balance = min(100, earned) - spent, never below 0. */
 export const royalFavorSchemas=[
- `CREATE TABLE IF NOT EXISTS aurelle_favor_spends(request_id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,amount INTEGER NOT NULL CHECK(amount>0),reason TEXT NOT NULL CHECK(reason IN ('leave-kinward')),spent_at INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS aurelle_favor_spends(request_id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,amount INTEGER NOT NULL CHECK(amount>0),reason TEXT NOT NULL CHECK(reason IN ('leave-kinward','charter-grant','charter-renew')),spent_at INTEGER NOT NULL)`,
 ] as const;
 /** #529 and #585: the one Royal Favor rule. Favor is earned at settlement (aurelle_settlements.favor), capped at 100, and spent (aurelle_favor_spends); no balance is stored.
  *  With the decay flag off (decayAt undefined) the rule is exactly the pre-#529 one. With HARIMU_FAVOR_DECAY_ENABLED on, decayAt is the current time in seconds and each
@@ -103,7 +103,7 @@ export function validAurelleCommand(body:Record<string,unknown>):body is Record<
  if(body.action==='aurelle-buy-food') return body.quantity===1||body.quantity===2;
  return (body.action==='aurelle-start-work'||body.action==='aurelle-household-meal')&&body.quantity===undefined;
 }
-export async function readAurelle(db:GameDatabase,userId:string,options:{favorDecayAt?:number}={}):Promise<AurellePlan>{
+export async function readAurelle(db:GameDatabase,userId:string,options:{favorDecayAt?:number;mealSeconds?:number}={}):Promise<AurellePlan>{
  const [citizen,ledger,shifts,favor]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
  db.prepare(`SELECT ${publicFood} AS public_food,${publicFunds} AS funds,
@@ -117,10 +117,11 @@ export async function readAurelle(db:GameDatabase,userId:string,options:{favorDe
  ]);
  return {available:citizen?.nation_id==='aurelle',mode:'bounded charter economy',charter:{id:'food-estate',name:'Highspire food-estate charter',active:true},job:aurelleJob,
  walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,favor:favor,publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,
- mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),
+ mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+(options.mealSeconds??aurelleMealSeconds))*1000).toISOString(),
  shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,rewardItem:'estate food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number){
+/** #531: mealSeconds is the household-meal cooldown; only a chartered citizen (flag on) passes a shorter one. The SQL keeps its literal 7200, so the shorter window is a shifted reference time. */
+export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds){
  const id=command.requestId.toLowerCase(),shiftId=command.shiftId?.toLowerCase()??null;
  const quantity=command.action==='aurelle-buy-food'?command.quantity!:command.action==='aurelle-household-meal'?2:0;
  const receipt=()=>db.prepare('SELECT clerk_user_id,action,quantity,shift_id FROM aurelle_receipts WHERE id=?').bind(id).first<{clerk_user_id:string;action:string;quantity:number;shift_id:string|null}>();
@@ -143,7 +144,7 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  db.prepare(aurelleBuyReceiptSql).bind(id,quantity,now,userId,quantity,quantity,quantity,id),db.prepare(aurelleBuySql).bind(id,userId,quantity),
  ]);
  else await db.batch([
- db.prepare(aurelleMealReceiptSql).bind(id,now,userId,now,id),db.prepare(aurelleMealSql).bind(id,userId),db.prepare(aurelleMealCapacitySql).bind(iso,userId,id),
+ db.prepare(aurelleMealReceiptSql).bind(id,now,userId,now+aurelleMealSeconds-mealSeconds,id),db.prepare(aurelleMealSql).bind(id,userId),db.prepare(aurelleMealCapacitySql).bind(iso,userId,id),
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-household-meal'").bind(id,userId),
  ]);
  const recorded=await receipt();
