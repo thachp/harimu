@@ -55,6 +55,10 @@
     "HARIMU_EMBARGO_ENABLED": "false",
     // #362: Aurelle Crown debasement PoC (mint parity, Currency Confidence, Monarch decree). Off until QA; decrees are written only by the scheduled Worker.
     "HARIMU_CROWN_DEBASEMENT_ENABLED": "false",
+    // #441: Kindle town hall PoC (citizen questions for 24 hours, top 10 answered). Off until QA. An operator sets HARIMU_TOWN_HALL_OPEN_AT (epoch seconds) to open every candidate's hall; unset it never opens.
+    "HARIMU_TOWN_HALLS_ENABLED": "false",
+    // #441: the AI candidates' town hall answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_TOWN_HALLS_ENABLED, the AI binding and a valid AI budget.
+    "HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

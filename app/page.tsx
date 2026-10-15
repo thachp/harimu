@@ -31,6 +31,7 @@ import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
 import {RankedBallot} from './ranked-ballot';
 import {AssemblyBallot} from './assembly-ballot';
+import {TownHalls} from './town-hall'; // #441
 import {PrimaryCard} from './primary-card';
 import type {ElectionSnapshot} from '../lib/elections';
 import {CollectivePetitionsPanel} from './collective-petitions';
@@ -1655,6 +1656,7 @@ export default function Home() {
         {citizenNation.id==='kindle'&&clerkConfigured&&<PrimaryCard key={`primary:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={citizenSessionKey} onSnapshot={setElection}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<TownHalls key={`town-hall:${citizenSessionKey}`}/>}
         {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={citizenSessionKey}/>}
         {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={citizenSessionKey} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
         <p>{citizenNation.id==='kindle'&&clerkConfigured?'Kindle’s preview ballot status is shown above. Protests and broader public-opinion systems are planned.':'This location has no counted ballot. Protests and broader public-opinion systems are planned under each nation’s rules.'}</p>
