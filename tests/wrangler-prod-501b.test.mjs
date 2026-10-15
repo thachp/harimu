@@ -16,7 +16,7 @@ const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTG
 // Vars production adds, with their required values.
 const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
-const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'] };
+const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AURELLE_SUCCESSION_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'] };
 // The only non-"false" values production may carry.
 const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
 

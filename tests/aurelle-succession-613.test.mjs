@@ -23,11 +23,11 @@ async function scene(t, backend, { on = true, secret = SECRET } = {}) {
 }
 const refused = (res, status, reason) => { assert.deepEqual([res.status, res.data.reason], [status, reason], JSON.stringify(res.data)); };
 
-test('wrangler: the flag ships "false" in both configs with its comment on its own line, no line has a trailing //, and no secret value is in the repo', async () => {
-  for (const file of ['wrangler.jsonc', 'wrangler.prod.jsonc']) {
+test('wrangler: the flag is "true" in preview and "false" in production, with its comment on its own line, no line has a trailing //, and no secret value is in the repo', async () => {
+  for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const cfg = await read(file);
-    assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_SUCCESSION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false'], file);
-    assert.match(cfg, /^\s*\/\/ #613:.*\n\s*"HARIMU_AURELLE_SUCCESSION_ENABLED": "false",$/m, `${file}: the comment is a full line above the flag`);
+    assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_SUCCESSION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), [value], file);
+    assert.match(cfg, new RegExp(`^\\s*\\/\\/ #613:.*\\n\\s*"HARIMU_AURELLE_SUCCESSION_ENABLED": "${value}",$`, 'm'), `${file}: the comment is a full line above the flag`);
     assert.deepEqual(cfg.split('\n').filter(l => !/^\s*\/\//.test(l)).filter(l => /\/\/|\/\*/.test(l.replace(/"(?:[^"\\]|\\.)*"/g, '""'))), [], file);
     assert.doesNotMatch(cfg, /"HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET"/, `${file}: the secret is set in the dashboard, never in the config`);
   }
