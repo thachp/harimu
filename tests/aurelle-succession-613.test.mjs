@@ -60,6 +60,25 @@ test('flag off: the trigger is a 404 before anything is read, and nothing is wri
   assert.deepEqual(await c.state(), { status: 'reigning', ruler: 'Maera Solenne', heir: 'Princess Elowen Solenne' });
 });
 
+test('flag off: the route makes zero database calls (no prepare, no batch), even with a valid credential and body', async t => {
+  const c = await scene(t, undefined, { on: false });
+  let calls = 0; const prepare = c.r.db.prepare.bind(c.r.db), batch = c.r.db.batch.bind(c.r.db);
+  c.r.db.prepare = sql => { calls++; return prepare(sql); }; c.r.db.batch = x => { calls++; return batch(x); };
+  const res = await c.send('illness', 'req-flag-off-0001'); c.r.db.prepare = prepare; c.r.db.batch = batch;
+  refused(res, 404, 'disabled'); assert.equal(calls, 0, 'nothing is read or written before the flag check');
+  const on = await scene(t); let onCalls = 0; const p2 = on.r.db.prepare.bind(on.r.db);
+  on.r.db.prepare = sql => { onCalls++; return p2(sql); }; await on.send('illness', 'req-flag-on-00001'); on.r.db.prepare = p2;
+  assert.ok(onCalls > 0, 'the spy sees database calls when the flag is on');
+});
+
+test('secret boundary: a 15-character secret never authorizes (401), a 16-character secret does (200)', async t => {
+  const fifteen = 'a'.repeat(15), sixteen = 'b'.repeat(16);
+  const short = await scene(t, undefined, { secret: fifteen }); refused(await short.send('illness', undefined, `Bearer ${fifteen}`), 401, 'unauthorized'); assert.deepEqual(await short.events(), []);
+  const ok = await scene(t, undefined, { secret: sixteen }); const res = await ok.send('illness', undefined, `Bearer ${sixteen}`);
+  assert.equal(res.status, 200, JSON.stringify(res.data)); assert.equal((await ok.events()).length, 1);
+  refused(await ok.send('vacate', undefined, `Bearer ${'b'.repeat(15)}`), 401, 'unauthorized');
+});
+
 test('credential before body: unset, short or wrong secret is 401 (fail closed); a bad body is 400', async t => {
   const none = await scene(t, undefined, { secret: null }); refused(await none.send('illness'), 401, 'unauthorized');
   const short = await scene(t, undefined, { secret: 'short' }); refused(await short.send('illness', undefined, 'Bearer short'), 401, 'unauthorized');
@@ -170,6 +189,11 @@ test('migration 0055 is additive in both dialects and matches the inline schema'
     assert.deepEqual([...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map(m => m[1]), ['aurelle_succession_events']);
   }
   assert.deepEqual([...mod.aurelleSuccessionSchemas.join(';').matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map(m => m[1]), ['aurelle_succession_events']);
+  const kinds = sql => [...sql.matchAll(/kind(?: TEXT)?(?: COLLATE "C")?(?: NOT NULL)? CHECK\(kind IN \(([^)]*)\)\)/g)].map(m => m[1].replace(/'/g, '').split(',').sort().join());
+  assert.deepEqual([kinds(sqlite).length, kinds(pg).length, kinds(mod.aurelleSuccessionSchema).length], [1, 1, 1]);
+  assert.deepEqual(kinds(pg), kinds(sqlite)); assert.deepEqual(kinds(mod.aurelleSuccessionSchema), kinds(sqlite));
+  const rules = await r.importModule('lib/aurelle-succession-rules.ts');
+  assert.deepEqual(kinds(sqlite)[0].split(','), Object.keys(rules.successionGazette).sort(), 'the CHECK list is exactly the event kinds that have a gazette line');
   for (const col of ['id', 'seq', 'request_id', 'kind', 'member_id', 'name', 'house', 'occurred_at']) { assert.match(sqlite, new RegExp(`\\b${col} `)); assert.match(pg, new RegExp(`\\b${col} `)); }
   const route = await read('app/api/aurelle-succession/route.ts');
   assert.ok(route.indexOf("HARIMU_AURELLE_SUCCESSION_ENABLED !== 'true'") < route.indexOf('bearerMatches(') && route.indexOf('bearerMatches(') < route.indexOf('readCommandObject('), 'flag, then credential, then body');
