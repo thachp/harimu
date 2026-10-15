@@ -34,7 +34,7 @@ export async function requestMission(db: GameDatabase, userId: string, command: 
     db.prepare(`UPDATE faith_missions SET closed_at=? WHERE user_id=? AND closed_at IS NULL AND ((accepted_at IS NULL AND expires_at<=?) OR (accepted_at IS NOT NULL AND ends_at<=?))`).bind(now, userId, now, now),
     db.prepare(`INSERT INTO faith_missions (id,user_id,faith_id,home_nation,host_nation,host_city_id,requested_at,expires_at,request_id)
       SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM faith_missions WHERE user_id=? AND closed_at IS NULL) ON CONFLICT DO NOTHING`)
-      .bind(`mission-${command.requestId}`, userId, faithId, home, command.hostNation, hostCityId(command.hostNation), now, now + cfg.inviteTtlSeconds, command.requestId, userId),
+      .bind(`mission-${crypto.randomUUID()}`, userId, faithId, home, command.hostNation, hostCityId(command.hostNation), now, now + cfg.inviteTtlSeconds, command.requestId, userId),
   ]);
   const saved = await byRequest(db, command.requestId);
   if (!saved) return fail(409, 'mission_active', 'You already have a mission. Finish it before you start another.');
@@ -63,7 +63,15 @@ export async function acceptMission(db: GameDatabase, userId: string, command: {
 export async function answerMission(db: GameDatabase, userId: string, command: { requestId: string; missionId: string; answer: 'accept' | 'decline' }, now: number, enabled: boolean) {
   if (!enabled) return disabled();
   const prior = await db.prepare('SELECT user_id,mission_id,outcome FROM missionary_responses WHERE request_id=?').bind(command.requestId).first<{ user_id: string; mission_id: string; outcome: string }>();
-  if (prior) return prior.user_id === userId && prior.mission_id === command.missionId ? { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) } : fail(409, 'request_reused', 'That request id was already used.');
+  if (prior) {
+    if (prior.user_id !== userId || prior.mission_id !== command.missionId) return fail(409, 'request_reused', 'That request id was already used.');
+    // A retry of an accepted answer finishes the conversion idempotently (chooseFaith keys on the same request id), so a dropped connection never leaves "accepted" without the faith change.
+    if (prior.outcome === 'accepted') {
+      const mission = await db.prepare(`SELECT ${missionColumns} FROM faith_missions WHERE id=?`).bind(command.missionId).first<MissionRow>();
+      if (mission) { const converted = await chooseFaith(db, userId, { requestId: command.requestId, faithId: mission.faith_id, hiddenFaithId: null }, now, enabled); if (!converted.ok) { await release(db, userId, command); return converted; } }
+    }
+    return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) };
+  }
   const state = await readFaith(db, userId, now, enabled);
   if (!state.supported) return fail(403, 'unsupported_nation', 'Missionaries visit Kindle, Korund and Aurelle citizens for now.');
   const mission = await db.prepare(`SELECT ${missionColumns} FROM faith_missions WHERE id=?`).bind(command.missionId).first<MissionRow>();
@@ -75,22 +83,28 @@ export async function answerMission(db: GameDatabase, userId: string, command: {
   const last = await lastAnswerAt(db, userId);
   if (!invitationAllowed(last, now)) return fail(409, 'invitation_recent', missionaryCooldowns.invitation.text.replace('{readyAt}', isoDate(nextInvitationAt(last)!)));
   if (mission.faith_id === state.faith.id) return fail(409, 'same_faith', 'That is already your faith.');
+  // #404: the (user_id, mission_id) response row is the single claim and is taken BEFORE any faith change. Whoever inserts it decides: a second answer (Accept then Not now,
+  // two tabs, concurrent calls, different request ids) finds the row owned by another request and stops, so the stored outcome always matches what happened.
+  await db.prepare('INSERT INTO missionary_responses (user_id,mission_id,outcome,responded_at,request_id) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING')
+    .bind(userId, mission.id, command.answer === 'accept' ? 'accepted' : 'declined', now, command.requestId).run();
+  const claim = await db.prepare('SELECT request_id FROM missionary_responses WHERE user_id=? AND mission_id=?').bind(userId, mission.id).first<{ request_id: string }>();
+  if (claim?.request_id !== command.requestId) return fail(409, 'already_answered', 'You have already answered this invitation.');
   let completion: string = outcomeText.declined;
   if (command.answer === 'accept') {
     const converted = await chooseFaith(db, userId, { requestId: command.requestId, faithId: mission.faith_id, hiddenFaithId: null }, now, enabled);
-    if (!converted.ok) return converted; // cooldown, insufficient_royal_favor, not_allowed: nothing changed and the invitation stays open
+    if (!converted.ok) { await release(db, userId, command); return converted; } // cooldown, insufficient_royal_favor, not_allowed: nothing changed, the claim is given back and the invitation stays open
     completion = outcomeText.success(faithName(mission.faith_id));
   }
-  await db.prepare('INSERT INTO missionary_responses (user_id,mission_id,outcome,responded_at,request_id) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING')
-    .bind(userId, mission.id, command.answer === 'accept' ? 'accepted' : 'declined', now, command.requestId).run();
   return { ok: true as const, completion, state: await readFaith(db, userId, now, enabled) };
 }
+/** Give back a claim whose conversion did not happen (only the request that took it can). */
+const release = (db: GameDatabase, userId: string, command: { requestId: string }) => db.prepare('DELETE FROM missionary_responses WHERE user_id=? AND request_id=?').bind(userId, command.requestId).run();
 
 /** Full mute: no invitations reach the citizen while muted. Safe to repeat. */
 export async function setMissionaryMute(db: GameDatabase, userId: string, command: { muted: boolean }, now: number, enabled: boolean) {
   if (!enabled) return disabled();
   const state = await readFaith(db, userId, now, enabled);
-  if (!state.supported) return fail(403, 'unsupported_nation', 'Missionaries visit Kindle, Korund and Aurelle citizens for now.');
+  if (!state.supported || state.nationId === 'korund') return fail(403, 'unsupported_nation', 'Missionaries visit Kindle and Aurelle citizens for now.'); // #404: Korund has no missionary block
   if (command.muted) await db.prepare('INSERT INTO missionary_mutes (user_id,muted_at) VALUES (?,?) ON CONFLICT DO NOTHING').bind(userId, now).run();
   else await db.prepare('DELETE FROM missionary_mutes WHERE user_id=?').bind(userId).run();
   return { ok: true as const, state: await readFaith(db, userId, now, enabled) };

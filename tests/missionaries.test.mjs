@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { missionaryState } from '../scripts/faith-ui-fixtures.mjs';
-import { hostDecision, invitationAllowed, missionActive, missionStatus, missionaryConfig as cfg, nextInvitationAt, presenceSeconds } from '../lib/missionary-rules.ts';
+import { hostDecision, invitationAllowed, missionActive, missionStatus, missionaryConfig as cfg, missionaryLabels, missionaryLabelMax, nextInvitationAt, presenceSeconds } from '../lib/missionary-rules.ts';
 
 const DAY = 7200, H = 3600, D = 86400;
 const faithCall = (r, user, body) => r.call('faith', user, { requestId: randomUUID(), ...body });
@@ -153,7 +153,7 @@ test('a host-city citizen sees the invitation, may Accept once, and the conversi
   assert.equal(offer.faithId, 'kinward-rite'); assert.equal(offer.pitch, 'A missionary of the Kinward Rite invites you.'); assert.deepEqual(offer.buttons, { accept: 'Accept', notNow: 'Not now', mute: 'Mute missionaries' }); assert.deepEqual(offer.warnings, []);
   assert.deepEqual(Object.keys(missionaryState({ nation: 'kindle', faith: 'unaffiliated', offer: 'kinward-rite' }).offer).sort(), Object.keys(offer).sort(), 'UI fixture offer has the live shape');
   assert.equal(state.faith.id, 'unaffiliated', 'seeing the invitation changes nothing'); assert.equal((await read(r, 'kim')).faith.id, 'unaffiliated');
-  assert.equal((await read(r, 'kai')).missionary.offer, null, 'Korund citizens are never offered');
+  assert.equal((await read(r, 'kai')).missionary, null, 'Korund citizens get no missionary state at all (#404)');
   assert.equal((await answer(r, 'kai', missionId, 'accept')).data.reason, 'no_mission_here', 'a citizen of another nation cannot answer');
   assert.equal((await answer(r, 'ava', missionId, 'accept')).data.reason, 'no_mission_here', 'the missionary cannot answer her own mission');
   assert.equal((await answer(r, 'kim', 'mission-does-not-exist', 'accept')).data.reason, 'no_mission_here');
@@ -253,4 +253,62 @@ test('flag default, migration 0038 is additive, and the app never imports the mi
   }
   const walk = async dir => (await Promise.all((await readdir(dir, { withFileTypes: true })).map(e => e.isDirectory() ? walk(new URL(`${e.name}/`, dir)) : [new URL(e.name, dir)]))).flat();
   for (const file of await walk(new URL('../app/', import.meta.url))) if (/\.(ts|tsx)$/.test(file.pathname)) assert.doesNotMatch(await readFile(file, 'utf8'), /missionary-copy|missionary-notice-copy/, file.pathname);
+});
+
+test('#404 Korund: the read carries no missionary state and the mute is refused; every missionary label fits the 80-character line limit', async t => {
+  const { r } = await setup(t); await citizen(r, 'kai', 'korund'); await citizen(r, 'kim', 'kindle');
+  assert.equal((await read(r, 'kai')).missionary, null); assert.notEqual((await read(r, 'kim')).missionary, null);
+  const muted = await mute(r, 'kai', true); assert.equal(muted.status, 403); assert.equal(muted.data.reason, 'unsupported_nation');
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM missionary_mutes').first()).n, 0);
+  const noticeCopy = await readFile(new URL('../lib/missionary-notice-copy.ts', import.meta.url), 'utf8');
+  assert.equal(Number(noticeCopy.match(/MISSIONARY_LINE_MAX=(\d+)/)[1]), missionaryLabelMax, 'the label limit is Content\'s line limit'); assert.equal(missionaryLabelMax, 80);
+  const all = [missionaryLabels.heading, missionaryLabels.intro, missionaryLabels.setOut, missionaryLabels.here('Fair-Wind Vow'), ...['Kindle', 'Korund', 'Aurelle'].flatMap(n => [missionaryLabels.send(n), ...['invited', 'traveling', 'present', 'over'].map(st => missionaryLabels.statusText(st, n))])];
+  for (const line of all) assert.ok(line.length <= missionaryLabelMax, `${line.length} chars: ${line}`);
+  const state = (await read(r, 'kim')).missionary; for (const line of [state.labels.intro, state.labels.setOut, ...Object.values(state.labels.send)]) assert.ok(line.length <= 80, line);
+});
+
+test('#404 the server makes the mission id; the client request id stays the idempotency key', async t => {
+  const { r } = await scene(t);
+  const rid = randomUUID(); const first = await request(r, 'ava', 'kindle', rid);
+  const id = first.data.state.missionary.mission.id; assert.match(id, /^mission-[0-9a-f-]{36}$/); assert.ok(!id.includes(rid), 'the id is not derived from the client request id');
+  const again = await request(r, 'ava', 'kindle', rid); assert.equal(again.data.replay, true); assert.equal(again.data.state.missionary.mission.id, id, 'a retry returns the same mission');
+  const row = await r.db.prepare("SELECT id,request_id FROM faith_missions WHERE user_id='ava'").first(); assert.equal(row.id, id); assert.equal(row.request_id, rid);
+  assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM faith_missions").first()).n, 1);
+  assert.equal((await answer(r, 'kim', `mission-${rid}`, 'accept')).data.reason, 'no_mission_here', 'a guessed client-side id means nothing');
+});
+
+test('#404 one answer wins: Accept then Not now (or the reverse) with different request ids; the stored outcome matches the faith', async t => {
+  for (const [first, second, faithAfter, stored] of [['accept', 'decline', 'kinward-rite', 'accepted'], ['decline', 'accept', 'unaffiliated', 'declined']]) {
+    const { r, nowS } = await scene(t); const missionId = await arrived(r, nowS);
+    const one = await answer(r, 'kim', missionId, first); assert.equal(one.status, 200, JSON.stringify(one.data));
+    const two = await answer(r, 'kim', missionId, second); assert.equal(two.status, 409); assert.equal(two.data.reason, 'already_answered');
+    assert.equal((await read(r, 'kim')).faith.id, faithAfter);
+    const rows = (await r.db.prepare("SELECT outcome FROM missionary_responses WHERE user_id='kim'").all()).results; assert.deepEqual(rows.map(x => x.outcome), [stored]);
+  }
+});
+
+test('#404 concurrent Accept and Not now: exactly one response row, and the faith change agrees with it', async t => {
+  for (const order of [['accept', 'decline'], ['decline', 'accept']]) {
+    const { r, nowS } = await scene(t); const missionId = await arrived(r, nowS);
+    const results = await Promise.all(order.map(a => answer(r, 'kim', missionId, a)));
+    assert.deepEqual(results.map(x => x.status).sort(), [200, 409], JSON.stringify(results.map(x => x.data.reason)));
+    const rows = (await r.db.prepare("SELECT outcome FROM missionary_responses WHERE user_id='kim'").all()).results; assert.equal(rows.length, 1);
+    const faith = (await read(r, 'kim')).faith.id; assert.equal(rows[0].outcome === 'accepted', faith === 'kinward-rite', `${rows[0].outcome} vs ${faith}`);
+    assert.equal(results.find(x => x.status === 200).data.completion !== undefined, true);
+  }
+});
+
+test('#404 a refused conversion gives the claim back; a retry of an accepted answer finishes the conversion', async t => {
+  const { r, nowS } = await scene(t); const missionId = await arrived(r, nowS);
+  await citizen(r, 'kit', 'kindle'); assert.equal((await choose(r, 'kit', 'open-hand')).status, 200); assert.equal((await choose(r, 'kit', 'fair-wind-vow')).status, 200);
+  const refused = await answer(r, 'kit', missionId, 'accept'); assert.equal(refused.data.reason, 'cooldown');
+  assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM missionary_responses WHERE user_id='kit'").first()).n, 0, 'nothing was claimed, the invitation stays open');
+  assert.equal((await answer(r, 'kit', missionId, 'decline')).status, 200, 'she can still say Not now');
+  // A claim that was taken but whose conversion never ran (a dropped connection) is completed by the retry with the same request id.
+  const rid = randomUUID();
+  await r.db.prepare("INSERT INTO missionary_responses (user_id,mission_id,outcome,responded_at,request_id) VALUES ('kim',?,'accepted',?,?)").bind(missionId, Math.floor(r.now / 1000), rid).run();
+  assert.equal((await read(r, 'kim')).faith.id, 'unaffiliated');
+  const retry = await answer(r, 'kim', missionId, 'accept', rid); assert.equal(retry.status, 200); assert.equal(retry.data.replay, true); assert.equal(retry.data.state.faith.id, 'kinward-rite');
+  assert.equal((await answer(r, 'kim', missionId, 'accept', rid)).data.state.faith.id, 'kinward-rite', 'and a second retry changes nothing');
+  assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM missionary_responses WHERE user_id='kim'").first()).n, 1);
 });

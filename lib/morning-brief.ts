@@ -34,7 +34,22 @@ export type MorningBriefInput = {
   headlines?: MorningBriefHeadline[];
   petitions?: { id: string; title: string }[];
   ballots?: { id: string; title: string }[];
+  /** #413: the citizen's nation picks the food and shift wording. Unset or any other nation keeps Kindle's wording. */
+  nationId?: string;
+  /** #413: marketVisible(nationId, flag). False only hides Kindle's market wording; Korund's State store and Aurelle's counter stay. Defaults to true. */
+  marketOpen?: boolean;
 };
+
+/** #413: the Needs lines per nation. Wording follows each nation's starter copy (lib/starter-copy.ts) and its own food counter:
+ * Korund redeems ration coupons at the State store, Aurelle buys at the chartered food counter. Both counters live on the market tab. */
+type NeedsCopy = { food: string; finished: string; underway: string; none: string };
+const kindleNeeds: NeedsCopy = { food: 'Household food · buy or eat at the market', finished: 'Shift finished · collect at the work board', underway: 'Shift underway', none: 'Choose a shift at the work board' };
+const nationNeeds: Readonly<Record<string, NeedsCopy>> = {
+  korund: { food: 'Household food · redeem ration coupons at the State store', finished: 'Shift finished · record your output and collect your Labor Notes in Work', underway: 'Shift underway · your brigade is at work', none: 'Report to your brigade in Work for your assigned shift' },
+  aurelle: { food: 'Household food · buy at the chartered food counter', finished: 'Service finished · receive your Crowns in Work', underway: 'Service underway', none: 'Enter royal estate service in Work' },
+};
+/** #365: while the market flag is off Kindle has no market tab; the starter merchant is in the City daily loop. */
+const kindleMarketOffFood = 'Household food · buy from the starter merchant in your daily loop';
 
 /** Local calendar day used for the once-per-real-day rule. */
 export function briefDayKey(now: number): string {
@@ -52,10 +67,12 @@ export function morningBriefSections(input: MorningBriefInput, sources: { news: 
   if (headlines.length) sections.push({ id: 'news', title: 'Headlines', items: headlines.map(h => ({ id: `news:${h.id}`, label: h.title, detail: headlineDetail(h), target: 'square' as SceneView, newsId: h.id })) });
   if (input.leaderOrder) sections.push({ id: 'leader', title: "Leader's latest order", items: [{ id: 'leader', label: input.leaderOrder.title, detail: input.leaderOrder.reason, target: 'government' }] });
   const needs: MorningBriefItem[] = [];
-  if (input.food !== undefined) needs.push({ id: 'food', label: `${input.food} food`, detail: 'Household food · buy or eat at the market', target: 'market' });
+  const copy = (input.nationId && nationNeeds[input.nationId]) || kindleNeeds;
+  const marketOff = copy === kindleNeeds && input.marketOpen === false;
+  if (input.food !== undefined) needs.push({ id: 'food', label: `${input.food} food`, detail: marketOff ? kindleMarketOffFood : copy.food, target: marketOff ? 'square' : 'market' });
   needs.push({ id: 'wc', label: `${input.capacity} / ${input.maxCapacity ?? 24} WC`, detail: 'Work capacity · meals restore it', target: 'household' });
-  if (input.shift) needs.push({ id: 'shift', label: input.shift.title, detail: input.now >= input.shift.endsAt * 1000 ? 'Shift finished · collect at the work board' : 'Shift underway', target: 'workplace' });
-  else needs.push({ id: 'shift', label: 'No active shift', detail: 'Choose a shift at the work board', target: 'workplace' });
+  if (input.shift) needs.push({ id: 'shift', label: input.shift.title, detail: input.now >= input.shift.endsAt * 1000 ? copy.finished : copy.underway, target: 'workplace' });
+  else needs.push({ id: 'shift', label: 'No active shift', detail: copy.none, target: 'workplace' });
   sections.push({ id: 'needs', title: 'Your needs', items: needs });
   const notices: MorningBriefItem[] = [
     ...(sources.petitions ? (input.petitions ?? []).map(p => ({ id: `petition:${p.id}`, label: p.title, detail: 'Open petition', target: 'government' as SceneView })) : []),

@@ -48,11 +48,12 @@ export const missionActive = (m: MissionTimes, now: number) => { const s = missi
 export const nextInvitationAt = (lastAnsweredAt: number | null) => lastAnsweredAt === null ? null : lastAnsweredAt + missionaryConfig.invitationGapSeconds;
 export const invitationAllowed = (lastAnsweredAt: number | null, now: number) => lastAnsweredAt === null || now >= lastAnsweredAt + missionaryConfig.invitationGapSeconds;
 
+export const missionaryLabelMax = 80; // same limit as Content's MISSIONARY_LINE_MAX (lib/missionary-notice-copy.ts); pinned by tests/missionaries.test.mjs
 /** [ASSUMPTION] Interface labels for the missionary's own side. Content's #355 copy covers the host citizen's card and the notices, not these buttons; they are server-sent
  *  like all other missionary strings (app/ never imports copy) and can move to Content's files without touching the UI. Docs 14.8 names the invitation flow only. */
 export const missionaryLabels = {
   heading: 'Missionaries',
-  intro: 'Send a missionary of your faith to another capital. Citizens there may accept the invitation. They are never converted automatically.',
+  intro: 'Send a missionary to another capital. Citizens there choose for themselves.', // #404: within the 80-character line limit
   send: (host: string) => `Send a missionary to ${host}`,
   setOut: 'Accept the invitation and set out',
   statusText: (status: MissionStatus, host: string) => status === 'invited' ? `${host} has received your missionary. Accept the invitation to set out.`
