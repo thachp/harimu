@@ -28,6 +28,7 @@ import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
 import {RankedBallot} from './ranked-ballot';
+import {AssemblyBallot} from './assembly-ballot';
 import type {ElectionSnapshot} from '../lib/elections';
 import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
@@ -53,6 +54,7 @@ import { validPlayerCommand, type PlayerCommand, type PlayerMarketState } from '
 import { CitizenMarket } from './citizen-market';
 import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
+import { MarketBoard, useOrderBook } from './market-board';
 import { FaithPanel, HolidayBanner, useFaith } from './faith-panel';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
@@ -1536,6 +1538,7 @@ export default function Home() {
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;
+  const orderBookApi = useOrderBook(viewMode === 'market' && citizenNation?.id === 'kindle' && clerkConfigured && !guestActive); // #200: renders nothing while HARIMU_ORDER_BOOK_ENABLED is off
   const faithApi = useFaith(Boolean(citizenNation) && !guestActive); // #280: renders nothing while HARIMU_FAITH_ENABLED is off
   useEffect(() => {
     if (!tourOpen || guestAllowed) return;
@@ -1617,8 +1620,9 @@ export default function Home() {
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
-        <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
-          onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />
+        <MarketBoard api={orderBookApi} economy={economy} />
+        {(!orderBookApi.book || playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')) && /* the board replaces fixed-lot listings once it is open; open lots stay cancellable */ <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
+          onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />}
         {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
@@ -1626,6 +1630,7 @@ export default function Home() {
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={citizenSessionKey} onSnapshot={setElection}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
         {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={citizenSessionKey}/>}
         {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={citizenSessionKey} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
         <p>{citizenNation.id==='kindle'&&clerkConfigured?'Kindle’s preview ballot status is shown above. Protests and broader public-opinion systems are planned.':'This location has no counted ballot. Protests and broader public-opinion systems are planned under each nation’s rules.'}</p>
