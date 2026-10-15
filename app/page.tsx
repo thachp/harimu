@@ -1531,7 +1531,7 @@ export default function Home() {
     return () => { active = false; };
   }, [citizenNationId]);
   const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
-  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,copy:starterCopyFor(citizenNation.id),enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
+  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,copy:starterCopyFor(citizenNation.id,{marketOpen:marketShown}),marketOpen:marketShown,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
   const weekKey = citizenNation ? weekStoreKey : '';
