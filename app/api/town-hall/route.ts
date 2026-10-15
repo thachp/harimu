@@ -5,6 +5,7 @@ import { readVerification } from '@/lib/verification';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { validPetitionId } from '@/lib/collective-petitions';
 import { accountElectionEnabled } from '@/lib/preview-election';
+import { kindleEligibility, previewParticipationReason } from '@/lib/kindle-eligibility';
 import { askQuestion, readTownHalls, townHallOpenAt, townHallsEnabled, voteQuestion, type TownHallBindings } from '@/lib/town-hall';
 
 export const dynamic = 'force-dynamic';
@@ -19,9 +20,7 @@ async function kindleCitizen(userId: string) {
 }
 /** The presidential ballot's eligibility: a verified human (Tier 1), or the approved account-level preview exception. */
 async function eligibility(userId: string) {
-  const verification = await readVerification(userId);
-  if (accountElectionEnabled(bindings())) return { eligible: true, scope: 'preview-citizen', reason: 'Signed-in Kindle citizens may take part in this preview PoC.', verification };
-  return { eligible: verification.countedActionsEligible, scope: 'tier1', reason: verification.reason, verification };
+  return kindleEligibility(await readVerification(userId), { on: accountElectionEnabled(bindings()), reason: previewParticipationReason });
 }
 
 export async function GET(request: Request) {
