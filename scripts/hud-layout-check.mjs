@@ -11,6 +11,7 @@
  *  (#79) The color-blind-safe nation symbol chips, flag on and off (scripts/nation-symbols-check.mjs).
  *  (#347) The shift quality dialog is rendered with the real component (scripts/shift-quality-layout-check.mjs).
  *  (#366) The top-bar help tooltips are driven with a real mouse, keyboard and touch (scripts/hud-tooltip-check.mjs).
+ *  (#452) The Clerk account menu never cuts off the email at 100-150% text (scripts/account-menu-layout-check.mjs).
  *  Run: npm run test:layout   (CI installs Chromium for it; `npm test` stays browser-free). */
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -22,6 +23,7 @@ import { checkDevelopmentPreviewNote } from './hud-preview-note-check.mjs';
 import { checkNationSymbols } from './nation-symbols-check.mjs';
 import { checkTopBarEmblem } from './hud-emblem-check.mjs';
 import { checkShiftQualityStep } from './shift-quality-layout-check.mjs';
+import { checkAccountMenu } from './account-menu-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
@@ -173,6 +175,7 @@ try {
   await checkShiftQualityStep({ browser, css, preflight, failures, rows }); // #347: shift quality dialog is styled, spaced, reachable
   await checkDevelopmentPreviewNote({ browser, css, preflight, failures, rows }); // #366: no "Development preview" label in the top bar; note lives in Game settings
   await checkHudTooltips({ browser, css, preflight, failures, rows }); // #366: one top-bar tooltip at a time, on-screen, closed by leave / blur / Escape
+  await checkAccountMenu({ browser, css, preflight, failures, rows }); // #452: the account menu shows the whole email at every text size
 } finally { await browser.close(); }
 console.log(rows.join('\n'));
 if (failures.length) { console.error(`\nHUD layout check FAILED:\n${failures.join('\n')}`); process.exit(1); }
