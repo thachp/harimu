@@ -72,9 +72,9 @@ test('hopefuls and candidates are never quoted; no endorsing body, no Notable, n
   assert.doesNotMatch(t,/["“”]|\bsaid\b|\bsays\b|spokes/i); assert.doesNotMatch(t,/endors|journalist|newspaper|union|guild|church|bank/i);
   assert.doesNotMatch(t,/\b(Earth|America|Congress|Senate|Parliament|Democrat|Republican|Labour|Tory|London|Washington)\b/); assert.doesNotMatch(t,/Notable/);
 });
-// #307 wired the primary card; #441 wires the town hall panel (townHallCopy). Any other UI importer still fails this guard.
-const wiredCopyImporters=new Set(['app/primary-card.tsx','app/town-hall.tsx']);
-test('wired by #307 and #441 only: the primary card and the town hall panel are the UI importers of campaign-copy', () => {
+// #307 wired the primary card; #441 wires the town hall panel (townHallCopy); #442 wires the canvassing panel (canvassingCopy). Any other UI importer still fails this guard.
+const wiredCopyImporters=new Set(['app/primary-card.tsx','app/town-hall.tsx','app/canvassing.tsx']);
+test('wired by #307, #441 and #442 only: the primary card, the town hall panel and the canvassing panel are the UI importers of campaign-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && !wiredCopyImporters.has(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/campaign-copy/, f);
 });
