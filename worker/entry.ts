@@ -4,6 +4,7 @@ import { authenticatedUserId } from '../lib/auth';
 import { getDatabase } from '../lib/db';
 import { readCityLocation } from '../lib/city-location';
 import { runCabinetCron } from '../lib/cabinet-cron';
+import { runDiplomacyCron } from '../lib/diplomacy';
 import { presenceSocketPath, presenceUpgrade, type PresenceEnv } from '../lib/city-presence';
 export { CityPresence } from './city-presence';
 
@@ -17,6 +18,9 @@ const worker = {
   async scheduled(controller: ScheduledController, _workerEnv: unknown, ctx: ExecutionContext) {
     ctx.waitUntil((async () => runCabinetCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000)))()
       .then(() => undefined, error => { console.warn('[cron] AI Cabinet responses failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #400: scheduled AI-leader treaty proposals; a no-op unless HARIMU_DIPLOMACY_ENABLED is "true" (default "false").
+    ctx.waitUntil((async () => runDiplomacyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string }))()
+      .then(() => undefined, error => { console.warn('[cron] AI treaty proposals failed', error instanceof Error ? error.name : 'unknown'); }));
   },
 };
 export default worker;

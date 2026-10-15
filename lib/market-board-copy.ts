@@ -52,11 +52,11 @@ export const orderStateLines:Readonly<Record<OrderState,Line>>={
  open:L('Open: waiting for a match on the board.'),
  'partly-filled':L('Partly filled: {filled} of {qty}. The rest is still open.'),
  filled:L('Filled: all {qty} {good} traded.'),
- cancelled:L('Cancelled. The unfilled part is released back to you.'),
+ cancelled:L('Canceled. The unfilled part is released back to you.'),
  spoiled:L('Spoiled: some {good} went bad before it sold.'),
 };
 export const fillNotice=L('Your order traded {filled} of {qty} {good}.');
-export const cancelConfirmation=L('Order cancelled. Your held Spark or goods are released.');
+export const cancelConfirmation=L('Order canceled. Your held Spark or goods are released.');
 
 /** Spoiling-soon hints: fruit and meat only, time through {days} alone. */
 export const spoilageHints={
@@ -75,7 +75,7 @@ const r=(key:RejectionKey,status:number,code:string|null,source:string,text:stri
 /** Exactly one line per rejection the order API returns. */
 export const rejections:readonly Rejection[]=[
  r('unauthenticated',401,null,'Sign in required.','Sign in to use the market board.'),
- r('traveling',409,'traveling','traveling','You are travelling. Orders open again when you arrive.'),
+ r('traveling',409,'traveling','traveling','You are traveling. Orders open again when you arrive.'),
  r('cross_origin',403,null,'Same-origin request required.','That request did not come from the game. Reload the page and try again.'),
  r('closed',403,'closed','closed','The city order book is not open yet. Check back later.'),
  r('bad_request',400,'bad_request','bad_request','That order could not be read. Pick a good, a quantity up to {maxQty} and a price up to {maxPrice}.'),
