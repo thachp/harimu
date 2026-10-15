@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
-import { cleanLabel, declarationBlock, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
+import { cleanLabel, declarationBlock, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
   type DeclarationBlock, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
 export * from './war-rules';
 
@@ -28,12 +28,20 @@ export const warSchemas = [
 )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS idx_wars_one_open_per_pair ON wars(pair_key) WHERE ended_at IS NULL',
   'CREATE INDEX IF NOT EXISTS idx_wars_declared ON wars(declared_at)',
+  // #310: a nation's saved defense window (start hour, UTC). No row = the seed window (defaultDefenseStartHours). Written only by setDefenseWindow.
+  `CREATE TABLE IF NOT EXISTS war_defense_windows (
+ nation_id TEXT PRIMARY KEY CHECK(nation_id IN ('kindle','korund','aurelle')),
+ start_hour_utc INTEGER NOT NULL CHECK(start_hour_utc BETWEEN 0 AND 23),
+ set_by TEXT NOT NULL CHECK(length(set_by) BETWEEN 1 AND 60),
+ changed_at INTEGER NOT NULL
+)`,
 ];
 
 type Row = { id: string; attacker_nation: WarNationId; defender_nation: WarNationId; casus_belli: string; declared_by: string; declared_at: number; mobilization_ends_at: number; ended_at: number | null; end_kind: WarEndKind | null };
 export type PublicWar = { id: string; attacker: WarNationId; defender: WarNationId; casusBelli: string; declaredBy: string; declaredAt: number; mobilizationEndsAt: number;
   status: WarStatus; endedAt: number | null; endKind: WarEndKind | null; peaceLockEndsAt: number | null };
-export type WarState = { wars: PublicWar[]; foundingPeriodEndsAt: number | null };
+export type DefenseWindowState = { startHourUtc: number; changedAt: number | null; nextChangeAt: number | null };
+export type WarState = { wars: PublicWar[]; foundingPeriodEndsAt: number | null; defenseWindows: Record<WarNationId, DefenseWindowState> };
 const columns = 'id,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at,ended_at,end_kind';
 const publicWar = (row: Row, now: number): PublicWar => {
   const times = { declaredAt: Number(row.declared_at), mobilizationEndsAt: Number(row.mobilization_ends_at), endedAt: row.ended_at === null ? null : Number(row.ended_at) };
@@ -107,7 +115,41 @@ export async function endWar(db: GameDatabase, warId: string, kind: WarEndKind, 
 export async function readWars(db: GameDatabase, now: number): Promise<WarState> {
   const rows = (await db.prepare(`SELECT ${columns} FROM wars ORDER BY declared_at DESC, id LIMIT 20`).all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] }))).results;
   const started = await shardStartedAt(db);
-  return { wars: rows.map(row => publicWar(row, now)), foundingPeriodEndsAt: started === null ? null : foundingPeriodEnd(started) };
+  return { wars: rows.map(row => publicWar(row, now)), foundingPeriodEndsAt: started === null ? null : foundingPeriodEnd(started), defenseWindows: await readDefenseWindows(db) };
+}
+
+type WindowRow = { nation_id: WarNationId; start_hour_utc: number; changed_at: number };
+const windowState = (nation: WarNationId, row: WindowRow | null | undefined): DefenseWindowState => row
+  ? { startHourUtc: Number(row.start_hour_utc), changedAt: Number(row.changed_at), nextChangeAt: defenseWindowNextChange(Number(row.changed_at)) }
+  : { startHourUtc: defaultDefenseStartHours[nation], changedAt: null, nextChangeAt: null };
+/** #310: every nation's saved window, or its seed window when none was saved (read-only; a database without migration 0033 reads as all seeds). */
+export async function readDefenseWindows(db: GameDatabase): Promise<Record<WarNationId, DefenseWindowState>> {
+  const rows = (await db.prepare('SELECT nation_id,start_hour_utc,changed_at FROM war_defense_windows').all<WindowRow>().catch(tolerate(isMissingRelation, { results: [] as WindowRow[] }))).results;
+  return Object.fromEntries(warNations.map(nation => [nation, windowState(nation, rows.find(row => row.nation_id === nation))])) as Record<WarNationId, DefenseWindowState>;
+}
+/** Start hours only, in the shape canResolveCityAssault takes. */
+export const defenseStartHours = (windows: Record<WarNationId, DefenseWindowState>) => Object.fromEntries(warNations.map(nation => [nation, windows[nation].startHourUtc])) as Record<WarNationId, number>;
+
+export type SetDefenseWindowCommand = { nation: string; startHourUtc: number; setBy: string };
+/** Server-side only (the AI leader's path would call it; no route does). Saves a nation's daily defense window. The first pick is free; after that a window
+ *  can change at most once per 7 real days [ASSUMPTION, defenseWindowConfig.changeCooldownSeconds]. One atomic upsert, so concurrent changes cannot both land.
+ *  Asking for the hour a nation already has changes nothing and does not start the cooldown. */
+export async function setDefenseWindow(db: GameDatabase, command: SetDefenseWindowCommand, now: number, enabled: boolean) {
+  if (!enabled) return fail(403, 'disabled', 'War is not open yet.');
+  if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid authoritative world time.');
+  if (!isWarNation(command.nation)) return fail(400, 'bad_nations', 'A defense window belongs to Kindle, Korund or Aurelle.');
+  if (!isDefenseStartHour(command.startHourUtc)) return fail(400, 'bad_hour', 'The window start must be a whole UTC hour from 0 to 23.');
+  const setBy = cleanLabel(command.setBy, warConfig.actorMax);
+  if (!setBy) return fail(400, 'bad_request', 'The AI leader setting the window must be named.');
+  const current = windowState(command.nation, await db.prepare('SELECT nation_id,start_hour_utc,changed_at FROM war_defense_windows WHERE nation_id=?').bind(command.nation).first<WindowRow>());
+  if (current.startHourUtc === command.startHourUtc) return { ok: true as const, unchanged: true as const, window: current };
+  if (!defenseWindowChangeAllowed(current.changedAt, now)) return fail(409, 'window_cooldown', 'This nation changed its defense window recently. It can change again after the cooldown.');
+  await db.prepare(`INSERT INTO war_defense_windows (nation_id,start_hour_utc,set_by,changed_at) VALUES (?,?,?,?)
+    ON CONFLICT(nation_id) DO UPDATE SET start_hour_utc=excluded.start_hour_utc,set_by=excluded.set_by,changed_at=excluded.changed_at WHERE war_defense_windows.changed_at<=?`)
+    .bind(command.nation, command.startHourUtc, setBy, now, now - defenseWindowConfig.changeCooldownSeconds).run();
+  const saved = windowState(command.nation, await db.prepare('SELECT nation_id,start_hour_utc,changed_at FROM war_defense_windows WHERE nation_id=?').bind(command.nation).first<WindowRow>());
+  return saved.startHourUtc === command.startHourUtc ? { ok: true as const, unchanged: false as const, window: saved }
+    : fail(409, 'window_cooldown', 'This nation changed its defense window recently. It can change again after the cooldown.');
 }
 
 export type WarNewsItem = { id: string; title: string; text: string; occurredAt: number; source: 'deterministic'; kind: 'template' | 'decree' };
