@@ -1,5 +1,5 @@
 /** AI-leader treaty proposal announcements (issue #440, companion to #400 / #418). Content only: lib/diplomacy.ts owns `runAiTreatyProposals`
- * and the proposals themselves, and no UI imports this. Break notices and the NAP-blocked war refusal live in lib/treaty-break-copy.ts (#435),
+ * and the proposals themselves, and no UI imports this. Break notices and the NAP-blocked war refusal live in the separate treaty-break copy module (#435),
  * not here. Canon: harimu-docs trade-diplomacy-sanctions §13.1 (every ratifier is an AI body) and §13.2 (a non-aggression pact bars war
  * declarations between the signatories; a trade agreement brings tariff reductions, quotas and supply contracts), ai-leadership (Kindle's
  * AI Cabinet, Korund's AI Chairman and Aurelle's AI Crown are the AI leaders that propose, matching `treatyAiLeaders`) and the three press
