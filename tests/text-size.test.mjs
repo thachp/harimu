@@ -91,3 +91,25 @@ test('desktop 150%: whole-word wrap applies at all widths and resource items siz
   assert.match(global, /\.game-resources\{min-width:max-content\}\.game-resources>\*\{flex:00auto\}/);
   assert.match(global, /\.game-resources>div,\.game-resources>\.game-hud-help>summary,\.game-resources>\.game-wallet-button\{min-width:max-content\}/);
 });
+
+test('Clerk menus follow the text size setting (#346): one scaled base size, applied through the provider', async () => {
+  const { clerkFontSize, clerkBaseFontPx } = await import('../lib/display-preferences.ts');
+  assert.equal(clerkBaseFontPx, 14);
+  assert.equal(clerkFontSize(100), '14px'); assert.equal(clerkFontSize(125), '17.5px'); assert.equal(clerkFontSize(150), '21px');
+  assert.equal(clerkFontSize(undefined), '14px'); assert.equal(clerkFontSize(999 ), '14px', 'unknown scales fall back to 100%');
+  assert.doesNotMatch(clerkFontSize(150), /calc|var\(/, 'Clerk does its own math, so the value stays a plain length');
+  const providers = await read('providers.tsx');
+  assert.match(providers, /clerkFontSize\(preferences\.textScale\)/);
+  assert.doesNotMatch(providers, /fontSize:\s*'14px'/, 'no fixed Clerk font size left');
+  assert.ok(providers.indexOf('<DisplayPreferencesProvider><ScaledClerk>') > -1, 'Clerk renders inside the display preferences');
+});
+
+test('top bar and overlay CSS keep room for big text and zoom (#346)', async () => {
+  const shell = await read('game-shell.css');
+  assert.match(shell, /@media\(max-width:1100px\) and \(min-width:761px\)\{\s*\.harimu-game\{--hud-height:calc\(152px \* var\(--text-scale, 1\)\)\}/, 'two-row top bar on tablets and zoomed desktops');
+  assert.match(shell, /\.game-stage-overlay\{display:contents\}/, 'phones keep the old per-element placement');
+  assert.match(shell, /\.inspector-collapsed \.game-stage-overlay\{right:calc\(36px \+ 290px \* var\(--text-scale, 1\)\)\}/, 'collapsed-panel button gets its own room');
+  assert.match(shell, /\.game-context-heading\{flex:0 0 calc\(220px \* var\(--text-scale, 1\)\)/, 'context heading grows with text size');
+  const gameShell = await read('game-shell.tsx');
+  assert.match(gameShell, /<div className="game-stage-overlay">\{breadcrumbs\}\{shiftChip\}<\/div>/, 'banner and shift chip stack in one wrapper');
+});
