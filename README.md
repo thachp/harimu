@@ -324,9 +324,9 @@ They are `"unknown"`/`null` if no SHA is available.
 
 **Korund (or any playable nation) test citizen on preview:**
 1. Sign in on preview with the QA account and enroll in any nation.
-2. PM sets two Worker variables on **harimu-preview only** (Cloudflare dashboard; deploys keep them with `--keep-vars`):
+2. PM sets two Worker variables on **harimu-preview only** (Cloudflare dashboard; deploys keep them: `--keep-vars` plus the deploy script leaving both names out of the built deploy config, #394):
    `HARIMU_QA_TEST_CITIZENS=true` and `HARIMU_QA_TEST_CITIZEN_IDS=<comma-separated Clerk user ids of QA accounts>`.
-   These are account ids, not credentials. Never commit them.
+   These are account ids, not credentials. Never commit them. `HARIMU_QA_TEST_CITIZENS` stays `"false"` in `wrangler.jsonc` as the default (local runs, tests, a new Worker), but `npm run deploy` removes both names from the built config, so a release deploy no longer resets them. Consequence: a value removed in the dashboard is not restored by a deploy; an unset var means off.
 3. From the signed-in preview tab:
    `fetch('/api/citizen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'qa-test-nation',nationId:'korund'})})`.
    This moves only that citizen to the chosen nation (the city resets to its capital) and does not spend the free citizenship change.
