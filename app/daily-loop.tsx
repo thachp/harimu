@@ -15,7 +15,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
   nationName: string; supported: boolean; localDemo: boolean; view: SceneView;
   economy: Economy | null; market: MarketState | null; shifts: WorkShift[]; capacity: number;
   jobs: Job[]; busy: boolean; uncertain: boolean;
-  /** #344: false while the market flag is off: no market prompts or food-buying step. */
+  /** #344: false while the market flag is off: no Market prompts or navigation; the food step buys in place instead. */
   marketOpen?: boolean;
   onNavigate: (view: SceneView) => void; onStart: (id: string) => void; onClaim: (id: string) => void;
   onBuyFood: (quantity: number) => void; onMeal: () => void; onRefresh: () => void;
@@ -35,7 +35,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
   const mealFood = market?.mealFood ?? 2;
   const quote = market?.quotes.find(item => item.item === 'food');
   const quantity = Math.min(10, Math.max(1, mealFood - food));
-  const canBuy = Boolean(marketOpen && market?.available && quote && economy && quote.stock >= quantity && economy.walletMinor >= quote.buyMinor * quantity);
+  const canBuy = Boolean(market?.available && quote && economy && quote.stock >= quantity && economy.walletMinor >= quote.buyMinor * quantity);
   const mealReady = Boolean(market?.available && food >= mealFood && capacity < 24 && now > 0
     && (!market.mealReadyAt || Date.parse(market.mealReadyAt) <= now));
   const firstJob = jobs.find(job => job.id === 'harvest' && capacity >= job.cost) ?? jobs.find(job => capacity >= job.cost);
@@ -61,8 +61,9 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
     } else if (nextAction === 'buy') {
       title = 'Use your earnings for household food';
       detail = `${food} food owned; a meal needs ${mealFood}. ${quantity} food costs ${((quote!.buyMinor * quantity) / 100).toFixed(2)} SPK at the starter merchant.`;
-      label = view === 'market' ? `Buy ${quantity} food` : 'Open food market';
-      action = view === 'market' ? () => onBuyFood(quantity) : () => onNavigate('market');
+      const buyHere = view === 'market' || !marketOpen; // flag off: buy in place from any view, same trade checks server-side
+      label = buyHere ? `Buy ${quantity} food` : 'Open food market';
+      action = buyHere ? () => onBuyFood(quantity) : () => onNavigate('market');
     } else if (nextAction === 'meal') {
       title = 'Feed your household and recover';
       detail = `${mealFood} food restores up to ${market!.mealCapacity} WC. Your current capacity is ${capacity} / 24.`;
