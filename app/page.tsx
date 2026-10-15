@@ -50,6 +50,7 @@ import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
 import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
+import { nationPlanPanelNation } from '@/lib/nation-panels';
 import { GovernmentPanel } from './government-panel';
 import { AurelleRisingPanel } from './aurelle-rising';
 import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
@@ -1585,6 +1586,7 @@ export default function Home() {
     </div> : <>
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</ActionButton></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</ActionButton></div>}
+      {nationPlanPanelNation(citizenNation.id, viewMode) && dailyLoop}
       {(viewMode === 'household' || viewMode === 'workplace') && <HolidayBanner faith={faithApi.faith} busy={faithApi.busy} onJoin={faithApi.joinFestival} />}
       {viewMode === 'household' && <>
         <FaithPanel api={faithApi} />
