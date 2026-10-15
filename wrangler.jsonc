@@ -33,6 +33,8 @@
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
+    // #631: preview-only Tessera TEST faucet (50.00 TSR once per citizen, labeled test). Off; it also needs NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW=true, so production refuses it.
+    "HARIMU_TEST_FAUCET_ENABLED": "false",
     "HARIMU_LABOR_BUREAU_ENABLED": "false",
     // #489: per-nation opening flags (seven-nations Stage 0). Off; even when "true" a nation is enrollable only by a QA-allowlisted account (lib/nation-openings.ts nationPlayable).
     "HARIMU_CONFLUENCE_ENABLED": "false",
