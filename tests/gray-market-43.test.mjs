@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { componentModule } from './helpers/component-module.mjs';
-import { validGrayOffer, grayCashFor, rumoredRate, graySeed, GRAY_AMOUNT_CAP_MINOR, GRAY_OFFER_LIFETIME_SECONDS, GRAY_STARTING_GRANT_MINOR, GRAY_RUMOR_WINDOW_SECONDS, GAME_DAY_SECONDS } from '../lib/gray-market-rules.ts';
+import { validGrayOffer, grayCashFor, rumoredRate, graySeed, GRAY_AMOUNT_CAP_MINOR, GRAY_OFFER_LIFETIME_SECONDS, GRAY_STARTING_GRANT_MINOR, GRAY_RUMOR_WINDOW_SECONDS, GAME_DAY_SECONDS, GRAY_RUMOR_NOISE, GRAY_RUMOR_NUDGE } from '../lib/gray-market-rules.ts';
 import { laborNoteSql, laborNoteBinds, laborNoteParams } from '../lib/korund-wallet.ts';
 
 async function gray(t, on = true) {
@@ -50,6 +50,21 @@ test('rules: no rumor until a trade; then the noisy average of the last 5 trades
   assert.equal(rumoredRate(six, now), r1, 'deterministic: the same inputs give the same rumor (seeded noise)');
   assert.equal(graySeed('a'), graySeed('a')); assert.notEqual(graySeed('a'), graySeed('b'));
   const spread = new Set([...Array(40)].map((_, i) => rumoredRate([point(1, 1000, 10)], now + i * GAME_DAY_SECONDS))); assert.ok(spread.size > 5, 'the noise varies by game day');
+});
+
+test('rumor nudge (QA1): with one trade, when the noisy figure lands exactly on the trade rate it is moved by at least 1% (floor 1); disabling the nudge fails this test', () => {
+  const now = 5_000_000, unnudged = (offerId, askRate, at) => Math.max(1, Math.round(askRate * (1 + GRAY_RUMOR_NOISE * (2 * (graySeed(`${offerId}:${Math.floor(at / GAME_DAY_SECONDS)}`) / 0x100000000) - 1))));
+  const hits = [];
+  for (const askRate of [2, 5, 9, 100, 5000]) for (let day = 0; day < 400; day++) {
+    const at = now + day * GAME_DAY_SECONDS, trade = { offerId: 'only-trade', askRate, tradedAt: at - 60 };
+    if (unnudged('only-trade', askRate, at) === askRate) hits.push({ askRate, at, trade });
+  }
+  assert.ok(hits.length >= 10, `the branch is reachable (${hits.length} hits)`);
+  for (const { askRate, at, trade } of hits) {
+    const rumor = rumoredRate([trade], at), step = Math.max(1, Math.round(askRate * GRAY_RUMOR_NUDGE));
+    assert.notEqual(rumor, askRate, `rate ${askRate}: never exactly the one trade's rate`);
+    assert.equal(Math.abs(rumor - askRate), step, `rate ${askRate}: moved by max(1, 1% of the rate)`); assert.ok(rumor >= 1);
+  }
 });
 
 test('flag off (shipped default): nothing visible, actions 404, no rows, wrangler says false', async t => {

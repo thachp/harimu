@@ -117,6 +117,31 @@ test('a clean seeded ledger reconciles with zero mismatches in all four currenci
   assert.equal((await r.call('citizen', 'aur1')).data.aurellePlan.walletMinor, 500);
 });
 
+test('a completed gray-market trade (#43): its LN legs are in the LN totals, with zero mismatches, and the balances match the Korund wallet', async t => {
+  const { r, m } = await setup(t); await seedClean(r);
+  const before = (await m.reconcileLedger(r.db)).totals.LN;
+  await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES ('korund2','korund','Private korund2',18,0,'Good standing',?,?)").bind(iso(Date.now()), iso(Date.now())).run();
+  const sec = Math.floor(Date.now() / 1000) - 3600;
+  await r.db.prepare("INSERT INTO gray_offers(id,clerk_user_id,amount_minor,ask_rate,cash_minor,created_at,expires_at) VALUES ('o-1','korund1',400,100,400,?,?)").bind(sec - 60, sec + 7200).run();
+  await r.db.prepare("INSERT INTO gray_trades(offer_id,request_id,seller_id,buyer_id,amount_minor,cash_minor,ask_rate,traded_at) VALUES ('o-1','a-1','korund1','korund2',400,400,100,?)").bind(sec).run();
+  const result = await m.reconcileLedger(r.db);
+  assert.equal(result.mismatchCount, 0, JSON.stringify(result.mismatches)); assert.equal(result.totals.LN.mismatches, 0);
+  const after = result.totals.LN;
+  assert.equal(after.entries, before.entries + 2, 'the trade adds two LN legs: LN bought and LN sold');
+  assert.equal(after.creditsMinor, before.creditsMinor + 400); assert.equal(after.debitsMinor, before.debitsMinor + 400);
+  assert.equal(after.walletTotalMinor, before.walletTotalMinor, 'a trade moves LN between citizens and creates none');
+  assert.equal(after.accounts, before.accounts + 1, 'the buyer is a new LN account');
+  // the balances the reconciliation compares are the Korund wallets the citizen route shows (one shared function)
+  assert.equal((await r.call('citizen', 'korund1')).data.korundPlan.walletMinor, 600 - 400);
+  assert.equal((await r.call('citizen', 'korund2')).data.korundPlan.walletMinor, 400);
+  // and without the trade legs the same wallets would be flagged, so the legs are really read
+  await r.db.prepare('DELETE FROM gray_trades').run();
+  assert.equal((await m.reconcileLedger(r.db)).totals.LN.walletTotalMinor, before.walletTotalMinor);
+  const src = await readFile(new URL('../lib/ledger-reconciliation.ts', import.meta.url), 'utf8');
+  assert.match(src, /import \{ laborNoteSql \} from '\.\/korund-wallet'/); assert.match(src, /laborNoteSql\('c\.clerk_user_id'\)/);
+  assert.doesNotMatch(src.replace(/\/\/.*$/gm, ''), /FROM korund_coupon_redemptions WHERE clerk_user_id = c\.clerk_user_id/, 'no inline copy of the LN formula');
+});
+
 test('a deliberately corrupted entry or balance is reported with its account id, nothing is corrected, and the log line appears once', async t => {
   const { r, m, epoch, reports } = await setup(t); await seedClean(r);
   await r.db.prepare('PRAGMA ignore_check_constraints = ON').run(); // simulate corruption that got past the table checks

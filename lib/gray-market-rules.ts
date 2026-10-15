@@ -13,6 +13,7 @@ export const GRAY_RUMOR_TRADES = 5;                 // rumored rate = average of
 export const GRAY_RUMOR_WINDOW_SECONDS = 7 * GAME_DAY_SECONDS; // ... within the last 7 game days ...
 export const GRAY_RUMOR_NOISE = 0.1;                // ... with +/-10% seeded noise [ASSUMPTION: no rumor until a trade exists]
 export const GRAY_STARTING_GRANT_MINOR = 1000;      // [ASSUMPTION] one small one-time grant of 10.00 FC per Korund citizen
+export const GRAY_RUMOR_NUDGE = 0.01;              // [ASSUMPTION] when the noisy figure equals the last trade's rate, move it by at least 1% of that rate (floor: 1 hundredth)
 export const GRAY_RATE_MIN = 1;                     // validation bounds only (0.01 .. 100.00 FC per LN), not a market view
 export const GRAY_RATE_MAX = 10000;
 
@@ -45,6 +46,9 @@ export function rumoredRate(trades: readonly GrayTradePoint[], now: number): num
   const average = recent.reduce((sum, t) => sum + t.askRate, 0) / recent.length;
   const u = graySeed(`${latest.offerId}:${Math.floor(now / GAME_DAY_SECONDS)}`) / 0x100000000;
   let rate = Math.max(GRAY_RATE_MIN, Math.round(average * (1 + GRAY_RUMOR_NOISE * (2 * u - 1))));
-  if (rate === latest.askRate) rate = latest.askRate <= GRAY_RATE_MIN ? latest.askRate + 1 : latest.askRate + (u < 0.5 ? -1 : 1);
+  if (rate === latest.askRate) {
+    const step = Math.max(1, Math.round(latest.askRate * GRAY_RUMOR_NUDGE)), down = latest.askRate - step;
+    rate = u < 0.5 && down >= GRAY_RATE_MIN ? down : latest.askRate + step;
+  }
   return rate;
 }
