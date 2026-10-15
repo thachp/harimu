@@ -1164,7 +1164,9 @@ export default function Home() {
     // #455: before the city account has loaded, a citizen's URL still names their capital (what the scene shows meanwhile), so every nation's links carry nation and city.
     const cityId = citizenNation?.id === nextNation ? currentCityAccount?.currentCityId ?? capitalCityForNation(nextNation)?.id : visitingCity && cityForNation(nextNation,visitingCity) ? visitingCity : undefined;
     // Civic keeps the nation being viewed (#91); a foreign nation renders read-only.
-    const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined, nextNation !== citizenNation?.id);
+    // #376: a guest or signed-out visitor previews one nation; keep it in every scene's URL. Not while the session is still loading (a citizen's own nation must not be pinned to the default, #411).
+    const visitor = !citizenNation && (!clerkConfigured || citizenSessionStatus === 'anonymous');
+    const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined, nextNation !== citizenNation?.id, visitor);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
   }
