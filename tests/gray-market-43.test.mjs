@@ -169,7 +169,7 @@ test('race-safe accept: two buyers take one offer at once and exactly one trade 
   assert.equal((await view(r, 'alice')).walletMinor, 300, 'alice gave 5.00 LN once');
   const fc = (await Promise.all(['alice', 'bob', 'carol'].map(u => view(r, u)))).reduce((sum, p) => sum + p.gray.cashMinor, 0);
   assert.equal(fc, 3 * GRAY_STARTING_GRANT_MINOR, 'FC is only moved, never created');
-  await assert.rejects(r.db.prepare('INSERT INTO gray_trades(offer_id,request_id,seller_id,buyer_id,amount_minor,cash_minor,ask_rate,traded_at) VALUES (?,?,?,?,1,1,100,1)').bind(offerId, randomUUID(), 'alice', 'carol').run(), /UNIQUE|unique|constraint|duplicate/i);
+  await assert.rejects(r.db.prepare('INSERT INTO gray_trades(offer_id,request_id,seller_id,buyer_id,amount_minor,cash_minor,ask_rate,traded_at) VALUES (?,?,?,?,1,1,100,1)').bind(offerId, randomUUID(), 'alice', 'carol').run(), /UNIQUE|unique|constraint|duplicate|23505/i);
 });
 
 test('race-safe FC: one buyer cannot overdraw FC by accepting two offers at once, and one poster cannot hold two open offers', async t => {
