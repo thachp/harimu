@@ -55,6 +55,8 @@
     "HARIMU_EMBARGO_ENABLED": "false",
     // #362: Aurelle Crown debasement PoC (mint parity, Currency Confidence, Monarch decree). Off until QA; decrees are written only by the scheduled Worker.
     "HARIMU_CROWN_DEBASEMENT_ENABLED": "false",
+    // #442: Kindle canvassing PoC (party members' ground-game quests; display-only district visibility, never votes). Off until QA.
+    "HARIMU_CANVASSING_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",
