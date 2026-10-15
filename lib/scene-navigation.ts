@@ -25,6 +25,17 @@ export function viewedNationAfterLoad(search: string, validNationIds: readonly s
   if (requested && validNationIds.includes(requested)) return currentId;
   return citizenNationId && validNationIds.includes(citizenNationId) ? citizenNationId : currentId;
 }
+const inspectingViews: readonly string[] = ['world', 'country', 'nation'];
+const personalViews: readonly string[] = ['square', 'household', 'workplace', 'market'];
+/** #527: which nation a navigation to `nextView` shows. A citizen inspecting another nation on World, Country or Nation keeps it there; the inspection ends when they
+ *  open a personal scene (City, Household, Work, Market), or Country or Civic from a personal scene, which are their own nation again. Otherwise a stale inspected
+ *  nation survived the walk and Civic opened that nation's government and the URLs dropped nation and city. Civic opened straight from an inspection stays read-only (#91). */
+export function nationForNavigation(nextView: string, currentView: string, viewedNationId: string, citizenNationId: string | null | undefined): string {
+  if (!citizenNationId) return viewedNationId;
+  if (personalViews.includes(nextView)) return citizenNationId;
+  if ((nextView === 'country' || nextView === 'government') && !inspectingViews.includes(currentView)) return citizenNationId;
+  return viewedNationId;
+}
 /** #455: while a signed-in visitor's citizen row is still loading and the URL names no nation, the top bar must not claim the default (Kindle) nation:
  *  it holds a neutral loading line until the row is read, then shows the citizen's own nation. A valid `?nation=` is shown at once (a visitor view). */
 export function identityPending(search: string, validNationIds: readonly string[], sessionLoading: boolean, hasCitizenNation: boolean): boolean {
