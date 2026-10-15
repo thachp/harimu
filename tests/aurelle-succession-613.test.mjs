@@ -23,11 +23,11 @@ async function scene(t, backend, { on = true, secret = SECRET } = {}) {
 }
 const refused = (res, status, reason) => { assert.deepEqual([res.status, res.data.reason], [status, reason], JSON.stringify(res.data)); };
 
-test('wrangler: the flag ships "false" in both configs with its comment on its own line, no line has a trailing //, and no secret value is in the repo', async () => {
-  for (const file of ['wrangler.jsonc', 'wrangler.prod.jsonc']) {
+test('wrangler: the flag is "true" in preview (#654 preview-on rule; the POST fails closed without the unset admin secret) and "false" in production, with its comment on its own line, no line has a trailing //, and no secret value is in the repo', async () => {
+  for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const cfg = await read(file);
-    assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_SUCCESSION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false'], file);
-    assert.match(cfg, /^\s*\/\/ #613:.*\n\s*"HARIMU_AURELLE_SUCCESSION_ENABLED": "false",$/m, `${file}: the comment is a full line above the flag`);
+    assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_SUCCESSION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), [value], file);
+    assert.match(cfg, new RegExp(`^\\s*\\/\\/ #613:.*\\n\\s*"HARIMU_AURELLE_SUCCESSION_ENABLED": "${value}",$`, 'm'), `${file}: the comment is a full line above the flag`);
     assert.deepEqual(cfg.split('\n').filter(l => !/^\s*\/\//.test(l)).filter(l => /\/\/|\/\*/.test(l.replace(/"(?:[^"\\]|\\.)*"/g, '""'))), [], file);
     assert.doesNotMatch(cfg, /"HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET"/, `${file}: the secret is set in the dashboard, never in the config`);
   }
@@ -69,6 +69,16 @@ test('flag off: the route makes zero database calls (no prepare, no batch), even
   const on = await scene(t); let onCalls = 0; const p2 = on.r.db.prepare.bind(on.r.db);
   on.r.db.prepare = sql => { onCalls++; return p2(sql); }; await on.send('illness', 'req-flag-on-00001'); on.r.db.prepare = p2;
   assert.ok(onCalls > 0, 'the spy sees database calls when the flag is on');
+});
+
+test('flag off: handleSuccessionCommand itself makes zero database calls and never reads the body', async t => {
+  const c = await scene(t, undefined, { on: false });
+  let db = 0, body = 0; const prepare = c.r.db.prepare.bind(c.r.db), batch = c.r.db.batch.bind(c.r.db);
+  c.r.db.prepare = sql => { db++; return prepare(sql); }; c.r.db.batch = x => { db++; return batch(x); };
+  const spy = new Proxy({ action: 'illness', requestId: 'req-direct-0001' }, { get: (o, k) => { body++; return o[k]; }, ownKeys: o => { body++; return Reflect.ownKeys(o); }, has: (o, k) => { body++; return k in o; }, getOwnPropertyDescriptor: (o, k) => { body++; return Reflect.getOwnPropertyDescriptor(o, k); } });
+  const res = await c.mod.handleSuccessionCommand(c.r.db, { enabled: false, secret: SECRET, authorization: `Bearer ${SECRET}`, body: spy, now: 1_800_000_000 });
+  c.r.db.prepare = prepare; c.r.db.batch = batch;
+  assert.deepEqual([res.ok, res.status, res.reason], [false, 404, 'disabled']); assert.equal(db, 0, 'no database call'); assert.equal(body, 0, 'the body is never read');
 });
 
 test('secret boundary: a 15-character secret never authorizes (401), a 16-character secret does (200)', async t => {
