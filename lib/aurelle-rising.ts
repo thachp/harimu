@@ -1,6 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { claimant, claimants, pledgeThreshold, risingConfig, risingReady, risingSucceeds, unrestSustainedSeconds, type ClaimantId } from './aurelle-rising-rules';
+import { greatLord } from './aurelle-coup-rules';
 import { pledgeToasts, risingStage, type RisingStage } from './claimant-copy';
 export * from './aurelle-rising-rules';
 
@@ -46,7 +47,7 @@ const weeklySql = `SELECT COUNT(*) AS n FROM civic_human_activity a JOIN citizen
 const pledgeCountsSql = `SELECT p.claimant_id, COUNT(*) AS n FROM aurelle_pledges p JOIN citizens c ON c.clerk_user_id = p.clerk_user_id
   WHERE c.nation_id = 'aurelle' AND p.policy = 'tier1-human-v1' GROUP BY p.claimant_id`;
 
-export type Crown = { claimantId: ClaimantId; name: string; house: string; motto: string; color: string; crownedAt: number } | null;
+export type Crown = { claimantId: string; name: string; house: string; motto: string; color: string; crownedAt: number; how: 'rising' | 'coup' } | null;
 export type RisingView = { id: string; claimantId: ClaimantId; claimantName: string; house: string; openedAt: number; closesAt: number;
   status: 'open' | 'succeeded' | 'failed'; resolvedAt: number | null };
 export type AurelleRisingState = {
@@ -56,10 +57,12 @@ export type AurelleRisingState = {
   myPledge: { claimantId: ClaimantId; pledgedAt: number; changeableAt: number } | null;
   pledge: { allowed: boolean; reason: string | null };
   rising: RisingView | null;
+  /** #281: public palace-coup window; added by the route only while HARIMU_AURELLE_COUP_ENABLED is on. */
+  coup?: { status: 'open' | 'succeeded' | 'failed'; openedAt: number; closesAt: number; resolvedAt: number | null; newLeader: { name: string; house: string } | null } | null;
   config: typeof risingConfig;
 };
 
-async function aurelleScores(db: GameDatabase) {
+export async function aurelleScores(db: GameDatabase) {
   const rows = await db.prepare("SELECT scheduled_at, unrest, stability FROM nation_stability_scores WHERE nation_id = 'aurelle' ORDER BY tick DESC LIMIT 60")
     .all<{ scheduled_at: number; unrest: number; stability: number }>().catch(tolerate(isMissingRelation, { results: [] as { scheduled_at: number; unrest: number; stability: number }[] }));
   return rows.results.map(r => ({ scheduledAt: Number(r.scheduled_at), unrest: Number(r.unrest), stability: Number(r.stability) }));
@@ -71,11 +74,19 @@ async function counts(db: GameDatabase) {
 export const weeklyAurelleHumans = async (db: GameDatabase, now: number) =>
   Number((await db.prepare(weeklySql).bind(now - 7 * 86400, now).first<{ n: number }>())?.n ?? 0);
 
+/** The current royal house: the latest of a successful Rising (#71) and a successful palace coup (#281), by resolution time. */
 export async function readCrown(db: GameDatabase): Promise<Crown> {
-  const row = await db.prepare("SELECT claimant_id, resolved_at FROM aurelle_risings WHERE outcome = 'succeeded' ORDER BY resolved_at DESC, id DESC LIMIT 1")
-    .first<{ claimant_id: ClaimantId; resolved_at: number }>().catch(tolerate(isMissingRelation, null));
+  const [row, coup] = await Promise.all([
+    db.prepare("SELECT claimant_id, resolved_at FROM aurelle_risings WHERE outcome = 'succeeded' ORDER BY resolved_at DESC, id DESC LIMIT 1")
+      .first<{ claimant_id: ClaimantId; resolved_at: number }>().catch(tolerate(isMissingRelation, null)),
+    db.prepare("SELECT ruler_id, ruler_name, house, resolved_at FROM aurelle_coups WHERE outcome = 'succeeded' ORDER BY resolved_at DESC, id DESC LIMIT 1")
+      .first<{ ruler_id: string; ruler_name: string; house: string; resolved_at: number }>().catch(tolerate(isMissingRelation, null)),
+  ]);
   const c = row ? claimant(row.claimant_id) : null;
-  return c && row ? { claimantId: c.id, name: c.name, house: c.house, motto: c.motto, color: c.color, crownedAt: Number(row.resolved_at) } : null;
+  const lord = coup ? greatLord(coup.ruler_id) : null;
+  if (coup && lord && (!row || Number(coup.resolved_at) >= Number(row.resolved_at)))
+    return { claimantId: `coup:${lord.id}`, name: coup.ruler_name, house: coup.house, motto: lord.motto, color: lord.color, crownedAt: Number(coup.resolved_at), how: 'coup' };
+  return c && row ? { claimantId: c.id, name: c.name, house: c.house, motto: c.motto, color: c.color, crownedAt: Number(row.resolved_at), how: 'rising' } : null;
 }
 
 const risingView = (r: { id: string; claimant_id: ClaimantId; opened_at: number; closes_at: number; resolved_at: number | null; outcome: 'succeeded' | 'failed' | null }): RisingView => {
@@ -134,6 +145,7 @@ export async function pledge(db: GameDatabase, userId: string, command: { reques
   return { status: 409, error: pledgeToasts.cooldown.text };
 }
 
+const coupWindowOpenSql = 'SELECT 1 FROM aurelle_coups WHERE window_opened_at IS NOT NULL AND resolved_at IS NULL';
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
 const gazette = (headline: string, detail: string) => `INSERT INTO world_events (kind, headline, detail, location, occurred_at, sort_order)
   SELECT 'court-gazette', '${headline.replace(/'/g, "''")}', '${detail.replace(/'/g, "''")}', 'Aurelle', ?, ?`;
@@ -164,6 +176,8 @@ export async function runAurelleRising(db: GameDatabase, now: number) {
     ]);
     return;
   }
+  // #281: a palace-coup Crisis Window and a Rising window are never open at once.
+  if (await db.prepare(coupWindowOpenSql).first().catch(tolerate(isMissingRelation, null))) return;
   const last = await db.prepare('SELECT MAX(resolved_at) AS t FROM aurelle_risings').first<{ t: number | null }>();
   if (last?.t != null && now < Number(last.t) + risingConfig.cooldownSeconds) return;
   const [byClaimant, weekly, crown] = await Promise.all([counts(db), weeklyAurelleHumans(db, now), readCrown(db)]);
@@ -173,7 +187,7 @@ export async function runAurelleRising(db: GameDatabase, now: number) {
   const id = `rising:${now}`;
   await db.batch([
     db.prepare(`INSERT OR IGNORE INTO aurelle_risings (id, claimant_id, opened_at, closes_at, pledges_at_open, weekly_humans_at_open, unrest_at_open)
-      SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM aurelle_risings WHERE resolved_at IS NULL)`)
+      SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM aurelle_risings WHERE resolved_at IS NULL) AND NOT EXISTS (${coupWindowOpenSql})`)
       .bind(id, leader.c.id, now, now + risingConfig.windowSeconds, leader.n, weekly, scores[0].unrest),
     db.prepare(`${gazette(stage('crisis-window-open', leader.c).gazette, `${stage('crisis-window-open', leader.c).notice} ${stage('crisis-window-open', leader.c).voice}`)}
       WHERE EXISTS (SELECT 1 FROM aurelle_risings WHERE id = ?) AND NOT EXISTS (SELECT 1 FROM world_events WHERE kind = 'court-gazette' AND occurred_at = ?)`)
