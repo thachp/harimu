@@ -14,6 +14,7 @@ import { mvpFestival } from './mvp-festival-copy';
 import { royalFavorBalance, royalFavorBalanceSql } from './aurelle';
 import { holderCity, readUndergroundView, undergroundHits, undergroundSchemas } from './korund-underground'; // #295
 import { korundUndergroundCopy } from './faith-copy';
+import { missionarySchemas, readMissionary, isMissionNation } from './missionaries'; // #225
 
 // ---- PoC constants, one place ----
 export const gameDaySeconds = 7200; // 12x clock: a game day is 2 real hours (lib/world-simulation.ts)
@@ -46,6 +47,7 @@ export const faithSchemas = [
 )`,
   ...festivalSchemas, // #68
   ...undergroundSchemas, // #295 (migration 0032)
+  ...missionarySchemas, // #225 (migration 0038)
 ];
 
 /** What each MVP nation lets a citizen hold publicly (14.2). Korund may also hold a hidden faith (14.6). */
@@ -143,6 +145,8 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const undergroundHitEvents = hiddenFaith ? await undergroundHits(db, userId, Number(row?.chosen_at ?? 0)) : [];
   const undergroundDevotion = hiddenFaith ? devotionFromEvents([...undergroundDays.map(day => ({ day, amount: devotionPerWorship })), ...undergroundHitEvents], today) : null;
   const underground = hiddenFaith ? await undergroundState(db, userId, hiddenFaith, undergroundDays.includes(today), Number(row?.chosen_at ?? 0), today, now) : null;
+  // #225: cross-border missionaries (derived on read; null with the flag off or in an unsupported nation).
+  const missionary = enabled && supported && isMissionNation(nationId ?? '') ? await readMissionary(db, userId, now, { nationId: nationId!, currentFaith: faith, worshipFaith, devotion, changeAvailableAt }) : null;
   const worshippedToday = days.includes(today);
   const worshipBlockedReason = !enabled ? 'Faith is not open yet.' : !worshipFaith ? (nationId === 'korund' ? 'Public worship is not permitted in Korund.' : 'Choose a faith to attend worship.')
     : worshippedToday ? 'You have already attended worship this game day. Come back tomorrow.' : null;
@@ -155,6 +159,7 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
     worship: worshipFaith ? { ...worshipCopy[worshipFaith], gameDay: today, worshippedToday, nextAt: worshippedToday ? (today + 1) * gameDaySeconds : null } : null,
     worshipBlockedReason, changeAvailableAt, changeBlockedReason,
     festivals: calendar?.festivals ?? [], holiday: calendar?.holiday ?? null, banEvents: calendar?.banEvents ?? [], // #68
+    missionary, // #225
     underground, // #295: private to the holder; null unless Korund, flag on and a hidden faith is held
     leaveCost: leaving ? kinwardLeaveFavorCost : null, royalFavor: leaving ? favor : null,
     leaveBlockedReason: leaving && favor < kinwardLeaveFavorCost ? kinwardLeaveBlockedReason(favor) : null,
@@ -177,6 +182,11 @@ const requestOk = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-
 export function parseFaithCommand(body: Record<string, unknown>) {
   if (!requestOk(body.requestId)) return null;
   if (body.action === 'join-festival' && typeof body.festivalId === 'string' && /^[a-z-]{3,40}$/.test(body.festivalId)) return { action: 'join-festival' as const, requestId: body.requestId, festivalId: body.festivalId };
+  if (body.action === 'request-mission' && typeof body.hostNation === 'string' && /^[a-z]{3,20}$/.test(body.hostNation)) return { action: 'request-mission' as const, requestId: body.requestId, hostNation: body.hostNation };
+  if (body.action === 'accept-mission') return { action: 'accept-mission' as const, requestId: body.requestId };
+  if (body.action === 'answer-mission' && typeof body.missionId === 'string' && /^[A-Za-z0-9-]{8,80}$/.test(body.missionId) && (body.answer === 'accept' || body.answer === 'decline'))
+    return { action: 'answer-mission' as const, requestId: body.requestId, missionId: body.missionId, answer: body.answer as 'accept' | 'decline' };
+  if (body.action === 'mute-missionaries' && typeof body.muted === 'boolean') return { action: 'mute-missionaries' as const, requestId: body.requestId, muted: body.muted };
   if (body.action === 'worship-underground') return { action: 'worship-underground' as const, requestId: body.requestId };
   if (body.action === 'attend-worship') return { action: 'attend-worship' as const, requestId: body.requestId };
   if (body.action === 'choose-faith' && typeof body.faithId === 'string' && (body.hiddenFaithId === undefined || body.hiddenFaithId === null || typeof body.hiddenFaithId === 'string'))
