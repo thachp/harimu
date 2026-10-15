@@ -162,7 +162,7 @@ export async function readPrimaries(db: GameDatabase, userId: string, now: numbe
     enabled: true as const, nationId: 'kindle' as const, id: scope?.id ?? primaryElectionId, scope: scope?.scope ?? null,
     parties: kindleParties.map(p => ({ id: p.id, name: p.name, ideology: p.ideology, color: p.color, members: counts[p.id] })),
     hopefuls: hopefuls.map(h => ({ id: h.id, partyId: h.partyId, name: h.name, platform: h.platform, ai: true as const })),
-    yourParty, privacyReady: scope !== null, privacyReason: scope === null ? ballotPrivacyReason : 'Account-level preview privacy: operators may correlate submissions.',
+    yourParty, privacyReady: scope !== null, privacyReason: scope === null ? ballotPrivacyReason : scope.scope === 'preview-citizen' ? 'Account-level preview privacy: operators may correlate submissions.' : '',
     voted: false, result: null, announcements: [] as ReturnType<typeof nomineeAnnouncements>,
   };
   const windowOpen = (opens: number, closes: number, closed: number | null) => closed === null && now >= opens && now < closes;

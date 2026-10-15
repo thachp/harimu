@@ -199,6 +199,8 @@ test(`#283 ${backend}: Tier-1 scope needs the certified privacy gate and a verif
   r.setVerification('alice', { userId: 'alice', emailVerified: true, phoneVerified: true, phoneUnique: true, revoked: false, checkedAt: r.now, expiresAt: r.now + 60000 });
   const ok = await r.call('assembly', 'alice', { ...cmd, requestId: randomUUID() }); assert.equal(ok.status, 200, JSON.stringify(ok.data));
   assert.equal(ok.data.scope, 'tier1'); assert.equal((await r.db.prepare('SELECT policy FROM assembly_anonymous_ballots').first()).policy, 'tier1-human-v1');
+  // #356: the Tier-1 scope never shows the account-preview wording (operators may correlate submissions); the certified gate has nothing to explain.
+  const tier1 = await r.call('assembly', 'alice'); assert.equal(tier1.data.privacyReady, true); assert.equal(tier1.data.privacyReason, ''); assert.doesNotMatch(JSON.stringify(tier1.data), /correlate/i);
 });
 
 test('#283 migration 0034 is additive, matches the runtime schema and passes the guard', async () => {

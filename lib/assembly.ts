@@ -129,7 +129,7 @@ export async function readAssembly(db: GameDatabase, userId: string, now: number
     enabled: true as const, nationId: 'kindle' as const, scope: scope?.scope ?? null, seats: { perDistrict: assemblySeatsPerDistrict, up: assemblySeatsUp },
     districts: assemblyDistricts.map(d => ({ id: d.id, name: d.name, seatsUp: assemblyIncumbents[d.id].up, seatsHeld: assemblyIncumbents[d.id].held })),
     parties: kindleParties.map(p => ({ id: p.id, name: p.name, ideology: p.ideology, color: p.color, blurb: p.blurb, ai: true as const })),
-    privacyReady: scope !== null, privacyReason: scope === null ? ballotPrivacyReason : 'Account-level preview privacy: operators may correlate submissions.',
+    privacyReady: scope !== null, privacyReason: scope === null ? ballotPrivacyReason : scope.scope === 'preview-citizen' ? 'Account-level preview privacy: operators may correlate submissions.' : '',
   };
   const district = await citizenDistrict(db, userId);
   const yourDistrict = { id: district, name: assemblyDistricts.find(d => d.id === district)!.name };
