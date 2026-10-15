@@ -15,7 +15,7 @@ const rule = fragment => rules.find(r => r.selector.includes(fragment));
 
 test('#528: the phone tap-target rules sit in one max-width:760px media block, so desktop is unchanged', () => {
   assert.ok(start > 0 && open > start, 'the #528 comment and media block exist');
-  assert.ok(rules.length >= 14, `expected the full rule list, got ${rules.length}`);
+  assert.ok(rules.length >= 15, `expected the full rule list, got ${rules.length}`);
   assert.ok(!css.slice(0, start).includes('#528'), 'no #528 rule outside the phone media block');
 });
 
@@ -27,6 +27,7 @@ test('#528: top bar, breadcrumb, tab and dock controls are at least 44px on phon
     ['.game-account .game-notifications', ['min-width:44px', 'min-height:44px']],
     ['.game-account>.game-hud-help>summary', ['min-width:44px', 'min-height:44px']],
     ['.game-resources>.game-hud-help>summary', ['min-height:44px']],
+    ['.game-hud>.game-identity', ['min-width:calc(120px*var(--text-scale,1))']],
     ['.game-breadcrumbs button', ['min-width:44px', 'min-height:44px']],
     ['.game-shift-chip', ['min-height:44px']],
     ['.game-dock button', ['min-height:max(44px,']],
@@ -64,4 +65,5 @@ test('#528: the rendered check is wired into npm run test:layout', async () => {
   const check = await readFile(new URL('../scripts/phone-tap-targets-check.mjs', import.meta.url), 'utf8');
   for (const size of ['[1280, 800]', '[390, 844]', '[320, 640]']) assert.ok(check.includes(size), `check covers ${size}`);
   assert.match(check, /\[1, 1\.25, 1\.5\]/);
+  assert.match(check, /clock text overlaps the identity text/, 'the probe measures the clock text against the identity text');
 });

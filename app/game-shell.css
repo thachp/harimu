@@ -285,6 +285,8 @@ body:has(.harimu-game){overflow:auto}
   .harimu-game .game-account .game-notifications{min-width:44px;min-height:44px;justify-content:center}
   .harimu-game .game-account>.game-hud-help>summary{display:flex;align-items:center;min-width:44px;min-height:44px}
   .harimu-game .game-resources>.game-hud-help>summary,.harimu-game .game-resources>.game-wallet-button{min-height:44px}
+  /* The identity column keeps a floor (the <=420px rule above lets it shrink to 0), so the wider 44px account controls wrap to a second row instead of squeezing it under the clock text (QA3 on #552). */
+  .harimu-game .game-hud>.game-identity{min-width:calc(120px * var(--text-scale, 1))}
   .harimu-game .game-breadcrumbs button{min-width:44px;min-height:44px}
   .harimu-game .game-shift-chip{min-height:44px}
   .harimu-game .game-dock button{min-height:max(44px,calc(39px * var(--text-scale, 1)))}

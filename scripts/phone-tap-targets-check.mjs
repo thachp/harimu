@@ -4,7 +4,7 @@
  *  - every visible button, link and <summary> (top bar, breadcrumbs, view tabs, camera bar, citizen dock, "Compare all ten nations", "Rules and limits")
  *    is >= 44px wide and tall
  *  - the camera bar never overlaps the canvas (where the globe labels are drawn), so it cannot cover a label
- *  - top-bar controls stay on-screen and do not overlap each other; the page never scrolls sideways
+ *  - top-bar controls stay on-screen and do not overlap each other, and the clock text never overlaps the identity text (HARIMU / nation line); the page never scrolls sideways
  *  At 1280x800 the desktop frame is unchanged: the camera bar stays an overlay and its buttons keep their desktop size.
  *  Used by hud-layout-check.mjs (npm run test:layout). Screenshots: LAYOUT_SHOTS_DIR=docs/screenshots/528 (PHONE_TAP_BEFORE=1 names them "before"). */
 import { build } from 'esbuild';
@@ -63,6 +63,11 @@ const probe = () => {
   const hud = [...document.querySelectorAll('.game-hud summary, .game-hud button, .game-hud .game-identity')].filter(e => e.getBoundingClientRect().width > 0 && !e.closest('.game-hud-tip')).map(e => ({ e, r: rect(e), n: name(e) }));
   for (const it of hud) if (it.r.left < -0.5 || it.r.right > vw + 0.5) issues.push(`top-bar "${it.n}" leaves the screen`);
   for (let i = 0; i < hud.length; i++) for (let j = i + 1; j < hud.length; j++) if (!hud[i].e.contains(hud[j].e) && !hud[j].e.contains(hud[i].e) && overlap(hud[i].r, hud[j].r)) issues.push(`top-bar "${hud[i].n}" overlaps "${hud[j].n}"`);
+  // Text, not boxes: a shrunken identity column keeps painting its words under the clock (QA3 on #552).
+  const textRects = e => { const g = document.createTreeWalker(e, NodeFilter.SHOW_TEXT), out = []; for (let n = g.nextNode(); n; n = g.nextNode()) { if (!n.textContent.trim()) continue; const rg = document.createRange(); rg.selectNodeContents(n); out.push(...[...rg.getClientRects()].filter(x => x.width > 0 && x.height > 0)); } return out; };
+  const idText = textRects(document.querySelector('.game-hud .game-identity')), clockEl = document.querySelector('.game-hud .game-clock');
+  if (clockEl && getComputedStyle(clockEl).display !== 'none') for (const c of textRects(clockEl)) for (const t of idText) if (overlap(c, t)) { issues.push(`top-bar clock text overlaps the identity text ("HARIMU" / nation line)`); break; }
+  for (const e of document.querySelectorAll('.game-hud .game-identity strong, .game-hud .game-identity span')) { const r = rect(e); if (r.width > 0 && (r.right > vw + 0.5)) issues.push('identity text leaves the screen'); }
   const bar = document.querySelector('.viewport-controls'), canvas = document.querySelector('.viewport-canvas');
   let camera = null;
   if (bar && canvas) {
