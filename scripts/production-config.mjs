@@ -46,12 +46,33 @@ const forbiddenVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_QA_TEST
 const requiredVars = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_PRODUCTION_STORAGE: 'true', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_AI_DAILY_BUDGET_MICRO: /^\d+$/, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: /^pk_live_/ };
 export const readPreviewHyperdriveId = () => JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, '')).hyperdrive?.[0]?.id;
 
+/** #501d (QA3): top-level key allowlist, for both the checked-in config and the built dist/server/wrangler.json. Any key outside the list must be an empty binding list (wrangler writes many `[]`/`{}` defaults), so a bound
+ *  d1/kv/r2/queue/service of any shape (array or object form) is refused. `env` blocks and `unsafe` are refused even when empty. The few legitimate non-empty blocks are pinned to the exact preview-equal value. */
+const allowedKeys = ['$schema', 'name', 'account_id', 'main', 'compatibility_date', 'compatibility_flags', 'placement', 'triggers', 'hyperdrive', 'ai', 'workers_dev', 'preview_urls', 'vars', 'durable_objects', 'migrations', 'assets', 'routes', 'route',
+  'configPath', 'userConfigPath', 'topLevelName', 'definedEnvironments', 'jsx_factory', 'jsx_fragment', 'rules', 'dev', 'no_bundle', 'python_modules'];
+const isEmptyDeep = value => Array.isArray(value) ? value.every(isEmptyDeep) : value !== null && typeof value === 'object' && Object.values(value).every(isEmptyDeep);
+const pinned = { placement: { region: 'gcp:us-central1' }, ai: { binding: 'AI' }, compatibility_flags: ['nodejs_compat'], durable_objects: { bindings: [{ name: 'CITY_PRESENCE', class_name: 'CityPresence' }] }, migrations: [{ tag: 'v1-city-presence', new_sqlite_classes: ['CityPresence'] }] };
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+export function productionKeyProblems(config) {
+  const problems = [];
+  for (const key of Object.keys(config ?? {})) {
+    if (key === 'env' || key === 'unsafe') problems.push(`${key} must not exist on production.`);
+    else if (!allowedKeys.includes(key) && !isEmptyDeep(config[key])) problems.push(`${key} is not allowed on production (only an empty binding list may be present).`);
+  }
+  for (const [key, expected] of Object.entries(pinned)) if (key in (config ?? {}) && !same(config[key], expected)) problems.push(`${key} must be exactly the approved value.`);
+  const triggers = config?.triggers ?? {};
+  if (Object.keys(triggers).some(k => k !== 'crons') || (triggers.crons && !same(triggers.crons, ['*/15 * * * *']))) problems.push('triggers may only be the one approved cron.');
+  if (config?.main !== undefined && !['./worker/entry.ts', 'index.js'].includes(config.main)) problems.push('main must be the Worker entry or the built index.js.');
+  if (config?.assets && (Object.keys(config.assets).some(k => k !== 'directory') || typeof config.assets.directory !== 'string')) problems.push('assets may only carry a directory.');
+  return problems;
+}
+
 /** #501c: refuse any production config (the checked-in wrangler.prod.jsonc or the built dist/server/wrangler.json) that is not exactly the inactive-by-default production shape. Collects every problem, names only. */
 export function productionConfigProblems(config) {
   const problems = [], vars = config?.vars ?? {};
   if (config?.name !== productionTarget.worker) problems.push(`Worker name must be ${productionTarget.worker}.`);
   if (config?.account_id !== productionTarget.accountId) problems.push('Cloudflare account id is not the approved account.');
-  for (const key of ['d1_databases', 'kv_namespaces', 'r2_buckets', 'services', 'queues']) if (config?.[key]?.length) problems.push(`${key} must not be bound on production.`);
+  problems.push(...productionKeyProblems(config));
   if (config?.workers_dev !== false || config?.preview_urls !== false) problems.push('workers_dev and preview_urls must be false.');
   const routes = [...(config?.routes ?? []), ...(config?.route ? [config.route] : [])];
   if (routes.length > 1 || routes.some(route => typeof route !== 'object' || route.pattern !== productionTarget.hostname || route.custom_domain !== true)) problems.push(`The only allowed route is the custom domain ${productionTarget.hostname}.`);
