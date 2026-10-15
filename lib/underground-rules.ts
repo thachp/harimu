@@ -22,6 +22,14 @@ export const undergroundConfig = {
   recentSeconds: 7 * 86400,
   newsWindowSeconds: 14 * 86400,
   newsLimit: 5,
+  /** #382 Suspicion (ARC ruling, every number an [ASSUMPTION]; docs 14.6 gives none): a whole number 0..100 per citizen; a discovery adds 10, or 5 when the holder was also found within the
+   *  repeat window (the last 14 real days); it decays 1 per real day, computed on read. Bands (also [ASSUMPTION]) name the level for the holder: it never sees the number. */
+  suspicionFirstStep: 10,
+  suspicionRepeatStep: 5,
+  suspicionMax: 100,
+  suspicionDecaySeconds: 86400,
+  repeatWindowSeconds: 14 * 86400,
+  suspicionBands: { low: 1, raised: 30, high: 60 },
 } as const;
 
 export const undergroundGameDay = (now: number) => Math.floor(now / undergroundConfig.gameDaySeconds);
@@ -41,6 +49,22 @@ export const raidDue = (cityId: string, gameDay: number) => raidRoll(cityId, gam
 export const pickIndex = (seed: string, count: number) => count <= 0 ? 0 : hash32(seed) % count;
 
 /** True when a new inspection of a city at `now` is allowed given the time of its previous one (null: none). Exact boundary: the gap itself is allowed. */
-/** #382, docs 14.6: the first time an inspection finds a holder only Suspicion is recorded (the "first" notice); any later discovery is a "repeat", the only kind that may lead to Correction Duty (capped at 7 real days). `earlier` is how many inspections found the holder before this one. */
-export const discoveryKind = (earlier: number): 'first' | 'repeat' => earlier > 0 ? 'repeat' : 'first';
+/** #382: a discovery is a repeat when the holder was also found within the repeat window before it. Counted from stored discovery times (korund_raid_hits), not from when the faith was chosen, so re-choosing a faith resets nothing.
+ *  The window is inclusive, and it equals the per-city 14-day inspection gap, so in one city a repeat can only land exactly on the gap boundary (or after the holder moves city) [flagged in the PR]. */
+export const isRepeatDiscovery = (previousAt: number | null, at: number) => previousAt !== null && at - previousAt <= undergroundConfig.repeatWindowSeconds;
+/** #382: the holder's Suspicion at `now`, folded from their discovery times (seconds, any order). Each step is decayed to its discovery first; the result is decayed to `now`. 0 with no discoveries. */
+export function suspicionLevel(discoveredAt: readonly number[], now: number): number {
+  const cfg = undergroundConfig, decay = (level: number, from: number, to: number) => Math.max(0, level - Math.floor(Math.max(0, to - from) / cfg.suspicionDecaySeconds));
+  let level = 0, last: number | null = null;
+  for (const at of [...discoveredAt].sort((a, b) => a - b)) {
+    if (last !== null) level = decay(level, last, at);
+    level = Math.min(cfg.suspicionMax, level + (isRepeatDiscovery(last, at) ? cfg.suspicionRepeatStep : cfg.suspicionFirstStep));
+    last = at;
+  }
+  return last === null ? 0 : decay(level, last, now);
+}
+export type SuspicionBand = 'none' | 'low' | 'raised' | 'high';
+export const suspicionBand = (level: number): SuspicionBand => level >= undergroundConfig.suspicionBands.high ? 'high' : level >= undergroundConfig.suspicionBands.raised ? 'raised' : level >= undergroundConfig.suspicionBands.low ? 'low' : 'none';
+/** The {level} word the private indicator shows ([ASSUMPTION] wording: Content's Suspicion copy module defines the line but no level words; Content may replace these). */
+export const suspicionWord: Record<Exclude<SuspicionBand, 'none'>, string> = { low: 'Low', raised: 'Raised', high: 'High' };
 export const raidAllowed = (now: number, lastRaidAt: number | null) => lastRaidAt === null || now - lastRaidAt >= undergroundConfig.raidMinGapSeconds;

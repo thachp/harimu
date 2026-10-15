@@ -173,6 +173,11 @@ test('#295 Korund hidden-faith holder: a quiet private button and the inspection
   const done = renderToStaticMarkup(React.createElement(FaithPanel, { api: api({ ...faithState({ nation: 'korund' }), underground: { ...underground, lastRaid: null, worshippedToday: true, blockedReason: 'You have already worshipped today. Try again tomorrow.' } }) }));
   assert.match(done, /<button[^>]*disabled=""[^>]*>Worship quietly/); assert.ok(text(done).includes('You have already worshipped today. Try again tomorrow.'));
   assert.ok(!renderToStaticMarkup(React.createElement(FaithPanel, { api: api(faithState({ nation: 'korund' })) })).includes('Worship quietly'), 'no underground block for a citizen without a hidden faith');
+  // #382: the private Suspicion row is the server's line and tag only; nothing is shown without it.
+  const suspicion = { line: 'Suspicion: Low', privateTag: 'Private to you', tooltip: ['State Security keeps a private record. Only you can see it.'] };
+  const withRow = renderToStaticMarkup(React.createElement(FaithPanel, { api: api({ ...faithState({ nation: 'korund' }), underground: { ...underground, lastRaid: null, suspicion } }) }));
+  assert.ok(text(withRow).includes('Suspicion: Low (Private to you)')); assert.match(withRow, /title="State Security keeps a private record\. Only you can see it\."/);
+  assert.ok(!text(renderToStaticMarkup(React.createElement(FaithPanel, { api: api({ ...faithState({ nation: 'korund' }), underground: { ...underground, suspicion: null } }) }))).includes('Suspicion: '));
 });
 
 test('#225 missionary block: server strings only, request/accept/answer/mute call the API, the badge never names anyone', () => {
