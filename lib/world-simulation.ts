@@ -56,7 +56,7 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
   supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; weariness?: PublicWeariness; treaties?: TreatyState; embargoes?: EmbargoState; reserve?: ReserveBoard };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean; warWeariness?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean; warWeariness?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
@@ -100,7 +100,7 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   // #71: Aurelle Rising thresholds and Crisis Window resolution, only while HARIMU_AURELLE_RISING_ENABLED is on (write paths only).
   if (options.aurelleRising) await runAurelleRising(db, now);
   // #281: Aurelle AI palace coup, only while HARIMU_AURELLE_COUP_ENABLED is on (write paths only).
-  if (options.aurelleCoup) await runAurelleCoup(db, now);
+  if (options.aurelleCoup) await runAurelleCoup(db, now, options.favorDecay === true);
   // #307: Kindle party primaries open at their configured time and are counted when due, only while HARIMU_PRIMARIES_ENABLED is on and the privacy gate is open (write paths only).
   if (options.primaries) await runPrimaries(db, now, options.primaries).catch(error => { console.warn('[world] primaries tick failed', error instanceof Error ? error.name : 'unknown'); });
   // #283: Kindle mid-term Assembly opens at its configured time and is counted when due, only while HARIMU_KINDLE_ASSEMBLY_ENABLED is on and the privacy gate is open (write paths only).
