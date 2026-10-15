@@ -81,6 +81,27 @@ test('tone: nothing glorifies war; no violence, no real-world names, no Notable,
   assert.doesNotMatch(t,/Notable|@|\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia)\b/);
 });
+const { REFUSAL_CODES, refusalForCode } = R;
+test('server refusal codes (#426 ruling) are pinned and map one to one onto the refusal copy', () => {
+  assert.deepEqual(Object.keys(REFUSAL_CODES),['rate_limit_declarations','rate_limit_active_wars','casus_belli_insufficient']);
+  assert.deepEqual(REFUSAL_CODES,{rate_limit_declarations:'rate_limit',rate_limit_active_wars:'active_war_cap',casus_belli_insufficient:'casus_belli'});
+  assert.deepEqual(Object.values(REFUSAL_CODES).sort(),[...REFUSAL_KEYS].sort());
+  assert.equal(refusalForCode('rate_limit_declarations'),refusalFor('rate_limit'));
+  assert.equal(refusalForCode('rate_limit_active_wars'),refusalFor('active_war_cap'));
+  assert.equal(refusalForCode('casus_belli_insufficient'),refusalFor('casus_belli'));
+  for (const bad of ['rate_limit','casus_belli','no_casus_belli','war_not_allowed','toString','__proto__','']) assert.equal(refusalForCode(bad),undefined,bad);
+});
+test('the refusal codes match the ones the war rules emit (DeclarationLimitBlock), so a rename there fails here', () => {
+  const m=readFileSync('lib/war-rules.ts','utf8').match(/export type DeclarationLimitBlock = ([^;]+);/);
+  assert.ok(m,'DeclarationLimitBlock found');
+  assert.deepEqual([...m[1].matchAll(/'([a-z_]+)'/g)].map(x=>x[1]).sort(),Object.keys(REFUSAL_CODES).sort());
+});
+test('the casus belli refusal leaks nothing of the grievance gate: no score, weights, threshold, inputs or counts', () => {
+  const x=refusalForCode('casus_belli_insufficient');
+  for (const t of [x.label,...x.lines.map(l=>l.text)]) {
+    assert.doesNotMatch(t,/\d|score|weight|threshold|point|pact|embargo|sanction|trade treaty|border|incident|commons|dispute|\bAI\b|model/i,t);
+  }
+});
 test('unwired: nothing in app/, components/ or lib/ imports war-refusal-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-refusal-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/war-refusal-copy/, f);

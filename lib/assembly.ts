@@ -151,7 +151,7 @@ export type AssemblySnapshot = {
 };
 
 function legacyResult(json: string): AssemblyResult | null {
-  try { const parsed = JSON.parse(json) as AssemblyResult; return Array.isArray(parsed?.districts) && parsed.districts.length > 0 && parsed.districts.every(d => !Array.isArray(d.belowThreshold) || 'bloc' in d) ? parsed : null; } catch { return null; }
+  try { const parsed = JSON.parse(json) as AssemblyResult; return Array.isArray(parsed?.districts) && parsed.districts.length > 0 && parsed.districts.every(d => !Array.isArray(d.belowThreshold) || 'bloc' in d || !('belowMinimum' in d)) ? parsed : null; } catch { return null; }
 }
 
 /** Read-only (GETs write nothing, not even the election row): a due open or close is shown as the write path will record it. */
@@ -180,7 +180,7 @@ export async function readAssembly(db: GameDatabase, userId: string, now: number
   let result: AssemblyResult | null = null;
   if (closed) {
     result = await counted(db, scope, id, incumbents);
-    // A count saved before #351 (no `belowThreshold`) or before #449 (it carries the AI `bloc`) was made under the old rules: it stays as published, not recounted.
+    // A count saved before #351 (no `belowThreshold`), before #449 (it carries the AI `bloc`) or before #463 (no `belowMinimum`) was made under the old rules: it stays as published, not recounted.
     const legacy = election.result_json ? legacyResult(election.result_json) : null;
     if (legacy) result = legacy;
     else if (election.result_json && election.result_json !== JSON.stringify(result)) throw Error('Saved Assembly count does not match the confirmed count.');
