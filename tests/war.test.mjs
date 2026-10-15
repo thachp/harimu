@@ -158,6 +158,9 @@ test('world snapshot and national news show the war in each nation\'s voice, rea
   r.setNow(r.now + 48 * H * 1000);
   const later = await titles('kim'); assert.deepEqual(later.map(i => i.title).sort(), ['Kindle declares war', 'Mobilization is over']);
   assert.equal((await r.call('world', null)).data.simulation.wars.wars[0].status, 'active');
+  // #334 mobilization-ended copy, per nation voice: the attacker, the defender, and the third nation.
+  const korundLater = (await titles('kai')).find(i => i.id.endsWith(':mobilized')); assert.equal(korundLater.title, 'The war on Korund is active'); assert.equal(korundLater.kind, 'template');
+  const aurelleLater = (await titles('ava')).find(i => i.id.endsWith(':mobilized')); assert.equal(aurelleLater.title, 'War is active beyond the realm'); assert.match(aurelleLater.text, /Kindle and Korund have ended mobilization/);
   const { endWar } = war; await endWar(r.db, made.war.id, 'treaty', Math.floor(r.now / 1000), true);
   const ended = (await titles('kim')).find(i => i.title === 'The war has ended'); assert.match(ended.text, /a peace treaty locks declarations until \d{4}-\d{2}-\d{2}/);
   // The Country view stops showing the banner once the war has ended.
@@ -176,7 +179,7 @@ test('war banner: both nations see a mobilization countdown; the third nation an
   const { WarBanner } = await load('../app/war-banner.tsx', { '@/lib/war-copy': copy, '@/lib/war-rules': rules, './game-timer': { GameTimer }, './display-preferences': { useDisplayTimestamp: () => v => new Date(v).toISOString() }, '@/lib/war': {} });
   const base = { id: 'w1', attacker: 'kindle', defender: 'korund', casusBelli: 'Border incidents', declaredBy: 'AI President', declaredAt: 1000, mobilizationEndsAt: 1000 + 48 * H, status: 'mobilizing', endedAt: null, endKind: null, peaceLockEndsAt: null };
   const html = nation => renderToStaticMarkup(WarBanner({ wars: [base], nationId: nation }));
-  assert.match(html('kindle'), /Kindle declares war/); assert.match(html('kindle'), /data-timer="\d+"/); assert.match(html('kindle'), /Mobilization is under way\. No attack can begin before 1970-01-03/);
+  assert.match(html('kindle'), /Kindle declares war/); assert.match(html('kindle'), /data-timer="\d+"/); assert.match(html('kindle'), /At war with Korund/); assert.match(html('kindle'), /Mobilization ends 1970-01-03\S+ No attack can begin before then/);
   assert.match(html('korund'), /War declared on Korund/); assert.match(html('korund'), /Mobilization ends in/);
   assert.equal(html('aurelle'), '', 'the third nation has no banner on its own view');
   assert.match(renderToStaticMarkup(WarBanner({ wars: [{ ...base, status: 'active' }], nationId: 'kindle' })), /war is active/i);

@@ -1,6 +1,6 @@
 'use client';
 import type { PublicWar } from '@/lib/war';
-import { citizenSafety, mobilizationStatus, noticesFor, type WarNation } from '@/lib/war-copy';
+import { citizenSafety, mobilizationStatus, noticesFor, warBanner, type WarNation } from '@/lib/war-copy';
 import { fillWarText, isWarNation, warNationNames } from '@/lib/war-rules';
 import { GameTimer } from './game-timer';
 import { useDisplayTimestamp } from './display-preferences';
@@ -17,10 +17,11 @@ export function WarBanner({ wars, nationId }: { wars: PublicWar[] | undefined; n
     const names = { attacker: warNationNames[war.attacker], defender: warNationNames[war.defender], casusBelli: war.casusBelli, endsAt: formatTime(war.mobilizationEndsAt * 1000) };
     const notice = notices.notices[war.attacker === nationId ? 'ours' : 'against-us'];
     return <article key={war.id} aria-label={`War: ${names.attacker} and ${names.defender}`}>
-      <h4>{fillWarText(notice.headline, names)}</h4>
+      <h4>{fillWarText(war.attacker === nationId ? warBanner.header.ours : warBanner.header.againstUs, names)}</h4>
+      <h5>{fillWarText(notice.headline, names)}</h5>
       <p>{fillWarText(war.casusBelli ? notice.body : notice.bodyNoGrievance, names)}</p>
       {war.status === 'mobilizing'
-        ? <><p>{fillWarText(mobilizationStatus.mobilizing[0].text, names)}</p><GameTimer endsAt={war.mobilizationEndsAt * 1000} label="Mobilization ends in" readyLabel="Mobilization over" /></>
+        ? <><p>{fillWarText(warBanner.countdownCaption.text, names)}</p><GameTimer endsAt={war.mobilizationEndsAt * 1000} label="Mobilization ends in" readyLabel={fillWarText(warBanner.countdownLabel, names)} /></>
         : <p>{mobilizationStatus.active[1].text} {mobilizationStatus.active[0].text}</p>}
       <p>{citizenSafety.lines[0].text}</p>
     </article>;

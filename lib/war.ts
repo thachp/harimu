@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
-import { blockedDeclaration, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
+import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
 import { cleanLabel, declarationBlock, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
   type DeclarationBlock, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
 export * from './war-rules';
@@ -111,16 +111,21 @@ const fill = fillWarText;
 /** National news lines for one reader's nation, derived from the war records (read-only, never published as a game event): the declaration in that
  *  nation's voice (ours / against us / the world), the end of mobilization, and the end of the war. Occurred-at values are milliseconds. */
 export function warNewsItems(wars: PublicWar[], readerNation: string): WarNewsItem[] {
-  const notices = isWarNation(readerNation) ? noticesFor(readerNation) : undefined;
+  if (!isWarNation(readerNation)) return [];
+  const notices = noticesFor(readerNation);
   if (!notices) return [];
   const kind = readerNation === 'aurelle' ? 'decree' as const : 'template' as const;
   const items: WarNewsItem[] = [];
   for (const war of wars) {
     const names = { attacker: warNationNames[war.attacker], defender: warNationNames[war.defender], casusBelli: war.casusBelli };
-    const notice = notices.notices[war.attacker === readerNation ? 'ours' : war.defender === readerNation ? 'against-us' : 'world'];
+    const side = war.attacker === readerNation ? 'ours' as const : war.defender === readerNation ? 'against-us' as const : 'world' as const;
+    const notice = notices.notices[side];
     items.push({ id: `war:${war.id}:declared`, title: fill(notice.headline, names), text: fill(war.casusBelli ? notice.body : notice.bodyNoGrievance, names), occurredAt: war.declaredAt * 1000, source: 'deterministic', kind });
     if (war.endedAt === null || war.endedAt >= war.mobilizationEndsAt) {
-      if (war.status !== 'mobilizing') items.push({ id: `war:${war.id}:mobilized`, title: 'Mobilization is over', text: mobilizationStatus.active[1].text, occurredAt: war.mobilizationEndsAt * 1000, source: 'deterministic', kind });
+      if (war.status !== 'mobilizing') {
+        const over = endedNoticesFor(readerNation)!.notices[side];
+        items.push({ id: `war:${war.id}:mobilized`, title: fill(over.headline, names), text: fill(over.body, names), occurredAt: war.mobilizationEndsAt * 1000, source: 'deterministic', kind: over.aiBadge ? 'decree' : 'template' });
+      }
     }
     if (war.endedAt !== null) {
       const lockEnds = war.peaceLockEndsAt === null ? '' : new Date(war.peaceLockEndsAt * 1000).toISOString().slice(0, 10);
