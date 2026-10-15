@@ -42,6 +42,8 @@
     "HARIMU_AURELLE_COUP_ENABLED": "false",
     // #283: Kindle mid-term Assembly election (D'Hondt per district). Off until QA. Opening is manual: set HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) to open the 72-hour vote.
     "HARIMU_KINDLE_ASSEMBLY_ENABLED": "false",
+    // #307: Kindle party membership and human primaries. Off until QA. Opening is manual: set HARIMU_PRIMARIES_OPEN_AT (epoch seconds) to open the 72-hour primary.
+    "HARIMU_PRIMARIES_ENABLED": "false",
     "HARIMU_TRAVEL_ENABLED": "false",
     "HARIMU_KORUND_PRESIDIUM_ENABLED": "false",
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
