@@ -1,5 +1,6 @@
 import type { GameDatabase } from './database-contract';
 import { mapHeight, mapWidth, type Zone } from './map-zones';
+import { tesseraBalanceBinds, tesseraBalanceSql as balanceSql } from './tessera-exchange';
 
 /**
  * World Registry square purchase (#122, docs 6.1 / 15.1). PoC: a citizen of an MVP nation buys one unclaimed
@@ -67,11 +68,9 @@ export function checkPurchaseSite(squares: readonly Square[], nationId: string, 
   return null;
 }
 
-/** Spendable Tessera: World Registry ledger plus Clearing House kiosk purchases (#210). */
-const balanceSql = `COALESCE((SELECT SUM(delta_minor) FROM citizen_tessera_ledger WHERE clerk_user_id=?),0)
-  + COALESCE((SELECT SUM(tessera_minor) FROM citizen_tessera_exchanges WHERE clerk_user_id=?),0)`;
+/** Spendable Tessera: the shared balance (ledger, Clearing House kiosk purchases #210, claimed earned rewards #465), defined once in tessera-exchange.ts. */
 export async function readTessera(db: GameDatabase, userId: string): Promise<number> {
-  const row = await db.prepare(`SELECT ${balanceSql} AS balance`).bind(userId, userId).first<{ balance: number }>();
+  const row = await db.prepare(`SELECT ${balanceSql} AS balance`).bind(...tesseraBalanceBinds(userId)).first<{ balance: number }>();
   return Number(row?.balance ?? 0);
 }
 
@@ -100,7 +99,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
       SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM world_squares WHERE x=? AND y=? AND zone='wildlands' AND owner IS NULL)
       AND EXISTS (SELECT 1 FROM world_squares WHERE owner=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND NOT (x=? AND y=?))
       AND ${balanceSql} >= ?
-      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, squarePriceMinor, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, userId, userId, squarePriceMinor),
+      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, squarePriceMinor, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, ...tesseraBalanceBinds(userId), squarePriceMinor),
     db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
       SELECT ?,?,?,'square-purchase',? WHERE EXISTS (SELECT 1 FROM world_square_purchases WHERE request_id=? AND clerk_user_id=?)
       ON CONFLICT DO NOTHING`)

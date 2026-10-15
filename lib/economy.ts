@@ -3,6 +3,7 @@ import { defaultRecoverySeconds } from './economy-rules';
 export { recoveryInterval } from './economy-rules';
 import { starterGrantSql } from './market';
 import { kioskHistoryRow } from './kiosk-text';
+import { tesseraBalanceBinds, tesseraBalanceSql } from './tessera-exchange';
 import { walletHistorySql, toTransactions, sortHistory, type WalletHistoryRow, type WalletTransaction } from './wallet';
 // Prototype tuning. Integer minor units: 100 cents = 1 Spark.
 export const employerBudgetMinor = 100000;
@@ -132,8 +133,7 @@ import { isMissingRelation } from './db-errors';
 export { isMissingRelation };
 export async function readTesseraBalance(db: GameDatabase, userId: string): Promise<number> {
   try {
-    const row = await db.prepare(`SELECT COALESCE((SELECT SUM(delta_minor) FROM citizen_tessera_ledger WHERE clerk_user_id=?),0)
-      + COALESCE((SELECT SUM(tessera_minor) FROM citizen_tessera_exchanges WHERE clerk_user_id=?),0) AS balance`).bind(userId, userId).first<{ balance: number }>();
+    const row = await db.prepare(`SELECT ${tesseraBalanceSql} AS balance`).bind(...tesseraBalanceBinds(userId)).first<{ balance: number }>();
     return Number(row?.balance ?? 0);
   } catch (error) { if (isMissingRelation(error)) return 0; throw error; }
 }
