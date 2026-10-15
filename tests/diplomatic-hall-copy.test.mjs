@@ -67,7 +67,7 @@ test('the header names no other lib module path', () => {
   const head=readFileSync('lib/diplomatic-hall-copy.ts','utf8').split('*/')[0];
   assert.doesNotMatch(head,/\blib\/|\.ts\b|app\/|components\//);
 });
-test('wired only into the Diplomatic Hall route (#599 slice 1): nothing else in app/, components/ or lib/ imports diplomatic-hall-copy', () => {
+test('wired only into the Diplomatic Hall route, panel and dock (#599): nothing else in app/, components/ or lib/ imports diplomatic-hall-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('diplomatic-hall-copy.ts')&&f!=='app/api/diplomatic-hall/route.ts') assert.doesNotMatch(readFileSync(f,'utf8'),/diplomatic-hall-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('diplomatic-hall-copy.ts')&&!['app/api/diplomatic-hall/route.ts','app/diplomatic-hall.tsx','app/citizen-dock.tsx'].includes(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/diplomatic-hall-copy/, f);
 });
