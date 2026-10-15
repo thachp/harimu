@@ -13,6 +13,7 @@ import { runNpcSupply } from './npc-supply';
 import { readPublicWeariness, readWarWeariness, type PublicWeariness } from './war-weariness'; // #423
 import { holidayNationsOn } from './festivals';
 import { readWars, type WarState } from './war'; // #309
+import { readSiegeSnapshot, type SiegeSnapshotItem } from './siege-actions'; // #620
 import { readTreaties, runDiplomacy, type TreatyState } from './diplomacy'; // #308
 import { readEmbargoes, runEmbargo, type EmbargoState } from './embargo'; // #363
 import { readReserveBoard, type ReserveBoard } from './spark-supply'; // #431
@@ -54,7 +55,7 @@ export type WorldClock = {
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
 export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecution | null;
-  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; weariness?: PublicWeariness; treaties?: TreatyState; embargoes?: EmbargoState; reserve?: ReserveBoard };
+  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; sieges?: SiegeSnapshotItem[]; weariness?: PublicWeariness; treaties?: TreatyState; embargoes?: EmbargoState; reserve?: ReserveBoard };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
 export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean; warWeariness?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
@@ -140,5 +141,5 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation'},
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:await readWars(db,now)}:{}),...(options.war&&options.warWeariness?{weariness:await readPublicWeariness(db,now)}:{}),...(options.diplomacy?{treaties:await readTreaties(db,now)}:{}),...(options.embargo?{embargoes:await readEmbargoes(db)}:{}),...(options.reserve?{reserve:await readReserveBoard(db,now)}:{})};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:await readWars(db,now),sieges:await readSiegeSnapshot(db,now)}:{}),...(options.war&&options.warWeariness?{weariness:await readPublicWeariness(db,now)}:{}),...(options.diplomacy?{treaties:await readTreaties(db,now)}:{}),...(options.embargo?{embargoes:await readEmbargoes(db)}:{}),...(options.reserve?{reserve:await readReserveBoard(db,now)}:{})};
 }
