@@ -54,13 +54,13 @@ export const rankChrome={
 /** The promotion notice shown to the citizen, three variants. {rank} is the new rank. Formal, short, and not the Crown's voice. */
 export const promotionNotice=[
  L('Your service is noted. You now hold the rank of {rank}.'),
- L('The court records your rise. Your rank is now {rank}.'),
+ L('Your standing at court has risen. Your rank is now {rank}.'),
  L('You are promoted. You now hold the rank of {rank}.'),
 ] as const;
 
 /** Court Gazette reports of a promotion, two variants. Bylined, ornate, a report about a rank and not a line spoken for the Crown. */
 export const promotionGazette:readonly GazetteLine[]=[
- {headline:'A new {rank} at court',body:'The court records that {name} now holds the rank of {rank}. Service has been noted.',aiBadge:false,proposal:true},
+ {headline:'A new {rank} at court',body:'Court notice: {name} now holds the rank of {rank}. Service has been noted.',aiBadge:false,proposal:true},
  {headline:'{name} is raised to {rank}',body:'Word from the court: {name} has risen to {rank}, with an estate and no jurisdiction.',aiBadge:false,proposal:true},
 ];
 

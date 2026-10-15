@@ -4,16 +4,16 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { hallChrome as CH, hallExplainer as EX, hallComposer as CO, hallRefusals as RF, hallRefusalFor, diplomaticHallCopy as C, HALL_REFUSAL_KEYS, HALL_NAME_MAX, HALL_NUMBER_MAX, HALL_LABEL_MAX, HALL_LINE_MAX, HALL_PLACEHOLDERS } from '../lib/diplomatic-hall-copy.ts';
 
 const labels=()=>[CH.tabLabel,CH.headerTitle,CO.placeholder,CO.sendButton,CO.nationTag.text,CO.nationTag.accessibleName];
-const lineObjs=()=>[CH.emptyState,EX.line,EX.inCharacter,EX.nationNote,...RF.map(r=>r.line)];
+const lineObjs=()=>[CH.emptyState,EX.line,EX.nationNote,...RF.map(r=>r.line)];
 const lines=()=>lineObjs().map(l=>l.text);
 const all=()=>[...labels(),...lines()];
 const fill=t=>HALL_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(p==='{max}'?HALL_NUMBER_MAX:HALL_NAME_MAX)),t);
 const refusal=k=>hallRefusalFor(k).line.text;
 
-test('shape: tab, header, empty state, explainer, composer with a nation tag, and four refusals in check order; every line proposal and distinct', () => {
+test('shape: tab, header, empty state, explainer, composer with a nation tag, and five refusals in check order; every line proposal and distinct', () => {
   for (const o of [CH,EX,CO,C]) assert.equal(o.proposal,true);
   for (const l of lineObjs()) { assert.equal(l.proposal,true); assert.ok(l.text.trim().length>0); }
-  assert.deepEqual(RF.map(r=>r.key),[...HALL_REFUSAL_KEYS]); assert.deepEqual([...HALL_REFUSAL_KEYS],['nation_closed','signed_out','rate_limit','too_long']);
+  assert.deepEqual(RF.map(r=>r.key),[...HALL_REFUSAL_KEYS]); assert.deepEqual([...HALL_REFUSAL_KEYS],['nation_closed','alert_closed','signed_out','rate_limit','too_long']);
   for (const r of RF) { assert.equal(r.proposal,true); assert.equal(hallRefusalFor(r.key),r); }
   assert.equal(hallRefusalFor('nope'),undefined); assert.equal(new Set(all()).size,all().length);
   assert.equal(CH.tabLabel,'Diplomatic Hall');
@@ -34,9 +34,15 @@ test('placeholders: only {nation} (the tag) and {max} (the too-long refusal), ea
 test('no figure is written: no digits, number words or limits; the post limit arrives only through {max}', () => {
   for (const t of all()) assert.doesNotMatch(t,/\d|%|\b(one|two|three|four|five|six|ten|hundred|thousand|half|twice|per|every|each hour|minutes?|seconds?|hours?|days?|weeks?)\b/i,t);
 });
-test('who can read it: citizens of the nations in the hall, in character; the nation is shown next to the name; the docs\' Korund exception is the refusal, not the explainer', () => {
-  assert.match(EX.line.text,/Citizens of the nations in this hall can read and post here/); assert.match(EX.inCharacter.text,/in character/); assert.match(EX.nationNote.text,/Your nation is shown next to your name/);
-  assert.doesNotMatch(EX.line.text+EX.inCharacter.text+EX.nationNote.text,/Korund|Kindle|Aurelle|all nations|everyone|anyone|world/i);
+test('who can read it: citizens of the nations in the hall; the nation note describes the shipped tag; no in-character rule is claimed (not in the docs)', () => {
+  assert.equal(EX.line.text,'Citizens of the nations in this hall can read and post here.');
+  assert.deepEqual(Object.keys(EX).sort(),['line','nationNote','proposal']); assert.equal(EX.nationNote.text,'Your nation is shown next to your name.');
+  assert.doesNotMatch(EX.line.text,/Korund|Kindle|Aurelle|Varkand|all nations|everyone|anyone|world|in character/i);
+  for (const t of all()) assert.doesNotMatch(t,/in character/i,t);
+});
+test('a nation that loses the hall at a Red Alert gets its own plain refusal (docs 18.1: Varkand), separate from the closed-nation line', () => {
+  const t=refusal('alert_closed'); assert.equal(t,'The Diplomatic Hall is closed to your nation during a Red Alert.'); assert.notEqual(t,refusal('nation_closed'));
+  assert.doesNotMatch(t,/Korund|Kindle|Aurelle|Varkand|other nations?|saying|said|talk\w*|messages?|conversation\w*|radio|delegate\w*|State Media|propaganda|\d|[{]/i);
 });
 test('the closed-nation refusal is neutral: it names no nation, says nothing about what is said in the hall, and hints at no workaround', () => {
   const t=refusal('nation_closed'); assert.equal(t,'The Diplomatic Hall is closed to your nation.');
