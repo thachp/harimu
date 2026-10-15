@@ -112,6 +112,17 @@ test('two concurrent runs of the same request write one decree and one gazette l
   assert.equal((await gazette()).length, 1, 'the run that did not write the decree posts no gazette line');
 });
 
+test('two concurrent decrees reusing one request id with different amounts: one lands, the other is request_reused', async t => {
+  const { epoch, rows, gazette, decree } = await setup(t);
+  const requestId = randomUUID(), at = epoch + 7200;
+  const results = await Promise.all([decree(1000, at, { requestId }), decree(500, at, { requestId })]);
+  const ok = results.filter(res => res.ok), refused = results.filter(res => !res.ok);
+  assert.equal(ok.length, 1, JSON.stringify(results)); assert.equal(refused.length, 1);
+  assert.equal(refused[0].status, 409); assert.equal(refused[0].reason, 'request_reused');
+  const all = await rows(); assert.equal(all.length, 1); assert.equal(all[0].percent_bp, ok[0].decree.percentBp);
+  assert.equal((await gazette()).length, 1);
+});
+
 test('the decree is capped at 15% per game year and needs a request id', async t => {
   const { r, c, epoch, rows, decree } = await setup(t);
   for (const bad of [0, 1501, 2000, -5, 10.5]) { const res = await decree(bad, epoch + 1); assert.equal(res.ok, false); assert.equal(res.status, 400, String(bad)); }

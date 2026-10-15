@@ -90,6 +90,7 @@ export async function decreeDebasement(db: GameDatabase, command: DecreeCommand,
       .bind(iso, -now, id, now, iso),
   ]);
   const saved = await db.prepare(`SELECT ${columns} FROM crown_decrees WHERE request_id=?`).bind(command.requestId).first<Row>();
+  if (saved && Number(saved.percent_bp) !== command.percentBp) return fail(409, 'request_reused', 'That request id was already used for a different decree.'); // a concurrent run with another amount won the insert
   if (saved) return { ok: true as const, decree: publicDecree(saved) };
   return fail(409, 'already_debased_this_year', 'The Crown has already been debased this game year.');
 }
