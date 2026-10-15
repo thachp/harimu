@@ -38,9 +38,9 @@ const serverOffset = (): number | null => null;
 export function DefenseWindow({ windows, nationId, offsetMinutes }: { windows: Record<string, DefenseWindowState> | undefined; nationId: string; offsetMinutes?: number }) {
   const browserOffset = useSyncExternalStore(subscribeNever, browserOffsetMinutes, serverOffset);
   const offset = offsetMinutes ?? browserOffset;
-  const window = windows?.[nationId];
-  if (!isWarNation(nationId) || !window || offset === null) return null;
-  const { start, end } = defenseWindowLocal(window.startHourUtc, offset);
+  const state = windows?.[nationId];
+  if (!isWarNation(nationId) || !state || offset === null) return null;
+  const { start, end } = defenseWindowLocal(state.startHourUtc, offset);
   return <section aria-label="Defense window">
     <p><strong>{fillWarText(defenseWindow.line.text, { start, end })}</strong></p>
     {defenseWindow.explainer.map(line => <p key={line.text}>{line.text}</p>)}

@@ -46,7 +46,7 @@ test('saved start hours override the seeds, and unknown input fails closed', () 
   assert.equal(canResolveCityAssault('kindle', DAY0 + 3 * H, saved), true); assert.equal(canResolveCityAssault('kindle', DAY0 + 22 * H, saved), false);
   assert.equal(canResolveCityAssault('varkand', DAY0 + 14 * H), false); assert.equal(canResolveCityAssault('', DAY0), false);
   assert.equal(canResolveCityAssault('korund', Number.NaN), false); assert.equal(inDefenseWindow(24, DAY0), false);
-  assert.equal(canResolveFieldSkirmish(DAY0 + 3 * H), true); assert.equal(canResolveFieldSkirmish(DAY0 + 14 * H), true); assert.equal(canResolveFieldSkirmish(), true, 'open-field skirmishes can happen anytime');
+  assert.equal(canResolveFieldSkirmish(), true, 'open-field skirmishes can happen anytime, at any hour');
 });
 
 test('the 7-day change rule is exact: first pick free, one second early is refused, exactly 7 days is allowed', () => {

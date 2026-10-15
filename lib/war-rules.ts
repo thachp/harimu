@@ -73,7 +73,7 @@ export function inDefenseWindow(startHourUtc: number, at: number): boolean {
 export const canResolveCityAssault = (defenderNation: string, at: number, startHours: DefenseStartHours = defaultDefenseStartHours) =>
   isWarNation(defenderNation) && inDefenseWindow(startHours[defenderNation], at);
 /** Docs 15.3: open-field skirmishes on frontier squares can happen anytime (they move control only slowly; that is not built here). */
-export const canResolveFieldSkirmish = (_at?: number) => true;
+export const canResolveFieldSkirmish = () => true;
 /** When the window may next change; null when it has never been set (the first pick is free). */
 export const defenseWindowNextChange = (changedAt: number | null) => changedAt === null ? null : changedAt + defenseWindowConfig.changeCooldownSeconds;
 export const defenseWindowChangeAllowed = (changedAt: number | null, now: number) => changedAt === null || now >= changedAt + defenseWindowConfig.changeCooldownSeconds;
