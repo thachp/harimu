@@ -56,7 +56,7 @@ export function faithState({ nation = 'kindle', faith = nation === 'aurelle' ? '
     leaveCost: leaving ? kinwardLeaveFavorCost : null, royalFavor: leaving ? royalFavor : null,
     leaveBlockedReason: leaving && royalFavor < kinwardLeaveFavorCost ? kinwardLeaveBlockedReason(royalFavor) : null,
     underground: null, // #295: only a Korund hidden-faith holder gets this block
-    missionary: missionaryState({ nation, faith, devotion, ...missionaryOptions }), // #225 (the live read is null only when the flag is off or the nation is unsupported)
+    missionary: nation === 'korund' ? null : missionaryState({ nation, faith, devotion, ...missionaryOptions }), // #404: Korund has no public faith, so no missionary state // #225 (the live read is null only when the flag is off or the nation is unsupported)
   };
 }
 
