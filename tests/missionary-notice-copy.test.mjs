@@ -16,7 +16,7 @@ const out=join(mkdtempSync(join(tmpdir(),'missionary-notice-')),'missionary-noti
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 const { missionaryInvite:I, missionaryOutcomes:O, missionaryCooldowns:C, missionaryFeed:F, FEED_NATIONS, MISSIONARY_PLACEHOLDERS, MISSIONARY_NAME_MAX, MISSIONARY_LABEL_MAX, MISSIONARY_LINE_MAX } = await import(pathToFileURL(out).href);
 
-const labels=()=>[I.accept,I.decline];
+const labels=()=>[I.accept,I.notNow];
 const lineObjs=()=>[I.prompt,O.success,O.declined,O.failure,C.invitation,C.faithChange];
 const lineTexts=()=>[...lineObjs().map(l=>l.text),...Object.values(F).map(l=>l.text)];
 const fill=t=>MISSIONARY_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(MISSIONARY_NAME_MAX)),t);
@@ -24,7 +24,10 @@ const fill=t=>MISSIONARY_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(MI
 test('shape: invite, accept/decline, success, failure, cooldown and feed lines exist; every line proposal', () => {
   for (const o of [I,O,C]) assert.equal(o.proposal,true);
   for (const l of lineObjs()) { assert.equal(l.proposal,true); assert.ok(l.text.length>0); }
-  assert.deepEqual(labels(),['Accept','Decline']);
+  assert.deepEqual(labels(),['Accept','Not now']);
+  // #383: the generic prompt and the per-faith cards offer the same two labels for the same invitation.
+  for (const i of Object.values(invitationCopy)) { assert.equal(i.buttons.accept,I.accept); assert.equal(i.buttons.notNow,I.notNow); }
+  assert.equal(Object.hasOwn(I,'decline'),false);
   assert.deepEqual(Object.keys(F),[...FEED_NATIONS]); assert.deepEqual([...FEED_NATIONS],['kindle','aurelle']);
   for (const l of Object.values(F)) { assert.equal(l.proposal,true); assert.equal(typeof l.aiBadge,'boolean'); }
 });
