@@ -1,7 +1,8 @@
 'use client';
-import type { PublicWar } from '@/lib/war';
-import { citizenSafety, mobilizationStatus, noticesFor, warBanner, type WarNation } from '@/lib/war-copy';
-import { fillWarText, isWarNation, warNationNames } from '@/lib/war-rules';
+import type { DefenseWindowState, PublicWar } from '@/lib/war';
+import { citizenSafety, defenseWindow, mobilizationStatus, noticesFor, warBanner, type WarNation } from '@/lib/war-copy';
+import { defenseWindowLocal, fillWarText, isWarNation, warNationNames } from '@/lib/war-rules';
+import { useEffect, useState } from 'react';
 import { GameTimer } from './game-timer';
 import { useDisplayTimestamp } from './display-preferences';
 
@@ -26,4 +27,20 @@ export function WarBanner({ wars, nationId }: { wars: PublicWar[] | undefined; n
       <p>{citizenSafety.lines[0].text}</p>
     </article>;
   })}</section>;
+}
+
+/** #310: "Defense window: HH:MM–HH:MM your time" on the nation's Country view (HARIMU_WAR_ENABLED; the server sends no windows while it is off).
+ *  The window is saved in UTC and shown in the viewer's own time: the offset is read in the browser after mount, so nothing renders on the server pass.
+ *  `offsetMinutes` (minutes east of UTC) is for tests and previews. Copy comes from lib/war-copy.ts (#312). */
+export function DefenseWindow({ windows, nationId, offsetMinutes }: { windows: Record<string, DefenseWindowState> | undefined; nationId: string; offsetMinutes?: number }) {
+  const [browserOffset, setBrowserOffset] = useState<number | null>(null);
+  useEffect(() => { setBrowserOffset(-new Date().getTimezoneOffset()); }, []);
+  const offset = offsetMinutes ?? browserOffset;
+  const window = windows?.[nationId];
+  if (!isWarNation(nationId) || !window || offset === null) return null;
+  const { start, end } = defenseWindowLocal(window.startHourUtc, offset);
+  return <section aria-label="Defense window">
+    <p><strong>{fillWarText(defenseWindow.line.text, { start, end })}</strong></p>
+    {defenseWindow.explainer.map(line => <p key={line.text}>{line.text}</p>)}
+  </section>;
 }
