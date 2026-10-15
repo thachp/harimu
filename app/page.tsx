@@ -25,7 +25,7 @@ import { marketVisible } from '@/lib/market-visibility';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
-import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, nationForNavigation, identityPending, sceneUrl, viewedNationAfterLoad, type SceneView } from '@/lib/scene-navigation';
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, nationForNavigation, identityPending, sceneUrl, isVisitorSession, viewedNationAfterLoad, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -1166,7 +1166,7 @@ export default function Home() {
     const cityId = citizenNation?.id === nextNation ? currentCityAccount?.currentCityId ?? capitalCityForNation(nextNation)?.id : visitingCity && cityForNation(nextNation,visitingCity) ? visitingCity : undefined;
     // Civic keeps the nation being viewed (#91); a foreign nation renders read-only.
     // #376: a guest or signed-out visitor previews one nation; keep it in every scene's URL. Not while the session is still loading (a citizen's own nation must not be pinned to the default, #411).
-    const visitor = !citizenNation && (!clerkConfigured || citizenSessionStatus === 'anonymous');
+    const visitor = isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus);
     const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined, nextNation !== citizenNation?.id, visitor);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
