@@ -78,7 +78,11 @@ test('faith-neutral, no real-world currency, bank or place; no Notable', () => {
   assert.doesNotMatch(t,/\b(dollar|euro|yen|pound|ruble|yuan|bitcoin|crypto|USD|EUR|IMF|World Bank|Fed|Federal Reserve|Earth|America|Europe|China|Russia|Wall Street)\b/i);
   assert.doesNotMatch(t,/Notable|@/);
 });
-test('unwired: nothing in app/ or components/ imports clearing-house-copy', () => {
+test('wired (#210 follow-up): only lib/kiosk-text.ts imports the copy; the app reaches it through that module, and the strings are not duplicated', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/clearing-house-copy/, f);
+  const files=[...walk('app'),...walk('components'),...walk('lib')].filter(f=>/\.(t|j)sx?$/.test(f));
+  const importers=files.filter(f=>/clearing-house-copy/.test(readFileSync(f,'utf8'))&&f!=='lib/clearing-house-copy.ts');
+  assert.deepEqual(importers,['lib/kiosk-text.ts']);
+  assert.match(readFileSync('app/wallet-panel.tsx','utf8'),/@\/lib\/kiosk-text/);
+  assert.doesNotMatch(readFileSync('app/wallet-panel.tsx','utf8'),/Buy tessera with Spark|No fee in this preview|kiosk is not open yet/i);
 });

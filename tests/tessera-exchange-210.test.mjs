@@ -28,7 +28,7 @@ test('a Kindle citizen earns Tessera at the kiosk: SPK debit and TSR credit at t
   const economy = (await r.call('citizen', 'alice')).data.economy;
   assert.equal(economy.tesseraMinor, 100); assert.equal(economy.walletMinor, spark - 400);
   const tx = economy.transactions.find(x => x.kind === 'tessera-buy');
-  assert.equal(tx.amountMinor, -400); assert.equal(tx.reason, 'Clearing House kiosk · bought 1.00 TSR');
+  assert.equal(tx.amountMinor, -400); assert.equal(tx.reason, 'Clearing House kiosk · bought 1.00 TSR · paid 4.00 SPK', "Content's #325 history row, amount and cost with units");
   assert.equal(economy.transactions.reduce((a, x) => a + x.amountMinor, 0), economy.walletMinor, 'history reconciles with the balance');
 });
 
@@ -81,7 +81,7 @@ test('the placeholder grant is removed from code; the wallet panel offers the ki
   const registry = await readFile(new URL('../lib/world-registry.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(registry, /TEMP_STARTER_GRANT|'starter-grant',\?/);
   const panel = await readFile(new URL('../app/wallet-panel.tsx', import.meta.url), 'utf8');
-  assert.match(panel, /Clearing House kiosk/); assert.doesNotMatch(panel, /Currency exchange is not available yet/);
+  assert.match(panel, /@\/lib\/kiosk-text/); assert.doesNotMatch(panel, /Currency exchange is not available yet/);
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
   assert.match(page, /onBuyTessera=\{kioskOpen \? buyTessera : undefined\}/);
 });

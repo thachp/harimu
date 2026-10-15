@@ -47,12 +47,14 @@ export const walletHistorySql = `SELECT id, kind, amount_minor, item, quantity, 
 
 export type WalletHistoryRow = { id: string; kind: WalletTransaction['kind']; amount_minor: number; item: string | null; quantity: number | null; occurred_at: number | null };
 
-export function describeTransaction(row: WalletHistoryRow): string {
+/** `kioskRow` formats the Clearing House row from Content's copy (lib/kiosk-text.ts); wallet.ts stays free of runtime imports so tests can load it directly. */
+export type KioskRowFormatter = (tesseraMinor: number, sparkMinor: number) => string;
+export function describeTransaction(row: WalletHistoryRow, kioskRow?: KioskRowFormatter): string {
   const goods = `${row.quantity ?? 0} ${row.item ?? 'goods'}`;
   switch (row.kind) {
     case 'wage': return `Wage · ${row.item ?? 'paid shift'}`;
     case 'income-tax': return `Income tax · ${row.quantity ?? 0}% withheld · ${row.item ?? 'paid shift'}`;
-    case 'tessera-buy': return `Clearing House kiosk · bought ${((row.quantity ?? 0) / 100).toFixed(2)} TSR`;
+    case 'tessera-buy': return kioskRow ? kioskRow(row.quantity ?? 0, Math.abs(row.amount_minor ?? 0)) : `Clearing House kiosk · bought ${((row.quantity ?? 0) / 100).toFixed(2)} TSR`;
     case 'market-buy': return `Market purchase · ${goods}`;
     case 'market-sell': return `Market sale · ${goods}`;
     case 'citizen-buy': return `Citizen listing purchase · ${goods}`;
@@ -61,8 +63,8 @@ export function describeTransaction(row: WalletHistoryRow): string {
   }
 }
 
-export function toTransactions(rows: WalletHistoryRow[]): WalletTransaction[] {
-  return rows.map((row) => ({ id: row.id, kind: row.kind, amountMinor: row.amount_minor, reason: describeTransaction(row),
+export function toTransactions(rows: WalletHistoryRow[], kioskRow?: KioskRowFormatter): WalletTransaction[] {
+  return rows.map((row) => ({ id: row.id, kind: row.kind, amountMinor: row.amount_minor, reason: describeTransaction(row, kioskRow),
     occurredAt: new Date((row.occurred_at ?? 0) * 1000).toISOString() }));
 }
 
