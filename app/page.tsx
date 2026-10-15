@@ -651,14 +651,14 @@ export default function Home() {
   const [demoReceipts, setDemoReceipts] = useState<string[]>([]);
   const [demoStarterGranted, setDemoStarterGranted] = useState(false);
   const [economy, setEconomy] = useState<Economy | null>(null);
-  // #210: the Clearing House kiosk opens with the World Registry (HARIMU_SQUARE_PURCHASE_ENABLED).
+  // #210, #626: the Clearing House kiosk opens with HARIMU_TESSERA_EXCHANGE_ENABLED (the registry reports it as kiosk.open), not with square purchases.
   const [kioskOpen, setKioskOpen] = useState(false);
   const kioskRules = useRef({ minTesseraMinor: 100, maxTesseraMinor: 10000, sparkPerTessera: 4 }); // replaced by the server's kiosk block
 
   useEffect(() => {
     if (!walletOpen) return;
     let live = true;
-    fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean; kiosk?: { sparkPerTessera: number; minTesseraMinor: number; maxTesseraMinor: number } } | null> : null).then((data) => { if (data?.kiosk) kioskRules.current = data.kiosk; if (live) setKioskOpen(data?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
+    fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean; kiosk?: { open?: boolean; sparkPerTessera: number; minTesseraMinor: number; maxTesseraMinor: number } } | null> : null).then((data) => { if (data?.kiosk) kioskRules.current = data.kiosk; if (live) setKioskOpen(data?.kiosk?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
     return () => { live = false; };
   }, [walletOpen]);
   const buyTessera = async (tesseraMinor: number): Promise<string | null> => {
