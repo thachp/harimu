@@ -36,7 +36,7 @@ export const palaceCoupCopy:readonly CoupStageCopy[]=[
    'Be it known: {leader} hears the murmurs of the court and is not moved. Every thread keeps its place.',true),
   g('rumour-banquets','Empty seats at the high table',
    'Some great lords keep away from court of late. The Gazette reports the talk and draws no conclusion.',false),
- ],panel('Court unsettled','Rumours of discontent among the great lords. {leader} still holds the Sky Throne.')),
+ ],panel('Court unsettled','Rumors of discontent among the great lords. {leader} still holds the Sky Throne.')),
  st('crisis-window-open',[
   g('window-proclaimed','A palace coup is declared',
    'Great lords have moved against the Crown. The Crisis Window is open, and the Guard decides the Sky Throne.',false),
