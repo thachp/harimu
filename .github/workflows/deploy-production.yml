@@ -46,6 +46,7 @@ jobs:
       github.event.repository.full_name == github.repository
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 45
     env:
       SHA: ${{ github.sha }}
       QA2_GO_SHA: ${{ inputs.qa2_go_sha }}
@@ -53,10 +54,12 @@ jobs:
       DATABASE_URL_ENV: ${{ inputs.database_url_env }}
       HARIMU_DEPLOY_ENVIRONMENT: production
     steps:
-      - uses: actions/checkout@v4
+      # Pinned by commit sha (the v4 tag target on Oct 15, 2026): a moved tag cannot reach the secret-bearing steps below. Bump deliberately.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.SHA }}
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -75,20 +78,31 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           node scripts/deploy-production.mjs "--rollback=$ROLLBACK_VERSION"
-          node scripts/smoke-production.mjs --sha=any
+      - name: Smoke checks after rollback (no secrets)
+        if: inputs.dry_run == false && inputs.rollback_version != ''
+        run: node scripts/smoke-production.mjs --sha=any
       - name: Refuse a real deploy without the backup confirmation
         if: inputs.dry_run == false && inputs.rollback_version == '' && inputs.backup_confirmed != true
         run: |
           echo "backup_confirmed is required for a real production deploy." >&2
           exit 1
-      - name: Apply pending Postgres migrations (fails closed; expand/contract only)
-        if: inputs.dry_run == false && inputs.rollback_version == ''
-        env:
-          PREVIEW_DATABASE_ADMIN_URL: ${{ inputs.database_url_env == 'PRODUCTION_DATABASE_ADMIN_URL' && secrets.PRODUCTION_DATABASE_ADMIN_URL || secrets.PREVIEW_DATABASE_ADMIN_URL }}
-        run: npm run db:postgres:migrate
-      - name: Build production (clean environment; no secrets)
+      - name: Build production (clean environment; no secrets; before any database change)
         if: inputs.dry_run == false && inputs.rollback_version == ''
         run: node scripts/build-production.mjs
+      - name: Apply pending Postgres migrations with the production admin secret (fails closed; expand/contract only)
+        if: inputs.dry_run == false && inputs.rollback_version == '' && inputs.database_url_env == 'PRODUCTION_DATABASE_ADMIN_URL'
+        env:
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PRODUCTION_DATABASE_ADMIN_URL }}
+        run: |
+          test -n "$PREVIEW_DATABASE_ADMIN_URL" || { echo "PRODUCTION_DATABASE_ADMIN_URL is empty; refusing to fall back to preview's." >&2; exit 1; }
+          npm run db:postgres:migrate
+      - name: Apply pending Postgres migrations with preview's admin secret (shared database; fails closed; expand/contract only)
+        if: inputs.dry_run == false && inputs.rollback_version == '' && inputs.database_url_env == 'PREVIEW_DATABASE_ADMIN_URL'
+        env:
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+        run: |
+          test -n "$PREVIEW_DATABASE_ADMIN_URL" || { echo "PREVIEW_DATABASE_ADMIN_URL is empty." >&2; exit 1; }
+          npm run db:postgres:migrate
       - name: Deploy production
         if: inputs.dry_run == false && inputs.rollback_version == ''
         env:
