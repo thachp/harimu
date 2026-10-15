@@ -17,3 +17,11 @@ export function displayTimestamp(value:string|number,timeFormat:DisplayPreferenc
 
 /** Reduced motion applies when the player chose Reduce in Settings or the OS prefers reduced motion (#120). */
 export function effectiveReducedMotion(motion:DisplayPreferences['motion'],osPrefersReduced:boolean):boolean{return motion==='reduce'||osPrefersReduced;}
+
+/** #346: Clerk derives its whole type scale from one base size (14px at 100% text), so scaling that one value scales its menus and
+ *  forms in step with the Text size setting. Never use calc()/var() here: Clerk does its own math with the value. */
+export const clerkBaseFontPx=14;
+export function clerkFontSize(scale:number|undefined):string{
+ const percent=textScales.includes(scale as TextScale)?scale as number:100;
+ return `${Math.round(clerkBaseFontPx*percent)/100}px`;
+}
