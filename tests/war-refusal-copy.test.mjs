@@ -40,12 +40,18 @@ test('limits: labels 40, countdown captions 80, refusal lines 140, with every pl
 });
 test('only known placeholders, in the right lines', () => {
   for (const t of all()) for (const m of t.match(/\{[^}]*\}/g)??[]) assert.ok(REFUSAL_PLACEHOLDERS.includes(m),`${m} in ${t}`);
-  assert.match(refusalFor('rate_limit').lines[1].text,/\{nextAt\}/); assert.match(refusalFor('rate_limit').lines[0].text,/every \{days\} real days/); for (const n of REFUSAL_NATIONS) assert.match(MC[n].text,/\{endsAt\}/);
+  assert.match(refusalFor('rate_limit').lines[1].text,/\{nextAt\}/); assert.match(refusalFor('rate_limit').lines[0].text,/every \{days\}\.$/); for (const n of REFUSAL_NATIONS) assert.match(MC[n].text,/\{endsAt\}/);
   for (const t of [...refusalFor('active_war_cap').lines,...refusalFor('casus_belli').lines].map(l=>l.text)) assert.doesNotMatch(t,/\{/,t);
   for (const t of labels()) assert.doesNotMatch(t,/\{/,t);
 });
+test('{days} is a pre-formatted string that carries its unit, so the line reads right for one day and for many; the line itself writes no unit', () => {
+  const line=refusalFor('rate_limit').lines[0].text;
+  assert.doesNotMatch(line,/\breal days?\b|\bdays?\b/i);
+  for (const [days,expected] of [['1 real day','every 1 real day.'],['14 real days','every 14 real days.']]) assert.ok(line.replace('{days}',days).endsWith(expected),days);
+  assert.ok(!line.replace('{days}','1 real day').includes('1 real days'));
+});
 test('figures: only the docs\' 1 and 2 (rate limits), and the interval is the {days} placeholder; no other digits or number words anywhere', () => {
-  assert.match(refusalFor('rate_limit').lines[0].text,/at most 1 new offensive war every \{days\} real days/); assert.match(refusalFor('active_war_cap').lines[0].text,/at most 2 active offensive wars/);
+  assert.match(refusalFor('rate_limit').lines[0].text,/at most 1 new offensive war every \{days\}\.$/); assert.match(refusalFor('active_war_cap').lines[0].text,/at most 2 active offensive wars/);
   for (const t of all()) { const bare=t.replace(/\{[^}]*\}/g,'').replace(/\bat most 1 new\b|\bat most 2 active\b|\balready has 2 active\b/g,''); assert.doesNotMatch(bare,/\d|%|percent|\b(one|two|three|four|five|six|seven|ten|twice|once|half)\b|\b(hours?|weeks?|months?|years?)\b/i,t); }
   for (const t of captions()) assert.doesNotMatch(t.replace(/\{[^}]*\}/g,''),/\d/,t);
 });
