@@ -28,6 +28,7 @@ import { checkNationCrests } from './nation-crests-check.mjs';
 import { checkUiV2Topbar } from './ui-v2-topbar-check.mjs';
 import { checkTopBarEmblem } from './hud-emblem-check.mjs';
 import { checkShiftQualityStep } from './shift-quality-layout-check.mjs';
+import { checkPhoneLabels } from './phone-labels-check.mjs';
 import { checkAccountMenu } from './account-menu-layout-check.mjs';
 import { checkPhoneTapTargets } from './phone-tap-targets-check.mjs';
 import { checkVisitorWording } from './visitor-wording-check.mjs';
@@ -184,6 +185,7 @@ try {
   await checkShiftQualityStep({ browser, css, preflight, failures, rows }); // #347: shift quality dialog is styled, spaced, reachable
   await checkDevelopmentPreviewNote({ browser, css, preflight, failures, rows }); // #366: no "Development preview" label in the top bar; note lives in Game settings
   await checkHudTooltips({ browser, css, preflight, failures, rows }); // #366: one top-bar tooltip at a time, on-screen, closed by leave / blur / Escape
+  await checkPhoneLabels({ browser, css, preflight, failures, rows }); // #377: phone city labels inside the canvas and apart, destination cards and nation strip fit the width
   await checkAccountMenu({ browser, css, preflight, failures, rows }); // #452: the account menu shows the whole email at every text size
   await checkPhoneTapTargets({ browser, css, preflight, failures, rows }); // #528: phone controls are at least 44x44; the camera bar sits under the canvas
   await checkVisitorWording({ browser, css, preflight, failures, rows }); // #379: visitor wording (VISITOR PREVIEW, Household) and guide/pin text fit
