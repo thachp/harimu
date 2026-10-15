@@ -146,7 +146,8 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const undergroundDevotion = hiddenFaith ? devotionFromEvents([...undergroundDays.map(day => ({ day, amount: devotionPerWorship })), ...undergroundHitEvents], today) : null;
   const underground = hiddenFaith ? await undergroundState(db, userId, hiddenFaith, undergroundDays.includes(today), Number(row?.chosen_at ?? 0), today, now) : null;
   // #225: cross-border missionaries (derived on read; null with the flag off or in an unsupported nation).
-  const missionary = enabled && supported && isMissionNation(nationId ?? '') ? await readMissionary(db, userId, now, { nationId: nationId!, currentFaith: faith, worshipFaith, devotion, changeAvailableAt }) : null;
+  // #404: Korund has no public faith (docs 14.6), so it gets no missionary state or block.
+  const missionary = enabled && supported && nationId !== 'korund' && isMissionNation(nationId ?? '') ? await readMissionary(db, userId, now, { nationId: nationId!, currentFaith: faith, worshipFaith, devotion, changeAvailableAt }) : null;
   const worshippedToday = days.includes(today);
   const worshipBlockedReason = !enabled ? 'Faith is not open yet.' : !worshipFaith ? (nationId === 'korund' ? 'Public worship is not permitted in Korund.' : 'Choose a faith to attend worship.')
     : worshippedToday ? 'You have already attended worship this game day. Come back tomorrow.' : null;
