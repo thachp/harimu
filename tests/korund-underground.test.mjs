@@ -142,25 +142,25 @@ test('the 14-day cap: no second inspection of a city inside 14 real days, allowe
   assert.deepEqual(await mod.runKorundRaids(r.db, t0 + 1), [], 'and then capped again');
 });
 
-test('#382 pure rules: Suspicion is 0..100, +10 per discovery or +5 for a repeat within 14 days, -1 per real day, derived from discovery times', () => {
+test('#382 pure rules: Suspicion is 0..100, +10 per discovery or +5 for a repeat within 30 days, -1 per real day, derived from discovery times', () => {
   const D = 86400, t = 1_000_000;
   assert.equal(suspicionLevel([], t), 0); assert.equal(suspicionLevel([t], t), 10);
   assert.equal(suspicionLevel([t], t + 3 * D + 86399), 7, 'decays a whole day at a time, computed on read'); assert.equal(suspicionLevel([t], t + 10 * D), 0); assert.equal(suspicionLevel([t], t + 400 * D), 0, 'never below 0');
-  assert.equal(isRepeatDiscovery(null, t), false); assert.equal(isRepeatDiscovery(t, t + 14 * D), true, 'the window is the last 14 real days, inclusive'); assert.equal(isRepeatDiscovery(t, t + 14 * D + 1), false);
-  assert.equal(suspicionLevel([t, t + 14 * D], t + 14 * D), 5, '10 decays to 0 over 14 days, then a repeat adds 5'); assert.equal(suspicionLevel([t, t + 14 * D + 1], t + 14 * D + 1), 10, 'outside the window it is a first step again');
+  assert.equal(isRepeatDiscovery(null, t), false); assert.equal(isRepeatDiscovery(t, t + 30 * D), true, 'the window is the last 30 real days, inclusive'); assert.equal(isRepeatDiscovery(t, t + 30 * D + 1), false); assert.equal(isRepeatDiscovery(t, t + 14 * D), true, 'longer than the 14-day inspection gap');
+  assert.equal(suspicionLevel([t, t + 14 * D], t + 14 * D), 5, '10 decays to 0 over 14 days, then a repeat adds 5'); assert.equal(suspicionLevel([t, t + 30 * D], t + 30 * D), 5); assert.equal(suspicionLevel([t, t + 30 * D + 1], t + 30 * D + 1), 10, 'outside the window it is a first step again');
   assert.equal(suspicionLevel([t, t + 14 * D], t + 14 * D), suspicionLevel([t + 14 * D, t], t + 14 * D), 'order does not matter');
   assert.equal(suspicionLevel([t, t + D, t + 2 * D], t + 2 * D), 10 + 4 + 4);
   assert.equal(suspicionLevel(Array.from({ length: 60 }, (_, i) => t + i * D), t + 59 * D), 100, 'capped at 100');
   assert.deepEqual([0, 1, 29, 30, 59, 60, 100].map(l => suspicionBand(l)), ['none', 'low', 'low', 'raised', 'raised', 'high', 'high']);
   assert.deepEqual(suspicionWord, { low: 'Low', raised: 'Raised', high: 'High' });
-  assert.equal(cfg.suspicionFirstStep, 10); assert.equal(cfg.suspicionRepeatStep, 5); assert.equal(cfg.repeatWindowSeconds, 14 * 86400); // pin the [ASSUMPTION] numbers
+  assert.equal(cfg.suspicionFirstStep, 10); assert.equal(cfg.suspicionRepeatStep, 5); assert.equal(cfg.repeatWindowSeconds, 30 * 86400); assert.equal(cfg.raidMinGapSeconds, 14 * 86400); // pin the [ASSUMPTION] numbers
 });
 
-test('#382: the first inspection shows the first-discovery line and a private Suspicion band; a repeat inside the 14-day window shows the repeat line; re-choosing a faith resets nothing; others are not affected', async t => {
+test('#382: the first inspection shows the first-discovery line and a private Suspicion band; a repeat inside the 30-day window shows the repeat line; re-choosing a faith resets nothing; others are not affected', async t => {
   const { r, mod, nowS } = await setup(t);
   await hold(r, 'kai'); assert.equal((await underground(r, 'kai')).status, 200);
   const capital = 'stonehearth', gap = cfg.raidMinGapSeconds;
-  // Two game days a real 14 days apart that both roll a discovery: the second lands exactly on the per-city gap boundary, which is also the end of the repeat window.
+  // Two game days a real 14 days apart that both roll a discovery: the second lands exactly on the per-city gap boundary, well inside the 30-day repeat window.
   let d1 = undergroundGameDay(nowS()) + 1; while (!(raidDue(capital, d1) && raidDue(capital, d1 + gap / DAY))) d1++;
   const t1 = d1 * DAY + 60, t2 = t1 + gap;
   r.setNow(t1 * 1000); await r.db.prepare('UPDATE citizen_worship SET worshipped_at=?').bind(t1 - 100).run();

@@ -23,12 +23,12 @@ export const undergroundConfig = {
   newsWindowSeconds: 14 * 86400,
   newsLimit: 5,
   /** #382 Suspicion (ARC ruling, every number an [ASSUMPTION]; docs 14.6 gives none): a whole number 0..100 per citizen; a discovery adds 10, or 5 when the holder was also found within the
-   *  repeat window (the last 14 real days); it decays 1 per real day, computed on read. Bands (also [ASSUMPTION]) name the level for the holder: it never sees the number. */
+   *  repeat window (the last 30 real days, ARC ruling; longer than the 14-day per-city inspection gap so repeats can happen); it decays 1 per real day, computed on read. Bands (also [ASSUMPTION]) name the level for the holder: it never sees the number. */
   suspicionFirstStep: 10,
   suspicionRepeatStep: 5,
   suspicionMax: 100,
   suspicionDecaySeconds: 86400,
-  repeatWindowSeconds: 14 * 86400,
+  repeatWindowSeconds: 30 * 86400,
   suspicionBands: { low: 1, raised: 30, high: 60 },
 } as const;
 
@@ -50,7 +50,7 @@ export const pickIndex = (seed: string, count: number) => count <= 0 ? 0 : hash3
 
 /** True when a new inspection of a city at `now` is allowed given the time of its previous one (null: none). Exact boundary: the gap itself is allowed. */
 /** #382: a discovery is a repeat when the holder was also found within the repeat window before it. Counted from stored discovery times (korund_raid_hits), not from when the faith was chosen, so re-choosing a faith resets nothing.
- *  The window is inclusive, and it equals the per-city 14-day inspection gap, so in one city a repeat can only land exactly on the gap boundary (or after the holder moves city) [flagged in the PR]. */
+ *  The window is inclusive and, at 30 days, longer than the per-city 14-day inspection gap, so a holder who stays in one city can be repeated by the next inspection (the 14-day gap is unchanged) [ASSUMPTION, ARC ruling]. */
 export const isRepeatDiscovery = (previousAt: number | null, at: number) => previousAt !== null && at - previousAt <= undergroundConfig.repeatWindowSeconds;
 /** #382: the holder's Suspicion at `now`, folded from their discovery times (seconds, any order). Each step is decayed to its discovery first; the result is decayed to `now`. 0 with no discoveries. */
 export function suspicionLevel(discoveredAt: readonly number[], now: number): number {

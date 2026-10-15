@@ -79,7 +79,7 @@ export async function undergroundHits(db: GameDatabase, userId: string, since: n
   } catch (error) { if (isMissingRelation(error)) return []; throw error; }
 }
 
-/** Private to the holder (#382). `repeat`: the holder was also found within the 14-day repeat window before this inspection (the repeat notice). `discoveries`: how many inspections found them since they chose this faith.
+/** Private to the holder (#382). `repeat`: the holder was also found within the 30-day repeat window before this inspection (the repeat notice). `discoveries`: how many inspections found them since they chose this faith.
  *  `suspicion`: the private indicator, a label and a band word only (never the number); null while Suspicion is 0. */
 export type UndergroundView = { lastRaid: { at: number; text: string; devotionNote: string; repeat: boolean; discoveries: number } | null; quietWeek: string | null; suspicion: { line: string; privateTag: string; tooltip: string[] } | null };
 /** What a hidden-faith holder sees (private, derived on read). A recent inspection of them shows the existing "found a shrine" notice and the Devotion note;
@@ -93,7 +93,7 @@ export async function readUndergroundView(db: GameDatabase, userId: string, city
     const suspicion = band === 'none' ? null : { line: suspicionIndicator.levelLine.replace('{level}', suspicionWord[band]), privateTag: suspicionIndicator.privateTag, tooltip: suspicionIndicator.tooltip.map(t => t.text) };
     let index = -1; times.forEach((at, i) => { if (at >= since && at >= recentFrom) index = i; });
     if (index >= 0) {
-      // docs 14.6: a first discovery adds Suspicion only; a repeat (also found within the last 14 real days) is the one that may lead to Correction Duty.
+      // docs 14.6: a first discovery adds Suspicion only; a repeat (also found within the last 30 real days) is the one that may lead to Correction Duty.
       const repeat = isRepeatDiscovery(index > 0 ? times[index - 1] : null, times[index]);
       return { lastRaid: { at: times[index], text: copy.discovery[repeat ? 'repeat' : 'first'].text, devotionNote: copy.raidResult.devotionNote.text, repeat, discoveries: index + 1 }, quietWeek: null, suspicion };
     }
