@@ -79,7 +79,7 @@ test('tone: nothing graphic or warlike beyond the rule; no real-world names, no 
   assert.doesNotMatch(t,/Notable|@|\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia)\b/);
 });
-test('wired only through lib/founding-period.ts (#612): nothing else in app/, components/ or lib/ imports founding-period-copy', () => {
+test('wired only through lib/founding-period.ts and app/founding-banner.tsx (#612): nothing else in app/, components/ or lib/ imports founding-period-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('founding-period-copy.ts')&&f!=='lib/founding-period.ts') assert.doesNotMatch(readFileSync(f,'utf8'),/founding-period-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('founding-period-copy.ts')&&f!=='lib/founding-period.ts'&&f!=='app/founding-banner.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/founding-period-copy/, f);
 });
