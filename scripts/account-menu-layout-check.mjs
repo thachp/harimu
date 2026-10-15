@@ -31,7 +31,7 @@ const clerkCss = `.cl-userButtonPopoverCard{padding:16px;display:block}.cl-userP
 async function bundle() {
   const result = await build({
     stdin: { resolveDir: root, loader: 'tsx', contents: entry }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', target: 'es2022', logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': '"production"' }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
+    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"' }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
     plugins: [{ name: 'stubs', setup(b) {
       b.onResolve({ filter: /^@clerk\/nextjs$/ }, a => ({ path: a.path, namespace: 'stub' }));
       b.onResolve({ filter: /\.module\.css$/ }, () => ({ path: 'css-module', namespace: 'stub' }));
