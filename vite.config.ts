@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
 import { defineConfig } from 'vite';
 import { buildInfo } from './scripts/build-info.mjs';
+import { wranglerConfigPath } from './scripts/production-config.mjs';
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
@@ -32,7 +33,7 @@ export default defineConfig(async () => {
       vinext(),
       cloudflare({
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
-        configPath: 'wrangler.jsonc',
+        configPath: wranglerConfigPath(), // #501c: wrangler.jsonc unless HARIMU_WRANGLER_CONFIG names wrangler.prod.jsonc (scripts/build-production.mjs)
       }),
     ],
   };
