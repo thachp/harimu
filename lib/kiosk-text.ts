@@ -20,10 +20,13 @@ export const kioskHistoryRow = (tesseraMinor: number, sparkMinor: number) => fil
 
 /** Server refusal reasons (lib/tessera-exchange.ts, POST /api/world/registry) to the copy's refusal keys. */
 export const refusalForReason: Readonly<Record<string, RefusalKey>> = {
-  disabled: 'closed', non_convertible: 'korund', no_kiosk: 'other-nation', insufficient_spark: 'insufficient-spark', bad_request: 'out-of-range',
+  disabled: 'closed', non_convertible: 'korund', no_kiosk: 'other-nation', insufficient_spark: 'insufficient-spark', out_of_range: 'out-of-range',
 };
+/** [not in #325] A request the kiosk could not read (a missing or malformed request id): not an amount problem, so it gets its own plain line. */
+export const kioskBadRequest = 'The kiosk could not read that request. Try again.';
 /** Refusal line for a server reason, or null when the reason has no copy (the caller keeps the server's message). */
 export function kioskRefusal(reason: unknown, values: CopyValues): string | null {
+  if (reason === 'bad_request') return kioskBadRequest;
   const key = typeof reason === 'string' ? refusalForReason[reason] : undefined;
   return key ? fillCopy(refusals[key][0].text, values) : null;
 }

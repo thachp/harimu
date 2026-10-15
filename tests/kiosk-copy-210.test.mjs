@@ -8,6 +8,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { loadApp, componentModule } from './helpers/component-module.mjs';
 import { describeTransaction } from '../lib/wallet.ts';
+import { sparkPerTessera, kioskMinTesseraMinor, kioskMaxTesseraMinor } from '../lib/tessera-exchange.ts';
+import { readFile } from 'node:fs/promises';
 
 const text = html => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/\s+/g, ' ');
 const K = await import(await componentModule(new URL('../lib/kiosk-text.ts', import.meta.url).pathname));
@@ -54,7 +56,13 @@ test('real refusals map to the #325 refusal lines with pre-formatted values', as
   assert.equal(poor.data.reason, 'insufficient_spark'); assert.equal(K.kioskRefusal(poor.data.reason, values), 'You do not have enough Spark for 5.00 TSR.');
   // Out of range (server validation).
   const range = await kiosk(r, 'alice', 1);
-  assert.equal(range.status, 400); assert.equal(K.kioskRefusal(range.data.reason, values), 'That amount is out of range. Choose between 1.00 TSR and 100.00 TSR.');
+  assert.equal(range.status, 400); assert.equal(range.data.reason, 'out_of_range'); assert.equal(K.kioskRefusal(range.data.reason, values), 'That amount is out of range. Choose between 1.00 TSR and 100.00 TSR.');
+  // A missing request id is not an amount problem: it must not say "out of range".
+  const noId = await r.call('world/registry', 'alice', { action: 'buy-tessera', tesseraMinor: 500 });
+  assert.equal(noId.status, 400); assert.equal(noId.data.reason, 'bad_request');
+  assert.equal(K.kioskRefusal(noId.data.reason, values), 'The kiosk could not read that request. Try again.'); assert.doesNotMatch(K.kioskRefusal(noId.data.reason, values), /range|Choose/);
+  assert.equal((await r.call('world/registry', 'alice', { action: 'buy-tessera', tesseraMinor: 500, requestId: 'x' })).data.reason, 'bad_request');
+  assert.equal((await r.call('world/registry', 'alice', { action: 'buy-tessera', tesseraMinor: 1.5, requestId: randomUUID() })).data.reason, 'out_of_range');
   // Korund: State Media notice, never the Kindle kiosk.
   await r.call('citizen', 'bob'); await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
   const korund = await kiosk(r, 'bob', 500);
@@ -77,4 +85,16 @@ test('wallet history shows the #325 row with amount and cost after a real purcha
   assert.equal(tx.reason, 'Clearing House kiosk · bought 1.00 TSR · paid 4.00 SPK');
   assert.match(panel({ transactions: [tx] }), /Clearing House kiosk · bought 1\.00 TSR · paid 4\.00 SPK/);
   assert.equal(describeTransaction({ id: 'x', kind: 'tessera-buy', amount_minor: -400, item: null, quantity: 100, occurred_at: 0 }), 'Clearing House kiosk · bought 1.00 TSR');
+});
+
+test('the client fallback kiosk numbers (4 / 100 / 10000) are pinned to lib/tessera-exchange, so they cannot drift', async () => {
+  assert.deepEqual([sparkPerTessera, kioskMinTesseraMinor, kioskMaxTesseraMinor], [4, 100, 10000]);
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const fallback = page.match(/kioskRules = useRef\(\{ minTesseraMinor: (\d+), maxTesseraMinor: (\d+), sparkPerTessera: (\d+) \}\)/);
+  assert.ok(fallback, 'page keeps a fallback until the registry GET answers');
+  assert.deepEqual(fallback.slice(1).map(Number), [kioskMinTesseraMinor, kioskMaxTesseraMinor, sparkPerTessera]);
+  const panel = await readFile(new URL('../app/wallet-panel.tsx', import.meta.url), 'utf8');
+  const offers = JSON.parse(panel.match(/kioskOffers = (\[[\d, ]+\])/)[1]);
+  for (const offer of offers) assert.ok(offer >= kioskMinTesseraMinor && offer <= kioskMaxTesseraMinor, `offer ${offer} is inside the server range`);
+  assert.ok(Math.abs(1 / sparkPerTessera - 0.25) < 1e-9, 'matches the 0.25 TSR per SPK display rate');
 });

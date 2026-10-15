@@ -50,5 +50,9 @@ export function firstWeekDay(input:{nationId:string;enrolledAt?:string;now:numbe
  return arc.days.find(entry=>entry.day===day)??null;
 }
 
+/** #344: with the market flag off, goals that point at the Market are hidden (not just untracked), so they cannot block the day.
+ * `marketOpen` is marketVisible(nationId, flag) from lib/market-visibility.ts (Korund coupons and Aurelle's royal store stay). */
+export function withoutMarketGoals(day:WeekDay|null,marketOpen:boolean):WeekDay|null{return day&&!marketOpen?{...day,goals:day.goals.filter(goal=>goal.screen!=='market')}:day;}
+
 /** Goals shown to citizens: goals that require an unbuilt feature stay hidden unless that feature is listed as available. */
 export function visibleGoals(day:WeekDay,available:readonly GoalRequirement[]=[]):readonly WeekGoal[]{return day.goals.filter(goal=>!goal.requires||goal.requires.every(need=>available.includes(need)));}
