@@ -1,5 +1,5 @@
 import { finalizeDueElection } from './elections';
-import { runKindleAssembly, type AssemblyScope } from './assembly';
+import { runKindleAssembly, type AssemblyTickConfig } from './assembly';
 import { runPrimaries, type PrimaryScope } from './primaries';
 import { accountElectionDatabase } from './preview-election';
 import type {GameDatabase} from './database-contract';
@@ -54,7 +54,7 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
   supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; treaties?: TreatyState; embargoes?: EmbargoState };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; kindleAssembly?: { scope: AssemblyScope; openAt: number | null } | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
