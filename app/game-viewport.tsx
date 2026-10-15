@@ -6,6 +6,7 @@ import {graphicsOptions} from '../lib/display-preferences';
 import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, type LocationId, type ViewportSelection } from '../lib/game-viewport';
+import { nationSymbolElement } from './nation-symbol';
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
@@ -83,6 +84,9 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'viewport-world-label'; button.textContent = anchor.label;
       button.setAttribute('aria-label', `Select ${anchor.label}`);
+      const nationId = 'nationId' in anchor.selection ? anchor.selection.nationId : undefined;
+      const chip = mode === 'world' && nationId ? nationSymbolElement(nationId) : null;
+      if (chip) button.insertBefore(chip, button.firstChild); // #79: symbol chip beside the nation name (flagged)
       Object.assign(button.style, { position: 'absolute', pointerEvents: 'auto', transform: 'translate(-50%, -100%)' });
       button.addEventListener('click', () => { highlight.setFromObject(anchor.object); highlight.visible = true; render(); callback.current(anchor.selection); });
       labelLayer.appendChild(button);
