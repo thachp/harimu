@@ -83,7 +83,7 @@ body:has(.harimu-game){overflow:auto}
 .game-account .account-menu-trigger{min-height:36px;min-width:64px;padding:7px 11px;border:1px solid #45636d;border-radius:3px;background:#15323d;color:#d6ebe8}
 .game-account .account-menu-trigger::after{content:'Account';font-size:calc(11px * var(--text-scale, 1))}
 @media(max-width:760px){.game-account .account-menu-trigger{min-height:44px}}
-.game-mode-world{--context-height:calc(205px * var(--text-scale, 1))}.game-nation-strip{display:grid;grid-template-columns:166px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}.game-nation-strip .game-context-heading{grid-row:2}.game-nation-strip .game-context-items{grid-row:2}.nation-preview-badge{display:inline-block;margin-left:6px;border:1px solid #647779;border-radius:3px;padding:1px 4px;font-size:calc(8px * var(--text-scale, 1));color:#b8caca;vertical-align:middle}
+.game-mode-world{--context-height:calc(205px * var(--text-scale, 1))}.game-nation-strip{display:grid;grid-template-columns:166px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}.nation-preview-badge{display:inline-block;margin-left:6px;border:1px solid #647779;border-radius:3px;padding:1px 4px;font-size:calc(8px * var(--text-scale, 1));color:#b8caca;vertical-align:middle}
 @media(max-width:760px){.game-mode-world{--context-height:calc(210px * var(--text-scale, 1));grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,44dvh) minmax(calc(210px * var(--text-scale, 1)),auto) minmax(0,auto)}.game-mode-world .game-context-strip{height:210px}.game-nation-strip{grid-template-columns:105px minmax(0,1fr)}.game-mode-world.inspector-collapsed{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,54dvh) minmax(calc(210px * var(--text-scale, 1)),auto) auto}}
 
 .game-country-stage{overflow:auto;padding:76px 20px 20px;background:radial-gradient(ellipse at center,#20404a,#0b1c24)}
@@ -183,7 +183,7 @@ body:has(.harimu-game){overflow:auto}
  .game-context-strip>.game-context-heading{flex:1 1 100%;border-right:0;border-bottom:1px solid #2c4651;padding:10px 12px}
  .game-context-items{flex:1 1 100%;flex-wrap:nowrap;min-width:0}
  .game-nation-strip .game-context-heading,.game-nation-strip .game-context-items{grid-column:1/-1}
- .game-nation-strip .game-context-items{grid-row:3}
+ .game-nation-strip .game-context-items{grid-row:2}
  .game-identity span:not(.game-crest){white-space:normal;overflow:visible;max-width:none;overflow-wrap:normal}
  .game-dock{flex-wrap:wrap}
  .game-dock button span{overflow-wrap:anywhere;text-align:center;line-height:1.15}
