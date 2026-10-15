@@ -504,6 +504,11 @@ function writeEnrollmentReview(userId: string | null, review: EnrollmentReview |
 
 type CitizenSessionStatus = 'loading' | 'anonymous' | 'ready' | 'error';
 
+// #533: Clerk's __client_uat cookie says whether a session exists before Clerk loads. The server snapshot is 'unknown', so hydration matches the server render.
+const subscribeNever = () => () => {};
+const readSignedInHint = (): SignedInHint => signedInHint(document.cookie);
+const serverSignedInHint = (): SignedInHint => 'unknown';
+
 function ClerkCitizenSession({
   onHydrate,
   onStatus,
@@ -704,18 +709,19 @@ export default function Home() {
   );
 
   // #533: what the browser knows about a signed-in session before Clerk loads (Clerk's __client_uat cookie), and a timeout so a stalled Clerk or /api/citizen never holds the top bar forever.
-  const [signedHint, setSignedHint] = useState<SignedInHint>('unknown');
-  useLayoutEffect(() => { setSignedHint(signedInHint(document.cookie)); }, []);
-  const [holdExpired, setHoldExpired] = useState(false);
-  const sessionLoading = clerkConfigured && citizenSessionStatus === 'loading';
-  useEffect(() => {
-    if (!sessionLoading) { setHoldExpired(false); return; }
-    const timer = window.setTimeout(() => setHoldExpired(true), identityHoldTimeoutMs);
-    return () => window.clearTimeout(timer);
-  }, [sessionLoading]);
   const citizenIdentity = useRef<string | null>(null);
   const citizenEpoch = useRef(0);
   const [citizenSessionKey, setCitizenSessionKey] = useState(0);
+  const signedHint = useSyncExternalStore(subscribeNever, readSignedInHint, serverSignedInHint);
+  const [holdExpiredFor, setHoldExpiredFor] = useState<string | null>(null);
+  const sessionLoading = clerkConfigured && citizenSessionStatus === 'loading';
+  const holdEpisode = `${citizenSessionKey}:${sessionRetry}`;
+  const holdExpired = holdExpiredFor === holdEpisode;
+  useEffect(() => {
+    if (!sessionLoading) return;
+    const timer = window.setTimeout(() => setHoldExpiredFor(holdEpisode), identityHoldTimeoutMs);
+    return () => window.clearTimeout(timer);
+  }, [sessionLoading, holdEpisode]);
   const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[]}} | null>(null);
   const [cityError, setCityError] = useState('');
   const [cityRetry, setCityRetry] = useState(0);

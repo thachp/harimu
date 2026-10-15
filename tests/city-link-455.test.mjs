@@ -12,8 +12,11 @@ test('page passes the hold to the shell from the session status, the cookie hint
   assert.match(page, /const identityHoldNow = identityHold\(locationSearch, fallbackNationIds, sessionLoading, Boolean\(citizenNation\), signedHint, holdExpired\);/);
   assert.match(page, /identityHold=\{identityHoldNow\} viewedNationHeld=\{viewedNationHeld\(identityHoldNow, locationSearch, fallbackNationIds\)\}/);
   assert.match(page, /const sessionLoading = clerkConfigured && citizenSessionStatus === 'loading';/);
-  assert.match(page, /useLayoutEffect\(\(\) => \{ setSignedHint\(signedInHint\(document\.cookie\)\); \}, \[\]\);/);
-  assert.match(page, /window\.setTimeout\(\(\) => setHoldExpired\(true\), identityHoldTimeoutMs\)/);
+  assert.match(page, /const signedHint = useSyncExternalStore\(subscribeNever, readSignedInHint, serverSignedInHint\);/, 'hydration-safe: the server snapshot is unknown');
+  assert.match(page, /const serverSignedInHint = \(\): SignedInHint => 'unknown';/);
+  assert.match(page, /const holdExpired = holdExpiredFor === holdEpisode;/);
+  assert.match(page, /window\.setTimeout\(\(\) => setHoldExpiredFor\(holdEpisode\), identityHoldTimeoutMs\)/, 'state is set only inside the timer callback');
+  assert.doesNotMatch(page, /setHoldExpired\(false\)|setSignedHint\(/, 'no synchronous setState in an effect body');
   assert.match(page, /sessionLoading && signedHint === 'signed-in' && !holdExpired \? 'Loading your citizen…' : 'Explore a nation/, 'the scene panel line follows the same hold');
   assert.doesNotMatch(page, /identityPending/);
 });
