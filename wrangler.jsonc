@@ -67,6 +67,8 @@
     "HARIMU_FAITH_ENABLED": "false",
     // #599: Diplomatic Hall (Kindle + Aurelle citizens, closed to Korund). Off: the route returns 404 and the tab is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_DIPLOMATIC_HALL_ENABLED": "false",
+    // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
+    "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
     "HARIMU_WAR_ENABLED": "false",
     // #423: war weariness PoC (weekly Unrest from an active war, docs 15.3). Needs HARIMU_WAR_ENABLED too. Off until QA.
     "HARIMU_WAR_WEARINESS_ENABLED": "false",
