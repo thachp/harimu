@@ -53,19 +53,20 @@ test('no numbers, no penalties or costs, and no promise of the outcome', () => {
   for (const t of all()) assert.doesNotMatch(t.replace(/\{[^}]*\}/g,''),/\d|%|percent|\b(one|two|three|four|five|six|ten|twice|once|half)\b|\b(hours?|days?|weeks?|months?|years?)\b|\bcap(ped)?\b/i,t);
   for (const t of all()) assert.doesNotMatch(t,/Legitimacy|Reputation|penalt\w*|\bcosts?\b/,t);
   for (const t of all()) assert.doesNotMatch(t,/\b(will (be )?(accept|ratif|sign|agree)\w*|has (accepted|agreed|signed)|certain|guarantee\w*|promise\w*)\b/i,t);
-  for (const x of news()) if (x.role==='recipient'&&x.nation!=='kindle') assert.match(x.n.body,/awaits ratification/,x.n.id);
+  for (const x of news()) if (x.role==='recipient') assert.match(x.n.body,/awaits ratification/,x.n.id);
 });
 test('scope: proposals only; no break, ended or war-declaration wording (#435 owns break notices)', () => {
   for (const t of all()) assert.doesNotMatch(t,/\b(break|breaks|breaking|broke|broken|ends?|ended|declar\w*|revok\w*|rumou?rs?)\b/i,t);
   for (const x of news()) assert.match(x.n.body,/propos|offer/i,x.n.id);
 });
-test('voices: Kindle Cabinet speaks plainly; Korund State Media reports the Chairman\'s own act; Aurelle opens "Be it known" for the Crown; recipients are reported with a byline', () => {
+test('voices: Kindle\'s President and Secretary of State (docs 13.1 negotiators) speak plainly; Korund State Media reports the Chairman\'s own act; Aurelle opens "Be it known" for the Crown; recipients are reported with a byline', () => {
   for (const k of PROPOSAL_KINDS) {
-    assert.match(aiProposalNewsFor('kindle').notices.proposer[k].body,/^Cabinet: we propose/); assert.match(aiProposalNewsFor('kindle').notices.recipient[k].body,/^Republic Wire Service: /);
+    assert.match(aiProposalNewsFor('kindle').notices.proposer[k].body,/^President and Secretary of State: we propose/); assert.match(aiProposalNewsFor('kindle').notices.recipient[k].body,/^Republic Wire Service: /);
     assert.match(aiProposalNewsFor('korund').notices.proposer[k].body,/^Korund State Media reports: the Chairman offers/); assert.match(aiProposalNewsFor('korund').notices.recipient[k].body,/^Korund State Media reports: /);
     assert.match(aiProposalNewsFor('aurelle').notices.proposer[k].body,/^Be it known: the Crown offers/); assert.match(aiProposalNewsFor('aurelle').notices.recipient[k].body,/^The Court Gazette reports that /);
   }
-  assert.match(aiProposalNewsFor('kindle').notices.proposer['non-aggression'].body,/bar war/); assert.match(aiProposalNewsFor('kindle').notices.proposer.trade.body,/open trade/);
+  for (const k of PROPOSAL_KINDS) assert.doesNotMatch(aiProposalNewsFor('kindle').notices.proposer[k].body+aiProposalNewsFor('kindle').notices.recipient[k].body,/Cabinet/);
+  assert.match(aiProposalNewsFor('kindle').notices.proposer['non-aggression'].headline,/The President proposes a pact/);
   assert.match(aiProposalNewsFor('korund').notices.proposer['non-aggression'].body,/bar war/); assert.match(aiProposalNewsFor('korund').notices.proposer.trade.body,/open trade/);
   assert.match(aiProposalNewsFor('aurelle').notices.proposer['non-aggression'].body,/war may be barred/); assert.match(aiProposalNewsFor('aurelle').notices.proposer.trade.body,/trade may flow/);
 });
