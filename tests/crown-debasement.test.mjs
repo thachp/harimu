@@ -31,10 +31,10 @@ test('pure rules: the docs cap of 15%, parity, fixed Confidence drop, official r
   assert.ok([...Array(200).keys()].some(i => monarchPlan(i + 1).debases) && [...Array(200).keys()].some(i => !monarchPlan(i + 1).debases));
 });
 
-test('the flag defaults to "false", migration 0041 only adds a table, and no route or page can decree a debasement', async () => {
+test('the flag defaults to "false", migration 0042 only adds a table, and no route or page can decree a debasement', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   assert.deepEqual([...cfg.matchAll(/"HARIMU_CROWN_DEBASEMENT_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
-  for (const file of ['../drizzle/0041_crown_decrees.sql', '../db/postgres/0041_crown_decrees.sql']) {
+  for (const file of ['../drizzle/0042_crown_decrees.sql', '../db/postgres/0042_crown_decrees.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS crown_decrees/);
   }

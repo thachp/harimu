@@ -46,7 +46,7 @@ async function latestDecree(db: GameDatabase): Promise<Row | null> {
   return db.prepare(`SELECT ${columns} FROM crown_decrees ORDER BY game_year DESC LIMIT 1`).first<Row>().catch(tolerate(isMissingRelation, null));
 }
 
-/** Read-only. Flag off: the caller does not call this. A database without migration 0041 reads as the baseline. */
+/** Read-only. Flag off: the caller does not call this. A database without migration 0042 reads as the baseline. */
 export async function readCrownMint(db: GameDatabase, now: number): Promise<CrownMint> {
   const row = await latestDecree(db);
   const parity = row ? Number(row.parity_after) : crownConfig.baselineParity;
