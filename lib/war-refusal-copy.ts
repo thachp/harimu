@@ -13,15 +13,15 @@
  * banner caption is a system line (#381 / ui-ux §23.2). {endsAt} and {nextAt} are pre-formatted strings filled at runtime. The refusal
  * keys below are proposed names; the server has no keys for these refusals yet.
  *
- * Rules: figures come only from the docs: 1 and 2 (rate limits) and 48 (mobilization hours), each real; nothing else is written. The length of the rate-limit interval is not written: the docs mark it as an assumption, so the line takes it as {days}, a runtime value from the rules. The
+ * Rules: figures come only from the docs: 1 and 2 (rate limits) and 48 (mobilization hours), each real; nothing else is written. The rate-limit interval is not written: the docs tag it [ASSUMPTION] (§13.5), so the line takes it as {days}, a pre-formatted string that carries its own unit (for example "14 real days" or "1 real day"), filled by the rules. The
  * threshold of the grievance score is not given by the docs and is never named. The placeholders are runtime values capped by the shared name cap,
- * which this module re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts). Limits: labels 40, lines 140 (refusal lines are full
+ * which this module re-exports (COUP_NAME_MAX from the palace coup copy module). Limits: labels 40, lines 140 (refusal lines are full
  * sentences, like the existing refusals), countdown captions 80, tested with every placeholder filled to 24 characters. All wording is
  * new: `proposal: true`. */
 
 export { COUP_NAME_MAX as REFUSAL_NAME_MAX } from './palace-coup-copy';
 
-/** {days}: the rate-limit interval in real days, a runtime value (the docs treat the figure as an assumption, so it is not written into a line). */
+/** {days}: the rate-limit interval as a pre-formatted string with its unit, such as "14 real days" or "1 real day" (the docs tag the figure [ASSUMPTION], so it is not written into a line). */
 export const REFUSAL_PLACEHOLDERS=['{endsAt}','{nextAt}','{days}'] as const;
 export const REFUSAL_LABEL_MAX=40;
 export const REFUSAL_CAPTION_MAX=80;
@@ -44,7 +44,7 @@ const L=(text:string):Line=>({text,proposal:true});
 /** Refusals, two variants each. Plain system lines: reasons, not threats. */
 export const declarationRefusals:readonly Refusal[]=[
  {key:'rate_limit',label:'Declaration limit',proposal:true,lines:[
-  L('The declaration was not made. A nation may declare at most 1 new offensive war every {days} real days.'),
+  L('The declaration was not made. A nation may declare at most 1 new offensive war every {days}.'),
   L('The declaration was not made. This nation declared a war recently. It can declare again on {nextAt}.')]},
  {key:'active_war_cap',label:'War limit reached',proposal:true,lines:[
   L('The declaration was not made. A nation may have at most 2 active offensive wars.'),
