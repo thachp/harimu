@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
-import { bearerMatches } from '@/lib/admin-bearer';
+import { bearerMatches } from '@/lib/war-authority'; // the same constant-time bearer check the war admin routes use
 import { readLatestReport, reconciliationConfig } from '@/lib/ledger-reconciliation';
 
 export const dynamic = 'force-dynamic';

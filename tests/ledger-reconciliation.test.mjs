@@ -135,7 +135,7 @@ test('a deliberately corrupted entry or balance is reported with its account id,
   assert.ok(hit('SPK', 'tax_over_gross', 'alice')); assert.ok(hit('SPK', 'negative_wallet', 'bob')); assert.ok(hit('LN', 'negative:korund_coupon_redemptions', 'korund1'));
   assert.ok(hit('CRN', 'purchase_not_quantity_times_price', 'aur1')); assert.ok(hit('TSR', 'square_ledger_debit_without_purchase', 'bob'));
   assert.ok(run.report.totals.SPK.mismatches > 0 && run.report.totals.LN.mismatches > 0 && run.report.totals.CRN.mismatches > 0 && run.report.totals.TSR.mismatches > 0);
-  assert.equal(spy.length, 1, 'one error line'); assert.match(spy[0], /^\[ledger-reconciliation\] MISMATCH game_day=1 count=\d+ first=.*SPK:negative_wallet:bob/); assert.doesNotMatch(spy[0], /\n/);
+  assert.equal(spy.length, 1, 'one error line'); assert.match(spy[0], /^\[ledger-reconciliation\] MISMATCH game_day=1 count=\d+ checks=.*SPK:negative_wallet/); assert.doesNotMatch(spy[0], /\n/); assert.doesNotMatch(spy[0], /\b(alice|bob|korund1|aur1)\b/, 'no account ids in Worker logs');
   assert.deepEqual(await dump(r), before, 'no wallet, fund or ledger row was touched');
   const stored = (await reports())[0]; assert.equal(stored.mismatch_count, run.report.mismatchCount); assert.equal(JSON.parse(stored.first_mismatches_json).length <= 10, true);
 });

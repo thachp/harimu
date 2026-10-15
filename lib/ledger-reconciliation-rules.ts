@@ -6,7 +6,7 @@ export type ReconciliationCurrency = typeof reconciliationCurrencies[number];
 export const reconciliationConfig = {
   gameDaySeconds: 7200,     // PLACEHOLDER: one game day is 7200 real seconds (12x time), the unit every other Worker job here uses; docs 12.7 say "about every 2 real hours"
   firstMismatchLimit: 10,   // PLACEHOLDER: each report keeps the first 10 mismatching ids (the issue says "the first few")
-  minAdminTokenLength: 16,  // PLACEHOLDER: shorter HARIMU_ADMIN_TOKEN values never authorize (same floor as the war admin helper in #429)
+  minAdminTokenLength: 16,  // PLACEHOLDER: shorter HARIMU_ADMIN_TOKEN values never authorize (same floor as the shared war bearer helper)
 } as const;
 
 /** Game day number (1-based) from the world clock epoch. */

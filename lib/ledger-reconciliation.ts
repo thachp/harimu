@@ -167,7 +167,7 @@ export async function readLatestReport(db: GameDatabase): Promise<Reconciliation
 }
 
 /** The scheduled Worker's daily reconciliation (never a read, never from a route). One immutable report per game day: the first run of a game day reconciles and writes it, every later
- *  run (and any racing run that loses the unique game_day) does nothing. A mismatch logs one error line to the Worker logs; there is no automatic correction. Flag off: nothing happens. */
+ *  run (and any racing run that loses the unique game_day) does nothing. A mismatch logs one error line to the Worker logs (game day, count and check names only: no account ids); there is no automatic correction. Flag off: nothing happens. */
 export async function runLedgerReconciliationCron(db: GameDatabase, now: number, options: { enabled: boolean }) {
   if (!options.enabled) return { status: 'disabled' as const };
   if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid authoritative world time.');
@@ -180,7 +180,7 @@ export async function runLedgerReconciliationCron(db: GameDatabase, now: number,
   const saved = await db.prepare(`SELECT ${columns} FROM reconciliation_reports WHERE game_day=?`).bind(gameDay).first<ReportRow>();
   if (!saved || saved.run_id !== runId) return { status: 'idle' as const }; // another run wrote this game day's report first
   if (result.mismatchCount > 0) {
-    console.error(`[ledger-reconciliation] MISMATCH game_day=${gameDay} count=${result.mismatchCount} first=${result.mismatches.map(item => `${item.currency}:${item.check}:${item.account}`).join(',')}`);
+    console.error(`[ledger-reconciliation] MISMATCH game_day=${gameDay} count=${result.mismatchCount} checks=${[...new Set(result.mismatches.map(item => `${item.currency}:${item.check}`))].join(',')} (account ids are in the stored report, not in logs)`);
   }
   return { status: 'reported' as const, report: publicReport(saved) };
 }

@@ -44,11 +44,11 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/world-simulation.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',
     'lib/qa-tools.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
-    'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts', // #309
+    'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts','lib/war-authority.ts','lib/war-actions.ts', // #309, #350
     'lib/labor-bureau-rules.ts','lib/labor-bureau-text.ts','lib/labor-bureau-copy.ts','lib/labor-bureau.ts','lib/diplomacy.ts','lib/diplomacy-rules.ts','lib/diplomacy-copy.ts','lib/game-time.ts', // #308
     'lib/embargo.ts','lib/embargo-rules.ts','lib/embargo-copy.ts', // #363
     'lib/crown-debasement.ts','lib/crown-debasement-rules.ts','lib/press-templates.ts', // #362
-    'lib/ledger-reconciliation.ts','lib/ledger-reconciliation-rules.ts','lib/admin-bearer.ts','app/api/admin/ledger-reconciliation/route.ts', // #432
+    'lib/ledger-reconciliation.ts','lib/ledger-reconciliation-rules.ts','app/api/admin/ledger-reconciliation/route.ts', // #432
     'lib/world-registry.ts','lib/market-visibility.ts','lib/tessera-exchange.ts','lib/clearing-house-copy.ts','lib/kiosk-text.ts','app/api/world/registry/route.ts','lib/order-book-rules.ts','lib/order-book.ts','lib/npc-supply-rules.ts','lib/npc-supply.ts','lib/spoilage-rules.ts','lib/spoilage.ts','lib/db-errors.ts','app/api/market/orders/route.ts','lib/travel.ts','app/api/travel/route.ts','lib/worship-copy.ts','lib/faith-copy.ts','lib/mvp-festival-copy.ts','lib/festivals.ts','lib/faith.ts','app/api/faith/route.ts','lib/congregations.ts','app/api/congregations/route.ts','lib/claimant-copy.ts','lib/aurelle-rising-rules.ts','lib/aurelle-rising.ts','app/api/aurelle/rising/route.ts','lib/korund-presidium-rules.ts','lib/korund-presidium.ts','lib/aurelle-coup-rules.ts','lib/aurelle-coup.ts','lib/palace-coup-copy.ts','lib/assembly-copy.ts','lib/kindle-parties.ts','lib/assembly-rules.ts','lib/assembly.ts','app/api/assembly/route.ts','lib/campaign-copy.ts','lib/primaries-rules.ts','lib/primaries.ts','app/api/primaries/route.ts',
     'lib/korund-underground.ts','lib/underground-rules.ts', // #295
     'lib/missionary-rules.ts','lib/missionaries.ts','lib/missionary-actions.ts','lib/missionary-copy.ts','lib/missionary-notice-copy.ts', // #225
