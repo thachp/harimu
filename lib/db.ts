@@ -25,6 +25,7 @@ import { worldSquaresSchema, worldSquaresSeedSql } from './map-zones';
 import { worldCitiesSchema } from './city-founding';
 import { aurelleSchemas, royalFavorSchemas } from './aurelle';
 import { warSchemas } from './war'; // #309
+import { treatySchemas } from './diplomacy'; // #308
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
@@ -212,7 +213,7 @@ async function initialize(database: GameDatabase) {
     database.prepare(travelSchema),
     ...faithSchemas.map(sql=>database.prepare(sql)),
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
-    ...warSchemas.map(sql=>database.prepare(sql)), // #309
+    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), // #309, #308
     ...congregationSchemas.map(sql=>database.prepare(sql)),
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
