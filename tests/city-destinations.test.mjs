@@ -22,8 +22,8 @@ test('#378: the card labels match the dock tabs and the 3D buildings Korund alre
   assert.equal(cards[1].label, 'Assignment'); assert.equal(cards[2].label, 'State store');
 });
 
-test('#378: Kindle and Aurelle (and a nation not yet known) keep the existing card wording', () => {
-  for (const nation of ['kindle', 'aurelle', null, undefined]) {
+test('#378: Kindle (and a nation not yet known) keep the existing card wording', () => {
+  for (const nation of ['kindle', null, undefined]) {
     const cards = cityDestinations(nation, true);
     assert.deepEqual(labels(cards), ['Household', 'Workplace', 'Market', 'Government'], String(nation));
     assert.deepEqual(cards.map(card => card.detail), ['Belongings and recovery', 'Contributions and earnings', 'Goods and citizen listings', 'Policy and petitions']);
@@ -53,4 +53,22 @@ test('#378: country map pins grow with the text size, size to their text and sta
   assert.doesNotMatch(css, /max-width: 100px/, 'no fixed 100px pin cap');
   const scene = await readFile(new URL('../app/country-scene.tsx', import.meta.url), 'utf8');
   assert.match(scene, /left:`clamp\(calc\(var\(--pin-max\) \/ 2\), \$\{pins\[index\]\.x\}%, calc\(100% - var\(--pin-max\) \/ 2\)\)`/, 'the pin centre keeps half a pin from the map edges');
+});
+
+test('#583: Aurelle\'s market card, dock tab and scene title say Chartered food, for visitors and citizens alike; the other cards and the card id are unchanged', async () => {
+  const cards = cityDestinations('aurelle', true);
+  assert.deepEqual(labels(cards), ['Household', 'Workplace', 'Chartered food', 'Government']);
+  assert.deepEqual(cards.map(card => card.id), ['household', 'workplace', 'market', 'government'], 'still opens the market scene');
+  assert.equal(cards[2].detail, 'Buy food at the chartered counter');
+  assert.doesNotMatch(words(cards), /Market|citizen listings/);
+  assert.deepEqual(cards.map(card => card.detail).filter((_, index) => index !== 2), ['Belongings and recovery', 'Contributions and earnings', 'Policy and petitions']);
+  assert.deepEqual(labels(cityDestinations('aurelle', false)), ['Household', 'Workplace', 'Government'], 'the #344 rule stays with the caller: no card is invented');
+  const shell = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
+  assert.match(shell, /resourceNation\.id === 'aurelle' && id === 'market' \? 'Chartered food'/, 'the dock tab');
+  assert.match(shell, /nation\.id === 'aurelle' && view === 'market' \? 'Chartered food counter'/, 'the scene title');
+});
+
+test('#583: Korund and Kindle wording is untouched by the Aurelle change', () => {
+  assert.deepEqual(labels(cityDestinations('korund', true)), ['Household', 'Assignment', 'State store', 'Government']);
+  assert.deepEqual(labels(cityDestinations('kindle', true)), ['Household', 'Workplace', 'Market', 'Government']);
 });
