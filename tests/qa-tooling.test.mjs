@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { buildInfo } from '../scripts/build-info.mjs';
-import { qaTestCitizenAllowed } from '../lib/qa-tools.ts';
+const { qaTestCitizenAllowed } = await (async () => { const r = await localRuntime(); try { return await r.importModule('lib/qa-tools.ts'); } finally { await r.close(); } })(); // qa-tools imports the shared playable list (#485)
 
 const versionModule = async globals => {
   const out = ts.transpileModule(await readFile('app/api/version/route.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
