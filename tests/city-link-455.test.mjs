@@ -12,7 +12,7 @@ test('page passes the hold to the shell from the session status, the cookie hint
   assert.match(page, /const identityHoldNow = identityHold\(locationSearch, fallbackNationIds, sessionLoading, Boolean\(citizenNation\), signedHint, holdExpired\);/);
   assert.match(page, /identityHold=\{identityHoldNow\} viewedNationHeld=\{viewedNationHeld\(identityHoldNow, locationSearch, fallbackNationIds\)\}/);
   assert.match(page, /const sessionLoading = clerkConfigured && citizenSessionStatus === 'loading';/);
-  assert.match(page, /const signedHint = useSyncExternalStore\(subscribeNever, readSignedInHint, serverSignedInHint\);/, 'hydration-safe: the server snapshot is unknown');
+  assert.match(page, /const signedHint = useSyncExternalStore\(subscribeNever, readCookieHint, serverSignedInHint\);/, 'hydration-safe: the server snapshot is unknown');
   assert.match(page, /const serverSignedInHint = \(\): SignedInHint => 'unknown';/);
   assert.match(page, /const holdExpired = holdExpiredFor === holdEpisode;/);
   assert.match(page, /window\.setTimeout\(\(\) => setHoldExpiredFor\(holdEpisode\), identityHoldTimeoutMs\)/, 'state is set only inside the timer callback');

@@ -5,11 +5,13 @@ import {useDisplayPreferences} from './display-preferences';
 import {graphicsOptions} from '../lib/display-preferences';
 import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
-import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, type LocationId, type ViewportSelection } from '../lib/game-viewport';
+import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 import { nationSymbolElement } from './nation-symbol';
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
+  /** #379: the viewer is not a citizen, so the household is not "Your household". Defaults to false (citizen wording). */
+  visitor?: boolean;
   cityName?: string;
   /** #344: false hides the Market building (market flag off). Defaults to true. */
   marketOpen?: boolean;
@@ -24,7 +26,7 @@ export type GameViewportProps = {
 };
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
 
-export function GameViewport({ mode, nationId, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '' }: GameViewportProps) {
+export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '' }: GameViewportProps) {
   const {preferences:{graphics}}=useDisplayPreferences();
   const host = useRef<HTMLDivElement>(null);
   const callback = useRef(onSelect);
@@ -78,7 +80,7 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
     Object.assign(labelLayer.style, { position: 'absolute', inset: '0', pointerEvents: 'none', overflow: 'hidden' });
     container.appendChild(labelLayer);
     const anchors = mode === 'city'
-      ? world.buildings.map(building => ({ object: building.object, label: building.label, selection: locationSelection(building.location, nationId) }))
+      ? world.buildings.map(building => ({ object: building.object, label: locationLabel(building.location, building.label, visitor), selection: locationSelection(building.location, nationId, visitor) }))
       : world.selectables.filter(object => object.userData.kind === 'nation').map(object => ({ object, label: String(object.userData.label), selection: { kind: 'nation' as const, label: String(object.userData.label), detail: String(object.userData.detail), nationId: String(object.userData.nationId) } }));
     const labels = anchors.map(anchor => {
       const button = document.createElement('button');
@@ -180,7 +182,7 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
       const data = object.userData;
       const selectedBuilding = data.location ? world.buildings.find(b => b.location === data.location) : null;
       highlight.setFromObject(selectedBuilding?.object || object); highlight.visible = true; render();
-      if (mode === 'city' && data.location) { callback.current(locationSelection(data.location, nationId)); return; }
+      if (mode === 'city' && data.location) { callback.current(locationSelection(data.location, nationId, visitor)); return; }
       callback.current({ kind: data.kind, label: data.label || `Square ${data.x ?? ''}, ${data.z ?? ''}`, detail: data.detail || 'Prototype terrain square. Citizen ownership and construction are not yet available.', location: data.location, nationId: data.nationId });
     };
     const cancel = () => { dragging = null; };
@@ -205,7 +207,7 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
       textures.forEach(texture => texture.dispose());
       sun.shadow.map?.dispose(); renderer.dispose(); renderer.forceContextLoss(); labelLayer.remove(); canvas.remove();
     };
-  }, [mode, nationId, cityName, marketOpen, nationSignature, graphics]);
+  }, [mode, nationId, cityName, marketOpen, nationSignature, graphics, visitor]);
   useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, nationSignature, graphics]);
   useEffect(() => { if (cameraTourNationId && mode === 'world') controls.current?.focusNation(cameraTourNationId, false); }, [cameraTourNationId, mode, nationId, nationSignature, graphics]);
   useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId, cityName, graphics]);
@@ -223,7 +225,7 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
         if (key === '+' || key === '=') controls.current?.zoom(.15);
         if (key === '-') controls.current?.zoom(-.15);
         if (key === 'Home') controls.current?.reset();
-        if (key === 'Enter' && mode === 'city') callback.current(locationSelection(selectedLocation || 'square', nationId));
+        if (key === 'Enter' && mode === 'city') callback.current(locationSelection(selectedLocation || 'square', nationId, visitor));
       }} />
     {fallback && <p className="viewport-fallback">3D unavailable. Use the bottom strip to continue.</p>}
     <div className="viewport-controls" aria-label="Camera controls">
