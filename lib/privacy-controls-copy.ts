@@ -29,7 +29,7 @@ export const privacyExplainer={
  intro:L('Harimu keeps only what the world needs to run. Here is what is stored, and why.'),
  categories:[
   {key:'account',line:L('Your account sign-in, so you can come back as the same player.')},
-  {key:'citizen',line:L('Your citizen, nation and faith choice, so the world knows who you are in it.')},
+  {key:'citizen',line:L('Your citizen, nation and faith choice, so the game knows who you are.')},
   {key:'balances',line:L('Your household and wallet balances, so your money stays correct.')},
   {key:'actions',line:L('Your actions in the world, such as work, trades and civic acts, so results and records are right.')},
   {key:'messages',line:L('Messages you post in public squares, so other players can read them.')},

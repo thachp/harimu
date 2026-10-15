@@ -36,6 +36,11 @@ test('the visitor label is plain, has no figure and none of the citizen or demo 
   assert.doesNotMatch(Lb.visitor.text,/\d|citizen|snapshot|demo|sample|disposable|guest|sign|account|log ?in|free|trial/i);
   assert.match(Lb.visitor.text,/^Visitor preview$/);
 });
+test('the header comment says visitor comes from isVisitorSession(...) when wired, and names no other lib module path', () => {
+  const head=readFileSync('lib/context-strip-copy.ts','utf8').split('*/')[0];
+  assert.match(head,/should come from isVisitorSession\(\.\.\.\) when this is wired/);
+  assert.doesNotMatch(head,/\blib\/|\.ts\b|app\/|components\//);
+});
 test('unwired: nothing in app/, components/ or lib/ imports context-strip-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('context-strip-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/context-strip-copy/, f);
