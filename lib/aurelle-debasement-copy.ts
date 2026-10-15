@@ -8,7 +8,7 @@
  *
  * Voice: the Court Gazette is ornate and deferential. Decrees ("Be it known") speak for the AI Monarch, so they are AI-badged (#381,
  * ui-ux §23.2); a Gazette report, the commoner rumors and the Kindle and Korund reports about the Monarch's act are not. The Clearing
- * House kiosk speaks as a plain system notice (lib/clearing-house-copy.ts), with no official behind it. Rumors are marked as rumor and
+ * House kiosk speaks as a plain system notice (the kiosk copy module), with no official behind it. Rumors are marked as rumor and
  * never state an official rate.
  *
  * Rules: no numbers appear in the copy: the 5% re-coinage band, the 15% a game year cap and any Confidence threshold stay in #362,
