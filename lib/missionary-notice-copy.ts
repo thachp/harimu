@@ -2,7 +2,7 @@
  * #225 and to lib/missionary-copy.ts from #266). Content only: #225 owns invitations, conversion and cooldowns, and no UI
  * imports this. lib/missionary-copy.ts already holds the per-faith invitation cards, the accept and not-now buttons, the
  * day-count cooldown notices, mute copy and host permission notices; this module adds only what #340 found missing: a
- * generic invite prompt with Accept and Decline labels, a private success toast and a failure toast, cooldown block lines that
+ * generic invite prompt with Accept and Not now labels (the same "Not now" as lib/missionary-copy.ts, #383), a private success toast and a failure toast, cooldown block lines that
  * give the time only through {readyAt}, and one public host-city feed line in the host nation's press voice.
  * Canon: harimu-docs religion-faiths §14.8 (invitations are opt-in; conversion happens only if the citizen accepts; host permission
  * is free in pluralist nations, Kinward Rite only in Aurelle, banned in Korund), §14.3 (conversion prompts are always opt-in),
@@ -34,7 +34,7 @@ const L=(text:string):Line=>({text,proposal:true});
 export const missionaryInvite={
  prompt:L('A missionary of {faith} invites you. The choice is yours alone.'),
  accept:'Accept',
- decline:'Decline',
+ notNow:'Not now',
  proposal:true,
 } as const;
 

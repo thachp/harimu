@@ -68,7 +68,7 @@ async function setup(t, { flag = true } = {}) {
 test('flag off: nothing is proposed, decided, read or shown', async t => {
   const { r, d, propose, rows } = await setup(t, { flag: false });
   const res = await propose(); assert.equal(res.ok, false); assert.equal(res.reason, 'disabled'); assert.deepEqual(await rows(), []);
-  assert.equal((await d.breakTreaty(r.db, 'x', Math.floor(r.now / 1000), false)).reason, 'disabled');
+  assert.equal((await d.breakTreaty(r.db, { treatyId: 'x', breaker: 'kindle' }, Math.floor(r.now / 1000), false)).reason, 'disabled');
   const world = await r.call('world', null);
   assert.equal(world.status, 200); assert.equal('treaties' in world.data.simulation, false, 'no treaty state is sent while the flag is off');
   await r.db.prepare("INSERT INTO treaties (id,request_id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at) VALUES ('t-x','req-xxxxxxxx','korund:kindle','non-aggression','kindle','korund','AI',1)").run();
@@ -143,9 +143,9 @@ test('proposal checks: idempotent request id, bad input, one live treaty per pai
   assert.equal(await d.nationsAtPeace(r.db, 'kindle', 'aurelle'), false); assert.equal(await d.nationsAtPeace(r.db, 'kindle', 'korund'), true);
   await decide();
   const live = (await rows()).find(x => x.pair_key === 'kindle:korund' && x.kind === 'non-aggression'); assert.equal(live.status, 'in_force');
-  const broken = await d.breakTreaty(r.db, live.id, nowS() + 100, true); assert.equal(broken.ok, true); assert.equal(broken.treaty.status, 'broken'); assert.equal(broken.treaty.brokenAt, nowS() + 100);
+  const broken = await d.breakTreaty(r.db, { treatyId: live.id, breaker: 'korund' }, nowS() + 100, true); assert.equal(broken.ok, true); assert.equal(broken.treaty.status, 'broken'); assert.equal(broken.treaty.brokenAt, nowS() + 100); assert.equal(broken.treaty.brokenBy, 'korund');
   assert.equal(await d.activeNonAggressionPact(r.db, 'kindle', 'korund', nowS() + 101), false);
-  assert.equal((await d.breakTreaty(r.db, 'nope', nowS(), true)).reason, 'not_found');
+  assert.equal((await d.breakTreaty(r.db, { treatyId: 'nope', breaker: 'kindle' }, nowS(), true)).reason, 'not_found');
   // A repeated tick decides nothing twice.
   const before = JSON.stringify(await rows()); await decide(nowS() + 5); assert.equal(JSON.stringify(await rows()), before);
 });
@@ -173,7 +173,7 @@ test('foreign affairs panel: this nation\'s treaties with their terms; empty sta
     new Function('exports', 'require', ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText)(exports, name => name in stubs ? stubs[name] : require(name)); return exports; };
   const rules = await rt.importModule('lib/diplomacy-rules.ts'), copy = await rt.importModule('lib/diplomacy-copy.ts'); const embargoCopy = await rt.importModule('lib/embargo-copy.ts');
   const { ForeignAffairsPanel } = await load('../app/foreign-affairs-panel.tsx', { '@/lib/diplomacy-copy': copy, '@/lib/diplomacy-rules': rules, '@/lib/embargo-copy': embargoCopy, './display-preferences': { useDisplayTimestamp: () => value => `T${value}` } });
-  const base = { id: 't1', kind: 'non-aggression', proposer: 'kindle', other: 'korund', proposedBy: 'AI President', proposedAt: 1, status: 'in-force', ratifiedAt: 2, endsAt: 5000, brokenAt: null, ratifications: [] };
+  const base = { id: 't1', kind: 'non-aggression', proposer: 'kindle', other: 'korund', proposedBy: 'AI President', proposedAt: 1, status: 'in-force', ratifiedAt: 2, endsAt: 5000, brokenAt: null, brokenBy: null, breakPenalty: null, ratifications: [] };
   const html = (treaties, nation) => renderToStaticMarkup(ForeignAffairsPanel({ treaties, nationId: nation }));
   assert.match(html([base], 'kindle'), /Foreign affairs/); assert.match(html([base], 'kindle'), /In force until T5000000: non-aggression pact between Kindle and Korund/); assert.match(html([base], 'kindle'), /No war declarations between the signatories/);
   assert.match(html([base], 'korund'), /between Korund and Kindle/); assert.match(html([base], 'kindle'), /Every negotiator and ratifying body is an AI/);

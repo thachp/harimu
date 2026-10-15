@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
+import { activeNonAggressionPact } from './diplomacy'; // #402
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
 import { cleanLabel, declarationBlock, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
   type DeclarationBlock, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
@@ -58,10 +59,11 @@ export async function shardStartedAt(db: GameDatabase, configured: string | unde
   return clock ? Number(clock.epoch_seconds) : null;
 }
 
-/** Non-aggression pact between the two nations (docs 13.2: a pact bars declarations between its signatories).
- *  TODO(#308): wire this to the treaty store when the diplomacy PoC (#308, docs 13.2) lands. Until then there are no treaties, so it FAILS OPEN:
- *  no pact is assumed and the declaration is not blocked. The same holds if a supplied check reads a treaty table that does not exist yet. */
-export const nonAggressionInForce = async (_db: GameDatabase, _a: WarNationId, _b: WarNationId, _now: number) => false;
+/** Non-aggression pact between the two nations (docs 13.2: a pact bars declarations between its signatories). #402: wired to the treaty store from #308
+ *  (`activeNonAggressionPact`: an in-force pact whose term has not ended; proposed, rejected, expired and broken pacts do not count). Read-only.
+ *  A database without the treaties table (migration 0037) reads as no pact, so it still fails open there. [ASSUMPTION] The treaties flag is not re-checked:
+ *  treaties are only ever written while HARIMU_DIPLOMACY_ENABLED is on, and a pact in force binds the declaration whatever the flag is now (fail closed). */
+export const nonAggressionInForce = (db: GameDatabase, a: WarNationId, b: WarNationId, now: number) => activeNonAggressionPact(db, a, b, now);
 async function pactInForce(check: NonNullable<DeclareWarOptions['nonAggression']>, db: GameDatabase, a: WarNationId, b: WarNationId, now: number): Promise<boolean> {
   try { return (await check(db, a, b, now)) === true; } catch (error) { if (isMissingRelation(error)) return false; throw error; }
 }
