@@ -3,7 +3,8 @@ import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import {test} from 'node:test';
 import ts from 'typescript';
-import * as preferences from '../lib/onboarding-preferences.ts';
+import {localRuntime} from './helpers/local-runtime.mjs';
+const preferences = await (async()=>{const r=await localRuntime();try{return await r.importModule('lib/onboarding-preferences.ts');}finally{await r.close();}})(); // imports the live list from nation-discovery (#488)
 const require=createRequire(import.meta.url);
 const source=await readFile(new URL('../app/first-visit-guide.tsx',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
