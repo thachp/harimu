@@ -6,8 +6,8 @@
  * the same visitor work puts on the inspector. A citizen keeps "Citizen snapshot".
  *
  * `contextStripStatus` is the whole chain as one tiny pure function, in the shell's own order, so the shell can swap its inline chain for one
- * call. `visitor` means no citizen nation and a session that has finished loading (the visitor work's own rule), so it is false while a
- * citizen's session loads and a citizen reloading a city never sees the visitor label. Nothing here changes who counts as a visitor. The
+ * call. `visitor` should come from isVisitorSession(...) when this is wired: that is the visitor work's own rule (no citizen nation and a session that is not still
+ * loading), so it is false while a citizen's session loads and a citizen reloading a city never sees the visitor label. Nothing here decides who counts as a visitor. The
  * three existing labels are not new wording (`proposal: false`); only the visitor label is new (`proposal: true`). Limit: labels 40. */
 
 export const CONTEXT_STRIP_LABEL_MAX=40;
