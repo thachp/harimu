@@ -26,7 +26,7 @@ import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWee
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
 import { cityDestinations } from '@/lib/city-destinations';
-import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, identityHold, identityHoldTimeoutMs, signedInHint, viewedNationHeld, sceneUrl, isVisitorSession, viewedNationAfterLoad, type SceneView, type SignedInHint } from '@/lib/scene-navigation';
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, nationForNavigation, identityHold, identityHoldTimeoutMs, signedInHint, viewedNationHeld, sceneUrl, isVisitorSession, viewedNationAfterLoad, type SceneView, type SignedInHint } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -1177,7 +1177,7 @@ export default function Home() {
     // #344: with the market flag off, nothing navigates to the Market scene (it falls back to the city square).
     const nextView: ViewMode = requestedView === 'market' && !marketShown ? 'square' : requestedView;
     if (nextView !== 'world') stopTour();
-    const nextNation = nextView === 'country' && !['world','country','nation'].includes(viewMode) && citizenNation ? citizenNation.id : selected.id;
+    const nextNation = nationForNavigation(nextView, viewMode, selected.id, citizenNation?.id); // #527
     setSelectedId(nextNation);
     const visitingCity = new URLSearchParams(window.location.search).get('city');
     // #455: before the city account has loaded, a citizen's URL still names their capital (what the scene shows meanwhile), so every nation's links carry nation and city.
