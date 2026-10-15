@@ -28,6 +28,8 @@ export type GameShellProps = {
   citizenNation?: GameNation;
   /** #455: the citizen row is still loading and the URL names no nation: show a neutral line, never the default nation. */
   identityLoading?: boolean;
+  /** #379: isVisitorSession(): no citizen and the session is not loading or in error. False by default (citizen wording). */
+  visitorSession?: boolean;
   nations: readonly GameNation[];
   capacity: number;
   currencyCode?: 'SPK' | 'LN' | 'CRN';
@@ -80,7 +82,7 @@ function HudHelp({ label, children, help, open = false }: { label: string; child
   return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ worldClock, holidayName, nextDeadline, view, nation, citizenNation, identityLoading = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ worldClock, holidayName, nextDeadline, view, nation, citizenNation, identityLoading = false, visitorSession = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -98,8 +100,8 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   const shownNationName = identityLoading ? 'Your nation' : nation.name; // #455
   const emblemOn = topBarEmblemEnabled();
   const inspecting = view === 'world' || view === 'nation' || view === 'country';
-  // #379: a visitor (guest, signed out, or local demo) is not a citizen; a citizen whose record is still loading keeps the citizen wording.
-  const visitor = !citizenNation && !identityLoading;
+  // #379: a visitor (guest, signed out, local demo, or signed in with no citizenship yet) is not a citizen. `visitorSession` comes from isVisitorSession(), which is false while the session loads or errors, so a citizen reloading a city never sees visitor wording and the scene is not rebuilt after load.
+  const visitor = !citizenNation && visitorSession;
   const hasPanel = !collapsed;
   useEffect(() => { document.getElementById('game-details')?.querySelector('.game-inspector-body')?.scrollTo({top:0,left:0}); }, [view,nation.id]);
   const close = () => { setCollapsed(true); setSelection(null); requestAnimationFrame(() => document.getElementById('game-reopen')?.focus()); };
@@ -138,7 +140,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   const shiftChip = shiftSummary ? <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong>{shiftSummary.endsAt !== undefined ? <GameTimer compact endsAt={shiftSummary.endsAt * 1000} label="Shift" expiredText={shiftSummary.expiredText} /> : <span>Active shift</span>}<CaretRight /></button> : null;
   return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}`}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
-    <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport visitor={visitor} marketOpen={marketVisible(resourceNation.id, marketOpen)} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
+    <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} visitor={visitor} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
     <header className="game-hud" {...hudHelpHandlers}>
       <div className="game-identity"><span className="game-crest" aria-hidden="true">H</span><div><strong>HARIMU</strong><span>{identityLoading ? 'Loading your citizen…' : <>{emblemOn && <NationEmblemMark id={resourceNation.id} name={resourceNation.name} />}{resourceNation.name}<i />{identityStatus({ guestDemo, localDemo, hasCitizenNation: Boolean(citizenNation) }, emblemOn)}</>}</span></div></div>
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>

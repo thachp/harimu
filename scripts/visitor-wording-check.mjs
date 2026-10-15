@@ -36,11 +36,11 @@ async function bundle() {
 const nation = { id: 'kindle', name: 'Kindle Republic', capital: 'Forgehaven' };
 const base = { nation, nations: [nation], capacity: 18, localDemo: false, currentCityName: 'Forgehaven', contextTitle: 'City destinations' };
 const scenes = [
-  { name: 'visitor City', slug: 'visitor-city', visitor: true, args: { props: { ...base, view: 'square', citizenNation: null } }, labels: ['Household'], header: 'VISITOR PREVIEW' },
+  { name: 'visitor City', slug: 'visitor-city', visitor: true, args: { props: { ...base, view: 'square', citizenNation: null, visitorSession: true } }, labels: ['Household'], header: 'VISITOR PREVIEW' },
   { name: 'citizen City', slug: 'citizen-city', visitor: false, args: { props: { ...base, view: 'square', citizenNation: nation } }, labels: ['Your household'], header: 'CITIZEN LIFE' },
-  { name: 'visitor World guide 1', slug: 'visitor-guide-arrival', visitor: true, args: { props: { ...base, view: 'world', citizenNation: null, contextTitle: 'Nations' }, guide: 'arrival' }, header: 'NATION INSPECTION', guide: 'Welcome to Harimu' },
-  { name: 'visitor World guide 2', slug: 'visitor-guide-government', visitor: true, args: { props: { ...base, view: 'world', citizenNation: null, contextTitle: 'Nations' }, guide: 'government' }, header: 'NATION INSPECTION', guide: 'Who runs the government' },
-  { name: 'visitor Country', slug: 'visitor-country', visitor: true, args: { props: { ...base, view: 'country', citizenNation: null, contextTitle: 'Country travel' }, country: true }, pins: 'Presence shows in your own nation' },
+  { name: 'visitor World guide 1', slug: 'visitor-guide-arrival', visitor: true, args: { props: { ...base, view: 'world', citizenNation: null, visitorSession: true, contextTitle: 'Nations' }, guide: 'arrival' }, header: 'NATION INSPECTION', guide: 'Welcome to Harimu' },
+  { name: 'visitor World guide 2', slug: 'visitor-guide-government', visitor: true, args: { props: { ...base, view: 'world', citizenNation: null, visitorSession: true, contextTitle: 'Nations' }, guide: 'government' }, header: 'NATION INSPECTION', guide: 'Who runs the government' },
+  { name: 'visitor Country', slug: 'visitor-country', visitor: true, args: { props: { ...base, view: 'country', citizenNation: null, visitorSession: true, contextTitle: 'Country travel' }, country: true }, pins: 'Presence shows in your own nation' },
 ];
 
 /** Runs in the page. */

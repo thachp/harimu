@@ -18,13 +18,14 @@ const text=tree=>tree.filter(n=>typeof n==='string').join(' ');
 // ---- #379: visitor wording (setup above is the same GameShell harness as game-hud.test.mjs) ----
 const panelProps={panel:'panel'};
 test('#379: a visitor sees "VISITOR PREVIEW", a citizen (or a citizen still loading) keeps "CITIZEN LIFE"',()=>{
-  const visitor=text(render({...panelProps}));
+  const visitor=text(render({...panelProps,visitorSession:true}));
   assert.match(visitor,/VISITOR PREVIEW/);assert.doesNotMatch(visitor,/CITIZEN LIFE/);
-  assert.match(text(render({...panelProps,guestDemo:true})),/VISITOR PREVIEW/);
-  assert.match(text(render({...panelProps,localDemo:true})),/VISITOR PREVIEW/);
-  const citizen=text(render({...panelProps,citizenNation:{id:'kindle',name:'Kindle'}}));
+  assert.match(text(render({...panelProps,visitorSession:true,guestDemo:true})),/VISITOR PREVIEW/);
+  assert.match(text(render({...panelProps,visitorSession:true,localDemo:true})),/VISITOR PREVIEW/);
+  const citizen=text(render({...panelProps,visitorSession:true,citizenNation:{id:'kindle',name:'Kindle'}}));
   assert.match(citizen,/CITIZEN LIFE/);assert.doesNotMatch(citizen,/VISITOR PREVIEW/);
   const loading=text(render({...panelProps,identityLoading:true}));
+  assert.match(text(render({...panelProps})),/CITIZEN LIFE/,'default is citizen wording');
   assert.match(loading,/CITIZEN LIFE/);assert.doesNotMatch(loading,/VISITOR PREVIEW/);
   assert.match(text(render({...panelProps,view:'world'})),/NATION INSPECTION/,'inspection views are unchanged for everyone');
   assert.match(text(render({...panelProps,view:'world',citizenNation:{id:'kindle',name:'Kindle'}})),/NATION INSPECTION/);
@@ -48,16 +49,38 @@ test('#379: the viewport label and selection say "Household" for visitors and ke
 test('#379: GameViewport defaults to citizen wording and the shell passes the visitor flag',async()=>{
   const viewport=await readFile(new URL('../app/game-viewport.tsx',import.meta.url),'utf8');
   assert.match(viewport,/visitor = false/);assert.match(viewport,/locationLabel\(building\.location, building\.label, visitor\)/);
-  assert.match(source,/<GameViewport visitor=\{visitor\}/);
-  assert.match(source,/const visitor = !citizenNation && !identityLoading;/);
+  assert.match(source,/<GameViewport marketOpen=\{[^}]*\} visitor=\{visitor\}/);
+  assert.match(source,/const visitor = !citizenNation && visitorSession;/);
 });
 test('#379: first-visit guide and country map wording do not call a visitor a citizen',async()=>{
   const guide=await readFile(new URL('../app/first-visit-guide.tsx',import.meta.url),'utf8');
   assert.doesNotMatch(guide,/You are a citizen/);assert.match(guide,/Who runs the government/);
-  assert.match(guide,/you become a citizen only when you choose a nation and confirm/);
+  assert.match(guide,/you become a citizen only when you choose a nation and confirm the Oath of Citizenship, which is permanent/);
   const {liveNations}=await import('../lib/nation-discovery.ts');
   assert.deepEqual([...liveNations],['kindle','korund','aurelle'],'the guide names the three playable nations; update it if this list changes');
   assert.match(guide,/Three of them \(Kindle, Korund and Aurelle\) are playable/);
   const country=await readFile(new URL('../app/country-scene.tsx',import.meta.url),'utf8');
   assert.match(country,/preview \? 'Presence shows in your own nation' : 'Online count unavailable'/,'citizens keep "Online count unavailable"');
+});
+
+test('#379: a citizen reloading a city URL while the session loads never sees visitor wording (and the scene is not rebuilt after load)',async()=>{
+  const nav=await import('../lib/scene-navigation.ts');
+  const url='?view=square&nation=kindle&city=forgehaven';
+  // identityPending is false here (a valid ?nation= is shown at once), so it cannot be the visitor signal...
+  assert.equal(nav.identityPending(url,['kindle','korund','aurelle'],true,false),false);
+  // ...isVisitorSession is: false while the session loads or errors, true only once it is known to be a visitor.
+  assert.equal(nav.isVisitorSession(false,true,'loading'),false);
+  assert.equal(nav.isVisitorSession(false,true,'error'),false);
+  assert.equal(nav.isVisitorSession(true,true,'ready'),false);
+  assert.equal(nav.isVisitorSession(false,true,'anonymous'),true);
+  assert.equal(nav.isVisitorSession(false,true,'ready'),true);
+  assert.equal(nav.isVisitorSession(false,false,'loading'),true,'local demo is a visitor');
+  // Loading -> ready as a citizen: the wording is citizen wording at every step, so the flag never flips.
+  const kindle={id:'kindle',name:'Kindle'};
+  for (const [citizenNation,status] of [[undefined,'loading'],[kindle,'ready']]) {
+    const out=text(render({...panelProps,citizenNation,visitorSession:nav.isVisitorSession(Boolean(citizenNation),true,status)}));
+    assert.match(out,/CITIZEN LIFE/);assert.doesNotMatch(out,/VISITOR PREVIEW/);
+  }
+  const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
+  assert.match(page,/<GameShell visitorSession=\{isVisitorSession\(Boolean\(citizenNation\), clerkConfigured, citizenSessionStatus\)\}/);
 });
