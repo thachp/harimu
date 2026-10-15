@@ -13,7 +13,7 @@ async function earn(r, user) { // one real Kindle harvest shift: 800 SPK minor
   assert.equal((await r.call('citizen', user, { action: 'claim-work', shiftId: shift.id })).status, 200);
   return (await r.call('citizen', user)).data.economy.walletMinor;
 }
-async function runtime(t) { const r = await localRuntime(); t.after(() => r.close()); r.setSquarePurchase(true); return r; }
+async function runtime(t) { const r = await localRuntime(); t.after(() => r.close()); r.setSquarePurchase(true); r.setTesseraExchange(true); return r; } // #626: the exchange has its own flag (the squares test below needs both)
 
 test('a Kindle citizen earns Tessera at the kiosk: SPK debit and TSR credit at the official rate, recorded and shown in the wallet', async t => {
   const r = await runtime(t);
@@ -62,7 +62,7 @@ test('insufficient Spark, replay, request reuse, concurrency: never double-credi
 test('gate, nation rules, validation and origin', async t => {
   const r = await runtime(t);
   await earn(r, 'alice');
-  r.setSquarePurchase(false); assert.equal((await kiosk(r, 'alice', 100)).data.reason, 'disabled'); r.setSquarePurchase(true);
+  r.setTesseraExchange(false); assert.equal((await kiosk(r, 'alice', 100)).data.reason, 'disabled'); r.setTesseraExchange(true);
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
   const korund = await kiosk(r, 'bob', 100); assert.equal(korund.status, 403); assert.equal(korund.data.reason, 'non_convertible');
   await r.db.prepare("UPDATE citizens SET nation_id='aurelle' WHERE clerk_user_id='bob'").run();
@@ -74,7 +74,7 @@ test('gate, nation rules, validation and origin', async t => {
   assert.equal((await r.call('world/registry', null, { action: 'buy-tessera', tesseraMinor: 100, requestId: randomUUID() })).status, 401);
   assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM citizen_tessera_exchanges').first()).n), 0, 'nothing written by any rejection');
   const listing = (await r.call('world/registry', 'alice')).data;
-  assert.deepEqual(listing.kiosk, { sparkPerTessera: 4, minTesseraMinor: 100, maxTesseraMinor: 10000 });
+  assert.deepEqual(listing.kiosk, { open: true, sparkPerTessera: 4, minTesseraMinor: 100, maxTesseraMinor: 10000 });
 });
 
 test('the placeholder grant is removed from code; the wallet panel offers the kiosk only while it is open', async () => {

@@ -5,7 +5,7 @@ import type { GameDatabase } from './database-contract';
  * Clearing House kiosk (a licensed exchange) at the official rate. Replaces the temporary 50.00 TSR starter grant.
  * PoC: the official rate is the fixed placeholder quote (1 SPK = 0.25 TSR, lib/wallet.ts), buy-only, no kiosk fee,
  * Kindle only (unlimited in Kindle apart from the verification-tier limits of Section 20, which do not exist yet;
- * Korund is non-convertible). Opens together with the World Registry (HARIMU_SQUARE_PURCHASE_ENABLED).
+ * Korund is non-convertible). Behind its own flag HARIMU_TESSERA_EXCHANGE_ENABLED, default off (#626, Decision 111); HARIMU_SQUARE_PURCHASE_ENABLED is squares only.
  * Integer minor units; the SPK cost rounds up so the kiosk never mints Tessera for less than the official rate.
  */
 export const kioskNations = ['kindle'] as const;
