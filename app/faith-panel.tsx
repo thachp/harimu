@@ -64,6 +64,10 @@ export function useFaith(active: boolean) {
     chooseFaith: (faithId: string) => post('/api/faith', { action: 'choose-faith', faithId }),
     attendWorship: () => post('/api/faith', { action: 'attend-worship' }),
     worshipUnderground: () => post('/api/faith', { action: 'worship-underground' }), // #295
+    requestMission: (hostNation: string) => post('/api/faith', { action: 'request-mission', hostNation }), // #225
+    acceptMission: () => post('/api/faith', { action: 'accept-mission' }),
+    answerMission: (missionId: string, answer: 'accept' | 'decline') => post('/api/faith', { action: 'answer-mission', missionId, answer }),
+    muteMissionaries: (muted: boolean) => post('/api/faith', { action: 'mute-missionaries', muted }),
     joinFestival: (festivalId: string) => post('/api/faith', { action: 'join-festival', festivalId }),
     congregation: (action: 'join-congregation' | 'leave-congregation' | 'stand-for-officiant' | 'stand-down' | 'officiate') => post('/api/congregations', { action }),
   };
@@ -125,6 +129,8 @@ export function FaithPanel({ api, initialPick = null }: { api: FaithApi; initial
       {faith.underground.quietWeek && <p className="faith-note">{faith.underground.quietWeek}</p>}
     </div>}
 
+    {faith.missionary && <MissionaryBlock missionary={faith.missionary} busy={busy} api={api} />}
+
     {korund ? <p className="faith-note">{korundFaithCopy.publicChoice}</p> : <fieldset className="faith-picker" disabled={Boolean(cooldown) || busy}>
       <legend>Choose your faith</legend>
       <p className="faith-note">Your first choice is free. After that you can change faith once every 60 real days.</p>
@@ -139,6 +145,37 @@ export function FaithPanel({ api, initialPick = null }: { api: FaithApi; initial
     {!korund && congregations && <CongregationBlock faith={faith} state={congregations} api={api} />}
     <div aria-live="polite" className="faith-status">{message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}</div>
   </section>;
+}
+
+/** #225: cross-border missionaries. Every string comes from the server payload (this file never imports the Content copy). The badge never names the missionary. */
+function MissionaryBlock({ missionary: m, busy, api }: { missionary: NonNullable<FaithState['missionary']>; busy: boolean; api: FaithApi }) {
+  const mission = m.mission;
+  return <div className="faith-missionary" aria-labelledby="missionary-heading">
+    <h3 id="missionary-heading">{m.labels.heading}</h3>
+    {m.here.map(h => <p key={h.missionId} className="faith-note faith-missionary-here" role="status">{h.line}</p>)}
+    {m.offer && <div className="faith-missionary-offer" role="group" aria-label={m.offer.pitch}>
+      <p><strong>{m.offer.pitch}</strong></p>
+      <p>{m.offer.body}</p>
+      {m.offer.warnings.map(line => <p key={line} className="faith-note">{line}</p>)}
+      <ActionButton type="button" reason={busy ? 'Saving…' : null} onClick={() => api.answerMission(m.offer!.missionId, 'accept')}>{m.offer.buttons.accept}</ActionButton>
+      <ActionButton type="button" reason={busy ? 'Saving…' : null} onClick={() => api.answerMission(m.offer!.missionId, 'decline')}>{m.offer.buttons.notNow}</ActionButton>
+    </div>}
+    {m.notice && <p className="faith-note" role="status">{m.notice}</p>}
+    {mission ? <div className="faith-missionary-mission">
+      <p role="status">{mission.statusText}</p>
+      {mission.status === 'invited' && <ActionButton type="button" reason={busy ? 'Saving…' : null} onClick={() => api.acceptMission()}>{m.labels.setOut}</ActionButton>}
+      {mission.status === 'invited' && <GameTimer compact endsAt={new Date(mission.expiresAt * 1000).toISOString()} label="Invitation lapses" readyLabel="Invitation lapsed" />}
+      {mission.status === 'traveling' && mission.arrivesAt && <GameTimer compact endsAt={new Date(mission.arrivesAt * 1000).toISOString()} label="Arrives" readyLabel="Arrived" />}
+      {mission.status === 'present' && mission.endsAt && <GameTimer compact endsAt={new Date(mission.endsAt * 1000).toISOString()} label="Mission ends" readyLabel="Mission ended" />}
+    </div> : <div className="faith-missionary-request">
+      <p className="faith-note">{m.labels.intro}</p>
+      {m.request.hosts.map(host => <div key={host.nationId}>
+        <ActionButton type="button" reason={busy ? 'Saving…' : m.request.blockedReason ?? host.reason} onClick={() => api.requestMission(host.nationId)}>{m.labels.send[host.nationId]}</ActionButton>
+      </div>)}
+    </div>}
+    <ActionButton type="button" aria-pressed={m.muted} reason={busy ? 'Saving…' : null} onClick={() => api.muteMissionaries(!m.muted)}>{m.mute.label}</ActionButton>
+    <p className="faith-note">{m.muted ? m.mute.muted : m.mute.unmuted}</p>
+  </div>;
 }
 
 /** The citizen's own congregation (one per faith per capital). Korund has none in public (§14.6), so the block is not rendered there. */
