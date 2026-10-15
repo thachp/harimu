@@ -111,12 +111,12 @@ test('scheduled proposals: trade under an embargo and at-war pairs are skipped',
   assert.equal((await rows()).filter(x => x.request_id.startsWith('ai-slot-')).length, 1);
 });
 
-test('wiring: the scheduled Worker calls runDiplomacyCron with the bindings; no route or app code proposes or breaks a treaty; flags stay off', async () => {
+test('wiring: the scheduled Worker calls runDiplomacyCron with the bindings; no route or app code proposes or breaks a treaty; diplomacy flag is on in preview', async () => {
   const entry = await readFile(new URL('../worker/entry.ts', import.meta.url), 'utf8');
   assert.match(entry, /runDiplomacyCron\(await getDatabase\(\), Math\.floor\(controller\.scheduledTime \/ 1000\), env as unknown as/);
   assert.match(entry, /async scheduled\([\s\S]*runDiplomacyCron/);
   const wrangler = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.match(wrangler, /"HARIMU_DIPLOMACY_ENABLED": "false"/);
+  assert.match(wrangler, /"HARIMU_DIPLOMACY_ENABLED": "true"/);
   const war = await readFile(new URL('../lib/war.ts', import.meta.url), 'utf8'); // #422 intentionally wires the read-only pact check into lib/war.ts: that is the only diplomacy import allowed there (no break/propose/cron wiring).
   const diplomacyImports = [...war.matchAll(/import\s*\{([^}]*)\}\s*from\s*'\.\/diplomacy'/g)].flatMap(m => m[1].split(',').map(x => x.trim()).filter(Boolean));
   assert.deepEqual(diplomacyImports, ['activeNonAggressionPact'], 'lib/war.ts imports only activeNonAggressionPact from ./diplomacy');

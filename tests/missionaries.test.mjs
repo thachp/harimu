@@ -243,9 +243,9 @@ test('the same rules hold on PostgreSQL (PGlite): one open mission, travel timer
   assert.equal((await answer(r, 'kim', id, 'accept')).data.reason, 'already_answered');
 });
 
-test('flag default, migration 0038 is additive, and the app never imports the missionary copy (the server sends the strings)', async () => {
+test('faith flag in preview wrangler, migration 0038 is additive, and the app never imports the missionary copy (the server sends the strings)', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_FAITH_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_FAITH_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0038_faith_missions.sql', '../db/postgres/0038_faith_missions.sql']) {
     const sql = (await readFile(new URL(file, import.meta.url), 'utf8')).replace(/^--.*$/gm, '').replace(/ON DELETE CASCADE/g, '');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file);

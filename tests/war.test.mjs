@@ -34,9 +34,9 @@ test('pure rules: 48 real hours, 30-day Founding Period, 10-day peace lock, each
   assert.equal(cleanLabel('x'.repeat(100), 40).length, 40); assert.equal(cleanLabel(42, 40), '');
 });
 
-test('the war flag defaults to "false" in wrangler.jsonc and migration 0031 only adds a table', async () => {
+test('the war flag is "true" in preview wrangler.jsonc and migration 0031 only adds a table', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0031_wars.sql', '../db/postgres/0031_wars.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS wars/);

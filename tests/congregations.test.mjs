@@ -16,9 +16,9 @@ async function citizen(r, id, nation, name = id) {
 }
 const kinwardForge = p => p.congregations.find(c => c.faithId === 'kinward-rite' && c.nationId === 'kindle');
 
-test('congregations ride HARIMU_FAITH_ENABLED (default "false")', async t => {
+test('congregations ride HARIMU_FAITH_ENABLED (preview wrangler "true", code default off)', async t => {
   const { readFile } = await import('node:fs/promises');
-  assert.match(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'), /"HARIMU_FAITH_ENABLED"\s*:\s*"false"/);
+  assert.match(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'), /"HARIMU_FAITH_ENABLED"\s*:\s*"true"/);
   const r = await localRuntime(); t.after(() => r.close());
   const p = await panel(r, 'alice');
   assert.equal(p.enabled, false); assert.equal(p.congregations.length, 9); assert.ok(p.congregations.every(c => c.members === 0 && c.officiant === null));

@@ -160,9 +160,9 @@ test('GETs write nothing: war reads and the world snapshot are read-only; the ro
   assert.doesNotMatch(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'), /HARIMU_WAR_ADMIN_SECRET/, 'the secret never goes in the repo config');
 });
 
-test('migration 0041 is additive in both dialects, and the flag is still default "false"', async () => {
+test('migration 0041 is additive in both dialects, and the preview flag is "true"', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0041_war_actions.sql', '../db/postgres/0041_war_actions.sql']) {
     const sql = (await readFile(new URL(file, import.meta.url), 'utf8')).replace(/^--.*$/gm, '').replace(/ON DELETE CASCADE/g, '');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS war_actions/);

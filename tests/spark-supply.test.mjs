@@ -36,9 +36,9 @@ test('Price Index: flat at 100 for a steady economy, drifts toward supply/output
   assert.equal(priceIndex(steady, 1000), priceIndex(steady, 1000));
 });
 
-test('the flag defaults to "false", migration 0043 only adds a table, and no route or page can issue Spark', async () => {
+test('the flag is "true" in preview wrangler, migration 0043 only adds a table, and no route or page can issue Spark', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_SPARK_SUPPLY_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_SPARK_SUPPLY_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0043_spark_issuances.sql', '../db/postgres/0043_spark_issuances.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS spark_issuances/);
