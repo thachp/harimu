@@ -63,6 +63,7 @@ export function useFaith(active: boolean) {
     faith: active ? faith : null, congregations: active ? congregations : null, busy, message, error,
     chooseFaith: (faithId: string) => post('/api/faith', { action: 'choose-faith', faithId }),
     attendWorship: () => post('/api/faith', { action: 'attend-worship' }),
+    worshipUnderground: () => post('/api/faith', { action: 'worship-underground' }), // #295
     joinFestival: (festivalId: string) => post('/api/faith', { action: 'join-festival', festivalId }),
     congregation: (action: 'join-congregation' | 'leave-congregation' | 'stand-for-officiant' | 'stand-down' | 'officiate') => post('/api/congregations', { action }),
   };
@@ -118,6 +119,11 @@ export function FaithPanel({ api, initialPick = null }: { api: FaithApi; initial
       <ActionButton type="button" reason={busy ? 'Saving…' : faith.worshipBlockedReason} onClick={() => api.attendWorship()}>{worship.label}</ActionButton>
       {worship.worshippedToday && worship.nextAt && <GameTimer compact endsAt={new Date(worship.nextAt * 1000).toISOString()} label="Next worship" readyLabel="Worship is open again" />}
     </div> : faith.worshipBlockedReason && <p className="faith-note">{faith.worshipBlockedReason}</p>}
+    {faith.underground && <div className="faith-underground" aria-label="Private practice">{/* #295: private to the holder, no banner, nothing posted */}
+      <ActionButton type="button" reason={busy ? 'Saving…' : faith.underground.blockedReason} onClick={() => api.worshipUnderground()}>{faith.underground.label}</ActionButton>
+      {faith.underground.lastRaid && <p className="faith-note" role="status">{faith.underground.lastRaid.text} {faith.underground.lastRaid.devotionNote}</p>}
+      {faith.underground.quietWeek && <p className="faith-note">{faith.underground.quietWeek}</p>}
+    </div>}
 
     {korund ? <p className="faith-note">{korundFaithCopy.publicChoice}</p> : <fieldset className="faith-picker" disabled={Boolean(cooldown) || busy}>
       <legend>Choose your faith</legend>
