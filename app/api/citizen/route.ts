@@ -140,10 +140,16 @@ export async function GET(request: Request) {
   // verified-human visit are written by the write paths (POST); here they are projected so players see the same values.
   const database = await getDatabase();
   const readNow = Math.floor(Date.now() / 1000);
-  const simulation = await readWorldSimulation(database, readNow, { reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true' });
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
-  const [capacity, starterFood] = await Promise.all([readCapacityProjection(database, userId, readNow, interval), pendingStarterFood(database, userId)]);
-  const [profile, plan, itemResult, decision, politicalAction] = await Promise.all([
+  const accountLevel=accountElectionEnabled(env as unknown as {NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string});
+  const electionDatabase=accountLevel?accountElectionDatabase(database):database;
+  // #596: every read below is read-only and independent of the others, so they run together: one wave of round trips instead of about twenty in a row (each is a network hop on preview).
+  // Only the reads that need the profile or the verification (election, collective petitions, first week, government) wait for them, in the second wave.
+  const [simulation, capacity, starterFood, [profile, plan, itemResult, decision, politicalAction], verification, market, aurellePlan, korundPlan, nationWork, economy, playerMarket, shifts] = await Promise.all([
+    readWorldSimulation(database, readNow, { reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true' }),
+    readCapacityProjection(database, userId, readNow, interval),
+    pendingStarterFood(database, userId),
+    Promise.all([
     database.prepare(`SELECT clerk_user_id, nation_id, nation_changes, display_name, capacity,
       influence, standing, created_at
       FROM citizens WHERE clerk_user_id = ?`).bind(userId).first<CitizenProfileRow>(),
@@ -164,30 +170,40 @@ export async function GET(request: Request) {
       SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ?
       UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id = ? UNION ALL SELECT 1 FROM civic_petition_signatures WHERE clerk_user_id = ? UNION ALL SELECT 1 FROM civic_voter_receipts WHERE clerk_user_id = ? AND ballot_written=1 UNION ALL SELECT 1 FROM poc_voter_receipts WHERE clerk_user_id=? AND ballot_written=1 LIMIT 1
     ) AS political_action_taken`).bind(userId, userId, userId, userId,userId).first<{ political_action_taken: number }>(),
+  ]),
+    readVerification(userId),
+    readMarket(database, userId, interval),
+    readAurelleView(database,userId),
+    readKorund(database,userId,Math.floor(Date.now()/1000),korundOptions()),
+    nationWorkPlanPart(database,userId),
+    readEconomy(database, userId, interval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
+    readPlayerMarket(database, userId),
+    readShifts(database, userId),
   ]);
-
-  const verification=await readVerification(userId);
   const civicNow=Math.floor(Date.now()/1000);
-  const accountLevel=accountElectionEnabled(env as unknown as {NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string});
-  const electionDatabase=accountLevel?accountElectionDatabase(database):database;
+  const [election, collectivePetitions, firstWeek, governmentRead] = await Promise.all([
+    profile?.nation_id==='kindle'?readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true):null,
+    profile?.nation_id==='kindle'?readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
+    profile ? readFirstWeekProgress(database,userId) : null,
+    profile?.nation_id ? readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId, { readOnly: true, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' }) : null,
+  ]);
   if (profile && capacity) profile.capacity = capacity.capacity;
-  const market = await readMarket(database, userId, interval);
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
   return privateJson({
-    aurellePlan: await readAurelleView(database,userId),
-    election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true),...(accountLevel?{id:accountElectionId}:{})}:null,
-    collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
-    korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000),korundOptions()),
-    ...await nationWorkPlanPart(database,userId),
-    firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
+    aurellePlan,
+    election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountElectionId}:{})}:null,
+    collectivePetitions,
+    korundPlan,
+    ...nationWork,
+    firstWeek,
     flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED) }, // #344: the UI hides Market entry points while this is false
     simulation,
     verification,
-    economy: await readEconomy(database, userId, interval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
+    economy,
     market,
-    playerMarket: await readPlayerMarket(database, userId),
-    government: profile?.nation_id ? publicGovernmentSnapshot(await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId, { readOnly: true, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' })) : null,
-    shifts: await readShifts(database, userId),
+    playerMarket,
+    government: governmentRead ? publicGovernmentSnapshot(governmentRead) : null,
+    shifts,
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
       : null,
