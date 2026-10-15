@@ -3,6 +3,7 @@
 import { X } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { formatMinor, quoteTessera, summarizeWallet, walletHistoryLimit, type WalletTransaction } from '@/lib/wallet';
+import { kioskClaim, kioskClaimable, kioskHistory, kioskLabels, kioskNationVoice, kioskNotes } from '@/lib/reward-kiosk-copy';
 import { kioskBuyLabel, kioskClosed, kioskComingSoon, kioskExplainer, kioskHeader, kioskRateLine, kioskReceipt, spk } from '@/lib/kiosk-text';
 
 export type WalletPanelProps = {
@@ -51,24 +52,29 @@ function WalletTestFaucet({ grantMinor, granted, claim }: NonNullable<WalletPane
 
 export type WalletRewardRow = { entryId: string; epochDay: number; amountMinor: number; claimedAt?: string };
 export type WalletRewards = { claimable: WalletRewardRow[]; history: WalletRewardRow[]; claimableMinor: number; claimedMinor: number; claimableCount: number; claimedCount: number; claim: (entryId: string) => Promise<string | null> };
-const rewardsHeader = 'Earned Tessera rewards';
-const rewardsExplainer = 'Tessera earned for settled shift work by verified citizens, once a day. It is earn-only: it cannot be bought with Spark, exchanged or cashed out.';
+const rewardVoice = kioskNationVoice.kindle; // the wallet is Kindle-only (page.tsx); every line below is from Content's lib/reward-kiosk-copy.ts (#535)
+const rewardsLineWork = 'Tessera earned for settled shift work by verified citizens.'; // ARC's two lines (each under 80 characters); no buy, exchange or cash-out wording, even as a negation
+const rewardsLineCaps = 'Rewards are capped and paid only for verified work.';
 const rewardDay = (epochDay: number) => new Date(epochDay * 86400000).toISOString().slice(0, 10);
+const rewardWork = 'shift work';
+const fillReward = (text: string, minor: number) => text.replace('{reward}', `${formatMinor(minor)} TSR`).replace('{work}', rewardWork);
 /** #466: every row here is provenance "earned" (a settled shift reward). Starter grants and the test faucet are never listed or counted here. */
 function WalletRewardKiosk({ claimable, history, claimableMinor, claimedMinor, claimableCount, claimedCount, claim }: WalletRewards) {
   const [state, setState] = useState<{ pending: string | null; message: string | null }>({ pending: null, message: null });
   const more = (shown: number, total: number) => total > shown ? <small>Showing the newest {shown} of {total}.</small> : null;
-  return <section className="wallet-rewards" aria-label={rewardsHeader}>
-    <h3>{rewardsHeader}</h3>
-    <p><small>{rewardsExplainer}</small></p>
-    <p>Ready to claim: {formatMinor(claimableMinor)} TSR · Claimed so far: {formatMinor(claimedMinor)} TSR</p>
-    {claimable.length === 0 ? <p><small>No unclaimed rewards yet.</small></p> : <ul>{claimable.map((row) => <li key={row.entryId}>
-      <span>Earned · shift reward · {rewardDay(row.epochDay)} UTC</span>
-      <button type="button" disabled={state.pending !== null} onClick={async () => { setState({ pending: row.entryId, message: null }); const error = await claim(row.entryId); setState({ pending: null, message: error ?? `Claimed ${formatMinor(row.amountMinor)} TSR.` }); }}>Claim {formatMinor(row.amountMinor)} TSR</button></li>)}</ul>}
+  const earned = `${kioskLabels.earned} · shift reward`;
+  return <section className="wallet-rewards" aria-label={rewardVoice.title}>
+    <h3>{rewardVoice.title}</h3>
+    <p><small>{rewardsLineWork}</small><br /><small>{rewardsLineCaps}</small></p>
+    <p><small>{kioskNotes.sparkStays.text}</small></p>
+    <p>{kioskClaimable.label}: {formatMinor(claimableMinor)} TSR · Claimed so far: {formatMinor(claimedMinor)} TSR</p>
+    {claimable.length === 0 && history.length === 0 ? <p><small>{kioskHistory.empty.text}</small></p> : claimable.length === 0 ? <p><small>Nothing is waiting to be claimed.</small></p> : <ul>{claimable.map((row) => <li key={row.entryId}>
+      <span>{earned} · {rewardDay(row.epochDay)} UTC</span>
+      <button type="button" aria-label={fillReward(kioskClaimable.claimAccessibleName.text, row.amountMinor)} disabled={state.pending !== null} onClick={async () => { setState({ pending: row.entryId, message: null }); const error = await claim(row.entryId); setState({ pending: null, message: error ?? fillReward(kioskClaim.claimed.text, row.amountMinor) }); }}>{kioskClaimable.claimButton}</button></li>)}</ul>}
     {more(claimable.length, claimableCount)}
     {state.message && <p role="status">{state.message}</p>}
-    {history.length > 0 && <table className="wallet-history"><caption>Claimed rewards</caption><thead><tr><th scope="col">Day</th><th scope="col">Provenance</th><th scope="col">Amount (TSR)</th></tr></thead>
-      <tbody>{history.map((row) => <tr key={row.entryId}><td>{rewardDay(row.epochDay)} UTC</td><td>Earned · shift reward</td><td className="wallet-credit">{formatMinor(row.amountMinor, true)}</td></tr>)}</tbody></table>}
+    {history.length > 0 && <table className="wallet-history"><caption>{kioskHistory.title}</caption><thead><tr><th scope="col">Day</th><th scope="col">Provenance</th><th scope="col">Amount (TSR)</th></tr></thead>
+      <tbody>{history.map((row) => <tr key={row.entryId}><td>{rewardDay(row.epochDay)} UTC</td><td>{earned}</td><td className="wallet-credit">{formatMinor(row.amountMinor, true)}</td></tr>)}</tbody></table>}
     {more(history.length, claimedCount)}
   </section>;
 }

@@ -687,7 +687,7 @@ export default function Home() {
       const data = await response.json() as { error?: string; replay?: true; amountMinor?: number };
       if (!response.ok) return data.error ?? 'The reward could not be claimed right now. Try again.';
       if (!data.replay) setEconomy(current => current && { ...current, tesseraMinor: (current.tesseraMinor ?? 0) + (data.amountMinor ?? 0) });
-      setRewardsView(await fetchRewards());
+      const view = await fetchRewards(); if (view) setRewardsView(view); // a failed refetch keeps the previous view
       return null;
     } catch { return 'The reward could not be claimed right now. Try again.'; }
   };
@@ -810,7 +810,7 @@ export default function Home() {
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
     setCitizenNationId(null); seededNationId.current = null; setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
-    setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setVerification(null); setWorkShifts([]);
+    setEconomy(null); setRewardsView(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setVerification(null); setWorkShifts([]);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
     setKorundPlan(null); korundIntent.current = null; setKorundCommand(null);
     setPlanNote(''); setCompletedPlanIds([]); setPlanSaved(false); setHorizon('week'); setCommittedDecision(null);
