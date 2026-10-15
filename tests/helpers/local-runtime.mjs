@@ -39,7 +39,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
     'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/government.ts',
-    'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/diplomatic-hall.ts', 'lib/founding-period.ts', 'lib/founding-period-copy.ts', 'lib/diplomatic-hall-copy.ts', 'app/api/diplomatic-hall/route.ts', 'lib/command-request.ts',
+    'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/diplomatic-hall.ts', 'lib/founding-period.ts', 'lib/founding-period-copy.ts', 'lib/aurelle-succession.ts', 'lib/aurelle-succession-rules.ts', 'app/api/aurelle-succession/route.ts', 'lib/diplomatic-hall-copy.ts', 'app/api/diplomatic-hall/route.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/world-simulation.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',
     'lib/qa-tools.ts','lib/nation-openings.ts','lib/onboarding-preferences.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
@@ -136,6 +136,7 @@ export async function readVerification(userId) {
   const ordersRoute = await import(pathToFileURL(join(directory, 'app/api/market/orders/route.mjs')).href); // #197
   const travelRoute = await import(pathToFileURL(join(directory, 'app/api/travel/route.mjs')).href); // #123
   const hallRoute = await import(pathToFileURL(join(directory, 'app/api/diplomatic-hall/route.mjs')).href); // #599
+  const successionRoute = await import(pathToFileURL(join(directory, 'app/api/aurelle-succession/route.mjs')).href); // #613
   const faithRoute = await import(pathToFileURL(join(directory, 'app/api/faith/route.mjs')).href); // #67
   const congregationsRoute = await import(pathToFileURL(join(directory, 'app/api/congregations/route.mjs')).href); // #224
   const chartersRoute = await import(pathToFileURL(join(directory, 'app/api/aurelle/charters/route.mjs')).href); // #531
@@ -155,13 +156,13 @@ export async function readVerification(userId) {
     VALUES (?,'kindle',?,18,1240,'Good standing',?,?)`).bind(user, `Private ${user}`, now, now)));
   let postgres;
   if(backend==='postgres'){const {postgresFixture}=await import('./postgres-runtime.mjs');postgres=await postgresFixture(env.DB.sqlite,path,directory,accountElection);env.DB.close();env.DB=postgres.db;}
-  const call = async (endpoint, user, body, origin = 'https://fixture.invalid', query = '') => {
+  const call = async (endpoint, user, body, origin = 'https://fixture.invalid', query = '', headers = {}) => {
     const request = new Request(`https://fixture.invalid/api/${endpoint}${query}`, body === undefined ? undefined : {
-      method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body),
     });
     if (user) identify(request, user);
     const handlers = endpoint === 'notables' ? notables : endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'world/found-city' ? foundCityRoute : endpoint === 'city' ? city : square;
-    const routed = endpoint === 'world/registry' ? registryRoute : endpoint === 'test-faucet' ? faucetRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'diplomatic-hall' ? hallRoute : endpoint === 'aurelle/charters' ? chartersRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'canvassing' ? canvassingRoute : endpoint === 'town-hall' ? townHallRoute : endpoint === 'debate' ? debateRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
+    const routed = endpoint === 'world/registry' ? registryRoute : endpoint === 'test-faucet' ? faucetRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'diplomatic-hall' ? hallRoute : endpoint === 'aurelle-succession' ? successionRoute : endpoint === 'aurelle/charters' ? chartersRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'canvassing' ? canvassingRoute : endpoint === 'town-hall' ? townHallRoute : endpoint === 'debate' ? debateRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
     const response = await routed[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
