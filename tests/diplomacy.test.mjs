@@ -43,9 +43,9 @@ test('Kindle ratification: a NAP needs two-thirds of the seats, a trade deal a s
   assert.equal(decideTreaty('non-aggression', 'korund', 'aurelle', seats(0, 0, 0)).approved, true, 'Chairman and Crown alone: no Assembly needed');
 });
 
-test('the flag defaults to "false", migration 0037 only adds a table, and no route can propose, ratify or break a treaty', async () => {
+test('the flag is "true" in preview wrangler, migration 0037 only adds a table, and no route can propose, ratify or break a treaty', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_DIPLOMACY_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_DIPLOMACY_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0037_treaties.sql', '../db/postgres/0037_treaties.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS treaties/);

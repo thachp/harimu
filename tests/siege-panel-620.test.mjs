@@ -125,9 +125,9 @@ test('panel: caption from the copy module, next window or captured line, rules l
   assert.ok(done.includes('Captured T1800100000000.')); assert.ok(done.includes(copy.siegeStrip.caption.text.replace('{city}', 'Harrowgate').replace('{n}', '2'))); assert.doesNotMatch(done, /Next assault/);
 });
 
-test('the government view mounts the panel from simulation.sieges, and the war flag stays off in wrangler.jsonc', async () => {
+test('the government view mounts the panel from simulation.sieges, and the war flag is on in preview wrangler.jsonc', async () => {
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
   assert.match(page, /\{simulation\?\.sieges && <SiegePanel sieges=\{simulation\.sieges\} nationId=\{citizenNation\.id\} \/>\}\s*<FoundingBanner /);
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
 });

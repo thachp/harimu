@@ -29,9 +29,9 @@ test('pure rules: game day, integer minor units, and the report keeps only the f
   assert.equal(firstMismatches(many).length, 10); assert.equal(firstMismatches(many)[0].account, 'a0'); assert.equal(firstMismatches(many.slice(0, 3)).length, 3);
 });
 
-test('static: flag defaults "false", the admin secret is not in the repo, migration only adds a table, every money statement is a SELECT, only the cron writes its own table', async () => {
+test('static: flag is "true" in preview wrangler, the admin secret is not in the repo, migration only adds a table, every money statement is a SELECT, only the cron writes its own table', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_LEDGER_RECONCILIATION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_LEDGER_RECONCILIATION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   assert.doesNotMatch(cfg, /"HARIMU_ADMIN_TOKEN"/, 'the secret is set in the dashboard, never in the repo');
   for (const file of ['../drizzle/0045_reconciliation_reports.sql', '../db/postgres/0045_reconciliation_reports.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');

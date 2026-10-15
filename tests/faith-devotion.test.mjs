@@ -14,10 +14,10 @@ async function citizen(r, id, nation) {
   await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,?,?,18,0,'Good standing',?,?)").bind(id, nation, id, at, at).run();
 }
 
-test('wrangler.jsonc ships faith off by default, and the flag gates every POST', async t => {
+test('wrangler.jsonc ships faith on in preview (code default off), and the flag gates every POST', async t => {
   const { readFile } = await import('node:fs/promises');
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_FAITH_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_FAITH_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   const r = await localRuntime(); t.after(() => r.close());
   assert.equal((await choose(r, 'alice', 'open-hand')).data.reason, 'disabled');
   assert.equal((await worship(r, 'alice')).data.reason, 'disabled');

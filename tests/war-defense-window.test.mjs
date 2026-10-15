@@ -66,9 +66,9 @@ test('the local-time range is right for a viewer in UTC-7 and one in UTC+9 (and 
   assert.deepEqual(defenseWindowLocal(20, Number.NaN), { start: '20:00', end: '00:00' }, 'an unknown offset reads as UTC');
 });
 
-test('the war flag stays "false", migration 0033 only adds a table, and no route or app code sets a window', async () => {
+test('the war flag is "true" in preview wrangler, migration 0033 only adds a table, and no route or app code sets a window', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0033_war_defense_windows.sql', '../db/postgres/0033_war_defense_windows.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS war_defense_windows/);
