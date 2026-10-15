@@ -6,6 +6,8 @@ import { readCityLocation } from '../lib/city-location';
 import { runCabinetCron } from '../lib/cabinet-cron';
 import { runDiplomacyCron } from '../lib/diplomacy';
 import { runCrownCron } from '../lib/crown-debasement';
+import { runSparkCron } from '../lib/spark-supply';
+import { runLedgerReconciliationCron } from '../lib/ledger-reconciliation';
 import { presenceSocketPath, presenceUpgrade, type PresenceEnv } from '../lib/city-presence';
 export { CityPresence } from './city-presence';
 
@@ -25,6 +27,12 @@ const worker = {
     // #362: the AI Monarch's yearly Crown debasement decree; a no-op unless HARIMU_CROWN_DEBASEMENT_ENABLED="true". Never runs on a read.
     ctx.waitUntil((async () => runCrownCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true' }))()
       .then(() => undefined, error => { console.warn('[cron] Crown debasement failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #431: the AI Reserve Board's monthly Spark issuance; a no-op unless HARIMU_SPARK_SUPPLY_ENABLED="true". Never runs on a read.
+    ctx.waitUntil((async () => runSparkCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true' }))()
+      .then(() => undefined, error => { console.warn('[cron] Spark supply failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #432: daily ledger reconciliation (read-only on money, one report per game day); a no-op unless HARIMU_LEDGER_RECONCILIATION_ENABLED="true". Never runs on a read.
+    ctx.waitUntil((async () => runLedgerReconciliationCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_LEDGER_RECONCILIATION_ENABLED?: string }).HARIMU_LEDGER_RECONCILIATION_ENABLED === 'true' }))()
+      .then(() => undefined, error => { console.warn('[cron] Ledger reconciliation failed', error instanceof Error ? error.name : 'unknown'); }));
   },
 };
 export default worker;
