@@ -31,6 +31,7 @@ import { embargoSchemas } from './embargo'; // #363
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
 import { townHallSchemas } from './town-hall'; // #441
+import { debateSchemas } from './debate'; // #282
 import { sparkIssuanceSchemas } from './spark-supply'; // #431
 import { reconciliationSchemas } from './ledger-reconciliation'; // #432
 import { squareSchema } from './square-chat';
@@ -220,7 +221,7 @@ async function initialize(database: GameDatabase) {
     database.prepare(travelSchema),
     ...faithSchemas.map(sql=>database.prepare(sql)),
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
-    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), ...sparkIssuanceSchemas.map(sql=>database.prepare(sql)), ...reconciliationSchemas.map(sql=>database.prepare(sql)), ...townHallSchemas.map(sql=>database.prepare(sql)), ...canvassSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362, #431, #432, #441, #442
+    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), ...sparkIssuanceSchemas.map(sql=>database.prepare(sql)), ...reconciliationSchemas.map(sql=>database.prepare(sql)), ...townHallSchemas.map(sql=>database.prepare(sql)), ...debateSchemas.map(sql=>database.prepare(sql)), ...canvassSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362, #431, #432, #441, #442
     ...congregationSchemas.map(sql=>database.prepare(sql)),
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),

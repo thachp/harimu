@@ -7,6 +7,9 @@ export const townHallTopAnswered = 10;
 /** [ASSUMPTION] question length bounds in characters. */
 export const townHallQuestionMin = 10;
 export const townHallQuestionMax = 200;
+/** #282: the presidential debate keeps its questions and up-votes in the same tables as the town halls, as one more hall row whose candidate_id is this value (it is no candidate, so no
+ *  town hall list, answer cron or town hall vote ever treats it as one). */
+export const debateHallCandidateId = 'debate';
 export type TownHallStage = 'waiting' | 'open' | 'closed';
 
 /** The same text checks the petitions use (trimmed, bounded, no control characters), plus no links or addresses: the question is shown to every citizen and fed to the AI as untrusted text. */

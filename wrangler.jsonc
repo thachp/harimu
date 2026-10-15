@@ -61,6 +61,10 @@
     "HARIMU_TOWN_HALLS_ENABLED": "false",
     // #441: the AI candidates' town hall answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_TOWN_HALLS_ENABLED, the AI binding and a valid AI budget.
     "HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED": "false",
+    // #282: Kindle presidential debate PoC (citizen questions and up-votes through the town hall path, top 5 put to every AI candidate, fact-check panel). Off until QA. An operator sets HARIMU_DEBATE_OPEN_AT (epoch seconds) to open intake for 24 hours; unset it never opens.
+    "HARIMU_DEBATE_ENABLED": "false",
+    // #282: the AI candidates' debate answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_DEBATE_ENABLED, the AI binding and a valid AI budget. Off, every answer is the candidate's fallback line.
+    "HARIMU_AI_DEBATE_ANSWERS_ENABLED": "false",
     // #431: Kindle Spark money supply and Price Index PoC (Reserve Board issuance within the 3% cap and the Charter Limit). Off until QA; issuance is written only by the scheduled Worker.
     "HARIMU_SPARK_SUPPLY_ENABLED": "false",
     // #432: daily ledger reconciliation job and its read-only admin report route. Off until QA. The route also needs the HARIMU_ADMIN_TOKEN Worker secret (set in the dashboard, never in this file); without it the route is a 404.
