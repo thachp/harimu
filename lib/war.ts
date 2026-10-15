@@ -36,6 +36,21 @@ export const warSchemas = [
  set_by TEXT NOT NULL CHECK(length(set_by) BETWEEN 1 AND 60),
  changed_at INTEGER NOT NULL
 )`,
+  // #350: who acted and under which authority (declaration, proposal to end, acceptance). Append-only, written only by lib/war-actions.ts (server-only caller).
+  `CREATE TABLE IF NOT EXISTS war_actions (
+ id TEXT PRIMARY KEY,
+ request_id TEXT NOT NULL UNIQUE,
+ war_id TEXT NOT NULL REFERENCES wars(id) ON DELETE CASCADE,
+ action TEXT NOT NULL CHECK(action IN ('declare','propose-end','accept-end')),
+ nation TEXT NOT NULL CHECK(nation IN ('kindle','korund','aurelle')),
+ role TEXT NOT NULL CHECK(length(role) BETWEEN 1 AND 40),
+ authority TEXT NOT NULL CHECK(authority IN ('proposal','decree')),
+ ratifier TEXT NOT NULL CHECK(length(ratifier) BETWEEN 1 AND 60),
+ end_kind TEXT CHECK(end_kind IN ('ceasefire','peace')),
+ acted_at INTEGER NOT NULL,
+ CHECK((action='propose-end')=(end_kind IS NOT NULL))
+)`,
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_war_actions_one_per_kind ON war_actions(war_id,action)",
 ];
 
 type Row = { id: string; attacker_nation: WarNationId; defender_nation: WarNationId; casus_belli: string; declared_by: string; declared_at: number; mobilization_ends_at: number; ended_at: number | null; end_kind: WarEndKind | null };
