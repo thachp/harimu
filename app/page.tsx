@@ -47,7 +47,7 @@ import { firstLoopStep } from '@/lib/first-loop';
 import { starterCopyFor } from '@/lib/starter-copy';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
-import { WalletPanel } from './wallet-panel';
+import { WalletPanel, type WalletRewards } from './wallet-panel';
 import { ShiftQualityStep } from './shift-quality-step';
 import { qualityWorkOrderId, harvestQuestions, type QualityInput, type QualityQuestion } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
@@ -672,6 +672,25 @@ export default function Home() {
     fetch('/api/test-faucet').then(r => r.ok ? r.json() as Promise<{ available?: boolean; grantMinor: number; granted: boolean } | null> : null).then(data => { if (live) setTestFaucet(data?.available === true ? { grantMinor: data.grantMinor, granted: data.granted } : null); }).catch(() => { if (live) setTestFaucet(null); });
     return () => { live = false; };
   }, [walletOpen]);
+  // #466: earned-Tessera reward kiosk; HARIMU_TESSERA_REWARDS_ENABLED off is a 404 on the route, so nothing shows (earn-only: no purchase or exchange UI).
+  const [rewardsView, setRewardsView] = useState<Omit<WalletRewards, 'claim'> | null>(null);
+  const fetchRewards = async () => { try { const response = await fetch('/api/tessera/rewards'); return response.ok ? await response.json() as Omit<WalletRewards, 'claim'> : null; } catch { return null; } };
+  useEffect(() => {
+    if (!walletOpen) return;
+    let live = true;
+    fetchRewards().then(view => { if (live) setRewardsView(view); });
+    return () => { live = false; };
+  }, [walletOpen]);
+  const claimReward = async (entryId: string): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/tessera/rewards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'claim', entryId, requestId: crypto.randomUUID() }) });
+      const data = await response.json() as { error?: string; replay?: true; amountMinor?: number };
+      if (!response.ok) return data.error ?? 'The reward could not be claimed right now. Try again.';
+      if (!data.replay) setEconomy(current => current && { ...current, tesseraMinor: (current.tesseraMinor ?? 0) + (data.amountMinor ?? 0) });
+      setRewardsView(await fetchRewards());
+      return null;
+    } catch { return 'The reward could not be claimed right now. Try again.'; }
+  };
   const claimTestFaucet = async (): Promise<string | null> => {
     try {
       const response = await fetch('/api/test-faucet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'claim' }) });
@@ -1849,7 +1868,7 @@ export default function Home() {
       socialDock={<CitizenDock diplomaticHall={hallFlag} key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} collectivePetitions={collectivePetitions} election={election} korund={korundPlan} onNavigate={navigateGame} />}
       accountControls={<>{citizenNation && !guestActive && <button id={MORNING_BRIEF_TRIGGER_ID} type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief" aria-haspopup="dialog" aria-expanded={morningBriefOpen} aria-controls={morningBriefOpen ? 'morning-brief' : undefined}><Newspaper size={17} aria-hidden="true" /><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
-      {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onBuyTessera={kioskOpen ? buyTessera : undefined} testFaucet={testFaucet ? { ...testFaucet, claim: claimTestFaucet } : undefined} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
+      {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onBuyTessera={kioskOpen ? buyTessera : undefined} testFaucet={testFaucet ? { ...testFaucet, claim: claimTestFaucet } : undefined} rewards={rewardsView ? { ...rewardsView, claim: claimReward } : undefined} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
       {qualityOrder && rewards[qualityOrder.order.id] && <ShiftQualityStep orderName={qualityOrder.order.name} cost={qualityOrder.order.cost} base={rewards[qualityOrder.order.id]} questions={qualityOrder.questions}
         onCancel={() => setQualityOrder(null)} onStart={(choice) => { const { order, ticket } = qualityOrder; setQualityOrder(null);
           const quality: QualityInput | undefined = 'skip' in choice ? choice : ticket ? { answers: choice.answers, ticket } : undefined;
