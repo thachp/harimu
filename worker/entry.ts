@@ -6,6 +6,7 @@ import { readCityLocation } from '../lib/city-location';
 import { runCabinetCron } from '../lib/cabinet-cron';
 import { runDiplomacyCron } from '../lib/diplomacy';
 import { runCrownCron } from '../lib/crown-debasement';
+import { runTownHallCron } from '../lib/town-hall-ai';
 import { runSparkCron } from '../lib/spark-supply';
 import { runLedgerReconciliationCron } from '../lib/ledger-reconciliation';
 import { presenceSocketPath, presenceUpgrade, type PresenceEnv } from '../lib/city-presence';
@@ -27,6 +28,9 @@ const worker = {
     // #362: the AI Monarch's yearly Crown debasement decree; a no-op unless HARIMU_CROWN_DEBASEMENT_ENABLED="true". Never runs on a read.
     ctx.waitUntil((async () => runCrownCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true' }))()
       .then(() => undefined, error => { console.warn('[cron] Crown debasement failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #441: AI town hall answers for closed halls; a no-op unless HARIMU_TOWN_HALLS_ENABLED and HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED are "true" (both default "false"), with the AI binding and budget. Never runs on a read.
+    ctx.waitUntil((async () => runTownHallCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as Parameters<typeof runTownHallCron>[2]))()
+      .then(() => undefined, error => { console.warn('[cron] Town hall answers failed', error instanceof Error ? error.name : 'unknown'); }));
     // #431: the AI Reserve Board's monthly Spark issuance; a no-op unless HARIMU_SPARK_SUPPLY_ENABLED="true". Never runs on a read.
     ctx.waitUntil((async () => runSparkCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true' }))()
       .then(() => undefined, error => { console.warn('[cron] Spark supply failed', error instanceof Error ? error.name : 'unknown'); }));
