@@ -325,6 +325,12 @@ async function initialize(database: GameDatabase) {
     await database.prepare('ALTER TABLE citizens ADD COLUMN nation_changes INTEGER NOT NULL DEFAULT 0').run();
   }
 
+  // #400: treaties gained broken_by (migration 0040); a local database created before it gets the column once.
+  const treatyColumns = await database.prepare('PRAGMA table_info(treaties)').all<{ name: string }>();
+  if (treatyColumns.results.length > 0 && !treatyColumns.results.some((column) => column.name === 'broken_by')) {
+    await database.prepare("ALTER TABLE treaties ADD COLUMN broken_by TEXT CHECK(broken_by IS NULL OR broken_by IN ('kindle','korund','aurelle'))").run();
+  }
+
   const hasLegacyAffinity = columnNames.has('affinity');
   const nationColumnsSql = hasLegacyAffinity
     ? `id, name, short_name, affinity, government, economy, currency, religion, capital, population,
