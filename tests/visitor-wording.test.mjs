@@ -66,8 +66,8 @@ test('#379: first-visit guide and country map wording do not call a visitor a ci
 test('#379: a citizen reloading a city URL while the session loads never sees visitor wording (and the scene is not rebuilt after load)',async()=>{
   const nav=await import('../lib/scene-navigation.ts');
   const url='?view=square&nation=kindle&city=forgehaven';
-  // identityPending is false here (a valid ?nation= is shown at once), so it cannot be the visitor signal...
-  assert.equal(nav.identityPending(url,['kindle','korund','aurelle'],true,false),false);
+  // identityHold is 'none' here when the sign-in hint is unknown (a valid ?nation= is shown at once), so it cannot be the visitor signal...
+  assert.equal(nav.identityHold(url,['kindle','korund','aurelle'],true,false,'unknown'),'none');
   // ...isVisitorSession is: false while the session loads or errors, true only once it is known to be a visitor.
   assert.equal(nav.isVisitorSession(false,true,'loading'),false);
   assert.equal(nav.isVisitorSession(false,true,'error'),false);
