@@ -54,6 +54,10 @@ test('one neutral court voice: no byline, no Crown decree, no AI badge', () => {
   for (const o of [E,C]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
   for (const t of all()) assert.doesNotMatch(t,/Be it known|hereby|decree|we, |the Crown (says|speaks|decrees)|\bI am an AI\b|Gazette/i,t);
 });
+test('no string here repeats a string from another lib module, so a screen never shows the same line from two sources', () => {
+  const others=readdirSync('lib').filter(f=>/\.ts$/.test(f)&&f!=='favor-decay-copy.ts').map(f=>readFileSync(`lib/${f}`,'utf8')).join('\n');
+  for (const t of all()) assert.ok(!others.includes(`'${t}'`)&&!others.includes(`"${t}"`)&&!others.includes(`\`${t}\``), t);
+});
 test('unwired: nothing in app/, components/ or lib/ imports favor-decay-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('favor-decay-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/favor-decay-copy/, f);
