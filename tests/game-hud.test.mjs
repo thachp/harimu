@@ -49,3 +49,8 @@ test('empty context copy reflects open and collapsed details without inventing i
   stateOverrides={0:true};
   try {assert.match(text(render({view:'household'})),/Show details to view available actions/);assert.doesNotMatch(text(render({view:'household'})),/Details are open/);} finally {stateOverrides={};}
 });
+
+test('#541 removed the identityLoading prop: nothing in the shell may still read it (semantic merge with the #534 crest, a ReferenceError in the inspector header)', () => {
+  assert.doesNotMatch(source, /\bidentityLoading\b/);
+  for (const hold of ['none', 'neutral', 'loading']) assert.doesNotThrow(() => render({ identityHold: hold }), hold);
+});
