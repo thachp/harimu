@@ -50,7 +50,7 @@ test('real refusals map to the #325 refusal lines with pre-formatted values', as
   // Flag off: closed.
   const closed = await kiosk(r, 'alice', 500);
   assert.equal(closed.data.reason, 'disabled'); assert.equal(K.kioskRefusal(closed.data.reason, values), 'The Clearing House kiosk is closed right now.');
-  r.setSquarePurchase(true);
+  r.setTesseraExchange(true);
   // No Spark yet: insufficient.
   const poor = await kiosk(r, 'alice', 500);
   assert.equal(poor.data.reason, 'insufficient_spark'); assert.equal(K.kioskRefusal(poor.data.reason, values), 'You do not have enough Spark for 5.00 TSR.');
@@ -76,7 +76,7 @@ test('real refusals map to the #325 refusal lines with pre-formatted values', as
 });
 
 test('wallet history shows the #325 row with amount and cost after a real purchase; the fallback formatter is only for direct callers', async t => {
-  const r = await localRuntime(); t.after(() => r.close()); r.setSquarePurchase(true);
+  const r = await localRuntime(); t.after(() => r.close()); r.setTesseraExchange(true);
   await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'harvest' });
   const shift = (await r.call('citizen', 'alice')).data.shifts.find(s => !s.claimedAt); r.setNow(Date.parse(shift.completesAt));
   assert.equal((await r.call('citizen', 'alice', { action: 'claim-work', shiftId: shift.id })).status, 200);

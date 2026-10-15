@@ -33,6 +33,8 @@
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
+    // #626 (Decision 111): the Spark-to-Tessera kiosk exchange, separate from square purchases. Off: buy-tessera is refused and the kiosk stays closed.
+    "HARIMU_TESSERA_EXCHANGE_ENABLED": "false",
     "HARIMU_LABOR_BUREAU_ENABLED": "false",
     // #489: per-nation opening flags (seven-nations Stage 0). Off; even when "true" a nation is enrollable only by a QA-allowlisted account (lib/nation-openings.ts nationPlayable).
     "HARIMU_CONFLUENCE_ENABLED": "false",
@@ -61,7 +63,8 @@
     "HARIMU_KORUND_PRESIDIUM_ENABLED": "false",
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
     "HARIMU_FAITH_ENABLED": "false",
-    "HARIMU_DIPLOMATIC_HALL_ENABLED": "false", // #599: Diplomatic Hall (Kindle + Aurelle), flag off
+    // #599: Diplomatic Hall (Kindle + Aurelle citizens, closed to Korund). Off: the route returns 404 and the tab is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_DIPLOMATIC_HALL_ENABLED": "false",
     "HARIMU_WAR_ENABLED": "false",
     // #423: war weariness PoC (weekly Unrest from an active war, docs 15.3). Needs HARIMU_WAR_ENABLED too. Off until QA.
     "HARIMU_WAR_WEARINESS_ENABLED": "false",
