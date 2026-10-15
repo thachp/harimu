@@ -23,7 +23,7 @@ async function scene(t, backend, { on = true, secret = SECRET } = {}) {
 }
 const refused = (res, status, reason) => { assert.deepEqual([res.status, res.data.reason], [status, reason], JSON.stringify(res.data)); };
 
-test('wrangler: the flag is "true" in preview and "false" in production, with its comment on its own line, no line has a trailing //, and no secret value is in the repo', async () => {
+test('wrangler: the flag is "true" in preview (#654 preview-on rule; the POST fails closed without the unset admin secret) and "false" in production, with its comment on its own line, no line has a trailing //, and no secret value is in the repo', async () => {
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const cfg = await read(file);
     assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_SUCCESSION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), [value], file);
