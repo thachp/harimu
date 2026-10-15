@@ -3,12 +3,13 @@
 import { pathToFileURL } from 'node:url';
 import { productionTarget } from './production-config.mjs';
 
+export const smokeTimeoutMs = 10_000; // per request: a hung host fails the check instead of hanging the job
 export const smokeBase = `https://${productionTarget.hostname}`;
 /** Returns the list of failed checks (empty = healthy). `expectedSha` must be the deployed commit: /api/version proves the new bundle is the one serving. After a rollback the serving commit is unknown, so 'any' skips only that comparison. */
 export async function smokeProblems(expectedSha, fetchImpl = fetch, base = smokeBase) {
   if (base !== smokeBase) throw new Error(`Smoke checks run only against ${smokeBase}.`);
   if (expectedSha !== 'any' && !/^[a-f0-9]{40}$/.test(expectedSha ?? '')) throw new Error('A full 40 hex commit sha is required.');
-  const problems = [], get = async path => { try { return await fetchImpl(`${base}${path}`, { redirect: 'manual', headers: { 'user-agent': 'harimu-production-smoke' } }); } catch { problems.push(`${path}: request failed.`); return null; } };
+  const problems = [], get = async path => { try { return await fetchImpl(`${base}${path}`, { redirect: 'manual', signal: AbortSignal.timeout(smokeTimeoutMs), headers: { 'user-agent': 'harimu-production-smoke' } }); } catch { problems.push(`${path}: request failed.`); return null; } };
   const home = await get('/'); if (home && home.status !== 200) problems.push(`/: status ${home.status}.`);
   const version = await get('/api/version');
   if (version) { if (version.status !== 200) problems.push(`/api/version: status ${version.status}.`); else { const body = await version.json().catch(() => ({})); if (expectedSha !== 'any' && body.sha !== expectedSha) problems.push('/api/version: the serving build is not the deployed commit.'); } }
