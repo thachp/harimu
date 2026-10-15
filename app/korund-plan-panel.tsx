@@ -13,15 +13,18 @@ import type { KorundPlan } from '@/lib/korund';
 import { quotaPercent } from '@/lib/korund-coupons';
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
+import { grayText, grayRefusal, ln, fc, rate, rumorLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
 
 export type KorundPlanView = KorundPlan;
-export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal' | 'korund-join-ration-queue' | 'korund-cancel-ration-queue' | 'korund-redeem-coupon' | 'korund-set-preferences' | 'korund-request-assignment';
-export type KorundCommand = { action: KorundAction; requestId: string; preferences?: string[]; shiftId?: string; queueId?:string; coupon?:'clothing'|'goods'; gameWeek?: number };
+export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal' | 'korund-join-ration-queue' | 'korund-cancel-ration-queue' | 'korund-redeem-coupon' | 'korund-set-preferences' | 'korund-request-assignment' | 'korund-gray-post-offer' | 'korund-gray-accept-offer';
+export type KorundCommand = { action: KorundAction; requestId: string; preferences?: string[]; shiftId?: string; queueId?:string; coupon?:'clothing'|'goods'; gameWeek?: number; amountMinor?: number; askRate?: number; offerId?: string };
+/** #43: what the gray-market card asks the page to send (the page adds the request id). */
+export type GrayCommand = { action: 'korund-gray-post-offer'; amountMinor: number; askRate: number } | { action: 'korund-gray-accept-offer'; offerId: string };
 
-export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, onCommand, onRetry, onRefresh, onNavigate }: {
+export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, onCommand, onGray, onRetry, onRefresh, onNavigate }: {
   plan: KorundPlanView | null; scene: SceneView; capacity: number; pending: boolean; uncertain: boolean;
   localDemo: boolean; error: string | null; onCommand: (action: KorundAction, shiftId?: string, preferences?: string[]) => void;
-  otherShiftActive?: boolean;
+  otherShiftActive?: boolean; onGray?: (command: GrayCommand) => void;
   onRetry: () => void; onRefresh: () => void; onNavigate: (scene: SceneView) => void;
 }) {
   const formatTime=useDisplayTimestamp();
@@ -71,6 +74,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       <p>Daily loop: complete the assigned shift, collect Labor Notes, redeem game-week food coupons at the state counter, then prepare a household meal.</p>
       <button type="button" onClick={() => onNavigate(active ? 'workplace' : plan.foodQuantity < 2 && plan.couponFoodRemaining > 0 ? 'market' : 'workplace')}>{active ? 'Check assigned shift' : plan.foodQuantity < 2 && plan.couponFoodRemaining > 0 ? 'Redeem ration coupons' : 'Open assigned work'}</button>
     </>}
+    {plan.gray && onGray ? <GrayMarket gray={plan.gray} pending={pending} uncertain={uncertain} onGray={onGray} /> : null}
   </NationDocument>;
 }
 
@@ -144,4 +148,39 @@ function LaborBureau({ bureau, pending, uncertain, formatTime, onCommand }: { bu
     {bureau.assignment && <ActionButton type="button" reason={requestReason} onClick={() => onCommand('korund-request-assignment')}>{bureauText.reassignButton}</ActionButton>}
     {bureau.nextRequestAt && <p>{fillText(bureauText.nextRequest, { nextRequestAt: nextAt })}</p>}
   </section>;
+}
+
+/** #43 gray market (flag HARIMU_GRAY_MARKET_ENABLED): rendered only when the server sends plan.gray, for Korund citizens. A collapsed, optional
+ * entry. Copy is Content's #314 via lib/gray-market-text (PoC warning lines only: no Suspicion or seizure). FC is smuggled foreign cash. */
+export function GrayMarket({ gray, pending, uncertain, onGray }: { gray: NonNullable<KorundPlanView['gray']>; pending: boolean; uncertain: boolean; onGray: (command: GrayCommand) => void }) {
+  const [amount, setAmount] = useState('');
+  const [askRate, setAskRate] = useState('');
+  const amountMinor = Math.round(Number(amount) * 100), rateHundredths = Math.round(Number(askRate) * 100);
+  const validTerms = amount !== '' && askRate !== '' && Number.isSafeInteger(amountMinor) && amountMinor >= 1 && amountMinor <= gray.limits.amountCapMinor
+    && Number.isSafeInteger(rateHundredths) && rateHundredths >= gray.limits.rateMin && rateHundredths <= gray.limits.rateMax;
+  const mine = gray.myOffer;
+  const base = pendingActionReason(pending, uncertain);
+  return <details className="korund-gray-market" aria-label={grayText.label}>
+    <summary>{grayText.label} · {grayText.subtitle}</summary>
+    <section aria-label={grayText.warningTitle}><h4>{grayText.warningTitle}</h4>{grayText.warning.map(line => <p key={line}>{line}</p>)}</section>
+    <dl><dt>{grayText.cashLabel}</dt><dd>{fc(gray.cashMinor)}{gray.grantPending ? ' (starting stash, yours when you first trade)' : ''}</dd></dl>
+    <p><small>{grayText.cashHelp}</small></p>
+    <p aria-label={grayText.rumorLabel}>{gray.rumoredRate === null ? grayText.noRumor : rumorLine(gray.rumoredRate)}</p>
+    <h4>{grayText.yourOffer}</h4>
+    {mine ? <div className="gray-offer-card" data-status={mine.status}>
+      <dl><dt>Amount</dt><dd>{ln(mine.amountMinor)}</dd><dt>Asking rate</dt><dd>{rate(mine.askRate)}</dd><dt>For</dt><dd>{fc(mine.cashMinor)}</dd></dl>
+      <p>{mine.status === 'open' ? postedLine(mine.amountMinor, mine.askRate) : mine.status === 'accepted' ? acceptedLine(mine.amountMinor, mine.askRate) : expiredLine}</p>
+      {mine.status === 'open' && <GameTimer endsAt={mine.expiresAt} label="Offer expires in" />}
+    </div> : null}
+    {(!mine || mine.status !== 'open') && <form onSubmit={event => { event.preventDefault(); if (validTerms) onGray({ action: 'korund-gray-post-offer', amountMinor, askRate: rateHundredths }); }}>
+      <label>{grayText.amountLabel} <input inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} aria-label={grayText.amountLabel} /></label>{' '}
+      <label>{grayText.rateLabel} <input inputMode="decimal" value={askRate} onChange={event => setAskRate(event.target.value)} aria-label={grayText.rateLabel} /></label>{' '}
+      <ActionButton type="submit" reason={base ?? firstActionReason([!validTerms, `Offer 0.01 to ${(gray.limits.amountCapMinor / 100).toFixed(2)} LN at ${(gray.limits.rateMin / 100).toFixed(2)} to ${(gray.limits.rateMax / 100).toFixed(2)} FC per LN.`])}>{grayText.postButton}</ActionButton>
+    </form>}
+    <h4>{grayText.boardTitle}</h4>
+    {gray.offers.length === 0 ? <p>{noOffersLine}</p> : <ul>{gray.offers.map(offer => <li key={offer.id} className="gray-offer-card">
+      <dl><dt>Amount</dt><dd>{ln(offer.amountMinor)}</dd><dt>Asking rate</dt><dd>{rate(offer.askRate)}</dd><dt>Price</dt><dd>{fc(offer.cashMinor)}</dd></dl>
+      <ActionButton type="button" reason={base ?? firstActionReason([gray.cashMinor < offer.cashMinor, grayRefusal.insufficient_cash])} onClick={() => onGray({ action: 'korund-gray-accept-offer', offerId: offer.id })}>{grayText.acceptButton}</ActionButton>
+    </li>)}</ul>}
+  </details>;
 }

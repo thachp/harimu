@@ -49,7 +49,7 @@ import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
 import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
-import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
+import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction, type GrayCommand } from './korund-plan-panel';
 import { nationPlanPanelNation } from '@/lib/nation-panels';
 import { GovernmentPanel } from './government-panel';
 import { AurelleRisingPanel } from './aurelle-rising';
@@ -1110,6 +1110,7 @@ export default function Home() {
     }
   }
 
+  const startGrayAction = (command: GrayCommand) => void runKorundCommand({ ...command, requestId: crypto.randomUUID() });
   const startKorundAction = (action: KorundAction, shiftId?: string, preferences?: string[]) => void runKorundCommand(action === 'korund-set-preferences' ? { action, preferences, requestId: crypto.randomUUID() } : action === 'korund-request-assignment' ? { action, requestId: crypto.randomUUID() } : action === 'korund-redeem-coupon' ? { action, coupon: shiftId === 'goods' ? 'goods' : 'clothing', gameWeek: korundPlan?.gameWeek, requestId: crypto.randomUUID() } : { action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
   async function runAurelleCommand(command: AurelleCommand) {
     const originalAurelleClaim = command.action === 'aurelle-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'CRN');
@@ -1516,7 +1517,7 @@ export default function Home() {
       else void runWork('claim-work', undefined, priorNationShift.id); }} />;
   const korundPanel = <KorundPlanPanel plan={korundPlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
     uncertain={Boolean(korundCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
-    onCommand={startKorundAction} onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}
+    onCommand={startKorundAction} onGray={startGrayAction} onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}
     onRefresh={() => void runWork('refresh-work')} />;
   const aurellePanel = <AurellePlanPanel plan={aurellePlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
     uncertain={Boolean(aurelleCommand || korundCommand || marketCommand || playerCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}

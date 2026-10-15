@@ -35,6 +35,9 @@ async function readAurelleView(database: Awaited<ReturnType<typeof getDatabase>>
   return crownMintOn() && plan.available ? { ...plan, mint: await readCrownMint(database, Math.floor(Date.now() / 1000)) } : plan;
 }
 const laborBureauOn = () => (env as unknown as { HARIMU_LABOR_BUREAU_ENABLED?: string }).HARIMU_LABOR_BUREAU_ENABLED === 'true';
+// #43: the Korund gray market ships off (HARIMU_GRAY_MARKET_ENABLED).
+const grayMarketOn = () => (env as unknown as { HARIMU_GRAY_MARKET_ENABLED?: string }).HARIMU_GRAY_MARKET_ENABLED === 'true';
+const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';
@@ -160,7 +163,7 @@ export async function GET(request: Request) {
     aurellePlan: await readAurelleView(database,userId),
     election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true),...(accountLevel?{id:accountElectionId}:{})}:null,
     collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
-    korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000),{laborBureau:laborBureauOn()}),
+    korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000),korundOptions()),
     firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
     flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED) }, // #344: the UI hides Market entry points while this is false
     simulation,
@@ -247,15 +250,15 @@ async function handlePost(request: Request) {
     if (!validAurelleCommand(body)) return privateJson({error:'Use a valid request identifier, shift identifier and food quantity of 1 or 2.'},{status:400});
     const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000));
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),{laborBureau:laborBureauOn()}),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundOptions()),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (typeof body.action === 'string' && body.action.startsWith('korund-')) {
     if (!validKorundCommand(body)) return privateJson({error:'Use a valid work or request identifier.'},{status:400});
     const seconds=Math.floor(Date.parse(now)/1000);
-    const result=await executeKorund(database,userId,body,seconds,{laborBureau:laborBureauOn()});
+    const result=await executeKorund(database,userId,body,seconds,korundOptions());
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,seconds,{laborBureau:laborBureauOn()}),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,seconds,korundOptions()),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (body.action === 'government-petition') {
@@ -328,7 +331,7 @@ async function handlePost(request: Request) {
       simulation,verification:await readVerification(userId),
       government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null,
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
-      aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),{laborBureau:laborBureauOn()}),
+      aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundOptions()),
       economy:await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
     },{status:ok?200:409});
     const current=await readCurrent();

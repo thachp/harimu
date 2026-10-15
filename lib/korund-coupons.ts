@@ -24,10 +24,12 @@ export const korundCouponSpendSql=`COALESCE((SELECT SUM(price_minor) FROM korund
 
 // Coupons are bound to the redeeming citizen, the current game week and their own LN balance.
 // There is no transfer path: no other account can redeem them and past weeks are rejected.
-export const korundCouponRedeemSql=`INSERT OR IGNORE INTO korund_coupon_redemptions(id,clerk_user_id,game_week,coupon,item,quantity,price_minor,occurred_at)
+/** `laborNote` is the shared LN balance expression from lib/korund-wallet (laborNoteSql('?'), bind laborNoteBinds(userId) after the price).
+ * Passed in so this file keeps no runtime import and the one formula lives in one place. */
+export const korundCouponRedeemSql=(laborNote:string)=>`INSERT OR IGNORE INTO korund_coupon_redemptions(id,clerk_user_id,game_week,coupon,item,quantity,price_minor,occurred_at)
  SELECT ?,clerk_user_id,?,?,?,1,?,? FROM citizens WHERE clerk_user_id=? AND nation_id='korund'
  AND NOT EXISTS(SELECT 1 FROM korund_coupon_redemptions WHERE clerk_user_id=? AND game_week=? AND coupon=?)
- AND ?<=COALESCE((SELECT SUM(wage_minor) FROM korund_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(price_minor) FROM korund_coupon_redemptions WHERE clerk_user_id=?),0)`;
+ AND ?<=${laborNote}`; // the one shared LN formula (lib/korund-wallet): wages - coupons + gray-market trades; bind laborNoteBinds(userId) after the price
 
 export function buildCoupons(foodUsed:boolean,used:Set<string>,expiresAt:string):KorundCoupon[]{
  return [{kind:'food',...korundFoodCoupon,used:foodUsed,expiresAt},

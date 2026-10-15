@@ -34,6 +34,7 @@
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
     "HARIMU_LABOR_BUREAU_ENABLED": "false",
+    "HARIMU_GRAY_MARKET_ENABLED": "false",
     "HARIMU_KINDLE_INCOME_TAX_ENABLED": "false",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "false",

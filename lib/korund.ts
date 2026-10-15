@@ -2,6 +2,8 @@ import type {GameDatabase} from './database-contract';
 import {activeRationQueue,readRationQueue,executeRationQueue,queueIdentifierUsed,type RationQueue} from './korund-queue';
 import type { WorkShift } from './work-shifts';
 import { readBureau, setPreferences, requestAssignment, type BureauView } from './labor-bureau';
+import { laborNoteSql, laborNoteBinds } from './korund-wallet';
+import { readGray, postOffer, acceptOffer, type GrayView } from './gray-market';
 import {readCouponsAndQuota,korundCouponGoods,korundCouponRedeemSql,type KorundCoupon,type KorundQuota} from './korund-coupons';
 export const korundJob = {id:'korund-food-production',name:'State food-production brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4} as const;
 export const gameWeekSeconds = 50400;
@@ -40,13 +42,16 @@ export const korundMealSql = `INSERT OR IGNORE INTO korund_meals(id,clerk_user_i
 export type KorundPlan = { available:boolean; mode:'bounded state planning'; assignment:typeof korundJob;
  walletMinor:number;foodQuantity:number;publicFoodRemaining:number;publicFundMinor:number;
  gameWeek:number;couponFoodRemaining:number;couponExpiresAt:string;mealReadyAt:string|null;shifts:WorkShift[];queue?:RationQueue;
- coupons?:KorundCoupon[];quota?:KorundQuota;bureau?:BureauView;clothingQuantity?:number;goodsQuantity?:number };
-export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'|'korund-join-ration-queue'|'korund-cancel-ration-queue'|'korund-redeem-coupon'|'korund-set-preferences'|'korund-request-assignment'; requestId?:string;preferences?:string[];shiftId?:string;queueId?:string;coupon?:'clothing'|'goods';gameWeek?:number};
+ coupons?:KorundCoupon[];quota?:KorundQuota;bureau?:BureauView;gray?:GrayView;clothingQuantity?:number;goodsQuantity?:number };
+export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'|'korund-join-ration-queue'|'korund-cancel-ration-queue'|'korund-redeem-coupon'|'korund-set-preferences'|'korund-request-assignment'|'korund-gray-post-offer'|'korund-gray-accept-offer'; requestId?:string;amountMinor?:number;askRate?:number;offerId?:string;preferences?:string[];shiftId?:string;queueId?:string;coupon?:'clothing'|'goods';gameWeek?:number};
 const uuid=(v:unknown):v is string=>typeof v==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export function validKorundCommand(body:Record<string,unknown>):body is Record<string,unknown>&KorundCommand {
  // #235 (flag-gated at execution): preferences are three job ids; the assignment request carries only an id.
  if(body.action==='korund-set-preferences')return uuid(body.requestId)&&Array.isArray(body.preferences)&&Object.keys(body).every(k=>['action','requestId','preferences'].includes(k));
  if(body.action==='korund-request-assignment')return uuid(body.requestId)&&Object.keys(body).every(k=>['action','requestId'].includes(k));
+ // #43 (flag-gated at execution): a gray-market offer carries whole-number terms; accepting names the offer.
+ if(body.action==='korund-gray-post-offer')return uuid(body.requestId)&&Object.keys(body).every(k=>['action','requestId','amountMinor','askRate'].includes(k));
+ if(body.action==='korund-gray-accept-offer')return uuid(body.requestId)&&uuid(body.offerId)&&Object.keys(body).every(k=>['action','requestId','offerId'].includes(k));
  if(body.action==='korund-cancel-ration-queue')return uuid(body.requestId)&&uuid(body.queueId);
  if(body.action==='korund-redeem-coupon')return uuid(body.requestId)&&(body.coupon==='clothing'||body.coupon==='goods')&&(body.gameWeek===undefined||(Number.isInteger(body.gameWeek)&&Number(body.gameWeek)>=1))&&Object.keys(body).every(k=>['action','requestId','coupon','gameWeek'].includes(k));
  return body.action==='korund-claim-work' ? uuid(body.shiftId)&&(body.requestId===undefined||uuid(body.requestId)) : ['korund-start-work','korund-redeem-ration','korund-household-meal','korund-join-ration-queue'].includes(String(body.action)) && uuid(body.requestId);
@@ -59,7 +64,7 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number,options:{laborBureau?:boolean}={}):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{laborBureau?:boolean;grayMarket?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -67,22 +72,31 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  // the quota bar are read afterwards by readCouponsAndQuota (a separate round-trip; display only, never a guard).
  db.prepare(`SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) AS public_food,
  initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0) AS funds,
- COALESCE((SELECT SUM(wage_minor) FROM korund_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(price_minor) FROM korund_coupon_redemptions WHERE clerk_user_id=?),0) AS wallet,
+ ${laborNoteSql('?')} AS wallet,
  COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=?),0) AS food,
  EXISTS(SELECT 1 FROM korund_rations WHERE clerk_user_id=? AND game_week=?) AS coupon_used,
  (SELECT MAX(occurred_at) FROM korund_meals WHERE clerk_user_id=?) AS last_meal
- FROM korund_resources WHERE id='state'`).bind(userId,userId,userId,userId,userId,w.number,userId)
+ FROM korund_resources WHERE id='state'`).bind(...laborNoteBinds(userId),userId,userId,userId,w.number,userId)
  .first<{public_food:number;funds:number;wallet:number;food:number;coupon_used:number;last_meal:number|null}>(),
  db.prepare(`SELECT s.* FROM work_shifts s JOIN korund_work_starts k ON k.id=s.id WHERE s.clerk_user_id=? ORDER BY s.started_at DESC LIMIT 20`).bind(userId).all<{id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
  ]);
  const extra=await readCouponsAndQuota(db,userId,w.number,Boolean(ledger?.coupon_used),w.start,w.end);
  const bureau=options.laborBureau&&citizen?.nation_id==='korund'?{bureau:await readBureau(db,userId,now)}:{};
- return {...extra,...bureau,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
+ // #43: the gray market is in the plan only with HARIMU_GRAY_MARKET_ENABLED on, and only for a Korund citizen.
+ const gray=options.grayMarket&&citizen?.nation_id==='korund'?{gray:await readGray(db,userId,now)}:{};
+ return {...extra,...bureau,...gray,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{laborBureau?:boolean}={}) {
+export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{laborBureau?:boolean;grayMarket?:boolean}={}) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
+ if(command.action==='korund-gray-post-offer'||command.action==='korund-gray-accept-offer'){
+  // #43: the gray market ships off; with the flag off these actions are not found and change nothing.
+  if(!options.grayMarket)return {status:404,reason:'disabled',error:'Not found.'};
+  if(nation?.nation_id!=='korund')return {status:403,reason:'korund_only',error:'Korund citizenship required.'};
+  const requestId=command.requestId!.toLowerCase();
+  return command.action==='korund-gray-post-offer'?postOffer(db,userId,{amountMinor:command.amountMinor,askRate:command.askRate},requestId,now):acceptOffer(db,userId,command.offerId!.toLowerCase(),requestId,now);
+ }
  // An already-started shift may settle into its original LN ledger after a grace-period move.
  if(nation?.nation_id!=='korund' && command.action!=='korund-claim-work') return {status:409,error:'Korund citizenship required; previous balances remain in their original currency.'};
  if(command.action==='korund-set-preferences'||command.action==='korund-request-assignment'){
@@ -139,7 +153,7 @@ async function redeemCoupon(db:GameDatabase,userId:string,id:string,coupon:'clot
  const w=await week(db,now);const good=korundCouponGoods[coupon];
  // The client sends the week it displayed; an expired book must never spend the new week's coupon.
  if(shownWeek!==undefined&&shownWeek!==w.number)return {status:409,error:'Your coupon book expired at the weekly reset. Refresh to see this week’s coupons.'};
- await db.prepare(korundCouponRedeemSql).bind(id,w.number,coupon,good.item,good.priceMinor,now,userId,userId,w.number,coupon,good.priceMinor,userId,userId).run();
+ await db.prepare(korundCouponRedeemSql(laborNoteSql('?'))).bind(id,w.number,coupon,good.item,good.priceMinor,now,userId,userId,w.number,coupon,good.priceMinor,...laborNoteBinds(userId)).run();
  let receipt=await db.prepare('SELECT id FROM korund_coupon_redemptions WHERE id=? AND clerk_user_id=?').bind(id,userId).first();
  // Committed re-check (pattern from #47 ai-budget). Under Postgres READ COMMITTED, concurrent clothing and goods
  // redemptions can each pass the INSERT guard against the pre-insert balance. After commit, the later re-check
@@ -152,7 +166,8 @@ async function redeemCoupon(db:GameDatabase,userId:string,id:string,coupon:'clot
  return receipt?{status:200}:{status:409,error:`${good.label} unavailable: it was already used this game week or you need ${(good.priceMinor/100).toFixed(2)} LN.`};
 }
 
+/** The LN balance, from the one shared formula in lib/korund-wallet (wages - coupons + gray-market trades). */
 export async function korundLaborNoteBalance(db:GameDatabase,userId:string){
- const row=await db.prepare('SELECT COALESCE((SELECT SUM(wage_minor) FROM korund_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(price_minor) FROM korund_coupon_redemptions WHERE clerk_user_id=?),0) AS balance').bind(userId,userId).first<{balance:number}>();
+ const row=await db.prepare(`SELECT ${laborNoteSql('?')} AS balance`).bind(...laborNoteBinds(userId)).first<{balance:number}>();
  return Number(row?.balance??0);
 }
