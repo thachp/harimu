@@ -46,7 +46,7 @@ export const wearinessStrip={
  levelNames:{rising:'Rising',high:'High',severe:'Severe'} as Readonly<Record<WearinessLevel,string>>,
  tooltip:[
   L('Each game week at war adds Unrest. Losses and lost squares speed it up.'),
-  L('The longer a war goes on, the more Unrest it adds in all.'),
+  L('Each game week at war adds Unrest, so a longer war adds more in all.'),
  ],
  weekly:[
   L('Another week of war. Unrest rose by {amount}.'),

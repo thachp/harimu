@@ -96,7 +96,7 @@ test('unwired: nothing in app/, components/ or lib/ imports war-weariness-copy',
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-weariness-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/war-weariness-copy/, f);
 });
 test('QA3 fixes: the tooltip does not claim the weekly step grows; Kindle officials are weighing, not obliged; relief lines carry no weariness wording', () => {
-  assert.doesNotMatch(ST.tooltip[1].text,/each (game )?week|every (game )?week|faster|grows? (each|every)/i); assert.match(ST.tooltip[1].text,/in all/);
+  assert.doesNotMatch(ST.tooltip[1].text,/faster|more (each|every)|grows? (each|every)|longer a war goes on, the more/i); assert.match(ST.tooltip[1].text,/Each game week at war adds Unrest/); assert.match(ST.tooltip[1].text,/more in all/);
   assert.doesNotMatch(wearinessNewsFor('kindle').notices.high.body,/must|obliged|required/i); assert.match(wearinessNewsFor('kindle').notices.high.body,/weighing/);
   for (const l of RL) assert.doesNotMatch(l.text,/weari|weary/i,l.text);
 });
