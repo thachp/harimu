@@ -25,6 +25,7 @@ import { marketVisible } from '@/lib/market-visibility';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
+import { cityDestinations } from '@/lib/city-destinations';
 import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, nationForNavigation, identityHold, identityHoldTimeoutMs, readSignedInHint, viewedNationHeld, sceneUrl, isVisitorSession, viewedNationAfterLoad, type SceneView, type SignedInHint } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -1791,12 +1792,7 @@ export default function Home() {
         id: role.name, label: role.name, detail: role.controller,
       })) : viewMode === 'world' || viewMode === 'nation' ? worldNations.map(nation => ({
         id: nation.id, label: nation.shortName, selected: nation.id === selected.id, badge: nation.populationBand && populationBandLabel[nation.populationBand], detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
-      })) : viewMode === 'square' ? [
-        { id: 'household', label: 'Household', detail: 'Belongings and recovery', onSelect: () => changeView('household') },
-        { id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings', onSelect: () => changeView('workplace') },
-        ...(marketShown ? [{ id: 'market', label: citizenNation?.id === 'korund' ? 'State store' : 'Market', detail: citizenNation?.id === 'korund' ? 'Ration coupons and state food' : 'Goods and citizen listings', onSelect: () => changeView('market') }] : []),
-        { id: 'government', label: 'Government', detail: 'Policy and petitions', onSelect: () => changeView('government') },
-      ] : [];
+      })) : viewMode === 'square' ? cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown)).map(card => ({ ...card, onSelect: () => changeView(card.id) })) : [];
   const briefInventory = citizenNation?.id === 'aurelle' ? aurellePlan?.foodQuantity : citizenNation?.id === 'korund' ? korundPlan?.foodQuantity : economy ? goods('food') : undefined;
   const briefStorageKey = citizenNation ? `harimu:morning-brief:${citizenNation.id}` : null;
   // #73: headlines come from the same /api/news edition as the News panel, fetched only while the brief is open.
