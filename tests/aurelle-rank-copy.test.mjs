@@ -60,7 +60,8 @@ test('byline and badge: the gazette byline is the Court Gazette byline from the 
 test('the promotion notice is formal and short and does not speak for the Crown; the gazette is ornate and reports, naming no house, noble or claimant', () => {
   for (const l of PN) assert.doesNotMatch(l.text,/\b(Crown|Monarch|Majesty|decree|royal|realm|Herald)\b/i,l.text);
   for (const t of [...bodies(),...PG.map(g=>g.headline)]) assert.doesNotMatch(t,/\b(House|Highspire|Sieran|Vale|Duke|Count|Baroness)\b/,t);
-  assert.match(PG[0].body,/The court records/); assert.match(PG[1].body,/Word from the court/);
+  assert.match(PG[0].body,/^Court notice: /); assert.match(PG[1].body,/Word from the court/);
+  for (const t of all()) assert.doesNotMatch(t,/The court records/,t); // QA3 (#605): no echo of the press template's phrasing
 });
 test('calm and neutral: no urgency, pressure or flattery, no real-world peerage, title of honor or dated history', () => {
   for (const t of all()) {

@@ -59,7 +59,7 @@ test('the accents stay readable on the dark game bars in every colour view',()=>
  const bg=rgb('#0f2a33'),lum=c=>.2126*c[0]+.7152*c[1]+.0722*c[2];
  for(const id of ids)for(const kind of kinds){const ratio=(lum(view(id,kind))+.05)/(lum(bg)+.05);assert.ok(ratio>=3,`${id} accent contrast ${ratio.toFixed(2)} in ${kind}`);}
 });
-test('the symbols flag ships off and only the exact string "true" turns it on',async()=>{
+test('the symbols flag is on in preview, off in production, and only the exact string "true" turns it on',async()=>{
  assert.equal(nationSymbolsEnabled('true'),true);for(const value of [undefined,'false','','1','TRUE'])assert.equal(nationSymbolsEnabled(value),false);
- assert.match(await read('wrangler.jsonc'),/"NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "false"/);
+ assert.match(await read('wrangler.jsonc'),/"NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "true"/);assert.match(await read('wrangler.prod.jsonc'),/"NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "false"/);
 });
