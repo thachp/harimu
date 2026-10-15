@@ -11,10 +11,12 @@ import { nextDailyAction } from './daily-loop-choice';
 
 type Job = { id: string; name: string; cost: number; detail: string };
 export function DailyLoop({ nationName, supported, localDemo, view, economy, market, shifts, capacity,
-  jobs, busy, uncertain, onNavigate, onStart, onClaim, onBuyFood, onMeal, onRefresh }: {
+  jobs, busy, uncertain, marketOpen = true, onNavigate, onStart, onClaim, onBuyFood, onMeal, onRefresh }: {
   nationName: string; supported: boolean; localDemo: boolean; view: SceneView;
   economy: Economy | null; market: MarketState | null; shifts: WorkShift[]; capacity: number;
   jobs: Job[]; busy: boolean; uncertain: boolean;
+  /** #344: false while the market flag is off: no market prompts or food-buying step. */
+  marketOpen?: boolean;
   onNavigate: (view: SceneView) => void; onStart: (id: string) => void; onClaim: (id: string) => void;
   onBuyFood: (quantity: number) => void; onMeal: () => void; onRefresh: () => void;
 }) {
@@ -33,7 +35,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
   const mealFood = market?.mealFood ?? 2;
   const quote = market?.quotes.find(item => item.item === 'food');
   const quantity = Math.min(10, Math.max(1, mealFood - food));
-  const canBuy = Boolean(market?.available && quote && economy && quote.stock >= quantity && economy.walletMinor >= quote.buyMinor * quantity);
+  const canBuy = Boolean(marketOpen && market?.available && quote && economy && quote.stock >= quantity && economy.walletMinor >= quote.buyMinor * quantity);
   const mealReady = Boolean(market?.available && food >= mealFood && capacity < 24 && now > 0
     && (!market.mealReadyAt || Date.parse(market.mealReadyAt) <= now));
   const firstJob = jobs.find(job => job.id === 'harvest' && capacity >= job.cost) ?? jobs.find(job => capacity >= job.cost);
@@ -47,7 +49,7 @@ export function DailyLoop({ nationName, supported, localDemo, view, economy, mar
   if (supported && economy) {
     if ((nextAction === 'collect' || nextAction === 'waiting') && active) {
       title = readyToCollect ? 'Your wages and goods are ready' : `${active.orderName} is underway`;
-      detail = readyToCollect ? 'Collect the agreed reward once, then take your earnings to market.'
+      detail = readyToCollect ? (marketOpen ? 'Collect the agreed reward once, then take your earnings to market.' : 'Collect the agreed reward once.')
         : now ? `About ${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remain. Your shift continues while you are away.` : 'Checking the shift timer…';
       label = readyToCollect && view === 'workplace' ? 'Collect wages and goods' : 'Open work board';
       action = readyToCollect && view === 'workplace' ? () => onClaim(active.id) : () => onNavigate('workplace');

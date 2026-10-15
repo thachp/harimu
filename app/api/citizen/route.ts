@@ -10,6 +10,7 @@ import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/li
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
 import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket, shiftAnswerKey } from '@/lib/shift-quality-key';
+import { marketFlagOn } from '@/lib/market-visibility';
 import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
@@ -150,6 +151,7 @@ export async function GET(request: Request) {
     collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
     korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
     firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
+    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED) }, // #344: the UI hides Market entry points while this is false
     simulation,
     verification,
     economy: await readEconomy(database, userId, interval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),

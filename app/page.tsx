@@ -20,9 +20,10 @@ import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { FirstWeekTracker } from './first-week-tracker';
+import { marketVisible } from '@/lib/market-visibility';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
-import { firstWeekDay, visibleGoals, type WeekDay } from '@/lib/first-week';
-const visibleWeekDay = (day: WeekDay | null): WeekDay | null => day && {...day, goals: visibleGoals(day)};
+import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
+const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
 import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -443,6 +444,7 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
+  flags?: { market?: boolean };
   firstWeek?: { completed: string[] } | null;
   profile: {
     nationId: string | null;
@@ -608,6 +610,8 @@ export default function Home() {
   // First-week progress (#134): STUB store in this browser until server-side tracking (#135).
   const [weekDone, setWeekDone] = useState<{key:string;ids:string[]}>({key:'',ids:[]});
   const [serverWeekIds, setServerWeekIds] = useState<string[] | null>(null);
+  // #344: the server's market flag (HARIMU_ORDER_BOOK_ENABLED). Fails closed until the citizen snapshot says otherwise.
+  const [marketFlag, setMarketFlag] = useState(false);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -1134,7 +1138,9 @@ export default function Home() {
   }
 
   const startAurelleAction = (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void runAurelleCommand({ action, shiftId, quantity, requestId: crypto.randomUUID() });
-  function changeView(nextView: ViewMode) {
+  function changeView(requestedView: ViewMode) {
+    // #344: with the market flag off, nothing navigates to the Market scene (it falls back to the city square).
+    const nextView: ViewMode = requestedView === 'market' && !marketShown ? 'square' : requestedView;
     if (nextView !== 'world') stopTour();
     const nextNation = nextView === 'country' && !['world','country','nation'].includes(viewMode) && citizenNation ? citizenNation.id : selected.id;
     setSelectedId(nextNation);
@@ -1215,6 +1221,7 @@ export default function Home() {
     if ('election' in snapshot)setElection(snapshot.election??null);
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
+    if (snapshot.flags) setMarketFlag(snapshot.flags.market === true);
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
@@ -1500,10 +1507,12 @@ export default function Home() {
   const aurellePanel = <AurellePlanPanel plan={aurellePlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
     uncertain={Boolean(aurelleCommand || korundCommand || marketCommand || playerCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
     onCommand={startAurelleAction} onRetry={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }} onRefresh={() => void runWork('refresh-work')} />;
+  // #344: Korund's State store and Aurelle's royal store are not the flagged market. The local demo and guest sandbox have no server flag.
+  const marketShown = marketVisible(citizenNation?.id, marketFlag || !clerkConfigured || (citizenSessionStatus === 'anonymous' && guestMode));
   const dailyLoop = citizenNation?.id === 'aurelle' ? <>{priorShiftPanel}{aurellePanel}</> : citizenNation?.id === 'korund' ? <>{priorShiftPanel}{korundPanel}</> : priorNationShift ? priorShiftPanel : citizenNation && <DailyLoop nationName={citizenNation.shortName} supported={citizenNation.id === 'kindle'}
     localDemo={!clerkConfigured} view={viewMode} economy={economy} market={market} shifts={workShifts} capacity={capacity}
     jobs={availableWorkOrders.filter(order => !order.nationId || order.nationId === citizenNation.id)}
-    busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)} onNavigate={changeView}
+    busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)} marketOpen={marketShown} onNavigate={changeView}
     onStart={id => { const order = availableWorkOrders.find(item => item.id === id); if (order) void commitWork(order); }}
     onClaim={id => void runWork('claim-work', undefined, id)} onRefresh={() => void runWork('refresh-work')}
     onBuyFood={quantity => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side: 'buy', item: 'food', quantity })}
@@ -1524,7 +1533,7 @@ export default function Home() {
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
   const weekKey = citizenNation ? weekStoreKey : '';
-  const weekDayInfo = weekKey && citizenNation ? visibleWeekDay(firstWeekDay({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,firstLoopActive:Boolean(firstLoop)})) : null;
+  const weekDayInfo = weekKey && citizenNation ? visibleWeekDay(firstWeekDay({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,firstLoopActive:Boolean(firstLoop)}), marketShown) : null;
   const weekDayStart = weekDayInfo ? Date.parse(citizenshipStatus?.enrolledAt ?? '') + (weekDayInfo.day - 1) * 86400000 : 0;
   const weekStored = weekDone.key===weekKey ? [...new Set([...weekDone.ids, ...(clerkConfigured ? serverWeekIds ?? [] : [])])] : [];
   const weekTrack = !firstLoop && weekDayInfo ? firstWeekTracker({day:weekDayInfo,done:weekStored,signals:{shifts:[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])],dayStart:weekDayStart,
@@ -1611,9 +1620,10 @@ export default function Home() {
             reason={pendingActionReason(workPending, Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)) ?? firstActionReason([hasActiveShift, 'Finish and collect your active shift first.'], [capacity < order.cost, `You need ${order.cost} WC. Prepare a meal or wait for recovery.`])} onClick={() => void commitWork(order)}>
             <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${describeKindlePay(rewards[order.id].wageMinor, economy?.incomeTaxPercent ?? 0)} + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></ActionButton>)}
         {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length === 0 && <p>No shifts are available for this nation yet. Kindle has the first supported work and wage programme; other national workplaces are planned.</p>}
-        </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
+        </section>{marketShown && <button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>}
       </>}
-      {viewMode === 'market' && !['korund','aurelle'].includes(citizenNation.id) && <>
+      {viewMode === 'market' && !marketShown && <section className="scene-market-closed"><h2>Market</h2><p>The market is not open yet. Work a shift and check back soon.</p></section>}
+      {viewMode === 'market' && marketShown && !['korund','aurelle'].includes(citizenNation.id) && <>
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
@@ -1732,7 +1742,7 @@ export default function Home() {
       })) : viewMode === 'square' ? [
         { id: 'household', label: 'Household', detail: 'Belongings and recovery', onSelect: () => changeView('household') },
         { id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings', onSelect: () => changeView('workplace') },
-        { id: 'market', label: citizenNation?.id === 'korund' ? 'State store' : 'Market', detail: citizenNation?.id === 'korund' ? 'Ration coupons and state food' : 'Goods and citizen listings', onSelect: () => changeView('market') },
+        ...(marketShown ? [{ id: 'market', label: citizenNation?.id === 'korund' ? 'State store' : 'Market', detail: citizenNation?.id === 'korund' ? 'Ration coupons and state food' : 'Goods and citizen listings', onSelect: () => changeView('market') }] : []),
         { id: 'government', label: 'Government', detail: 'Policy and petitions', onSelect: () => changeView('government') },
       ] : [];
   const briefInventory = citizenNation?.id === 'aurelle' ? aurellePlan?.foodQuantity : citizenNation?.id === 'korund' ? korundPlan?.foodQuantity : economy ? goods('food') : undefined;
