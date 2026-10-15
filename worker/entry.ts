@@ -10,6 +10,8 @@ import { runTownHallCron } from '../lib/town-hall-ai';
 import { runDebateCron } from '../lib/debate-ai';
 import { runSparkCron } from '../lib/spark-supply';
 import { runLedgerReconciliationCron } from '../lib/ledger-reconciliation';
+import { runTesseraRewardCron } from '../lib/tessera-rewards';
+import { readVerification } from '../lib/verification';
 import { presenceSocketPath, presenceUpgrade, type PresenceEnv } from '../lib/city-presence';
 export { CityPresence } from './city-presence';
 
@@ -41,6 +43,9 @@ const worker = {
     // #432: daily ledger reconciliation (read-only on money, one report per game day); a no-op unless HARIMU_LEDGER_RECONCILIATION_ENABLED="true". Never runs on a read.
     ctx.waitUntil((async () => runLedgerReconciliationCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_LEDGER_RECONCILIATION_ENABLED?: string }).HARIMU_LEDGER_RECONCILIATION_ENABLED === 'true' }))()
       .then(() => undefined, error => { console.warn('[cron] Ledger reconciliation failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #465: earned-Tessera epoch close (one entry per verified settled shift, pro-rata from a fixed daily pool); a no-op unless HARIMU_TESSERA_REWARDS_ENABLED="true" (default "false"). Idempotent; never runs on a read.
+    ctx.waitUntil((async () => runTesseraRewardCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_TESSERA_REWARDS_ENABLED?: string }, async userId => (await readVerification(userId)).countedActionsEligible))()
+      .then(() => undefined, error => { console.warn('[cron] Tessera reward epoch close failed', error instanceof Error ? error.name : 'unknown'); }));
   },
 };
 export default worker;

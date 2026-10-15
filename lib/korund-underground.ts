@@ -9,8 +9,8 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation } from './db-errors';
 import { capitalCityForNation, cityForNation } from './cities';
 import { korundUndergroundCopy as copy } from './faith-copy';
-import { suspicionIndicator } from './korund-suspicion-copy';
-import { isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionWord, pickIndex, raidDue, raidId, undergroundConfig as cfg, undergroundGameDay } from './underground-rules';
+import { correctionDuty, dutyEnded, suspicionIndicator } from './korund-suspicion-copy';
+import { appealGranted, deriveDuties, dutyDays, isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionWord, pickIndex, raidDue, raidId, undergroundConfig as cfg, undergroundGameDay } from './underground-rules';
 
 export * from './underground-rules';
 
@@ -30,6 +30,14 @@ export const undergroundSchemas = [
  devotion_hit INTEGER NOT NULL CHECK(devotion_hit BETWEEN 0 AND 10),
  PRIMARY KEY(raid_id, user_id)
 )`,
+  `CREATE TABLE IF NOT EXISTS korund_duty_appeals (
+ user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+ duty_started_at INTEGER NOT NULL,
+ appealed_at INTEGER NOT NULL,
+ granted INTEGER NOT NULL CHECK(granted IN (0,1)),
+ request_id TEXT NOT NULL UNIQUE,
+ PRIMARY KEY(user_id, duty_started_at)
+)`, // #382 PR B (migration 0056)
   'CREATE INDEX IF NOT EXISTS idx_korund_raids_at ON korund_raids(raided_at)',
   'CREATE INDEX IF NOT EXISTS idx_korund_raid_hits_user ON korund_raid_hits(user_id, raided_at)',
 ];
@@ -79,29 +87,85 @@ export async function undergroundHits(db: GameDatabase, userId: string, since: n
   } catch (error) { if (isMissingRelation(error)) return []; throw error; }
 }
 
-/** Private to the holder (#382). `repeat`: the holder was also found within the 30-day repeat window before this inspection (the repeat notice). `discoveries`: how many inspections found them since they chose this faith.
- *  `suspicion`: the private indicator, a label and a band word only (never the number); null while Suspicion is 0. */
-export type UndergroundView = { lastRaid: { at: number; text: string; devotionNote: string; repeat: boolean; discoveries: number } | null; quietWeek: string | null; suspicion: { line: string; privateTag: string; tooltip: string[] } | null };
-/** What a hidden-faith holder sees (private, derived on read). A recent inspection of them shows the existing "found a shrine" notice and the Devotion note;
- *  otherwise a quiet-week line when their city has had no inspection this week. */
-export async function readUndergroundView(db: GameDatabase, userId: string, cityId: string, since: number, now: number): Promise<UndergroundView> {
-  const recentFrom = now - cfg.recentSeconds, none = { lastRaid: null, quietWeek: null, suspicion: null };
+/** Appeal wording is the server's: the Content copy in lib/korund-suspicion-copy.ts says appeals are decided "by staff", but docs 8.18 and ARC rule an automatic decision, so these lines say that.
+ *  [Placeholder wording; Content to review on the PR.] */
+const appealLines = {
+  explainer: 'Correction Duty can be appealed once. The result is decided automatically.',
+  granted: 'Your appeal was decided automatically. Correction Duty is lifted.',
+  denied: 'Your appeal was decided automatically. Correction Duty stands.',
+} as const;
+
+/** Private to the holder (#382). `repeat`: the holder was also found within the 30-day repeat window before this inspection (the repeat notice).
+ *  `suspicion`: the private indicator, a label and a band word only (never the number); null while Suspicion is 0.
+ *  `duty` (PR B): the current Correction Duty, or the automatic appeal result that just lifted one; null otherwise. Days left is a string with its unit, never a timestamp. */
+export type DutyView = { active: boolean; label: string; banner: string | null; daysLeft: string | null; lines: string[]; appeal: { available: boolean; explainer: string; status: 'granted' | 'denied' | null; statusLine: string | null } };
+export type UndergroundView = { lastRaid: { at: number; text: string; devotionNote: string; repeat: boolean } | null; quietWeek: string | null; suspicion: { line: string; privateTag: string; tooltip: string[] } | null; duty: DutyView | null };
+
+type Appeal = { granted: boolean; appealedAt: number };
+/** The holder's stored discovery times and appeals, and the Correction Duties derived from them (#382). Everything is derived on read; only appeals are stored (migration 0056). */
+async function loadDuties(db: GameDatabase, userId: string) {
+  const times = (await db.prepare('SELECT raided_at FROM korund_raid_hits WHERE user_id=? ORDER BY raided_at').bind(userId).all<{ raided_at: number }>()).results.map(r => Number(r.raided_at));
+  const appeals = new Map<number, Appeal>();
   try {
-    // #382: every stored discovery of this citizen, whatever faith they chose at the time (re-choosing a faith resets nothing). Suspicion and the repeat flag are derived from these on read.
-    const times = (await db.prepare('SELECT raided_at FROM korund_raid_hits WHERE user_id=? ORDER BY raided_at').bind(userId).all<{ raided_at: number }>()).results.map(r => Number(r.raided_at));
-    const level = suspicionLevel(times, now), band = suspicionBand(level);
+    for (const r of (await db.prepare('SELECT duty_started_at,appealed_at,granted FROM korund_duty_appeals WHERE user_id=?').bind(userId).all<{ duty_started_at: number; appealed_at: number; granted: number }>()).results)
+      appeals.set(Number(r.duty_started_at), { granted: Number(r.granted) === 1, appealedAt: Number(r.appealed_at) });
+  } catch (error) { if (!isMissingRelation(error)) throw error; } // a database without 0056 has no appeals
+  return { times, appeals, duties: deriveDuties(times) };
+}
+const lifted = (appeal: Appeal | undefined) => appeal?.granted === true;
+function dutyView(duties: { startAt: number; endsAt: number }[], appeals: Map<number, Appeal>, now: number): DutyView | null {
+  const latest = duties[duties.length - 1];
+  if (!latest) return null;
+  const appeal = appeals.get(latest.startAt), status = appeal ? (appeal.granted ? 'granted' as const : 'denied' as const) : null;
+  const appealView = { available: !appeal, explainer: appealLines.explainer, status, statusLine: status ? appealLines[status] : null };
+  if (latest.endsAt > now && !lifted(appeal)) return { active: true, label: correctionDuty.label, banner: correctionDuty.banner.text, daysLeft: correctionDuty.daysLeft.replace('{days}', String(Math.max(1, Math.ceil((latest.endsAt - now) / 86400)))), lines: [correctionDuty.cap.text, correctionDuty.playable.text], appeal: appealView };
+  if (appeal && lifted(appeal) && now - appeal.appealedAt < cfg.recentSeconds) return { active: false, label: correctionDuty.label, banner: null, daysLeft: null, lines: [dutyEnded.system.text], appeal: appealView };
+  return null;
+}
+/** Devotion (social standing) is the only effect of a Correction Duty: 1 point per duty day, taken at its start, none if an appeal lifted it. Dated negative events for the Devotion derivation. */
+export async function dutyDevotionEvents(db: GameDatabase, userId: string): Promise<{ day: number; amount: number }[]> {
+  try {
+    const { duties, appeals } = await loadDuties(db, userId);
+    return duties.filter(d => !lifted(appeals.get(d.startAt))).map(d => ({ day: undergroundGameDay(d.startAt), amount: -dutyDays(d) * cfg.dutyDevotionPerDay }));
+  } catch (error) { if (isMissingRelation(error)) return []; throw error; }
+}
+
+/** What a hidden-faith holder sees (private, derived on read). A recent inspection of them shows the first or repeat "found a shrine" notice and the Devotion note;
+ *  otherwise a quiet-week line when their city has had no inspection this week. Plus the private Suspicion band and any Correction Duty. */
+export async function readUndergroundView(db: GameDatabase, userId: string, cityId: string, since: number, now: number): Promise<UndergroundView> {
+  const recentFrom = now - cfg.recentSeconds, none = { lastRaid: null, quietWeek: null, suspicion: null, duty: null };
+  try {
+    // #382: every stored discovery of this citizen, whatever faith they chose at the time (re-choosing a faith resets nothing). Suspicion, the repeat flag and duties are derived from these on read.
+    const { times, appeals, duties } = await loadDuties(db, userId);
+    const level = suspicionLevel(times, now), band = suspicionBand(level), duty = dutyView(duties, appeals, now);
     const suspicion = band === 'none' ? null : { line: suspicionIndicator.levelLine.replace('{level}', suspicionWord[band]), privateTag: suspicionIndicator.privateTag, tooltip: suspicionIndicator.tooltip.map(t => t.text) };
     let index = -1; times.forEach((at, i) => { if (at >= since && at >= recentFrom) index = i; });
     if (index >= 0) {
-      // docs 14.6: a first discovery adds Suspicion only; a repeat (also found within the last 30 real days) is the one that may lead to Correction Duty.
+      // docs 14.6: a first discovery adds Suspicion only; a repeat (also found within the last 30 real days) is the one that starts Correction Duty.
       const repeat = isRepeatDiscovery(index > 0 ? times[index - 1] : null, times[index]);
-      return { lastRaid: { at: times[index], text: copy.discovery[repeat ? 'repeat' : 'first'].text, devotionNote: copy.raidResult.devotionNote.text, repeat, discoveries: index + 1 }, quietWeek: null, suspicion };
+      return { lastRaid: { at: times[index], text: copy.discovery[repeat ? 'repeat' : 'first'].text, devotionNote: copy.raidResult.devotionNote.text, repeat }, quietWeek: null, suspicion, duty };
     }
     const cityRaid = await db.prepare('SELECT id FROM korund_raids WHERE city_id=? AND raided_at>=? LIMIT 1').bind(cityId, recentFrom).first<{ id: string }>();
-    if (cityRaid) return { ...none, suspicion };
+    if (cityRaid) return { ...none, suspicion, duty };
     const line = copy.quietWeek[pickIndex(`${userId}:${undergroundGameDay(now)}`, copy.quietWeek.length)];
-    return { lastRaid: null, quietWeek: fillCity(line.text, cityId), suspicion };
+    return { lastRaid: null, quietWeek: fillCity(line.text, cityId), suspicion, duty };
   } catch (error) { if (!isMissingRelation(error)) throw error; return none; }
+}
+
+/** The holder's one automatic appeal of their current Correction Duty (docs 8.18: automatic rule, decided at once). Idempotent per request id; refuses with no active duty or a second appeal for the same duty. */
+export async function appealCorrectionDuty(db: GameDatabase, userId: string, requestId: string, now: number):
+  Promise<{ ok: true; granted: boolean; text: string; replay: boolean } | { ok: false; status: 409; reason: string; error: string }> {
+  const prior = await db.prepare('SELECT user_id,granted FROM korund_duty_appeals WHERE request_id=?').bind(requestId).first<{ user_id: string; granted: number }>();
+  if (prior) return prior.user_id === userId ? { ok: true, granted: Number(prior.granted) === 1, text: appealLines[Number(prior.granted) === 1 ? 'granted' : 'denied'], replay: true } : { ok: false, status: 409, reason: 'request_reused', error: 'That request id was already used.' };
+  const { times, appeals, duties } = await loadDuties(db, userId);
+  const duty = duties[duties.length - 1];
+  if (!duty || duty.endsAt <= now || lifted(appeals.get(duty.startAt))) return { ok: false, status: 409, reason: 'no_duty', error: 'You are not on Correction Duty.' };
+  if (appeals.has(duty.startAt)) return { ok: false, status: 409, reason: 'already_appealed', error: 'You have already appealed this Correction Duty.' };
+  const granted = appealGranted(times, duty.startAt);
+  await db.batch([db.prepare('INSERT INTO korund_duty_appeals (user_id,duty_started_at,appealed_at,granted,request_id) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING').bind(userId, duty.startAt, now, granted ? 1 : 0, requestId)]);
+  const saved = await db.prepare('SELECT user_id FROM korund_duty_appeals WHERE request_id=?').bind(requestId).first<{ user_id: string }>();
+  if (!saved) return { ok: false, status: 409, reason: 'already_appealed', error: 'You have already appealed this Correction Duty.' };
+  return { ok: true, granted, text: appealLines[granted ? 'granted' : 'denied'], replay: false };
 }
 
 /** The citizen's city for raids: their home city, or the Korund capital when no location row exists. */
