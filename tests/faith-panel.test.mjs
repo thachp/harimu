@@ -13,7 +13,7 @@ import { worshipCopy } from '../lib/worship-copy.ts';
 
 const { FaithPanel, HolidayBanner } = await loadApp('faith-panel');
 const noop = () => {};
-const api = (faith, congregations = null, extra = {}) => ({ faith, congregations, busy: false, message: '', error: '', chooseFaith: noop, attendWorship: noop, joinFestival: noop, congregation: noop, ...extra });
+const api = (faith, congregations = null, extra = {}) => ({ faith, congregations, busy: false, message: '', error: '', chooseFaith: noop, attendWorship: noop, worshipUnderground: noop, joinFestival: noop, congregation: noop, ...extra });
 const text = html => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&apos;/g, "'").replace(/\s+/g, ' ');
 const daySec = 7200, year = 360;
 async function runtime(t) { const r = await localRuntime(); t.after(() => r.close()); r.setFaith(true); return r; }
@@ -159,4 +159,15 @@ test('page wiring: faith UI is mounted once, off the guest demo, and the clock m
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), shell = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
   assert.match(page, /useFaith\(Boolean\(citizenNation\) && !guestActive\)/); assert.equal((page.match(/<FaithPanel /g) ?? []).length, 1); assert.match(page, /holidayName=\{faithApi\.faith\?\.holiday\?\.name \?\? null\}/);
   assert.match(shell, /game-clock-holiday/);
+});
+
+test('#295 Korund hidden-faith holder: a quiet private button and the inspection notice; no banner, no faith named', () => {
+  const underground = { faithId: 'open-hand', label: 'Worship quietly', worshippedToday: false, blockedReason: null, nextAt: null, confirmation: 'You worshipped in private. Nothing is posted.',
+    lastRaid: { at: 1, text: 'An inspection found a shrine. Suspicion was recorded.', devotionNote: 'Your Devotion fell a little.' }, quietWeek: null };
+  const html = renderToStaticMarkup(React.createElement(FaithPanel, { api: api({ ...faithState({ nation: 'korund' }), underground }) })), t = text(html);
+  assert.match(html, /<button[^>]*>Worship quietly<\/button>/); assert.ok(t.includes('An inspection found a shrine. Suspicion was recorded. Your Devotion fell a little.'));
+  assert.doesNotMatch(html, /<button[^>]*disabled=""[^>]*>Worship quietly/);
+  const done = renderToStaticMarkup(React.createElement(FaithPanel, { api: api({ ...faithState({ nation: 'korund' }), underground: { ...underground, lastRaid: null, worshippedToday: true, blockedReason: 'You have already worshipped today. Try again tomorrow.' } }) }));
+  assert.match(done, /<button[^>]*disabled=""[^>]*>Worship quietly/); assert.ok(text(done).includes('You have already worshipped today. Try again tomorrow.'));
+  assert.ok(!renderToStaticMarkup(React.createElement(FaithPanel, { api: api(faithState({ nation: 'korund' })) })).includes('Worship quietly'), 'no underground block for a citizen without a hidden faith');
 });

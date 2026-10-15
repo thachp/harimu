@@ -10,6 +10,7 @@ import { runKorundPresidium } from './korund-presidium';
 import { runNpcSupply } from './npc-supply';
 import { holidayNationsOn } from './festivals';
 import { readWars, type WarState } from './war'; // #309
+import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
 export const tickSeconds = 7200;
@@ -95,6 +96,8 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   if (options.kindleAssembly) await runKindleAssembly(db, now, options.kindleAssembly).catch(error => { console.warn('[world] Assembly tick failed', error instanceof Error ? error.name : 'unknown'); });
   // #70: Korund emergency Presidium session and succession, only while HARIMU_KORUND_PRESIDIUM_ENABLED is on (write paths only).
   if (options.korundPresidium) await runKorundPresidium(db, now);
+  // #295: Korund underground inspections (capped), only while HARIMU_FAITH_ENABLED is on (write paths only).
+  if (options.faithFestivals) await runKorundRaids(db, now).catch(error => { console.warn('[world] Korund inspection tick failed', error instanceof Error ? error.name : 'unknown'); });
   return readWorldSimulation(db, now, { war: options.war });
 
 }
