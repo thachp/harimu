@@ -24,7 +24,7 @@ import { getDatabase } from '@/lib/db';
 import { travelBlock } from '@/lib/travel';
 import { checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
 import { qaTestCitizenAllowed, qaTestNationSql } from '@/lib/qa-tools';
-import { isLiveNation } from '@/lib/nation-discovery'; // #485
+import { nationPlayable } from '@/lib/nation-openings'; // #485, #489
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
@@ -314,7 +314,7 @@ async function handlePost(request: Request) {
   if (body.action === 'qa-test-nation') {
     if (!qaTestCitizenAllowed(env as never, userId)) return privateJson({ error: 'Not found.' }, { status: 404 });
     const nationId = typeof body.nationId === 'string' ? body.nationId : '';
-    if (!isLiveNation(nationId)) return privateJson({ error: 'Choose kindle, korund or aurelle.' }, { status: 400 });
+    if (!nationPlayable(nationId, env as never, userId)) return privateJson({ error: 'Choose a nation that is open to you.' }, { status: 400 });
     const result = await database.prepare(qaTestNationSql).bind(nationId, now, userId).run();
     if (!result.meta.changes) return privateJson({ error: 'Enroll in any nation first.' }, { status: 409 });
     return privateJson({ ok: true, nationId, qa: true });
@@ -340,7 +340,8 @@ async function handlePost(request: Request) {
     // A repeated choice has no further effect, including after an uncertain response.
     if (current?.nation_id===nationId) return response(current,true);
     // #485: only playable nations can be enrolled in. A direct POST used to enroll a citizen in any seeded nation (the Coming soon gate was client-side only). Refused before any write.
-    if (!isLiveNation(nationId)) return privateJson({ error: 'That nation is not open yet.', reason: 'not_playable' }, { status: 403 });
+    // #489: the same helper as the QA switch; a flag-on nation is open only to a QA-allowlisted account.
+    if (!nationPlayable(nationId, env as never, userId)) return privateJson({ error: 'That nation is not open yet.', reason: 'not_playable' }, { status: 403 });
     if ((current?.nation_id??null)!==body.expectedNationId) return response(current,false,'Citizenship changed since this form was opened. Refresh and review your current nation before confirming another choice.');
     if (!current?.nation_id) {
       await database.batch([
