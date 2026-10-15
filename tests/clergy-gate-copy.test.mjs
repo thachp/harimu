@@ -22,7 +22,7 @@ test('faith-neutral, social only, no real-world references', () => {
   assert.doesNotMatch(t,/wage|production|output|price|combat|weapon|attack|reward|bonus|Kinward|Fair-Wind|Open Hand|Hearth|Notable/i);
   assert.doesNotMatch(t,/\b(Christian|Muslim|Jewish|Hindu|Buddhist|church|priest|bishop|Earth)\b/i);
 });
-test('unwired: nothing in app/ or components/ imports clergy-gate-copy', () => {
+test('wired only into the faith panel (#280): nothing else in app/ or components/ imports clergy-gate-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/clergy-gate-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/faith-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/clergy-gate-copy/, f);
 });

@@ -66,7 +66,7 @@ export type FallbackLine={candidateId:string;text:string;pledges:readonly string
 const fb=(candidateId:string,pledges:string[],text:string):FallbackLine=>({candidateId,text,pledges,proposal:true});
 export const fallbackLines:readonly FallbackLine[]=[
  fb('ines-varro',['jobs-full-employment'],'{candidate}\'s live answer is unavailable. Platform card: "A job for every Resident who wants one".'),
- fb('tobin-achterberg',['tax-lower-income','trade-open-markets'],'{candidate}\'s live answer is unavailable. Platform card: "Lower the income tax", "Open the markets to every trader".'),
+ fb('tobin-achterberg',['tax-lower-income','trade-open-markets'],'{candidate}\'s live answer is unavailable. Platform card: "Lower income tax to 20%", "Open the markets to every trader".'),
  fb('mara-quell',['housing-public','frontier-docks'],'{candidate}\'s live answer is unavailable. Platform card: "Build public housing", "Build new docks at Brasswell Port".'),
 ];
 export const fallbackNotice:Line=L('Live AI answers are unavailable right now, so each candidate\'s platform card is shown instead.');

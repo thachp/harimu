@@ -54,6 +54,7 @@ import { validPlayerCommand, type PlayerCommand, type PlayerMarketState } from '
 import { CitizenMarket } from './citizen-market';
 import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
+import { FaithPanel, HolidayBanner, useFaith } from './faith-panel';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
@@ -1536,6 +1537,7 @@ export default function Home() {
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;
+  const faithApi = useFaith(Boolean(citizenNation) && !guestActive); // #280: renders nothing while HARIMU_FAITH_ENABLED is off
   useEffect(() => {
     if (!tourOpen || guestAllowed) return;
     const frame = requestAnimationFrame(stopTour);
@@ -1564,7 +1566,9 @@ export default function Home() {
     </div> : <>
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</ActionButton></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</ActionButton></div>}
+      {(viewMode === 'household' || viewMode === 'workplace') && <HolidayBanner faith={faithApi.faith} busy={faithApi.busy} onJoin={faithApi.joinFestival} />}
       {viewMode === 'household' && <>
+        <FaithPanel api={faithApi} />
         {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
         <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
@@ -1756,7 +1760,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? 'Country travel' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
