@@ -13,6 +13,7 @@ import { holidayNationsOn } from './festivals';
 import { readWars, type WarState } from './war'; // #309
 import { readTreaties, runDiplomacy, type TreatyState } from './diplomacy'; // #308
 import { readEmbargoes, runEmbargo, type EmbargoState } from './embargo'; // #363
+import { readReserveBoard, type ReserveBoard } from './spark-supply'; // #431
 import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 
@@ -51,10 +52,10 @@ export type WorldClock = {
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
 export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecution | null;
-  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; treaties?: TreatyState; embargoes?: EmbargoState };
+  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; treaties?: TreatyState; embargoes?: EmbargoState; reserve?: ReserveBoard };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
@@ -107,14 +108,14 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   if (options.diplomacy) await runDiplomacy(db, now).catch(error => { console.warn('[world] diplomacy tick failed', error instanceof Error ? error.name : 'unknown'); });
   // #363: embargoes (decide proposals), only while HARIMU_EMBARGO_ENABLED is on (write paths only).
   if (options.embargo) await runEmbargo(db, now).catch(error => { console.warn('[world] embargo tick failed', error instanceof Error ? error.name : 'unknown'); });
-  return readWorldSimulation(db, now, { war: options.war, diplomacy: options.diplomacy, embargo: options.embargo });
+  return readWorldSimulation(db, now, { war: options.war, diplomacy: options.diplomacy, embargo: options.embargo, reserve: options.reserve });
 
 }
 
 /** #205: the same snapshot advanceWorld returns, computed without any write. Due-but-unprocessed ticks show as
  *  pendingTicks; the next write path (or GET /api/world) processes them. */
 /** #309: `war` (HARIMU_WAR_ENABLED) adds the derived war state; with it off nothing is queried or returned. */
-export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { war?: boolean; diplomacy?: boolean; embargo?: boolean } = {}): Promise<SimulationState> {
+export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { war?: boolean; diplomacy?: boolean; embargo?: boolean; reserve?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
   const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
@@ -131,5 +132,5 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation'},
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:await readWars(db,now)}:{}),...(options.diplomacy?{treaties:await readTreaties(db,now)}:{}),...(options.embargo?{embargoes:await readEmbargoes(db)}:{})};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:await readWars(db,now)}:{}),...(options.diplomacy?{treaties:await readTreaties(db,now)}:{}),...(options.embargo?{embargoes:await readEmbargoes(db)}:{}),...(options.reserve?{reserve:await readReserveBoard(db,now)}:{})};
 }
