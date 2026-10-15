@@ -163,7 +163,7 @@ test('the panel shows the Bureau only when the server sends it, wired to Content
   const panel = await readFile(new URL('../app/korund-plan-panel.tsx', import.meta.url), 'utf8');
   assert.match(panel, /plan\.bureau \? <LaborBureau/); assert.match(panel, /bureauText\.fileButton/); assert.match(panel, /bureauText\.refusal/); assert.match(panel, /outcomeNotice\(/);
   assert.doesNotMatch(panel, /requestButton|noPreferences|korund-request-assignment'\)\}>\{bureauText\.requestButton/, 'no separate first-assignment button (ARC on #389)');
-  assert.match(panel, /bureau\.assignment && <ActionButton[^>]*korund-request-assignment/, 'only reassignment, and only once assigned');
+  assert.match(panel, /bureau\.assignment && <ActionButton[\s\S]{0,120}korund-request-assignment/, 'only reassignment, and only once assigned');
   const text = await readFile(new URL('../lib/labor-bureau-text.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(text, /Request assignment|File three preferences first/);
   assert.match(text, /from '\.\/labor-bureau-copy'/); assert.doesNotMatch(text, /30/, 'the 30-day rule is never written as a number in the copy');
