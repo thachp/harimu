@@ -24,7 +24,7 @@ test('#379: a visitor sees "VISITOR PREVIEW", a citizen (or a citizen still load
   assert.match(text(render({...panelProps,visitorSession:true,localDemo:true})),/VISITOR PREVIEW/);
   const citizen=text(render({...panelProps,visitorSession:true,citizenNation:{id:'kindle',name:'Kindle'}}));
   assert.match(citizen,/CITIZEN LIFE/);assert.doesNotMatch(citizen,/VISITOR PREVIEW/);
-  const loading=text(render({...panelProps,identityLoading:true}));
+  const loading=text(render({...panelProps,identityHold:'loading'}));
   assert.match(text(render({...panelProps})),/CITIZEN LIFE/,'default is citizen wording');
   assert.match(loading,/CITIZEN LIFE/);assert.doesNotMatch(loading,/VISITOR PREVIEW/);
   assert.match(text(render({...panelProps,view:'world'})),/NATION INSPECTION/,'inspection views are unchanged for everyone');
