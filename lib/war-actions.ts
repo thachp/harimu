@@ -7,6 +7,7 @@ import { declareWar, endWar } from './war';
 import { isWarNation, requestIdOk, warNationNames, type WarNationId } from './war-rules';
 import { authorizeWarRole, bearerMatches, isWarEndKind, warAuthority, type WarEndRequestKind } from './war-authority';
 import { leaderPersonas } from './leader-personas';
+import { resolveCityAssault } from './siege-actions'; // #419
 
 const fail = (status: 400 | 401 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 const disabled = () => fail(403, 'disabled', 'War is not open yet.');
@@ -102,5 +103,6 @@ export async function handleWarCommand(db: GameDatabase, input: WarCommandInput)
   if (body.action === 'declare') return declareByAuthority(db, { ...base, defender: text(body.defender, 20), casusBelli: typeof body.casusBelli === 'string' ? body.casusBelli : undefined, declaredBy: typeof body.declaredBy === 'string' ? body.declaredBy : undefined }, now, true);
   if (body.action === 'propose-end') return proposeEnd(db, { ...base, warId: text(body.warId, 80), kind: text(body.kind, 20) }, now, true);
   if (body.action === 'accept-end') return acceptEnd(db, { ...base, warId: text(body.warId, 80) }, now, true);
-  return fail(400, 'bad_request', 'Send action "declare", "propose-end" or "accept-end".');
+  if (body.action === 'assault') return resolveCityAssault(db, { nation: base.nation, warId: text(body.warId, 80), cityKind: text(body.cityKind, 20), cityId: text(body.cityId, 80), requestId: base.requestId }, now, true); // #419: one successful city assault (siege PoC)
+  return fail(400, 'bad_request', 'Send action "declare", "propose-end", "accept-end" or "assault".');
 }
