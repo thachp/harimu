@@ -9,7 +9,7 @@ import { AiBadge, AiTextTag } from './ai-disclosure';
 
 /** #613: the succession line (HARIMU_AURELLE_SUCCESSION_ENABLED; the server sends `succession` only then). [ASSUMPTION] placeholder strings for the Aurelle succession copy companion; in-file so this component loads under plain Node. */
 const successionStatus={reigning:'The Monarch reigns.',ailing:'The Monarch is ailing.',vacant:'The throne stands vacant.',acceded:'The heir has acceded.',abdicated:'The Monarch has abdicated.'} as const;
-const successionLine=(s:NonNullable<GovernmentSnapshot['succession']>)=>`${successionStatus[s.status]} ${s.heir?`${s.heir.named?'Named heir':'Heir by seniority'}: ${s.heir.name}.`:'No heir remains: the Great Council will elect a new house.'}`;
+const successionLine=(s:NonNullable<GovernmentSnapshot['succession']>)=>`${successionStatus[s.status]} ${s.heir?`${s.heir.named?'Named heir':'Heir by seniority'}: ${s.heir.name}.`:'No heir remains: the Great Council elects a new house.'}`;
 export function LeaderPanel({snapshot,simulation}:{snapshot:GovernmentSnapshot;simulation?:SimulationState}) {
   const authored=leaderPersonas[snapshot.nationId as keyof typeof leaderPersonas];
   // #71/#281: a successful Rising or palace coup crowns a new AI royal house; the new AI royal house replaces the authored monarch.
