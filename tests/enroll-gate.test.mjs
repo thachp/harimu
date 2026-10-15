@@ -58,8 +58,8 @@ test('the QA nation switch cannot reach a non-playable nation either; one shared
   const all = [...live, ...unplayable, 'atlantis'];
   assert.deepEqual(all.map(id => shared.isLiveNation(id)), all.map(id => live.includes(id)));
   assert.deepEqual(all.filter(id => ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara'].includes(id)).map(id => discovery.nationIsPreview(id)), ['kindle', 'korund', 'aurelle', ...unplayable].map(id => !live.includes(id)), 'same answer as the old literal for all ten');
-  assert.deepEqual([...qa.qaTestNations], [...shared.liveNations]);
+  assert.equal('qaTestNations' in qa, false, 'qa-tools no longer carries its own copy of the list');
   const route = await readFile(new URL('../app/api/citizen/route.ts', import.meta.url), 'utf8');
-  assert.ok(route.indexOf('isLiveNation(nationId)') > route.indexOf("body.action === 'enroll'") && route.indexOf('isLiveNation(nationId)') < route.indexOf('enrollmentInitialSql).bind'), 'the gate runs before any enrollment write');
+  assert.ok(route.lastIndexOf('isLiveNation(nationId)') > route.indexOf("body.action === 'enroll'") && route.lastIndexOf('isLiveNation(nationId)') < route.indexOf('enrollmentInitialSql).bind'), 'the gate runs before any enrollment write');
   assert.doesNotMatch(await readFile(new URL('../lib/nation-discovery.ts', import.meta.url), 'utf8'), /^import /m, 'the shared list imports nothing');
 });
