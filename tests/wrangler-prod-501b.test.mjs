@@ -12,13 +12,13 @@ import { hyperdriveIdProblem, productionWorker, readProductionConfigRaw, runtime
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
 // Vars present in preview and deliberately absent in production.
-const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS'];
+const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']; // #501c: no journal in production
 // Vars production adds, with their required values.
 const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
 const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'] };
 // The only non-"false" values production may carry.
-const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
+const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
 
 test('wrangler.prod.jsonc has only full-line // comments (the #633 rule) and parses', () => {
   const offenders = readFileSync('wrangler.prod.jsonc', 'utf8').split('\n').map((line, index) => ({ line, number: index + 1 }))
@@ -40,7 +40,7 @@ test('vars: same names as preview except the listed differences; every flag fals
   const previewNames = Object.keys(preview.vars), prodNames = Object.keys(prod.vars);
   assert.deepEqual(prodNames.filter(n => !previewNames.includes(n)).sort(), Object.keys(productionOnlyVars).sort());
   assert.deepEqual(previewNames.filter(n => !prodNames.includes(n)).sort(), [...previewOnlyVars].sort());
-  for (const name of ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_AI_PRICE_REVIEWED_UNTIL']) assert.equal(name in prod.vars, false, name);
+  for (const name of ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_AI_PRICE_REVIEWED_UNTIL', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']) assert.equal(name in prod.vars, false, name);
   for (const [name, value] of Object.entries(prod.vars)) {
     if (name in differingVars) assert.equal(value, differingVars[name][1], name);
     else if (name in productionOnlyVars) assert.equal(value, productionOnlyVars[name], name);
@@ -54,6 +54,14 @@ test('vars: same names as preview except the listed differences; every flag fals
   assert.ok(flags(prod).length > 40); for (const flag of flags(prod)) assert.equal(prod.vars[flag], 'false', flag);
   assert.equal(prod.vars.HARIMU_STORAGE_MAINTENANCE, 'false');
   assert.strictEqual(prod.vars.HARIMU_PRODUCTION_STORAGE, 'true', 'exactly "true": TRUE, 1 or "" silently take the old (non-production) path in selectStorageBackend');
+});
+
+test('flag comments copied into wrangler.prod.jsonc equal the preview comments (they cannot drift unnoticed)', () => {
+  const commentsByVar = text => { const map = {}; let buffer = []; for (const line of text.split('\n')) { const t = line.trim(), name = /^"([A-Z0-9_]+)":/.exec(t)?.[1]; if (t.startsWith('//')) buffer.push(t); else { if (name) map[name] = buffer.join('\n'); buffer = []; } } return map; };
+  const previewComments = commentsByVar(readFileSync('wrangler.jsonc', 'utf8')), prodComments = commentsByVar(readFileSync('wrangler.prod.jsonc', 'utf8'));
+  const shared = Object.keys(prod.vars).filter(name => name in preview.vars && previewComments[name]);
+  assert.ok(shared.length > 15, 'most flags carry a comment');
+  for (const name of shared) assert.equal(prodComments[name], previewComments[name], `${name}: the comment above it differs from wrangler.jsonc; copy it again`);
 });
 
 test('Hyperdrive: one binding, id only (no connection string), checked-in id is a detected placeholder', () => {
@@ -93,7 +101,6 @@ test('QA3 on #641: the runtime role grants, applied on a real Postgres (PGlite) 
   await pg.exec('SET ROLE harimu_runtime');
   try {
     assert.equal((await pg.query("SELECT id FROM harimu_storage_migrations WHERE id='fresh-world-v1'")).rows.length, 1);
-    await pg.query("INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ('[]')");
     assert.equal((await pg.query("SELECT harimu_compat.json_valid('{}') AS ok")).rows[0].ok, true);
     await pg.exec('UPDATE citizens SET capacity=capacity WHERE false'); await pg.exec('DELETE FROM citizens WHERE false'); assert.equal((await pg.query('SELECT COUNT(*)::int AS n FROM citizens')).rows[0].n, 0); // read and write on the game tables
     await assert.rejects(pg.exec("UPDATE harimu_storage_migrations SET validated=0"), /permission denied/);

@@ -1,11 +1,13 @@
 // Preview cutover validated against the protected D1 backup. #501a: production has its own explicit, fail-closed path (HARIMU_PRODUCTION_STORAGE=true, Postgres only, never D1,
 // never together with the preview marker, never with the temporary admin waiver or the preview election POC). Nothing in wrangler.jsonc sets it, so preview is unchanged.
 export const postgresRuntimeEnabled=true;
+/** #501c: production keeps no rollback journal (harimu_postgres_write_journal), which would grow without bound and has no purpose with no D1 to roll back to. scripts/deploy-production.mjs refuses to deploy while this is not false. */
+export const productionKeepsWriteJournal=false;
 export function selectStorageBackend(input:{backend?:string;developmentPreview?:string;maintenance?:string;cutoverReady?:string;hyperdriveConfigured:boolean;implementationEnabled?:boolean;journalRetentionApproved?:boolean;productionStorage?:string;temporaryAdminApproved?:string;accountElectionEnabled?:boolean}){
  if(input.maintenance==='true')throw Error('Storage is paused for migration validation.');
  if(input.productionStorage==='true'){
   // Every condition is mandatory and none falls back to D1: a mistake here must stop the Worker, not serve from the wrong store.
-  if(input.backend!=='postgres'||input.implementationEnabled!==true||input.developmentPreview==='true'||input.temporaryAdminApproved==='true'||input.accountElectionEnabled===true||input.cutoverReady!=='true'||!input.hyperdriveConfigured||input.journalRetentionApproved!==true)throw Error('Production PostgreSQL storage is not approved and ready.');
+  if(input.backend!=='postgres'||input.implementationEnabled!==true||input.developmentPreview==='true'||input.temporaryAdminApproved==='true'||input.accountElectionEnabled===true||input.cutoverReady!=='true'||!input.hyperdriveConfigured)throw Error('Production PostgreSQL storage is not approved and ready.');
   return 'postgres' as const;
  }
  if(input.backend===undefined||input.backend==='d1')return 'd1' as const;
