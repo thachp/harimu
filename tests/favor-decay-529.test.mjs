@@ -28,9 +28,9 @@ const faith = async (r, user = 'ava') => (await r.call('faith', user)).data;
 const leave = (r, user = 'ava', to = 'open-hand') => r.call('faith', user, { action: 'choose-faith', faithId: to, requestId: randomUUID() });
 const count = async (r, table) => Number((await r.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first()).n);
 
-test('static: the flag ships "false"; one decay constant and one rule used by readAurelle and royalFavorBalance; flag off is the old SQL, byte for byte', async () => {
+test('static: the flag is "true" in preview wrangler; one decay constant and one rule used by readAurelle and royalFavorBalance; flag off is the old SQL, byte for byte', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_FAVOR_DECAY_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_FAVOR_DECAY_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['true']);
   assert.equal(royalFavorBalanceSql, "MAX(0,MIN(100,COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0))-COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=?),0))");
   assert.equal(royalFavorSql(), royalFavorBalanceSql); assert.deepEqual(royalFavorBinds('u'), ['u', 'u']);
   assert.equal(favorDecaySeconds, 14 * 86400); assert.equal(favorCap, 100);

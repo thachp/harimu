@@ -48,9 +48,9 @@ test('pure rules: one inspection per city per 14 real days (exact gap), determin
   assert.equal(undergroundGameDay(DAY * 3 + 5), 3); assert.equal(pickIndex('x', 0), 0); assert.ok(pickIndex('seed', 3) < 3);
 });
 
-test('wrangler ships faith off, migration 0032 is additive, and the game day matches faith.ts', async t => {
+test('wrangler ships faith on in preview, migration 0032 is additive, and the game day matches faith.ts', async t => {
   const cfgText = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfgText.matchAll(/"HARIMU_FAITH_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfgText.matchAll(/"HARIMU_FAITH_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const dir of ['drizzle', 'db/postgres']) {
     const sql = await readFile(new URL(`../${dir}/0032_korund_underground.sql`, import.meta.url), 'utf8');
     assert.doesNotMatch(sql.replace(/--[^\n]*/g, '').replace(/ON DELETE CASCADE/g, ''), /\b(DROP|ALTER|DELETE|UPDATE|TRUNCATE)\b/i, `${dir} 0032 is additive`);

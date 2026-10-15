@@ -120,9 +120,9 @@ test('GET read path writes nothing: the public level is derived on read, Korund 
   assert.deepEqual(await wear.readWarWeariness(r.db, scheduledAt), { kindle: 6, korund: 2, aurelle: 0 });
 });
 
-test('wiring: flag default false, every advanceWorld caller passes it, the banner shows the level copy, war routes untouched', async () => {
+test('wiring: preview flag true, every advanceWorld caller passes it, the banner shows the level copy, war routes untouched', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_WEARINESS_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_WEARINESS_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['world/route.ts', 'citizen/route.ts', 'market/orders/route.ts', 'aurelle/rising/route.ts']) {
     const src = await readFile(new URL(`../app/api/${file}`, import.meta.url), 'utf8');
     assert.match(src, /warWeariness: wearinessEnabled\(env as unknown as WearinessBindings\)/, file);

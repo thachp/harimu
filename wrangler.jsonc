@@ -18,6 +18,7 @@
   "ai": { "binding": "AI" },
   "workers_dev": true,
   "preview_urls": true,
+  // Preview turns on every feature flag that is safe without an unset Worker secret or paid AI use (the QA2 smoke list is in the PR that did it). The "Off" in a flag comment below describes that flag's off behavior. wrangler.prod.jsonc keeps every flag "false".
   "vars": {
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaGFyaW11LmNvbSQ",
     "NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW": "true",
@@ -36,8 +37,8 @@
     // #626 (Decision 111): the Spark-to-Tessera kiosk exchange, separate from square purchases. Off: buy-tessera is refused and the kiosk stays closed.
     "HARIMU_TESSERA_EXCHANGE_ENABLED": "false",
     // #631: preview-only Tessera TEST faucet (50.00 TSR once per citizen, labeled test). Off; it also needs NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW=true, so production refuses it.
-    "HARIMU_TEST_FAUCET_ENABLED": "false",
-    "HARIMU_LABOR_BUREAU_ENABLED": "false",
+    "HARIMU_TEST_FAUCET_ENABLED": "true",
+    "HARIMU_LABOR_BUREAU_ENABLED": "true",
     // #489: per-nation opening flags (seven-nations Stage 0). Off; even when "true" a nation is enrollable only by a QA-allowlisted account (lib/nation-openings.ts nationPlayable).
     "HARIMU_CONFLUENCE_ENABLED": "false",
     "HARIMU_MERIDIAN_ENABLED": "false",
@@ -46,46 +47,46 @@
     "HARIMU_VARKAND_ENABLED": "false",
     "HARIMU_VELDWOOD_ENABLED": "false",
     "HARIMU_FULMARA_ENABLED": "false",
-    "HARIMU_GRAY_MARKET_ENABLED": "false",
+    "HARIMU_GRAY_MARKET_ENABLED": "true",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts, which none has yet.
     "HARIMU_NATION_WORK_ENABLED": "false",
     // #529: Aurelle Royal Favor decays over time (read-time, no stored balance, no cron). Off: the Favor balance is exactly the flat rule of before. The window is an [ASSUMPTION] pending ARC.
-    "HARIMU_FAVOR_DECAY_ENABLED": "false",
-    "HARIMU_KINDLE_INCOME_TAX_ENABLED": "false",
+    "HARIMU_FAVOR_DECAY_ENABLED": "true",
+    "HARIMU_KINDLE_INCOME_TAX_ENABLED": "true",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
-    "HARIMU_ORDER_BOOK_ENABLED": "false",
-    "HARIMU_AURELLE_RISING_ENABLED": "false",
+    "HARIMU_ORDER_BOOK_ENABLED": "true",
+    "HARIMU_AURELLE_RISING_ENABLED": "true",
     // #281: Aurelle AI palace coup (plot, Power Weight, Crisis Window). Off until QA.
-    "HARIMU_AURELLE_COUP_ENABLED": "false",
+    "HARIMU_AURELLE_COUP_ENABLED": "true",
     // #531: Aurelle guild charter PoC (request/renew a market-stall charter for Royal Favor). Off: the charter route is a 404 and nothing is written.
-    "HARIMU_AURELLE_CHARTERS_ENABLED": "false",
+    "HARIMU_AURELLE_CHARTERS_ENABLED": "true",
     // #465: earned-Tessera rewards (a fixed daily pool split pro-rata over verified settled Kindle shifts, claimed at a kiosk; no exchange, cash-out or conversion). Off: the rewards route is a 404 and the epoch-close cron is a no-op.
     "HARIMU_TESSERA_REWARDS_ENABLED": "false",
     // #283: Kindle mid-term Assembly election (D'Hondt per district, 5% district share). Off until QA. #351: the real calendar is driven by the world clock: set HARIMU_KINDLE_CYCLE_START_AT (epoch seconds, start of day 0 of the first 120-day cycle) and the vote opens at day 60 of every cycle for 72 hours. Without it, HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) is a manual one-off open. Neither set: it never opens.
     "HARIMU_KINDLE_ASSEMBLY_ENABLED": "false",
     // #307: Kindle party membership and human primaries. Off until QA. Opening is manual: set HARIMU_PRIMARIES_OPEN_AT (epoch seconds) to open the 72-hour primary.
     "HARIMU_PRIMARIES_ENABLED": "false",
-    "HARIMU_TRAVEL_ENABLED": "false",
-    "HARIMU_KORUND_PRESIDIUM_ENABLED": "false",
+    "HARIMU_TRAVEL_ENABLED": "true",
+    "HARIMU_KORUND_PRESIDIUM_ENABLED": "true",
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
-    "HARIMU_FAITH_ENABLED": "false",
+    "HARIMU_FAITH_ENABLED": "true",
     // #599: Diplomatic Hall (Kindle + Aurelle citizens, closed to Korund). Off: the route returns 404 and the tab is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
-    "HARIMU_DIPLOMATIC_HALL_ENABLED": "false",
+    "HARIMU_DIPLOMATIC_HALL_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
-    "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
+    "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
     "HARIMU_AURELLE_SUCCESSION_ENABLED": "false",
-    "HARIMU_WAR_ENABLED": "false",
+    "HARIMU_WAR_ENABLED": "true",
     // #423: war weariness PoC (weekly Unrest from an active war, docs 15.3). Needs HARIMU_WAR_ENABLED too. Off until QA.
-    "HARIMU_WAR_WEARINESS_ENABLED": "false",
+    "HARIMU_WAR_WEARINESS_ENABLED": "true",
     // #426: war declaration rate limits (1 per nation per 14 real days, 2 active offensive wars) and the casus belli (grievance score >= 40) gate. Needs HARIMU_WAR_ENABLED too. Off until QA.
-    "HARIMU_WAR_DECLARATION_LIMITS_ENABLED": "false",
+    "HARIMU_WAR_DECLARATION_LIMITS_ENABLED": "true",
     // #308: AI treaties PoC (non-aggression pact, trade agreement). Off until QA; treaties are proposed and ratified by server code only.
-    "HARIMU_DIPLOMACY_ENABLED": "false",
+    "HARIMU_DIPLOMACY_ENABLED": "true",
     // #363: embargo PoC (bilateral trade cut). Off until QA; embargoes are proposed and ratified by server code only.
-    "HARIMU_EMBARGO_ENABLED": "false",
+    "HARIMU_EMBARGO_ENABLED": "true",
     // #362: Aurelle Crown debasement PoC (mint parity, Currency Confidence, Monarch decree). Off until QA; decrees are written only by the scheduled Worker.
-    "HARIMU_CROWN_DEBASEMENT_ENABLED": "false",
+    "HARIMU_CROWN_DEBASEMENT_ENABLED": "true",
     // #442: Kindle canvassing PoC (party members' ground-game quests; display-only district visibility, never votes). Off until QA.
     "HARIMU_CANVASSING_ENABLED": "false",
     // #441: Kindle town hall PoC (citizen questions for 24 hours, top 10 answered). Off until QA. An operator sets HARIMU_TOWN_HALL_OPEN_AT (epoch seconds) to open every candidate's hall; unset it never opens.
@@ -97,9 +98,9 @@
     // #282: the AI candidates' debate answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_DEBATE_ENABLED, the AI binding and a valid AI budget. Off, every answer is the candidate's fallback line.
     "HARIMU_AI_DEBATE_ANSWERS_ENABLED": "false",
     // #431: Kindle Spark money supply and Price Index PoC (Reserve Board issuance within the 3% cap and the Charter Limit). Off until QA; issuance is written only by the scheduled Worker.
-    "HARIMU_SPARK_SUPPLY_ENABLED": "false",
+    "HARIMU_SPARK_SUPPLY_ENABLED": "true",
     // #432: daily ledger reconciliation job and its read-only admin report route. Off until QA. The route also needs the HARIMU_ADMIN_TOKEN Worker secret (set in the dashboard, never in this file); without it the route is a 404.
-    "HARIMU_LEDGER_RECONCILIATION_ENABLED": "false",
+    "HARIMU_LEDGER_RECONCILIATION_ENABLED": "true",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

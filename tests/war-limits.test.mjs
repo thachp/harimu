@@ -39,9 +39,9 @@ test('pure rules: the ruling\'s weights, the 40 threshold, the border-incident c
   assert.equal(declarationNextDay(0), 14 * D);
 });
 
-test('the limits flag defaults to "false" in wrangler.jsonc and the route passes it through (no migration)', async () => {
+test('the limits flag is "true" in preview wrangler.jsonc and the route passes it through (no migration)', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_DECLARATION_LIMITS_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_DECLARATION_LIMITS_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   const route = await readFile(new URL('../app/api/war/route.ts', import.meta.url), 'utf8');
   assert.match(route, /limits: bindings\.HARIMU_WAR_DECLARATION_LIMITS_ENABLED === 'true'/);
   assert.ok(route.indexOf("HARIMU_WAR_ENABLED !== 'true'") < route.indexOf('HARIMU_WAR_DECLARATION_LIMITS_ENABLED ==='), 'the war flag is still checked first');

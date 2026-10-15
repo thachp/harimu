@@ -101,12 +101,19 @@ if (tesseraPerCitizen === tesseraBalanceSql) throw new Error('tesseraBalanceSql 
 const TSR: CurrencySpec = {
   currency: 'TSR',
   legs: `SELECT clerk_user_id AS acct, delta_minor AS delta FROM citizen_tessera_ledger
-    UNION ALL SELECT clerk_user_id, tessera_minor FROM citizen_tessera_exchanges`,
+    UNION ALL SELECT clerk_user_id, tessera_minor FROM citizen_tessera_exchanges
+    UNION ALL SELECT clerk_user_id, amount_minor FROM tessera_reward_claims`, // #465: claimed earned rewards are credits against the epoch reward pool
   appBalances: `SELECT c.clerk_user_id AS acct, ${tesseraPerCitizen} AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('TSR', 'citizen_tessera_ledger', 'clerk_user_id', 'delta_minor', false),
     ...integerAndSign('TSR', 'citizen_tessera_exchanges', 'clerk_user_id', 'tessera_minor', true),
     ...integerAndSign('TSR', 'world_square_purchases', 'clerk_user_id', 'price_minor', true),
+    // #465 earned rewards: per epoch claimed <= allocated <= pool (allocated is exactly the sum of its entries); no entry without a settled shift of the same citizen; no claim that differs from its entry.
+    ...integerAndSign('TSR', 'tessera_reward_claims', 'clerk_user_id', 'amount_minor', true),
+    { currency: 'TSR', check: 'reward_epoch_allocated_over_pool', sql: `SELECT CAST(p.epoch_day AS TEXT) AS acct FROM tessera_reward_epochs p WHERE p.allocated_minor > p.pool_minor OR p.allocated_minor <> COALESCE((SELECT SUM(e.amount_minor) FROM tessera_reward_entries e WHERE e.epoch_day = p.epoch_day), 0)` },
+    { currency: 'TSR', check: 'reward_epoch_claimed_over_allocated', sql: `SELECT CAST(p.epoch_day AS TEXT) AS acct FROM tessera_reward_epochs p WHERE COALESCE((SELECT SUM(c.amount_minor) FROM tessera_reward_claims c JOIN tessera_reward_entries e ON e.id = c.entry_id WHERE e.epoch_day = p.epoch_day), 0) > p.allocated_minor` },
+    { currency: 'TSR', check: 'reward_entry_without_settled_shift', sql: `SELECT e.clerk_user_id AS acct FROM tessera_reward_entries e LEFT JOIN shift_settlements s ON s.shift_id = e.source_shift_id WHERE s.shift_id IS NULL OR s.clerk_user_id <> e.clerk_user_id` },
+    { currency: 'TSR', check: 'reward_claim_not_its_entry', sql: `SELECT c.clerk_user_id AS acct FROM tessera_reward_claims c LEFT JOIN tessera_reward_entries e ON e.id = c.entry_id WHERE e.id IS NULL OR e.clerk_user_id <> c.clerk_user_id OR e.amount_minor <> c.amount_minor` },
     { currency: 'TSR', check: 'square_purchase_not_ledger_debit', sql: `SELECT p.clerk_user_id AS acct FROM world_square_purchases p LEFT JOIN citizen_tessera_ledger l ON l.id = 'tsr-square-' || p.request_id WHERE l.id IS NULL OR l.delta_minor <> -p.price_minor` },
     { currency: 'TSR', check: 'square_ledger_debit_without_purchase', sql: `SELECT l.clerk_user_id AS acct FROM citizen_tessera_ledger l WHERE l.reason = 'square-purchase' AND NOT EXISTS (SELECT 1 FROM world_square_purchases p WHERE 'tsr-square-' || p.request_id = l.id)` },
   ],
