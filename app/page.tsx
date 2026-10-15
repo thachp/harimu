@@ -432,7 +432,6 @@ function ClerkAccountControl() {
 
   return (
     <div className="account-control">
-      {process.env.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW === 'true' && <span className="development-preview-label" title="Fresh development world. Production progress is separate.">Development preview</span>}
       <Show when="signed-out">
         <SignInButton mode="modal">
           <button className="account-sign-in" type="button">Sign in</button>
