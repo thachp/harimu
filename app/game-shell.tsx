@@ -3,7 +3,7 @@
 import { scopeNotice, type NoticeScope } from '@/lib/notice-scope';
 import { useEffect, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { nationMark, nationSymbolsEnabled, nationTheme } from '@/lib/nation-themes';
-import { identityStatus, nationEmblem, topBarEmblemEnabled } from '@/lib/nation-emblem';
+import { identityStatus, nationEmblem, topBarEmblemEnabled, uiV2TopbarEnabled } from '@/lib/nation-emblem';
 import { helpClosed, helpIdOf, reduceHelp, type HelpEvent } from '@/lib/hud-help';
 import { GlobeHemisphereWest, House, Hammer, Storefront, Bank, UsersThree, X, Coins, Lightning, Bread, Cube, BookOpen, Compass, CaretRight } from '@phosphor-icons/react';
 import {GameSettings} from './game-settings';
@@ -99,7 +99,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   const sceneTitle = view === 'world' ? nation.name : nation.id === 'korund' && view === 'market' ? 'State ration store' : nation.id === 'korund' && view === 'workplace' ? 'Assignment board' : titles[view];
   const resourceNation = citizenNation ?? nation;
   const shownNationName = viewedNationHeld ? 'Your nation' : nation.name; // #455, #533
-  const emblemOn = topBarEmblemEnabled();
+  const emblemOn = topBarEmblemEnabled(), topbarV2 = uiV2TopbarEnabled(); // #392 S2: topbarV2 adds the restyle (class game-hud-v2); it implies emblemOn
   const inspecting = view === 'world' || view === 'nation' || view === 'country';
   const hasPanel = !collapsed;
   useEffect(() => { document.getElementById('game-details')?.querySelector('.game-inspector-body')?.scrollTo({top:0,left:0}); }, [view,nation.id]);
@@ -140,7 +140,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}`}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
     <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
-    <header className="game-hud" {...hudHelpHandlers}>
+    <header className={topbarV2 ? 'game-hud game-hud-v2' : 'game-hud'} {...hudHelpHandlers}>
       <div className="game-identity"><span className="game-crest" aria-hidden="true">H</span><div><strong>HARIMU</strong><span><span role="status">{identityHold === 'loading' ? 'Loading your citizen…' : null}</span>{identityHold !== 'none' ? null : <>{emblemOn && <NationEmblemMark id={resourceNation.id} name={resourceNation.name} />}{resourceNation.name}<i />{identityStatus({ guestDemo, localDemo, hasCitizenNation: Boolean(citizenNation) }, emblemOn)}</>}</span></div></div>
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>
         {guestDemo ? <span>No account · sample actions only</span> : !citizenNation && !localDemo ? <HudHelp label="Resources" open={isOpen("Resources")} help="Work capacity, money, food, materials and knowledge unlock after citizenship. Exploring nations does not create a citizen."><span>Resources unlock after citizenship</span></HudHelp> : <>

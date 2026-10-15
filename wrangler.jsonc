@@ -43,6 +43,8 @@
     "HARIMU_VELDWOOD_ENABLED": "false",
     "HARIMU_FULMARA_ENABLED": "false",
     "HARIMU_GRAY_MARKET_ENABLED": "false",
+    // #529: Aurelle Royal Favor decays over time (read-time, no stored balance, no cron). Off: the Favor balance is exactly the flat rule of before. The window is an [ASSUMPTION] pending ARC.
+    "HARIMU_FAVOR_DECAY_ENABLED": "false",
     "HARIMU_KINDLE_INCOME_TAX_ENABLED": "false",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "false",
@@ -89,6 +91,7 @@
     "NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_CREST": "false",
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "false",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"
   },
