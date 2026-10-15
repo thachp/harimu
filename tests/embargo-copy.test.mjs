@@ -67,10 +67,10 @@ test('what the docs say: embargo stops all trade; costs the sanctioner; Clearing
 test('out of scope stays out: no multilateral sanctions, suspension, smuggling or evasion', () => {
   for (const t of all()) assert.doesNotMatch(t,/multilateral|suspend|suspension|smuggl|evad|barter|black.?market|reserve freeze|treaty of/i, t);
 });
-test('bylines match the canon press packs; AI badge only on "Be it known" Crown lines', () => {
+test('bylines match the canon press packs; AI badge on Crown "Be it known" lines and Korund State Media lines (#381)', () => {
   assert.deepEqual(pressFor('kindle').byline,kindlePress.byline); assert.deepEqual(pressFor('korund').byline,korundStateMedia.byline); assert.deepEqual(pressFor('aurelle').byline,aurelleGazette.byline);
   for (const x of PR) {
-    for (const l of Object.values(x.report)) { assert.equal(l.aiBadge,false); assert.doesNotMatch(l.text,/Be it known/); }
+    for (const l of Object.values(x.report)) { assert.equal(l.aiBadge,x.nationId==='korund'); assert.doesNotMatch(l.text,/Be it known/); }
     for (const l of Object.values(x.crown??{})) { assert.equal(l.aiBadge,true); assert.match(l.text,/^Be it known/); }
   }
   assert.ok(!pressFor('kindle').crown&&!pressFor('korund').crown); assert.ok(pressFor('aurelle').crown);
