@@ -13,11 +13,22 @@ export type NationOpening = {
   id: NationId;
   /** null = live for everyone (it is in `liveNations`); otherwise the name of the (off) flag that will open the nation. */
   openingFlag: string | null;
-  /** Filled in by the PR that opens the nation; none yet. */
+  /** Map seed (#491): filled in by the PR that opens the nation. The three live nations carry theirs; no new capital yet. */
   capital?: { x: number; y: number };
+  /** Border outpost square, when the nation has one (the three live nations do). */
+  outpost?: { x: number; y: number };
+  /** Heartland terrain mix, used to seed the nation's squares. Present exactly when `capital` is. */
+  biome?: readonly string[];
+};
+type MapSeed = { capital: { x: number; y: number }; outpost: { x: number; y: number }; biome: readonly string[] };
+/** The three live nations' capitals, outposts and biomes (moved from lib/map-zones.ts `mvpNations`, values unchanged; docs 6.1/6.2 reduced-scale map, #66). */
+const liveMapSeeds: Readonly<Partial<Record<NationId, MapSeed>>> = {
+  kindle: { capital: { x: 5, y: 4 }, outpost: { x: 8, y: 7 }, biome: ['plains', 'hills', 'volcanic badland'] },
+  korund: { capital: { x: 18, y: 4 }, outpost: { x: 15, y: 7 }, biome: ['mountains', 'cliff/plateau', 'hills'] },
+  aurelle: { capital: { x: 12, y: 14 }, outpost: { x: 12, y: 11 }, biome: ['cliff/plateau', 'plains', 'coast'] },
 };
 
-export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED` }));
+export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED`, ...liveMapSeeds[id] }));
 
 export const nationOpening = (id: unknown): NationOpening | undefined => typeof id === 'string' ? nationOpenings.find(opening => opening.id === id) : undefined;
 /** Ids whose rules run: the live nations plus any whose opening flag is exactly "true" in `bindings`, in catalog order. Unknown ids never appear.  */

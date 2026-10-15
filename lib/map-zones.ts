@@ -1,4 +1,5 @@
 import type { GameDatabase } from './database-contract';
+import { nationOpenings } from './nation-openings';
 
 /**
  * World map zones PoC (#66, docs 6.1/6.2). A reduced-scale, deterministic
@@ -19,12 +20,13 @@ export const acquisitionRules: Record<Zone, string> = {
   commons: 'Cannot be bought. Claimed only by war or treaty (or a joint-development agreement)',
 };
 
-/** Capitals and their outward direction toward the Commons for the border outpost. */
-export const mvpNations = [
-  { id: 'kindle', capital: { x: 5, y: 4 }, outpost: { x: 8, y: 7 }, biome: ['plains', 'hills', 'volcanic badland'] },
-  { id: 'korund', capital: { x: 18, y: 4 }, outpost: { x: 15, y: 7 }, biome: ['mountains', 'cliff/plateau', 'hills'] },
-  { id: 'aurelle', capital: { x: 12, y: 14 }, outpost: { x: 12, y: 11 }, biome: ['cliff/plateau', 'plains', 'coast'] },
-] as const;
+type Point = { x: number; y: number };
+export type MapNation = { id: string; capital: Point; outpost?: Point; biome: readonly string[] };
+/** Capitals, border outposts and biomes of the nations on the map (#491): derived from the registry (`lib/nation-openings.ts`), the nations that have a capital there.
+ *  Today that is exactly the three live nations, in the same order and with the same values as the old literal. */
+export const mvpNations: readonly MapNation[] = nationOpenings.flatMap(o => o.capital && o.biome?.length ? [{ id: o.id, capital: o.capital, outpost: o.outpost, biome: o.biome }] : []);
+/** The nations whose squares the original seed (migration 0011 / `worldSquaresSeedSql`) already wrote; any other nation with a capital is added by `nationSquaresUpsertSql`. */
+export const originallySeededNations: readonly string[] = ['kindle', 'korund', 'aurelle'];
 const commonsCentre = { x: 12, y: 6 };
 const heartlandRadius = 2, frontierRadius = 3;
 const wildTerrain = ['plains', 'forest', 'hills', 'wetland', 'river edge', 'old-growth forest'];
@@ -39,30 +41,56 @@ function hash(x: number, y: number): number {
 }
 const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
-export function seedWorldSquares(): WorldSquare[] {
-  const squares: WorldSquare[] = [];
-  for (let y = 0; y < mapHeight; y++) for (let x = 0; x < mapWidth; x++) {
-    const h = hash(x, y), p = { x, y };
-    const nation = mvpNations.find(n => cheb(p, n.capital) <= frontierRadius);
-    if (nation) {
-      const d = cheb(p, nation.capital);
-      const heart = d <= heartlandRadius;
-      const isCapital = d === 0, isOutpost = x === nation.outpost.x && y === nation.outpost.y;
-      squares.push({ x, y, zone: heart ? 'heartland' : 'frontier', owner: heart || isOutpost ? nation.id : null,
-        terrain: isCapital || isOutpost ? 'city' : nation.biome[h % nation.biome.length],
-        resource: isCapital || isOutpost || h % 5 ? null : ordinaryResources[h % ordinaryResources.length],
-        feature: isCapital ? 'capital' : isOutpost ? 'border outpost' : null });
-      continue;
-    }
-    if (cheb(p, commonsCentre) <= 1) {
-      squares.push({ x, y, zone: 'commons', owner: null, terrain: wildTerrain[h % wildTerrain.length],
-        resource: h % 3 ? rareResources[h % rareResources.length] : null, feature: x === commonsCentre.x && y === commonsCentre.y ? 'wonder site' : null });
-      continue;
-    }
-    squares.push({ x, y, zone: 'wildlands', owner: null, terrain: wildTerrain[h % wildTerrain.length],
-      resource: h % 4 ? null : ordinaryResources[h % ordinaryResources.length], feature: null });
+function squareAt(x: number, y: number, nations: readonly MapNation[]): WorldSquare {
+  const h = hash(x, y), p = { x, y };
+  const nation = nations.find(n => cheb(p, n.capital) <= frontierRadius);
+  if (nation) {
+    const d = cheb(p, nation.capital);
+    const heart = d <= heartlandRadius;
+    const isCapital = d === 0, isOutpost = Boolean(nation.outpost) && x === nation.outpost!.x && y === nation.outpost!.y;
+    return { x, y, zone: heart ? 'heartland' : 'frontier', owner: heart || isOutpost ? nation.id : null,
+      terrain: isCapital || isOutpost ? 'city' : nation.biome[h % nation.biome.length],
+      resource: isCapital || isOutpost || h % 5 ? null : ordinaryResources[h % ordinaryResources.length],
+      feature: isCapital ? 'capital' : isOutpost ? 'border outpost' : null };
   }
+  if (cheb(p, commonsCentre) <= 1) {
+    return { x, y, zone: 'commons', owner: null, terrain: wildTerrain[h % wildTerrain.length],
+      resource: h % 3 ? rareResources[h % rareResources.length] : null, feature: x === commonsCentre.x && y === commonsCentre.y ? 'wonder site' : null };
+  }
+  return { x, y, zone: 'wildlands', owner: null, terrain: wildTerrain[h % wildTerrain.length],
+    resource: h % 4 ? null : ordinaryResources[h % ordinaryResources.length], feature: null };
+}
+
+export function seedWorldSquares(nations: readonly MapNation[] = mvpNations): WorldSquare[] {
+  const squares: WorldSquare[] = [];
+  for (let y = 0; y < mapHeight; y++) for (let x = 0; x < mapWidth; x++) squares.push(squareAt(x, y, nations));
   return squares;
+}
+
+/** One nation's Heartland + Frontier squares exactly as `seedWorldSquares(nations)` would write them (a square two nations' blocks share belongs to the first in `nations`). */
+export function nationBlockSquares(nationId: string, nations: readonly MapNation[] = mvpNations): WorldSquare[] {
+  const nation = nations.find(n => n.id === nationId);
+  if (!nation) return [];
+  const out: WorldSquare[] = [];
+  for (let y = Math.max(0, nation.capital.y - frontierRadius); y <= Math.min(mapHeight - 1, nation.capital.y + frontierRadius); y++)
+    for (let x = Math.max(0, nation.capital.x - frontierRadius); x <= Math.min(mapWidth - 1, nation.capital.x + frontierRadius); x++)
+      if (nations.find(n => cheb({ x, y }, n.capital) <= frontierRadius)?.id === nationId) out.push(squareAt(x, y, nations));
+  return out;
+}
+/** Squares of a nation's block that are not plain untouched Wildlands in `existing` (another nation's block, the Commons, a purchased or founded square, off-grid). The PR that gives a nation a capital
+ *  must choose one with no conflicts: the upsert below refuses to overwrite any of them, so such a capital would seed a partial block. */
+export function nationBlockConflicts(nationId: string, nations: readonly MapNation[], existing: readonly WorldSquare[]): { x: number; y: number }[] {
+  const nation = nations.find(n => n.id === nationId);
+  if (!nation) return [];
+  const at = new Map(existing.map(s => [`${s.x},${s.y}`, s]));
+  const bad: { x: number; y: number }[] = [];
+  for (let y = nation.capital.y - frontierRadius; y <= nation.capital.y + frontierRadius; y++)
+    for (let x = nation.capital.x - frontierRadius; x <= nation.capital.x + frontierRadius; x++) {
+      const e = at.get(`${x},${y}`);
+      const taken = nations.find(n => cheb({ x, y }, n.capital) <= frontierRadius)?.id !== nationId; // off the grid is never taken, but also never present
+      if (!e || taken || e.zone !== 'wildlands' || e.owner !== null || e.feature !== null) bad.push({ x, y });
+    }
+  return bad;
 }
 
 export const worldSquaresSchema = `CREATE TABLE IF NOT EXISTS world_squares (
@@ -84,6 +112,22 @@ export function worldSquaresSeedSql(chunk = 100, conflict: 'sqlite' | 'postgres'
   }
   return out;
 }
+/** Idempotent upsert that adds only one nation's squares to an already-seeded `world_squares` (#491), keyed by (x,y). It overwrites a square only while it is still untouched Wildlands (no owner, no feature),
+ *  so the three live nations, the Commons and any purchased or founded square are never changed, and a second run changes nothing. The same statement runs on SQLite (3.24+, D1) and Postgres. Literal values from the fixed seed only. */
+export function nationSquaresUpsertSql(nationId: string, nations: readonly MapNation[] = mvpNations, chunk = 100): string[] {
+  const rows = nationBlockSquares(nationId, nations).map(s => `(${[s.x, s.y, s.zone, s.owner, s.terrain, s.resource, s.feature].map(lit).join(',')})`);
+  const out: string[] = [];
+  for (let i = 0; i < rows.length; i += chunk)
+    out.push(`INSERT INTO world_squares (x,y,zone,owner,terrain,resource,feature) VALUES ${rows.slice(i, i + chunk).join(',')} ON CONFLICT (x,y) DO UPDATE SET zone=excluded.zone, owner=excluded.owner, terrain=excluded.terrain, resource=excluded.resource, feature=excluded.feature `
+      + `WHERE world_squares.zone='wildlands' AND world_squares.owner IS NULL AND world_squares.feature IS NULL`);
+  return out;
+}
+/** Boot step (lib/db.ts, SQLite/D1): the upsert for every mapped nation the original seed did not write. Empty today (only the three live nations have capitals), so it adds no statement. A Postgres
+ *  database has no boot DDL path: the PR that gives the first new nation its capital runs `nationSquaresUpsertSql(id)` as its (additive) migration. */
+export function bootNationSquaresSql(nations: readonly MapNation[] = mvpNations): string[] {
+  return nations.filter(n => !originallySeededNations.includes(n.id)).flatMap(n => nationSquaresUpsertSql(n.id, nations));
+}
+
 export function postgresWorldSquaresMigration(): string {
   return ['-- Generated by lib/map-zones.ts (#66). Read-only world squares PoC; additive.',
     worldSquaresSchema.replace(/TEXT/g, 'TEXT COLLATE "C"') + ';',
