@@ -11,6 +11,8 @@ export type WalletPanelProps = {
   transactions?: WalletTransaction[];
   /** #210: Clearing House kiosk. Resolves to an error message, or null on success. Omitted while the kiosk is closed. */
   onBuyTessera?: (tesseraMinor: number) => Promise<string | null>;
+  /** #631: preview-only TEST faucet; omitted unless the server says it is available. claim resolves to an error message, or null on success. */
+  testFaucet?: { grantMinor: number; granted: boolean; claim: () => Promise<string | null> };
   onClose: () => void;
 };
 
@@ -32,7 +34,20 @@ function WalletKiosk({ sparkMinor, rate, onBuyTessera }: { sparkMinor: number; r
   </section>;
 }
 
-export function WalletPanel({ sparkMinor, tesseraMinor = 0, transactions, onBuyTessera, onClose }: WalletPanelProps) {
+const testFaucetLabel = 'Test faucet, preview only'; // the same text as lib/test-faucet.ts (a test pins them equal; the panel stays free of server-lib imports)
+/** #631: clearly a test tool, not the Clearing House: its own section, labeled "Test faucet, preview only". */
+function WalletTestFaucet({ grantMinor, granted, claim }: NonNullable<WalletPanelProps['testFaucet']>) {
+  const [state, setState] = useState<{ pending: boolean; done: boolean; message: string | null }>({ pending: false, done: false, message: null });
+  return <section className="wallet-test-faucet" aria-label={testFaucetLabel}>
+    <h3>{testFaucetLabel}</h3>
+    <p><small>Test tool for the preview world only. It pays {formatMinor(grantMinor)} TSR once per citizen and cannot be cashed out or exchanged.</small></p>
+    <button type="button" disabled={state.pending || state.done || granted} onClick={async () => { setState({ pending: true, done: false, message: null }); const error = await claim(); setState({ pending: false, done: error === null, message: error ?? `Test grant received: ${formatMinor(grantMinor)} TSR.` }); }}>
+      Get {formatMinor(grantMinor)} test TSR</button>
+    {(granted || state.message) && <p role="status">{state.message ?? 'This citizen already took the test grant.'}</p>}
+  </section>;
+}
+
+export function WalletPanel({ sparkMinor, tesseraMinor = 0, transactions, onBuyTessera, testFaucet, onClose }: WalletPanelProps) {
   const wallet = sparkMinor === undefined ? null : summarizeWallet(sparkMinor, transactions ?? [], tesseraMinor);
   return <div className="wallet-panel-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="wallet-panel" role="dialog" aria-modal="true" aria-labelledby="wallet-panel-title" onKeyDown={(event) => { if (event.key === 'Escape') onClose(); else if (event.key === 'Tab') { event.preventDefault(); (event.currentTarget.querySelector('button') as HTMLButtonElement | null)?.focus(); } }}>
@@ -45,6 +60,7 @@ export function WalletPanel({ sparkMinor, tesseraMinor = 0, transactions, onBuyT
         <p className="wallet-quote">1 SPK = {wallet.quote.rate.toFixed(2)} TSR · your SPK ≈ {formatMinor(quoteTessera(wallet.sparkMinor))} TSR<br />
           <small>Official rate, {wallet.quote.source}.</small></p>
         {onBuyTessera ? <WalletKiosk sparkMinor={wallet.sparkMinor} rate={wallet.quote.rate} onBuyTessera={onBuyTessera} /> : <p><small>{kioskClosed}</small></p>}
+        {testFaucet && <WalletTestFaucet {...testFaucet} />}
         <h3>Recent transactions</h3>
         {wallet.transactions.length === 0 ? <p>No wages, purchases or fees recorded yet.</p> :
           <table className="wallet-history"><thead><tr><th scope="col">Date</th><th scope="col">Reason</th><th scope="col">Amount (SPK)</th></tr></thead>

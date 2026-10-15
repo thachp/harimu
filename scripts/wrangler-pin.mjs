@@ -17,7 +17,7 @@ export function deployArgs(dryRun) {
  * #627: the same for the two flags the PM turns on in the preview dashboard, HARIMU_SQUARE_PURCHASE_ENABLED (squares only) and HARIMU_TESSERA_EXCHANGE_ENABLED (the Spark-to-Tessera
  * kiosk, #626): each is still "false" in wrangler.jsonc (local runs, tests, a brand-new Worker), but a release deploy no longer resets what the dashboard set.
  */
-export const dashboardManagedVars = Object.freeze(['HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_EXCHANGE_ENABLED']);
+export const dashboardManagedVars = Object.freeze(['HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_TEST_FAUCET_ENABLED']);
 export function withoutDashboardVars(config) {
   if (!config.vars || typeof config.vars !== 'object') return config;
   const vars = Object.fromEntries(Object.entries(config.vars).filter(([name]) => !dashboardManagedVars.includes(name)));

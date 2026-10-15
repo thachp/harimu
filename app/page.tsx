@@ -663,6 +663,24 @@ export default function Home() {
     fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean; kiosk?: { open?: boolean; sparkPerTessera: number; minTesseraMinor: number; maxTesseraMinor: number } } | null> : null).then((data) => { if (data?.kiosk) kioskRules.current = data.kiosk; if (live) setKioskOpen(data?.kiosk?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
     return () => { live = false; };
   }, [walletOpen]);
+  // #631: preview-only Tessera TEST faucet; the server reports it only when HARIMU_TEST_FAUCET_ENABLED and the preview marker are both on (production answers 404, so nothing shows).
+  const [testFaucet, setTestFaucet] = useState<{ grantMinor: number; granted: boolean } | null>(null);
+  useEffect(() => {
+    if (!walletOpen) return;
+    let live = true;
+    fetch('/api/test-faucet').then(r => r.ok ? r.json() as Promise<{ available?: boolean; grantMinor: number; granted: boolean } | null> : null).then(data => { if (live) setTestFaucet(data?.available === true ? { grantMinor: data.grantMinor, granted: data.granted } : null); }).catch(() => { if (live) setTestFaucet(null); });
+    return () => { live = false; };
+  }, [walletOpen]);
+  const claimTestFaucet = async (): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/test-faucet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'claim' }) });
+      const data = await response.json() as { error?: string; tesseraMinor?: number };
+      if (!response.ok) return data.error ?? 'The test faucet is not available.';
+      setEconomy(current => current && { ...current, tesseraMinor: data.tesseraMinor ?? current.tesseraMinor });
+      setTestFaucet(current => current && { ...current, granted: true });
+      return null;
+    } catch { return 'The test faucet is not available.'; }
+  };
   const buyTessera = async (tesseraMinor: number): Promise<string | null> => {
     try {
       const response = await fetchIdempotent(fetch, '/api/world/registry', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1829,7 +1847,7 @@ export default function Home() {
       socialDock={<CitizenDock diplomaticHall={hallFlag} key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} collectivePetitions={collectivePetitions} election={election} korund={korundPlan} onNavigate={navigateGame} />}
       accountControls={<>{citizenNation && !guestActive && <button id={MORNING_BRIEF_TRIGGER_ID} type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief" aria-haspopup="dialog" aria-expanded={morningBriefOpen} aria-controls={morningBriefOpen ? 'morning-brief' : undefined}><Newspaper size={17} aria-hidden="true" /><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
-      {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onBuyTessera={kioskOpen ? buyTessera : undefined} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
+      {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onBuyTessera={kioskOpen ? buyTessera : undefined} testFaucet={testFaucet ? { ...testFaucet, claim: claimTestFaucet } : undefined} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
       {qualityOrder && rewards[qualityOrder.order.id] && <ShiftQualityStep orderName={qualityOrder.order.name} cost={qualityOrder.order.cost} base={rewards[qualityOrder.order.id]} questions={qualityOrder.questions}
         onCancel={() => setQualityOrder(null)} onStart={(choice) => { const { order, ticket } = qualityOrder; setQualityOrder(null);
           const quality: QualityInput | undefined = 'skip' in choice ? choice : ticket ? { answers: choice.answers, ticket } : undefined;
