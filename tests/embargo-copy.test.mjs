@@ -16,7 +16,7 @@ writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.
 const { embargoPrivate:E, tradeClosed:T, targetedSanctions:S, embargoPress:PR, pressFor, EMBARGO_NATIONS, EMBARGO_EVENTS, EMBARGO_PLACEHOLDERS, EMBARGO_NAME_MAX, EMBARGO_LABEL_MAX, EMBARGO_LINE_MAX } = await import(pathToFileURL(out).href);
 
 const privLines=()=>[E.imposePrompt,E.costNote,E.clearingNote,E.imposed,E.endsLine,E.liftPrompt,E.lifted,T.post,T.fill,S.good,S.office];
-const pressLines=()=>PR.flatMap(x=>[...Object.values(x.report),...Object.values(x.crown??{})]);
+const pressLines=()=>PR.flatMap(x=>[...Object.values(x.report),...Object.values(x.chairman??{}),...Object.values(x.crown??{})]);
 const labels=()=>[E.imposeButton,E.liftButton,...PR.flatMap(x=>Object.values(x.headline))];
 const lines=()=>[...privLines().map(l=>l.text),...pressLines().map(l=>l.text)];
 const all=()=>[...labels(),...lines()];
@@ -67,13 +67,15 @@ test('what the docs say: embargo stops all trade; costs the sanctioner; Clearing
 test('out of scope stays out: no multilateral sanctions, suspension, smuggling or evasion', () => {
   for (const t of all()) assert.doesNotMatch(t,/multilateral|suspend|suspension|smuggl|evad|barter|black.?market|reserve freeze|treaty of/i, t);
 });
-test('bylines match the canon press packs; AI badge only on "Be it known" Crown lines', () => {
+test('bylines match the canon press packs; AI badge on Crown "Be it known" lines and Korund State Media lines (#381)', () => {
   assert.deepEqual(pressFor('kindle').byline,kindlePress.byline); assert.deepEqual(pressFor('korund').byline,korundStateMedia.byline); assert.deepEqual(pressFor('aurelle').byline,aurelleGazette.byline);
   for (const x of PR) {
-    for (const l of Object.values(x.report)) { assert.equal(l.aiBadge,false); assert.doesNotMatch(l.text,/Be it known/); }
+    for (const l of Object.values(x.report)) { assert.equal(l.aiBadge,false, 'a generic report names any {actor}, so it is not an AI leader speaking'); assert.doesNotMatch(l.text,/Be it known/); }
+    for (const l of Object.values(x.chairman??{})) { assert.equal(l.aiBadge,true); assert.match(l.text,/^State Media: the Chairman /); assert.deepEqual(l.text.match(/\{[^}]+\}/g),['{target}']); assert.ok(l.text.length<=80); }
     for (const l of Object.values(x.crown??{})) { assert.equal(l.aiBadge,true); assert.match(l.text,/^Be it known/); }
   }
   assert.ok(!pressFor('kindle').crown&&!pressFor('korund').crown); assert.ok(pressFor('aurelle').crown);
+  assert.ok(!pressFor('kindle').chairman&&!pressFor('aurelle').chairman); assert.deepEqual(Object.keys(pressFor('korund').chairman),['imposed','lifted']);
   assert.match(pressFor('korund').report.imposed.text,/^State Media:/); assert.match(pressFor('aurelle').report.imposed.text,/^Court Gazette:/);
 });
 test('voices stay distinct; no real-world country, treaty or leader; no Notable; no player named; no threats', () => {

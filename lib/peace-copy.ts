@@ -11,8 +11,8 @@
  * Rules: no figures. The lock length is the docs' own number, but it is never written in prose: the end time comes only through
  * {readyAt}. No reparation or cession sizes, no named terms. Press lines are written from the nation's own war: {other} is the nation it
  * made peace or a ceasefire with. Placeholders ({other}, {readyAt}) are pre-formatted strings capped by the shared name cap, which this
- * module re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts). Press headlines are fixed text. Only "Be it known" Crown lines are
- * AI-badged. Limits: labels and headlines 40, lines 80 (ARC's number for this batch), tested with every placeholder filled to 24
+ * module re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts). Press headlines are fixed text. Crown "Be it known" lines are
+ * AI-badged, and so, since #381 (docs ui-ux 23.2), are Korund State Media lines, which speak for the AI Chairman and Presidium. Limits: labels and headlines 40, lines 80 (ARC's number for this batch), tested with every placeholder filled to 24
  * characters. All wording is new: `proposal: true`. */
 
 export { COUP_NAME_MAX as PEACE_NAME_MAX } from './palace-coup-copy';
@@ -61,7 +61,7 @@ export const peacePress:readonly PeacePress[]=[
   report:{signed:P('Peace signed with {other}. Ask officials what the terms are.'),ceasefireBroken:P('The ceasefire with {other} is broken. Officials must explain.')}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,
   headline:{signed:'State Media: peace signed',ceasefireBroken:'State Media: ceasefire broken'},
-  report:{signed:P('State Media: peace with {other}. The plan goes on.'),ceasefireBroken:P('State Media: the ceasefire with {other} is broken.')}},
+  report:{signed:P('State Media: peace with {other}. The plan goes on.',true),ceasefireBroken:P('State Media: the ceasefire with {other} is broken.',true)}},
  {nationId:'aurelle',byline:{name:'Court Gazette',proposal:false},proposal:true,
   headline:{signed:'The Court notes a peace',ceasefireBroken:'The Court notes a broken ceasefire'},
   report:{signed:P('Court Gazette: peace is signed with {other}.'),ceasefireBroken:P('Court Gazette: the ceasefire with {other} is broken.')},

@@ -23,7 +23,7 @@ export const WAVE2_PRESS_PARAGRAPH_MAX=140;
 export const WAVE2_PRESS_TEMPLATES_MIN=8;
 export const WAVE2_PRESS_TEMPLATES_MAX=12;
 
-const t=(id:string,topic:string,headline:string,...body:string[]):PressTemplate=>({id,topic,headline,body,proposal:true});
+const t=(id:string,topic:string,headline:string,...body:string[]):PressTemplate=>({id,topic,headline,body,aiBadge:false,proposal:true});
 
 /** The Confluence: one official paper, calm, collective and target-focused ("Guidance Plan on course"). Soft "we", water metaphors,
  * indirect criticism at most; the Four Pillars are never mocked or even named. Registered faiths are named only as registered. */

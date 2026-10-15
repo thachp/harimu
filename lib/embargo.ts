@@ -142,7 +142,7 @@ export function embargoNewsItems(embargoes: PublicEmbargo[], readerNation: strin
       if (at === null) continue;
       const crown = readerNation === 'aurelle' && embargo.actor === 'aurelle' && press.crown ? press.crown[event] : null;
       const line = crown ?? press.report[event];
-      items.push({ id: `embargo:${embargo.id}:${event}`, title: press.headline[event], text: fillText(line.text, values), occurredAt: at * 1000, source: 'deterministic', kind: line.aiBadge ? 'decree' : 'template' });
+      items.push({ id: `embargo:${embargo.id}:${event}`, title: press.headline[event], text: fillText(line.text, values), occurredAt: at * 1000, source: 'deterministic', kind: line.aiBadge && readerNation === 'aurelle' ? 'decree' : 'template' });
     }
   }
   return items;
