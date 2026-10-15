@@ -309,5 +309,5 @@ body:has(.harimu-game){overflow:auto}
 .game-notifications-topbar.has-unread{border-color:#e0b64c}
 .game-notifications-topbar.has-unread strong{min-width:1.4em;padding:0 4px;border-radius:999px;background:#e0b64c;color:#10181c;text-align:center;line-height:1.5}
 @media(max-width:760px){.game-notifications-topbar{min-height:44px;min-width:44px}}
-/* #78: on phones the identity keeps its own width, so the account group wraps to the next row instead of sliding under it (citizen at 150% text) */
-@media(max-width:420px){.harimu-game .game-hud>.game-identity{flex:1 0 auto;max-width:100%}}
+/* #78: on phones, with the emblem on, the identity keeps its own width so the account group wraps to the next row instead of sliding under it (citizen at 150% text). Scoped to the emblem so the flag-off top bar is untouched. */
+@media(max-width:420px){.harimu-game .game-hud>.game-identity:has(.nation-emblem){flex:1 0 auto;max-width:100%}}

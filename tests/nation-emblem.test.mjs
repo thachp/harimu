@@ -37,3 +37,9 @@ test('flagged top-bar bell: badge only when unread, polite live count, 44px phon
  assert.equal((dock.match(/unreadInbox\(/g)||[]).length,1,'one unread source feeds the bell, the dock button and the live region');
  assert.match(css,/@media\(max-width:760px\)\{\.game-notifications-topbar\{min-height:44px;min-width:44px\}\}/);
 });
+test('the phone identity-width rule only applies with the emblem on, so the flag-off top bar is unchanged (#78 review)',async()=>{
+ const css=await readFile(new URL('../app/game-shell.css',import.meta.url),'utf8'),own=css.slice(css.indexOf('/* #78 nation emblem'));
+ assert.ok(own.length>200);
+ assert.match(own,/\.game-hud>\.game-identity:has\(\.nation-emblem\)\{flex:1 0 auto/);
+ assert.doesNotMatch(own,/\.game-hud>\.game-identity\{/);
+});

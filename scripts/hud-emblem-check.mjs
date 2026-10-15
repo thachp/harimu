@@ -56,6 +56,17 @@ export async function checkTopBarEmblem({ browser, css, preflight, failures, row
     await page.waitForSelector('.game-hud');
     await page.waitForSelector('.game-hud .game-notifications');
     const m = await page.evaluate(measure); m.issues.forEach(fail);
+    if (flag === 'off') { // flag off must not change the top bar at all: same height as with every #78 rule removed (the CSS from the "#78 nation emblem" marker to the end of the file)
+      const hudHeight = p => p.evaluate(() => document.querySelector('.game-hud').getBoundingClientRect().height);
+      const base = await context.newPage(); base.setDefaultTimeout(90000);
+      await base.setContent(`<!doctype html><html style="--text-scale:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${preflight}${css.slice(0, css.indexOf('/* #78 nation emblem'))}</style></head><body><div id="root"></div></body></html>`);
+      await base.addScriptTag({ content: scripts.off });
+      await base.evaluate(([p, d]) => window.mountShell(p, d), [{ ...shellProps, nation, nations: [nation], citizenNation: who === 'citizen' ? nation : null, localDemo: false }, dock]);
+      await base.waitForSelector('.game-hud .game-notifications');
+      const [a, b] = [await hudHeight(page), await hudHeight(base)];
+      if (Math.abs(a - b) > 0.5) fail(`flag off changed the top-bar height: ${Math.round(a)}px, dev baseline ${Math.round(b)}px`);
+      await base.close();
+    }
     if (flag === 'off') { if (m.count) fail('an emblem shows with the flag off'); if (who === 'visitor' && !m.status.includes('Nation preview')) fail(`flag off changed the wording: "${m.status}"`); }
     else {
       if (m.count !== 1) fail(`expected one emblem, found ${m.count}`);
