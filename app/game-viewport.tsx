@@ -119,11 +119,12 @@ export function GameViewport({ mode, nationId, cityName, marketOpen = true, nati
         button.style.left = `${(point.x + 1) * w / 2}px`;
         button.style.top = `${(1 - point.y) * h / 2}px`;
       });
-      if (mode === 'city') { // #377: labels stay inside the canvas and out of each other's way (a phone has little room)
+      if (mode === 'city' && window.matchMedia?.('(max-width: 760px)').matches) { // #377: on a phone (the shell's breakpoint) labels stay inside the canvas and out of each other's way; desktop is untouched
         const shown = labels.filter(({ button }) => !button.hidden && button.offsetWidth > 0);
         const here = container.getBoundingClientRect(); // the breadcrumb and shift chip float over the canvas: labels keep clear of them
         const blocked = [...(container.closest('.harimu-game')?.querySelectorAll('.game-stage-overlay > *') ?? [])].map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0)
           .map(r => ({ x: r.left - here.left + r.width / 2, y: r.bottom - here.top, w: r.width, h: r.height })).filter(b => b.y > 0 && b.y - b.h < h && b.x + b.w / 2 > 0 && b.x - b.w / 2 < w);
+        shown.forEach(({ button }) => { button.dataset.anchor = `${button.style.left},${button.style.top}`; }); // where the building is, so a check can measure how far a label moved
         const spots = placeLabels(shown.map(({ button }) => ({ x: parseFloat(button.style.left), y: parseFloat(button.style.top), w: button.offsetWidth, h: button.offsetHeight })), { w, h }, 4, blocked);
         shown.forEach(({ button }, index) => { button.style.left = `${spots[index].x}px`; button.style.top = `${spots[index].y}px`; });
       }

@@ -31,9 +31,9 @@ test('a label wider than the canvas is centred and the result is deterministic',
   assert.deepEqual(placeLabels(boxes, area), placeLabels(boxes, area));
 });
 
-test('the viewport applies placement in the city scene only, and the phone cards wrap in a grid instead of scrolling sideways', () => {
+test('the viewport applies placement in the city scene on phones only (the 760px breakpoint; desktop labels are untouched), and the phone cards wrap in a grid instead of scrolling sideways', () => {
   const viewport = readFileSync(new URL('../app/game-viewport.tsx', import.meta.url), 'utf8');
-  assert.match(viewport, /if \(mode === 'city'\) \{[\s\S]{0,900}placeLabels\(/);
+  assert.match(viewport, /if \(mode === 'city' && window\.matchMedia\?\.\('\(max-width: 760px\)'\)\.matches\) \{[\s\S]{0,1200}placeLabels\(/);
   const css = readFileSync(new URL('../app/game-shell.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const phone = css.split(/@media\(max-width:760px\)\{/).slice(1).find(block => block.startsWith('.game-context-items{display:grid'));
   assert.ok(phone, 'a phone block makes the destination cards a grid');
@@ -52,4 +52,13 @@ test('labels keep clear of the breadcrumb / shift chip over the canvas, results 
   placed.forEach((p, i) => assert.equal(p.w, boxes[i].w, 'same order as the input'));
   for (const p of placed) { assert.ok(!overlap(p, blocked[0]), 'clear of the breadcrumb'); assert.ok(p.y - p.h >= 0 && p.y <= area.h && p.x - p.w / 2 >= 0 && p.x + p.w / 2 <= area.w); }
   for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) assert.ok(!overlap(placed[i], placed[j]), `${i} and ${j} overlap`);
+});
+
+test('crowded phone canvases: the whole canvas is used, and on a canvas too short for every label none is buried under another (320px wide)', () => {
+  // 390 wide, 270 tall, breadcrumb at the top left, wider font: five labels fit clear of the breadcrumb and of each other.
+  const placed = placeLabels([{ x: 195, y: 112, w: 176, h: 44 }, { x: 112, y: 101, w: 144, h: 44 }, { x: 191, y: 48, w: 201, h: 44 }, { x: 197, y: 161, w: 178, h: 44 }, { x: 269, y: 88, w: 133, h: 44 }], { w: 390, h: 270 }, 4, [{ x: 134, y: 72, w: 244, h: 62 }]);
+  for (let i = 0; i < placed.length; i++) { assert.ok(!overlap(placed[i], { x: 134, y: 72, w: 244, h: 62 })); for (let j = i + 1; j < placed.length; j++) assert.ok(!overlap(placed[i], placed[j])); }
+  // 320 wide, 181 tall: cannot fit; labels stay inside and no centre is covered by another label.
+  const tiny = placeLabels([{ x: 160, y: 60, w: 167, h: 44 }, { x: 100, y: 90, w: 140, h: 44 }, { x: 150, y: 40, w: 191, h: 44 }, { x: 160, y: 120, w: 168, h: 44 }, { x: 220, y: 70, w: 127, h: 44 }], { w: 320, h: 181 }, 4, [{ x: 130, y: 72, w: 237, h: 62 }]);
+  for (const a of tiny) { assert.ok(a.x - a.w / 2 >= 0 && a.x + a.w / 2 <= 320 && a.y - a.h >= 0 && a.y <= 181); for (const b of tiny) if (a !== b) assert.ok(!(Math.abs(a.x - b.x) < b.w / 2 && Math.abs((a.y - a.h / 2) - (b.y - b.h / 2)) < b.h / 2), 'a label centre is buried'); }
 });
