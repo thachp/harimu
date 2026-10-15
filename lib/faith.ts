@@ -47,7 +47,7 @@ export const faithSchemas = [
 )`,
   ...festivalSchemas, // #68
   ...undergroundSchemas, // #295 (migration 0032)
-  ...missionarySchemas, // #225 (migration 0037)
+  ...missionarySchemas, // #225 (migration 0038)
 ];
 
 /** What each MVP nation lets a citizen hold publicly (14.2). Korund may also hold a hidden faith (14.6). */
