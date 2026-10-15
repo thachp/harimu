@@ -61,7 +61,7 @@ function facade(group: THREE.Group, p: Palette, w: number, h: number, d: number)
   }
 }
 
-export function createCityWorld(nationId: string, cityName?: string): WorldArt {
+export function createCityWorld(nationId: string, cityName?: string, options: { marketOpen?: boolean } = {}): WorldArt {
   materials.clear(); // Each world owns its materials; renderer may dispose the previous world.
   const key = nationId.toLowerCase(); const profile = capitalProfiles[key] ?? capitalProfiles.kindle; const p = profile.palette;
   const displayedCity = cityName?.trim() || profile.capital;
@@ -111,7 +111,8 @@ export function createCityWorld(nationId: string, cityName?: string): WorldArt {
     for (let i = 0; i < 3; i++) cylinder(g, 1.9, 0.27, 0.7 + i * 0.4, 0.2, 0.2, 0.5, p.trim);
     box(g, -0.4, 0.3, 1.5, 1.9, 0.16, 0.5, 0x654b36);
   });
-  addBuilding('market', key === 'korund' ? 'State ration store' : `${displayedCity} market`, 4, 3.8, g => {
+  // #344: with the market flag off the Kindle-style market building is not drawn (callers pass marketVisible(nation, flag) from lib/market-visibility.ts, which keeps Korund's State ration store and Aurelle's royal store).
+  if (options.marketOpen !== false) addBuilding('market', key === 'korund' ? 'State ration store' : `${displayedCity} market`, 4, 3.8, g => {
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 1.25;
       box(g, x, 0.52, 0, 1.05, 0.65, 0.75, 0x806346);
