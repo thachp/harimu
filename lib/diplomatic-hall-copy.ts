@@ -36,9 +36,10 @@ export const hallChrome={
  proposal:true,
 } as const;
 
-/** The one-line explainer under the header. The docs give no rule about posting in character or about a nation tag, so nothing here claims one (QA3 note on #606). */
+/** The one-line explainer under the header, and the note that each post shows its nation (the shipped Diplomatic Hall panel does this). The docs give no rule about posting in character, so no line claims one (QA3 note on #606). */
 export const hallExplainer={
  line:L('Citizens of the nations in this hall can read and post here.'),
+ nationNote:L('Your nation is shown next to your name.'),
  proposal:true,
 } as const;
 

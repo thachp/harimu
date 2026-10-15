@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { hallChrome as CH, hallExplainer as EX, hallComposer as CO, hallRefusals as RF, hallRefusalFor, diplomaticHallCopy as C, HALL_REFUSAL_KEYS, HALL_NAME_MAX, HALL_NUMBER_MAX, HALL_LABEL_MAX, HALL_LINE_MAX, HALL_PLACEHOLDERS } from '../lib/diplomatic-hall-copy.ts';
 
 const labels=()=>[CH.tabLabel,CH.headerTitle,CO.placeholder,CO.sendButton,CO.nationTag.text,CO.nationTag.accessibleName];
-const lineObjs=()=>[CH.emptyState,EX.line,...RF.map(r=>r.line)];
+const lineObjs=()=>[CH.emptyState,EX.line,EX.nationNote,...RF.map(r=>r.line)];
 const lines=()=>lineObjs().map(l=>l.text);
 const all=()=>[...labels(),...lines()];
 const fill=t=>HALL_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(p==='{max}'?HALL_NUMBER_MAX:HALL_NAME_MAX)),t);
@@ -34,11 +34,11 @@ test('placeholders: only {nation} (the tag) and {max} (the too-long refusal), ea
 test('no figure is written: no digits, number words or limits; the post limit arrives only through {max}', () => {
   for (const t of all()) assert.doesNotMatch(t,/\d|%|\b(one|two|three|four|five|six|ten|hundred|thousand|half|twice|per|every|each hour|minutes?|seconds?|hours?|days?|weeks?)\b/i,t);
 });
-test('who can read it: citizens of the nations in the hall; no in-character or nation-tag rule is claimed in the explainer (not in the docs)', () => {
+test('who can read it: citizens of the nations in the hall; the nation note describes the shipped tag; no in-character rule is claimed (not in the docs)', () => {
   assert.equal(EX.line.text,'Citizens of the nations in this hall can read and post here.');
-  assert.deepEqual(Object.keys(EX).sort(),['line','proposal']);
-  assert.doesNotMatch(EX.line.text,/Korund|Kindle|Aurelle|Varkand|all nations|everyone|anyone|world|in character|next to your name/i);
-  for (const t of all()) assert.doesNotMatch(t,/in character|next to your name/i,t);
+  assert.deepEqual(Object.keys(EX).sort(),['line','nationNote','proposal']); assert.equal(EX.nationNote.text,'Your nation is shown next to your name.');
+  assert.doesNotMatch(EX.line.text,/Korund|Kindle|Aurelle|Varkand|all nations|everyone|anyone|world|in character/i);
+  for (const t of all()) assert.doesNotMatch(t,/in character/i,t);
 });
 test('a nation that loses the hall at a Red Alert gets its own plain refusal (docs 18.1: Varkand), separate from the closed-nation line', () => {
   const t=refusal('alert_closed'); assert.equal(t,'The Diplomatic Hall is closed to your nation during a Red Alert.'); assert.notEqual(t,refusal('nation_closed'));
