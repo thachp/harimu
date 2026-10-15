@@ -12,6 +12,8 @@ import { devotionTier, faithCopy, unaffiliatedCopy } from './faith-copy';
 import { devotionPerFestival, festivalCalendar, festivalJoins, festivalSchemas } from './festivals';
 import { mvpFestival } from './mvp-festival-copy';
 import { royalFavorBalance, royalFavorBalanceSql } from './aurelle';
+import { holderCity, readUndergroundView, undergroundHits, undergroundSchemas } from './korund-underground'; // #295
+import { korundUndergroundCopy } from './faith-copy';
 
 // ---- PoC constants, one place ----
 export const gameDaySeconds = 7200; // 12x clock: a game day is 2 real hours (lib/world-simulation.ts)
@@ -43,6 +45,7 @@ export const faithSchemas = [
  PRIMARY KEY(user_id, game_day)
 )`,
   ...festivalSchemas, // #68
+  ...undergroundSchemas, // #295 (migration 0032)
 ];
 
 /** What each MVP nation lets a citizen hold publicly (14.2). Korund may also hold a hidden faith (14.6). */
@@ -69,7 +72,7 @@ export function devotionFromEvents(events: { day: number; amount: number }[], to
   let devotion = 0; let last: number | null = null;
   for (const day of [...byDay.keys()].sort((a, b) => a - b)) {
     if (last !== null) devotion = Math.max(0, devotion - devotionDecayPerGameDay * Math.max(0, day - last - 1));
-    devotion = Math.min(devotionMax, devotion + byDay.get(day)!); last = day;
+    devotion = Math.max(0, Math.min(devotionMax, devotion + byDay.get(day)!)); last = day; // #295: a raid's Devotion hit is a negative amount, never below 0
   }
   if (last !== null) devotion = Math.max(0, devotion - devotionDecayPerGameDay * Math.max(0, today - last));
   return devotion;
@@ -134,6 +137,12 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const changeAvailableAt = row?.changed_at != null ? Number(row.changed_at) + faithChangeCooldownSeconds : null;
   const changeBlockedReason = !enabled ? 'Faith is not open yet.' : changeAvailableAt !== null && now < changeAvailableAt
     ? `You can change faith once every 60 real days. Next change: ${new Date(changeAvailableAt * 1000).toISOString().slice(0, 10)}.` : null;
+  // #295: a Korund citizen's hidden faith has its own private worship log (the same citizen_worship rows, written by worship-underground) and takes Devotion hits from inspections.
+  const hiddenFaith: WorshipFaithId | null = enabled && nationId === 'korund' && faith === 'unaffiliated' ? row?.hidden_faith_id ?? null : null;
+  const undergroundDays = hiddenFaith ? (await db.prepare('SELECT game_day FROM citizen_worship WHERE user_id=? AND faith_id=? AND worshipped_at>=? ORDER BY game_day').bind(userId, hiddenFaith, row?.chosen_at ?? 0).all<{ game_day: number }>()).results.map(r => Number(r.game_day)) : [];
+  const undergroundHitEvents = hiddenFaith ? await undergroundHits(db, userId, Number(row?.chosen_at ?? 0)) : [];
+  const undergroundDevotion = hiddenFaith ? devotionFromEvents([...undergroundDays.map(day => ({ day, amount: devotionPerWorship })), ...undergroundHitEvents], today) : null;
+  const underground = hiddenFaith ? await undergroundState(db, userId, hiddenFaith, undergroundDays.includes(today), Number(row?.chosen_at ?? 0), today, now) : null;
   const worshippedToday = days.includes(today);
   const worshipBlockedReason = !enabled ? 'Faith is not open yet.' : !worshipFaith ? (nationId === 'korund' ? 'Public worship is not permitted in Korund.' : 'Choose a faith to attend worship.')
     : worshippedToday ? 'You have already attended worship this game day. Come back tomorrow.' : null;
@@ -142,12 +151,25 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
     faith: { id: faith, name: label(faith), chosen: Boolean(row), chosenAt: row ? Number(row.chosen_at) : null },
     hiddenFaith: row?.hidden_faith_id ? { id: row.hidden_faith_id, name: faithCopy[row.hidden_faith_id].name, private: true } : null,
     options: { public: options.public.map(id => ({ id, name: label(id) })), hidden: options.hidden.map(id => ({ id, name: faithCopy[id].name })) },
-    devotion: { value: devotion, max: devotionMax, tier: worshipFaith ? devotionTier(devotion) : null, explanation: 'Devotion gives social standing only. It never changes wages, production, prices or combat.' },
+    devotion: { value: undergroundDevotion ?? devotion, max: devotionMax, tier: worshipFaith ? devotionTier(devotion) : undergroundDevotion !== null ? devotionTier(undergroundDevotion) : null, explanation: 'Devotion gives social standing only. It never changes wages, production, prices or combat.' },
     worship: worshipFaith ? { ...worshipCopy[worshipFaith], gameDay: today, worshippedToday, nextAt: worshippedToday ? (today + 1) * gameDaySeconds : null } : null,
     worshipBlockedReason, changeAvailableAt, changeBlockedReason,
     festivals: calendar?.festivals ?? [], holiday: calendar?.holiday ?? null, banEvents: calendar?.banEvents ?? [], // #68
+    underground, // #295: private to the holder; null unless Korund, flag on and a hidden faith is held
     leaveCost: leaving ? kinwardLeaveFavorCost : null, royalFavor: leaving ? favor : null,
     leaveBlockedReason: leaving && favor < kinwardLeaveFavorCost ? kinwardLeaveBlockedReason(favor) : null,
+  };
+}
+
+/** #295: the holder's private underground-worship state: the action label, whether it can be used today, and what an inspection left (derived on read). */
+async function undergroundState(db: GameDatabase, userId: string, faithId: WorshipFaithId, worshippedToday: boolean, since: number, today: number, now: number) {
+  const view = await readUndergroundView(db, userId, await holderCity(db, userId), since, now);
+  return {
+    faithId, label: korundUndergroundCopy.worshipAction.label, worshippedToday,
+    blockedReason: worshippedToday ? korundUndergroundCopy.worshipAction.alreadyToday.text : null,
+    nextAt: worshippedToday ? (today + 1) * gameDaySeconds : null,
+    confirmation: korundUndergroundCopy.worshipAction.confirmation.text,
+    lastRaid: view.lastRaid, quietWeek: view.quietWeek,
   };
 }
 
@@ -155,6 +177,7 @@ const requestOk = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-
 export function parseFaithCommand(body: Record<string, unknown>) {
   if (!requestOk(body.requestId)) return null;
   if (body.action === 'join-festival' && typeof body.festivalId === 'string' && /^[a-z-]{3,40}$/.test(body.festivalId)) return { action: 'join-festival' as const, requestId: body.requestId, festivalId: body.festivalId };
+  if (body.action === 'worship-underground') return { action: 'worship-underground' as const, requestId: body.requestId };
   if (body.action === 'attend-worship') return { action: 'attend-worship' as const, requestId: body.requestId };
   if (body.action === 'choose-faith' && typeof body.faithId === 'string' && (body.hiddenFaithId === undefined || body.hiddenFaithId === null || typeof body.hiddenFaithId === 'string'))
     return { action: 'choose-faith' as const, requestId: body.requestId, faithId: body.faithId, hiddenFaithId: (body.hiddenFaithId as string | null | undefined) ?? null };
@@ -260,6 +283,24 @@ export async function attendWorship(db: GameDatabase, userId: string, requestId:
   const saved = await db.prepare('SELECT user_id FROM citizen_worship WHERE request_id=?').bind(requestId).first<{ user_id: string }>();
   if (!saved) return fail(409, 'already_worshipped', 'You have already attended worship this game day. Come back tomorrow.');
   return { ok: true as const, completion: worshipCopy[state.worship.faithId].completion, state: await readFaith(db, userId, now, enabled) };
+}
+
+/** #295: a Korund citizen with a hidden faith worships in private: once per game day, +Devotion, nothing is posted. Unaffiliated-only citizens, other nations and
+ *  public worship are refused. The log is citizen_worship (faith = the hidden faith), so the one-per-day rule is the same primary key as public worship. */
+export async function worshipUnderground(db: GameDatabase, userId: string, requestId: string, now: number, enabled: boolean) {
+  if (!enabled) return fail(403, 'disabled', 'Faith is not open yet.');
+  const prior = await db.prepare('SELECT user_id FROM citizen_worship WHERE request_id=?').bind(requestId).first<{ user_id: string }>();
+  if (prior) return prior.user_id === userId ? { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled) } : fail(409, 'request_reused', 'That request id was already used.');
+  const state = await readFaith(db, userId, now, enabled);
+  if (state.nationId !== 'korund') return fail(403, 'unsupported_nation', 'There is no underground worship here.');
+  if (!state.underground) return fail(409, 'no_hidden_faith', 'You have no private practice to keep.');
+  if (state.underground.worshippedToday) return fail(409, 'already_worshipped', state.underground.blockedReason!);
+  await db.batch([db.prepare(`INSERT INTO citizen_worship (user_id,game_day,faith_id,worshipped_at,request_id)
+    SELECT f.user_id,?,f.hidden_faith_id,?,? FROM citizen_faith f WHERE f.user_id=? AND f.nation_id='korund' AND f.faith_id='unaffiliated' AND f.hidden_faith_id IS NOT NULL ON CONFLICT DO NOTHING`)
+    .bind(gameDayOf(now), now, requestId, userId)]);
+  const saved = await db.prepare('SELECT user_id FROM citizen_worship WHERE request_id=?').bind(requestId).first<{ user_id: string }>();
+  if (!saved) return fail(409, 'already_worshipped', korundUndergroundCopy.worshipAction.alreadyToday.text);
+  return { ok: true as const, completion: korundUndergroundCopy.worshipAction.confirmation.text, state: await readFaith(db, userId, now, enabled) };
 }
 
 /** #68: join an active festival of your faith, once per festival occurrence (+Devotion). Not in a banning nation. */
