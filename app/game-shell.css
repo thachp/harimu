@@ -303,3 +303,11 @@ body:has(.harimu-game){overflow:auto}
 .game-identity span:has(>.nation-emblem){display:flex;align-items:center;flex-wrap:wrap}
 .game-identity .nation-emblem{font-size:calc(13px * var(--text-scale, 1));overflow:visible;max-width:none;white-space:nowrap;text-overflow:clip}
 @media(max-width:420px){.game-identity span:has(>.nation-emblem){max-width:calc(110px + 28px * var(--text-scale, 1))}}
+/* #78: top-bar notifications bell (NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM): count badge only when something is unread; a polite live region announces changes */
+.game-notifications-live{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.game-notifications-topbar{position:relative;min-width:calc(32px * var(--text-scale, 1));justify-content:center}
+.game-notifications-topbar.has-unread{border-color:#e0b64c}
+.game-notifications-topbar.has-unread strong{min-width:1.4em;padding:0 4px;border-radius:999px;background:#e0b64c;color:#10181c;text-align:center;line-height:1.5}
+@media(max-width:760px){.game-notifications-topbar{min-height:44px;min-width:44px}}
+/* #78: on phones the identity keeps its own width, so the account group wraps to the next row instead of sliding under it (citizen at 150% text) */
+@media(max-width:420px){.harimu-game .game-hud>.game-identity{flex:1 0 auto;max-width:100%}}

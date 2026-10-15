@@ -26,6 +26,14 @@ test('the emblem flag is exactly "true" and ships off in wrangler.jsonc',async()
 });
 test('top-bar notifications button names the unread count and still opens the civic inbox (#78)',async()=>{
  const dock=await readFile(new URL('../app/citizen-dock.tsx',import.meta.url),'utf8');
- assert.match(dock,/className="game-notifications"[^>]*aria-label=\{`Notifications, \$\{unread\} unread`\}/);
+ assert.match(dock,/className=\{`game-notifications[^`]*`\}[^>]*aria-label=\{`Notifications, \$\{unread\} unread`\}/);
  assert.match(dock,/aria-haspopup="dialog"[^>]*aria-expanded=\{tab==='inbox'\}[^>]*onClick=\{event=>open\('inbox',event\.currentTarget\)\}/);
+});
+test('flagged top-bar bell: badge only when unread, polite live count, 44px phone target, same unread source (#78)',async()=>{
+ const dock=await readFile(new URL('../app/citizen-dock.tsx',import.meta.url),'utf8'),css=await readFile(new URL('../app/game-shell.css',import.meta.url),'utf8');
+ assert.match(dock,/topBar=topBarEmblemEnabled\(\)/);
+ assert.match(dock,/\(!topBar\|\|unread>0\)&&<strong>\{unread\}<\/strong>/);
+ assert.match(dock,/topBar&&<span className="game-notifications-live" role="status">/);
+ assert.equal((dock.match(/unreadInbox\(/g)||[]).length,1,'one unread source feeds the bell, the dock button and the live region');
+ assert.match(css,/@media\(max-width:760px\)\{\.game-notifications-topbar\{min-height:44px;min-width:44px\}\}/);
 });
