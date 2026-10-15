@@ -86,7 +86,7 @@ test('the page, shell and daily loop use the flag: tab, link, prompts and naviga
   assert.match(page, /requestedView === 'market' && !marketShown \? 'square'/, 'no navigation reaches the Market scene');
   assert.match(page, /viewMode === 'market' && marketShown && !\['korund','aurelle'\]/);
   assert.match(page, /\.\.\.\(marketShown \? \[\{ id: 'market'/, 'city square destinations');
-  assert.match(page, /marketOpen=\{marketShown\}/);
+  assert.match(page, /marketOpen=\{marketShown\}/, 'the DailyLoop prop (the GameShell tag is checked separately below)');
   assert.match(shell, /places\.filter\(\(\{id\}\) => locationVisible\(id, resourceNation\.id, marketOpen\)\)/, 'location dock');
   assert.match(shell, /<GameViewport marketOpen=\{marketVisible\(resourceNation\.id, marketOpen\)\}/, 'map building');
   assert.match(loop, /marketOpen \? 'Collect the agreed reward once, then take your earnings to market\.' : 'Collect the agreed reward once\.'/);
@@ -171,4 +171,22 @@ test('flag off: a Kindle citizen works a shift, buys food (the daily-loop trade)
   assert.equal(meal.status, 200, JSON.stringify(meal.data));
   assert.ok(await capacity() > before, 'capacity went up after the meal');
   assert.ok(food(await state()) < food(afterBuy), 'the meal used food');
+});
+
+/** #451: GameShell defaults marketOpen to true, so the page must pass the flag on the <GameShell> tag itself. The loose regex above also matches
+ *  the DailyLoop prop, which is how the dock tab, "Open Market" button and map building stayed visible with the flag off. */
+test('#451 page.tsx passes marketOpen={marketShown} on the <GameShell> tag', async () => {
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const ast = ts.createSourceFile('page.tsx', page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const shells = [];
+  (function visit(node) {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(ast) === 'GameShell') shells.push(node);
+    ts.forEachChild(node, visit);
+  })(ast);
+  assert.equal(shells.length, 1, 'exactly one <GameShell> in page.tsx');
+  const attribute = shells[0].attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(ast) === 'marketOpen');
+  assert.ok(attribute, '<GameShell> receives marketOpen (it defaults to true)');
+  assert.equal(attribute.initializer?.getText(ast), '{marketShown}');
+  const shell = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
+  assert.match(shell, /marketOpen = true/, 'the shell default that makes the missing prop show the Market');
 });

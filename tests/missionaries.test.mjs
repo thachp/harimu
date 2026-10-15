@@ -258,7 +258,7 @@ test('flag default, migration 0038 is additive, and the app never imports the mi
 test('#404 Korund: the read carries no missionary state and the mute is refused; every missionary label fits the 80-character line limit', async t => {
   const { r } = await setup(t); await citizen(r, 'kai', 'korund'); await citizen(r, 'kim', 'kindle');
   assert.equal((await read(r, 'kai')).missionary, null); assert.notEqual((await read(r, 'kim')).missionary, null);
-  const muted = await mute(r, 'kai', true); assert.equal(muted.status, 403); assert.equal(muted.data.reason, 'unsupported_nation');
+  const muted = await mute(r, 'kai', true); assert.equal(muted.status, 403); assert.equal(muted.data.reason, 'unsupported_nation'); assert.equal(muted.data.error, 'Missionaries are available to Kindle and Aurelle citizens for now.', 'one wording for every missionary action');
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM missionary_mutes').first()).n, 0);
   const noticeCopy = await readFile(new URL('../lib/missionary-notice-copy.ts', import.meta.url), 'utf8');
   assert.equal(Number(noticeCopy.match(/MISSIONARY_LINE_MAX=(\d+)/)[1]), missionaryLabelMax, 'the label limit is Content\'s line limit'); assert.equal(missionaryLabelMax, 80);
@@ -311,4 +311,17 @@ test('#404 a refused conversion gives the claim back; a retry of an accepted ans
   const retry = await answer(r, 'kim', missionId, 'accept', rid); assert.equal(retry.status, 200); assert.equal(retry.data.replay, true); assert.equal(retry.data.state.faith.id, 'kinward-rite');
   assert.equal((await answer(r, 'kim', missionId, 'accept', rid)).data.state.faith.id, 'kinward-rite', 'and a second retry changes nothing');
   assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM missionary_responses WHERE user_id='kim'").first()).n, 1);
+});
+
+test('#404 replaying an old Accept after a later faith change is refused and keeps the original accepted row (the 14-day gap record)', async t => {
+  const { r, nowS } = await scene(t); const missionId = await arrived(r, nowS);
+  const rid = randomUUID(); assert.equal((await answer(r, 'kim', missionId, 'accept', rid)).status, 200);
+  const stamp = async () => (await r.db.prepare("SELECT outcome,responded_at,request_id FROM missionary_responses WHERE user_id='kim'").all()).results.map(x => ({ ...x }));
+  const before = await stamp(); assert.deepEqual(before.map(x => [x.outcome, x.request_id]), [['accepted', rid]]);
+  // She later changes faith (a new request id), which moves the faith row's request id on; the old Accept id no longer matches it.
+  r.setNow(r.now + 61 * D * 1000); assert.equal((await choose(r, 'kim', 'open-hand')).status, 200);
+  r.setNow(r.now + 1000);
+  const replay = await answer(r, 'kim', missionId, 'accept', rid); assert.equal(replay.status, 409); assert.equal(replay.data.reason, 'cooldown');
+  assert.deepEqual(await stamp(), before, 'the original accepted row is untouched');
+  assert.equal((await read(r, 'kim')).faith.id, 'open-hand');
 });
