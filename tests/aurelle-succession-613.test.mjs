@@ -71,6 +71,16 @@ test('flag off: the route makes zero database calls (no prepare, no batch), even
   assert.ok(onCalls > 0, 'the spy sees database calls when the flag is on');
 });
 
+test('flag off: handleSuccessionCommand itself makes zero database calls and never reads the body', async t => {
+  const c = await scene(t, undefined, { on: false });
+  let db = 0, body = 0; const prepare = c.r.db.prepare.bind(c.r.db), batch = c.r.db.batch.bind(c.r.db);
+  c.r.db.prepare = sql => { db++; return prepare(sql); }; c.r.db.batch = x => { db++; return batch(x); };
+  const spy = new Proxy({ action: 'illness', requestId: 'req-direct-0001' }, { get: (o, k) => { body++; return o[k]; }, ownKeys: o => { body++; return Reflect.ownKeys(o); }, has: (o, k) => { body++; return k in o; }, getOwnPropertyDescriptor: (o, k) => { body++; return Reflect.getOwnPropertyDescriptor(o, k); } });
+  const res = await c.mod.handleSuccessionCommand(c.r.db, { enabled: false, secret: SECRET, authorization: `Bearer ${SECRET}`, body: spy, now: 1_800_000_000 });
+  c.r.db.prepare = prepare; c.r.db.batch = batch;
+  assert.deepEqual([res.ok, res.status, res.reason], [false, 404, 'disabled']); assert.equal(db, 0, 'no database call'); assert.equal(body, 0, 'the body is never read');
+});
+
 test('secret boundary: a 15-character secret never authorizes (401), a 16-character secret does (200)', async t => {
   const fifteen = 'a'.repeat(15), sixteen = 'b'.repeat(16);
   const short = await scene(t, undefined, { secret: fifteen }); refused(await short.send('illness', undefined, `Bearer ${fifteen}`), 401, 'unauthorized'); assert.deepEqual(await short.events(), []);
