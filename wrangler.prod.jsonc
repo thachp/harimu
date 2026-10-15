@@ -62,6 +62,8 @@
     "HARIMU_AURELLE_COUP_ENABLED": "false",
     // #531: Aurelle guild charter PoC (request/renew a market-stall charter for Royal Favor). Off: the charter route is a 404 and nothing is written.
     "HARIMU_AURELLE_CHARTERS_ENABLED": "false",
+    // #465: earned-Tessera rewards (a fixed daily pool split pro-rata over verified settled Kindle shifts, claimed at a kiosk; no exchange, cash-out or conversion). Off: the rewards route is a 404 and the epoch-close cron is a no-op.
+    "HARIMU_TESSERA_REWARDS_ENABLED": "false",
     // #283: Kindle mid-term Assembly election (D'Hondt per district, 5% district share). Off until QA. #351: the real calendar is driven by the world clock: set HARIMU_KINDLE_CYCLE_START_AT (epoch seconds, start of day 0 of the first 120-day cycle) and the vote opens at day 60 of every cycle for 72 hours. Without it, HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) is a manual one-off open. Neither set: it never opens.
     "HARIMU_KINDLE_ASSEMBLY_ENABLED": "false",
     // #307: Kindle party membership and human primaries. Off until QA. Opening is manual: set HARIMU_PRIMARIES_OPEN_AT (epoch seconds) to open the 72-hour primary.
