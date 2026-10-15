@@ -1,5 +1,5 @@
 /** #465 slice 1: earned-Tessera rewards (Option A, shift source only), on SQLite and PGlite: epoch close (idempotent, pro-rata, caps, verified only), cron, kiosk read, idempotent claim, flag-off 404,
- *  the Postgres 0056 migration, and the default-off wrangler flags. Numbers are the [ASSUMPTION]s in lib/tessera-rewards-rules.ts. */
+ *  the Postgres 0057 migration, and the default-off wrangler flags. Numbers are the [ASSUMPTION]s in lib/tessera-rewards-rules.ts. */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
@@ -83,10 +83,10 @@ test('allocation is pro-rata under the pool, honours every cap, and has no sourc
   for (const forbidden of [/citizen_tessera_ledger/, /citizen_tessera_exchanges/, /tessera-exchange/, /player_fills/, /starter-grant/, /npc/i]) assert.doesNotMatch(source, forbidden, 'no exchange, faucet, ledger or NPC source and no balance change in slice 1');
 });
 
-test('Postgres 0056 is additive, re-runnable, and enforces the guards', async () => {
+test('Postgres 0057 is additive, re-runnable, and enforces the guards', async () => {
   const db = new PGlite(); await db.exec('CREATE TABLE citizens(clerk_user_id TEXT PRIMARY KEY); CREATE TABLE shift_settlements(shift_id TEXT PRIMARY KEY)');
   await db.exec("INSERT INTO citizens VALUES ('u'),('v'); INSERT INTO shift_settlements VALUES ('s1'),('s2')");
-  const migration = await readFile(new URL('../db/postgres/0056_tessera_rewards.sql', import.meta.url), 'utf8'); await db.exec(migration); await db.exec(migration);
+  const migration = await readFile(new URL('../db/postgres/0057_tessera_rewards.sql', import.meta.url), 'utf8'); await db.exec(migration); await db.exec(migration);
   assert.doesNotMatch(migration, /DROP |ALTER TABLE|^\s*(DELETE|UPDATE)\b/im, 'additive only');
   await db.exec("INSERT INTO tessera_reward_epochs VALUES (1,10000,25,1,100); INSERT INTO tessera_reward_entries VALUES ('trw-1-s1',1,'u','s1',25,'shift')");
   await assert.rejects(db.exec("INSERT INTO tessera_reward_epochs VALUES (1,10000,0,0,100)"), 'one row per epoch'); await assert.rejects(db.exec("INSERT INTO tessera_reward_epochs VALUES (2,100,200,0,100)"), 'allocated cannot exceed the pool');
