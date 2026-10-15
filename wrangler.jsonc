@@ -55,6 +55,8 @@
     "HARIMU_EMBARGO_ENABLED": "false",
     // #362: Aurelle Crown debasement PoC (mint parity, Currency Confidence, Monarch decree). Off until QA; decrees are written only by the scheduled Worker.
     "HARIMU_CROWN_DEBASEMENT_ENABLED": "false",
+    // #431: Kindle Spark money supply and Price Index PoC (Reserve Board issuance within the 3% cap and the Charter Limit). Off until QA; issuance is written only by the scheduled Worker.
+    "HARIMU_SPARK_SUPPLY_ENABLED": "false",
     // #432: daily ledger reconciliation job and its read-only admin report route. Off until QA. The route also needs the HARIMU_ADMIN_TOKEN Worker secret (set in the dashboard, never in this file); without it the route is a 404.
     "HARIMU_LEDGER_RECONCILIATION_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
