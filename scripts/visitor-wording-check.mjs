@@ -55,6 +55,9 @@ const probe = scene => {
   if (scene.visitor && labels.includes('Your household')) issues.push('a visitor sees "Your household"');
   const page = document.body.innerText;
   if (scene.visitor && /You are a citizen/.test(page)) issues.push('a visitor is told "You are a citizen"');
+  const strip = text(document.querySelector('.game-context-heading span')), note = text(document.querySelector('.game-world-note')); // #379: the context strip and the footer note
+  if (scene.visitor && (/Citizen snapshot/.test(strip) || /CITIZEN VIEW/.test(note))) issues.push(`a visitor sees citizen wording in the context strip ("${strip}") or footer note ("${note}")`);
+  if (!scene.visitor && (strip !== 'Citizen snapshot' || note !== 'CITY DISTRICTS · CITIZEN VIEW')) issues.push(`a citizen's strip/note changed ("${strip}" / "${note}")`);
   if (scene.guide && !page.includes(scene.guide)) issues.push(`guide heading "${scene.guide}" missing`);
   if (scene.pins && ![...document.querySelectorAll('button small')].some(e => text(e) === scene.pins)) issues.push(`country pins lack "${scene.pins}"`);
   // Text must stay inside its own box: guide card, inspector header, country pins.
