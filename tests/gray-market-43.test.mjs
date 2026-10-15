@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { componentModule } from './helpers/component-module.mjs';
-import { validGrayOffer, grayCashFor, rumoredRate, graySeed, GRAY_AMOUNT_CAP_MINOR, GRAY_OFFER_LIFETIME_SECONDS, GRAY_STARTING_GRANT_MINOR, GRAY_RUMOR_WINDOW_SECONDS, GAME_DAY_SECONDS, GRAY_RUMOR_NOISE, GRAY_RUMOR_NUDGE } from '../lib/gray-market-rules.ts';
+import { validGrayOffer, grayCashFor, rumoredRate, graySeed, GRAY_AMOUNT_CAP_MINOR, GRAY_OFFER_LIFETIME_SECONDS, GRAY_STARTING_GRANT_MINOR, GRAY_RUMOR_WINDOW_SECONDS, GAME_DAY_SECONDS, GRAY_RUMOR_NOISE, GRAY_RUMOR_NUDGE, GRAY_RATE_MAX, GRAY_RATE_MIN } from '../lib/gray-market-rules.ts';
 import { laborNoteSql, laborNoteBinds, laborNoteParams } from '../lib/korund-wallet.ts';
 
 async function gray(t, on = true) {
@@ -64,6 +64,14 @@ test('rumor nudge (QA1): with one trade, when the noisy figure lands exactly on 
     const rumor = rumoredRate([trade], at), step = Math.max(1, Math.round(askRate * GRAY_RUMOR_NUDGE));
     assert.notEqual(rumor, askRate, `rate ${askRate}: never exactly the one trade's rate`);
     assert.equal(Math.abs(rumor - askRate), step, `rate ${askRate}: moved by max(1, 1% of the rate)`); assert.ok(rumor >= 1);
+  }
+});
+
+test('rumored rate is clamped to the offer rate range, even for trades at the limits', () => {
+  for (const askRate of [GRAY_RATE_MAX, GRAY_RATE_MAX - 1, GRAY_RATE_MIN]) for (let day = 0; day < 300; day++) {
+    const at = 1_000_000 + day * GAME_DAY_SECONDS, rumor = rumoredRate([{ offerId: `edge-${askRate}`, askRate, tradedAt: at - 60 }], at);
+    assert.ok(rumor >= GRAY_RATE_MIN && rumor <= GRAY_RATE_MAX, `rate ${askRate} day ${day}: ${rumor}`);
+    assert.notEqual(rumor, askRate, 'a single trade is never echoed back');
   }
 });
 

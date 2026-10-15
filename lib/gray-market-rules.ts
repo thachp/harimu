@@ -45,10 +45,10 @@ export function rumoredRate(trades: readonly GrayTradePoint[], now: number): num
   const latest = recent[0];
   const average = recent.reduce((sum, t) => sum + t.askRate, 0) / recent.length;
   const u = graySeed(`${latest.offerId}:${Math.floor(now / GAME_DAY_SECONDS)}`) / 0x100000000;
-  let rate = Math.max(GRAY_RATE_MIN, Math.round(average * (1 + GRAY_RUMOR_NOISE * (2 * u - 1))));
+  let rate = Math.min(GRAY_RATE_MAX, Math.max(GRAY_RATE_MIN, Math.round(average * (1 + GRAY_RUMOR_NOISE * (2 * u - 1)))));
   if (rate === latest.askRate) {
     const step = Math.max(1, Math.round(latest.askRate * GRAY_RUMOR_NUDGE)), down = latest.askRate - step;
-    rate = u < 0.5 && down >= GRAY_RATE_MIN ? down : latest.askRate + step;
+    rate = (u < 0.5 && down >= GRAY_RATE_MIN) || latest.askRate + step > GRAY_RATE_MAX ? down : latest.askRate + step;
   }
   return rate;
 }

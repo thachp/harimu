@@ -1,7 +1,6 @@
 /** #432: daily ledger reconciliation PoC behind HARIMU_LEDGER_RECONCILIATION_ENABLED. Read-only on money, one report per game day, scheduled Worker only, fail-closed admin route. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { firstMismatches, isMinorUnit, reconciliationConfig, reconciliationGameDay } from '../lib/ledger-reconciliation-rules.ts';
@@ -176,7 +175,7 @@ test('wallet drift is caught: a wallet view that disagrees with its entries name
 });
 
 test('the report keeps only the first 10 mismatching ids while the count stays exact', async t => {
-  const { r, m, epoch } = await setup(t); await seedClean(r);
+  const { r, m } = await setup(t); await seedClean(r);
   await r.db.prepare('PRAGMA ignore_check_constraints = ON').run();
   for (let i = 0; i < 14; i++) await r.db.prepare("INSERT INTO citizen_economy_events(id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,'alice','sell','food',-1,?,1)").bind(`frac-${i}`, 0.5).run();
   const result = await m.reconcileLedger(r.db);
