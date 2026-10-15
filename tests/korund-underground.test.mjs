@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { discoveryKind, hash32, pickIndex, raidAllowed, raidDue, raidId, raidRoll, undergroundConfig as cfg, undergroundGameDay } from '../lib/underground-rules.ts';
+import { hash32, isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionWord, pickIndex, raidAllowed, raidDue, raidId, raidRoll, undergroundConfig as cfg, undergroundGameDay } from '../lib/underground-rules.ts';
 
 const DAY = 7200, WEEK = 7 * 86400;
 const choose = (r, user, faithId, hiddenFaithId, requestId = randomUUID()) => r.call('faith', user, { action: 'choose-faith', faithId, ...(hiddenFaithId ? { hiddenFaithId } : {}), requestId });
@@ -142,27 +142,64 @@ test('the 14-day cap: no second inspection of a city inside 14 real days, allowe
   assert.deepEqual(await mod.runKorundRaids(r.db, t0 + 1), [], 'and then capped again');
 });
 
-test('#382: the notice is the first-discovery line the first time and the repeat line on a later discovery, from real history; the count is private to the holder', async t => {
+test('#382 pure rules: Suspicion is 0..100, +10 per discovery or +5 for a repeat within 30 days, -1 per real day, derived from discovery times', () => {
+  const D = 86400, t = 1_000_000;
+  assert.equal(suspicionLevel([], t), 0); assert.equal(suspicionLevel([t], t), 10);
+  assert.equal(suspicionLevel([t], t + 3 * D + 86399), 7, 'decays a whole day at a time, computed on read'); assert.equal(suspicionLevel([t], t + 10 * D), 0); assert.equal(suspicionLevel([t], t + 400 * D), 0, 'never below 0');
+  assert.equal(isRepeatDiscovery(null, t), false); assert.equal(isRepeatDiscovery(t, t + 30 * D), true, 'the window is the last 30 real days, inclusive'); assert.equal(isRepeatDiscovery(t, t + 30 * D + 1), false); assert.equal(isRepeatDiscovery(t, t + 14 * D), true, 'longer than the 14-day inspection gap');
+  assert.equal(suspicionLevel([t, t + 14 * D], t + 14 * D), 5, '10 decays to 0 over 14 days, then a repeat adds 5'); assert.equal(suspicionLevel([t, t + 30 * D], t + 30 * D), 5); assert.equal(suspicionLevel([t, t + 30 * D + 1], t + 30 * D + 1), 10, 'outside the window it is a first step again');
+  assert.equal(suspicionLevel([t, t + 14 * D], t + 14 * D), suspicionLevel([t + 14 * D, t], t + 14 * D), 'order does not matter');
+  assert.equal(suspicionLevel([t, t + D, t + 2 * D], t + 2 * D), 10 + 4 + 4);
+  assert.equal(suspicionLevel(Array.from({ length: 60 }, (_, i) => t + i * D), t + 59 * D), 100, 'capped at 100');
+  assert.deepEqual([0, 1, 29, 30, 59, 60, 100].map(l => suspicionBand(l)), ['none', 'low', 'low', 'raised', 'raised', 'high', 'high']);
+  assert.deepEqual(suspicionWord, { low: 'Low', raised: 'Raised', high: 'High' });
+  assert.equal(cfg.suspicionFirstStep, 10); assert.equal(cfg.suspicionRepeatStep, 5); assert.equal(cfg.repeatWindowSeconds, 30 * 86400); assert.equal(cfg.raidMinGapSeconds, 14 * 86400); // pin the [ASSUMPTION] numbers
+});
+
+test('#382: the first inspection shows the first-discovery line and a private Suspicion band; a repeat inside the 30-day window shows the repeat line; re-choosing a faith resets nothing; others are not affected', async t => {
   const { r, mod, nowS } = await setup(t);
-  assert.equal(discoveryKind(0), 'first'); assert.equal(discoveryKind(1), 'repeat'); assert.equal(discoveryKind(5), 'repeat');
   await hold(r, 'kai'); assert.equal((await underground(r, 'kai')).status, 200);
   const capital = 'stonehearth', gap = cfg.raidMinGapSeconds;
-  const d1 = dueDay(capital, undergroundGameDay(nowS()) + 1), t1 = d1 * DAY + 60;
+  // Two game days a real 14 days apart that both roll a discovery: the second lands exactly on the per-city gap boundary, well inside the 30-day repeat window.
+  let d1 = undergroundGameDay(nowS()) + 1; while (!(raidDue(capital, d1) && raidDue(capital, d1 + gap / DAY))) d1++;
+  const t1 = d1 * DAY + 60, t2 = t1 + gap;
   r.setNow(t1 * 1000); await r.db.prepare('UPDATE citizen_worship SET worshipped_at=?').bind(t1 - 100).run();
   assert.deepEqual(await mod.runKorundRaids(r.db, t1), [capital]);
-  const first = (await read(r, 'kai')).underground.lastRaid;
-  assert.equal(first.text, 'An inspection found a shrine. Suspicion was recorded.'); assert.equal(first.repeat, false); assert.equal(first.discoveries, 1);
-  // 14 real days and a bit later: the same holder is found again (after worshipping again), and a newcomer is found for the first time.
-  const d2 = dueDay(capital, Math.ceil((t1 + gap) / DAY) + 1), t2 = d2 * DAY + 60;
+  const first = (await read(r, 'kai')).underground;
+  assert.equal(first.lastRaid.text, 'An inspection found a shrine. Suspicion was recorded.'); assert.equal(first.lastRaid.repeat, false); assert.equal(first.lastRaid.discoveries, 1);
+  assert.deepEqual(first.suspicion, { line: 'Suspicion: Low', privateTag: 'Private to you', tooltip: ['State Security keeps a private record. Only you can see it.', 'Each inspection that finds a shrine adds to it. Nobody else sees it.'] });
+  assert.doesNotMatch(JSON.stringify(first.suspicion), /\b10\b/, 'the number is never sent');
   r.setNow((t2 - 200) * 1000); await hold(r, 'kay'); assert.equal((await underground(r, 'kay')).status, 200); assert.equal((await underground(r, 'kai')).status, 200);
   r.setNow(t2 * 1000); assert.deepEqual(await mod.runKorundRaids(r.db, t2), [capital]);
-  const again = (await read(r, 'kai')).underground.lastRaid;
-  assert.equal(again.text, 'An inspection found a shrine again. Correction Duty may follow, for up to 7 days.'); assert.equal(again.repeat, true); assert.equal(again.discoveries, 2);
-  const newcomer = (await read(r, 'kay')).underground.lastRaid;
-  assert.equal(newcomer.text, 'An inspection found a shrine. Suspicion was recorded.'); assert.equal(newcomer.repeat, false); assert.equal(newcomer.discoveries, 1, "another holder's history does not count");
-  // Private: the count and the repeat flag come only from the holder's own faith read, never from the news.
-  const rumor = (await r.call('news', 'kai')).data.items.find(i => i.id === `korund:inspection:${raidId(capital, d2)}`);
+  const again = (await read(r, 'kai')).underground;
+  assert.equal(again.lastRaid.text, 'An inspection found a shrine again. Correction Duty may follow, for up to 7 days.'); assert.equal(again.lastRaid.repeat, true); assert.equal(again.lastRaid.discoveries, 2);
+  assert.equal(again.suspicion.line, 'Suspicion: Low');
+  const newcomer = (await read(r, 'kay')).underground;
+  assert.equal(newcomer.lastRaid.repeat, false); assert.equal(newcomer.lastRaid.discoveries, 1, "another holder's history does not count"); assert.equal(newcomer.suspicion.line, 'Suspicion: Low');
+  // Re-choosing the faith (chosen_at moves forward) keeps Suspicion: it is keyed to the citizen and counted from stored discoveries.
+  await r.db.prepare("UPDATE citizen_faith SET chosen_at=? WHERE user_id='kai'").bind(t2 + 60).run(); r.setNow((t2 + 120) * 1000);
+  const rechosen = (await read(r, 'kai')).underground;
+  assert.equal(rechosen.lastRaid, null, 'the notice is for this faith choice'); assert.equal(rechosen.suspicion.line, 'Suspicion: Low', 'Suspicion survives re-choosing');
+  // It decays on read: a day short of its decay to zero it still shows, and after it is gone nothing is shown.
+  r.setNow((t2 + 4 * 86400) * 1000); assert.equal((await read(r, 'kai')).underground.suspicion.line, 'Suspicion: Low');
+  r.setNow((t2 + 6 * 86400) * 1000); assert.equal((await read(r, 'kai')).underground.suspicion, null, 'decayed to 0');
+  // The news rumor carries none of it.
+  const rumor = (await r.call('news', 'kai')).data.items.find(i => i.id === `korund:inspection:${raidId(capital, Math.floor(t2 / DAY))}`);
   assert.ok(rumor); assert.doesNotMatch(JSON.stringify(rumor), /repeat|discoveries|Correction|Suspicion|kai|kay/);
+});
+
+test('#382: more discoveries raise the band (Raised, then High) from stored rows, and a GET writes nothing', async t => {
+  const { r, nowS } = await setup(t);
+  await hold(r, 'kai'); assert.equal((await underground(r, 'kai')).status, 200);
+  const seed = async (n, step) => { for (let i = 0; i < n; i++) { const at = nowS() - (n - i) * step, id = `seed-${step}-${i}`;
+    await r.db.prepare('INSERT INTO korund_raids (id,city_id,game_day,raided_at) VALUES (?,?,?,?)').bind(id, 'stonehearth', -1000 - i - step, at).run();
+    await r.db.prepare('INSERT INTO korund_raid_hits (raid_id,user_id,game_day,raided_at,devotion_hit) VALUES (?,?,?,?,?)').bind(id, 'kai', -1000 - i - step, at, 0).run(); } };
+  await seed(8, 86400); // +10, then +4 a day: 38 at the last one, 37 now
+  assert.equal((await read(r, 'kai')).underground.suspicion.line, 'Suspicion: Raised');
+  assert.deepEqual(await writesDuring(r, () => read(r, 'kai')), [], 'reading Suspicion writes nothing');
+  await r.db.prepare('DELETE FROM korund_raid_hits').run(); await r.db.prepare('DELETE FROM korund_raids').run();
+  await seed(25, 86400 / 2); // twelve-hour steps: +5 each and no real decay between them
+  assert.equal((await read(r, 'kai')).underground.suspicion.line, 'Suspicion: High');
 });
 
 test('no wage, production, market or combat effect: an inspection writes only its own two tables and Devotion stays social', async t => {

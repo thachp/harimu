@@ -71,7 +71,8 @@ test('tone (#322, §14.6): quiet and abstract; no violence, arrest, believers na
   assert.doesNotMatch(t,/State Media|Notable|@/); assert.doesNotMatch(t,/\b(Kindle|Aurelle|Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(Earth|America|Europe|Russia|China)\b/);
 });
-test('unwired: nothing in app/, components/ or lib/ imports korund-suspicion-copy', () => {
+test('wired only on the server (#382): app/ and components/ never import korund-suspicion-copy; in lib/ only korund-underground.ts does, and sends the strings', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('korund-suspicion-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/korund-suspicion-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('korund-suspicion-copy.ts') && !f.endsWith('lib/korund-underground.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/korund-suspicion-copy/, f);
+  assert.match(readFileSync('lib/korund-underground.ts','utf8'),/from '\.\/korund-suspicion-copy'/);
 });
