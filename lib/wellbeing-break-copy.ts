@@ -8,6 +8,9 @@
  * someone plays and never pressing them to stay: the player decides. No clinical or health claims. The word "streak", urgency and
  * fear-of-missing-out wording are kept out of every line, and a test scans for them.
  *
+ * Nothing here promises that the citizen, a balance or anything else is kept as it is: the citizen ages with the World Clock and may be
+ * succeeded by an heir, and the savings shield is partial. Only the page's own claims are used, and a test scans every reminder body for them.
+ *
  * Rules: no figure is written into any line: the reminder interval is {interval} and the daily limit is {limit}, both pre-formatted by the code
  * (for example a length of time). The runtime values are capped by the shared name cap, which this module re-exports (COUP_NAME_MAX from the
  * palace coup copy module). Limits: labels 40, lines 80, bodies 140, tested with every placeholder filled to 24 characters. All wording is new:
@@ -38,7 +41,7 @@ export const breakReminder={
  bodies:[
   L('You have been playing for a while. Your world will be here when you come back.'),
   L('A good moment to stretch, have some water or rest your eyes.'),
-  L('Take a break if you would like to. Your citizen will be here when you return.'),
+  L('Take a break if you would like to. There is no pressure to stay.'),
   L('Resting is part of playing. Come back whenever you are ready.'),
  ] as readonly Line[],
  actions:{keepPlaying:'Keep playing',takeBreak:'Take a break'},
@@ -59,6 +62,6 @@ export const breakLimitNotice={
 export const breakReassurance={
  identity:L('You can take a break, pause or leave without losing your identity.'),
  absence:L('Harimu does not punish you for being away, and there is no pressure to log in.'),
- protection:L('Offline players are protected. For example, small balances are shielded from inflation.'),
+ protection:L('Offline players are protected. For example, small balances get some inflation protection.'),
  proposal:true,
 } as const;

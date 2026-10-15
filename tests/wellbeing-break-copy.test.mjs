@@ -51,8 +51,9 @@ test('no clinical or health claims, no promise beyond the docs: nothing on treat
   for (const t of all()) { assert.doesNotMatch(t,/\b(therap\w*|diagnos\w*|treatment|disorder|mental health|anxiety|depress\w*|stress\w*|sleep\w*|doctor|medical|clinical|healthy|health)\b/i,t); assert.doesNotMatch(t,/\b(track\w*|monitor\w*|measure\w*|score\w*|data|logged|we notice|we can see|we know|guarantee\w*|promise\w*|always|never|forever)\b/i,t); }
 });
 test('the reassurance stays inside the wellbeing page: identity kept, absence not punished, offline players protected (small balances, inflation)', () => {
-  assert.match(A.identity.text,/without losing your identity/); assert.match(A.absence.text,/does not punish you for being away/); assert.match(A.protection.text,/Offline players are protected/); assert.match(A.protection.text,/small balances are shielded from inflation/);
+  assert.match(A.identity.text,/without losing your identity/); assert.match(A.absence.text,/does not punish you for being away/); assert.match(A.protection.text,/Offline players are protected/); assert.match(A.protection.text,/small balances get some inflation protection/);
   for (const t of [A.identity.text,A.absence.text,A.protection.text]) assert.doesNotMatch(t,/savings|home|house|property|wallet|rank|office|job|progress|nothing (is|will be) lost/i,t);
+  assert.doesNotMatch(A.protection.text,/shield\w*|fully|completely|all of|safe/i);
 });
 test('one neutral system voice: no byline, no AI badge, no nation, leader or outlet voice, no real-world references', () => {
   for (const o of [S,R,N,A]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
@@ -61,4 +62,9 @@ test('one neutral system voice: no byline, no AI badge, no nation, leader or out
 test('unwired: nothing in app/, components/ or lib/ imports wellbeing-break-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('wellbeing-break-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/wellbeing-break-copy/, f);
+});
+
+test('no continuity promise anywhere in the reminders: the citizen ages and may be succeeded by an heir, and the savings shield is partial, so no body or notice says the citizen, home or savings stay as they are', () => {
+  for (const t of [...R.bodies.map(b=>b.text),N.body.text,N.settingsNote.text,A.identity.text,A.absence.text,A.protection.text]) assert.doesNotMatch(t,/\b(citizen|citizens|savings|home|house|property|wallet|balance|balances|account|progress|rank|office|job|heir|character|will be waiting|waiting for you|be there when|stay as|stays as|as you left|where you left|nothing (is|will be) lost|nothing changes|keeps? (your|everything)|safe)\b/i,t);
+  assert.ok(R.bodies.some(b=>b.text==='Take a break if you would like to. There is no pressure to stay.'));
 });
