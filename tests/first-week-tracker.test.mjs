@@ -2,6 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { loadApp } from './helpers/component-module.mjs';
 import { firstWeekArcs, firstWeekDay, visibleGoals } from '../lib/first-week.ts';
 import { firstWeekTracker, goalAvailable, goalSignalDone, newlyDone, stubFirstWeekProgressStore, firstWeekStubKey } from '../lib/first-week-progress.ts';
 
@@ -65,12 +68,23 @@ test('stub store persists per citizen key and survives bad data', () => {
   assert.match(firstWeekStubKey('k'),/stub/);
 });
 
-test('page wires the tracker after the first loop and labels the stub (#135)', async () => {
+test('page wires the tracker after the first loop and uses the server store when signed in (#135, #345)', async () => {
   const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
   assert.match(page,/\{firstLoopHint\}\{weekTracker\}\{dailyLoop\}/);
   assert.match(page,/!firstLoop && weekDayInfo/);
   const ui=await readFile(new URL('../app/first-week-tracker.tsx',import.meta.url),'utf8');
-  assert.match(ui,/<details/); assert.doesNotMatch(ui,/type="checkbox"/,'no manual ticks'); assert.match(ui,/this browser only/);
+  assert.match(ui,/<details/); assert.doesNotMatch(ui,/type="checkbox"/,'no manual ticks'); assert.doesNotMatch(ui,/browser only|localStorage/,'#345: no browser-only footer, the component never touches storage');
   const lib=await readFile(new URL('../lib/first-week-progress.ts',import.meta.url),'utf8');
   assert.match(lib,/STUB[^\n]*#135/);
+});
+
+test('#345: the rendered footer no longer says progress is browser-only, and signed-in progress is server-backed', async () => {
+  const { FirstWeekTracker } = await loadApp('first-week-tracker');
+  const tracker = at(2);
+  const html = renderToStaticMarkup(React.createElement(FirstWeekTracker, { tracker, onNavigate() {} })).replace(/<[^>]+>/g, ' ');
+  assert.match(html, /Guidance only, with no rewards/);
+  assert.doesNotMatch(html, /saved in this browser|browser only/i);
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /clerkConfigured \? serverFirstWeekProgressStore\(serverWeekIds\) : stubFirstWeekProgressStore\(\)/, 'localStorage stub is only the signed-out local demo path');
+  assert.match(page, /setServerWeekIds\(snapshot\.firstWeek\?\.completed/, 'signed-in goals hydrate from the citizen GET (migration 0013)');
 });

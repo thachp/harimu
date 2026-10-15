@@ -10,6 +10,8 @@ import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locatio
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
   cityName?: string;
+  /** #344: false hides the Market building (market flag off). Defaults to true. */
+  marketOpen?: boolean;
   nations?: readonly { id: string; name?: string; color?: string }[];
   selectedNationId?: string | null;
   nationFocusRevision?: number;
@@ -21,7 +23,7 @@ export type GameViewportProps = {
 };
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
 
-export function GameViewport({ mode, nationId, cityName, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '' }: GameViewportProps) {
+export function GameViewport({ mode, nationId, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '' }: GameViewportProps) {
   const {preferences:{graphics}}=useDisplayPreferences();
   const host = useRef<HTMLDivElement>(null);
   const callback = useRef(onSelect);
@@ -51,7 +53,7 @@ export function GameViewport({ mode, nationId, cityName, nations, selectedNation
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(mode === 'world' ? '#101d29' : '#172c31');
     if (mode === 'city') scene.fog = new THREE.Fog('#172c31', 35, 85);
-    const world = mode === 'city' ? createCityWorld(nationId, cityName) : createRegionWorld(JSON.parse(nationSignature));
+    const world = mode === 'city' ? createCityWorld(nationId, cityName, { marketOpen }) : createRegionWorld(JSON.parse(nationSignature));
     scene.add(world.group);
     scene.add(new THREE.HemisphereLight('#fff3d6', '#334b4d', 2.2));
     const sun = new THREE.DirectionalLight('#ffe2ac', 3.2);
@@ -199,7 +201,7 @@ export function GameViewport({ mode, nationId, cityName, nations, selectedNation
       textures.forEach(texture => texture.dispose());
       sun.shadow.map?.dispose(); renderer.dispose(); renderer.forceContextLoss(); labelLayer.remove(); canvas.remove();
     };
-  }, [mode, nationId, cityName, nationSignature, graphics]);
+  }, [mode, nationId, cityName, marketOpen, nationSignature, graphics]);
   useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, nationSignature, graphics]);
   useEffect(() => { if (cameraTourNationId && mode === 'world') controls.current?.focusNation(cameraTourNationId, false); }, [cameraTourNationId, mode, nationId, nationSignature, graphics]);
   useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId, cityName, graphics]);
