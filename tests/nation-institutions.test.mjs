@@ -84,3 +84,10 @@ test('shell inspection and terrain use selected nation while resources preserve 
     assert.ok(html.includes('Open State store'));assert.ok(html.includes('Open Assignment'));
   }
 });
+test('the world strip has no nation filter or sort rows: all ten nations show in default order, with no filter copy',()=>{
+  const html=renderToStaticMarkup(React.createElement(GameShell,{view:'world',nation:nations[0],nations,capacity:18,localDemo:false,panel:null,onNavigate:noAction,onSelectNation:noAction,contextItems:nations.map(n=>({id:n.id,label:n.name,detail:n.capital,selected:n.id==='kindle',onSelect:noAction}))}));
+  for(const gone of ['All nations','Democracies','Party states','Crown &amp; Canon','Power blocs','Default order','Filter nations by power','Sort nation strip'])assert.ok(!html.includes(gone),`${gone} should be gone`);
+  assert.doesNotMatch(html,/Shortlist · /,'no shortlist, no toggle row');
+  const order=[...html.matchAll(/<strong>([^<]+?)(?:<small|<\/strong>)/g)].map(m=>m[1]);
+  assert.deepEqual(order.slice(-nations.length),nations.map(n=>n.name),'strip cards keep the default (registry) order');
+});
