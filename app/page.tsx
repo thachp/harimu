@@ -19,12 +19,13 @@ import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/gu
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
+import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
 import { marketVisible } from '@/lib/market-visibility';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
-import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, viewedNationAfterLoad, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -49,6 +50,7 @@ import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
 import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
+import { nationPlanPanelNation } from '@/lib/nation-panels';
 import { GovernmentPanel } from './government-panel';
 import { AurelleRisingPanel } from './aurelle-rising';
 import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
@@ -592,6 +594,7 @@ export default function Home() {
   const [guestMode, setGuestMode] = useState(false);
   const [guestState, setGuestState] = useState(createGuestDemo);
   const [citizenNationId, setCitizenNationId] = useState<string | null>(null);
+  const seededNationId = useRef<string | null>(null); // #411: the citizen nation the viewed nation was last seeded from
   const [citizenshipStatus, setCitizenshipStatus] = useState<CitizenshipStatus | null>(null);
   const [enrollmentExpectedNation, setEnrollmentExpectedNation] = useState<string | null>(null);
   const enrollmentLock = useRef(false);
@@ -639,21 +642,27 @@ export default function Home() {
   const [economy, setEconomy] = useState<Economy | null>(null);
   // #210: the Clearing House kiosk opens with the World Registry (HARIMU_SQUARE_PURCHASE_ENABLED).
   const [kioskOpen, setKioskOpen] = useState(false);
+  const kioskRules = useRef({ minTesseraMinor: 100, maxTesseraMinor: 10000, sparkPerTessera: 4 }); // replaced by the server's kiosk block
+
   useEffect(() => {
     if (!walletOpen) return;
     let live = true;
-    fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean } | null> : null).then((data) => { if (live) setKioskOpen(data?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
+    fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean; kiosk?: { sparkPerTessera: number; minTesseraMinor: number; maxTesseraMinor: number } } | null> : null).then((data) => { if (data?.kiosk) kioskRules.current = data.kiosk; if (live) setKioskOpen(data?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
     return () => { live = false; };
   }, [walletOpen]);
   const buyTessera = async (tesseraMinor: number): Promise<string | null> => {
     try {
       const response = await fetchIdempotent(fetch, '/api/world/registry', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'buy-tessera', tesseraMinor, requestId: crypto.randomUUID() }) });
-      const data = await response.json() as { error?: string; sparkMinor?: number; tesseraMinor?: number };
-      if (!response.ok) return data.error ?? 'The Clearing House kiosk is unavailable.';
+      const data = await response.json() as { error?: string; reason?: string; sparkMinor?: number; tesseraMinor?: number };
+      if (!response.ok) {
+        // #210 follow-up: Content's #325 refusal copy, values pre-formatted with units; the server message stays the fallback.
+        const rules = kioskRules.current;
+        return kioskRefusal(data.reason, { amount: tsr(tesseraMinor), cost: spk(Math.ceil(tesseraMinor * rules.sparkPerTessera)), min: tsr(rules.minTesseraMinor), max: tsr(rules.maxTesseraMinor) }) ?? data.error ?? kioskClosed;
+      }
       setEconomy(current => current && { ...current, walletMinor: data.sparkMinor ?? current.walletMinor, tesseraMinor: data.tesseraMinor ?? current.tesseraMinor });
       return null;
-    } catch { return 'The Clearing House kiosk is unavailable.'; }
+    } catch { return kioskClosed; }
   };
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
   const [workPending, setWorkPending] = useState(false);
@@ -736,7 +745,7 @@ export default function Home() {
     setCitizenSessionKey(value => value + 1);
     cityTravelLock.current = false; setCityTravelPending(false); setCityAccount(null); setCityError('');
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
-    setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
+    setCitizenNationId(null); seededNationId.current = null; setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
     setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setVerification(null); setWorkShifts([]);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
@@ -1101,7 +1110,7 @@ export default function Home() {
     }
   }
 
-  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand(action === 'korund-redeem-coupon' ? { action, coupon: shiftId === 'goods' ? 'goods' : 'clothing', gameWeek: korundPlan?.gameWeek, requestId: crypto.randomUUID() } : { action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
+  const startKorundAction = (action: KorundAction, shiftId?: string, preferences?: string[]) => void runKorundCommand(action === 'korund-set-preferences' ? { action, preferences, requestId: crypto.randomUUID() } : action === 'korund-request-assignment' ? { action, requestId: crypto.randomUUID() } : action === 'korund-redeem-coupon' ? { action, coupon: shiftId === 'goods' ? 'goods' : 'clothing', gameWeek: korundPlan?.gameWeek, requestId: crypto.randomUUID() } : { action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
   async function runAurelleCommand(command: AurelleCommand) {
     const originalAurelleClaim = command.action === 'aurelle-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'CRN');
     if (marketIntent.current || playerIntent.current || korundIntent.current) return;
@@ -1241,6 +1250,8 @@ export default function Home() {
     }
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
+      // #411: an existing citizen's own nation is the viewed nation unless the URL names one (once per citizen nation, so a later visit elsewhere is kept).
+      if (seededNationId.current !== snapshot.profile.nationId) { seededNationId.current = snapshot.profile.nationId; setSelectedId(current => viewedNationAfterLoad(window.location.search, fallbackNations.map(nation => nation.id), snapshot.profile!.nationId, current)); }
       setCitizenshipStatus(snapshot.profile.citizenship);
       setCapacity(snapshot.profile.capacity);
       setInfluence(snapshot.profile.influence);
@@ -1578,6 +1589,7 @@ export default function Home() {
     </div> : <>
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</ActionButton></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</ActionButton></div>}
+      {nationPlanPanelNation(citizenNation.id, viewMode) && dailyLoop}
       {(viewMode === 'household' || viewMode === 'workplace') && <HolidayBanner faith={faithApi.faith} busy={faithApi.busy} onJoin={faithApi.joinFestival} />}
       {viewMode === 'household' && <>
         <FaithPanel api={faithApi} />
@@ -1765,7 +1777,7 @@ export default function Home() {
     }).catch(() => {});
     return () => controller.abort();
   }, [morningBriefOpen, citizenNationId, guestActive, citizenSessionStatus]); // clerkConfigured is a module-level constant (build-time env), so it is not a dependency.
-  const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow,
+  const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow, nationId: citizenNation.id, marketOpen: marketShown,
     shift: activeShift ? { title: activeShift.orderName, endsAt: Date.parse(activeShift.completesAt) / 1000 } : null,
     leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null,
     headlines: briefHeadlines?.nationId === citizenNationId ? briefHeadlines.items : [] }) : [];

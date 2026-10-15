@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { componentModule } from './helpers/component-module.mjs';
+const bureauTextModule = await import(await componentModule(new URL('../lib/labor-bureau-text.ts', import.meta.url).pathname)); // #329 copy through its adapter
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -58,7 +60,7 @@ test('completing a shift moves the work-unit quota bar for the unit and the citi
 
 test('quota bar and coupon book render',async()=>{
  const js=ts.transpileModule(await readFile(new URL('../app/korund-plan-panel.tsx',import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
- const exports={};new Function('exports','require',js)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>String}:name==='./game-timer'?{GameTimer:()=>null}:name==='./nation-document'?{NationDocument:()=>null}:name==='./action-button'?{ActionButton:()=>null}:name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='@/lib/korund-coupons'?require('../lib/korund-coupons.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):name==='react'?{useState:i=>[i,()=>{}],useEffect(){}}:require(name));
+ const exports={};new Function('exports','require',js)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>String}:name==='@/lib/labor-bureau-text'?bureauTextModule:name==='@/lib/labor-bureau-rules'?require('../lib/labor-bureau-rules.ts'):name==='./game-timer'?{GameTimer:()=>null}:name==='./nation-document'?{NationDocument:()=>null}:name==='./action-button'?{ActionButton:()=>null}:name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='@/lib/korund-coupons'?require('../lib/korund-coupons.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):name==='react'?{useState:i=>[i,()=>{}],useEffect(){}}:require(name));
  const nodes=n=>!n||typeof n!=='object'?[n]:[n,...[n.props?.children].flat(Infinity).flatMap(nodes)];
  const text=t=>t.filter(n=>typeof n==='string'||typeof n==='number').join(' ');
  const bar=nodes(exports.QuotaBar({quota:{workUnit:'Brigade',targetFood:40,unitFood:10,ownFood:4,weekStartsAt:'',weekEndsAt:''}}));
@@ -70,7 +72,7 @@ test('quota bar and coupon book render',async()=>{
 
 test('review fix: an expired coupon book cannot spend the new week (UI disabled, server checks week)',async t=>{
  const js=ts.transpileModule(await readFile(new URL('../app/korund-plan-panel.tsx',import.meta.url),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.CommonJS}}).outputText;
- const exports={};new Function('exports','require',js)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>String}:name==='./game-timer'?{GameTimer:()=>null}:name==='./nation-document'?{NationDocument:()=>null}:name==='./action-button'?{ActionButton:()=>null}:name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='@/lib/korund-coupons'?require('../lib/korund-coupons.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):name==='react'?{useState:i=>[i,()=>{}],useEffect(){}}:require(name));
+ const exports={};new Function('exports','require',js)(exports,name=>name==='./display-preferences'?{useDisplayTimestamp:()=>String}:name==='@/lib/labor-bureau-text'?bureauTextModule:name==='@/lib/labor-bureau-rules'?require('../lib/labor-bureau-rules.ts'):name==='./game-timer'?{GameTimer:()=>null}:name==='./nation-document'?{NationDocument:()=>null}:name==='./action-button'?{ActionButton:()=>null}:name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='@/lib/korund-coupons'?require('../lib/korund-coupons.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):name==='react'?{useState:i=>[i,()=>{}],useEffect(){}}:require(name));
  const nodes=n=>!n||typeof n!=='object'?[n]:[n,...[n.props?.children].flat(Infinity).flatMap(nodes)];
  const book=nodes(exports.CouponBook({now:Date.parse('2026-01-01T00:00:01.000Z'),coupons:buildCoupons(false,new Set(),'2026-01-01T00:00:00.000Z'),walletMinor:800,clothing:0,goods:0,reason:null,onRedeem(){},onFood(){}}));
  const reasons=book.filter(n=>n?.props?.reason!==undefined&&typeof n.props.onClick==='function').map(n=>n.props.reason);

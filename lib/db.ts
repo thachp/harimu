@@ -1,5 +1,6 @@
 import { aurelleRisingSchemas } from './aurelle-rising';
 import { aurelleCoupSchemas } from './aurelle-coup';
+import { laborBureauSchemas } from './labor-bureau';
 import { presidiumSchemas } from './korund-presidium';
 import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView } from './market-orders';
 import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
@@ -26,6 +27,7 @@ import { worldCitiesSchema } from './city-founding';
 import { aurelleSchemas, royalFavorSchemas } from './aurelle';
 import { warSchemas } from './war'; // #309
 import { treatySchemas } from './diplomacy'; // #308
+import { embargoSchemas } from './embargo'; // #363
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
@@ -213,7 +215,7 @@ async function initialize(database: GameDatabase) {
     database.prepare(travelSchema),
     ...faithSchemas.map(sql=>database.prepare(sql)),
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
-    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), // #309, #308
+    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), // #309, #308
     ...congregationSchemas.map(sql=>database.prepare(sql)),
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
@@ -231,7 +233,7 @@ async function initialize(database: GameDatabase) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
-    ...marketSchemas.map(sql => database.prepare(sql)), ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
+    ...marketSchemas.map(sql => database.prepare(sql)), ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
@@ -322,6 +324,12 @@ async function initialize(database: GameDatabase) {
   const citizenColumnNames = new Set(citizenColumns.results.map((column) => column.name));
   if (!citizenColumnNames.has('nation_changes')) {
     await database.prepare('ALTER TABLE citizens ADD COLUMN nation_changes INTEGER NOT NULL DEFAULT 0').run();
+  }
+
+  // #400: treaties gained broken_by (migration 0040); a local database created before it gets the column once.
+  const treatyColumns = await database.prepare('PRAGMA table_info(treaties)').all<{ name: string }>();
+  if (treatyColumns.results.length > 0 && !treatyColumns.results.some((column) => column.name === 'broken_by')) {
+    await database.prepare("ALTER TABLE treaties ADD COLUMN broken_by TEXT CHECK(broken_by IS NULL OR broken_by IN ('kindle','korund','aurelle'))").run();
   }
 
   const hasLegacyAffinity = columnNames.has('affinity');

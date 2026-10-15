@@ -3,8 +3,8 @@ import { isMissingRelation, tolerate } from './db-errors';
 import { gameTimeCompression } from './game-time';
 import { assemblyIncumbents } from './assembly-rules';
 import { brokenPactLine, ratificationFor, ratificationHeadlines, treatyStatusLines, DIPLOMACY_NAME_MAX, type RatificationKey } from './diplomacy-copy';
-import { cleanTreatyLabel, decideTreaty, isTreatyKind, isTreatyNation, treatyActorMax, treatyKindNames, treatyNationNames, treatyPairKey, treatyRequestIdOk, treatyStatus, treatyTermSeconds,
-  type PartySeats, type Ratification, type TreatyDbStatus, type TreatyKind, type TreatyNationId, type TreatyStatus } from './diplomacy-rules';
+import { cleanTreatyLabel, decideTreaty, isTreatyKind, isTreatyNation, treatyActorMax, treatyKindNames, treatyNationNames, treatyPairKey, treatyRequestIdOk, treatyStatus, treatyTermSeconds, treatyBreakPenaltyFor, treatyAiLeaders, treatyCandidates, treatyProposalCooldownSlots, treatyProposalRequestId, treatyProposalSlotSeconds, treatySlot,
+  type PartySeats, type Ratification, type TreatyDbStatus, type TreatyBreakPenalty, type TreatyKind, type TreatyNationId, type TreatyStatus } from './diplomacy-rules';
 export * from './diplomacy-rules';
 
 /** #308: AI treaties PoC (non-aggression pact, trade agreement) behind HARIMU_DIPLOMACY_ENABLED (default "false"). Canon: harimu-docs 13.1, 13.2
@@ -26,6 +26,7 @@ export const treatySchemas = [
  ends_at INTEGER,
  ended_at INTEGER,
  ratification_json TEXT,
+ broken_by TEXT CHECK(broken_by IS NULL OR broken_by IN ('kindle','korund','aurelle')),
  CHECK(proposer_nation<>other_nation),
  CHECK(status NOT IN ('in_force','expired','broken') OR (ratified_at IS NOT NULL AND ends_at IS NOT NULL AND ends_at>ratified_at)),
  CHECK(status IN ('proposed') OR decided_at IS NOT NULL)
@@ -35,10 +36,10 @@ export const treatySchemas = [
 ];
 
 type Row = { id: string; pair_key: string; kind: TreatyKind; proposer_nation: TreatyNationId; other_nation: TreatyNationId; proposed_by: string; proposed_at: number; status: TreatyDbStatus;
-  decided_at: number | null; ratified_at: number | null; ends_at: number | null; ended_at: number | null; ratification_json: string | null };
-const columns = 'id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at,ratification_json';
+  decided_at: number | null; ratified_at: number | null; ends_at: number | null; ended_at: number | null; ratification_json: string | null; broken_by: TreatyNationId | null };
+const columns = 'id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at,ratification_json,broken_by';
 export type PublicTreaty = { id: string; kind: TreatyKind; proposer: TreatyNationId; other: TreatyNationId; proposedBy: string; proposedAt: number; status: TreatyStatus;
-  ratifiedAt: number | null; endsAt: number | null; brokenAt: number | null; ratifications: Ratification[] };
+  ratifiedAt: number | null; endsAt: number | null; brokenAt: number | null; brokenBy: TreatyNationId | null; breakPenalty: TreatyBreakPenalty | null; ratifications: Ratification[] };
 export type TreatyState = { treaties: PublicTreaty[] };
 const num = (value: number | null) => value === null || value === undefined ? null : Number(value);
 function publicTreaty(row: Row, now: number): PublicTreaty | null {
@@ -47,7 +48,8 @@ function publicTreaty(row: Row, now: number): PublicTreaty | null {
   let ratifications: Ratification[] = [];
   try { const parsed = JSON.parse(row.ratification_json ?? '[]'); if (Array.isArray(parsed)) ratifications = parsed; } catch { ratifications = []; }
   return { id: row.id, kind: row.kind, proposer: row.proposer_nation, other: row.other_nation, proposedBy: row.proposed_by, proposedAt: Number(row.proposed_at), status,
-    ratifiedAt: num(row.ratified_at), endsAt: num(row.ends_at), brokenAt: row.status === 'broken' ? num(row.ended_at) : null, ratifications };
+    ratifiedAt: num(row.ratified_at), endsAt: num(row.ends_at), brokenAt: row.status === 'broken' ? num(row.ended_at) : null, brokenBy: row.status === 'broken' ? row.broken_by ?? null : null,
+    breakPenalty: row.status === 'broken' && row.broken_by ? treatyBreakPenaltyFor(row.kind, row.broken_by) : null, ratifications };
 }
 const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 
@@ -66,9 +68,15 @@ async function openWarBetween(db: GameDatabase, a: string, b: string): Promise<b
   return Boolean(row);
 }
 
+/** #363: an in-force embargo between the pair (either direction). A direct query so this module does not import lib/embargo.ts (which imports this one); a database without the table reads as none. */
+async function embargoInForce(db: GameDatabase, a: string, b: string): Promise<boolean> {
+  const row = await db.prepare("SELECT 1 AS found FROM embargoes WHERE pair_key=? AND status='in_force'").bind(treatyPairKey(a, b)).first().catch(tolerate(isMissingRelation, null));
+  return Boolean(row);
+}
+
 export type ProposeTreatyCommand = { proposer: string; other: string; kind: string; proposedBy: string; requestId: string };
 /** Server-side only (the AI leadership path calls this; no route does). Writes one `proposed` row; the world tick decides it. Idempotent per requestId. */
-export async function proposeTreaty(db: GameDatabase, command: ProposeTreatyCommand, now: number, options: { enabled: boolean }) {
+export async function proposeTreaty(db: GameDatabase, command: ProposeTreatyCommand, now: number, options: { enabled: boolean; embargo?: boolean }) {
   if (!options.enabled) return fail(403, 'disabled', 'Treaties are not open yet.');
   if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid authoritative world time.');
   if (!treatyRequestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
@@ -80,6 +88,8 @@ export async function proposeTreaty(db: GameDatabase, command: ProposeTreatyComm
   if (prior) return prior.proposer_nation === command.proposer && prior.other_nation === command.other && prior.kind === command.kind
     ? { ok: true as const, replay: true as const, treaty: publicTreaty(prior, now) } : fail(409, 'request_reused', 'That request id was already used for a different proposal.');
   await expireDueTreaties(db, now);
+  // #363: no new trade agreement while an embargo is in force between the pair, in either direction. `embargo` is the HARIMU_EMBARGO_ENABLED flag the caller passes (off: not checked).
+  if (options.embargo === true && command.kind === 'trade' && await embargoInForce(db, command.proposer, command.other)) return fail(409, 'embargo', 'An embargo is in force between these nations, so a trade agreement cannot be proposed.');
   if (await openWarBetween(db, command.proposer, command.other)) return fail(409, 'at_war', 'These nations are at war; a ceasefire or peace treaty is not part of this proposal path.');
   const id = `treaty-${command.requestId}`;
   // The unique live-per-pair-and-kind index and the request id make concurrent proposals safe: only one insert can land.
@@ -118,14 +128,47 @@ export async function runDiplomacy(db: GameDatabase, now: number) {
   await decideProposedTreaties(db, now);
 }
 
-/** Server-side only: a signatory breaks an in-force pact or trade agreement. Sets the status and records the time; the news line names the cost
- *  without a number. Penalties to Legitimacy and Reputation are out of scope for this PoC. */
-export async function breakTreaty(db: GameDatabase, treatyId: string, now: number, enabled: boolean) {
+export type BreakTreatyCommand = { treatyId: string; breaker: string };
+/** Server-side only: a signatory breaks an in-force pact or trade agreement (#400: the breaking nation is named, must be a signatory and is recorded).
+ *  Sets the status and records the time and who broke it. The penalty to the breaker's Legitimacy and Reputation is returned as an [ASSUMPTION]
+ *  placeholder (`applied: false`): those scores have no store yet. A treaty that is not in force (proposed, expired, already broken) is not broken. */
+export async function breakTreaty(db: GameDatabase, command: BreakTreatyCommand, now: number, enabled: boolean) {
   if (!enabled) return fail(403, 'disabled', 'Treaties are not open yet.');
-  await db.prepare("UPDATE treaties SET status='broken',ended_at=? WHERE id=? AND status='in_force' AND ends_at>?").bind(now, treatyId, now).run();
-  const row = await db.prepare(`SELECT ${columns} FROM treaties WHERE id=?`).bind(treatyId).first<Row>();
+  if (!isTreatyNation(command.breaker)) return fail(400, 'bad_nations', 'The breaking nation must be Kindle, Korund or Aurelle.');
+  const before = await db.prepare(`SELECT ${columns} FROM treaties WHERE id=?`).bind(command.treatyId).first<Row>();
+  if (!before) return fail(409, 'not_found', 'No such treaty.');
+  if (before.proposer_nation !== command.breaker && before.other_nation !== command.breaker) return fail(403, 'not_signatory', 'Only a signatory can break a treaty.');
+  // Guarded by status, term and signatory, so a repeated or concurrent break changes one row once.
+  const result = await db.prepare("UPDATE treaties SET status='broken',ended_at=?,broken_by=? WHERE id=? AND status='in_force' AND ends_at>? AND (proposer_nation=? OR other_nation=?)")
+    .bind(now, command.breaker, command.treatyId, now, command.breaker, command.breaker).run();
+  if ((result as { meta?: { changes?: number } }).meta?.changes === 0) return fail(409, 'not_in_force', 'That treaty is not in force.');
+  const row = await db.prepare(`SELECT ${columns} FROM treaties WHERE id=?`).bind(command.treatyId).first<Row>();
   const treaty = row ? publicTreaty(row, now) : null;
-  return treaty ? { ok: true as const, treaty } : fail(409, 'not_found', 'No such treaty.');
+  if (!treaty || treaty.status !== 'broken') return fail(409, 'not_in_force', 'That treaty is not in force.');
+  return { ok: true as const, treaty, penalty: treatyBreakPenaltyFor(treaty.kind, command.breaker) };
+}
+
+/** #400: the scheduled AI-leader proposal (called from the scheduled Worker, never from a read or a route). At most one proposal per slot: the slot's
+ *  request id makes a repeated cron run a no-op. Walks the slot's rotated candidates and proposes the first one that is allowed: not already live or
+ *  proposed (the live-treaty index), not at war, not a trade agreement under an embargo (`proposeTreaty` refuses those), and not refused in the
+ *  last few slots. The world tick then decides it with each signatory's ratifying body (docs 13.1). Flag off: nothing happens. */
+export async function runAiTreatyProposals(db: GameDatabase, now: number, options: { enabled: boolean; embargo?: boolean }) {
+  if (!options.enabled) return { status: 'disabled' as const };
+  const slot = treatySlot(now), requestId = treatyProposalRequestId(slot);
+  if (await db.prepare('SELECT 1 AS found FROM treaties WHERE request_id=?').bind(requestId).first()) return { status: 'already' as const };
+  await expireDueTreaties(db, now);
+  const since = now - treatyProposalCooldownSlots * treatyProposalSlotSeconds;
+  for (const candidate of treatyCandidates(slot)) {
+    const refused = await db.prepare("SELECT 1 AS found FROM treaties WHERE pair_key=? AND kind=? AND status='rejected' AND decided_at>?").bind(treatyPairKey(candidate.proposer, candidate.other), candidate.kind, since).first();
+    if (refused) continue;
+    const result = await proposeTreaty(db, { ...candidate, proposedBy: treatyAiLeaders[candidate.proposer], requestId }, now, { enabled: true, embargo: options.embargo });
+    if (result.ok) return { status: 'proposed' as const, treaty: result.treaty };
+  }
+  return { status: 'none' as const };
+}
+/** The scheduled Worker's entry: reads the two flags from the bindings (both default off). */
+export async function runDiplomacyCron(db: GameDatabase, now: number, bindings: { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string }) {
+  return runAiTreatyProposals(db, now, { enabled: bindings.HARIMU_DIPLOMACY_ENABLED === 'true', embargo: bindings.HARIMU_EMBARGO_ENABLED === 'true' });
 }
 
 /** Read-only. Flag off: the caller does not call this. A database without migration 0037 reads as no treaties. Newest first. */
@@ -155,7 +198,7 @@ export function treatyNewsItems(treaties: PublicTreaty[], readerNation: string):
     const other = treaty.proposer === readerNation ? treaty.other : treaty.proposer;
     const values = { nationA: cap(treatyNationNames[readerNation]), nationB: cap(treatyNationNames[other]), treaty: treatyKindNames[treaty.kind], endsAt: treaty.endsAt === null ? '' : new Date(treaty.endsAt * 1000).toISOString().slice(0, 10) };
     const key: RatificationKey = readerNation === 'kindle' ? (treaty.kind === 'trade' ? 'kindle:trade' : 'kindle:treaty') : `${readerNation}:any` as RatificationKey;
-    const news = ratificationFor(key)!, kind = news.aiBadge ? 'decree' as const : 'template' as const;
+    const news = ratificationFor(key)!, kind = news.aiBadge && news.nationId === 'aurelle' ? 'decree' as const : 'template' as const;
     items.push({ id: `treaty:${treaty.id}:ratified`, title: ratificationHeadlines[key], text: fill(news.body, values), occurredAt: treaty.ratifiedAt * 1000, source: 'deterministic', kind });
     if (treaty.status === 'broken' && treaty.brokenAt !== null) items.push({ id: `treaty:${treaty.id}:broken`, title: 'A treaty was broken', text: fill(treaty.kind === 'non-aggression' ? brokenPactLine.text : treatyStatusLines.broken[0].text, values), occurredAt: treaty.brokenAt * 1000, source: 'deterministic', kind });
   }

@@ -46,10 +46,9 @@ test('layout fixtures have the same shape as the live /api/faith and /api/congre
   assert.equal(live.holiday.name, fx.holiday.name); assert.equal(live.holiday.line, fx.holiday.line);
   const kor = (await r.call('faith', 'kai')).data, kfx = faithState({ nation: 'korund' });
   assert.deepEqual(keys(kfx), keys(kor)); assert.deepEqual(kfx.options.public.map(o => o.id), kor.options.public.map(o => o.id)); assert.equal(kor.worship, null);
-  assert.deepEqual(keys(kfx.missionary), keys(kor.missionary)); assert.deepEqual(keys(fx.missionary.labels), keys(live.missionary.labels)); assert.deepEqual(keys(fx.missionary.request), keys(live.missionary.request));
+  assert.equal(kor.missionary, null, 'Korund: no missionary state (docs 14.6)'); assert.equal(kfx.missionary, null); assert.deepEqual(keys(fx.missionary.labels), keys(live.missionary.labels)); assert.deepEqual(keys(fx.missionary.request), keys(live.missionary.request));
   assert.deepEqual(keys(fx.missionary.request.hosts[0]), keys(live.missionary.request.hosts[0])); assert.deepEqual(keys(fx.missionary.mute), keys(live.missionary.mute));
   assert.deepEqual(fx.missionary.request.hosts.map(h => [h.nationId, h.allowed, h.reason]), live.missionary.request.hosts.map(h => [h.nationId, h.allowed, h.reason]), 'fixture host stances match the server');
-  assert.deepEqual(kfx.missionary.labels, kor.missionary.labels);
   const cong = (await r.call('congregations', 'ava')).data, cfx = congregationState({ nation: 'aurelle', faith: 'kinward-rite' });
   assert.deepEqual(keys(cfx), keys(cong)); assert.deepEqual(keys(cfx.you), keys(cong.you)); assert.deepEqual(keys(cfx.congregations[0]), keys(cong.congregations[0]));
   assert.equal(cfx.congregations.length, cong.congregations.length);
@@ -180,6 +179,7 @@ test('#225 missionary block: server strings only, request/accept/answer/mute cal
   const calls = [];
   const spy = Object.fromEntries(['requestMission', 'acceptMission', 'answerMission', 'muteMissionaries'].map(n => [n, (...args) => calls.push([n, ...args])]));
   const render = (missionary, nation = 'kindle', faith = 'fair-wind-vow', devotion = 45) => renderToStaticMarkup(React.createElement(FaithPanel, { api: api(faithState({ nation, faith, devotion, missionary }), null, spy) }));
+  assert.ok(!text(renderToStaticMarkup(React.createElement(FaithPanel, { api: api(faithState({ nation: 'korund' })) }))).includes('Missionaries'), 'no Missionaries block on Korund');
   const idle = text(render({}));
   assert.match(idle, /Missionaries/); assert.match(idle, /Send a missionary to Aurelle/); assert.match(idle, /Send a missionary to Korund/); assert.ok(!idle.includes('Send a missionary to Kindle'), 'no button for your own nation');
   const low = render({}, 'kindle', 'fair-wind-vow', 20); assert.match(low, /Reach 40 Devotion[^<]*You have 20/);

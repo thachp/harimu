@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { componentModule } from './helpers/component-module.mjs';
+const kioskText = await import(await componentModule(new URL('../lib/kiosk-text.ts', import.meta.url).pathname)); // #325 copy, formatted the same way the app does
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
@@ -53,7 +55,7 @@ test('clicking SPK in the top bar opens the wallet; other currencies keep the he
 });
 
 test('wallet panel shows SPK and TSR balances, the quote and each transaction',async()=>{
- const exports={};new Function('exports','require',await compile('../app/wallet-panel.tsx'))(exports,name=>name==='@phosphor-icons/react'?{X:()=>null}:name==='@/lib/wallet'?require('../lib/wallet.ts'):require(name));
+ const exports={};new Function('exports','require',await compile('../app/wallet-panel.tsx'))(exports,name=>name==='@phosphor-icons/react'?{X:()=>null}:name==='@/lib/wallet'?require('../lib/wallet.ts'):name==='@/lib/kiosk-text'?kioskText:require(name));
  let closed=false;
  const tree=nodes(exports.WalletPanel({sparkMinor:650,transactions:[{id:'wage:1',kind:'wage',amountMinor:800,reason:'Wage · Harvest',occurredAt:'2026-10-14T10:00:00.000Z'},{id:'market:2',kind:'market-buy',amountMinor:-150,reason:'Market purchase · 1 food',occurredAt:'2026-10-14T11:00:00.000Z'}],onClose:()=>{closed=true;}}));
  const t=text(tree);
@@ -69,7 +71,7 @@ test('review fixes: history comes from the balance snapshot, demo hides the wall
  assert.match(economy,/AS history_json/);assert.match(economy,/prepare\(economyWalletSnapshotSql\)/);assert.doesNotMatch(economy.match(/export const economySnapshotSql = `[^`]+`/)[0],/\$\{/,'snapshot SQL literal has no interpolation');assert.doesNotMatch(economy,/prepare\(walletHistorySql\)/);
  const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
  assert.match(page,/onOpenWallet=\{clerkConfigured && !guestActive/);
- const exports={};new Function('exports','require',await compile('../app/wallet-panel.tsx'))(exports,name=>name==='@phosphor-icons/react'?{X:()=>null}:name==='@/lib/wallet'?require('../lib/wallet.ts'):require(name));
+ const exports={};new Function('exports','require',await compile('../app/wallet-panel.tsx'))(exports,name=>name==='@phosphor-icons/react'?{X:()=>null}:name==='@/lib/wallet'?require('../lib/wallet.ts'):name==='@/lib/kiosk-text'?kioskText:require(name));
  const tree=nodes(exports.WalletPanel({sparkMinor:0,transactions:[],onClose(){}}));const dialog=tree.find(n=>n?.props?.role==='dialog');
  let prevented=false,focused=false;dialog.props.onKeyDown({key:'Tab',preventDefault(){prevented=true;},currentTarget:{querySelector:()=>({focus(){focused=true;}})}});
  assert.equal(prevented,true);assert.equal(focused,true);

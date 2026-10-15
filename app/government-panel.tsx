@@ -36,7 +36,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> <AiBadge /> · {role.controller}</li>)}</ul>
     {!localDemo && simulation?.wars && <WarBanner wars={simulation.wars.wars} nationId={snapshot.nationId} />}
     {!localDemo && simulation?.wars?.defenseWindows && <DefenseWindow windows={simulation.wars.defenseWindows} nationId={snapshot.nationId} />}
-    {!localDemo && simulation?.treaties && <ForeignAffairsPanel treaties={simulation.treaties.treaties} nationId={snapshot.nationId} />}
+    {!localDemo && (simulation?.treaties || simulation?.embargoes) && <ForeignAffairsPanel treaties={simulation.treaties?.treaties} embargoes={simulation.embargoes?.embargoes} nationId={snapshot.nationId} />}
     {!localDemo && simulation?.stability && <StabilityPanel score={simulation.stability.find(score => score.nationId === snapshot.nationId)} />}
     {!localDemo && simulation && <section aria-label="Durable world simulation">
       <h4>World day {simulation.clock.gameDay} · 12× time</h4>

@@ -60,10 +60,11 @@ test('ratifying-body mapping: Kindle Assembly (2/3 treaty, simple-majority trade
   assert.deepEqual(R.map(x=>[x.nationId,x.ratifier]),[['kindle','Assembly'],['kindle','Assembly'],['korund','Chairman'],['aurelle','Crown']]);
   assert.match(H['kindle:treaty'],/Assembly/); assert.match(H['kindle:trade'],/Assembly/); assert.match(H['korund:any'],/Chairman/); assert.match(H['aurelle:any'],/royal decree/);
 });
-test('bylines reuse the three press packs; Crown-speaking Aurelle line is AI-badged, the others are not', () => {
+test('bylines reuse the three press packs; Crown and Chairman ratifications are AI-badged (#381), the Assembly report is not', () => {
   assert.deepEqual(DIPLOMACY_BYLINES.kindle,kindlePress.byline); assert.deepEqual(DIPLOMACY_BYLINES.korund,korundStateMedia.byline); assert.deepEqual(DIPLOMACY_BYLINES.aurelle,aurelleGazette.byline);
   assert.equal(ratificationFor('aurelle:any').aiBadge,true); assert.match(ratificationFor('aurelle:any').body,/^Be it known/);
-  for (const k of ['kindle:treaty','kindle:trade','korund:any']) assert.equal(ratificationFor(k).aiBadge,false);
+  for (const k of ['kindle:treaty','kindle:trade']) assert.equal(ratificationFor(k).aiBadge,false);
+  assert.equal(ratificationFor('korund:any').aiBadge,true, '#381: the Chairman ratifies, an AI leader speaks');
   assert.match(ratificationFor('korund:any').body,/^Korund State Media reports/);
 });
 test('broken pact line names Legitimacy and global Reputation with no number', () => {

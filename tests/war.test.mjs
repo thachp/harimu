@@ -123,7 +123,7 @@ test('non-aggression pact and peace lock each refuse a declaration (fixed clock)
   const pact = await declare({}, nowS(), { nonAggression: async (_db, a, b) => [a, b].sort().join() === 'korund,kindle'.split(',').sort().join() });
   assert.equal(pact.status, 409); assert.equal(pact.reason, 'non_aggression'); assert.match(pact.error, /non-aggression pact with Korund is in force/);
   assert.equal((await declare({ attacker: 'kindle', defender: 'aurelle' }, nowS(), { nonAggression: () => false })).ok, true, 'a pact only covers its own signatories');
-  assert.equal((await declare({ attacker: 'aurelle', defender: 'korund' })).ok, true, 'the default stub reports no pact');
+  assert.equal((await declare({ attacker: 'aurelle', defender: 'korund' })).ok, true, 'the default check reads the treaty store: no pact there, so allowed');
   assert.deepEqual((await rows()).map(x => x.pair_key).sort(), ['aurelle:kindle', 'aurelle:korund']);
   // Peace: a ceasefire or peace treaty locks declarations between the pair for 10 real days.
   const war = (await rows()).find(x => x.pair_key === 'aurelle:korund');
@@ -187,14 +187,96 @@ test('war banner: both nations see a mobilization countdown; the third nation an
   assert.equal(renderToStaticMarkup(WarBanner({ wars: undefined, nationId: 'kindle' })), '', 'flag off: no wars are sent, nothing renders');
 });
 
-test('the NAP check fails open: no pact is assumed without a treaty system, and a missing treaty table does not block', async t => {
+test('the NAP check fails open only when there is no pact to read: an injected missing-table error does not block, other errors are not swallowed', async t => {
   const { r, declare, nowS } = await setup(t);
   const war = await r.importModule('lib/war.ts');
-  assert.equal(await war.nonAggressionInForce(r.db, 'kindle', 'korund', nowS()), false, 'the stub reports no pact');
+  assert.equal(await war.nonAggressionInForce(r.db, 'kindle', 'korund', nowS()), false, 'no pact in the treaty store');
   const missing = await declare({}, nowS(), { nonAggression: async () => { throw new Error('PostgreSQL operation failed (42P01): relation "treaties" does not exist.'); } });
   assert.equal(missing.ok, true, 'a treaty table that does not exist yet means no pact');
   const sqlite = await declare({ attacker: 'aurelle', defender: 'kindle' }, nowS(), { nonAggression: async () => { throw new Error('no such table: treaties'); } });
   assert.equal(sqlite.ok, true);
   await assert.rejects(declare({ attacker: 'aurelle', defender: 'korund' }, nowS(), { nonAggression: async () => { throw new Error('disk on fire'); } }), /disk on fire/, 'other errors are not swallowed');
   assert.equal((await declare({ attacker: 'aurelle', defender: 'korund' }, nowS(), { nonAggression: async () => true })).reason, 'non_aggression', 'a real pact still blocks');
+});
+
+// #402: the default check is the treaty store from #308 (activeNonAggressionPact). Rows are written directly: treaties have no route.
+async function treaty(r, { a = 'kindle', b = 'korund', kind = 'non-aggression', status = 'in_force', ratifiedAt, endsAt, id = randomUUID() } = {}) {
+  const decided = status === 'proposed' ? null : ratifiedAt;
+  await r.db.prepare('INSERT INTO treaties (id,request_id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(id, id, pairKey(a, b), kind, a, b, 'AI Chair', ratifiedAt - 10, status, decided, ['in_force', 'expired', 'broken'].includes(status) ? ratifiedAt : null, ['in_force', 'expired', 'broken'].includes(status) ? endsAt : null, status === 'broken' ? ratifiedAt + 5 : null).run();
+  return id;
+}
+const writeTables = async (r, fn) => {
+  const writes = [], prepare = r.db.prepare.bind(r.db), batch = r.db.batch.bind(r.db);
+  r.db.prepare = sql => { if (/^\s*(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER)\b/i.test(sql)) writes.push(sql.replace(/\s+/g, ' ').slice(0, 40)); return prepare(sql); };
+  r.db.batch = s => { writes.push('batch'); return batch(s); };
+  try { await fn(); } finally { r.db.prepare = prepare; r.db.batch = batch; }
+  return writes;
+};
+
+test('#402 an in-force non-aggression pact refuses the declaration (either direction, its own pair only); the refusal writes nothing', async t => {
+  const { r, declare, rows, nowS } = await setup(t); const at = nowS();
+  await treaty(r, { ratifiedAt: at - 100, endsAt: at + 1000 });
+  for (const [attacker, defender] of [['kindle', 'korund'], ['korund', 'kindle']]) {
+    const res = await declare({ attacker, defender }); assert.equal(res.ok, false); assert.equal(res.status, 409); assert.equal(res.reason, 'non_aggression');
+    assert.match(res.error, /non-aggression pact with (Korund|Kindle) is in force/);
+  }
+  assert.deepEqual(await rows(), [], 'nothing was declared');
+  assert.equal((await declare({ attacker: 'kindle', defender: 'aurelle' })).ok, true, 'a pact only covers its own pair');
+  assert.equal((await declare({ attacker: 'aurelle', defender: 'korund' })).ok, true);
+  // A trade agreement is not a non-aggression pact.
+  const { r: r2, declare: declare2, nowS: now2 } = await setup(t); await treaty(r2, { kind: 'trade', ratifiedAt: now2() - 100, endsAt: now2() + 1000 });
+  assert.equal((await declare2()).ok, true, 'only a non-aggression pact bars a declaration');
+});
+
+test('#402 no pact, a proposed, rejected, expired or broken pact, or a term that ended at this second: the declaration is allowed (Founding Period and peace lock still apply)', async t => {
+  for (const status of ['proposed', 'rejected', 'expired', 'broken']) {
+    const { r, declare, nowS } = await setup(t); const at = nowS();
+    await treaty(r, { status, ratifiedAt: at - 100, endsAt: at + 1000 });
+    assert.equal((await declare()).ok, true, `${status} does not block`);
+  }
+  const { r, declare, nowS } = await setup(t); const at = nowS();
+  await treaty(r, { ratifiedAt: at - 100, endsAt: at }); // the term ends exactly now
+  assert.equal((await declare()).ok, true, 'a pact is in force only while now < ends_at');
+  const young = await setup(t, { shardDaysAgo: 5 }); await treaty(young.r, { ratifiedAt: young.nowS() - 100, endsAt: young.nowS() + 1000 });
+  assert.equal((await young.declare()).reason, 'founding_period', 'the Founding Period is checked first (declarationBlock order), pact or not');
+  const early = await setup(t, { shardDaysAgo: 5 });
+  assert.equal((await early.declare()).reason, 'founding_period', 'Founding Period still applies without a pact');
+  const lock = await setup(t); const peaceAt = lock.nowS();
+  await lock.r.db.prepare("INSERT INTO wars (id,request_id,pair_key,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at,ended_at,end_kind) VALUES ('w1','r-aaaaaaaa','kindle:korund','kindle','korund','','AI',?,?,?, 'treaty')").bind(peaceAt - 5 * D, peaceAt - 5 * D + 48 * H, peaceAt - 1).run();
+  assert.equal((await lock.declare()).reason, 'peace_lock', 'the peace lock still applies without a pact');
+});
+
+test('#402 a database without the treaties table reads as no pact; other read errors still surface', async t => {
+  const { r, declare } = await setup(t);
+  await r.db.prepare('DROP TABLE treaties').run();
+  assert.equal((await declare()).ok, true, 'missing table: fails open');
+  const { r: r2, declare: declare2 } = await setup(t); const prepare = r2.db.prepare.bind(r2.db);
+  r2.db.prepare = sql => { if (/FROM treaties/.test(sql)) throw new Error('disk on fire'); return prepare(sql); };
+  await assert.rejects(declare2(), /disk on fire/);
+});
+
+test('#402 flag off is a no-op: the treaty store is not read or written, and a pact changes nothing', async t => {
+  const { r, declare, rows, nowS } = await setup(t, { flag: false }); await treaty(r, { ratifiedAt: nowS() - 100, endsAt: nowS() + 1000 });
+  let reads = 0; const prepare = r.db.prepare.bind(r.db); r.db.prepare = sql => { if (/treaties/.test(sql)) reads++; return prepare(sql); };
+  const res = await declare(); assert.equal(res.status, 403); assert.equal(res.reason, 'disabled'); assert.equal(reads, 0, 'the treaty table is never touched');
+  r.db.prepare = prepare; assert.deepEqual(await rows(), []);
+});
+
+test('#402 the pact check and the war reads are read-only (no GET writes)', async t => {
+  const { r, war, nowS } = await setup(t); const at = nowS(); await treaty(r, { ratifiedAt: at - 100, endsAt: at + 1000 });
+  const writes = await writeTables(r, async () => {
+    assert.equal(await war.nonAggressionInForce(r.db, 'kindle', 'korund', at), true); assert.equal(await war.nonAggressionInForce(r.db, 'aurelle', 'korund', at), false);
+    await war.readWars(r.db, at); await r.call('world', 'alice').catch(() => null);
+  });
+  assert.deepEqual(writes.filter(w => /treaties|wars/.test(w)), [], 'the pact check never writes the treaty or war tables');
+});
+
+test('#402 the same pact refusal holds on PostgreSQL (PGlite)', async t => {
+  const r = await localRuntime({ backend: 'postgres' }); t.after(() => r.close());
+  const nowS = Math.floor(r.now / 1000); r.setFixtureEnv('HARIMU_SHARD_STARTED_AT', String(nowS - 31 * D));
+  const war = await r.importModule('lib/war.ts');
+  const declare = (over = {}) => war.declareWar(r.db, { attacker: 'kindle', defender: 'korund', casusBelli: '', declaredBy: 'AI President', requestId: randomUUID(), ...over }, nowS, { enabled: true });
+  await treaty(r, { ratifiedAt: nowS - 100, endsAt: nowS + 1000 });
+  assert.equal((await declare()).reason, 'non_aggression'); assert.equal((await declare({ attacker: 'aurelle', defender: 'korund' })).ok, true);
 });

@@ -12,7 +12,8 @@
 export const CLAIMANT_PLACEHOLDERS=['{claimant}','{house}','{motto}'] as const;
 export type Line={text:string;proposal:true};
 export type RisingStage='support-growing'|'crisis-window-open'|'rising-succeeded'|'rising-failed';
-export type StageCopy={stage:RisingStage;notice:string;crownGazette:string;claimantVoice:string;proposal:true};
+/** `crownGazetteAiBadge` is explicit (#381, docs ui-ux 23.2): true when the Gazette line is the Crown speaking ("Be it known"). */
+export type StageCopy={stage:RisingStage;notice:string;crownGazette:string;crownGazetteAiBadge:boolean;claimantVoice:string;proposal:true};
 
 export const CLAIMANT_LABEL_MAX=40;
 export const CLAIMANT_BODY_MAX=140;
@@ -35,7 +36,7 @@ export const pledgeToasts={
  cooldown:L('You changed your pledge recently. You can change it again once the waiting period ends.'),
 } as const;
 
-const st=(stage:RisingStage,notice:string,crownGazette:string,claimantVoice:string):StageCopy=>({stage,notice,crownGazette,claimantVoice,proposal:true});
+const st=(stage:RisingStage,notice:string,crownGazette:string,claimantVoice:string):StageCopy=>({stage,notice,crownGazette,crownGazetteAiBadge:/^Be it known/.test(crownGazette),claimantVoice,proposal:true});
 
 export const risingStageCopy:readonly StageCopy[]=[
  st('support-growing','Support for {claimant} of {house} is growing among the commons.',

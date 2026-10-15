@@ -2,6 +2,7 @@ import type {GameDatabase} from './database-contract';
 import { defaultRecoverySeconds } from './economy-rules';
 export { recoveryInterval } from './economy-rules';
 import { starterGrantSql } from './market';
+import { kioskHistoryRow } from './kiosk-text';
 import { walletHistorySql, toTransactions, sortHistory, type WalletHistoryRow, type WalletTransaction } from './wallet';
 // Prototype tuning. Integer minor units: 100 cents = 1 Spark.
 export const employerBudgetMinor = 100000;
@@ -156,6 +157,6 @@ export async function readEconomy(db: GameDatabase, userId: string, interval: nu
       : [...inventory, { item: 'food', quantity: starter }].sort((a, b) => a.item.localeCompare(b.item));
     recoveredAt = (await readCapacityProjection(db, userId, now, interval))?.recoveredAt ?? recoveredAt;
   }
-  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: await readTesseraBalance(db, userId), transactions: toTransactions(history),
+  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: await readTesseraBalance(db, userId), transactions: toTransactions(history, kioskHistoryRow),
     inventory, nextRecoveryAt: new Date((recoveredAt + interval) * 1000).toISOString(), incomeTaxPercent: options.incomeTaxPercent ?? 0 };
 }
