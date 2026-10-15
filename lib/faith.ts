@@ -225,11 +225,14 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
   // is only written while the balance covers it and the cooldown allows the change, and the faith change only lands if that spend row exists.
   // #318: a concurrent replay of the same request id never rewrites the row, so it cannot stamp the cooldown on a free first pick.
   const cooldownGuard = 'WHERE (citizen_faith.changed_at IS NULL OR citizen_faith.changed_at <= ?) AND citizen_faith.request_id <> excluded.request_id';
+  // #617 [ASSUMPTION]: a leave only lands while the row still says "on the Kinward Rite" (no row to conflict with, a row from another nation, or faith_id kinward-rite). Without this a concurrent leave with another
+  // request id conflicts with the first one's fresh row (changed_at NULL, a "first pick"), passes the cooldown guard and charges a second time; now its upsert changes nothing and its own spend row is undone below.
+  const leaveStillOnKinward = " AND (citizen_faith.nation_id<>'aurelle' OR citizen_faith.faith_id='kinward-rite')";
   const upsert = (guardSpend: boolean) => db.prepare(`INSERT INTO citizen_faith (user_id,nation_id,faith_id,hidden_faith_id,chosen_at,request_id)
     SELECT clerk_user_id,nation_id,?,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?${guardSpend ? ' AND EXISTS (SELECT 1 FROM aurelle_favor_spends WHERE request_id=? AND clerk_user_id=?)' : ''}
     ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,faith_id=excluded.faith_id,hidden_faith_id=excluded.hidden_faith_id,chosen_at=excluded.chosen_at,
       changed_at=CASE WHEN citizen_faith.request_id LIKE 'default-%' THEN NULL ELSE excluded.chosen_at END,request_id=excluded.request_id
-    ${cooldownGuard}`).bind(command.faithId, command.hiddenFaithId, now, command.requestId, userId, citizen!.nation_id, ...(guardSpend ? [command.requestId, userId] : []), now - faithChangeCooldownSeconds);
+    ${cooldownGuard}${guardSpend ? leaveStillOnKinward : ''}`).bind(command.faithId, command.hiddenFaithId, now, command.requestId, userId, citizen!.nation_id, ...(guardSpend ? [command.requestId, userId] : []), now - faithChangeCooldownSeconds);
   let saved;
   if (leaving) {
     const spend = db.prepare(`INSERT INTO aurelle_favor_spends (request_id,clerk_user_id,amount,reason,spent_at)
@@ -251,6 +254,8 @@ export async function chooseFaith(db: GameDatabase, userId: string, command: { r
       const landed = await db.prepare('SELECT user_id FROM citizen_faith WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
       if (!spent && landed?.user_id === userId) return { ok: true as const, replay: true as const, state: await readFaith(db, userId, now, enabled, favorDecayAt) }; // a concurrent call with this id already did it
       if (!spent && await spendRowFor(db, command.requestId)) return fail(409, 'request_reused', 'That request id was already used for a Royal Favor spend.');
+      const left = await db.prepare('SELECT nation_id,faith_id FROM citizen_faith WHERE user_id=?').bind(userId).first<{ nation_id: string; faith_id: string }>();
+      if (left?.nation_id === 'aurelle' && left.faith_id !== 'kinward-rite') return fail(409, 'already_left', 'You have already left the Kinward Rite. Nothing was spent.'); // #617: a concurrent leave landed first
       const balance = await royalFavorBalance(db, userId, favorDecayAt);
       return balance < kinwardLeaveFavorCost ? fail(409, 'insufficient_royal_favor', kinwardLeaveBlockedReason(balance)) : fail(409, 'cooldown', 'You can change faith once every 60 real days.');
     }

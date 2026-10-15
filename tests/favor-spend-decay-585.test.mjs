@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { favorDecaySeconds, royalFavorBalance, royalFavorBalanceSql, royalFavorSql, royalFavorBinds, royalFavorColumnBinds } from '../lib/aurelle.ts';
+import { favorDecaySeconds, royalFavorBalance, royalFavorBalanceSql, royalFavorSql, royalFavorBinds, royalFavorColumnBinds, royalFavorAverageSql } from '../lib/aurelle.ts';
 
 const DAY = 86400 * 1000;
 async function setup(t, users = ['ava']) {
@@ -90,14 +90,14 @@ test('(c) the decayed offline fallback (no aurelle_favor_spends yet) reads the f
 
 test('(b) the coup reads the decayed Favor with the shared rule; flag off keeps the flat query', async t => {
   const src = await readFile(new URL('../lib/aurelle-coup.ts', import.meta.url), 'utf8');
-  assert.match(src, /royalFavorSql\(decayAt, 'u\.clerk_user_id'\)/); assert.match(src, /readFavorAverage\(db, favorDecay \? now : undefined\)/);
+  assert.match(src, /royalFavorAverageSql\(decayAt\)/); assert.match(await readFile(new URL('../lib/aurelle.ts', import.meta.url), 'utf8'), /royalFavorSql\(decayAt,'u\.clerk_user_id'\)/); assert.match(src, /readFavorAverage\(db, favorDecay \? now : undefined\)/);
   assert.match(src, /const flatFavorAverageSql = `SELECT AVG\(CASE WHEN f > 100 THEN 100 ELSE f END\) AS favor FROM \(SELECT SUM\(favor\) AS f FROM aurelle_settlements GROUP BY clerk_user_id\) t`;/);
   for (const f of ['../app/api/citizen/route.ts', '../app/api/world/route.ts', '../app/api/aurelle/rising/route.ts']) assert.match(await readFile(new URL(f, import.meta.url), 'utf8'), /favorDecay: .*HARIMU_FAVOR_DECAY_ENABLED.*=== 'true'/, f);
   assert.equal(royalFavorBalanceSql, "MAX(0,MIN(100,COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0))-COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=?),0))");
   // behaviour: the average over settling citizens, from the same function as each citizen's balance
   const r = await setup(t, ['ava', 'bea']); const t0 = r.now;
   await serve(r, 'ava', 10); await serve(r, 'bea', 10); await spend(r, 'bea', 10);
-  const average = async decayAt => { const sql = decayAt === undefined ? 'SELECT AVG(CASE WHEN f > 100 THEN 100 ELSE f END) AS favor FROM (SELECT SUM(favor) AS f FROM aurelle_settlements GROUP BY clerk_user_id) t' : `SELECT AVG(f) AS favor FROM (SELECT ${royalFavorSql(decayAt, 'u.clerk_user_id')} AS f FROM (SELECT DISTINCT clerk_user_id FROM aurelle_settlements) u) t`;
+  const average = async decayAt => { const sql = decayAt === undefined ? 'SELECT AVG(CASE WHEN f > 100 THEN 100 ELSE f END) AS favor FROM (SELECT SUM(favor) AS f FROM aurelle_settlements GROUP BY clerk_user_id) t' : royalFavorAverageSql(decayAt);
     const binds = decayAt === undefined ? [] : royalFavorColumnBinds(decayAt); return Number((await r.db.prepare(sql).bind(...binds).first()).favor); };
   assert.equal(await average(at(r)), (await bal(r, 'ava') + await bal(r, 'bea')) / 2, 'same numbers as the two balances'); assert.equal(await average(at(r)), 15);
   assert.equal(await average(undefined), 20, 'flag off: flat average, spends not counted (unchanged)');
