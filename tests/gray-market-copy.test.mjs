@@ -77,7 +77,9 @@ test('street voice is private, not State Media; faith-neutral; no Notable or rea
   assert.doesNotMatch(t,/faith|shrine|worship|congregation|church|prayer|bless/i);
   assert.doesNotMatch(t,/\b(Earth|Soviet|Moscow|Kremlin|USSR|China|America|London)\b/); assert.doesNotMatch(t,/Notable/);
 });
-test('unwired: nothing in app/ or components/ imports gray-market-copy', () => {
+test('wired (#43): lib/gray-market-text.ts is the only importer of gray-market-copy; the app talks to that adapter', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/gray-market-copy/, f);
+  const importers=[...walk('app'),...walk('components'),...walk('lib')].filter(f=>/\.(t|j)sx?$/.test(f)&&!f.endsWith('gray-market-copy.ts')&&/gray-market-copy/.test(readFileSync(f,'utf8')));
+  assert.deepEqual(importers,['lib/gray-market-text.ts']);
+  assert.match(readFileSync('app/korund-plan-panel.tsx','utf8'),/@\/lib\/gray-market-text/);
 });
