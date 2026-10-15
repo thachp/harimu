@@ -18,6 +18,13 @@ export function nationFromSearch(search: string, validNationIds: readonly string
   const requested = new URLSearchParams(search).get('nation');
   return requested && validNationIds.includes(requested) ? requested : fallbackId;
 }
+/** #411: which nation the page views right after an existing citizen's profile loads. With no valid `nation` in the URL it is the citizen's own nation, so
+ *  Civic opens their own government (editable) and no Kindle default applies. A valid `?nation=` keeps the visitor view of that nation. An unknown citizen nation changes nothing. */
+export function viewedNationAfterLoad(search: string, validNationIds: readonly string[], citizenNationId: string | null | undefined, currentId: string): string {
+  const requested = new URLSearchParams(search).get('nation');
+  if (requested && validNationIds.includes(requested)) return currentId;
+  return citizenNationId && validNationIds.includes(citizenNationId) ? citizenNationId : currentId;
+}
 export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false): string {
   const url = new URL(href);
   url.searchParams.set('view', scene);
