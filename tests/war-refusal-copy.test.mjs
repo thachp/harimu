@@ -46,7 +46,7 @@ test('only known placeholders, in the right lines', () => {
 });
 test('{days} is a pre-formatted string that carries its unit, so the line reads right for one day and for many; the line itself writes no unit', () => {
   const line=refusalFor('rate_limit').lines[0].text;
-  assert.doesNotMatch(line,/\breal days?\b|\bdays?\b/i);
+  assert.doesNotMatch(line.replace('{days}',''),/\breal days?\b|\bdays?\b/i);
   for (const [days,expected] of [['1 real day','every 1 real day.'],['14 real days','every 14 real days.']]) assert.ok(line.replace('{days}',days).endsWith(expected),days);
   assert.ok(!line.replace('{days}','1 real day').includes('1 real days'));
 });
