@@ -53,6 +53,7 @@ import { validPlayerCommand, type PlayerCommand, type PlayerMarketState } from '
 import { CitizenMarket } from './citizen-market';
 import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
+import { MarketBoard, useOrderBook } from './market-board';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
@@ -1535,6 +1536,7 @@ export default function Home() {
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;
+  const orderBookApi = useOrderBook(viewMode === 'market' && citizenNation?.id === 'kindle' && clerkConfigured && !guestActive); // #200: renders nothing while HARIMU_ORDER_BOOK_ENABLED is off
   useEffect(() => {
     if (!tourOpen || guestAllowed) return;
     const frame = requestAnimationFrame(stopTour);
@@ -1613,8 +1615,9 @@ export default function Home() {
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
-        <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
-          onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />
+        <MarketBoard api={orderBookApi} economy={economy} />
+        {(!orderBookApi.book || playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')) && /* the board replaces fixed-lot listings once it is open; open lots stay cancellable */ <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
+          onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />}
         {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
