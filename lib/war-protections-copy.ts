@@ -14,7 +14,7 @@
  * Rules: the only figures are the docs' 14 real days (newcomer shield) and 10 real days (foundation truce), each in its own lines. The
  * wounded length comes only through {days}, a pre-formatted string that already carries its unit, so the docs' 1-3 range is never
  * written in. No compensation is promised: relocation support is only offered, any buyout is
- * voluntary, and no share, percentage or payment for land is written. Support and buyouts are Tessera only and never convertible.
+ * voluntary, and no share, percentage or payment for land is written. Support and buyouts are paid in Tessera only.
  * {city} is the captured or newly founded city, {safeCity} the nearest home city; both are runtime values capped by the shared name cap, which this module
  * re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts). Limits: labels 40, lines 80, tested with every placeholder filled to 24
  * characters. Capture, conscription and truce mechanics are not described beyond the docs. All wording is new: `proposal: true`. */
@@ -93,7 +93,6 @@ export const relocationSupport={
  label:'Relocation support',
  funded:L('Relocation support, when funded, is in Tessera only.'),
  empty:L('No funds are available for relocation support.'),
- stays:L('Support is Tessera only and is not convertible.'),
  proposal:true,
 } as const;
 
