@@ -207,7 +207,19 @@ const redact = connectionString => { try { const u = new URL(connectionString); 
  * then verifies with the deploy guard before COMMIT. Any failure rolls everything back, leaving
  * the database empty, so the bootstrap is safe to rerun.
  */
-export async function bootstrapEmptyPostgres(db, { dir = 'db/postgres', log = () => {} } = {}) {
+/** #501a: the fresh-world-v1 readiness marker for a production database that launches empty (no D1 import). Written inside the bootstrap transaction, only with { freshWorld: true }.
+ *  backup_sha256 is the sha256 of the applied migration manifest (id and checksum of every numbered migration, in order), so the marker is bound to exactly what was applied.
+ *  The two storage tables are created here, not in a numbered migration, because they belong to the storage layer (the D1 import creates the same shapes) and must not change repoTables(). */
+export const freshWorldMarkerId = 'fresh-world-v1';
+export const freshWorldManifest = migrations => JSON.stringify(migrations.map(m => [m.id, m.checksum]));
+export async function writeFreshWorldMarker(db, migrations) {
+  const manifest = freshWorldManifest(migrations);
+  await db.exec('CREATE TABLE IF NOT EXISTS harimu_postgres_write_journal (id bigserial PRIMARY KEY, statements_json text NOT NULL)');
+  await db.exec('CREATE TABLE IF NOT EXISTS harimu_storage_migrations (id text PRIMARY KEY, backup_sha256 text NOT NULL, manifest_json text NOT NULL, validated integer NOT NULL CHECK(validated IN (0,1)))');
+  await db.query('INSERT INTO harimu_storage_migrations (id, backup_sha256, manifest_json, validated) VALUES ($1, $2, $3, 1)', [freshWorldMarkerId, checksum(manifest), manifest]);
+}
+
+export async function bootstrapEmptyPostgres(db, { dir = 'db/postgres', log = () => {}, freshWorld = false } = {}) {
   const migrations = postgresMigrations(dir);
   assertNoTransactionControl(migrations);
   for (const m of migrations) if (isDestructive(m.sql) && !hasReviewMarker(m.sql)) throw new Error(`${m.file} looks destructive; add "${destructiveReviewedMarker}" after manual review.`);
@@ -227,12 +239,13 @@ export async function bootstrapEmptyPostgres(db, { dir = 'db/postgres', log = ()
         await db.query('INSERT INTO schema_migrations (id, checksum) VALUES ($1, $2)', [m.id, m.checksum]);
       }
       step = 'verification'; await assertPostgresMigrationsApplied(db, migrations);
+      if (freshWorld) { step = 'fresh-world marker'; await writeFreshWorldMarker(db, migrations); }
       await db.exec('COMMIT');
     } catch (error) {
       await db.exec('ROLLBACK');
       throw new Error(`Bootstrap failed at ${step} and was rolled back; the database is still empty and safe to retry: ${error.message}`);
     }
-    log(`Bootstrapped: compatibility.sql, schema.sql and ${migrations.length} migration(s) applied and recorded.`);
+    log(`Bootstrapped: compatibility.sql, schema.sql and ${migrations.length} migration(s) applied and recorded${freshWorld ? `; ${freshWorldMarkerId} written` : ''}.`);
     return { applied: migrations.map(m => m.file), pending: [] };
   } finally { await db.query('SELECT pg_advisory_unlock($1)', [lockKey]); }
 }
