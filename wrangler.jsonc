@@ -34,6 +34,14 @@
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
     "HARIMU_LABOR_BUREAU_ENABLED": "false",
+    // #489: per-nation opening flags (seven-nations Stage 0). Off; even when "true" a nation is enrollable only by a QA-allowlisted account (lib/nation-openings.ts nationPlayable).
+    "HARIMU_CONFLUENCE_ENABLED": "false",
+    "HARIMU_MERIDIAN_ENABLED": "false",
+    "HARIMU_ILMAR_ENABLED": "false",
+    "HARIMU_HOARVALE_ENABLED": "false",
+    "HARIMU_VARKAND_ENABLED": "false",
+    "HARIMU_VELDWOOD_ENABLED": "false",
+    "HARIMU_FULMARA_ENABLED": "false",
     "HARIMU_GRAY_MARKET_ENABLED": "false",
     "HARIMU_KINDLE_INCOME_TAX_ENABLED": "false",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
