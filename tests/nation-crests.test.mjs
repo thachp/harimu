@@ -40,11 +40,11 @@ test('the crest flag is exactly "true" and ships off in wrangler.jsonc (flag-off
 test('the crest component renders nothing with the flag off, and a named svg with it on (flag-off pin)',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'crest-'));
  const entry=`import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import {NationCrest} from './app/nation-crest.tsx';
-  export const off=renderToStaticMarkup(<NationCrest id="kindle"/>), forced=renderToStaticMarkup(<NationCrest id="aurelle" force/>), unknown=renderToStaticMarkup(<NationCrest id="foreign" force/>);`;
+  export const off=renderToStaticMarkup(<NationCrest id="kindle"/>), forced=renderToStaticMarkup(<NationCrest id="aurelle" force/>), labelled=renderToStaticMarkup(<NationCrest id="aurelle" force labelled/>), unknown=renderToStaticMarkup(<NationCrest id="foreign" force/>);`;
  const result=await build({stdin:{contents:entry,resolveDir:new URL('../',import.meta.url).pathname,loader:'tsx'},bundle:true,write:false,format:'cjs',platform:'node',jsx:'automatic',logLevel:'silent',define:{'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST':'"false"','process.env.NODE_ENV':'"production"'}});
  await writeFile(join(dir,'crest.cjs'),result.outputFiles[0].text);const out=createRequire(import.meta.url)(join(dir,'crest.cjs'));
  assert.equal(out.off,'');assert.equal(out.unknown,'');
- assert.match(out.forced,/data-nation-crest="aurelle"/);assert.match(out.forced,/data-nation-pattern="diagonal"/);assert.match(out.forced,/title="Aurelle crest: a winged crown"/);assert.match(out.forced,/<svg[^>]*aria-hidden="true"/);assert.doesNotMatch(out.forced,/role="img"|aria-label/);
+ assert.match(out.forced,/data-nation-crest="aurelle"/);assert.match(out.forced,/data-nation-pattern="diagonal"/);assert.match(out.forced,/title="Aurelle crest: a winged crown"/);assert.match(out.forced,/<svg[^>]*aria-hidden="true"/);assert.doesNotMatch(out.forced,/role="img"|aria-label/);assert.match(out.labelled,/<svg[^>]*role="img"[^>]*aria-label="Aurelle crest: a winged crown"/);assert.doesNotMatch(out.labelled,/aria-hidden/);
 });
 test('the inspector header is the only consumer, every pattern has crest CSS, and the layout stays clipped to the shield',async()=>{
  const shell=await read('app/game-shell.tsx'),css=await read('app/game-shell.css');

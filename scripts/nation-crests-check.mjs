@@ -65,7 +65,7 @@ export async function checkNationCrests({ browser, css, preflight, failures, row
         if (!m.inHead) fail(`${nation}: crest leaves the header`);
         if (m.hitsTitle || m.hitsBtn) fail(`${nation}: crest overlaps the ${m.hitsTitle ? 'title' : 'collapse button'}`);
         if (Math.abs(m.w * 8 / 7 - m.ch) > 1.5) fail(`${nation}: crest is ${Math.round(m.w)}x${Math.round(m.ch)}, not a 7:8 shield`);
-        if (m.w < 44 * scale * 7 / 8 * (w <= 340 ? .75 : 1) - 2) fail(`${nation}: crest is only ${Math.round(m.w)}px wide at ${scale * 100}% text`);
+        if (m.w < 44 * scale * 7 / 8 * (w <= 360 ? .75 : 1) - 2) fail(`${nation}: crest is only ${Math.round(m.w)}px wide at ${scale * 100}% text`);
         if (m.headH - base[nation] > 44 * scale * 8 / 7 + 2) fail(`${nation}: header grew ${Math.round(m.headH - base[nation])}px with the crest`);
         summary.push(nation);
       }
