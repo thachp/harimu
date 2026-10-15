@@ -25,7 +25,7 @@ import { marketVisible } from '@/lib/market-visibility';
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
-import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, identityPending, sceneUrl, viewedNationAfterLoad, type SceneView } from '@/lib/scene-navigation';
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, identityHold, identityHoldTimeoutMs, signedInHint, viewedNationHeld, sceneUrl, viewedNationAfterLoad, type SceneView, type SignedInHint } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -703,6 +703,16 @@ export default function Home() {
     clerkConfigured ? 'loading' : 'anonymous',
   );
 
+  // #533: what the browser knows about a signed-in session before Clerk loads (Clerk's __client_uat cookie), and a timeout so a stalled Clerk or /api/citizen never holds the top bar forever.
+  const [signedHint, setSignedHint] = useState<SignedInHint>('unknown');
+  useLayoutEffect(() => { setSignedHint(signedInHint(document.cookie)); }, []);
+  const [holdExpired, setHoldExpired] = useState(false);
+  const sessionLoading = clerkConfigured && citizenSessionStatus === 'loading';
+  useEffect(() => {
+    if (!sessionLoading) { setHoldExpired(false); return; }
+    const timer = window.setTimeout(() => setHoldExpired(true), identityHoldTimeoutMs);
+    return () => window.clearTimeout(timer);
+  }, [sessionLoading]);
   const citizenIdentity = useRef<string | null>(null);
   const citizenEpoch = useRef(0);
   const [citizenSessionKey, setCitizenSessionKey] = useState(0);
@@ -802,6 +812,7 @@ export default function Home() {
     [locationSearch, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
+  const identityHoldNow = identityHold(locationSearch, fallbackNationIds, sessionLoading, Boolean(citizenNation), signedHint, holdExpired);
   const weekStoreKey = citizenNationId && citizenshipStatus?.enrolledAt ? `${citizenNationId}:${citizenshipStatus.enrolledAt}` : '';
   // Load progress when the citizen key changes (adjust-state-during-render). Signed-in citizens use server progress (#135); the local demo keeps the browser stub.
   const weekProgressStore = clerkConfigured ? serverFirstWeekProgressStore(serverWeekIds) : stubFirstWeekProgressStore();
@@ -1589,7 +1600,7 @@ export default function Home() {
   function actInGuestDemo(action: GuestDemoAction) { setGuestState(current => guestDemoAction(current, action)); }
   const guestEntry = guestAllowed && <button type="button" className="primary-action" onClick={startGuestDemo}>Try a day in the life</button>;
   const citizenScene = <section className={`citizen-scene scene-${viewMode}`} aria-label="Citizen location actions">
-    {!citizenNation ? <div className="scene-access">{guestEntry}<p>{clerkConfigured && citizenSessionStatus === 'loading' ? 'Loading your citizen…' : 'Explore a nation, then choose citizenship to begin.'}</p>
+    {!citizenNation ? <div className="scene-access">{guestEntry}<p>{sessionLoading && signedHint === 'signed-in' && !holdExpired ? 'Loading your citizen…' : 'Explore a nation, then choose citizenship to begin.'}</p>
       {citizenSessionStatus==='error' ? <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button> : <button type="button" onClick={() => changeView('world')}>Explore nations</button>}
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
@@ -1797,7 +1808,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? 'Country travel' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell marketOpen={marketShown} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityLoading={identityPending(locationSearch, fallbackNationIds, clerkConfigured && citizenSessionStatus === 'loading', Boolean(citizenNation))} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell marketOpen={marketShown} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}

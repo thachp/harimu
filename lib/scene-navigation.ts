@@ -25,12 +25,37 @@ export function viewedNationAfterLoad(search: string, validNationIds: readonly s
   if (requested && validNationIds.includes(requested)) return currentId;
   return citizenNationId && validNationIds.includes(citizenNationId) ? citizenNationId : currentId;
 }
-/** #455: while a signed-in visitor's citizen row is still loading and the URL names no nation, the top bar must not claim the default (Kindle) nation:
- *  it holds a neutral loading line until the row is read, then shows the citizen's own nation. A valid `?nation=` is shown at once (a visitor view). */
-export function identityPending(search: string, validNationIds: readonly string[], sessionLoading: boolean, hasCitizenNation: boolean): boolean {
-  if (!sessionLoading || hasCitizenNation) return false;
+/** #533 (follow-up to #455/#523): what the top bar says while the citizen row loads.
+ *  `hint` is what the browser knows before Clerk loads, read from Clerk's non-HttpOnly `__client_uat` cookie (see `signedInHint`); `unknown` only until the first client effect (server render, hydration).
+ *  - session not loading, citizen known, signed-out hint, or the hold timed out (`expired`): `none`, the normal identity line (an anonymous visitor never sees a loading line, and a stalled Clerk or /api/citizen ends the hold).
+ *  - signed-in hint: `loading` ("Loading your citizen…"), even when the URL names another nation, because the top bar shows the citizen's own nation, never the visited one (no false "Nation preview").
+ *  - unknown hint: a valid `?nation=` is a visitor view and shows at once (`none`); otherwise `neutral` (no nation and no status text), so the server render never says Kindle or "Loading your citizen…". */
+export type SignedInHint = 'unknown' | 'signed-in' | 'signed-out';
+export type IdentityHold = 'none' | 'neutral' | 'loading';
+export const identityHoldTimeoutMs = 8000;
+export function signedInHint(cookie: string | null | undefined): SignedInHint {
+  if (typeof cookie !== 'string') return 'unknown';
+  for (const part of cookie.split(';')) {
+    const eq = part.indexOf('=');
+    const name = (eq < 0 ? part : part.slice(0, eq)).trim();
+    if (name !== '__client_uat' && !name.startsWith('__client_uat_')) continue;
+    const value = eq < 0 ? '' : part.slice(eq + 1).trim();
+    if (/^[1-9][0-9]*$/.test(value)) return 'signed-in';
+  }
+  return 'signed-out';
+}
+export function validNationInSearch(search: string, validNationIds: readonly string[]): boolean {
   const requested = new URLSearchParams(search).get('nation');
-  return !(requested && validNationIds.includes(requested));
+  return Boolean(requested && validNationIds.includes(requested));
+}
+export function identityHold(search: string, validNationIds: readonly string[], sessionLoading: boolean, hasCitizenNation: boolean, hint: SignedInHint, expired = false): IdentityHold {
+  if (!sessionLoading || hasCitizenNation || expired || hint === 'signed-out') return 'none';
+  if (hint === 'signed-in') return 'loading';
+  return validNationInSearch(search, validNationIds) ? 'none' : 'neutral';
+}
+/** The viewed-nation labels (breadcrumb nation and city, inspector label) are held only while a hold is on and the URL names no nation of its own. */
+export function viewedNationHeld(hold: IdentityHold, search: string, validNationIds: readonly string[]): boolean {
+  return hold !== 'none' && !validNationInSearch(search, validNationIds);
 }
 export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false): string {
   const url = new URL(href);

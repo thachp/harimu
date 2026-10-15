@@ -8,6 +8,12 @@ test('the capital is the fallback city for every live nation, and changeView use
   assert.deepEqual(['kindle', 'korund', 'aurelle'].map(id => capitalCityForNation(id)?.id), ['forgehaven', 'stonehearth', 'highspire']);
   assert.match(page, /currentCityAccount\?\.currentCityId \?\? capitalCityForNation\(nextNation\)\?\.id/);
 });
-test('page passes the loading hold to the shell from the session status and the URL', () => {
-  assert.match(page, /identityLoading=\{identityPending\(locationSearch, fallbackNationIds, clerkConfigured && citizenSessionStatus === 'loading', Boolean\(citizenNation\)\)\}/);
+test('page passes the hold to the shell from the session status, the cookie hint, the URL and the timeout (#533)', () => {
+  assert.match(page, /const identityHoldNow = identityHold\(locationSearch, fallbackNationIds, sessionLoading, Boolean\(citizenNation\), signedHint, holdExpired\);/);
+  assert.match(page, /identityHold=\{identityHoldNow\} viewedNationHeld=\{viewedNationHeld\(identityHoldNow, locationSearch, fallbackNationIds\)\}/);
+  assert.match(page, /const sessionLoading = clerkConfigured && citizenSessionStatus === 'loading';/);
+  assert.match(page, /useLayoutEffect\(\(\) => \{ setSignedHint\(signedInHint\(document\.cookie\)\); \}, \[\]\);/);
+  assert.match(page, /window\.setTimeout\(\(\) => setHoldExpired\(true\), identityHoldTimeoutMs\)/);
+  assert.match(page, /sessionLoading && signedHint === 'signed-in' && !holdExpired \? 'Loading your citizen…' : 'Explore a nation/, 'the scene panel line follows the same hold');
+  assert.doesNotMatch(page, /identityPending/);
 });

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, nationFromSearch, viewModes, identityPending } from '../lib/scene-navigation.ts';
+import { isSceneTraversal, sceneHistoryState, sceneFromSearch, sceneUrl, nationFromSearch, viewModes, identityHold, signedInHint, viewedNationHeld, validNationInSearch, identityHoldTimeoutMs } from '../lib/scene-navigation.ts';
 assert.equal(sceneFromSearch(''), 'square');
 assert.equal(sceneFromSearch('?view=unknown'), 'square');
 for (const view of viewModes) {
@@ -107,15 +107,35 @@ assert.equal(new URL(cityVisit).searchParams.get('nation'),'korund','Sample city
   assert.equal(new URL(sceneUrl(country, 'household', 'confluence', undefined, true)).searchParams.get('nation'), null);
 }
 
-// #455: the top bar holds a neutral line while a signed-in citizen's row loads and the URL names no nation.
+// #455/#533: what the top bar says while a citizen row loads.
 {
   const ids = ['kindle', 'korund', 'aurelle'];
-  assert.equal(identityPending('', ids, true, false), true);
-  assert.equal(identityPending('?view=workplace', ids, true, false), true);
-  assert.equal(identityPending('?view=nation&nation=korund', ids, true, false), false, 'a valid ?nation= is shown at once');
-  assert.equal(identityPending('?nation=atlantis', ids, true, false), true, 'an unknown nation does not count');
-  assert.equal(identityPending('', ids, false, false), false, 'anonymous, error or local demo: no hold');
-  assert.equal(identityPending('', ids, true, true), false, 'the citizen is known');
+  const hold = (search, loading, citizen, hint, expired) => identityHold(search, ids, loading, citizen, hint, expired);
+  // Anonymous or signed-out: never a hold, even on the very first client render.
+  assert.equal(hold('', true, false, 'signed-out'), 'none', 'a signed-out visitor never sees a loading line');
+  assert.equal(hold('?view=workplace', true, false, 'signed-out'), 'none');
+  // Server render and hydration (hint not known yet): neutral, never a nation or a loading line; a valid ?nation= is a visitor view.
+  assert.equal(hold('', true, false, 'unknown'), 'neutral');
+  assert.equal(hold('?nation=korund', true, false, 'unknown'), 'none');
+  assert.equal(hold('?nation=atlantis', true, false, 'unknown'), 'neutral');
+  // A returning citizen (signed-in hint): loading until the row is read, with or without a nation in the URL (no false "Nation preview").
+  assert.equal(hold('', true, false, 'signed-in'), 'loading');
+  assert.equal(hold('?view=nation&nation=kindle', true, false, 'signed-in'), 'loading', 'a shared ?nation= link no longer flashes the visited nation as the top bar');
+  // Ends: row read, citizen known, error/anonymous status (not loading), or the timeout.
+  for (const hint of ['unknown', 'signed-in']) { assert.equal(hold('', false, false, hint), 'none'); assert.equal(hold('', true, true, hint), 'none'); assert.equal(hold('', true, false, hint, true), 'none', `${hint}: timed out`); }
+  assert.ok(identityHoldTimeoutMs >= 3000 && identityHoldTimeoutMs <= 15000, 'a few seconds');
+  // Viewed-nation labels (breadcrumb nation and city) are held only while a hold is on and the URL names no nation, so a legitimate visitor view keeps its names.
+  assert.equal(viewedNationHeld('loading', '', ids), true); assert.equal(viewedNationHeld('neutral', '?view=square', ids), true);
+  assert.equal(viewedNationHeld('loading', '?nation=kindle', ids), false, 'a visited nation keeps its own name');
+  assert.equal(viewedNationHeld('none', '', ids), false);
+  assert.equal(validNationInSearch('?nation=korund', ids), true); assert.equal(validNationInSearch('?nation=x', ids), false); assert.equal(validNationInSearch('', ids), false);
+  // Clerk's __client_uat cookie: a unix time means signed in, 0 or absent means signed out, no cookie string means unknown.
+  assert.equal(signedInHint('__client_uat=1760500000; other=1'), 'signed-in');
+  assert.equal(signedInHint('a=b; __client_uat_Ab12Cd=1760500000'), 'signed-in', 'suffixed cookie of newer Clerk versions');
+  assert.equal(signedInHint('__client_uat=0'), 'signed-out'); assert.equal(signedInHint('__client_uat_Ab12Cd=0; __client_uat=0'), 'signed-out');
+  assert.equal(signedInHint(''), 'signed-out'); assert.equal(signedInHint('theme=dark; session=abc'), 'signed-out');
+  assert.equal(signedInHint('__client_uat='), 'signed-out'); assert.equal(signedInHint('__client_uat=abc'), 'signed-out'); assert.equal(signedInHint('xx__client_uat=1760500000'), 'signed-out', 'only the exact name or the suffixed one');
+  assert.equal(signedInHint(undefined), 'unknown'); assert.equal(signedInHint(null), 'unknown');
   // Every nation's citizen link carries nation and city, Aurelle included (#455).
   for (const [nation, city] of [['kindle', 'forgehaven'], ['korund', 'stonehearth'], ['aurelle', 'highspire']]) {
     const url = new URL(sceneUrl('https://harimu.com/', 'workplace', nation, city));
