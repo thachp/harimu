@@ -230,6 +230,9 @@ export async function bootstrapEmptyPostgres(db, { dir = 'db/postgres', log = ()
     if (tables.size) throw new Error(`--bootstrap-empty refuses: schema public already has ${tables.size} table(s). Use the normal migrate command.`);
     let step = 'BEGIN';
     await db.exec('BEGIN');
+    // #501 (QA3): check again inside the transaction, so a table created between the first check and BEGIN is refused rather than bootstrapped over.
+    const late = await publicTables(db);
+    if (late.size) { await db.exec('ROLLBACK'); throw new Error(`--bootstrap-empty refuses: schema public already has ${late.size} table(s). Use the normal migrate command.`); }
     try {
       for (const b of base) { step = b.file; await db.exec(b.sql); }
       step = 'schema_migrations'; await db.exec(schemaMigrationsTable);

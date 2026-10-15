@@ -1,0 +1,104 @@
+/** #501 slice b: wrangler.prod.jsonc is the inactive production Worker config. This drift guard keeps it in sync with wrangler.jsonc except for the intentional differences listed here,
+ *  so a new preview flag or binding cannot be forgotten or default on in production. Nothing reads the file yet; the Hyperdrive id is a placeholder until Patrick creates the config. */
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+import { spawnSync } from 'node:child_process';
+import { PGlite } from '@electric-sql/pglite';
+import { assertPostgresApplicationRole } from '../lib/storage-selection.ts';
+import { bootstrapEmptyPostgres } from '../scripts/postgres-migrations.mjs';
+import { hyperdriveIdProblem, productionWorker, readProductionConfigRaw, runtimeRoleGrantSql } from '../scripts/production-config.mjs';
+
+const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
+const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
+// Vars present in preview and deliberately absent in production.
+const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS'];
+// Vars production adds, with their required values.
+const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
+// Vars present in both whose value intentionally differs.
+const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'] };
+// The only non-"false" values production may carry.
+const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
+
+test('wrangler.prod.jsonc has only full-line // comments (the #633 rule) and parses', () => {
+  const offenders = readFileSync('wrangler.prod.jsonc', 'utf8').split('\n').map((line, index) => ({ line, number: index + 1 }))
+    .filter(({ line }) => !/^\s*\/\//.test(line)).filter(({ line }) => /\/\/|\/\*|\*\//.test(line.replace(/"(?:[^"\\]|\\.)*"/g, '""')))
+    .map(({ line, number }) => `${number}: ${line.trim().slice(0, 80)}`);
+  assert.deepEqual(offenders, [], 'move each comment to its own full line');
+  assert.equal(prod.name, productionWorker);
+});
+
+test('identity and bindings: own Worker, same account and runtime shape, no D1, no route, no workers.dev', () => {
+  assert.notEqual(prod.name, preview.name); assert.equal(prod.account_id, preview.account_id, 'same Cloudflare account (Patrick ruling 3)');
+  for (const key of ['main', 'compatibility_date', 'compatibility_flags', 'placement', 'triggers', 'ai', 'durable_objects', 'migrations']) assert.deepEqual(prod[key], preview[key], key);
+  for (const key of ['d1_databases', 'routes', 'route', 'kv_namespaces', 'r2_buckets', 'services', 'queues', 'tail_consumers', 'env']) assert.equal(prod[key], undefined, `${key} must not exist on production yet`);
+  assert.equal(prod.workers_dev, false); assert.equal(prod.preview_urls, false);
+  assert.deepEqual(Object.keys(prod).sort(), [...Object.keys(preview).filter(key => key !== 'd1_databases'), ].sort(), 'no top-level key beyond the preview set (minus D1)');
+});
+
+test('vars: same names as preview except the listed differences; every flag false; no preview-only or secret-looking var', () => {
+  const previewNames = Object.keys(preview.vars), prodNames = Object.keys(prod.vars);
+  assert.deepEqual(prodNames.filter(n => !previewNames.includes(n)).sort(), Object.keys(productionOnlyVars).sort());
+  assert.deepEqual(previewNames.filter(n => !prodNames.includes(n)).sort(), [...previewOnlyVars].sort());
+  for (const name of ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_AI_PRICE_REVIEWED_UNTIL']) assert.equal(name in prod.vars, false, name);
+  for (const [name, value] of Object.entries(prod.vars)) {
+    if (name in differingVars) assert.equal(value, differingVars[name][1], name);
+    else if (name in productionOnlyVars) assert.equal(value, productionOnlyVars[name], name);
+    else assert.equal(value, preview.vars[name], `${name} must equal preview unless listed in differingVars`);
+    if (name in nonFalse) assert.equal(value, nonFalse[name], name); else assert.equal(value, 'false', `${name} must be "false" on production`);
+    assert.ok(!/SECRET|TOKEN|PASSWORD|ADMIN_URL|PRIVATE/.test(name), `${name} looks like a secret name`);
+    assert.ok(!/^(sk_|postgres(ql)?:\/\/)/.test(value), `${name} looks like a secret value`);
+  }
+  const flags = config => Object.keys(config.vars).filter(n => /_ENABLED$/.test(n)).sort();
+  assert.deepEqual(flags(prod), flags(preview), 'the *_ENABLED flag set equals preview, so a new flag cannot be forgotten');
+  assert.ok(flags(prod).length > 40); for (const flag of flags(prod)) assert.equal(prod.vars[flag], 'false', flag);
+  assert.equal(prod.vars.HARIMU_STORAGE_MAINTENANCE, 'false');
+  assert.strictEqual(prod.vars.HARIMU_PRODUCTION_STORAGE, 'true', 'exactly "true": TRUE, 1 or "" silently take the old (non-production) path in selectStorageBackend');
+});
+
+test('Hyperdrive: one binding, id only (no connection string), checked-in id is a detected placeholder', () => {
+  assert.equal(prod.hyperdrive.length, 1); assert.deepEqual(Object.keys(prod.hyperdrive[0]).sort(), ['binding', 'id']); assert.equal(prod.hyperdrive[0].binding, 'HYPERDRIVE');
+  const previewId = preview.hyperdrive[0].id;
+  assert.match(hyperdriveIdProblem(prod.hyperdrive[0].id, previewId), /placeholder/, 'slice c must refuse to deploy with this id');
+  assert.match(prod.hyperdrive[0].id, /^PLACEHOLDER/);
+  assert.equal(hyperdriveIdProblem('0123456789abcdef0123456789abcdef', previewId), null, 'a real-looking id is accepted');
+  assert.match(hyperdriveIdProblem(previewId, previewId), /must not be the preview/);
+  for (const bad of [undefined, null, '', 'PLACEHOLDER-production-hyperdrive-config-id', 'A1F662C88F3B485190C402D9548AE360', 'abc123', 'a1f662c88f3b485190c402d9548ae36', 'a1f662c88f3b485190c402d9548ae360 ', 42]) assert.match(hyperdriveIdProblem(bad, previewId), /placeholder or not a valid/, String(bad));
+  assert.doesNotMatch(readFileSync('wrangler.prod.jsonc', 'utf8'), /postgres(ql)?:\/\/|connectionString|localConnectionString/i);
+});
+
+test('the preview config is untouched by production: it never gains the production switch or a production name', () => {
+  assert.equal(preview.vars.HARIMU_PRODUCTION_STORAGE, undefined); assert.equal(preview.name, 'harimu-preview'); assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW, 'true');
+});
+
+test('QA3 on #641: the CLI refuses --fresh-world without --bootstrap-empty before it connects; bootstrap re-checks emptiness after BEGIN', async () => {
+  const run = args => spawnSync(process.execPath, ['scripts/apply-postgres-migrations.mjs', ...args], { env: { PATH: process.env.PATH, PREVIEW_DATABASE_ADMIN_URL: 'postgres://nobody@127.0.0.1:1/none' }, encoding: 'utf8', timeout: 20000 });
+  for (const args of [['--fresh-world'], ['--fresh-world', '--dry-run']]) { const result = run(args); assert.equal(result.status, 1); assert.match(result.stderr, /--fresh-world only works with --bootstrap-empty/); assert.doesNotMatch(result.stderr, /connection/i); }
+  const pg = new PGlite(); await pg.waitReady;
+  const racing = { query: (t, p) => pg.query(t, p), exec: async t => { if (t === 'BEGIN') await pg.exec('CREATE TABLE late_stray(id int)'); return pg.exec(t); } }; // a table appears between the first check and BEGIN
+  await assert.rejects(bootstrapEmptyPostgres(racing, { freshWorld: true }), /refuses: schema public already has 1 table/);
+  assert.deepEqual((await pg.query("SELECT tablename FROM pg_tables WHERE schemaname='public'")).rows.map(r => r.tablename), ['late_stray'], 'nothing was bootstrapped over it');
+  assert.equal((await pg.query('SELECT pg_try_advisory_lock(1191280) AS ok')).rows[0].ok, true, 'lock released'); await pg.close();
+});
+
+test('QA3 on #641: the runtime role grants, applied on a real Postgres (PGlite) after the fresh-world bootstrap, satisfy the startup role check and the Worker queries work', async () => {
+  const pg = new PGlite(); await pg.waitReady; const db = { query: (t, p) => pg.query(t, p), exec: t => pg.exec(t) };
+  await bootstrapEmptyPostgres(db, { freshWorld: true }); await pg.exec('CREATE ROLE harimu_runtime NOLOGIN; CREATE ROLE bad_runtime NOLOGIN');
+  for (const sql of runtimeRoleGrantSql('harimu_runtime')) await pg.exec(sql);
+  const check = async role => { await pg.exec(`SET ROLE ${role}`); try { return (await pg.query("SELECT has_schema_privilege(current_user,'public','CREATE')::int AS can_create_schema,has_any_column_privilege(current_user,'harimu_storage_migrations','UPDATE')::int AS can_change_marker,(SELECT rolsuper FROM pg_roles WHERE rolname=current_user)::int AS superuser")).rows[0]; } finally { await pg.exec('RESET ROLE'); } };
+  const good = await check('harimu_runtime'); assert.deepEqual(good, { can_create_schema: 0, can_change_marker: 0, superuser: 0 });
+  assertPostgresApplicationRole({ canCreateSchema: good.can_create_schema, canChangeMarker: good.can_change_marker, superuser: good.superuser });
+  await pg.exec('GRANT ALL ON ALL TABLES IN SCHEMA public TO bad_runtime; GRANT CREATE ON SCHEMA public TO bad_runtime'); // what a blanket write role would allow
+  const bad = await check('bad_runtime'); assert.throws(() => assertPostgresApplicationRole({ canCreateSchema: bad.can_create_schema, canChangeMarker: bad.can_change_marker, superuser: bad.superuser }));
+  await pg.exec('SET ROLE harimu_runtime');
+  try {
+    assert.equal((await pg.query("SELECT id FROM harimu_storage_migrations WHERE id='fresh-world-v1'")).rows.length, 1);
+    await pg.query("INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ('[]')");
+    assert.equal((await pg.query("SELECT harimu_compat.json_valid('{}') AS ok")).rows[0].ok, true);
+    await pg.exec('UPDATE citizens SET capacity=capacity WHERE false'); await pg.exec('DELETE FROM citizens WHERE false'); assert.equal((await pg.query('SELECT COUNT(*)::int AS n FROM citizens')).rows[0].n, 0); // read and write on the game tables
+    await assert.rejects(pg.exec("UPDATE harimu_storage_migrations SET validated=0"), /permission denied/);
+    await assert.rejects(pg.exec('CREATE TABLE runtime_made_this(id int)'), /permission denied/);
+  } finally { await pg.exec('RESET ROLE'); }
+  assert.throws(() => runtimeRoleGrantSql('Bad Role; DROP'), /lowercase role name/);
+  await pg.close();
+});
