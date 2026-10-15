@@ -37,14 +37,14 @@ test('#442 rules: gain is base 10 in an untouched district and diminishes, never
   assert.equal(rules.questStage(9, { completesAt: 9, completedAt: null }), 'ready'); assert.equal(rules.questStage(99, { completesAt: 9, completedAt: 20 }), 'completed');
 });
 
-test('#442: the flag defaults to "false", migration 0045 only adds a table, and no ballot, count or AI-share module can read visibility', async () => {
+test('#442: the flag defaults to "false", migration 0046 only adds a table, and no ballot, count or AI-share module can read visibility', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   assert.deepEqual([...cfg.matchAll(/"HARIMU_CANVASSING_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
-  for (const file of ['../drizzle/0045_canvass_quests.sql', '../db/postgres/0045_canvass_quests.sql']) {
+  for (const file of ['../drizzle/0046_canvass_quests.sql', '../db/postgres/0046_canvass_quests.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.equal(isDestructive(sql), false, file); assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS canvass_quests/);
   }
-  assert.deepEqual(postgresMigrations().find(m => m.file.startsWith('0045_')).tables, ['canvass_quests']);
+  assert.deepEqual(postgresMigrations().find(m => m.file.startsWith('0046_')).tables, ['canvass_quests']);
   // Nothing that counts, tallies or weighs a ballot (or an AI bloc share) mentions canvassing, visibility or the table.
   const ballotModules = ['assembly-rules', 'assembly', 'assembly-copy', 'elections', 'instant-runoff', 'primaries-rules', 'primaries', 'preview-election', 'ballot-privacy', 'kindle-parties'];
   for (const name of ballotModules) assert.doesNotMatch(await readFile(new URL(`../lib/${name}.ts`, import.meta.url), 'utf8'), /canvass|visibility/i, `lib/${name}.ts`);
