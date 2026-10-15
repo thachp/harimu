@@ -4,7 +4,7 @@ import { aiBudgetConfig, type AiBudgetConfig } from './ai-budget';
 import type { NewsAiBinding } from './ai-news';
 import { platformCards, generateAnswer } from './town-hall-ai';
 import { rankQuestions } from './town-hall-rules';
-import { debateHallId, debateTopQuestions } from './debate';
+import { debateHallId, debateQuestionsAsked, debateTopQuestions } from './debate';
 
 /** #282: the AI candidates' debate answers. Scheduled Worker only (`runDebateCron`), never a route and never a read. Off unless HARIMU_DEBATE_ENABLED and HARIMU_AI_DEBATE_ANSWERS_ENABLED are both
  *  "true" and the AI binding and a valid daily AI budget are present. It reuses the town hall answer pipeline (draft, support check, safety model, one budget reservation, no digits or links). */
@@ -27,6 +27,11 @@ async function nextPending(db: GameDatabase, now: number, day: string): Promise<
   return null;
 }
 const reservationFor = (questionId: string, candidateId: string, day: string) => `debate:${questionId}:${candidateId}:${day}`;
+/** The answer insert. The statement itself checks that intake has closed and that the question is among the hall's top `debateQuestionsAsked` (votes, then earliest, then id: the order of `rankQuestions`),
+ *  so it does not rely on the earlier read that chose the pair. Bound: question, candidate, text, time, hall, time, question. */
+export const debateAnswerInsertSql = `INSERT INTO debate_answers (question_id,candidate_id,answer_text,answered_at) SELECT ?,?,?,? FROM town_halls h WHERE h.id=? AND h.closes_at<=?
+ AND ? IN (SELECT t.id FROM (SELECT q.id AS id FROM town_hall_questions q WHERE q.hall_id=h.id ORDER BY (SELECT COUNT(*) FROM town_hall_votes v WHERE v.question_id=q.id) DESC, q.created_at ASC, q.id ASC LIMIT ${debateQuestionsAsked}) t)
+ ON CONFLICT DO NOTHING`;
 export async function prepareDebateAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number } = {}) {
   if (!options.enabled || !binding || !options.budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
   const day = new Date(now * 1000).toISOString().slice(0, 10);
@@ -42,12 +47,15 @@ export async function prepareDebateAnswer(db: GameDatabase, now: number, binding
   if (made.status === 'disabled') return { status: 'disabled' as const };
   if (made.status === 'budget-unavailable') return { status: 'budget-unavailable' as const };
   if (made.status === 'not-sent' || made.status === 'failed') return { status: made.status, questionId: p.questionId, candidateId: p.candidateId };
-  // Only after intake closed and a pair still unanswered: the insert is guarded by both, so overlapping runs never double-publish.
+  // Only after intake closed, only while the question is still one of the hall's top 5, and only for a pair still unanswered: the insert carries all three checks itself, so overlapping runs never double-publish
+  // and a ranking that moved after the pair was chosen publishes nothing.
   const [saved] = await db.batch([
-    db.prepare('INSERT INTO debate_answers (question_id,candidate_id,answer_text,answered_at) SELECT ?,?,?,? FROM town_halls h WHERE h.id=? AND h.closes_at<=? ON CONFLICT DO NOTHING').bind(p.questionId, p.candidateId, made.text, now, debateHallId, now),
+    db.prepare(debateAnswerInsertSql).bind(p.questionId, p.candidateId, made.text, now, debateHallId, now, p.questionId),
     db.prepare("UPDATE harimu_ai_reservations SET status='finished' WHERE request_id=?").bind(reservation),
   ]);
-  return { status: saved.meta.changes ? 'recorded' as const : 'already-recorded' as const, questionId: p.questionId, candidateId: p.candidateId };
+  if (saved.meta.changes) return { status: 'recorded' as const, questionId: p.questionId, candidateId: p.candidateId };
+  const exists = await db.prepare('SELECT 1 AS yes FROM debate_answers WHERE question_id=? AND candidate_id=?').bind(p.questionId, p.candidateId).first<{ yes: number }>();
+  return { status: exists ? 'already-recorded' as const : 'not-selected' as const, questionId: p.questionId, candidateId: p.candidateId };
 }
 export async function runDebateCron(db: GameDatabase, now: number, bindings: DebateCronBindings) {
   if (!debateAnswersConfigured(bindings)) return { status: 'disabled' as const, results: [] as string[] };

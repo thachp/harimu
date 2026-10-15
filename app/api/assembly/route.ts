@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { readVerification } from '@/lib/verification';
+import { kindleEligibility } from '@/lib/kindle-eligibility';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { validPetitionId } from '@/lib/collective-petitions';
 import { ballotPrivacyReason } from '@/lib/ballot-privacy';
@@ -18,9 +19,7 @@ async function kindleCitizen(userId: string) {
   return { db, kindle: (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id === 'kindle' };
 }
 async function eligibility(scope: ReturnType<typeof assemblyScope>, userId: string) {
-  const verification = await readVerification(userId);
-  if (scope?.scope === 'preview-citizen') return { eligible: true, scope: 'preview-citizen', reason: 'Signed-in Kindle citizens may vote once in this preview PoC.', verification };
-  return { eligible: verification.countedActionsEligible, scope: 'tier1', reason: verification.reason, verification };
+  return kindleEligibility(await readVerification(userId), { on: scope?.scope === 'preview-citizen', reason: 'Signed-in Kindle citizens may vote once in this preview PoC.' });
 }
 
 export async function GET(request: Request) {
