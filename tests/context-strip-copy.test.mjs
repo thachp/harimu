@@ -28,9 +28,11 @@ test('the chain keeps the shell order: guest example, then local demo, then the 
     assert.equal(S({country:true,visitor}),'Static lore · opt-in presence');
   }
 });
-test('the existing labels still match the shell source, so this module cannot drift from the strip it replaces', () => {
+test('the game shell takes the strip heading from this module (#379), so a visitor never reads "Citizen snapshot"', () => {
   const shell=readFileSync('app/game-shell.tsx','utf8');
-  for (const k of ['guestDemo','localDemo','country','citizen']) assert.ok(shell.includes(`'${Lb[k].text}'`),Lb[k].text);
+  assert.match(shell,/contextStripStatus\(\{ guestDemo, localDemo, country: view === 'country', visitor \}\)/);
+  for (const old of ['Disposable sample','Browser-local demo','Static lore · opt-in presence','Citizen snapshot']) assert.ok(!shell.includes(`'${old}'`),`${old} lives only in the copy module now`);
+  assert.match(shell,/visitor \? 'CITY DISTRICTS · VISITOR VIEW' : 'CITY DISTRICTS · CITIZEN VIEW'/);
 });
 test('the visitor label is plain, has no figure and none of the citizen or demo wording', () => {
   assert.doesNotMatch(Lb.visitor.text,/\d|citizen|snapshot|demo|sample|disposable|guest|sign|account|log ?in|free|trial/i);
@@ -41,7 +43,7 @@ test('the header comment says visitor comes from isVisitorSession(...) when wire
   assert.match(head,/should come from isVisitorSession\(\.\.\.\) when this is wired/);
   assert.doesNotMatch(head,/\blib\/|\.ts\b|app\/|components\//);
 });
-test('unwired: nothing in app/, components/ or lib/ imports context-strip-copy', () => {
+test('wired in one place: only app/game-shell.tsx imports context-strip-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('context-strip-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/context-strip-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('context-strip-copy.ts')&&f!=='app/game-shell.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/context-strip-copy/, f);
 });

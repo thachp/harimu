@@ -20,10 +20,10 @@ const events = async r => (await r.db.prepare('SELECT nation_id,kind,occurred_at
 const tick = async r => { await r.call('world', null); await r.call('world', null); };
 const gov = async (r, user) => (await r.call('citizen', user)).data.government;
 
-test('wrangler.jsonc ships the Founding Period off with its comment on its own line, and no line has a trailing comment', async () => {
+test('wrangler.jsonc ships the Founding Period on in preview with its comment on its own line, and no line has a trailing comment', async () => {
   const cfg = await read('wrangler.jsonc');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_FOUNDING_PERIOD_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
-  assert.match(cfg, /^\s*\/\/ #612:.*\n\s*"HARIMU_FOUNDING_PERIOD_ENABLED": "false",$/m, 'the comment is a full line above the flag');
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_FOUNDING_PERIOD_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
+  assert.match(cfg, /^\s*\/\/ #612:.*\n\s*"HARIMU_FOUNDING_PERIOD_ENABLED": "true",$/m, 'the comment is a full line above the flag');
   const trailing = cfg.split('\n').filter(l => !/^\s*\/\//.test(l)).filter(l => /\/\/|\/\*/.test(l.replace(/"(?:[^"\\]|\\.)*"/g, '""')));
   assert.deepEqual(trailing, []);
   const imports = [...(await read('lib/founding-period.ts')).matchAll(/^import .* from '([^']+)'/gm)].map(m => m[1]).sort();

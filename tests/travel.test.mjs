@@ -79,10 +79,10 @@ test('flag gate, validation, idempotent replay, unsupported nation and origin', 
   assert.equal((await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'harvest' })).status, 200);
 });
 
-test('wrangler.jsonc ships travel off by default', async () => {
+test('wrangler.jsonc ships travel on in preview', async () => {
   const { readFile } = await import('node:fs/promises');
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_TRAVEL_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_TRAVEL_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
 });
 
 test('capital and outpost squares are mapped by city role, not catalog order (ARC ruling on #264)', async t => {

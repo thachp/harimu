@@ -26,9 +26,9 @@ test('pure rules: Kindle needs a simple majority (more than half), Korund and Au
   assert.equal(embargoStatus('in_force'), 'in-force'); assert.equal(embargoStatus('rejected'), 'rejected');
 });
 
-test('the flag defaults to "false", migration 0039 only adds a table, and no route can propose, decide or lift an embargo', async () => {
+test('the flag is "true" in preview wrangler, migration 0039 only adds a table, and no route can propose, decide or lift an embargo', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_EMBARGO_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_EMBARGO_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0039_embargoes.sql', '../db/postgres/0039_embargoes.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS embargoes/);
