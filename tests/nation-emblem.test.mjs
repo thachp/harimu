@@ -20,9 +20,10 @@ test('visitors see "Visiting" only with the emblem flag on; other states keep th
  assert.equal(identityStatus({...visitor,hasCitizenNation:true},true),'Your citizen');
  assert.equal(identityStatus({...visitor,localDemo:true},true),'Local demo');assert.equal(identityStatus({...visitor,guestDemo:true,localDemo:true},true),'Guest example');
 });
-test('the emblem flag is exactly "true" and ships off in wrangler.jsonc',async()=>{
+test('the emblem flag is exactly "true" and is on in preview wrangler.jsonc and off in wrangler.prod.jsonc',async()=>{
  assert.equal(topBarEmblemEnabled('true'),true);for(const v of [undefined,'false','','1','TRUE'])assert.equal(topBarEmblemEnabled(v),false);
- assert.match(await readFile(new URL('../wrangler.jsonc',import.meta.url),'utf8'),/"NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false"/);
+ assert.match(await readFile(new URL('../wrangler.jsonc',import.meta.url),'utf8'),/"NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "true"/);
+ assert.match(await readFile(new URL('../wrangler.prod.jsonc',import.meta.url),'utf8'),/"NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false"/);
 });
 test('top-bar notifications button names the unread count and still opens the civic inbox (#78)',async()=>{
  const dock=await readFile(new URL('../app/citizen-dock.tsx',import.meta.url),'utf8');
