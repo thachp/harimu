@@ -53,3 +53,12 @@ test('the inspector header is the only consumer, every pattern has crest CSS, an
  for(const mark of Object.values(nationMarks))assert.match(css,new RegExp(`\\.nation-crest\\[data-nation-pattern="${mark.pattern}"\\]`),mark.pattern);
  assert.match(css,/\.nation-crest\{[^}]*clip-path:polygon\(/);
 });
+
+test('every esbuild harness that bundles the shell defines the crest flag (a missing define throws "process is not defined" in the browser, #571)',async()=>{
+ const{readdir,readFile}=await import('node:fs/promises');
+ const dir=new URL('../scripts/',import.meta.url);
+ const bundlers=[];
+ for(const f of await readdir(dir)){if(!f.endsWith('.mjs'))continue;const src=await readFile(new URL(f,dir),'utf8');if(/from 'esbuild'/.test(src)&&/define:\s*\{/.test(src))bundlers.push([f,src]);}
+ assert.ok(bundlers.length>=2,'found the shell bundlers');
+ for(const[f,src]of bundlers)assert.match(src,/'process\.env\.NEXT_PUBLIC_HARIMU_UI_V2_CREST'/,`${f} must define NEXT_PUBLIC_HARIMU_UI_V2_CREST`);
+});
