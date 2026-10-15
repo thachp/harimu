@@ -10,7 +10,7 @@ export type HouseLine = { named: string | null; members: readonly Member[] }; //
 export type SuccessionEvent = { seq: number; kind: SuccessionEventKind; memberId: string | null; name: string | null; house: string | null; occurredAt: number };
 export type Ruler = { name: string; house: string };
 export type Heir = { memberId: string; name: string; house: string; named: boolean };
-export type SuccessionState = { status: SuccessionStatus; ruler: Ruler; heir: Heir | null; ruledHouses: string[]; events: number };
+export type SuccessionState = { status: SuccessionStatus; ruler: Ruler; heir: Heir | null; ruledHouses: string[]; events: number; installedAt: number | null };
 
 /** The ruler before any crown or succession: lib/leader-personas.ts (pinned by a test). */
 export const baseRuler: Ruler = { name: 'Maera Solenne', house: 'House Solenne' };
@@ -43,17 +43,17 @@ export function nextHeir(house: string, reigned: ReadonlySet<string>): Heir | nu
 
 /** Derive the state from the base ruler (the crown in force, or Maera Solenne) and the events recorded AFTER that crown, in seq order. */
 export function deriveSuccession(base: Ruler, events: readonly SuccessionEvent[]): SuccessionState {
-  let ruler = base, status: SuccessionStatus = 'reigning', reigned = new Set<string>(); const ruledHouses = [base.house];
+  let ruler = base, status: SuccessionStatus = 'reigning', reigned = new Set<string>(), installedAt: number | null = null; const ruledHouses = [base.house];
   for (const e of [...events].sort((a, b) => a.seq - b.seq)) {
     if (e.kind === 'illness') status = 'ailing';
     else if (e.kind === 'vacancy') status = 'vacant';
     else if (e.kind === 'abdication') status = 'abdicated';
     else if (e.name && e.house) {
-      ruler = { name: e.name, house: e.house }; status = 'acceded';
+      ruler = { name: e.name, house: e.house }; status = 'acceded'; installedAt = e.occurredAt;
       if (e.kind === 'great_council') { reigned = new Set(); ruledHouses.push(e.house); } else if (e.memberId) reigned.add(e.memberId);
     }
   }
-  return { status, ruler, heir: nextHeir(ruler.house, reigned), ruledHouses, events: events.length };
+  return { status, ruler, heir: nextHeir(ruler.house, reigned), ruledHouses, events: events.length, installedAt };
 }
 /** The house the Great Council would elect now, or null when every council house has ruled since the last crown. */
 export const councilChoice = (ruledHouses: readonly string[]): Ruler | null => councilHouses.find(h => !ruledHouses.includes(h.house)) ?? null;

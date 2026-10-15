@@ -86,3 +86,12 @@ export async function handleSuccessionCommand(db: GameDatabase, input: { enabled
   if (!row) return fail(409, 'state_changed', 'The succession moved at the same moment; read it and try again.');
   return { ok: true as const, ...(row.id === id ? {} : { replay: true as const }), event: publicEvent(row), state: view(await readSuccession(db)) };
 }
+
+/** #613 slice 2: the public part of the state for the Aurelle government read (read-only): the status and the heir (name and whether named), and, once an heir or the Great Council has installed a ruler
+ *  since the last crown, a `crown` the leader panel shows in place of the authored Monarch. [ASSUMPTION] royal gold (the authored persona's colour) for every succession ruler; no motto. */
+export function publicSuccession(s: Awaited<ReturnType<typeof readSuccession>>) {
+  return {
+    succession: { status: s.status, heir: s.heir ? { name: s.heir.name, named: s.heir.named } : null },
+    crown: s.installedAt === null ? null : { claimantId: `succession:${s.ruler.house}`, name: s.ruler.name, house: s.ruler.house, motto: '', color: '#c7af75', crownedAt: s.installedAt, how: 'succession' as const },
+  };
+}
