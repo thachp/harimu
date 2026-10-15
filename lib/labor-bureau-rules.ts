@@ -4,7 +4,7 @@
 export type BureauJob = { id: string; name: string; minShifts: number; goodStandingOnly: boolean; seats: number };
 /** The plan's posts. 'korund-food-production' is the existing brigade and the fallback post. Seats are the plan's quota. [ASSUMPTION] */
 export const bureauJobs: readonly BureauJob[] = [
-  { id: 'korund-food-production', name: 'State food-production brigade', minShifts: 0, goodStandingOnly: false, seats: 6 },
+  { id: 'korund-food-production', name: 'State food brigade', minShifts: 0, goodStandingOnly: false, seats: 6 },
   { id: 'korund-quarry-gang', name: 'Stonehearth quarry gang', minShifts: 1, goodStandingOnly: false, seats: 5 },
   { id: 'korund-foundry-hand', name: 'Foundry hand', minShifts: 3, goodStandingOnly: false, seats: 4 },
   { id: 'korund-rail-crew', name: 'Rail maintenance crew', minShifts: 5, goodStandingOnly: false, seats: 4 },
