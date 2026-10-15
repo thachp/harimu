@@ -161,3 +161,17 @@ test('#252 without the server secret the step fails closed: no ticket, no graded
   assert.equal((await r.call('citizen', 'alice', { action: 'quality-ticket', workOrderId: 'freight' })).status, 404);
   const skipped = await claim(r, 'alice', { quality: { skip: true } }); assert.equal(skipped.done.data.economy.walletMinor, 800);
 });
+
+test('UI styling hooks (#347): buttons sit in one spaced action row, primary is distinct, the chosen option is marked', async () => {
+  const compiled = ts.transpileModule(await readFile(new URL('../app/shift-quality-step.tsx', import.meta.url), 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText;
+  const nodes = n => !n || typeof n !== 'object' ? [n] : [n, ...[n.props?.children].flat(Infinity).flatMap(nodes)];
+  let chosen = 0; const react = { useState: init => [typeof init === 'function' ? init().map((_, i) => i === 0 ? chosen : null) : init, () => {}], useRef: init => ({ current: init }) };
+  const exports = {}; new Function('exports', 'require', compiled)(exports, n => n === 'react' ? react : n === '@/lib/shift-quality' ? require('../lib/shift-quality.ts') : require(n));
+  const tree = nodes(exports.ShiftQualityStep({ orderName: 'Harvest', cost: 4, base: { wageMinor: 800, quantity: 4, item: 'food' }, questions: harvestQuestions, onStart() {}, onCancel() {} }));
+  const actions = tree.find(n => n?.props?.className === 'shift-quality-actions');
+  assert.ok(actions, 'one action row wraps the buttons');
+  const buttons = nodes(actions).filter(n => n?.type === 'button');
+  assert.deepEqual(buttons.map(b => b.props.className), ['shift-quality-start', 'shift-quality-skip', 'shift-quality-cancel']);
+  assert.equal(tree.filter(n => n?.type === 'label' && n.props.className === 'is-selected').length, 1, 'only the chosen option of the answered question is marked');
+  assert.ok(tree.some(n => n?.props?.className === 'shift-quality-questions') && tree.some(n => n?.props?.className === 'shift-quality-intro'));
+});

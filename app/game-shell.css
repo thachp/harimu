@@ -246,3 +246,25 @@ body:has(.harimu-game){overflow:auto}
 .faith-status p{margin:8px 0 0}.faith-status [role=alert]{color:#f3b3a6}
 .holiday-banner{border-color:#80d8ce;background:#12333a}.holiday-banner .holiday-line strong{font-size:calc(14px * var(--text-scale, 1))}.holiday-banner .festival-line{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between}.holiday-banner .festival-line>p{flex:1 1 calc(220px * var(--text-scale, 1))}
 .game-clock .game-clock-holiday{color:#80d8ce;letter-spacing:0}
+
+/* #347 shift quality step: card per question, whole-row options, spaced buttons (all >= 44px, text scales). */
+.shift-quality{width:min(560px,calc(100vw - 32px));font-size:calc(14px * var(--text-scale, 1));line-height:1.45}
+.shift-quality h2{margin:0 0 8px;font:600 calc(20px * var(--text-scale, 1))/1.25 Georgia,serif;color:#efd69c}
+.shift-quality-intro{margin:0 0 14px;color:#b9c4bf}
+.shift-quality-questions{display:grid;gap:12px;margin:0 0 16px;padding:0;list-style:none}
+.shift-quality-questions fieldset{margin:0;padding:12px;border:1px solid #2f4a52;background:#142226;min-width:0}
+.shift-quality-questions legend{padding:0 6px;color:#e8e4d4;font-weight:600}
+.shift-quality-questions label{display:flex;align-items:flex-start;gap:10px;min-height:44px;margin-top:8px;padding:10px 12px;border:1px solid #2f4a52;background:#0f1a1d;color:#d6e0dc;cursor:pointer}
+.shift-quality-questions label:hover{border-color:#5a8089}
+.shift-quality-questions label.is-selected{border-color:#efd69c;background:#1d2c2a;color:#fff7e0}
+.shift-quality-questions input[type=radio]{flex:none;width:18px;height:18px;margin:2px 0 0;accent-color:#72c7b9}
+.shift-quality-questions label:has(input:focus-visible){outline:2px solid #f7d080;outline-offset:2px}
+.shift-quality-questions label:has(input:disabled){opacity:.7;cursor:default}
+.shift-quality-actions{display:flex;flex-wrap:wrap;gap:10px}
+.shift-quality-actions button{flex:1 1 auto;min-height:44px;padding:10px 16px;border:1px solid #45636d;background:#15323d;color:#e4f1ef;font:inherit;cursor:pointer}
+.shift-quality-actions button.shift-quality-start{border-color:#72c7b9;background:rgba(114,199,185,.2);color:#e4fff8;font-weight:600}
+.shift-quality-actions button.shift-quality-cancel{flex:0 1 auto;background:transparent}
+.shift-quality-actions button:hover:not(:disabled){border-color:#9bd9ce}
+.shift-quality-actions button:focus-visible{outline:2px solid #f7d080;outline-offset:2px}
+.shift-quality-actions button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:480px){.shift-quality-actions button,.shift-quality-actions button.shift-quality-cancel{flex:1 1 100%}}
