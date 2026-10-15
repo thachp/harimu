@@ -11,7 +11,7 @@ import { bundleShell, shellProps } from './hud-tooltip-check.mjs';
 
 const entry = `
   import React from 'react'; import { createRoot } from 'react-dom/client'; import { GameShell } from './app/game-shell.tsx';
-  import { NationComparison } from './app/nation-strip-filters.tsx'; import { nationSymbolElement } from './app/nation-symbol.tsx';
+  import { NationComparison } from './app/nation-comparison.tsx'; import { nationSymbolElement } from './app/nation-symbol.tsx';
   const root = () => { window.__root?.unmount(); window.__root = createRoot(document.getElementById('root')); return window.__root; };
   window.nationSymbolElement = nationSymbolElement;
   window.mountStrip = props => root().render(<GameShell {...props} onNavigate={() => {}} onSelectNation={() => {}} accountControls={null} />);
