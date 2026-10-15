@@ -91,9 +91,9 @@ test('tone: no violence, no casualties named, no Notable, no other nations, no r
   assert.doesNotMatch(t,/Notable|@|\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia)\b/);
 });
-test('unwired: nothing in app/, components/ or lib/ imports war-weariness-copy', () => {
+test('wired only into the war banner (#423): nothing else in app/, components/ or lib/ imports war-weariness-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-weariness-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/war-weariness-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-weariness-copy.ts')&&f!=='app/war-banner.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/war-weariness-copy/, f);
 });
 test('QA3 fixes: the tooltip does not claim the weekly step grows; Kindle officials are weighing, not obliged; relief lines carry no weariness wording', () => {
   assert.doesNotMatch(ST.tooltip[1].text,/faster|more (each|every)|grows? (each|every)|longer a war goes on, the more/i); assert.match(ST.tooltip[1].text,/Each game week at war adds Unrest/); assert.match(ST.tooltip[1].text,/more in total/);
