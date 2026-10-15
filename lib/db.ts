@@ -29,6 +29,7 @@ import { worldCitiesSchema } from './city-founding';
 import { aurelleFavorIndexes, aurelleSchemas, royalFavorSchemas } from './aurelle';
 import { warSchemas } from './war'; // #309
 import { siegeSchemas } from './siege'; // #419
+import { hallSchema } from './diplomatic-hall'; // #599
 import { treatySchemas } from './diplomacy'; // #308
 import { embargoSchemas } from './embargo'; // #363
 import { crownDecreeSchemas } from './crown-debasement'; // #362
@@ -238,7 +239,7 @@ async function initialize(database: GameDatabase) {
     ...worldSquaresSeedSql().map(sql => database.prepare(sql)),
     ...bootNationSquaresSql().map(sql => database.prepare(sql)), // #491: nothing today; adds a new nation's squares once it has a capital
     database.prepare(worldCitiesSchema),
-    ...squareSchema.map(sql => database.prepare(sql)),
+    ...squareSchema.map(sql => database.prepare(sql)), ...hallSchema.map(sql => database.prepare(sql)), // #599
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
