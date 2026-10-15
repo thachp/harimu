@@ -85,7 +85,9 @@ test('the page, shell and daily loop use the flag: tab, link, prompts and naviga
   assert.match(page, /\{marketShown && <button type="button" onClick=\{\(\) => changeView\('market'\)\}>Take your earnings to market<\/button>\}/);
   assert.match(page, /requestedView === 'market' && !marketShown \? 'square'/, 'no navigation reaches the Market scene');
   assert.match(page, /viewMode === 'market' && marketShown && !\['korund','aurelle'\]/);
-  assert.match(page, /\.\.\.\(marketShown \? \[\{ id: 'market'/, 'city square destinations');
+  // #378: the city destination cards moved to lib/city-destinations.ts; the page passes the same #344 rule (marketShown, kept for Korund/Aurelle by marketVisible).
+  assert.match(page, /cityDestinations\(\(citizenNation \?\? selected\)\.id, marketVisible\(\(citizenNation \?\? selected\)\.id, marketShown\)\)/, 'city square destinations');
+  assert.match(await readFile(new URL('../lib/city-destinations.ts', import.meta.url), 'utf8'), /\.\.\.\(showMarket \? \[\{ id: 'market'/, 'the Market card only exists when showMarket');
   assert.match(page, /marketOpen=\{marketShown\}/, 'the DailyLoop prop (the GameShell tag is checked separately below)');
   assert.match(shell, /places\.filter\(\(\{id\}\) => locationVisible\(id, resourceNation\.id, marketOpen\)\)/, 'location dock');
   assert.match(shell, /<GameViewport marketOpen=\{marketVisible\(resourceNation\.id, marketOpen\)\}/, 'map building');
