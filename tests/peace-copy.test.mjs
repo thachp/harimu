@@ -61,10 +61,10 @@ test('what the docs say: peace ends the war; accept and decline outcomes; the lo
   assert.match(O.offerPrompt.text,/ends the war/); assert.match(O.incomingPrompt.text,/ends the war/); assert.match(O.accepted.text,/war is over/); assert.match(O.declined.text,/goes on/);
   assert.match(B.line.text,/no war declarations/);
 });
-test('bylines match the canon press packs; AI badge only on "Be it known" Crown lines', () => {
+test('bylines match the canon press packs; AI badge on Crown "Be it known" lines and Korund State Media lines (#381)', () => {
   assert.deepEqual(peacePressFor('kindle').byline,kindlePress.byline); assert.deepEqual(peacePressFor('korund').byline,korundStateMedia.byline); assert.deepEqual(peacePressFor('aurelle').byline,aurelleGazette.byline);
   for (const x of PR) {
-    for (const l of Object.values(x.report)) { assert.equal(l.aiBadge,false); assert.doesNotMatch(l.text,/Be it known/); }
+    for (const l of Object.values(x.report)) { assert.equal(l.aiBadge,x.nationId==='korund'); assert.doesNotMatch(l.text,/Be it known/); }
     if (x.crown) for (const l of Object.values(x.crown)) { assert.equal(l.aiBadge,true); assert.match(l.text,/^Be it known/); }
   }
   assert.ok(!peacePressFor('kindle').crown&&!peacePressFor('korund').crown); assert.ok(peacePressFor('aurelle').crown);

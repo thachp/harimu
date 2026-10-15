@@ -198,7 +198,7 @@ export function treatyNewsItems(treaties: PublicTreaty[], readerNation: string):
     const other = treaty.proposer === readerNation ? treaty.other : treaty.proposer;
     const values = { nationA: cap(treatyNationNames[readerNation]), nationB: cap(treatyNationNames[other]), treaty: treatyKindNames[treaty.kind], endsAt: treaty.endsAt === null ? '' : new Date(treaty.endsAt * 1000).toISOString().slice(0, 10) };
     const key: RatificationKey = readerNation === 'kindle' ? (treaty.kind === 'trade' ? 'kindle:trade' : 'kindle:treaty') : `${readerNation}:any` as RatificationKey;
-    const news = ratificationFor(key)!, kind = news.aiBadge ? 'decree' as const : 'template' as const;
+    const news = ratificationFor(key)!, kind = news.aiBadge && news.nationId === 'aurelle' ? 'decree' as const : 'template' as const;
     items.push({ id: `treaty:${treaty.id}:ratified`, title: ratificationHeadlines[key], text: fill(news.body, values), occurredAt: treaty.ratifiedAt * 1000, source: 'deterministic', kind });
     if (treaty.status === 'broken' && treaty.brokenAt !== null) items.push({ id: `treaty:${treaty.id}:broken`, title: 'A treaty was broken', text: fill(treaty.kind === 'non-aggression' ? brokenPactLine.text : treatyStatusLines.broken[0].text, values), occurredAt: treaty.brokenAt * 1000, source: 'deterministic', kind });
   }

@@ -3,14 +3,16 @@
  * (ledger-driven headlines), these are fixed sample stories: headline plus 1-2 short paragraphs, with no figures, so no
  * number can ever be invented (harimu-docs social-news-media §18.2: system stats stay truthful). Canon: nation pages,
  * social-news-media §18.2, culture bible. All prose is new wording, so `proposal: true`. Authored copy, not AI output,
- * so no AI-text flag. No people named, no "Notable", no real-world references.
+ * so no AI-text flag on the story itself; the explicit `aiBadge` marks only the Crown and Presidium voices (#381). No people named, no "Notable", no real-world references.
  * FILLER ONLY (ARC): a pack is shown only when no player paper has published in that nation. Not labeled as samples;
  * each pack carries an in-world wire byline instead (visual treatment: UX issue). */
 
 export type PressNation='kindle'|'korund'|'aurelle';
 /** Kindle: free press (player newspapers). Korund: State Media. Aurelle: Court Gazette. */
 export type PressOutlet='free-press'|'state-media'|'court-gazette';
-export type PressTemplate={id:string;topic:string;headline:string;body:readonly string[];proposal:true};
+/** `aiBadge` is explicit on every template (#381, docs ui-ux 23.2): true where the story speaks for an AI leader or body (a Crown decree or the
+ * Presidium), false for a bylined report. */
+export type PressTemplate={id:string;topic:string;headline:string;body:readonly string[];aiBadge:boolean;proposal:true};
 /** In-world wire service the stories run under. `proposal: true` when the name is new (a neutral service name), false when canon. */
 export type WireByline={name:string;proposal:boolean};
 export type PressPack={nationId:PressNation;outlet:PressOutlet;voice:string;byline:WireByline;templates:readonly PressTemplate[]};
@@ -20,7 +22,9 @@ export const PRESS_PARAGRAPH_MAX=140;
 export const PRESS_TEMPLATES_MIN=8;
 export const PRESS_TEMPLATES_MAX=12;
 
-const t=(id:string,topic:string,headline:string,...body:string[]):PressTemplate=>({id,topic,headline,body,proposal:true});
+const t=(id:string,topic:string,headline:string,...body:string[]):PressTemplate=>({id,topic,headline,body,aiBadge:false,proposal:true});
+/** A template that speaks for an AI leader or body, so it is AI-badged (#381). */
+const tb=(id:string,topic:string,headline:string,...body:string[]):PressTemplate=>({...t(id,topic,headline,...body),aiBadge:true});
 
 export const kindlePress:PressPack={nationId:'kindle',outlet:'free-press',
  byline:{name:'Republic Wire Service',proposal:true},
@@ -77,7 +81,7 @@ export const korundStateMedia:PressPack={nationId:'korund',outlet:'state-media',
    'Boots are short at the state stores this week. New deliveries are planned. Queue in order at the rails.'),
   t('korund-shortage-bread','shortages','Bread allocation adjusted',
    'Bread allocations are adjusted this week to match supply. Each household receives its share by coupon.'),
-  t('korund-presidium-notice','presidium','Presidium notice',
+  tb('korund-presidium-notice','presidium','Presidium notice',
    'The Presidium has reviewed the Five-Year Plan and confirmed its targets. Brigades will receive their quotas.'),
   t('korund-congress','presidium','People\'s Congress approves the plan',
    'The People\'s Congress met and approved the plan, as is its duty.'),
@@ -94,7 +98,7 @@ export const aurelleGazette:PressPack={nationId:'aurelle',outlet:'court-gazette'
  byline:{name:'Court Gazette',proposal:false},
  voice:'Ornate, deferential and ranked: "Every thread in its place." The Crown speaks; the realm is informed.',
  templates:[
-  t('aurelle-decree','sky-throne','A decree from the Sky Throne',
+  tb('aurelle-decree','sky-throne','A decree from the Sky Throne',
    'Be it known that the Monarch has issued a royal decree, read this day by the Herald with due ceremony.'),
   t('aurelle-privy-council','sky-throne','The Privy Council sits',
    'The Privy Council has met at Highspire to advise the Crown. Its counsel is entered in the royal register.'),
@@ -111,7 +115,7 @@ export const aurelleGazette:PressPack={nationId:'aurelle',outlet:'court-gazette'
    'The Monarch, as Keeper of the Hearth, gives thanks to the Hearth-Keepers for their blessing.'),
   t('aurelle-mint','crown-economy','The Royal Mint strikes new Crowns',
    'New Crowns, stamped with the reigning Monarch, are struck at the Royal Mint terrace.'),
-  t('aurelle-debasement','crown-economy','A decree on the coinage',
+  tb('aurelle-debasement','crown-economy','A decree on the coinage',
    'By royal decree, the coinage is reissued at a new weight. Full-weight Crowns of earlier strikes are much sought after.'),
   t('aurelle-charter-fair','crown-economy','Charter Fair opens',
    'Royal charters will be granted at the Charter Fair. Guilds may present their petitions to trade.'),

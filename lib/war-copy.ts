@@ -18,7 +18,8 @@
  * leader or conflict, and no line threatens a named player. No armies, battles, casualties or loot; no "Notable".
  * Placeholders ({attacker}, {defender}, {casusBelli}, {endsAt}, {start}, {end}, {peaceLockEnds}) are runtime values capped by the shared
  * name cap, which this module re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts). Lines that speak for the Crown
- * are AI-badged. All wording is new: `proposal: true`. */
+ * are AI-badged. #381 (ARC, docs ui-ux 23.2): so are Korund State Media lines for the state's own war (`ours` and `against-us`), which speak
+ * for the AI Chairman and Presidium; foreign-war (`world`) reports are not, like the Gazette's. All wording is new: `proposal: true`. */
 
 export { COUP_NAME_MAX as WAR_NAME_MAX } from './palace-coup-copy';
 
@@ -58,10 +59,10 @@ export const declarationNotices:readonly WarNationNotices[]=[
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
   ours:n('korund-ours','The state declares war',
    'Korund State Media reports: war on {defender}, for {casusBelli}. Mobilization lasts 48 real hours.',
-   'Korund State Media reports: war is declared on {defender}. Mobilization lasts 48 real hours. One hammer, one heart.'),
+   'Korund State Media reports: war is declared on {defender}. Mobilization lasts 48 real hours. One hammer, one heart.',true),
   'against-us':n('korund-against-us','War declared on Korund',
    'Korund State Media reports: {attacker} declares war over {casusBelli}. Brigades hold for 48 real hours.',
-   'Korund State Media reports: {attacker} has declared war. Brigades hold the plan for 48 real hours.'),
+   'Korund State Media reports: {attacker} has declared war. Brigades hold the plan for 48 real hours.',true),
   world:n('korund-world','War declared abroad',
    'State Media: {attacker} declares war on {defender} over {casusBelli}. Mobilizing: 48 real hours.',
    'Korund State Media reports: {attacker} has declared war on {defender}. Mobilization lasts 48 real hours.')}},
@@ -78,8 +79,8 @@ export const declarationNotices:readonly WarNationNotices[]=[
 ];
 
 /** Mobilization-ended news (#334, companion to #309): one notice per side in each nation's voice, with the same bylines as the
- * declaration notices. Placeholders: {attacker}, {defender} only. Aurelle "Be it known" lines speak for the Crown and are AI-badged;
- * Kindle, Korund and Gazette-report lines are not. The assault line repeats §15.3 ("cities and forts", only inside the defender's window). */
+ * declaration notices. Placeholders: {attacker}, {defender} only. Aurelle "Be it known" lines speak for the Crown and, since #381, Korund `ours` and
+ * `against-us` State Media lines speak for the Chairman and Presidium; both are AI-badged. Kindle, Korund `world` and Gazette-report lines are not. The assault line repeats §15.3 ("cities and forts", only inside the defender's window). */
 export type MobilizationEndedNotice={id:string;headline:string;body:string;aiBadge:boolean;proposal:true};
 export type MobilizationEndedNotices={nationId:WarNation;byline:{name:string;proposal:boolean};notices:Readonly<Record<DeclarationSide,MobilizationEndedNotice>>;proposal:true};
 const m=(id:string,headline:string,body:string,aiBadge=false):MobilizationEndedNotice=>({id,headline,body,aiBadge,proposal:true});
@@ -89,8 +90,8 @@ export const mobilizationEndedNotices:readonly MobilizationEndedNotices[]=[
   'against-us':m('kindle-end-against-us','The war on the Republic is active','{attacker}\'s 48 real hours are up. The war is active. Assaults on cities and forts resolve only in our defense window.'),
   world:m('kindle-end-world','A war is now active','{attacker} and {defender} have finished mobilizing. The war is active.')}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
-  ours:m('korund-end-ours','Mobilization is complete','Korund State Media reports: mobilization against {defender} is complete. The war is active. One hammer, one heart.'),
-  'against-us':m('korund-end-against-us','The war on Korund is active','Korund State Media reports: {attacker}\'s mobilization is over. The war is active. Brigades hold the plan.'),
+  ours:m('korund-end-ours','Mobilization is complete','Korund State Media reports: mobilization against {defender} is complete. The war is active. One hammer, one heart.',true),
+  'against-us':m('korund-end-against-us','The war on Korund is active','Korund State Media reports: {attacker}\'s mobilization is over. The war is active. Brigades hold the plan.',true),
   world:m('korund-end-world','War is active abroad','Korund State Media reports: {attacker} and {defender} have finished mobilizing. The war is active.')}},
  {nationId:'aurelle',byline:{name:'Court Gazette',proposal:false},proposal:true,notices:{
   ours:m('aurelle-end-ours','Mobilization is ended','Be it known: mobilization is ended. The realm is at war with {defender}. Every thread in its place.',true),
