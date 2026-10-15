@@ -1,4 +1,5 @@
 import { aurelleRisingSchemas } from './aurelle-rising';
+import { aurelleCoupSchemas } from './aurelle-coup';
 import { presidiumSchemas } from './korund-presidium';
 import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView } from './market-orders';
 import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
@@ -7,6 +8,7 @@ import {korundQueueSchemas} from './korund-queue';
 import {korundCouponSchemas} from './korund-coupons';
 import {firstWeekGoalsSchema} from './first-week-server';
 import {worldRegistrySchemas} from './world-registry';
+import { tesseraExchangeSchema, tesseraExchangeIndex } from './tessera-exchange';
 import {travelSchema} from './travel';
 import {faithSchemas} from './faith';
 import {congregationSchemas} from './congregations';
@@ -204,7 +206,7 @@ async function initialize(database: GameDatabase) {
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
     ...korundCouponSchemas.map(sql=>database.prepare(sql)),
     database.prepare(firstWeekGoalsSchema),
-    ...worldRegistrySchemas.map(sql=>database.prepare(sql)),
+    ...worldRegistrySchemas.map(sql=>database.prepare(sql)), database.prepare(tesseraExchangeSchema), database.prepare(tesseraExchangeIndex), // #210
     database.prepare(travelSchema),
     ...faithSchemas.map(sql=>database.prepare(sql)),
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
@@ -226,7 +228,7 @@ async function initialize(database: GameDatabase) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
-    ...marketSchemas.map(sql => database.prepare(sql)), ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
+    ...marketSchemas.map(sql => database.prepare(sql)), ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
@@ -272,6 +274,14 @@ async function initialize(database: GameDatabase) {
     await database.batch([
       database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('kindle-income-tax-v1')"),
+    ]);
+  }
+  // #210: Clearing House kiosk purchases debit Spark. Same atomic wallet-view swap as market-orders-v1.
+  const tesseraExchangeInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'tessera-exchange-v1'").first();
+  if (!tesseraExchangeInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('tessera-exchange-v1')"),
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));

@@ -14,11 +14,12 @@ const src=readFileSync('lib/war-copy.ts','utf8').replace("from './palace-coup-co
 const out=join(mkdtempSync(join(tmpdir(),'war-copy-')),'war-copy.mjs');
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 const W = await import(pathToFileURL(out).href);
-const { declarationNotices, mobilizationStatus:M, blockedDeclaration:B, defenseWindow:D, citizenSafety:S, noticesFor, WAR_NATIONS, DECLARATION_SIDES, WAR_PLACEHOLDERS, WAR_NAME_MAX, WAR_LABEL_MAX, WAR_BODY_MAX } = W;
+const { declarationNotices, mobilizationStatus:M, blockedDeclaration:B, defenseWindow:D, citizenSafety:S, noticesFor, WAR_NATIONS, DECLARATION_SIDES, WAR_PLACEHOLDERS, WAR_NAME_MAX, WAR_LABEL_MAX, WAR_BODY_MAX, mobilizationEndedNotices, endedNoticesFor, warBanner:BN } = W;
 
 const notices=()=>declarationNotices.flatMap(x=>Object.values(x.notices));
-const bodies=()=>[...notices().flatMap(x=>[x.body,x.bodyNoGrievance]),...M.mobilizing,...M.active,M.ended.treaty,M.ended.other,B.foundingPeriod,B.nonAggression,B.peaceLock,D.line,...D.explainer,...S.lines].map(x=>typeof x==='string'?x:x.text);
-const heads=()=>notices().map(x=>x.headline);
+const bodies=()=>[...endNotices().map(x=>x.body),BN.countdownCaption,...notices().flatMap(x=>[x.body,x.bodyNoGrievance]),...M.mobilizing,...M.active,M.ended.treaty,M.ended.other,B.foundingPeriod,B.nonAggression,B.peaceLock,D.line,...D.explainer,...S.lines].map(x=>typeof x==='string'?x:x.text);
+const endNotices=()=>mobilizationEndedNotices.flatMap(x=>Object.values(x.notices));
+const heads=()=>[...notices().map(x=>x.headline),...endNotices().map(x=>x.headline),BN.header.ours,BN.header.againstUs,BN.countdownLabel];
 const all=()=>[...heads(),...bodies()];
 const fill=t=>WAR_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(WAR_NAME_MAX)),t);
 const SAFETY=()=>S.lines.map(l=>l.text);
@@ -102,4 +103,36 @@ test('nation voices stay distinct: Kindle plain, Korund collective, Aurelle cere
 test('war-copy is imported only by the #309 war banner (flagged off); nothing else in app/ or components/ uses it', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/war-banner.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/war-copy/, f);
+});
+
+test('#334 mobilization-ended news: each nation has ours / against-us / world notices with the canon bylines', () => {
+  assert.deepEqual(mobilizationEndedNotices.map(x=>x.nationId),[...WAR_NATIONS]);
+  const ids=new Set(notices().map(x=>x.id));
+  for (const x of mobilizationEndedNotices) {
+    assert.equal(x.proposal,true); assert.equal(endedNoticesFor(x.nationId),x); assert.deepEqual(Object.keys(x.notices).sort(),[...DECLARATION_SIDES].sort());
+    assert.deepEqual(x.byline,noticesFor(x.nationId).byline);
+    for (const nt of Object.values(x.notices)) { assert.equal(nt.proposal,true); assert.equal(typeof nt.aiBadge,'boolean'); assert.ok(!ids.has(nt.id)); ids.add(nt.id); assert.match(nt.body,/\bactive\b|\bat war\b/,nt.id); }
+  }
+  assert.deepEqual(noticesFor('kindle').byline,kindlePress.byline); assert.deepEqual(noticesFor('korund').byline,korundStateMedia.byline); assert.deepEqual(noticesFor('aurelle').byline,aurelleGazette.byline);
+});
+test('#334 AI badge only on Aurelle "Be it known" Crown lines', () => {
+  for (const x of mobilizationEndedNotices) for (const nt of Object.values(x.notices)) assert.equal(nt.aiBadge,/^Be it known/.test(nt.body),nt.id);
+  assert.equal(endedNoticesFor('aurelle').notices.world.aiBadge,false); assert.equal(endedNoticesFor('aurelle').notices.ours.aiBadge,true);
+  for (const id of ['kindle','korund']) for (const nt of Object.values(endedNoticesFor(id).notices)) assert.equal(nt.aiBadge,false);
+});
+test('#334 ended notices use only {attacker} and {defender}; no time placeholder and no grievance or lock placeholder', () => {
+  for (const nt of endNotices()) for (const m of (nt.headline+nt.body).match(/\{[^}]*\}/g)??[]) assert.ok(['{attacker}','{defender}'].includes(m),`${m} in ${nt.id}`);
+  for (const nt of Object.values(endedNoticesFor('kindle').notices)) assert.doesNotMatch(nt.body,/\{casusBelli\}|\{peaceLockEnds\}|\{endsAt\}/);
+  assert.match(endedNoticesFor('kindle').notices['against-us'].body,/\{attacker\}/); assert.match(endedNoticesFor('korund').notices.ours.body,/\{defender\}/);
+});
+test('#334 ended notices keep the assault rule to cities and forts, and say nothing new about the window', () => {
+  for (const nt of endNotices()) { assert.doesNotMatch(nt.body,/no fighting|all fighting|fighting stops|city assaults|every attack|any time|anytime/i,nt.id); if (/assault/i.test(nt.body)) assert.match(nt.body,/Assaults on cities and forts resolve only in our defense window/); }
+});
+test('#334 war banner: header for each side names the other nation; countdown label and caption carry {endsAt} only', () => {
+  assert.equal(BN.proposal,true); assert.equal(BN.header.ours,'At war with {defender}'); assert.equal(BN.header.againstUs,'At war with {attacker}');
+  assert.match(BN.countdownLabel,/\{endsAt\}/); assert.match(BN.countdownCaption.text,/\{endsAt\}/); assert.equal(BN.countdownCaption.proposal,true);
+  for (const t of [BN.countdownLabel,BN.countdownCaption.text]) assert.deepEqual(t.match(/\{[^}]*\}/g),['{endsAt}']);
+  for (const t of [BN.header.ours,BN.header.againstUs,BN.countdownLabel]) assert.ok(fill(t).length<=WAR_LABEL_MAX,t);
+  assert.ok(fill(BN.countdownCaption.text).length<=WAR_BODY_MAX); assert.match(BN.countdownCaption.text,/No attack can begin before then/);
+  assert.doesNotMatch(BN.countdownLabel+BN.countdownCaption.text,/\b(UTC|GMT)\b|\d/);
 });

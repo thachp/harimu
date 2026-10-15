@@ -179,7 +179,7 @@ test('#71 UI: greyed-out pledge shows why; open Rising shows a banner with real 
   const compiled = ts.transpileModule(await readFile(new URL('../app/aurelle-rising.tsx', import.meta.url), 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText;
   const exports = {};
   const fill = (text, c) => text.replaceAll('{claimant}', c.name).replaceAll('{house}', c.house).replaceAll('{motto}', c.motto);
-  new Function('exports', 'require', compiled)(exports, name => name === '../lib/claimant-copy' ? require('../lib/claimant-copy.ts') : name === '../lib/aurelle-rising' ? { fillClaimantCopy: fill }
+  new Function('exports', 'require', compiled)(exports, name => name === '../lib/claimant-copy' ? require('../lib/claimant-copy.ts') : name === '../lib/palace-coup-copy' ? require('../lib/palace-coup-copy.ts') : name === '../lib/aurelle-rising' ? { fillClaimantCopy: fill }
     : name === '../lib/action-reasons' ? require('../lib/action-reasons.ts') : name === './game-timer' ? { GameTimer: ({ endsAt, label }) => React.createElement('span', { role: 'timer' }, `${label} ${endsAt} real · game`) }
     : name === './ai-disclosure' ? { AiBadge: () => React.createElement('span', null, 'AI') } : require(name));
   const base = { enabled: true, asOf: 1, crown: null, claimants: claimants.map(c => ({ ...c, pledges: 0, crowned: false })), weeklyHumans: 3, threshold: 1, unrest: 70, unrestSustainedSeconds: 3600,

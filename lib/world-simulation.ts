@@ -4,6 +4,7 @@ import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
 import { runSpoilage } from './spoilage';
 import { runAurelleRising } from './aurelle-rising';
+import { runAurelleCoup } from './aurelle-coup';
 import { runKorundPresidium } from './korund-presidium';
 import { runNpcSupply } from './npc-supply';
 import { holidayNationsOn } from './festivals';
@@ -48,7 +49,7 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
   supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; korundPresidium?: boolean; faithFestivals?: boolean; war?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; korundPresidium?: boolean; faithFestivals?: boolean; war?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
@@ -87,6 +88,8 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   }
   // #71: Aurelle Rising thresholds and Crisis Window resolution, only while HARIMU_AURELLE_RISING_ENABLED is on (write paths only).
   if (options.aurelleRising) await runAurelleRising(db, now);
+  // #281: Aurelle AI palace coup, only while HARIMU_AURELLE_COUP_ENABLED is on (write paths only).
+  if (options.aurelleCoup) await runAurelleCoup(db, now);
   // #70: Korund emergency Presidium session and succession, only while HARIMU_KORUND_PRESIDIUM_ENABLED is on (write paths only).
   if (options.korundPresidium) await runKorundPresidium(db, now);
   return readWorldSimulation(db, now, { war: options.war });
