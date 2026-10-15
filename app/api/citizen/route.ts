@@ -23,6 +23,7 @@ import { getDatabase } from '@/lib/db';
 import { travelBlock } from '@/lib/travel';
 import { checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
 import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
+import { isLiveNation } from '@/lib/playable-nations'; // #485
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
@@ -334,6 +335,8 @@ async function handlePost(request: Request) {
     const current=await readCurrent();
     // A repeated choice has no further effect, including after an uncertain response.
     if (current?.nation_id===nationId) return response(current,true);
+    // #485: only playable nations can be enrolled in. A direct POST used to enroll a citizen in any seeded nation (the Coming soon gate was client-side only). Refused before any write.
+    if (!isLiveNation(nationId)) return privateJson({ error: 'That nation is not open yet.', reason: 'not_playable' }, { status: 403 });
     if ((current?.nation_id??null)!==body.expectedNationId) return response(current,false,'Citizenship changed since this form was opened. Refresh and review your current nation before confirming another choice.');
     if (!current?.nation_id) {
       await database.batch([
