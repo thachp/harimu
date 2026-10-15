@@ -17,11 +17,13 @@ export const electionSchemas=[
  `CREATE INDEX IF NOT EXISTS idx_anonymous_ballots_election ON civic_anonymous_ballots(election_id)`,
 ];
 export type ElectionSnapshot={nationId:'kindle';id:string;candidates:readonly {id:string;name:string;platform:string}[];status:'waiting'|'open'|'closed';opensAt:number|null;closesAt:number|null;voted:boolean;result:RunoffResult|null;privacyReady:boolean;privacyReason:string};
-export async function openPreviewElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady()){
+export type Slate=readonly {id:string;name:string;platform:string}[];
+/** #307: `slate` is today's three candidates unless a closed party primary supplies one nominee per party (same slot ids). */
+export async function openPreviewElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),slate:Slate=electionCandidates){
  if(!privacyReady)return;
  // The caller must validate the applicable trusted policy: certified Tier1 or
  // the separately namespaced, approved account-level preview exception.
- await db.prepare(`INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) SELECT ?,'kindle',?,?,?+259200 FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(id) DO NOTHING`).bind(electionId,JSON.stringify(electionCandidates),now,now,userId).run();
+ await db.prepare(`INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) SELECT ?,'kindle',?,?,?+259200 FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(id) DO NOTHING`).bind(electionId,JSON.stringify(slate),now,now,userId).run();
 }
 export const voteReceiptSql=`INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,policy)
  SELECT e.id,c.clerk_user_id,?,?,'tier1-human-v1' FROM civic_elections e JOIN citizens c ON c.clerk_user_id=?
@@ -71,11 +73,11 @@ async function finalizedResult(db:GameDatabase,now:number,readOnly=false){
  return projected;
 }
 
-export async function readElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),projectOpen=false,readOnly=false):Promise<ElectionSnapshot>{
+export async function readElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),projectOpen=false,readOnly=false,ballotSlate:Slate=electionCandidates,primaryPending=false):Promise<ElectionSnapshot>{
  const election=await db.prepare('SELECT candidates_json,opens_at,closes_at,closed_at FROM civic_elections WHERE id=?').bind(electionId).first<{candidates_json:string;opens_at:number;closes_at:number;closed_at:number|null}>();
- const base={nationId:'kindle' as const,id:electionId,candidates:electionCandidates,voted:false,result:null,privacyReady,privacyReason:privacyReady?'Account-level preview privacy: operators may correlate submissions.':ballotPrivacyReason};
+ const base={nationId:'kindle' as const,id:electionId,candidates:ballotSlate,voted:false,result:null,privacyReady,privacyReason:privacyReady?'Account-level preview privacy: operators may correlate submissions.':ballotPrivacyReason};
  // #205: a read-only caller that would have opened the election shows it as openPreviewElection would create it.
- if(!election)return projectOpen&&privacyReady?{...base,status:'open',opensAt:now,closesAt:now+259200}:{...base,status:'waiting',opensAt:null,closesAt:null};
+ if(!election)return projectOpen&&privacyReady&&!primaryPending?{...base,status:'open',opensAt:now,closesAt:now+259200}:{...base,status:'waiting',opensAt:null,closesAt:null};
  const slate=JSON.parse(election.candidates_json) as {id:string;name:string;platform:string}[];
  if(!Array.isArray(slate)||slate.length!==candidateIds.length||slate.some((candidate,index)=>candidate.id!==candidateIds[index]||typeof candidate.name!=='string'||typeof candidate.platform!=='string'))throw Error('Saved candidate slate could not be confirmed.');
  const candidates=slate.map(({id,name,platform})=>({id,name,platform}));
