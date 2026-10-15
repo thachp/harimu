@@ -12,7 +12,7 @@ const src=readFileSync('lib/debate-chrome-copy.ts','utf8').replace("from './pala
 const out=join(mkdtempSync(join(tmpdir(),'debate-chrome-copy-')),'debate-chrome-copy.mjs');
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 const D = await import(pathToFileURL(out).href);
-const { debateChrome:C, DEBATE_CHROME_NAME_MAX, DEBATE_CHROME_LABEL_MAX, DEBATE_CHROME_LINE_MAX } = D;
+const { debateChrome:C, debateVotes:V, debateVotesLine, debateOwnQuestion:OQ, debateIntakeHint:IH, DEBATE_CHROME_PLACEHOLDERS, DEBATE_CHROME_NUMBER_MAX, DEBATE_CHROME_NAME_MAX, DEBATE_CHROME_LABEL_MAX, DEBATE_CHROME_LINE_MAX } = D;
 
 const labels=()=>[C.title,C.questionsCloseLabel];
 const lines=()=>[C.waiting.text,C.emptyOpen.text,C.emptyClosed.text];
@@ -53,4 +53,35 @@ test('tone: plain; no pressure, no real-world names', () => {
 test('unwired: nothing in app/, components/ or lib/ imports debate-chrome-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('debate-chrome-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/debate-chrome-copy/, f);
+});
+
+// Issue #522: the three leftovers (vote-count grammar, own-question marker, minimum-length hint).
+const extraLabels=()=>[OQ.marker];
+const extraLines=()=>[V.one.text,V.other.text,OQ.accessibleName.text,IH.tooShort.text];
+const extraAll=()=>[...extraLabels(),...extraLines()];
+const fillNum=t=>DEBATE_CHROME_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'9'.repeat(DEBATE_CHROME_NUMBER_MAX)),t);
+
+test('#522: covers vote-count grammar, the yours marker and the write-at-least hint; every line a proposal; two numeric placeholders', () => {
+  assert.deepEqual([...DEBATE_CHROME_PLACEHOLDERS],['{count}','{min}']); assert.equal(DEBATE_CHROME_NUMBER_MAX,6);
+  assert.equal(V.one.text,'{count} vote'); assert.equal(V.other.text,'{count} votes'); assert.equal(OQ.marker,'yours'); assert.equal(IH.tooShort.text,'Write at least {min} characters.');
+  for (const l of [V.one,V.other,OQ.accessibleName,IH.tooShort]) assert.equal(l.proposal,true); for (const o of [V,OQ,IH]) assert.equal(o.proposal,true);
+  assert.equal(new Set([...all(),...extraAll()]).size,all().length+extraAll().length);
+});
+test('#522: the vote line is singular only for exactly 1 and plural for 0 and every other count', () => {
+  assert.equal(debateVotesLine(1),V.one); for (const n of [0,2,3,9,10,11,1000]) assert.equal(debateVotesLine(n),V.other);
+  assert.equal(debateVotesLine(1).text.replace('{count}','1'),'1 vote'); assert.equal(debateVotesLine(0).text.replace('{count}','0'),'0 votes');
+});
+test('#522: limits with {count} and {min} filled to six characters; only those two placeholders, each where it belongs', () => {
+  for (const t of extraLabels()) assert.ok(fillNum(t).length<=DEBATE_CHROME_LABEL_MAX,t);
+  for (const t of extraLines()) assert.ok(fillNum(t).length<=DEBATE_CHROME_LINE_MAX,`${t} (${fillNum(t).length})`);
+  for (const t of extraAll()) for (const m of t.match(/\{[^}]*\}/g)??[]) assert.ok(DEBATE_CHROME_PLACEHOLDERS.includes(m),`${m} in ${t}`);
+  assert.ok(V.one.text.includes('{count}')); assert.ok(V.other.text.includes('{count}')); assert.ok(IH.tooShort.text.includes('{min}'));
+  for (const t of [OQ.marker,OQ.accessibleName.text]) assert.doesNotMatch(t,/\{/,t);
+});
+test('#522: no figure is written (the minimum comes from the rule), no schedule words, no byline or badge, no repeat of debate copy', () => {
+  for (const t of extraAll()) { assert.doesNotMatch(t.replace(/\{[^}]*\}/g,''),/\d|%|\b(two|three|four|five|six|seven|ten|twice|once|half)\b/i,t); assert.doesNotMatch(t,/\b(tonight|today|tomorrow|soon|shortly|date|hours?|days?|minutes?|guarantee\w*|promise\w*|!)\b|!/i,t); }
+  for (const o of [V,OQ,IH]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
+  const dc=readFileSync('lib/debate-copy.ts','utf8'); for (const t of extraLines()) assert.ok(!dc.includes(t),t);
+  for (const t of extraAll()) assert.ok(!all().includes(t),t);
+  assert.doesNotMatch(IH.tooShort.text,/\b(must|invalid|wrong|error|rejected)\b/i);
 });
