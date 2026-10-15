@@ -34,7 +34,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     {localDemo && <p>Local demo · petitions and decisions stay in this browser.</p>}
     {!localDemo && <section aria-label="Civic verification"><h4>Phone verification for petitions</h4><p>Petitions need a verified phone number to help protect each citizen’s voice. You can read policy previews while petition submission is unavailable.</p><p role="status">{verification?.reason ?? 'Checking whether your petitions can count…'}</p></section>}
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> <AiBadge /> · {role.controller}</li>)}</ul>
-    {!localDemo && simulation?.wars && <WarBanner wars={simulation.wars.wars} nationId={snapshot.nationId} />}
+    {!localDemo && simulation?.wars && <WarBanner wars={simulation.wars.wars} nationId={snapshot.nationId} weariness={simulation.weariness?.[snapshot.nationId as 'kindle' | 'korund' | 'aurelle']} />}
     {!localDemo && simulation?.wars?.defenseWindows && <DefenseWindow windows={simulation.wars.defenseWindows} nationId={snapshot.nationId} />}
     {!localDemo && (simulation?.treaties || simulation?.embargoes) && <ForeignAffairsPanel treaties={simulation.treaties?.treaties} embargoes={simulation.embargoes?.embargoes} nationId={snapshot.nationId} />}
     {!localDemo && simulation?.stability && <StabilityPanel score={simulation.stability.find(score => score.nationId === snapshot.nationId)} />}
