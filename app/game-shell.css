@@ -297,3 +297,16 @@ body:has(.harimu-game){overflow:auto}
 .shift-quality-actions button:focus-visible{outline:2px solid #f7d080;outline-offset:2px}
 .shift-quality-actions button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:480px){.shift-quality-actions button,.shift-quality-actions button.shift-quality-cancel{flex:1 1 100%}}
+/* #79: color-blind-safe nation symbol chip (NEXT_PUBLIC_HARIMU_NATION_SYMBOLS): shape + fill pattern + accent, never color alone */
+.nation-symbol{--nation-pattern-ink:color-mix(in srgb,currentColor 40%,transparent);display:inline-grid;place-items:center;flex:none;box-sizing:border-box;width:calc(20px * var(--text-scale, 1));height:calc(20px * var(--text-scale, 1));margin-right:6px;border:1px solid currentColor;border-radius:3px;background-color:#071820;font:700 calc(13px * var(--text-scale, 1))/1 system-ui,"Segoe UI Symbol","Apple Symbols","DejaVu Sans",sans-serif;vertical-align:middle;text-shadow:0 0 2px #071820,0 0 2px #071820}
+.nation-symbol[data-nation-pattern="ruled"]{background-image:repeating-linear-gradient(0deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="grid"]{background-image:repeating-linear-gradient(0deg,transparent 0 4px,var(--nation-pattern-ink) 4px 5px),repeating-linear-gradient(90deg,transparent 0 4px,var(--nation-pattern-ink) 4px 5px)}
+.nation-symbol[data-nation-pattern="diagonal"]{background-image:repeating-linear-gradient(135deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="reverse-diagonal"]{background-image:repeating-linear-gradient(45deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="crosshatch"]{background-image:repeating-linear-gradient(45deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px),repeating-linear-gradient(135deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="dots"]{background-image:radial-gradient(var(--nation-pattern-ink) 1.2px,transparent 1.6px);background-size:5px 5px}
+.nation-symbol[data-nation-pattern="checks"]{background-image:conic-gradient(var(--nation-pattern-ink) 25%,transparent 0 50%,var(--nation-pattern-ink) 0 75%,transparent 0);background-size:8px 8px}
+.nation-symbol[data-nation-pattern="waves"]{background-image:repeating-radial-gradient(circle at 0 100%,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="chevrons"]{background-image:linear-gradient(135deg,var(--nation-pattern-ink) 25%,transparent 25%),linear-gradient(225deg,var(--nation-pattern-ink) 25%,transparent 25%);background-size:6px 6px;background-position:-3px 0}
+.nation-symbol[data-nation-pattern="vertical"]{background-image:repeating-linear-gradient(90deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.game-context-items .nation-symbol,.viewport-world-label .nation-symbol{margin-right:6px}
