@@ -16,7 +16,9 @@ const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTG
 // Vars production adds, with their required values.
 const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
-const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'] };
+const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'],
+  // Build-time UI flags: on in preview (Patrick, Oct 15), always "false" in production (the nonFalse allowlist below does not list them).
+  NEXT_PUBLIC_HARIMU_NATION_SYMBOLS: ['true', 'false'], NEXT_PUBLIC_HARIMU_UI_V2_CREST: ['true', 'false'], NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM: ['true', 'false'], NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR: ['true', 'false'] };
 // The only non-"false" values production may carry.
 const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
 
@@ -54,6 +56,10 @@ test('vars: same names as preview except the listed differences; every flag fals
   assert.ok(flags(prod).length > 40); for (const flag of flags(prod)) assert.equal(prod.vars[flag], 'false', flag);
   assert.equal(prod.vars.HARIMU_STORAGE_MAINTENANCE, 'false');
   assert.strictEqual(prod.vars.HARIMU_PRODUCTION_STORAGE, 'true', 'exactly "true": TRUE, 1 or "" silently take the old (non-production) path in selectStorageBackend');
+});
+
+test('build-time UI flags: "true" in preview, "false" in production (each is baked into the client bundle at build, so production must never inherit preview\'s value)', () => {
+  for (const name of ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR']) { assert.equal(preview.vars[name], 'true', `${name} preview`); assert.equal(prod.vars[name], 'false', `${name} production`); }
 });
 
 test('flag comments copied into wrangler.prod.jsonc equal the preview comments (they cannot drift unnoticed)', () => {
