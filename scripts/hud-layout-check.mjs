@@ -9,6 +9,7 @@
  *  (#78) The nation emblem (flag on/off) and the notifications bell in the top bar (scripts/hud-emblem-check.mjs).
  *  (#346) The top bar, shift chip and collapsed-panel button at 320-1280px wide and 100-150% text (scripts/hud-zoom-check.mjs).
  *  (#79) The color-blind-safe nation symbol chips, flag on and off (scripts/nation-symbols-check.mjs).
+ *  (#392 S1) The nation crest in the inspector header, flag on and off, all ten nations (scripts/nation-crests-check.mjs).
  *  (#347) The shift quality dialog is rendered with the real component (scripts/shift-quality-layout-check.mjs).
  *  (#366) The top-bar help tooltips are driven with a real mouse, keyboard and touch (scripts/hud-tooltip-check.mjs).
  *  (#528) Every phone control is at least 44x44 and the camera bar never covers the canvas (scripts/phone-tap-targets-check.mjs).
@@ -21,6 +22,7 @@ import { checkHudTooltips } from './hud-tooltip-check.mjs';
 import { checkHudZoom } from './hud-zoom-check.mjs';
 import { checkDevelopmentPreviewNote } from './hud-preview-note-check.mjs';
 import { checkNationSymbols } from './nation-symbols-check.mjs';
+import { checkNationCrests } from './nation-crests-check.mjs';
 import { checkTopBarEmblem } from './hud-emblem-check.mjs';
 import { checkShiftQualityStep } from './shift-quality-layout-check.mjs';
 import { checkPhoneTapTargets } from './phone-tap-targets-check.mjs';
@@ -172,6 +174,7 @@ try {
   await checkTopBarEmblem({ browser, css, preflight, failures, rows }); // #78: nation emblem and notifications bell in the top bar
   await checkHudZoom({ browser, css, preflight, failures, rows }); // #346: top bar and overlays at big text and browser zoom
   await checkNationSymbols({ browser, css, preflight, failures, rows }); // #79: nation symbol chips on the strip, comparison table and globe labels
+  await checkNationCrests({ browser, css, preflight, failures, rows }); // #392 S1: nation crest in the inspector header (flag on and off)
   await checkShiftQualityStep({ browser, css, preflight, failures, rows }); // #347: shift quality dialog is styled, spaced, reachable
   await checkDevelopmentPreviewNote({ browser, css, preflight, failures, rows }); // #366: no "Development preview" label in the top bar; note lives in Game settings
   await checkHudTooltips({ browser, css, preflight, failures, rows }); // #366: one top-bar tooltip at a time, on-screen, closed by leave / blur / Escape
