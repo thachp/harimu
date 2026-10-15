@@ -13,7 +13,7 @@ const src=readFileSync('lib/war-refusal-copy.ts','utf8').replace("from './palace
 const out=join(mkdtempSync(join(tmpdir(),'war-refusal-copy-')),'war-refusal-copy.mjs');
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 const R = await import(pathToFileURL(out).href);
-const { declarationRefusals:DR, refusalFor, mobilizationCountdown:MC, mobilizationCountdownLabel:ML, REFUSAL_KEYS, REFUSAL_CODES, refusalForCode, REFUSAL_NATIONS, REFUSAL_PLACEHOLDERS, REFUSAL_NAME_MAX, REFUSAL_LABEL_MAX, REFUSAL_CAPTION_MAX, REFUSAL_LINE_MAX, OFFENSIVE_WAR_INTERVAL_DAYS, ACTIVE_OFFENSIVE_WARS_MAX, MOBILIZATION_HOURS } = R;
+const { declarationRefusals:DR, refusalFor, mobilizationCountdown:MC, mobilizationCountdownLabel:ML, REFUSAL_KEYS, REFUSAL_NATIONS, REFUSAL_PLACEHOLDERS, REFUSAL_NAME_MAX, REFUSAL_LABEL_MAX, REFUSAL_CAPTION_MAX, REFUSAL_LINE_MAX, OFFENSIVE_WAR_INTERVAL_DAYS, ACTIVE_OFFENSIVE_WARS_MAX, MOBILIZATION_HOURS } = R;
 
 const labels=()=>[...DR.map(x=>x.label),ML.text];
 const refusalLines=()=>DR.flatMap(x=>x.lines.map(l=>l.text));
@@ -75,6 +75,7 @@ test('tone: nothing glorifies war; no violence, no real-world names, no Notable,
   assert.doesNotMatch(t,/Notable|@|\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia)\b/);
 });
+const { REFUSAL_CODES, refusalForCode } = R;
 test('server refusal codes (#426 ruling) are pinned and map one to one onto the refusal copy', () => {
   assert.deepEqual(Object.keys(REFUSAL_CODES),['rate_limit_declarations','rate_limit_active_wars','casus_belli_insufficient']);
   assert.deepEqual(REFUSAL_CODES,{rate_limit_declarations:'rate_limit',rate_limit_active_wars:'active_war_cap',casus_belli_insufficient:'casus_belli'});
