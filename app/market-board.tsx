@@ -47,7 +47,7 @@ export function useOrderBook(active: boolean) {
   const [error, setError] = useState('');
   const intent = useRef<{ key: string; requestId: string } | null>(null);
   const latest = useRef<OrderBookState | null>(null);
-  latest.current = book;
+  useEffect(() => { latest.current = book; }, [book]);
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const r = await fetch('/api/market/orders', { cache: 'no-store', signal });
@@ -58,9 +58,17 @@ export function useOrderBook(active: boolean) {
   }, []);
   useEffect(() => {
     if (!active) return;
-    const controller = new AbortController(); void load(controller.signal);
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const r = await fetch('/api/market/orders', { cache: 'no-store', signal: controller.signal });
+        if (!r.ok) return; // signed out or unavailable: no board
+        const data = await r.json() as { open?: boolean; book?: OrderBookState };
+        if (data.open && data.book) setBook(data.book);
+      } catch { /* hidden */ }
+    })();
     return () => controller.abort();
-  }, [active, load]);
+  }, [active]);
   async function post(body: Record<string, unknown>, success: (after: OrderBookState, before: OrderBookState | null) => string) {
     if (busy) return;
     const key = JSON.stringify(body);
