@@ -53,7 +53,7 @@ test('the QA nation switch cannot reach a non-playable nation either; one shared
   assert.equal((await r.call('citizen', 'qa', { action: 'enroll', nationId: 'kindle', expectedNationId: null })).status, 200);
   for (const nationId of unplayable) assert.equal((await r.call('citizen', 'qa', { action: 'qa-test-nation', nationId })).status, 400, nationId);
   assert.equal((await r.call('citizen', 'qa', { action: 'qa-test-nation', nationId: 'aurelle' })).status, 200);
-  const shared = await r.importModule('lib/playable-nations.ts'), discovery = await r.importModule('lib/nation-discovery.ts'), qa = await r.importModule('lib/qa-tools.ts');
+  const shared = await r.importModule('lib/nation-discovery.ts'), discovery = shared, qa = await r.importModule('lib/qa-tools.ts');
   assert.deepEqual([...shared.liveNations], live);
   const all = [...live, ...unplayable, 'atlantis'];
   assert.deepEqual(all.map(id => shared.isLiveNation(id)), all.map(id => live.includes(id)));
@@ -61,5 +61,5 @@ test('the QA nation switch cannot reach a non-playable nation either; one shared
   assert.deepEqual([...qa.qaTestNations], [...shared.liveNations]);
   const route = await readFile(new URL('../app/api/citizen/route.ts', import.meta.url), 'utf8');
   assert.ok(route.indexOf('isLiveNation(nationId)') > route.indexOf("body.action === 'enroll'") && route.indexOf('isLiveNation(nationId)') < route.indexOf('enrollmentInitialSql).bind'), 'the gate runs before any enrollment write');
-  assert.doesNotMatch(await readFile(new URL('../lib/playable-nations.ts', import.meta.url), 'utf8'), /^import /m, 'the shared list imports nothing');
+  assert.doesNotMatch(await readFile(new URL('../lib/nation-discovery.ts', import.meta.url), 'utf8'), /^import /m, 'the shared list imports nothing');
 });

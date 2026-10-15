@@ -4,7 +4,7 @@
  * Requires HARIMU_QA_TEST_CITIZENS=true AND NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW=true; both default off
  * for production. The id list is account ids, not credentials.
  */
-import {liveNations} from './playable-nations';
+import {liveNations} from './nation-discovery';
 export type QaBindings={HARIMU_QA_TEST_CITIZENS?:string;HARIMU_QA_TEST_CITIZEN_IDS?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string};
 export const qaTestNations=liveNations; // #485: the shared playable list
 export function qaTestCitizenAllowed(bindings:QaBindings|undefined,userId:string):boolean{
