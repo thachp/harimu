@@ -117,6 +117,9 @@ test('wiring: the scheduled Worker calls runDiplomacyCron with the bindings; no 
   assert.match(entry, /async scheduled\([\s\S]*runDiplomacyCron/);
   const wrangler = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   assert.match(wrangler, /"HARIMU_DIPLOMACY_ENABLED": "false"/);
-  const war = await readFile(new URL('../lib/war.ts', import.meta.url), 'utf8'); assert.doesNotMatch(war, /activeNonAggressionPact/, 'lib/war.ts is not wired by this change');
+  const war = await readFile(new URL('../lib/war.ts', import.meta.url), 'utf8'); // #422 intentionally wires the read-only pact check into lib/war.ts: that is the only diplomacy import allowed there (no break/propose/cron wiring).
+  const diplomacyImports = [...war.matchAll(/import\s*\{([^}]*)\}\s*from\s*'\.\/diplomacy'/g)].flatMap(m => m[1].split(',').map(x => x.trim()).filter(Boolean));
+  assert.deepEqual(diplomacyImports, ['activeNonAggressionPact'], 'lib/war.ts imports only activeNonAggressionPact from ./diplomacy');
+  assert.doesNotMatch(war, /\b(breakTreaty|proposeTreaty|runDiplomacyCron|decideTreaty)\b/, 'lib/war.ts does not break or propose treaties');
   for (const file of ['app/api/world/route.ts', 'app/api/citizen/route.ts', 'app/api/news/route.ts']) assert.doesNotMatch(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'), /runAiTreatyProposals|runDiplomacyCron|breakTreaty|proposeTreaty/, file);
 });
