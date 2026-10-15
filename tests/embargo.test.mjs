@@ -155,3 +155,21 @@ test('foreign affairs panel: embargoes show for both parties; nothing renders wh
   assert.doesNotMatch(html([{ ...base, status: 'lifted', liftedAt: 5 }], 'kindle'), /embargo on Aurelle/i, 'a lifted embargo is not listed');
   assert.equal(html(undefined, 'kindle'), '', 'flag off: nothing sent, nothing rendered');
 });
+
+test('#308 trade agreement: refused while an embargo is in force between the pair (either direction); a pact, other pairs and a lifted embargo are not affected', async t => {
+  const { r, e, propose, decide, nowS } = await setup(t);
+  const d = await r.importModule('lib/diplomacy.ts');
+  const trade = (over = {}, options = { enabled: true, embargo: true }) => d.proposeTreaty(r.db, { proposer: 'kindle', other: 'aurelle', kind: 'trade', proposedBy: 'AI President', requestId: randomUUID(), ...over }, nowS(), options);
+  const made = await propose({ actor: 'kindle', target: 'aurelle' });
+  assert.equal((await trade()).ok, true, 'a proposal alone does not block');
+  await r.db.prepare('DELETE FROM treaties').run(); await decide();
+  const refused = await trade(); assert.equal(refused.ok, false); assert.equal(refused.status, 409); assert.equal(refused.reason, 'embargo');
+  assert.equal((await trade({ proposer: 'aurelle', other: 'kindle' })).reason, 'embargo', 'the other direction too');
+  assert.equal((await trade({}, { enabled: true })).ok, true, 'flag off for embargoes (not passed): not checked');
+  await r.db.prepare('DELETE FROM treaties').run();
+  assert.equal((await trade({ other: 'korund' })).ok, true, 'another pair is open');
+  assert.equal((await d.proposeTreaty(r.db, { proposer: 'kindle', other: 'aurelle', kind: 'non-aggression', proposedBy: 'AI President', requestId: randomUUID() }, nowS(), { enabled: true, embargo: true })).ok, true, 'a non-aggression pact is not a trade agreement');
+  await r.db.prepare('DELETE FROM treaties').run();
+  await e.liftEmbargo(r.db, made.embargo.id, 'kindle', nowS() + 1, true);
+  assert.equal((await trade()).ok, true, 'allowed again after the embargo is lifted');
+});
