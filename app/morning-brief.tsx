@@ -3,7 +3,7 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 
 import type { SceneView } from '@/lib/scene-navigation';
-import type { MorningBriefSection } from '@/lib/morning-brief';
+import { requestOpenNews, type MorningBriefSection } from '@/lib/morning-brief';
 
 export const MORNING_BRIEF_TRIGGER_ID = 'morning-brief-trigger';
 
@@ -27,7 +27,7 @@ export function MorningBrief({ nationName, sections, onNavigate, onClose }: {
     <header><h2 id="morning-brief-title">Morning brief · {nationName}</h2><button type="button" onClick={onClose} aria-label="Dismiss morning brief">Dismiss</button></header>
     {sections.map(section => <div key={section.id} className="morning-brief-section">
       <h3>{section.title}</h3>
-      <ul>{section.items.map(item => <li key={item.id}><button type="button" onClick={() => { restoreFocus.current = false; onNavigate(item.target); onClose(); }}><strong>{item.label}</strong><span>{item.detail}</span></button></li>)}</ul>
+      <ul>{section.items.map(item => <li key={item.id}><button type="button" onClick={() => { restoreFocus.current = false; if (item.newsId) { onClose(); requestOpenNews(item.newsId); } else { onNavigate(item.target); onClose(); } }}><strong>{item.label}</strong><span>{item.detail}</span></button></li>)}</ul>
     </div>)}
   </section>;
 }

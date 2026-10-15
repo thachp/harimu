@@ -2,13 +2,17 @@ import {accountElectionEnabled,accountElectionDatabase,accountElectionId} from '
 import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
+import { readCrownMint } from '@/lib/crown-debasement';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
-import { advanceWorld } from '@/lib/world-simulation';
+import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
-import { petitionSql, petitionEligibilitySql, readGovernment } from '@/lib/government-state';
+import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
-import { rewards, recoverCapacity, readEconomy, recoveryInterval, settleSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
+import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
+import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket, shiftAnswerKey } from '@/lib/shift-quality-key';
+import { marketFlagOn } from '@/lib/market-visibility';
+import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection} from '@/lib/elections';
 import {readCollectivePetitions,recordVerifiedHumanVisit} from '@/lib/collective-petitions';
@@ -16,8 +20,25 @@ import { authenticatedUserId } from '@/lib/auth';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
+import { travelBlock } from '@/lib/travel';
+import { checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
+import { qaTestCitizenAllowed, qaTestNationSql, qaTestNations } from '@/lib/qa-tools';
+import { activeIncomeTaxPercent } from '@/lib/income-tax';
+import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
+import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
+/** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
+/** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
+const crownMintOn = () => (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true'; // #362
+/** #362: the Aurelle plan plus, while HARIMU_CROWN_DEBASEMENT_ENABLED is on, the read-only Royal Mint strip. Flag off: exactly readAurelle. */
+async function readAurelleView(database: Awaited<ReturnType<typeof getDatabase>>, userId: string) {
+  const plan = await readAurelle(database, userId);
+  return crownMintOn() && plan.available ? { ...plan, mint: await readCrownMint(database, Math.floor(Date.now() / 1000)) } : plan;
+}
+const laborBureauOn = () => (env as unknown as { HARIMU_LABOR_BUREAU_ENABLED?: string }).HARIMU_LABOR_BUREAU_ENABLED === 'true';
+const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';
+const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
 const privateJson = (data: unknown, init?: ResponseInit) => Response.json(data, { ...init, headers: { ...init?.headers, 'Cache-Control': 'private, no-store' } });
 
 const allowedHorizons = new Set(['today', 'week', 'season']);
@@ -98,10 +119,13 @@ export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
+  // #205: GET is read-only. World ticks, capacity recovery, the starter food grant, the preview election and the
+  // verified-human visit are written by the write paths (POST); here they are projected so players see the same values.
   const database = await getDatabase();
-  const simulation = await advanceWorld(database);
+  const readNow = Math.floor(Date.now() / 1000);
+  const simulation = await readWorldSimulation(database, readNow, { war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true' });
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
-  await recoverCapacity(database, userId, new Date().toISOString(), interval);
+  const [capacity, starterFood] = await Promise.all([readCapacityProjection(database, userId, readNow, interval), pendingStarterFood(database, userId)]);
   const [profile, plan, itemResult, decision, politicalAction] = await Promise.all([
     database.prepare(`SELECT clerk_user_id, nation_id, nation_changes, display_name, capacity,
       influence, standing, created_at
@@ -129,19 +153,22 @@ export async function GET(request: Request) {
   const civicNow=Math.floor(Date.now()/1000);
   const accountLevel=accountElectionEnabled(env as unknown as {NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string});
   const electionDatabase=accountLevel?accountElectionDatabase(database):database;
-  if(accountLevel&&profile?.nation_id==='kindle')await openPreviewElection(electionDatabase,userId,civicNow,true);
-  if(profile?.nation_id==='kindle'&&verification.countedActionsEligible){await recordVerifiedHumanVisit(database,userId,civicNow);await openPreviewElection(database,userId,civicNow);}
+  if (profile && capacity) profile.capacity = capacity.capacity;
+  const market = await readMarket(database, userId, interval);
+  if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
   return privateJson({
-    aurellePlan: await readAurelle(database,userId),
-    election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined),...(accountLevel?{id:accountElectionId}:{})}:null,
-    collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow):null,
-    korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000)),
+    aurellePlan: await readAurelleView(database,userId),
+    election:profile?.nation_id==='kindle'?{...await readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true),...(accountLevel?{id:accountElectionId}:{})}:null,
+    collectivePetitions:profile?.nation_id==='kindle'?await readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
+    korundPlan: await readKorund(database,userId,Math.floor(Date.now()/1000),{laborBureau:laborBureauOn()}),
+    firstWeek: profile ? await readFirstWeekProgress(database,userId) : null,
+    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED) }, // #344: the UI hides Market entry points while this is false
     simulation,
     verification,
-    economy: await readEconomy(database, userId, interval),
-    market: await readMarket(database, userId, interval),
+    economy: await readEconomy(database, userId, interval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
+    market,
     playerMarket: await readPlayerMarket(database, userId),
-    government: profile?.nation_id ? publicGovernmentSnapshot(await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId)) : null,
+    government: profile?.nation_id ? publicGovernmentSnapshot(await readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId, { readOnly: true, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' })) : null,
     shifts: await readShifts(database, userId),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -156,13 +183,40 @@ export async function GET(request: Request) {
   });
 }
 
+// #194: first-week ledger goals latch on the write paths, not on GET. A trade also latches the seller.
 export async function POST(request: Request) {
+  const response = await handlePost(request);
+  if (!response.ok) return response;
+  const userId = await authenticatedUserId(request);
+  if (!userId) return response;
+  const database = await getDatabase();
+  const nowSec = Math.floor(Date.now() / 1000);
+  // #205: side effects GET used to perform now happen on the write path (after enrolment too).
+  try { await recordCivicPresence(database, userId, nowSec); } catch (error) { console.warn('civic presence latch failed', error instanceof Error ? error.name : 'unknown'); /* best effort; never fails the write */ }
+  const sellers = (await database.prepare('SELECT DISTINCT seller_id FROM player_fills WHERE buyer_id=? AND filled_at>=?').bind(userId, nowSec - 300).all<{ seller_id: string }>().catch(() => ({ results: [] as { seller_id: string }[] }))).results ?? [];
+  return latchAfterWrite(database, response, [userId, ...sellers.map(r => r.seller_id)], nowSec);
+}
+
+/** #205: the preview-election opening, verified-human visit and starter grant/capacity clock that GET used to write. */
+async function recordCivicPresence(database: Awaited<ReturnType<typeof getDatabase>>, userId: string, now: number) {
+  const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
+  await recoverCapacity(database, userId, new Date(now * 1000).toISOString(), interval);
+  const citizen = await database.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
+  // The completed-day petition review latch that GET used to write (QA1 on #217); the world tick also latches it.
+  if (citizen?.nation_id) await latchGovernmentReviews(database, citizen.nation_id, now);
+  if (citizen?.nation_id !== 'kindle') return;
+  const accountLevel = accountElectionEnabled(env as unknown as { NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?: string; HARIMU_ACCOUNT_ELECTION_POC_ENABLED?: string });
+  if (accountLevel) await openPreviewElection(accountElectionDatabase(database), userId, now, true);
+  if ((await readVerification(userId)).countedActionsEligible) { await recordVerifiedHumanVisit(database, userId, now, { aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true' }); await openPreviewElection(database, userId, now); }
+}
+
+async function handlePost(request: Request) {
   if (!isSameOriginCommand(request)) return privateJson({ error: 'Same-origin request required.' }, { status: 403 });
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
-  const simulation = await advanceWorld(database);
+  const simulation = await advanceWorld(database, undefined, { npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true', aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true', aurelleCoup: (env as unknown as { HARIMU_AURELLE_COUP_ENABLED?: string }).HARIMU_AURELLE_COUP_ENABLED === 'true', kindleAssembly: assemblyTickConfig(env as unknown as AssemblyBindings), primaries: primaryTickConfig(env as unknown as PrimaryBindings), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true' });
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   await recoverCapacity(database, userId, new Date().toISOString(), interval);
   let body: Record<string, unknown>;
@@ -172,20 +226,36 @@ export async function POST(request: Request) {
     return privateJson({ error: 'Expected valid JSON.' }, { status: 400 });
   }
   const now = new Date().toISOString();
+  // #123: while travelling, location-bound actions wait for arrival (only when HARIMU_TRAVEL_ENABLED=true).
+  if (typeof body.action === 'string' && locationBoundActions.has(body.action)) {
+    const blocked = await travelBlock(database, userId, Math.floor(Date.parse(now) / 1000), (env as unknown as { HARIMU_TRAVEL_ENABLED?: string }).HARIMU_TRAVEL_ENABLED === 'true');
+    if (blocked) return privateJson({ error: blocked, reason: 'traveling' }, { status: 409 });
+  }
 
+  // #135: record a first-week goal (view-backed or client-detected). Idempotent; guidance only.
+  if (body.action === 'first-week-complete') {
+    if (typeof body.requestId !== 'string' || !/^[A-Za-z0-9-]{8,64}$/.test(body.requestId)) return privateJson({ error: 'Use a valid request identifier.' }, { status: 400 });
+    const citizen = await database.prepare('SELECT nation_id, created_at FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null; created_at: string }>();
+    const nowSec = Math.floor(Date.parse(now) / 1000);
+    const check = checkFirstWeekGoal(citizen?.nation_id ?? null, citizen?.created_at ?? '', body.goalId, nowSec);
+    if (!check.ok) return privateJson({ error: check.error }, { status: check.status });
+    await completeFirstWeekGoal(database, userId, body.goalId as string, nowSec);
+    await latchFirstWeekGoals(database, userId, nowSec);
+    return privateJson({ ok: true, firstWeek: await readFirstWeekProgress(database, userId) });
+  }
   if (typeof body.action === 'string' && body.action.startsWith('aurelle-')) {
     if (!validAurelleCommand(body)) return privateJson({error:'Use a valid request identifier, shift identifier and food quantity of 1 or 2.'},{status:400});
     const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000));
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),{laborBureau:laborBureauOn()}),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (typeof body.action === 'string' && body.action.startsWith('korund-')) {
     if (!validKorundCommand(body)) return privateJson({error:'Use a valid work or request identifier.'},{status:400});
     const seconds=Math.floor(Date.parse(now)/1000);
-    const result=await executeKorund(database,userId,body,seconds);
+    const result=await executeKorund(database,userId,body,seconds,{laborBureau:laborBureauOn()});
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,seconds),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,seconds,{laborBureau:laborBureauOn()}),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (body.action === 'government-petition') {
@@ -214,7 +284,7 @@ export async function POST(request: Request) {
     }
     const citizen = await database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at FROM citizens WHERE clerk_user_id=?`)
       .bind(userId).first<CitizenProfileRow>();
-    return privateJson({ ok:true, government: publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId)),
+    return privateJson({ ok:true, government: publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId, { korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' })),
       citizenship: citizen ? serializeCitizenship(citizen,true) : null });
   }
 
@@ -222,7 +292,7 @@ export async function POST(request: Request) {
     if (!validPlayerCommand(body)) return privateJson({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: typeof body.listingId === 'string' ? body.listingId.toLowerCase() : undefined };
     const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000));
-    return privateJson({ ...result, aurellePlan:await readAurelle(database,userId), economy: await readEconomy(database, userId, interval),
+    return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),
       playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
   }
 
@@ -231,10 +301,19 @@ export async function POST(request: Request) {
     const command = { ...body, requestId: body.requestId.toLowerCase() };
     const result = await executeMarketCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), interval);
     const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ capacity: number }>();
-    return privateJson({ ...result, aurellePlan:await readAurelle(database,userId), economy: await readEconomy(database, userId, interval),
+    return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),
       market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
+  // #138: preview-only QA nation switch for allowlisted accounts; 404 everywhere else.
+  if (body.action === 'qa-test-nation') {
+    if (!qaTestCitizenAllowed(env as never, userId)) return privateJson({ error: 'Not found.' }, { status: 404 });
+    const nationId = typeof body.nationId === 'string' ? body.nationId : '';
+    if (!(qaTestNations as readonly string[]).includes(nationId)) return privateJson({ error: 'Choose kindle, korund or aurelle.' }, { status: 400 });
+    const result = await database.prepare(qaTestNationSql).bind(nationId, now, userId).run();
+    if (!result.meta.changes) return privateJson({ error: 'Enroll in any nation first.' }, { status: 409 });
+    return privateJson({ ok: true, nationId, qa: true });
+  }
   if (body.action === 'enroll') {
     if (!validEnrollmentExpectation(body)) return privateJson({error:'Confirm the current citizenship with expectedNationId (a nation identifier or null for first enrollment).'}, {status:400});
     const nationId = typeof body.nationId === 'string' ? body.nationId : '';
@@ -247,10 +326,10 @@ export async function POST(request: Request) {
     ) AS taken`).bind(userId,userId,userId,userId,userId).first<{taken:number}>())?.taken);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
       simulation,verification:await readVerification(userId),
-      government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId)):null,
+      government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null,
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
-      aurellePlan:await readAurelle(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000)),
-      economy:await readEconomy(database,userId,interval),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
+      aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),{laborBureau:laborBureauOn()}),
+      economy:await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
     },{status:ok?200:409});
     const current=await readCurrent();
     // A repeated choice has no further effect, including after an uncertain response.
@@ -427,6 +506,15 @@ export async function POST(request: Request) {
     return privateJson({ ok: true, savedAt: now });
   }
 
+  // #252: issue the quality step for the citizen's next shift. Nothing is written and no WC is spent; the ticket
+  // carries the future shift id (signed for this user) and the questions in that shift's server-seeded option order.
+  if (body.action === 'quality-ticket') {
+    if (body.workOrderId !== qualityWorkOrderId) return privateJson({ error: 'This job has no quality step.' }, { status: 404 });
+    const secret = shiftQualitySecret(env as unknown as { HARIMU_SHIFT_QUALITY_SECRET?: string });
+    if (!secret) return privateJson({ error: 'The quality step is unavailable. You can start the shift for the base reward.' }, { status: 503 });
+    return privateJson({ ok: true, ...(await issueQualityTicket(secret, userId, harvestQuestions)) });
+  }
+
   if (body.action === 'commit-work') {
     const workOrderId = typeof body.workOrderId === 'string' ? body.workOrderId : '';
     const rule = shiftRules[workOrderId];
@@ -437,9 +525,28 @@ export async function POST(request: Request) {
     if (!order || !rule || order.capacity_cost <= 0) {
       return privateJson({ error: 'Work order unavailable.' }, { status: 404 });
     }
-    const reward = rewards[workOrderId];
-    if (!reward) return privateJson({ error: 'Shift reward unavailable.' }, { status: 409 });
-    const id = crypto.randomUUID();
+    const base = rewards[workOrderId];
+    if (!base) return privateJson({ error: 'Shift reward unavailable.' }, { status: 409 });
+    if (body.quality !== undefined && !validQualityInput(body.quality)) return privateJson({ error: 'Answer all three quality questions or skip the step.' }, { status: 400 });
+    // Graded exactly once, here at shift start; the result is stored with the shift (shift_id PK) and a repeat
+    // commit-work is refused by the one-active-shift rule, so it cannot re-grade (QA1 #125 review).
+    // This route serves signed-in human citizens only; AI/background actors never reach it, and gradeShift
+    // returns the base reward for any non-human actor.
+    // #252: answers are graded against this shift's own key, derived from the server secret and the shift id the
+    // ticket was issued for. The ticket's shift id becomes the shift's id, so a ticket can start at most one shift.
+    const input = body.quality as QualityInput | undefined;
+    let id: string = crypto.randomUUID();
+    let key: number[] | undefined;
+    if (input && 'answers' in input) {
+      const secret = shiftQualitySecret(env as unknown as { HARIMU_SHIFT_QUALITY_SECRET?: string });
+      if (!secret) return privateJson({ error: 'The quality step is unavailable. You can start the shift for the base reward.' }, { status: 503 });
+      const ticketShift = await redeemQualityTicket(secret, userId, input.ticket);
+      if (!ticketShift) return privateJson({ error: 'This quality step has expired. Open it again.' }, { status: 400 });
+      if (await database.prepare('SELECT 1 AS used FROM work_shifts WHERE id = ?').bind(ticketShift).first()) return privateJson({ error: 'This quality step was already used. Open it again.' }, { status: 409 });
+      id = ticketShift; key = await shiftAnswerKey(secret, ticketShift, harvestQuestions);
+    }
+    const quality = gradeShift(workOrderId, input, 'human', key);
+    const reward = { ...base, ...applyQuality(base, quality.multiplierPct) };
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
     // D1 batch is transactional: scheduling and debiting succeed together.
     const [scheduled] = await database.batch([
@@ -450,6 +557,9 @@ export async function POST(request: Request) {
       database.prepare(`INSERT INTO shift_rewards (shift_id, wage_minor, item, quantity)
         SELECT id, ?, ?, ? FROM work_shifts WHERE id = ? AND clerk_user_id = ?`)
         .bind(reward.wageMinor, reward.item, reward.quantity, id, userId),
+      database.prepare(`INSERT INTO shift_quality (shift_id, grade, multiplier_pct, correct)
+        SELECT id, ?, ?, ? FROM work_shifts WHERE id = ? AND clerk_user_id = ?`)
+        .bind(quality.grade, quality.multiplierPct, quality.correct, id, userId),
     ]);
     const shifts = await readShifts(database, userId);
     const profile = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?')
@@ -458,7 +568,7 @@ export async function POST(request: Request) {
       return privateJson({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
     }
-    return privateJson({ ok: true, aurellePlan:await readAurelle(database,userId), shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   if (body.action === 'claim-work') {
@@ -466,14 +576,17 @@ export async function POST(request: Request) {
     const shift = await database.prepare('SELECT claimed_at, completes_at, work_order_id FROM work_shifts WHERE id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first<{ claimed_at: string | null; completes_at: string; work_order_id: string }>();
     if (!shift) return privateJson({ error: 'Shift unavailable.' }, { status: 404 });
-    if (shift.work_order_id === 'aurelle-food-estate') return privateJson({ error: 'Collect this charter shift with aurelle-claim-work; the reward stays in Crowns.', aurellePlan:await readAurelle(database,userId) }, { status:409 });
+    if (shift.work_order_id === 'aurelle-food-estate') return privateJson({ error: 'Collect this charter shift with aurelle-claim-work; the reward stays in Crowns.', aurellePlan:await readAurelleView(database,userId) }, { status:409 });
     if (shift.completes_at > now) {
       return privateJson({ error: 'Your shift is still underway.' }, { status: 409 });
     }
+    const taxPercent = incomeTaxPercentNow();
     // One ledger transfer carries both wages and inventory; every write rolls back together.
     // Budget guard is in the insert itself, so concurrent settlements cannot overdraw the pool.
     await database.batch([
       database.prepare(settleSql).bind(now, shiftId, userId, now),
+      // #86: Kindle income tax is withheld from this settlement in the same transaction (only while the flag is on).
+      ...(taxPercent > 0 ? [database.prepare(withholdIncomeTaxSql).bind(taxPercent, taxPercent, shiftId, userId, now)] : []),
       database.prepare(settledContributionSql)
         .bind(now, shiftId, userId, now),
       database.prepare(finishSettledShiftSql)
@@ -482,7 +595,7 @@ export async function POST(request: Request) {
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return privateJson({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
-    return privateJson({ ok: true, aurellePlan:await readAurelle(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   return privateJson({ error: 'Unknown action.' }, { status: 400 });

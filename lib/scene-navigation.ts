@@ -18,10 +18,17 @@ export function nationFromSearch(search: string, validNationIds: readonly string
   const requested = new URLSearchParams(search).get('nation');
   return requested && validNationIds.includes(requested) ? requested : fallbackId;
 }
-export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string): string {
+/** #411: which nation the page views right after an existing citizen's profile loads. With no valid `nation` in the URL it is the citizen's own nation, so
+ *  Civic opens their own government (editable) and no Kindle default applies. A valid `?nation=` keeps the visitor view of that nation. An unknown citizen nation changes nothing. */
+export function viewedNationAfterLoad(search: string, validNationIds: readonly string[], citizenNationId: string | null | undefined, currentId: string): string {
+  const requested = new URLSearchParams(search).get('nation');
+  if (requested && validNationIds.includes(requested)) return currentId;
+  return citizenNationId && validNationIds.includes(citizenNationId) ? citizenNationId : currentId;
+}
+export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false): string {
   const url = new URL(href);
   url.searchParams.set('view', scene);
-  if (scene === 'nation' || scene === 'world' || scene === 'country' || Boolean(cityId)) {
+  if (scene === 'nation' || scene === 'world' || scene === 'country' || Boolean(cityId) || (keepNation && scene === 'government')) {
     if (nationId) url.searchParams.set('nation', nationId);
   } else url.searchParams.delete('nation');
   // A city belongs to one nation; never carry a previous nation's city forward (#55).
@@ -55,4 +62,8 @@ export function normalizeSceneSearch(search: string, nationIds: readonly string[
   if (city !== null && (validNation ? !cityInNation(validNation, city) : !nationIds.some(id => cityInNation(id, city)))) params.delete('city');
   const out = params.toString();
   return out ? `?${out}` : '';
+}
+/** Civic for a nation the player is not a citizen of renders read-only (#91). */
+export function isForeignCivic(view: SceneView, nationParam: string | null, viewedNationId: string, citizenNationId: string | null | undefined): boolean {
+  return view === 'government' && Boolean(nationParam) && viewedNationId === nationParam && viewedNationId !== citizenNationId;
 }

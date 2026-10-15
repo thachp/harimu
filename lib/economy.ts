@@ -2,6 +2,7 @@ import type {GameDatabase} from './database-contract';
 import { defaultRecoverySeconds } from './economy-rules';
 export { recoveryInterval } from './economy-rules';
 import { starterGrantSql } from './market';
+import { kioskHistoryRow } from './kiosk-text';
 import { walletHistorySql, toTransactions, sortHistory, type WalletHistoryRow, type WalletTransaction } from './wallet';
 // Prototype tuning. Integer minor units: 100 cents = 1 Spark.
 export const employerBudgetMinor = 100000;
@@ -11,6 +12,11 @@ export const rewards: Record<string, { wageMinor: number; item: string; quantity
   harvest: { wageMinor: 800, item: 'food', quantity: 4 },
   freight: { wageMinor: 1200, item: 'materials', quantity: 2 },
   archive: { wageMinor: 600, item: 'knowledge', quantity: 1 },
+  // #196 Market MVP raw goods (Kindle). Base output; the same terms apply to any worker (no per-citizen multiplier yet).
+  // [ASSUMPTION] wages/quantities tuned so 1 WC earns about the same Spark as the existing jobs.
+  orchard: { wageMinor: 700, item: 'fruit', quantity: 3 },
+  herding: { wageMinor: 900, item: 'meat', quantity: 2 },
+  logging: { wageMinor: 1000, item: 'wood', quantity: 3 },
 };
 export type Economy = {
   walletMinor: number;
@@ -18,8 +24,10 @@ export type Economy = {
   nextRecoveryAt: string;
   /** Recent SPK movements, newest first (issue #39 wallet panel). */
   transactions?: WalletTransaction[];
-  /** Tessera holdings. No TSR source exists in the PoC, so this is always 0. */
+  /** Tessera holdings (#122, #210): Clearing House kiosk purchases plus the World Registry ledger (square purchases). */
   tesseraMinor?: number;
+  /** #86: Kindle income tax rate withheld at settlement; 0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off. */
+  incomeTaxPercent?: number;
 };
 export const economySchema = `CREATE TABLE IF NOT EXISTS shift_settlements (
   shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id),
@@ -56,6 +64,24 @@ export const settleSql = `INSERT OR IGNORE INTO shift_settlements
     AND r.wage_minor <= (SELECT initial_minor FROM economy_funds WHERE id = 'kindle-employer')
       - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements), 0)
       - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions), 0)`;
+// #86: Kindle income tax is withheld in the same batch as settleSql. Keyed by shift_id and limited to the
+// settlement written at this timestamp, so a retried or repeated claim never taxes twice. Integer division floors.
+export const incomeTaxSchema = `CREATE TABLE IF NOT EXISTS shift_income_tax (
+  shift_id TEXT PRIMARY KEY REFERENCES shift_settlements(shift_id) ON DELETE CASCADE,
+  clerk_user_id TEXT NOT NULL,
+  gross_minor INTEGER NOT NULL CHECK(gross_minor >= 0),
+  tax_minor INTEGER NOT NULL CHECK(tax_minor >= 0 AND tax_minor <= gross_minor),
+  rate_percent INTEGER NOT NULL CHECK(rate_percent BETWEEN 0 AND 50),
+  settled_at TEXT NOT NULL
+)`;
+export const withholdIncomeTaxSql = `INSERT OR IGNORE INTO shift_income_tax
+  (shift_id, clerk_user_id, gross_minor, tax_minor, rate_percent, settled_at)
+  SELECT s.shift_id, s.clerk_user_id, s.wage_minor, (s.wage_minor * ?) / 100, ?, s.settled_at
+  FROM shift_settlements s
+  WHERE s.shift_id = ? AND s.clerk_user_id = ? AND s.settled_at = ?
+    AND EXISTS (SELECT 1 FROM citizens c WHERE c.clerk_user_id = s.clerk_user_id AND c.nation_id = 'kindle')`;
+export const kindleTreasuryBalanceSql = `SELECT COALESCE((SELECT initial_minor FROM economy_funds WHERE id = 'kindle-treasury'), 0)
+  + COALESCE((SELECT SUM(tax_minor) FROM shift_income_tax), 0) AS balance`;
 export const settledContributionSql = `INSERT INTO work_contributions
   (clerk_user_id, work_order_id, capacity_spent, created_at)
   SELECT clerk_user_id, work_order_id, capacity_spent, ? FROM work_shifts
@@ -86,15 +112,51 @@ export const economyWalletSnapshotSql = economySnapshotSql + `,
   (SELECT json_group_array(json_object('id', id, 'kind', kind, 'amount_minor', amount_minor, 'item', item, 'quantity', quantity, 'occurred_at', occurred_at))
     FROM (` + walletHistorySql + `)) AS history_json`;
 
-export async function readEconomy(db: GameDatabase, userId: string, interval: number): Promise<Economy> {
-  await db.prepare(starterGrantSql).bind(userId).run();
+/** #205: capacity and recovery clock as recoverCapacity would leave them at `now`, without writing. */
+export async function readCapacityProjection(db: GameDatabase, userId: string, now: number, interval: number) {
+  const row = await db.prepare('SELECT c.capacity, k.recovered_at FROM citizens c LEFT JOIN capacity_clocks k ON k.clerk_user_id=c.clerk_user_id WHERE c.clerk_user_id=?')
+    .bind(userId).first<{ capacity: number; recovered_at: number | null }>();
+  if (!row) return null;
+  const recovered = row.recovered_at == null ? now : Number(row.recovered_at);
+  const steps = Math.max(0, Math.floor((now - recovered) / interval));
+  return { capacity: steps > 0 ? Math.min(maximumCapacity, Number(row.capacity) + steps * maximumCapacity) : Number(row.capacity), recoveredAt: recovered + steps * interval };
+}
+/** #205: the Kindle starter food grant a write path would record (0 once recorded or for other nations). */
+export async function pendingStarterFood(db: GameDatabase, userId: string): Promise<number> {
+  const row = await db.prepare("SELECT 1 AS pending FROM citizens c WHERE c.clerk_user_id=? AND c.nation_id='kindle' AND NOT EXISTS (SELECT 1 FROM starter_food_grants g WHERE g.clerk_user_id=c.clerk_user_id)").bind(userId).first<{ pending: number }>();
+  return row ? 2 : 0;
+}
+
+/** #205 (QA1 note 2 on #208): only a missing ledger table (not yet migrated) reads as 0; any other error surfaces. */
+import { isMissingRelation } from './db-errors';
+export { isMissingRelation };
+export async function readTesseraBalance(db: GameDatabase, userId: string): Promise<number> {
+  try {
+    const row = await db.prepare(`SELECT COALESCE((SELECT SUM(delta_minor) FROM citizen_tessera_ledger WHERE clerk_user_id=?),0)
+      + COALESCE((SELECT SUM(tessera_minor) FROM citizen_tessera_exchanges WHERE clerk_user_id=?),0) AS balance`).bind(userId, userId).first<{ balance: number }>();
+    return Number(row?.balance ?? 0);
+  } catch (error) { if (isMissingRelation(error)) return 0; throw error; }
+}
+
+export async function readEconomy(db: GameDatabase, userId: string, interval: number, options: { readOnly?: boolean; now?: number; incomeTaxPercent?: number } = {}): Promise<Economy> {
+  if (!options.readOnly) await db.prepare(starterGrantSql).bind(userId).run();
   // One SQLite read snapshot keeps wallet and goods consistent during another tab's claim.
   // Wallet history is read in the same statement so the balance and the listed movements always agree (#49 review).
-  const row = await db.prepare(economyWalletSnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId).first<{
+  const row = await db.prepare(economyWalletSnapshotSql).bind(userId, userId, userId, userId, userId, userId, userId, userId, userId).first<{
     wallet_minor: number; inventory_json: string; recovered_at: number | null; history_json: string | null;
   }>();
   const history = sortHistory(JSON.parse(row?.history_json ?? '[]') as WalletHistoryRow[]);
-  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: 0, transactions: toTransactions(history),
-    inventory: JSON.parse(row?.inventory_json ?? '[]') as Economy['inventory'],
-    nextRecoveryAt: new Date(((row?.recovered_at ?? Math.floor(Date.now() / 1000)) + interval) * 1000).toISOString() };
+  // #122/#210: Tessera = kiosk purchases plus the World Registry ledger.
+  let inventory = JSON.parse(row?.inventory_json ?? '[]') as Economy['inventory'];
+  let recoveredAt = row?.recovered_at ?? Math.floor(Date.now() / 1000);
+  if (options.readOnly) {
+    // Show exactly what the skipped writes would have produced: the pending starter food and the advanced clock.
+    const now = options.now ?? Math.floor(Date.now() / 1000);
+    const starter = await pendingStarterFood(db, userId);
+    if (starter) inventory = inventory.some(i => i.item === 'food') ? inventory.map(i => i.item === 'food' ? { ...i, quantity: i.quantity + starter } : i)
+      : [...inventory, { item: 'food', quantity: starter }].sort((a, b) => a.item.localeCompare(b.item));
+    recoveredAt = (await readCapacityProjection(db, userId, now, interval))?.recoveredAt ?? recoveredAt;
+  }
+  return { walletMinor: row?.wallet_minor ?? 0, tesseraMinor: await readTesseraBalance(db, userId), transactions: toTransactions(history, kioskHistoryRow),
+    inventory, nextRecoveryAt: new Date((recoveredAt + interval) * 1000).toISOString(), incomeTaxPercent: options.incomeTaxPercent ?? 0 };
 }

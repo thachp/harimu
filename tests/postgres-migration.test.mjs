@@ -6,6 +6,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {localRuntime} from './helpers/local-runtime.mjs';
 import {snapshotSqlite,snapshotManifest,orderedSchema,replayJournalSqlite,importSnapshot} from '../scripts/postgres-migration.mjs';
 import {postgresSql} from '../lib/postgres/sql.ts';
+import {repoTables} from '../scripts/postgres-migrations.mjs';
 import {assertPostgresApplicationRole,selectStorageBackend} from '../lib/storage-selection.ts';
 const identifier=name=>`"${name}"`;
 test('SQL literals and values stay separate; unsupported dialects fail closed',()=>{
@@ -20,7 +21,9 @@ test('storage activation requires preview, explicit cutover readiness and config
  assertPostgresApplicationRole({canCreateSchema:1,canChangeMarker:1,superuser:0},true);assert.throws(()=>assertPostgresApplicationRole({canCreateSchema:1,canChangeMarker:1,superuser:1},true));assertPostgresApplicationRole({canCreateSchema:0,canChangeMarker:0,superuser:0});for(const flag of ['canCreateSchema','canChangeMarker','superuser'])assert.throws(()=>assertPostgresApplicationRole({canCreateSchema:0,canChangeMarker:0,superuser:0,[flag]:1}));
 });
 test('a PostgreSQL fixture preserves its snapshot and journal restores subsequent writes to SQLite exactly once',async t=>{
- const r=await localRuntime({backend:'postgres'});t.after(()=>r.close());assert.equal(r.postgresSnapshot.schema.filter(s=>s.type==='table').length,61); // +korund_coupon_redemptions (#41)
+ const r=await localRuntime({backend:'postgres'});t.after(()=>r.close());const pgTables=r.postgresSnapshot.schema.filter(s=>s.type==='table').map(s=>s.name).sort();assert.deepEqual(pgTables,repoTables());assert.ok(pgTables.includes('nation_stability_scores'));assert.ok(['faith_missions','missionary_responses','missionary_mutes'].every(n=>pgTables.includes(n)));assert.ok(pgTables.includes('citizen_first_week_goals'));assert.ok(pgTables.includes('world_cities'));assert.ok(pgTables.includes('world_square_purchases')&&pgTables.includes('citizen_tessera_ledger'));assert.ok(pgTables.includes('shift_quality'));assert.ok(pgTables.includes('citizen_travel'));assert.ok(pgTables.includes('citizen_faith'));assert.ok(pgTables.includes('citizen_worship'));for(const t of ['congregation_members','congregation_changes','congregation_officiants','officiant_service','citizen_festival_joins','aurelle_favor_spends','wars','korund_raids','korund_raid_hits','war_defense_windows'])assert.ok(pgTables.includes(t),t);assert.equal(pgTables.length,107); // #362: +crown_decrees (0042); #363: +embargoes (0039); #308: +treaties (0037); #307: +party_members, primary_elections, primary_voter_receipts, primary_anonymous_ballots (0036); #310: +war_defense_windows (0033); #295: +korund_raids, korund_raid_hits (0032); #309: +wars (0031); #283: +assembly_elections, assembly_voter_receipts, assembly_anonymous_ballots (0034); #210: +citizen_tessera_exchanges; #235: +korund_job_preferences, korund_job_assignments (0035)
+  // #86: +shift_income_tax
+  // #119: derived from drizzle/ + db/postgres/ (incl. 0030 aurelle_coups #281, 0024 korund_presidium_sessions #70, 0023 aurelle_pledges + aurelle_risings #71, 0021 market_spoilage #199, 0012 nation_stability #69, 0013 first-week goals #135, 0014 world_cities #124, 0015 shift_quality #40, 0016 market goods/orders/cancellations/trades #195, 0017 world registry #122)
  const source=new DatabaseSync(':memory:');t.after(()=>source.close());
  for(const entry of orderedSchema(r.postgresSnapshot))source.exec(entry.sql);
  for(const entry of orderedSchema(r.postgresSnapshot).filter(s=>s.type==='table'))for(const row of r.postgresSnapshot.data[entry.name]){const keys=Object.keys(row);source.prepare(`INSERT INTO ${identifier(entry.name)} (${keys.map(identifier).join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...keys.map(key=>row[key]));}
@@ -48,6 +51,10 @@ test('the production PostgreSQL adapter rejects ballot writes before connection 
  let connects=0;const db=new PostgresDatabase(async()=>{connects++;throw Error('Must not connect.');});
  await assert.rejects(db.prepare('INSERT INTO civic_voter_receipts(request_id) VALUES (?)').bind('fixture').run(),/disabled pending privacy/);
  await assert.rejects(db.prepare('UPDATE civic_anonymous_ballots SET ranking_json=?').bind('[]').run(),/disabled pending privacy/);await assert.rejects(db.prepare('INSERT INTO public."civic_anonymous_ballots"(id) VALUES (?)').bind('fixture').run(),/disabled pending privacy/);
+ await assert.rejects(db.prepare('INSERT INTO assembly_voter_receipts(request_id) VALUES (?)').bind('fixture').run(),/disabled pending privacy/); // #283
+ await assert.rejects(db.prepare('INSERT INTO assembly_anonymous_ballots(id) VALUES (?)').bind('fixture').run(),/disabled pending privacy/);await assert.rejects(db.prepare('UPDATE assembly_voter_receipts SET ballot_written=1').run(),/disabled pending privacy/);
+ await assert.rejects(db.prepare('INSERT INTO primary_voter_receipts(request_id) VALUES (?)').bind('fixture').run(),/disabled pending privacy/); // #307
+ await assert.rejects(db.prepare('INSERT INTO primary_anonymous_ballots(id) VALUES (?)').bind('fixture').run(),/disabled pending privacy/);await assert.rejects(db.prepare('UPDATE primary_voter_receipts SET ballot_written=1').run(),/disabled pending privacy/);
  await assert.rejects(db.prepare('UPDATE citizens SET capacity=18').run(),/journal retention/);assert.equal(connects,0);
 });
 

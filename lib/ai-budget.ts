@@ -21,6 +21,8 @@ export function aiPricesStale(now:number){return aiPriceAgeDays(now)>aiPriceStal
 // ---- Durable daily budget ----
 export const aiNewsSequenceOperation='news-sequence-3b-guard-2026-10-14';
 export const aiNewsSequenceReservation=aiModelReservations['@cf/meta/llama-3.2-3b-instruct']*2+aiModelReservations['@cf/meta/llama-guard-3-8b'];
+/** Issue #20: Cabinet petition response, its own ledger operation (same 3b+3b+guard sequence cost). */
+export const aiCabinetResponseOperation='cabinet-response-3b-guard-2026-10-14';
 export const aiNotableQuestionOperation='notable-question-3b-double-guard-2026-10-14';
 export const aiNotableQuestionReservation=aiModelReservations['@cf/meta/llama-3.2-3b-instruct']*2+aiModelReservations['@cf/meta/llama-guard-3-8b']*2;
 /** Hard ceiling: US$0.97, below the approved US$1/day. The env budget can only lower it. */
@@ -49,9 +51,53 @@ export function aiGatewayOptions(config:AiBudgetConfig){return {gateway:{id:conf
  * charge is never refunded and still counts against the day(s) it reserved.
  */
 export const aiUncertainBlockTtlSeconds=3600;
+/** #92: a 'pending' row was never marked sent (see markAiReservationSent), so its inference never reached the gateway (each call times out
+ * after 30s, a sequence has at most four). It stops counting and is deleted on the next reservation. */
+export const aiPendingExpirySeconds=aiUncertainBlockTtlSeconds;
+/** #92: withdraw a reservation whose inference never reached the gateway (nothing was sent, so nothing is charged). */
+export async function releaseAiReservation(db:GameDatabase,id:string){await db.prepare("DELETE FROM harimu_ai_reservations WHERE request_id=? AND status='pending'").bind(id).run();}
+/** #92: persist "handed to the gateway" BEFORE the first gateway call. 'uncertain' = sent, outcome unknown: it never
+ * expires and is never released, so a crash mid-call stays charged and keeps its request id (Notable replay guard). */
+/** #141: settle a terminal failure to the metered cost of the calls the gateway actually answered (per-token from provider usage
+ * when valid, else the per-call table bound; #170), releasing the rest of the sequence reservation. Never raises a charge; at least 1 micro-USD stays booked.
+ * #169: only an open (pending/uncertain) row is settled; a row another path already finished is left untouched. */
+/** #170: Workers AI list prices in micro-USD per million tokens (developers.cloudflare.com/workers-ai/platform/pricing, checked 2026-10-14). */
+export const aiModelTokenPrices:{readonly [M in AiModel]:{readonly inputPerM:number;readonly outputPerM:number}}={
+ '@cf/meta/llama-3.2-3b-instruct':{inputPerM:51000,outputPerM:335000},
+ '@cf/meta/llama-guard-3-8b':{inputPerM:484000,outputPerM:30000},
+};
+/** One answered gateway call: the model and, when the provider reported it, its token usage. A bare model means no usage. */
+export type AiMeteredCall=AiModel|{readonly model:AiModel;readonly usage?:unknown};
+const tokenCount=(n:unknown,max:number)=>typeof n==='number'&&Number.isSafeInteger(n)&&n>=0&&n<=max?n:null;
+/**
+ * #170: cost of one answered call. Valid provider usage (prompt/completion tokens) is priced per token, rounded up and
+ * capped at the per-call bound; missing or implausible usage falls back to the per-call bound, so it never undercharges.
+ */
+export function meteredAiCallCost(call:AiMeteredCall){
+ const model=typeof call==='string'?call:call.model,bound=aiModelReservations[model];
+ const usage=typeof call==='string'?undefined:call.usage;if(!usage||typeof usage!=='object')return bound;
+ const u=usage as {prompt_tokens?:unknown;completion_tokens?:unknown};const input=tokenCount(u.prompt_tokens,1_000_000),output=tokenCount(u.completion_tokens,256);
+ if(input===null||output===null)return bound;const price=aiModelTokenPrices[model];
+ return Math.min(bound,Math.max(1,Math.ceil((input*price.inputPerM+output*price.outputPerM)/1_000_000)));
+}
+export function meteredAiCost(calls:readonly AiMeteredCall[]){return calls.reduce((sum,c)=>sum+meteredAiCallCost(c),0);}
+export async function settleAiReservation(db:GameDatabase,id:string,actualMicro:number){const micro=Math.max(1,Number.isSafeInteger(actualMicro)?actualMicro:Number.MAX_SAFE_INTEGER);await db.prepare("UPDATE harimu_ai_reservations SET status='finished',reserved_micro=CASE WHEN ?<reserved_micro THEN ? ELSE reserved_micro END WHERE request_id=? AND status IN ('pending','uncertain')").bind(micro,micro,id).run();}
+/** #169 follow-up (QA1 nit on #182): a transport/timeout failure keeps the full charge as 'uncertain', but only on an
+ * open row. A row another path already settled or finished is left untouched. Same SQL on SQLite and Postgres. */
+export async function markAiReservationUncertain(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status IN ('pending','uncertain')").bind(id).run();}
+export async function markAiReservationSent(db:GameDatabase,id:string){await db.prepare("UPDATE harimu_ai_reservations SET status='uncertain' WHERE request_id=? AND status='pending'").bind(id).run();}
+/** #92: ids of the removed preview acceptance ledger/prebook. Written by readiness, never sent through the gateway,
+ * some already 'finished'/'uncertain'. Real ids are UUIDs, notable:<sha>: or cabinet:, so this never matches them. */
+export const legacyPhantomReservationPattern='acceptance:%';
+/** #92: expire stale pending rows (no gateway evidence) and release the legacy phantom rows so neither consumes the
+ * daily budget. Idempotent; a plain DELETE the app role already performs for over-cap rows (no elevated privileges). */
+export async function expireStaleAiReservations(db:GameDatabase,now:number){if(!Number.isSafeInteger(now))return;await db.prepare("DELETE FROM harimu_ai_reservations WHERE (status='pending' AND started_at<=?) OR request_id LIKE ?").bind(now-aiPendingExpirySeconds,legacyPhantomReservationPattern).run();}
 export const aiBudgetSchema=`CREATE TABLE IF NOT EXISTS harimu_ai_reservations (request_id TEXT PRIMARY KEY,utc_day TEXT NOT NULL,next_utc_day TEXT NOT NULL,model TEXT NOT NULL,reserved_micro INTEGER NOT NULL CHECK(reserved_micro>0),started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending','finished','uncertain')))`;
 export async function reserveAiCall(db:GameDatabase,id:string,model:AiModel,now:number,config:AiBudgetConfig|null){
  if(!isPricedAiModel(model))return false;return reserveBudget(db,id,model,aiModelReservations[model],1,now,config);
+}
+export async function reserveAiCabinetSequence(db:GameDatabase,id:string,now:number,config:AiBudgetConfig|null){
+ return reserveBudget(db,id,aiCabinetResponseOperation,aiNewsSequenceReservation,3,now,config);
 }
 export async function reserveAiSequence(db:GameDatabase,id:string,now:number,config:AiBudgetConfig|null,quota?:{ownerPrefix:string;dailyLimit:number},freeform=false){
  if(quota&&(!/^[a-z]+:[a-f0-9]{64}:$/.test(quota.ownerPrefix)||!id.startsWith(quota.ownerPrefix)||!Number.isSafeInteger(quota.dailyLimit)||quota.dailyLimit<1||quota.dailyLimit>20))return false;
@@ -61,18 +107,19 @@ async function reserveBudget(db:GameDatabase,id:string,model:string,cost:number,
  // Fail closed: no valid budget config (or a legacy timestamp argument) means no reservation.
  if(!Number.isSafeInteger(now)||!validConfig(config)||!id)return false;
  const budget=config.dailyBudgetMicro;
+ await expireStaleAiReservations(db,now);
  const day=new Date(now*1000).toISOString().slice(0,10),next=new Date((now+86400)*1000).toISOString().slice(0,10);
  // Pre-book the next UTC day too, to cover requests spanning midnight. Earlier-day
  // uncertain/pending calls block further inference for aiUncertainBlockTtlSeconds; they are never refunded.
  // Step 1: one atomic conditional INSERT ... SELECT (a single statement in its own write transaction).
- const limits=`COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND COALESCE((SELECT SUM(CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND (?=0 OR (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id LIKE ? AND utc_day=?)<?)`;
+ const limits=`COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND COALESCE((SELECT SUM(CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND (?=0 OR (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id LIKE ? AND utc_day=?)<?)`;
  const result=await db.prepare(`INSERT OR IGNORE INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) SELECT ?,?,?,?,?,?,'pending' WHERE NOT EXISTS(SELECT 1 FROM harimu_ai_reservations WHERE status IN ('pending','uncertain') AND utc_day<? AND started_at>?) AND ${limits}`).bind(id,day,next,model,cost,now,day,now-aiUncertainBlockTtlSeconds,day,day,budget,cost,next,next,budget,cost,aiNewsSequenceOperation,aiNotableQuestionOperation,day,day,units,aiNewsSequenceOperation,aiNotableQuestionOperation,next,next,units,quota?1:0,quota?quota.ownerPrefix+'%':'',day,quota?.dailyLimit??0).run();
  if(result.meta.changes!==1)return false;
  // Step 2: committed re-check. Under READ COMMITTED two concurrent inserts could each miss the other's
  // uncommitted row. After commit, the later re-check of any racing pair sees both rows, so an over-cap
  // total is always detected and the losing pending row (no inference made yet) is withdrawn. Ties fail
  // closed (both withdraw). Postgres writes additionally serialize on the adapter's transaction advisory lock.
- const totals=`SELECT COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS day_micro,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS next_micro,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN (CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) ELSE 0 END),0) AS day_units,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN (CASE WHEN model=? THEN 3 WHEN model=? THEN 4 ELSE 1 END) ELSE 0 END),0) AS next_units,COALESCE(SUM(CASE WHEN ?=1 AND request_id LIKE ? AND utc_day=? THEN 1 ELSE 0 END),0) AS owned FROM harimu_ai_reservations`;
+ const totals=`SELECT COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS day_micro,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS next_micro,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN (CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) ELSE 0 END),0) AS day_units,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN (CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) ELSE 0 END),0) AS next_units,COALESCE(SUM(CASE WHEN ?=1 AND request_id LIKE ? AND utc_day=? THEN 1 ELSE 0 END),0) AS owned FROM harimu_ai_reservations`;
  const check=await db.prepare(totals).bind(day,day,next,next,day,day,aiNewsSequenceOperation,aiNotableQuestionOperation,next,next,aiNewsSequenceOperation,aiNotableQuestionOperation,quota?1:0,quota?quota.ownerPrefix+'%':'',day).first<{day_micro:number;next_micro:number;day_units:number;next_units:number;owned:number}>();
  const over=!check||check.day_micro>budget||check.next_micro>budget||check.day_units>200||check.next_units>200||(quota!==undefined&&check.owned>quota.dailyLimit);
  if(over){await db.prepare("DELETE FROM harimu_ai_reservations WHERE request_id=? AND status='pending'").bind(id).run();return false;}
@@ -83,7 +130,7 @@ export async function readAiBudget(db:GameDatabase,now:number,config?:AiBudgetCo
  const limit=config===undefined?aiDailyBudgetMicroUsd:validConfig(config)?config.dailyBudgetMicro:0;
  if(!Number.isSafeInteger(now))throw Error('Invalid budget time.');
  const day=new Date(now*1000).toISOString().slice(0,10),nextDay=new Date((now+86400)*1000).toISOString().slice(0,10);
- const row=await db.prepare("SELECT COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS reserved,COALESCE(SUM(CASE WHEN utc_day=? OR next_utc_day=? THEN reserved_micro ELSE 0 END),0) AS next_reserved,COALESCE(SUM(CASE WHEN status IN ('pending','uncertain') AND utc_day<? AND started_at>? THEN 1 ELSE 0 END),0) AS blocked FROM harimu_ai_reservations").bind(day,day,nextDay,nextDay,day,now-aiUncertainBlockTtlSeconds).first<{reserved:number;next_reserved:number;blocked:number}>();
+ const row=await db.prepare("SELECT COALESCE(SUM(CASE WHEN (utc_day=? OR next_utc_day=?) AND (status<>'pending' OR started_at>?) AND request_id NOT LIKE 'acceptance:%' THEN reserved_micro ELSE 0 END),0) AS reserved,COALESCE(SUM(CASE WHEN (utc_day=? OR next_utc_day=?) AND (status<>'pending' OR started_at>?) AND request_id NOT LIKE 'acceptance:%' THEN reserved_micro ELSE 0 END),0) AS next_reserved,COALESCE(SUM(CASE WHEN status IN ('pending','uncertain') AND utc_day<? AND started_at>? THEN 1 ELSE 0 END),0) AS blocked FROM harimu_ai_reservations").bind(day,day,now-aiPendingExpirySeconds,nextDay,nextDay,now-aiPendingExpirySeconds,day,now-aiUncertainBlockTtlSeconds).first<{reserved:number;next_reserved:number;blocked:number}>();
  if(!row||![row.reserved,row.next_reserved,row.blocked].every(n=>Number.isSafeInteger(n)&&n>=0))throw Error('AI budget unavailable.');
  return {day,nextDay,reservedMicroUsd:row.reserved,nextDayReservedMicroUsd:row.next_reserved,remainingMicroUsd:Math.max(0,Math.min(limit-row.reserved,limit-row.next_reserved)),dailyBudgetMicroUsd:limit,pricesVerifiedAt:aiPricesVerifiedAt,priceTableVersion:aiPriceTableVersion,pricesStale:aiPricesStale(now),blocked:row.blocked>0,topicMicroUsd:aiNewsSequenceReservation,questionMicroUsd:aiNotableQuestionReservation};
 }

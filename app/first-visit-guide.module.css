@@ -1,7 +1,7 @@
-.guide { padding: 14px 0; color: #dbe4df; font-size: 13px; line-height: 1.6; }
+.guide { padding: 14px 0; color: #dbe4df; font-size: calc(13px * var(--text-scale, 1)); line-height: 1.6; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.eyebrow { color: #a3b6ac; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
-.guide h2 { margin: 14px 0 10px; font-size: 23px; line-height: 1.2; color: #f3ecd9; }
+.eyebrow { color: #a3b6ac; font-size: calc(10px * var(--text-scale, 1)); letter-spacing: .08em; text-transform: uppercase; }
+.guide h2 { margin: 14px 0 10px; font-size: calc(23px * var(--text-scale, 1)); line-height: 1.2; color: #f3ecd9; }
 .guide p { margin: 10px 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .guide button { min-height: 44px; padding: 10px 12px; border: 1px solid #52665e; border-radius: 3px; background: transparent; color: #dbe4df; font: inherit; cursor: pointer; }
@@ -9,7 +9,7 @@
 .guide button:focus-visible { outline: 3px solid #72c7b9; outline-offset: 3px; }
 .guide button.primary { background: #d3aa5b; border-color: #d3aa5b; color: #09191d; font-weight: 700; }
 .guide button.primary:hover { background: #e2bd75; }
-@media (max-width: 420px) { .actions button { flex: 1 1 130px; } .guide h2 { font-size: 21px; } }
+@media (max-width: 420px) { .actions button { flex: 1 1 130px; } .guide h2 { font-size: calc(21px * var(--text-scale, 1)); } }
 .question { display: flex; flex-direction: column; gap: 5px; margin: 14px 0; }
 .question select { min-height: 44px; width: 100%; padding: 9px; border: 1px solid #52665e; border-radius: 3px; background: #15261f; color: #dbe4df; font: inherit; }
 .question select:focus-visible { outline: 3px solid #72c7b9; outline-offset: 3px; }

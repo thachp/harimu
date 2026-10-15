@@ -26,4 +26,45 @@ To re-verify: check Workers AI pricing, update the amounts if needed, bump the v
   READ COMMITTED pushed the day over the cap, the over-cap pending row is withdrawn before any inference (ties fail closed).
   PostgreSQL writes also serialize on the adapter's transaction advisory lock.
 - A pending/uncertain reservation from an earlier UTC day blocks new reservations for `aiUncertainBlockTtlSeconds` (1h)
-  after it started. After that it stops blocking, but its full charge is never refunded and still counts for its day(s).
+  after it started. After that it stops blocking. An `uncertain` row (the request was handed to the gateway and the
+  outcome is unknown) keeps its full charge.
+
+## Reservation lifecycle (#92)
+- **No reservation without inference.** Only an enabled feature with a valid budget *and* gateway id reserves. Database
+  readiness never writes `harimu_ai_reservations` (the old preview acceptance ledger/prebook was removed).
+- **Not sent = not charged.** If a sequence fails before any request is handed to the gateway, its `pending` row is deleted.
+- **Sent is persisted first.** Before the first gateway call the row is marked `uncertain` (sent, outcome unknown).
+  It never expires and is never released, so a crash mid-call stays charged and keeps its id (Notable replay guard).
+- **Stale pending expires.** A `pending` row (never marked sent) older than `aiPendingExpirySeconds` (1h) has no evidence of a gateway call:
+  it stops counting immediately and is deleted on the next reservation.
+
+## Preview cleanup (#92): automatic, in-app
+Preview readiness used to insert hard-coded `acceptance:2026-10-14:*` rows (9 rows, 959,000 micro-USD on Oct 14 and
+Oct 15; most already `finished`) that never went through `harimu-preview`. After #92 deploys:
+- `readAiBudget` ignores any `acceptance:%` row immediately, so the budget readout is restored on the first read.
+- The next reservation (`expireStaleAiReservations`, run inside every `reserveBudget`) deletes them. It is idempotent and
+  is the same plain `DELETE` the app role already runs for over-cap rows, so no elevated privilege is needed.
+- Real rows (UUID / `notable:` / `cabinet:` ids) are untouched whatever their status, including sent/`uncertain` ones.
+- Rollout window: old isolates may re-insert rows for a minute or so after deploy; they are ignored on read and deleted
+  again on the next reservation. Keep AI flags off until `GET /api/notables` shows `budget.remainingMicroUsd` restored.
+
+### Optional manual fallback (only if the in-app release cannot run)
+Preview readiness used to insert hard-coded `acceptance:2026-10-14:*` rows (959,000 micro-USD on Oct 14 and Oct 15)
+that never went through `harimu-preview`. After deploying #92, PM runs, against the **preview** database only:
+
+1. Deploy #92 to preview first (old readiness would re-insert the rows).
+2. Dry run (expect 9 rows, 959,000 total):
+   `psql "$PREVIEW_DATABASE_URL" -c "SELECT request_id,status,reserved_micro FROM harimu_ai_reservations WHERE request_id LIKE 'acceptance:%'"`
+3. Snapshot for rollback:
+   `psql "$PREVIEW_DATABASE_URL" -c "SELECT * INTO harimu_ai_reservations_backup_092 FROM harimu_ai_reservations WHERE request_id LIKE 'acceptance:%'"`
+4. Clean: `psql "$PREVIEW_DATABASE_URL" -1 -f db/postgres/maintenance/092_release_unspent_ai_reservations.sql`
+5. Rollout window: between the deploy and full rollout, old isolates still run the removed readiness code and can
+   re-insert the `acceptance:%` rows (within ~1 minute each). Keep AI flags off until cleanup is confirmed. A few minutes later re-run the dry-run SELECT; if rows reappear, run step 4
+   again (idempotent). Then check `GET /api/notables` → `budget.remainingMicroUsd` is back near the daily budget.
+
+**Rollback:**
+`psql "$PREVIEW_DATABASE_URL" -1 -c "INSERT INTO harimu_ai_reservations SELECT * FROM harimu_ai_reservations_backup_092 ON CONFLICT (request_id) DO NOTHING"`
+Without a snapshot, the rows can be rebuilt from `aiAcceptanceCharges` in `git show 8f27353^:lib/ai-acceptance-charges.ts`
+(day 2026-10-14, next day 2026-10-15, plus `acceptance:2026-10-14:news-final`, 72,400, finished). Drop the backup table
+once preview AI is confirmed healthy: `DROP TABLE harimu_ai_reservations_backup_092`.
+A direct `psql` write bypasses the app adapter's protected rollback journal, so this snapshot is the only undo record.

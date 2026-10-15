@@ -2,6 +2,11 @@ export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
   nationId: string;
   mode: 'rule-bound simulation';
+  /** #71: set when a Rising has crowned a claimant; the leader panel shows the new AI royal house. */
+  crown?: { claimantId: string; name: string; house: string; motto: string; color: string; crownedAt: number; how?: 'rising' | 'coup' };
+  /** #70/#74 Korund: current Chairman, Presidium seats and the latest emergency session (State Media rumor view). */
+  presidium?: { chairman: { name: string }; seats: { id: string; name: string; role: string; status: 'serving' | 'purged' }[];
+    session: { status: 'open' | 'survived' | 'purged'; openedAt: number; resolvesAt: number; resolvedAt: number | null } | null };
   roles: { name: string; controller: string }[];
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };

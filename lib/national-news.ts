@@ -1,6 +1,11 @@
 import type {GameDatabase} from './database-contract';
 import type { GovernmentSnapshot } from './government';
 import { publicGovernmentSnapshot, governmentDisclosure } from './government-disclosure';
+import { presidiumRumors, readPresidium } from './korund-presidium';
+import { readWars, warNewsItems } from './war'; // #309
+import { readTreaties, treatyNewsItems } from './diplomacy'; // #308
+import { embargoNewsItems, readEmbargoes } from './embargo'; // #363
+import { undergroundNewsItems } from './korund-underground'; // #295
 
 export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model';kind?:NewsItemKind};
 /** record: system ledger fact; template: Korund State Media template built only from ledger figures; decree: Aurelle court gazette entry; article: model-written article. */
@@ -9,7 +14,7 @@ export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean}={}):Promise<NationalNews|null> {
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
  if(!edition)return null;
@@ -30,6 +35,11 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  for(const item of items)item.kind='record';
  if(nationId==='korund')for(const row of receipts.results)items.push({id:`korund:template:${row.occurred_at}`,title:korundTemplateHeadline(row.food),text:`The brigades of Korund report ${row.shifts} completed shift${row.shifts===1?'':'s'} and ${row.food} food delivered to the common store. Every worker strengthens the plan. (State Media template · the figures are copied from the system ledger and cannot be edited.)`,occurredAt:row.occurred_at*1000,source:'deterministic',kind:'template'});
  if(nationId==='aurelle')for(const row of accessions.results)items.push({id:`aurelle:decree:register:${row.occurred_at}`,title:'By order of the Crown: new subjects received',text:`Hear ye. The Herald proclaims that ${row.citizens} new subject${row.citizens===1?' has':'s have'} sworn the oath and been entered in the royal register. This gazette entry records a fact; it grants no charter, fief or title.`,occurredAt:row.occurred_at*1000,source:'deterministic',kind:'decree'});
+ if(nationId==='korund'&&options.korundPresidium)for(const r of presidiumRumors(await readPresidium(db)))items.push({...r,source:'deterministic',kind:'template'}); // #70 State Media rumors
+ if(nationId==='korund'&&options.faith)items.push(...await undergroundNewsItems(db,Math.floor(now/1000))); // #295 State Media inspection rumors, derived on read (no faith, shrine or person named)
+ if(options.war)items.push(...warNewsItems((await readWars(db,Math.floor(now/1000))).wars,nationId)); // #309 declaration, mobilization end and war end lines, derived on read
+ if(options.diplomacy)items.push(...treatyNewsItems((await readTreaties(db,Math.floor(now/1000))).treaties,nationId)); // #308 ratification and broken-pact lines, derived on read
+ if(options.embargo)items.push(...embargoNewsItems((await readEmbargoes(db)).embargoes,nationId)); // #363 impose and lift lines, derived on read
  if(tick){
   const proposals=JSON.parse(tick.proposals_json) as (GovernmentSnapshot|null)[];
   const snapshot=publicGovernmentSnapshot(proposals.find(proposal=>proposal?.nationId===nationId)??null);

@@ -7,7 +7,7 @@ function targetsBallot(sql:string){
  const first=tokens[0]?.toUpperCase();let index=first==='INSERT'?tokens.findIndex(token=>token.toUpperCase()==='INTO')+1:first==='UPDATE'?1:first==='DELETE'?tokens.findIndex(token=>token.toUpperCase()==='FROM')+1:-1;
  if(index<0)return false;if(tokens[index]?.toUpperCase()==='ONLY')index++;
  if(tokens[index+1]==='.')index+=2;
- return /^(civic|poc)_(anonymous_ballots|voter_receipts)$/i.test(tokens[index]?.replace(/^["`]|["`]$/g,'')??'');
+ return /^(civic|poc|assembly|primary)_(anonymous_ballots|voter_receipts)$/i.test(tokens[index]?.replace(/^["`]|["`]$/g,'')??'');
 }
 function normalize(value:unknown):unknown{
  if(typeof value==='bigint'){const number=Number(value);if(!Number.isSafeInteger(number))throw Error('Database integer exceeds safe application range.');return number;}
@@ -48,7 +48,9 @@ export class PostgresDatabase implements GameDatabase{
    if(transaction&&ballot&&results.some(result=>result.meta.changes>0))await connection.query('INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ($1)',[JSON.stringify([{ballotBoundary:'separated-ballots-v1'}])]);
    if(transaction&&!ballot&&results.some(result=>result.meta.changes>0))await connection.query('INSERT INTO harimu_postgres_write_journal(statements_json) VALUES ($1)',[JSON.stringify(statements.filter(statement=>/^\s*(INSERT|UPDATE|DELETE)\b/i.test(statement.sql)).map(statement=>({sql:statement.sql,values:statement.values})))]);
    await connection.query('COMMIT');return results;
-  }catch(error){if(begun)await connection.query('ROLLBACK').catch(()=>{});const code=error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?` (${error.code})`:'';throw Error(`PostgreSQL operation failed${code}.`);
+  }catch(error){if(begun)await connection.query('ROLLBACK').catch(()=>{});const code=error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z0-9]{5}$/.test(error.code)?` (${error.code})`:'';// #179: keep only the relation name of an undefined-table error (no values or SQL) so callers can tell which table is missing.
+   const relation=code===' (42P01)'&&typeof (error as {message?:unknown}).message==='string'?/relation "([\w.]+)" does not exist/.exec((error as {message:string}).message)?.[1]:undefined;
+   throw Error(`PostgreSQL operation failed${code}${relation?`: relation "${relation}" does not exist`:''}.`);
   }finally{await connection.release().catch(()=>{});}
  }
 }

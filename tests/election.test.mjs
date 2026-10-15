@@ -23,6 +23,7 @@ test('an unverified visit waits honestly, never opens a clock or accepts a forge
 });
 test('first verified visit opens one exact 72-hour window; reopening and another visit do not restart it',async t=>{
  const r=await localRuntime({ballotPrivacyReady:true});t.after(()=>r.close());eligible(r,'alice');const first=await r.call('election','alice');assert.equal(first.data.status,'open');assert.equal(first.data.closesAt-first.data.opensAt,ballotWindowSeconds);assert.equal(first.cache,'private, no-store');
+ await (await r.importModule('lib/elections.ts')).openPreviewElection(r.db,'alice',Math.floor(r.now/1000),true);/* #221: a write path opens it (GET only projects) */
  r.setNow(r.now+10000);eligible(r,'bob');r.reopen();const next=await r.call('election','bob',undefined,'https://fixture.invalid','?nation=aurelle');assert.equal(next.data.nationId,'kindle');assert.equal(next.data.opensAt,first.data.opensAt);assert.equal(next.data.closesAt,first.data.closesAt);assert.equal(next.data.result,null);
 });
 test('stored rankings are separated from participation receipts; new receipts cannot vote twice and retry cannot edit the original',async t=>{
@@ -38,10 +39,10 @@ test('results stay hidden before exact close, then human and capped simulated ta
  r.setNow(close*1000-1);const before=await r.call('election','bob');assert.equal(before.data.result,null);assert.equal(before.data.status,'open');
  r.setNow(close*1000);const result=await r.call('election','alice');assert.equal(result.data.status,'closed');assert.equal(result.data.result.humanBallots,2);assert.equal(result.data.result.simulatedPublicUnits,2);assert.equal(result.data.result.winner,candidateIds[2]);assert.equal(result.data.result.weightScale,4);assert.equal(result.data.result.rounds[0].human[candidateIds[2]],2);
  r.reopen();r.setNow(close*1000+1000);assert.deepEqual((await r.call('election','bob')).data.result,result.data.result);assert.doesNotMatch(JSON.stringify(result.data),/ranking_json|ballot_id|receipt|clerk_user_id|"alice"|"bob"/);
- r.setNow(close*1000-5000);eligible(r,'bob');assert.equal((await r.call('election','bob',vote())).status,409);assert.equal((await r.call('election','alice')).data.status,'closed');
+ await (await r.importModule('lib/world-simulation.ts')).advanceWorld(r.db,Math.floor(r.now/1000));/* #221: the tick records the close GET only shows */r.setNow(close*1000-5000);eligible(r,'bob');assert.equal((await r.call('election','bob',vote())).status,409);assert.equal((await r.call('election','alice')).data.status,'closed');
 });
 test('an empty election closes with no simulated weight and no invented winner',async t=>{
- const r=await localRuntime({ballotPrivacyReady:true});t.after(()=>r.close());eligible(r,'alice');const open=await r.call('election','alice');r.setNow(open.data.closesAt*1000);const closed=await r.call('election','alice');assert.equal(closed.data.result.winner,null);assert.equal(closed.data.result.humanBallots,0);assert.equal(closed.data.result.simulatedPublicUnits,0);
+ const r=await localRuntime({ballotPrivacyReady:true});t.after(()=>r.close());eligible(r,'alice');await (await r.importModule('lib/elections.ts')).openPreviewElection(r.db,'alice',Math.floor(r.now/1000),true);/* #221: a write path opens it (GET only projects) */const open=await r.call('election','alice');r.setNow(open.data.closesAt*1000);const closed=await r.call('election','alice');assert.equal(closed.data.result.winner,null);assert.equal(closed.data.result.humanBallots,0);assert.equal(closed.data.result.simulatedPublicUnits,0);
 });
 test('invalid rankings, foreign origins and receipt collisions cannot create extra anonymous ballots',async t=>{
  const r=await localRuntime({ballotPrivacyReady:true});t.after(()=>r.close());eligible(r,'alice');eligible(r,'bob');assert.equal((await r.call('election','alice',vote([candidateIds[0],candidateIds[0],candidateIds[2]]))).status,400);assert.equal((await r.call('election','alice',vote(),'https://foreign.invalid')).status,403);

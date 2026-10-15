@@ -1,5 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
+import type { CrownMint } from './crown-debasement'; // #362 (type only: tests/aurelle.test.py loads this file straight into Node, so it needs no runtime import of a module)
 // Bounded prototype tuning; no gold backing, issuance, ranks or charter allocation model.
 export const aurelleJob = {id:'aurelle-food-estate',name:'Chartered food-estate service',capacityCost:4,hours:2,wageMinor:800,foodOutput:4,favorReward:2} as const;
 export const aurelleFoodPriceMinor=150;
@@ -13,6 +14,18 @@ export const aurelleSchemas=[
  `CREATE TABLE aurelle_purchases(id TEXT PRIMARY KEY REFERENCES aurelle_receipts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),quantity INTEGER NOT NULL CHECK(quantity IN (1,2)),spend_minor INTEGER NOT NULL CHECK(spend_minor=quantity*150))`,
  `CREATE TABLE aurelle_meals(id TEXT PRIMARY KEY REFERENCES aurelle_receipts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),quantity INTEGER NOT NULL CHECK(quantity=2),occurred_at INTEGER NOT NULL)`,
 ] as const;
+/** #289: Royal Favor is spent here (docs 14.2 / daily loops: "spent on petitions, ranks, estates, pardons"; leaving the Kinward Rite costs Royal Favor).
+ * Each spend is one immutable row keyed by its request id, so a retry can never debit twice. Balance = min(100, earned) - spent, never below 0. */
+export const royalFavorSchemas=[
+ `CREATE TABLE IF NOT EXISTS aurelle_favor_spends(request_id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,amount INTEGER NOT NULL CHECK(amount>0),reason TEXT NOT NULL CHECK(reason IN ('leave-kinward')),spent_at INTEGER NOT NULL)`,
+] as const;
+/** SQL for the spendable balance of the citizen bound to the first `?` (twice: earned, spent). */
+export const royalFavorBalanceSql=`MAX(0,MIN(100,COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0))-COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=?),0))`;
+/** Spendable Royal Favor. A database without migration 0028 yet has nothing spent, but nothing can be spent either (see faith.ts). */
+export async function royalFavorBalance(db:GameDatabase,userId:string):Promise<number>{
+ try{const row=await db.prepare(`SELECT ${royalFavorBalanceSql} AS favor`).bind(userId,userId).first<{favor:number}>();return Number(row?.favor??0);}
+ catch(error){if(!/no such table|does not exist|42P01/i.test(String((error as {code?:string})?.code??'')+' '+String((error as Error)?.message??error)))throw error;/* only a missing aurelle_favor_spends falls back: any other failure must not read as a balance (inline: tests/aurelle.test.py loads this file without a resolver, so no ./db-errors import) */const row=await db.prepare('SELECT MIN(100,COALESCE(SUM(favor),0)) AS favor FROM aurelle_settlements WHERE clerk_user_id=?').bind(userId).first<{favor:number}>();return Number(row?.favor??0);}
+}
 const publicFood=`initial_food+COALESCE((SELECT SUM(food_output) FROM aurelle_settlements),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_purchases),0)`;
 const publicFunds=`initial_minor+COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements),0)`;
 const privateWallet=`COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id=citizens.clerk_user_id),0)-COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id=citizens.clerk_user_id),0)`;
@@ -51,7 +64,9 @@ export const aurelleMealSql=`INSERT OR IGNORE INTO aurelle_meals(id,clerk_user_i
 export const aurelleMealCapacitySql=`UPDATE citizens SET capacity=MIN(24,capacity+4),updated_at=? WHERE clerk_user_id=? AND EXISTS(
  SELECT 1 FROM aurelle_receipts r JOIN aurelle_meals m ON m.id=r.id WHERE r.id=? AND r.clerk_user_id=citizens.clerk_user_id AND r.action='aurelle-household-meal' AND r.capacity_applied=0)`;
 export type AurellePlan={available:boolean;mode:'bounded charter economy';charter:{id:string;name:string;active:boolean};job:typeof aurelleJob;
- walletMinor:number;foodQuantity:number;favor:number;publicFoodRemaining:number;publicFundMinor:number;mealReadyAt:string|null;shifts:WorkShift[]};
+ walletMinor:number;foodQuantity:number;favor:number;publicFoodRemaining:number;publicFundMinor:number;mealReadyAt:string|null;shifts:WorkShift[];
+ /** #362: read-only mint parity, Currency Confidence and official rate strip; present only while HARIMU_CROWN_DEBASEMENT_ENABLED is on. */
+ mint?:CrownMint};
 export type AurelleCommand={action:'aurelle-start-work'|'aurelle-claim-work'|'aurelle-buy-food'|'aurelle-household-meal';requestId:string;shiftId?:string;quantity?:number};
 const uuid=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export function validAurelleCommand(body:Record<string,unknown>):body is Record<string,unknown>&AurelleCommand {
@@ -62,7 +77,7 @@ export function validAurelleCommand(body:Record<string,unknown>):body is Record<
  return (body.action==='aurelle-start-work'||body.action==='aurelle-household-meal')&&body.quantity===undefined;
 }
 export async function readAurelle(db:GameDatabase,userId:string):Promise<AurellePlan>{
- const [citizen,ledger,shifts]=await Promise.all([
+ const [citizen,ledger,shifts,favor]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
  db.prepare(`SELECT ${publicFood} AS public_food,${publicFunds} AS funds,
  COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id=?),0) AS wallet,
@@ -72,9 +87,10 @@ export async function readAurelle(db:GameDatabase,userId:string):Promise<Aurelle
  .bind(userId,userId,userId,userId,userId,userId).first<{public_food:number;funds:number;wallet:number;food:number;favor:number;last_meal:number|null}>(),
  db.prepare("SELECT * FROM work_shifts WHERE clerk_user_id=? AND work_order_id='aurelle-food-estate' ORDER BY started_at DESC LIMIT 20").bind(userId)
  .all<{id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
+ royalFavorBalance(db,userId), // #289: earned (capped at 100) minus what was spent
  ]);
  return {available:citizen?.nation_id==='aurelle',mode:'bounded charter economy',charter:{id:'food-estate',name:'Highspire food-estate charter',active:true},job:aurelleJob,
- walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,favor:ledger?.favor??0,publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,
+ walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,favor:favor,publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,
  mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),
  shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,rewardItem:'estate food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }

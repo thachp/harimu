@@ -1,22 +1,41 @@
+import { aurelleRisingSchemas } from './aurelle-rising';
+import { aurelleCoupSchemas } from './aurelle-coup';
+import { laborBureauSchemas } from './labor-bureau';
+import { presidiumSchemas } from './korund-presidium';
+import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView } from './market-orders';
 import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
-import {reconcileAiAcceptanceCharges,prebookNewsAcceptance} from './ai-acceptance-charges';
-import {aiBudgetConfig} from './ai-budget';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
 import {korundCouponSchemas} from './korund-coupons';
+import {firstWeekGoalsSchema} from './first-week-server';
+import {worldRegistrySchemas} from './world-registry';
+import { tesseraExchangeSchema, tesseraExchangeIndex } from './tessera-exchange';
+import {travelSchema} from './travel';
+import {faithSchemas} from './faith';
+import {congregationSchemas} from './congregations';
+import {stabilitySchemas} from './stability';
 import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
 import type {GameDatabase} from './database-contract';
 import {addressSchemas} from './weekly-addresses';
 import {electionSchemas} from './elections';
+import {assemblySchemas} from './assembly';
+import {primarySchemas} from './primaries';
 import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
-import { aurelleSchemas } from './aurelle';
+import { worldSquaresSchema, worldSquaresSeedSql } from './map-zones';
+import { worldCitiesSchema } from './city-founding';
+import { aurelleSchemas, royalFavorSchemas } from './aurelle';
+import { warSchemas } from './war'; // #309
+import { treatySchemas } from './diplomacy'; // #308
+import { embargoSchemas } from './embargo'; // #363
+import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
 import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
-import { economySchema, recoverySchema, rewardSchema, fundSchema, employerBudgetMinor, rewards } from './economy';
+import { economySchema, recoverySchema, rewardSchema, fundSchema, incomeTaxSchema, employerBudgetMinor, rewards } from './economy';
 import { shiftSchema, activeShiftIndex } from './work-shifts';
+import { shiftQualitySchema } from './shift-quality';
 import { env } from 'cloudflare:workers';
 import { isolateOnce } from './postgres/readiness';
 
@@ -39,6 +58,9 @@ const workOrderSeeds = [
   ['harvest', 'kindle', 'Support the savanna harvest', '+480 food · resolves in 2h', 4, 'open', 1],
   ['freight', 'kindle', 'Move a foundry convoy', '+210 materials · resolves in 4h', 6, 'open', 2],
   ['archive', 'kindle', 'Catalogue the civic archive', '+95 knowledge · resolves in 3h', 3, 'open', 3],
+  ['orchard', 'kindle', 'Pick the savanna orchards', '+3 fruit · resolves in 2h', 4, 'open', 6],
+  ['herding', 'kindle', 'Drive the grassland herds', '+2 meat · resolves in 3h', 5, 'open', 7],
+  ['logging', 'kindle', 'Cut timber for the city', '+3 wood · resolves in 4h', 6, 'open', 8],
 ] as const;
 
 const planningTaskSeeds = [
@@ -64,7 +86,6 @@ let initialization: Promise<void> | undefined;
 // its own Hyperdrive connection (5+ connects before the route's own work), and
 // the preview AI accounting ran a writer-locked transaction per request. Verify
 // once per isolate and refresh the preview accounting at most once a minute.
-const aiAccountingRefreshMs=60_000;
 
 function databaseBinding() {
   const database = (env as unknown as { DB?: GameDatabase }).DB;
@@ -181,13 +202,23 @@ async function initialize(database: GameDatabase) {
   ]);
 
   await database.batch([database.prepare(shiftSchema), database.prepare(activeShiftIndex)]);
+  await database.prepare(shiftQualitySchema).run();
 
-  await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema),
-    database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor)]);
+  await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema), database.prepare(incomeTaxSchema),
+    database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor),
+    database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-treasury', 0)")]);
   await database.batch([
     ...addressSchemas.map(sql=>database.prepare(sql)),
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
     ...korundCouponSchemas.map(sql=>database.prepare(sql)),
+    database.prepare(firstWeekGoalsSchema),
+    ...worldRegistrySchemas.map(sql=>database.prepare(sql)), database.prepare(tesseraExchangeSchema), database.prepare(tesseraExchangeIndex), // #210
+    database.prepare(travelSchema),
+    ...faithSchemas.map(sql=>database.prepare(sql)),
+    ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
+    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362
+    ...congregationSchemas.map(sql=>database.prepare(sql)),
+    ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),
@@ -195,11 +226,15 @@ async function initialize(database: GameDatabase) {
     database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_government_petitions_nation_period ON government_petitions(nation_id, period_start)'),
     database.prepare(cityLocationSchema),
+    database.prepare(worldSquaresSchema),
+    ...worldSquaresSeedSql().map(sql => database.prepare(sql)),
+    database.prepare(worldCitiesSchema),
     ...squareSchema.map(sql => database.prepare(sql)),
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
+    ...marketSchemas.map(sql => database.prepare(sql)), ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
@@ -216,6 +251,43 @@ async function initialize(database: GameDatabase) {
       database.prepare('DROP VIEW IF EXISTS citizen_inventory_balances'),
       database.prepare(walletViewSql), database.prepare(inventoryViewSql),
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('player-market-v1')"),
+    ]);
+  }
+  // #195: balances now include market order escrow and trades. Same atomic view swap as player-market-v1.
+  const marketOrdersInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'market-orders-v1'").first();
+  if (!marketOrdersInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'),
+      database.prepare('DROP VIEW IF EXISTS citizen_inventory_balances'),
+      database.prepare(walletViewSql), database.prepare(inventoryViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('market-orders-v1')"),
+    ]);
+  }
+  // #199: spoilage reduces inventory and open sell order remaining. Atomic swap of all three views.
+  const spoilageInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'market-spoilage-v1'").first();
+  if (!spoilageInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'),
+      database.prepare('DROP VIEW IF EXISTS citizen_inventory_balances'),
+      database.prepare('DROP VIEW IF EXISTS market_open_orders'),
+      database.prepare(marketOpenOrdersView), database.prepare(walletViewSql), database.prepare(inventoryViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('market-spoilage-v1')"),
+    ]);
+  }
+  // #86: balances net out withheld Kindle income tax. Same atomic view swap as market-orders-v1.
+  const incomeTaxInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'kindle-income-tax-v1'").first();
+  if (!incomeTaxInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('kindle-income-tax-v1')"),
+    ]);
+  }
+  // #210: Clearing House kiosk purchases debit Spark. Same atomic wallet-view swap as market-orders-v1.
+  const tesseraExchangeInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'tessera-exchange-v1'").first();
+  if (!tesseraExchangeInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('tessera-exchange-v1')"),
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));
@@ -253,6 +325,12 @@ async function initialize(database: GameDatabase) {
   const citizenColumnNames = new Set(citizenColumns.results.map((column) => column.name));
   if (!citizenColumnNames.has('nation_changes')) {
     await database.prepare('ALTER TABLE citizens ADD COLUMN nation_changes INTEGER NOT NULL DEFAULT 0').run();
+  }
+
+  // #400: treaties gained broken_by (migration 0040); a local database created before it gets the column once.
+  const treatyColumns = await database.prepare('PRAGMA table_info(treaties)').all<{ name: string }>();
+  if (treatyColumns.results.length > 0 && !treatyColumns.results.some((column) => column.name === 'broken_by')) {
+    await database.prepare("ALTER TABLE treaties ADD COLUMN broken_by TEXT CHECK(broken_by IS NULL OR broken_by IN ('kindle','korund','aurelle'))").run();
   }
 
   const hasLegacyAffinity = columnNames.has('affinity');
@@ -363,7 +441,7 @@ const postgresReady=isolateOnce(async(database:GameDatabase,bindings:PostgresBin
       if(schema?.count!==3){if(bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED!=='true')throw Error('Approved preview election migration required.');const {initializeAccountElectionSchema}=await import('./postgres/driver');await initializeAccountElectionSchema(bindings.HYPERDRIVE!.connectionString);}
     }
 });
-const postgresAccounting=isolateOnce(async(database:GameDatabase,bindings:PostgresBindings)=>{await reconcileAiAcceptanceCharges(database);await prebookNewsAcceptance(database,Math.floor(Date.now()/1000),aiBudgetConfig(bindings));},aiAccountingRefreshMs);
+// #92: readiness never writes AI reservations. Only a real, enabled, gateway-routed inference reserves budget.
 
 export async function getDatabase():Promise<GameDatabase> {
   const bindings=env as unknown as {HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
@@ -374,7 +452,6 @@ export async function getDatabase():Promise<GameDatabase> {
     const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved,accountElectionEnabled(bindings));
     const key=await readinessKey(bindings);
     await postgresReady(key,database,bindings);
-    if(bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true')await postgresAccounting(key,database,bindings);
     return database;
   }
   const database = databaseBinding();

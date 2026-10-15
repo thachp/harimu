@@ -74,6 +74,8 @@ test('petitions expose only own history and bind request replays to the account'
     assert.equal(alice.data.government.petitions.find(p => p.requestId === oldAlice).status, 'deferred');
     assert.equal(bob.data.government.petitions.find(p => p.requestId === oldBob).status, 'accepted');
     assert.equal(alice.data.government.petitions.find(p => p.requestId === aliceId).status, 'pending');
+    // #205: GET projects the completed-day review; a POST latches it.
+    assert.equal((await r.call('citizen', 'alice', { action: 'save-plan', horizon: 'today', note: 'latch', completedIds: [] })).status, 200);
     assert.equal((await r.db.prepare('SELECT COUNT(*) AS count FROM government_reviews').first()).count, 1);
     assert.equal((await r.db.prepare('SELECT COUNT(*) AS count FROM government_petition_resolutions').first()).count, 2);
     privateResponse(alice); privateResponse(bob);
@@ -175,6 +177,8 @@ test('legacy and foreign eligibility receipts do not enter counted petition revi
     r.db.prepare('INSERT INTO government_petition_eligibility VALUES (?,?,?)').bind(counted, 'alice', period - 86399),
   ]);
   const response = await r.call('citizen', 'alice');
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS count FROM government_reviews').first()).count, 0, '#205: GET does not latch');
+  await r.call('citizen', 'alice', { action: 'save-plan', horizon: 'today', note: 'latch', completedIds: [] });
   const review = await r.db.prepare('SELECT selected_topic,petition_count FROM government_reviews').first();
   assert.equal(review.selected_topic, 'food'); assert.equal(review.petition_count, 1);
   assert.match(response.data.government.petitions.find(p => p.requestId === legacy).reason, /not counted/);

@@ -11,14 +11,16 @@ import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
 import { quotaPercent } from '@/lib/korund-coupons';
+import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
+import { preferenceCount } from '@/lib/labor-bureau-rules';
 
 export type KorundPlanView = KorundPlan;
-export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal' | 'korund-join-ration-queue' | 'korund-cancel-ration-queue' | 'korund-redeem-coupon';
-export type KorundCommand = { action: KorundAction; requestId: string; shiftId?: string; queueId?:string; coupon?:'clothing'|'goods'; gameWeek?: number };
+export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal' | 'korund-join-ration-queue' | 'korund-cancel-ration-queue' | 'korund-redeem-coupon' | 'korund-set-preferences' | 'korund-request-assignment';
+export type KorundCommand = { action: KorundAction; requestId: string; preferences?: string[]; shiftId?: string; queueId?:string; coupon?:'clothing'|'goods'; gameWeek?: number };
 
 export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, onCommand, onRetry, onRefresh, onNavigate }: {
   plan: KorundPlanView | null; scene: SceneView; capacity: number; pending: boolean; uncertain: boolean;
-  localDemo: boolean; error: string | null; onCommand: (action: KorundAction, shiftId?: string) => void;
+  localDemo: boolean; error: string | null; onCommand: (action: KorundAction, shiftId?: string, preferences?: string[]) => void;
   otherShiftActive?: boolean;
   onRetry: () => void; onRefresh: () => void; onNavigate: (scene: SceneView) => void;
 }) {
@@ -44,8 +46,9 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
     {scene === 'workplace' ? <>
       <h4>{plan.assignment.name}</h4><p>{plan.assignment.capacityCost} WC · {formatDuration(plan.assignment.hours * 3600000)} real / {formatDuration(plan.assignment.hours * 3600000 * gameTimeCompression)} game · {(plan.assignment.wageMinor / 100).toFixed(2)} LN wages · {plan.assignment.foodOutput} food added to the state pool on collection.</p>
       {plan.quota && <QuotaBar quota={plan.quota} />}
-      <p>One assigned shift at a time. Job preferences, reassignment and production-drive progression are planned.</p>
-      {active ? <><GameTimer endsAt={active.completesAt} label="Shift ready" /><p>{active.orderName} · {ready ? 'Complete · collect your Labor Notes' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remaining` : 'Checking timing…'}</p>
+      {plan.bureau ? <LaborBureau bureau={plan.bureau} pending={pending} uncertain={uncertain} formatTime={formatTime} onCommand={onCommand} /> : null}
+      <p>One assigned shift at a time. {plan.bureau ? 'Bureau placement is recorded; shift pay is unchanged.' : 'Job preferences, reassignment and production-drive progression are planned.'}</p>
+      {active ? <><GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" /><p>{active.orderName} · {ready ? 'Complete · collect your Labor Notes' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remaining` : 'Checking timing…'}</p>
         <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!now, 'Checking the shift timer…'], [!ready, 'Your assignment is underway. Collect after it finishes.'])} onClick={() => onCommand('korund-claim-work', active.id)}>Collect assigned-shift wages</ActionButton></> :
         <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([otherShiftActive, 'Collect your earlier nation’s shift first.'], [capacity < plan.assignment.capacityCost, `You need ${plan.assignment.capacityCost} WC. Prepare a meal or wait for recovery.`])} onClick={() => onCommand('korund-start-work')}>Begin assigned shift · {plan.assignment.capacityCost} WC</ActionButton>}
       {otherShiftActive && <p>Collect your earlier nation’s shift before beginning another assignment.</p>}
@@ -117,5 +120,28 @@ export function CouponBook({ now, coupons, walletMinor, clothing, goods, reason,
         : <ActionButton type="button" reason={reason ?? firstActionReason([!now, 'Checking the coupon expiry…'], [now >= Date.parse(coupon.expiresAt), 'This coupon book expired at the weekly reset. Refresh for this week’s coupons.'], [coupon.used, 'This coupon was already used this week.'], [walletMinor < coupon.priceMinor, `You need ${(coupon.priceMinor / 100).toFixed(2)} LN. Complete an assigned shift first.`])} onClick={() => onRedeem(coupon.kind as 'clothing' | 'goods')}>Redeem {coupon.label.toLowerCase()}</ActionButton>}
     </li>)}</ul>
     <p>Household stores: {clothing} clothing · {goods} goods bundles.</p>
+  </section>;
+}
+
+/** #235 Labor Bureau (flag HARIMU_LABOR_BUREAU_ENABLED): rendered only when the server sends plan.bureau. Copy is Content's #329 via lib/labor-bureau-text. */
+function LaborBureau({ bureau, pending, uncertain, formatTime, onCommand }: { bureau: NonNullable<KorundPlanView['bureau']>; pending: boolean; uncertain: boolean;
+  formatTime: (iso: string) => string; onCommand: (action: KorundAction, shiftId?: string, preferences?: string[]) => void }) {
+  const [draft, setDraft] = useState<string[]>(() => bureau.preferences ?? Array(preferenceCount).fill(''));
+  const complete = draft.length === preferenceCount && draft.every(Boolean) && new Set(draft).size === preferenceCount;
+  const nextAt = bureau.nextRequestAt ? formatTime(bureau.nextRequestAt) : '';
+  const requestReason = pendingActionReason(pending, uncertain) ?? firstActionReason(
+    [Boolean(bureau.nextRequestAt), fillText(bureauText.refusal, { nextRequestAt: nextAt })]);
+  return <section aria-label="Labor Bureau">
+    <h4>{bureauText.header}</h4><p>{bureauText.explainer}</p>
+    {bureauText.slotLabels.map((label, index) => <label key={label}>{label}{' '}
+      <select value={draft[index] ?? ''} onChange={event => setDraft(current => current.map((value, i) => i === index ? event.target.value : value))}>
+        <option value="">Choose a job</option>{bureau.jobs.map(job => <option key={job.id} value={job.id}>{job.name} · {job.open} open</option>)}
+      </select></label>)}
+    <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!complete, 'Choose three different jobs.'])} onClick={() => onCommand('korund-set-preferences', undefined, draft)}>{bureauText.fileButton}</ActionButton>
+    {bureau.preferences && <p>{bureauText.filed}</p>}
+    {bureau.assignment && (() => { const notice = outcomeNotice(bureau.assignment.outcome, { id: bureau.assignment.jobId, name: bureau.assignment.jobName }); return <><p><strong>{notice.headline}</strong> · {notice.body}</p>
+      <ul>{bureau.assignment.reasons.map(reason => <li key={reason}>{reasonText[reason]}</li>)}</ul></>; })()}
+    {bureau.assignment && <ActionButton type="button" reason={requestReason} onClick={() => onCommand('korund-request-assignment')}>{bureauText.reassignButton}</ActionButton>}
+    {bureau.nextRequestAt && <p>{fillText(bureauText.nextRequest, { nextRequestAt: nextAt })}</p>}
   </section>;
 }

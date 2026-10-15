@@ -13,8 +13,10 @@ export function validPetitionText(value:unknown,min:number,max:number):value is 
 export function validPetitionId(value:unknown):value is string{return typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);}
 const weeklyCountSql=`SELECT COUNT(*) AS count FROM civic_human_activity a JOIN citizens c ON c.clerk_user_id=a.clerk_user_id WHERE c.nation_id='kindle' AND a.policy='tier1-human-v1' AND a.last_seen>=? AND a.last_seen<=?`;
 /** Only call after fresh trusted Tier-1 evidence. AI/background actors never enter this ledger. */
-export async function recordVerifiedHumanVisit(db:GameDatabase,userId:string,now:number){
- await db.prepare(`INSERT INTO civic_human_activity (clerk_user_id,last_seen,policy) SELECT clerk_user_id,?,'tier1-human-v1' FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(clerk_user_id) DO UPDATE SET last_seen=MAX(civic_human_activity.last_seen,excluded.last_seen)`).bind(now,userId).run();
+/** Aurelle visits (pledge threshold, #71) are recorded only while HARIMU_AURELLE_RISING_ENABLED is on. */
+export async function recordVerifiedHumanVisit(db:GameDatabase,userId:string,now:number,options:{aurelleRising?:boolean}={}){
+ const nations=options.aurelleRising?`('kindle','aurelle')`:`('kindle')`;
+ await db.prepare(`INSERT INTO civic_human_activity (clerk_user_id,last_seen,policy) SELECT clerk_user_id,?,'tier1-human-v1' FROM citizens WHERE clerk_user_id=? AND nation_id IN ${nations} ON CONFLICT(clerk_user_id) DO UPDATE SET last_seen=MAX(civic_human_activity.last_seen,excluded.last_seen)`).bind(now,userId).run();
 }
 export async function weeklyHumans(db:GameDatabase,now:number){return (await db.prepare(weeklyCountSql).bind(now-petitionWindowSeconds,now).first<{count:number}>())?.count??0;}
 export const createCollectivePetitionSql=`INSERT INTO civic_petitions (id,creator_id,nation_id,title,demand,created_at,expires_at,weekly_humans,threshold)
@@ -29,10 +31,12 @@ export const signCollectivePetitionSql=`INSERT INTO civic_petition_signatures (p
  AND (?='sign' OR p.creator_id=c.clerk_user_id) ON CONFLICT DO NOTHING`;
 export const latchCollectiveThresholdSql=`UPDATE civic_petitions SET reached_at=? WHERE id=? AND reached_at IS NULL AND created_at<=? AND expires_at>?
  AND (SELECT COUNT(*) FROM civic_petition_signatures s WHERE s.petition_id=civic_petitions.id AND s.policy='tier1-human-v1' AND s.signed_at>=civic_petitions.created_at AND s.signed_at<civic_petitions.expires_at)>=threshold`;
-export async function readCollectivePetitions(db:GameDatabase,userId:string,now:number):Promise<CollectivePetitions>{
+/** Read-only. `projectVisit` (#205): count the caller as this week's verified human when the write path has not recorded them yet. */
+export async function readCollectivePetitions(db:GameDatabase,userId:string,now:number,projectVisit=false):Promise<CollectivePetitions>{
+ const pending=projectVisit&&!(await db.prepare("SELECT 1 AS seen FROM civic_human_activity a JOIN citizens c ON c.clerk_user_id=a.clerk_user_id WHERE a.clerk_user_id=? AND c.nation_id='kindle' AND a.policy='tier1-human-v1' AND a.last_seen>=? AND a.last_seen<=?").bind(userId,now-petitionWindowSeconds,now).first());
  const rows=await db.prepare(`SELECT p.*, (SELECT COUNT(*) FROM civic_petition_signatures s WHERE s.petition_id=p.id AND s.policy='tier1-human-v1' AND s.signed_at>=p.created_at AND s.signed_at<p.expires_at) AS signatures,
  EXISTS(SELECT 1 FROM civic_petition_signatures s WHERE s.petition_id=p.id AND s.clerk_user_id=?) AS signed FROM civic_petitions p WHERE p.nation_id='kindle' ORDER BY p.created_at DESC,p.id LIMIT 50`).bind(userId).all<{id:string;creator_id:string;title:string;demand:string;created_at:number;expires_at:number;weekly_humans:number;threshold:number;signatures:number;signed:number;reached_at:number|null;response_text:string|null;response_at:number|null}>();
- return {nationId:'kindle',asOf:now,weeklyHumans:await weeklyHumans(db,now),petitions:rows.results.map(p=>({id:p.id,title:p.title,demand:p.demand,createdAt:p.created_at,expiresAt:p.expires_at,weeklyHumans:p.weekly_humans,threshold:p.threshold,signatures:p.signatures,signed:Boolean(p.signed),mine:p.creator_id===userId,status:p.response_text!==null?'responded':p.reached_at!==null?'awaiting-response':now>=p.expires_at?'expired':'collecting',reachedAt:p.reached_at,response:p.response_text!==null&&p.response_at!==null?{text:p.response_text,at:p.response_at}:null}))};
+ return {nationId:'kindle',asOf:now,weeklyHumans:await weeklyHumans(db,now)+(pending?1:0),petitions:rows.results.map(p=>({id:p.id,title:p.title,demand:p.demand,createdAt:p.created_at,expiresAt:p.expires_at,weeklyHumans:p.weekly_humans,threshold:p.threshold,signatures:p.signatures,signed:Boolean(p.signed),mine:p.creator_id===userId,status:p.response_text!==null?'responded':p.reached_at!==null?'awaiting-response':now>=p.expires_at?'expired':'collecting',reachedAt:p.reached_at,response:p.response_text!==null&&p.response_at!==null?{text:p.response_text,at:p.response_at}:null}))};
 }
 
 /** Internal foundation only: no public route invokes this publisher.

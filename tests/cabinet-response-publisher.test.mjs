@@ -17,7 +17,7 @@ test('trusted fixture session publishes one authored public response after a gen
  const after=(await r.call('citizen','alice')).data;assert.deepEqual(after.profile,before.profile);assert.deepEqual(after.economy,before.economy);
 });
 test('publisher refuses unthresholded/unknown petitions and public commands cannot invoke it',async t=>{
- const r=await localRuntime();t.after(()=>r.close());for(const user of ['alice','bob']){r.setVerification(user,tierOne(r,user));await r.call('petitions',user);}
+ const r=await localRuntime();t.after(()=>r.close());for(const user of ['alice','bob']){r.setVerification(user,tierOne(r,user));await (await r.importModule('lib/collective-petitions.ts')).recordVerifiedHumanVisit(r.db,user,Math.floor(r.now/1000));}/* #221: GET no longer records the visit */
  // Fixture census of 34 makes a threshold of two; the author alone remains below it.
  const now=Math.floor(r.now/1000);for(let i=0;i<32;i++){const user=`cabinet-fixture-${i}`;await r.db.prepare("INSERT INTO citizens(clerk_user_id,nation_id,capacity,influence,standing,created_at,updated_at) VALUES (?,'kindle',18,0,'Fixture',?,?)").bind(user,new Date(r.now).toISOString(),new Date(r.now).toISOString()).run();await r.db.prepare("INSERT INTO civic_human_activity(clerk_user_id,last_seen,policy) VALUES (?,?,'tier1-human-v1')").bind(user,now).run();}
  const id=randomUUID();assert.equal((await r.call('petitions','alice',{action:'create',requestId:id,title:'Fixture pending petition',demand:'Please review this fixture request.'})).status,200);

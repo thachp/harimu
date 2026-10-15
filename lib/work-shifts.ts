@@ -4,12 +4,20 @@ export const shiftRules: Record<string, { hours: number; output: string }> = {
   harvest: { hours: 2, output: '480 food contributed to the savanna harvest' },
   freight: { hours: 4, output: '210 materials delivered by the foundry convoy' },
   archive: { hours: 3, output: '95 knowledge contributed to the civic archive' },
+  orchard: { hours: 2, output: 'Fruit picked in the savanna orchards' },
+  herding: { hours: 3, output: 'Meat brought in from the grassland herds' },
+  logging: { hours: 4, output: 'Wood cut and stacked at the timber yard' },
 };
 
 export type WorkShift = {
   id: string;
   /** Work order this shift belongs to; lets the jobs dock label only the active job (#54). */
   workOrderId?: string;
+  /** Quality step result (#40): null grade = step skipped or not offered; multiplier in percent. */
+  qualityGrade?: 'poor' | 'fair' | 'good' | 'excellent' | null;
+  qualityMultiplierPct?: number;
+  /** True while a graded shift is still running: grade, multiplier and the graded reward stay hidden until completion. */
+  qualityPending?: boolean;
   orderName: string;
   output: string;
   capacitySpent: number;
@@ -53,18 +61,25 @@ export const claimShiftSql = `UPDATE work_shifts SET claimed_at = ?
 
 export async function readShifts(database: GameDatabase, userId: string): Promise<WorkShift[]> {
   const rows = await database.prepare(`SELECT s.id, s.work_order_id, s.order_name, s.output, s.capacity_spent,
-    s.started_at, s.completes_at, s.claimed_at, r.wage_minor, r.item, r.quantity FROM work_shifts s
-    LEFT JOIN shift_rewards r ON r.shift_id = s.id
+    s.started_at, s.completes_at, s.claimed_at, r.wage_minor, r.item, r.quantity, q.grade, q.multiplier_pct FROM work_shifts s
+    LEFT JOIN shift_rewards r ON r.shift_id = s.id LEFT JOIN shift_quality q ON q.shift_id = s.id
     WHERE s.clerk_user_id = ? ORDER BY s.started_at DESC, s.id DESC LIMIT 20`).bind(userId).all<{
       id: string; work_order_id: string; order_name: string; output: string; capacity_spent: number;
       started_at: string; completes_at: string; claimed_at: string | null;
-      wage_minor: number | null; item: string | null; quantity: number | null;
+      wage_minor: number | null; item: string | null; quantity: number | null; grade: string | null; multiplier_pct: number | null;
     }>();
-  return rows.results.map((row) => ({
+  return rows.results.map((row): WorkShift => ({
     id: row.id, workOrderId: row.work_order_id, orderName: row.order_name, output: row.output,
     capacitySpent: row.capacity_spent, startedAt: row.started_at,
     completesAt: row.completes_at, claimedAt: row.claimed_at,
     currency: row.work_order_id==='aurelle-food-estate'?'CRN':row.work_order_id==='korund-food-production'?'LN':'SPK',
     wageMinor: ['aurelle-food-estate','korund-food-production'].includes(row.work_order_id)?800:row.wage_minor ?? undefined, rewardItem: row.item ?? undefined, rewardQuantity: row.quantity ?? undefined,
-  }));
+    ...(row.multiplier_pct == null ? {} : { qualityGrade: (row.grade ?? null) as WorkShift['qualityGrade'], qualityMultiplierPct: Number(row.multiplier_pct) }),
+  })).map((shift) => {
+    // #40 / QA1: a graded result is revealed only once the shift is complete (the reward also encodes the multiplier).
+    if (!shift.qualityGrade || shift.claimedAt || Date.parse(shift.completesAt) <= Date.now()) return shift;
+    const hidden: WorkShift = { ...shift, qualityPending: true };
+    delete hidden.qualityGrade; delete hidden.qualityMultiplierPct; delete hidden.wageMinor; delete hidden.rewardQuantity;
+    return hidden;
+  });
 }

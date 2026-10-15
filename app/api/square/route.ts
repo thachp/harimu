@@ -1,7 +1,10 @@
 import {readCityLocation} from '@/lib/city-location';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
+import { travelBlock } from '@/lib/travel';
+import { env } from 'cloudflare:workers';
 import { postSquareSql, readSquare, uuidPattern, validSquareText } from '@/lib/square-chat';
+import { latchAfterWrite } from '@/lib/first-week-server';
 export const dynamic='force-dynamic';
 async function context(request:Request) {
   const userId=await authenticatedUserId(request);
@@ -17,7 +20,13 @@ export async function GET(request:Request) {
   if(!ctx.nationId)return privateResponse({error:'Enroll in a nation first.'},403);
   return privateResponse(await readSquare(ctx.db,ctx.userId,ctx.nationId,ctx.now));
 }
+// #194: a square post can complete a first-week goal; latch after a successful write.
 export async function POST(request:Request) {
+  const response=await handleSquarePost(request);if(!response.ok)return response;
+  const userId=await authenticatedUserId(request);if(!userId)return response;
+  return latchAfterWrite(await getDatabase(),response,[userId],Math.floor(Date.now()/1000));
+}
+async function handleSquarePost(request:Request) {
   if(request.headers.get('Origin')!==new URL(request.url).origin)return privateResponse({error:'Same-origin request required.'},403);
   if(Number(request.headers.get('Content-Length')??0)>4096)return privateResponse({error:'Request too large.'},413);
   const ctx=await context(request);
@@ -28,6 +37,7 @@ export async function POST(request:Request) {
   const {db,userId,nationId,now}=ctx;
   if((body.action==='post'||body.action==='delete')&&typeof body.expectedNationId!=='string')return privateResponse({error:'Refresh the conversation before submitting a nation-scoped command.'},400);
   if(body.expectedNationId!==undefined&&body.expectedNationId!==nationId)return privateResponse({error:'Citizenship changed. Refresh your citizen before reopening the conversation.'},409);
+  if(body.action==='post'){const blocked=await travelBlock(db,userId,now,(env as unknown as {HARIMU_TRAVEL_ENABLED?:string}).HARIMU_TRAVEL_ENABLED==='true');if(blocked)return privateResponse({error:blocked,reason:'traveling'},409);} // #123
   if(body.action==='presence') {
     if(typeof body.active!=='boolean')return privateResponse({error:'Invalid presence choice.'},400);
     const location=await readCityLocation(db,userId,nationId,now);

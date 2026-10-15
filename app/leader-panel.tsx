@@ -8,7 +8,11 @@ import { GameTimer } from './game-timer';
 import { AiBadge, AiTextTag } from './ai-disclosure';
 
 export function LeaderPanel({snapshot,simulation}:{snapshot:GovernmentSnapshot;simulation?:SimulationState}) {
-  const persona=leaderPersonas[snapshot.nationId as keyof typeof leaderPersonas];
+  const authored=leaderPersonas[snapshot.nationId as keyof typeof leaderPersonas];
+  // #71/#281: a successful Rising or palace coup crowns a new AI royal house; the new AI royal house replaces the authored monarch.
+  const crowned=snapshot.crown&&authored?{...authored,name:snapshot.crown.name,affiliation:`${snapshot.crown.house} · ${snapshot.crown.how==='coup'?'installed by a palace coup':'crowned by a popular Rising'}`,color:snapshot.crown.color,biography:snapshot.crown.how==='coup'?`${snapshot.crown.name} of ${snapshot.crown.house} now holds the Sky Throne after a palace coup. Motto: “${snapshot.crown.motto}”`:`Took the Sky Throne after a Rising of the commons. Motto: “${snapshot.crown.motto}”`}:authored;
+  // #70: after a purge the Chosen Comrade replaces the authored Chairman.
+  const persona=snapshot.presidium&&crowned&&snapshot.presidium.chairman.name!==crowned.name?{...crowned,name:snapshot.presidium.chairman.name,biography:'Confirmed as Chairman by the Presidium after an emergency session. Citizens receive official statements; council deliberation stays private.'}:crowned;
   if(!persona)return null;
   const disclosure=governmentDisclosure(snapshot);
   return <section className="leader-panel" aria-label={`${persona.office} of ${snapshot.nationId}`}>
@@ -22,6 +26,8 @@ export function LeaderPanel({snapshot,simulation}:{snapshot:GovernmentSnapshot;s
       </svg>
       <div><h3>{persona.office} · {persona.name} <AiBadge /></h3><p>{persona.affiliation}</p><p>{persona.biography}</p><small>Authored preview persona · fixed-rule leadership</small></div>
     </div>
+    {snapshot.presidium&&<section aria-label="Presidium seats"><h4>The Presidium <AiBadge /></h4><ul>{snapshot.presidium.seats.map(s=><li key={s.id}><strong>{s.name}</strong> · {s.role}{s.status==='purged'?' · removed from the Presidium':''}</li>)}</ul>
+      {snapshot.presidium.session?.status==='open'&&<p role="status">State Media rumor: the Presidium is meeting in emergency session.</p>}</section>}
     <details><summary>Current pledges and programme</summary><ul>{leaderProgramme(snapshot).map(pledge=><li key={pledge.title}><strong>{pledge.title}</strong> · {pledge.status}</li>)}</ul></details>
     <NationDocument nationId={snapshot.nationId} label={disclosure.title} className="leader-statement"><details><summary>Why? · {disclosure.title}</summary><p><AiTextTag provenance={disclosure.provenance}/></p><p>{disclosure.text}</p>{disclosure.kind==='brief' && <><p><strong>Goal:</strong> {snapshot.decision.title}.</p><p><strong>Other priorities:</strong> Food, infrastructure and workplace support compete for this proposal. Food safety takes precedence; otherwise recorded petition counts rank them, with ties favoring food, then infrastructure.</p></>}</details></NationDocument>
     {simulation && <details><summary>Upcoming routine review</summary><GameTimer endsAt={(simulation.clock.epochSeconds+(simulation.clock.latestTick+1)*simulation.clock.cadenceSeconds)*1000} label="Next policy settlement"/><p>Processed on a server visit after the deadline. No election or major AI decision is scheduled in this preview.</p></details>}

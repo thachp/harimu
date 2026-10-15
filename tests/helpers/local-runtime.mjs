@@ -34,16 +34,23 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const path = join(directory, 'fixture.sqlite');
   const modules = [
     'lib/storage-selection.ts','lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
-    'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'app/api/city/route.ts',
+    'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'lib/map-zones.ts', 'lib/city-founding.ts', 'app/api/world/found-city/route.ts', 'app/api/city/route.ts',
     'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
-    'lib/collective-petitions.ts','app/api/petitions/route.ts',
-    'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/wallet.ts',
-    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/government.ts',
+    'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
+    'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',
+    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/government.ts',
     'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts', 'lib/command-request.ts',
     'lib/verification.ts',
-    'lib/world-simulation.ts',
-    'lib/notable-profiles.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts','lib/ai-acceptance-charges.ts',
+    'lib/world-simulation.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',
+    'lib/qa-tools.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
+    'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts', // #309
+    'lib/labor-bureau-rules.ts','lib/labor-bureau-text.ts','lib/labor-bureau-copy.ts','lib/labor-bureau.ts','lib/diplomacy.ts','lib/diplomacy-rules.ts','lib/diplomacy-copy.ts','lib/game-time.ts', // #308
+    'lib/embargo.ts','lib/embargo-rules.ts','lib/embargo-copy.ts', // #363
+    'lib/crown-debasement.ts','lib/crown-debasement-rules.ts','lib/press-templates.ts', // #362
+    'lib/world-registry.ts','lib/market-visibility.ts','lib/tessera-exchange.ts','lib/clearing-house-copy.ts','lib/kiosk-text.ts','app/api/world/registry/route.ts','lib/order-book-rules.ts','lib/order-book.ts','lib/npc-supply-rules.ts','lib/npc-supply.ts','lib/spoilage-rules.ts','lib/spoilage.ts','lib/db-errors.ts','app/api/market/orders/route.ts','lib/travel.ts','app/api/travel/route.ts','lib/worship-copy.ts','lib/faith-copy.ts','lib/mvp-festival-copy.ts','lib/festivals.ts','lib/faith.ts','app/api/faith/route.ts','lib/congregations.ts','app/api/congregations/route.ts','lib/claimant-copy.ts','lib/aurelle-rising-rules.ts','lib/aurelle-rising.ts','app/api/aurelle/rising/route.ts','lib/korund-presidium-rules.ts','lib/korund-presidium.ts','lib/aurelle-coup-rules.ts','lib/aurelle-coup.ts','lib/palace-coup-copy.ts','lib/assembly-copy.ts','lib/kindle-parties.ts','lib/assembly-rules.ts','lib/assembly.ts','app/api/assembly/route.ts','lib/campaign-copy.ts','lib/primaries-rules.ts','lib/primaries.ts','app/api/primaries/route.ts',
+    'lib/korund-underground.ts','lib/underground-rules.ts', // #295
+    'lib/missionary-rules.ts','lib/missionaries.ts','lib/missionary-actions.ts','lib/missionary-copy.ts','lib/missionary-notice-copy.ts', // #225
     'lib/citizenship.ts',
     'app/api/citizen/route.ts', 'app/api/square/route.ts', 'app/api/world/route.ts',
   ];
@@ -58,7 +65,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const envPath = join(directory, 'fixture-env.mjs');
   const authPath = join(directory, 'lib/auth.mjs');
   await mkdir(dirname(authPath), { recursive: true });
-  await writeFile(envPath, `export const env = ${JSON.stringify(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))};\n`);
+  await writeFile(envPath, `export const env = ${JSON.stringify(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))};\nexport function waitUntil(promise){(globalThis.__harimuBackground??=[]).push(Promise.resolve(promise));}\n`);
   // Each fixture identity belongs to one Request. This substitution exists only
   // in temporary compiled test copies; production authentication is untouched.
   await writeFile(authPath, `const identities = new WeakMap();
@@ -94,11 +101,12 @@ export async function readVerification(userId) {
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, `import { Date } from ${JSON.stringify(pathToFileURL(clockPath).href)};\n${output}`);
   }
-  const accounting=await import(pathToFileURL(join(directory,'lib/ai-acceptance-charges.mjs')).href);
+  const cabinetAi=await import(pathToFileURL(join(directory,'lib/cabinet-response-ai.mjs')).href);
   const notableService=await import(pathToFileURL(join(directory,'lib/notables.mjs')).href);
   const notables=await import(pathToFileURL(join(directory,'app/api/notables/route.mjs')).href);
   const { env } = await import(pathToFileURL(envPath).href);
   env.DB = new LocalD1(path);
+  env.HARIMU_SHIFT_QUALITY_SECRET = 'fixture-shift-quality-secret-252'; // #252: server-only seed for per-shift option order
   // Apply the real additive world migration before the production bootstrap,
   // just as deployed D1 does; this is an isolated consumer-local database.
   env.DB.sqlite.exec(await readFile(join(root, 'drizzle/0004_boring_exiles.sql'), 'utf8'));
@@ -116,6 +124,15 @@ export async function readVerification(userId) {
   const news = await import(pathToFileURL(join(directory, 'app/api/news/route.mjs')).href);
   const addresses = await import(pathToFileURL(join(directory,'app/api/addresses/route.mjs')).href);
   const world = await import(pathToFileURL(join(directory, 'app/api/world/route.mjs')).href);
+  const foundCityRoute = await import(pathToFileURL(join(directory, 'app/api/world/found-city/route.mjs')).href);
+  const registryRoute = await import(pathToFileURL(join(directory, 'app/api/world/registry/route.mjs')).href); // #122
+  const ordersRoute = await import(pathToFileURL(join(directory, 'app/api/market/orders/route.mjs')).href); // #197
+  const travelRoute = await import(pathToFileURL(join(directory, 'app/api/travel/route.mjs')).href); // #123
+  const faithRoute = await import(pathToFileURL(join(directory, 'app/api/faith/route.mjs')).href); // #67
+  const congregationsRoute = await import(pathToFileURL(join(directory, 'app/api/congregations/route.mjs')).href); // #224
+  const risingRoute = await import(pathToFileURL(join(directory, 'app/api/aurelle/rising/route.mjs')).href); // #71
+  const assemblyRoute = await import(pathToFileURL(join(directory, 'app/api/assembly/route.mjs')).href); // #283
+  const primariesRoute = await import(pathToFileURL(join(directory, 'app/api/primaries/route.mjs')).href); // #307
   const collective = await import(pathToFileURL(join(directory,'lib/collective-petitions.mjs')).href);
   const government = await import(pathToFileURL(join(directory, 'lib/government-state.mjs')).href);
   const simulation = await import(pathToFileURL(join(directory, 'lib/world-simulation.mjs')).href);
@@ -131,12 +148,19 @@ export async function readVerification(userId) {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     if (user) identify(request, user);
-    const handlers = endpoint === 'notables' ? notables : endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'city' ? city : square;
-    const response = await handlers[body === undefined ? 'GET' : 'POST'](request);
+    const handlers = endpoint === 'notables' ? notables : endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'world/found-city' ? foundCityRoute : endpoint === 'city' ? city : square;
+    const routed = endpoint === 'world/registry' ? registryRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
+    const response = await routed[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
   return {
-    call, seedOriginalAcceptanceCharges:()=>env.DB.batch(accounting.aiAcceptanceCharges.map(c=>env.DB.prepare("INSERT OR IGNORE INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,?,?,?,?,?,?)").bind(c.id,'2026-10-14','2026-10-15',c.model,c.cost,c.startedAt,c.status))),reconcileAcceptanceCharges:()=>accounting.reconcileAiAcceptanceCharges(env.DB),prebookNewsAcceptance:(now,until)=>accounting.prebookNewsAcceptance(env.DB,now,until),setFixtureAiFlags:flags=>{if('news' in flags)env.HARIMU_AI_NEWS_ENABLED=String(flags.news);if('notables' in flags)env.HARIMU_NOTABLES_ENABLED=String(flags.notables);}, setFixtureAiBinding:binding=>{env.AI=binding;env.HARIMU_AI_NEWS_ENABLED='true';env.HARIMU_AI_DAILY_BUDGET_MICRO='970000';env.HARIMU_AI_GATEWAY_ID='harimu-test';}, answerNotable:(user,command,binding,options)=>notableService.answerNotable(env.DB,user,command,Math.floor(clock.Date.now()/1000),binding,options), sqliteBackupPath:path, storageEngine:backend, get postgresSnapshot(){return postgres?.snapshot;}, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
+    // Load a transpiled app module from this runtime, e.g. importModule('lib/city-location.ts').
+    importModule:rel=>import(pathToFileURL(join(directory,rel.replace(/\.tsx?$/,'.mjs'))).href),
+    call,setCityFounding:on=>{env.HARIMU_CITY_FOUNDING_ENABLED=String(on);},setFixtureEnv:(name,value)=>{if(value===undefined)delete env[name];else env[name]=value;},setFixtureAiFlags:flags=>{if('news' in flags)env.HARIMU_AI_NEWS_ENABLED=String(flags.news);if('notables' in flags)env.HARIMU_NOTABLES_ENABLED=String(flags.notables);if('cabinet' in flags)env.HARIMU_AI_CABINET_RESPONSES_ENABLED=String(flags.cabinet);}, settleBackground:async()=>{const jobs=globalThis.__harimuBackground??[];globalThis.__harimuBackground=[];await Promise.all(jobs);}, setFixtureAiBinding:binding=>{env.AI=binding;env.HARIMU_AI_NEWS_ENABLED='true';env.HARIMU_AI_DAILY_BUDGET_MICRO='970000';env.HARIMU_AI_GATEWAY_ID='harimu-test';}, prepareAiCabinetResponse:(binding,options)=>cabinetAi.prepareAiCabinetResponse(env.DB,Math.floor(clock.Date.now()/1000),binding,options), answerNotable:(user,command,binding,options)=>notableService.answerNotable(env.DB,user,command,Math.floor(clock.Date.now()/1000),binding,options), sqliteBackupPath:path, storageEngine:backend, get postgresSnapshot(){return postgres?.snapshot;}, recordCabinetResponse: (input,now=Math.floor(clock.Date.now()/1000)) => collective.recordAuthoredCabinetResponse(env.DB,input,now), readGovernment: (nationId, userId) => government.readGovernment(env.DB, nationId, Math.floor(clock.Date.now()/1000), userId), advanceWorld: now => simulation.advanceWorld(env.DB, now), get now() { return clock.Date.now(); }, setNow: clock.setNow, setVerification, get db() { return env.DB; },
+    setSquarePurchase:on=>{env.HARIMU_SQUARE_PURCHASE_ENABLED=String(on);}, // #122
+    setOrderBook:on=>{env.HARIMU_ORDER_BOOK_ENABLED=String(on);}, // #197
+    setTravel:on=>{env.HARIMU_TRAVEL_ENABLED=String(on);}, // #123
+    setFaith:on=>{env.HARIMU_FAITH_ENABLED=String(on);}, // #67
     reopen() { if(postgres){postgres.reopen();return;}env.DB.close(); env.DB = new LocalD1(path); },
     async close() { if(postgres)await postgres.close();else env.DB.close(); await rm(directory, { recursive: true, force: true }); },
   };

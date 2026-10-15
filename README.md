@@ -26,6 +26,9 @@ From this directory:
 
 Commit/push source through Git and use the guarded Cloudflare deploy command. Do not upload `.env*`, local database state, or authentication tokens. Development must not deploy to Sites, apex/www, or docs.
 
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch flow: feature PRs go to `dev`, PM cuts `release` from `dev` daily, preview deploys only from `release`, and PM release PRs go from `release` to `main`.
+
 ## Wrangler version (required)
 
 Preview deploys require **wrangler 4.92.0**, pinned exactly in `package.json` devDependencies and in `package-lock.json`. Newer releases (4.151 and later) reject the `legacy_env` key in the vinext-built `dist/server/wrangler.json`. The deploy script therefore removes `legacy_env: true`, which was the old default; wrangler states that removing it does not change the deployment. Both 4.92.0 and 4.151.0 then pass `wrangler deploy --dry-run`. `npm run deploy:cloudflare` refuses to run unless the project-local wrangler matches the pin. Run `npm ci` and never deploy with a global or `npx` wrangler. Before bumping the pin, check `npm run deploy -- --dry-run` (bundles with `wrangler deploy --dry-run`, without remote D1 access or upload) on the new version.
@@ -286,3 +289,46 @@ semantics, browser account switching, or authenticated multi-browser concurrency
 ## Direct Cloudflare hosting
 
 See [the migration runbook](docs/CLOUDFLARE_MIGRATION.md) for the isolated Workers preview, complete production-data transfer, docs-hosting constraints, and rollback. `npm run build:cloudflare` builds without the Sites plugin; `npm run deploy` is the default tested development deployment. Its guard pins the preview Worker and isolated D1 and rejects production routes. Production launch is deferred; its future data-export requirements do not block the fresh development world.
+
+## Postgres migrations (#119)
+
+Postgres (Hyperdrive) never bootstraps schema, so numbered `db/postgres/NNNN_*.sql` files are applied by
+`npm run db:postgres:migrate` and recorded (with a SHA-256 checksum) in `schema_migrations`:
+
+- Each pending file runs in its own transaction, in order, under an advisory lock; any failure rolls that file back and stops.
+- First run backfills migrations through `0012` (confirmed applied on preview) as applied **without re-running them**, and only if every table, column and index they create already exists (otherwise nothing is recorded). The deploy guard checks the same objects.
+- Migrations must stay idempotent and additive. Any `DROP …`, `RENAME`, `TRUNCATE`, column type change or `DELETE FROM` (even with `WHERE`; over-broad on purpose) is rejected unless `-- harimu:destructive-reviewed` sits on its own line in the file's first 5 lines, after manual review. Editing an applied file fails; add a new one.
+- Empty database (local dev, new preview, disaster recovery): `npm run db:postgres:migrate -- --bootstrap-empty` applies `compatibility.sql` + `schema.sql`, then runs and records every numbered migration. It refuses unless schema `public` has no tables.
+- Backfill and the deploy guard also require each table to keep at least the number of CHECK constraints its migration declares.
+- `npm run db:postgres:migrate -- --dry-run` lists what would run. It needs `PREVIEW_DATABASE_ADMIN_URL` (admin role with CREATE on `public`), never the app role.
+- `npm run deploy` refuses to upload when storage is Postgres and any migration is unrecorded, edited, or missing tables (needs `HARIMU_POSTGRES_URL` or `PREVIEW_DATABASE_ADMIN_URL`).
+
+## Preview auto-deploy (#128, #177)
+
+Flow: **dev → release → main**. PRs merge into `dev`, which does **not** deploy. PM cuts `release` from `dev` daily; hotfixes land on `release` and are merged back into `dev`.
+
+`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** on a push to `release` in this repository (or a manual `workflow_dispatch` on `release`). It never runs for `dev`, `main` or PRs. Each run checks out that commit, runs `npm run check`, applies pending Postgres migrations (any failure means no deploy), then runs `npm run deploy` (pinned wrangler, `--keep-vars`, #119 guard). Because it is triggered by the push itself rather than by a CI `workflow_run`, a cancelled or superseded CI run cannot drop the newest release deploy. Runs queue (never cancelled mid-migration) and only the newest pending one runs next. The commit SHA and Cloudflare version ID go to the job summary. `workflow_dispatch` defaults to a full deploy; set `migrate_only` to only migrate. Production stays manual.
+
+Repository secrets (environment `preview`):
+
+| Secret | Purpose |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Account: Workers Scripts Edit, D1 Edit (for the schema check query), Account Settings Read. Zone: Workers Routes Edit, if preview uses routes. Scope it to the one account. |
+| `CLOUDFLARE_ACCOUNT_ID` | The Cloudflare account that owns harimu-preview. |
+| `PREVIEW_DATABASE_ADMIN_URL` | Postgres admin connection string for the preview database. |
+## QA tooling (#138)
+
+**Build identity:** `GET /api/version` returns `{ "sha": "<commit>", "builtAt": "<ISO time>" }` and nothing else.
+The values are stamped at build time (`scripts/build-info.mjs`, in this order: `GITHUB_SHA`, `HARIMU_BUILD_SHA`, Workers Builds' commit SHA, `git rev-parse HEAD`).
+They are `"unknown"`/`null` if no SHA is available.
+
+**Korund (or any playable nation) test citizen on preview:**
+1. Sign in on preview with the QA account and enroll in any nation.
+2. PM sets two Worker variables on **harimu-preview only** (Cloudflare dashboard; deploys keep them: `--keep-vars` plus the deploy script leaving both names out of the built deploy config, #394):
+   `HARIMU_QA_TEST_CITIZENS=true` and `HARIMU_QA_TEST_CITIZEN_IDS=<comma-separated Clerk user ids of QA accounts>`.
+   These are account ids, not credentials. Never commit them. `HARIMU_QA_TEST_CITIZENS` stays `"false"` in `wrangler.jsonc` as the default (local runs, tests, a new Worker), but `npm run deploy` removes both names from the built config, so a release deploy no longer resets them. Consequence: a value removed in the dashboard is not restored by a deploy; an unset var means off.
+3. From the signed-in preview tab:
+   `fetch('/api/citizen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'qa-test-nation',nationId:'korund'})})`.
+   This moves only that citizen to the chosen nation (the city resets to its capital) and does not spend the free citizenship change.
+
+The action returns 404 unless both flags are on **and** `NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW=true` **and** the caller is on the allowlist, so it is inert in production.

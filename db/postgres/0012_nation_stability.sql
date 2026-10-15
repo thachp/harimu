@@ -1,0 +1,3 @@
+-- Additive (#69): per-nation daily Stability/Unrest history.
+CREATE TABLE IF NOT EXISTS nation_stability_scores(nation_id TEXT COLLATE "C" NOT NULL CHECK(nation_id IN('kindle','korund','aurelle')),tick BIGINT NOT NULL CHECK(tick>0),scheduled_at BIGINT NOT NULL,computed_at BIGINT NOT NULL,stability BIGINT NOT NULL CHECK(stability BETWEEN 0 AND 100),unrest BIGINT NOT NULL CHECK(unrest BETWEEN 0 AND 100),inputs_json TEXT COLLATE "C" NOT NULL,breakdown_json TEXT COLLATE "C" NOT NULL,PRIMARY KEY(nation_id,tick));
+CREATE INDEX IF NOT EXISTS idx_nation_stability_time ON nation_stability_scores(nation_id,scheduled_at);

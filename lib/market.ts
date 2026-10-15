@@ -45,9 +45,14 @@ export const marketEventsSchema = `CREATE TABLE IF NOT EXISTS citizen_economy_ev
 export const walletViewSql = `CREATE VIEW IF NOT EXISTS citizen_wallet_balances AS
   SELECT c.clerk_user_id,
     COALESCE((SELECT SUM(wage_minor) FROM shift_settlements WHERE clerk_user_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(tax_minor) FROM shift_income_tax WHERE clerk_user_id = c.clerk_user_id), 0)
     + COALESCE((SELECT SUM(wallet_delta) FROM citizen_economy_events WHERE clerk_user_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(spark_minor) FROM citizen_tessera_exchanges WHERE clerk_user_id = c.clerk_user_id), 0)
     + COALESCE((SELECT SUM(amount_minor) FROM player_fills WHERE seller_id = c.clerk_user_id), 0)
-    - COALESCE((SELECT SUM(amount_minor) FROM player_fills WHERE buyer_id = c.clerk_user_id), 0) AS balance
+    - COALESCE((SELECT SUM(amount_minor) FROM player_fills WHERE buyer_id = c.clerk_user_id), 0)
+    + COALESCE((SELECT SUM(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.sell_order_id WHERE o.citizen_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(remaining * limit_unit_minor) FROM market_open_orders WHERE citizen_id = c.clerk_user_id AND side = 'buy'), 0) AS balance
   FROM citizens c`;
 export const inventoryViewSql = `CREATE VIEW IF NOT EXISTS citizen_inventory_balances AS
   SELECT c.clerk_user_id, c.item,
@@ -56,12 +61,17 @@ export const inventoryViewSql = `CREATE VIEW IF NOT EXISTS citizen_inventory_bal
     + CASE WHEN c.item='food' THEN COALESCE((SELECT quantity FROM starter_food_grants WHERE clerk_user_id=c.clerk_user_id),0) ELSE 0 END
     - COALESCE((SELECT SUM(quantity) FROM player_open_lots WHERE seller_id=c.clerk_user_id AND item=c.item),0)
     - COALESCE((SELECT SUM(quantity) FROM player_fills WHERE seller_id=c.clerk_user_id AND item=c.item),0)
-    + COALESCE((SELECT SUM(quantity) FROM player_fills WHERE buyer_id=c.clerk_user_id AND item=c.item),0) AS quantity
+    + COALESCE((SELECT SUM(quantity) FROM player_fills WHERE buyer_id=c.clerk_user_id AND item=c.item),0)
+    + COALESCE((SELECT SUM(t.qty) FROM market_trades t JOIN market_orders o ON o.id=t.buy_order_id WHERE o.citizen_id=c.clerk_user_id AND t.good=c.item),0)
+    - COALESCE((SELECT SUM(t.qty) FROM market_trades t JOIN market_orders o ON o.id=t.sell_order_id WHERE o.citizen_id=c.clerk_user_id AND t.good=c.item),0)
+    - COALESCE((SELECT SUM(remaining) FROM market_open_orders WHERE citizen_id=c.clerk_user_id AND side='sell' AND good=c.item),0)
+    - COALESCE((SELECT SUM(qty) FROM market_spoilage WHERE clerk_user_id=c.clerk_user_id AND good=c.item),0) AS quantity
   FROM (
     SELECT clerk_user_id,item FROM shift_settlements
     UNION SELECT clerk_user_id,item FROM citizen_economy_events
     UNION SELECT clerk_user_id,'food' AS item FROM starter_food_grants
     UNION SELECT buyer_id AS clerk_user_id,item FROM player_fills
+    UNION SELECT citizen_id AS clerk_user_id,good AS item FROM market_orders WHERE citizen_id IS NOT NULL
   ) c`;
 export const merchantViewSql = `CREATE VIEW IF NOT EXISTS merchant_inventory_balances AS
   SELECT m.*, m.initial_stock + CASE WHEN m.item='food' THEN COALESCE((SELECT SUM(food_quantity) FROM government_policy_executions),0) ELSE 0 END - COALESCE((SELECT SUM(quantity_delta)

@@ -13,37 +13,54 @@ import { ActionButton } from './action-button';
 import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import { CountryScene } from './country-scene';
 import { capitalCityForNation, cityForNation } from '@/lib/cities';
-import type { CityLocation } from '@/lib/city-location';
+import type { CityLocation, CoResident } from '@/lib/city-location';
 import { NationComparison } from './nation-strip-filters';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
-import { isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, type SceneView } from '@/lib/scene-navigation';
+import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
+import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
+import { FirstWeekTracker } from './first-week-tracker';
+import { marketVisible } from '@/lib/market-visibility';
+import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
+import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
+const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, sceneUrl, viewedNationAfterLoad, type SceneView } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
 import {RankedBallot} from './ranked-ballot';
+import {AssemblyBallot} from './assembly-ballot';
+import {PrimaryCard} from './primary-card';
 import type {ElectionSnapshot} from '../lib/elections';
 import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
 import { SceneNews } from './world-scene';
+import { noticeboardEvents } from '@/lib/noticeboard'; // #375
 import { firstLoopStep } from '@/lib/first-loop';
+import { starterCopyFor } from '@/lib/starter-copy';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
 import { WalletPanel } from './wallet-panel';
+import { ShiftQualityStep } from './shift-quality-step';
+import { qualityWorkOrderId, harvestQuestions, type QualityInput, type QualityQuestion } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
 import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
 import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction } from './korund-plan-panel';
+import { nationPlanPanelNation } from '@/lib/nation-panels';
 import { GovernmentPanel } from './government-panel';
+import { AurelleRisingPanel } from './aurelle-rising';
 import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
 import { PlayerMarket } from './player-market';
 import { validPlayerCommand, type PlayerCommand, type PlayerMarketState } from '@/lib/player-market';
 import { CitizenMarket } from './citizen-market';
 import { marketSeeds, validMarketCommand, type MarketState, type MarketCommand } from '@/lib/market';
 import { WorkShiftBoard } from './work-shift-board';
+import { MarketBoard, useOrderBook } from './market-board';
+import { FaithPanel, HolidayBanner, useFaith } from './faith-panel';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
@@ -56,9 +73,12 @@ import {
 } from '@clerk/nextjs';
 import { MORNING_BRIEF_TRIGGER_ID, MorningBrief } from './morning-brief';
 import { Newspaper } from '@phosphor-icons/react';
-import { briefDayKey, claimDailyBrief, morningBriefSections } from '@/lib/morning-brief';
+import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHeadline } from '@/lib/morning-brief';
+import { CityCoResidents } from './city-coresidents';
+import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { clerkConfigured } from './providers';
+import { describeKindlePay, withholdIncomeTax } from '@/lib/income-tax';
 
 type ViewMode = SceneView;
 type PlanHorizon = 'today' | 'week' | 'season';
@@ -80,6 +100,8 @@ type Nation = {
   motto: string;
   tradeStatus: string;
   position: { x: number; y: number };
+  /** #81: band only (server never sends counts). Absent in the static fallback. */
+  populationBand?: PopulationBand;
 };
 
 type WorkOrder = {
@@ -340,6 +362,9 @@ const fallbackWorkOrders: WorkOrder[] = [
   { id: 'harvest', nationId: 'kindle', name: 'Support the savanna harvest', detail: '+480 food · resolves in 2h real · 1 game day', cost: 4 },
   { id: 'freight', nationId: 'kindle', name: 'Move a foundry convoy', detail: '+210 materials · resolves in 4h real · 2 game days', cost: 6 },
   { id: 'archive', nationId: 'kindle', name: 'Catalogue the civic archive', detail: '+95 knowledge · resolves in 3h real · 1.5 game days', cost: 3 },
+  { id: 'orchard', nationId: 'kindle', name: 'Pick the savanna orchards', detail: '+3 fruit · resolves in 2h real · 1 game day', cost: 4 },
+  { id: 'herding', nationId: 'kindle', name: 'Drive the grassland herds', detail: '+2 meat · resolves in 3h real · 1.5 game days', cost: 5 },
+  { id: 'logging', nationId: 'kindle', name: 'Cut timber for the city', detail: '+3 wood · resolves in 4h real · 2 game days', cost: 6 },
 ];
 
 const fallbackPlanningItems: PlanningTask[] = [
@@ -411,7 +436,6 @@ function ClerkAccountControl() {
 
   return (
     <div className="account-control">
-      {process.env.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW === 'true' && <span className="development-preview-label" title="Fresh development world. Production progress is separate.">Development preview</span>}
       <Show when="signed-out">
         <SignInButton mode="modal">
           <button className="account-sign-in" type="button">Sign in</button>
@@ -425,6 +449,8 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
+  flags?: { market?: boolean };
+  firstWeek?: { completed: string[] } | null;
   profile: {
     nationId: string | null;
     displayName: string | null;
@@ -529,6 +555,8 @@ export default function Home() {
   const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
+  // #252: the step for the next quality shift; ticket/questions come from the server (null ticket = local demo).
+  const [qualityOrder, setQualityOrder] = useState<{ order: WorkOrder; ticket: string | null; questions: readonly QualityQuestion[] } | null>(null);
   const [aurellePlan, setAurellePlan] = useState<AurellePlanView | null>(null);
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
   const aurelleIntent = useRef<AurelleCommand | null>(null);
@@ -566,6 +594,7 @@ export default function Home() {
   const [guestMode, setGuestMode] = useState(false);
   const [guestState, setGuestState] = useState(createGuestDemo);
   const [citizenNationId, setCitizenNationId] = useState<string | null>(null);
+  const seededNationId = useRef<string | null>(null); // #411: the citizen nation the viewed nation was last seeded from
   const [citizenshipStatus, setCitizenshipStatus] = useState<CitizenshipStatus | null>(null);
   const [enrollmentExpectedNation, setEnrollmentExpectedNation] = useState<string | null>(null);
   const enrollmentLock = useRef(false);
@@ -584,6 +613,11 @@ export default function Home() {
     return () => cancelAnimationFrame(frame);
   }, [tourOpen, viewMode, stopTour]);
   const [guideNow, setGuideNow] = useState(0);
+  // First-week progress (#134): STUB store in this browser until server-side tracking (#135).
+  const [weekDone, setWeekDone] = useState<{key:string;ids:string[]}>({key:'',ids:[]});
+  const [serverWeekIds, setServerWeekIds] = useState<string[] | null>(null);
+  // #344: the server's market flag (HARIMU_ORDER_BOOK_ENABLED). Fails closed until the citizen snapshot says otherwise.
+  const [marketFlag, setMarketFlag] = useState(false);
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -606,6 +640,30 @@ export default function Home() {
   const [demoReceipts, setDemoReceipts] = useState<string[]>([]);
   const [demoStarterGranted, setDemoStarterGranted] = useState(false);
   const [economy, setEconomy] = useState<Economy | null>(null);
+  // #210: the Clearing House kiosk opens with the World Registry (HARIMU_SQUARE_PURCHASE_ENABLED).
+  const [kioskOpen, setKioskOpen] = useState(false);
+  const kioskRules = useRef({ minTesseraMinor: 100, maxTesseraMinor: 10000, sparkPerTessera: 4 }); // replaced by the server's kiosk block
+
+  useEffect(() => {
+    if (!walletOpen) return;
+    let live = true;
+    fetch('/api/world/registry').then(r => r.ok ? r.json() as Promise<{ open?: boolean; kiosk?: { sparkPerTessera: number; minTesseraMinor: number; maxTesseraMinor: number } } | null> : null).then((data) => { if (data?.kiosk) kioskRules.current = data.kiosk; if (live) setKioskOpen(data?.open === true); }).catch(() => { if (live) setKioskOpen(false); });
+    return () => { live = false; };
+  }, [walletOpen]);
+  const buyTessera = async (tesseraMinor: number): Promise<string | null> => {
+    try {
+      const response = await fetchIdempotent(fetch, '/api/world/registry', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'buy-tessera', tesseraMinor, requestId: crypto.randomUUID() }) });
+      const data = await response.json() as { error?: string; reason?: string; sparkMinor?: number; tesseraMinor?: number };
+      if (!response.ok) {
+        // #210 follow-up: Content's #325 refusal copy, values pre-formatted with units; the server message stays the fallback.
+        const rules = kioskRules.current;
+        return kioskRefusal(data.reason, { amount: tsr(tesseraMinor), cost: spk(Math.ceil(tesseraMinor * rules.sparkPerTessera)), min: tsr(rules.minTesseraMinor), max: tsr(rules.maxTesseraMinor) }) ?? data.error ?? kioskClosed;
+      }
+      setEconomy(current => current && { ...current, walletMinor: data.sparkMinor ?? current.walletMinor, tesseraMinor: data.tesseraMinor ?? current.tesseraMinor });
+      return null;
+    } catch { return kioskClosed; }
+  };
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
   const [workPending, setWorkPending] = useState(false);
   const [workError, setWorkError] = useState<string | null>(null);
@@ -644,7 +702,7 @@ export default function Home() {
   const citizenIdentity = useRef<string | null>(null);
   const citizenEpoch = useRef(0);
   const [citizenSessionKey, setCitizenSessionKey] = useState(0);
-  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[]}} | null>(null);
+  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[]}} | null>(null);
   const [cityError, setCityError] = useState('');
   const [cityRetry, setCityRetry] = useState(0);
   const [cityTravelPending, setCityTravelPending] = useState(false);
@@ -656,7 +714,7 @@ export default function Home() {
     const loadCity = async () => {
       try {
         const response = await fetch('/api/city', {cache:'no-store',signal:controller.signal});
-        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];error?:string};
+        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];error?:string};
         if (controller.signal.aborted || epoch !== citizenEpoch.current) return;
         if (!response.ok || value.nationId !== citizenNationId || !cityForNation(value.nationId,value.currentCityId)) throw Error(value.error ?? 'City account unavailable.');
         setCityAccount({key:citizenSessionKey,value}); setCityError('');
@@ -687,7 +745,7 @@ export default function Home() {
     setCitizenSessionKey(value => value + 1);
     cityTravelLock.current = false; setCityTravelPending(false); setCityAccount(null); setCityError('');
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
-    setCitizenNationId(null); setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
+    setCitizenNationId(null); seededNationId.current = null; setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
     setEconomy(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setVerification(null); setWorkShifts([]);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
@@ -740,6 +798,10 @@ export default function Home() {
     [locationSearch, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
+  const weekStoreKey = citizenNationId && citizenshipStatus?.enrolledAt ? `${citizenNationId}:${citizenshipStatus.enrolledAt}` : '';
+  // Load progress when the citizen key changes (adjust-state-during-render). Signed-in citizens use server progress (#135); the local demo keeps the browser stub.
+  const weekProgressStore = clerkConfigured ? serverFirstWeekProgressStore(serverWeekIds) : stubFirstWeekProgressStore();
+  if (weekStoreKey && weekDone.key !== weekStoreKey) setWeekDone({key:weekStoreKey,ids:weekProgressStore.load(weekStoreKey)});
   const demoGovernmentSnapshot = useMemo(() => citizenNation ? simulateGovernment({
     nationId: citizenNation.id, availableBudgetMinor: 100000,
     foodSecurity: (economy?.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) >= 2 ? 100 : 0,
@@ -772,7 +834,7 @@ export default function Home() {
     return () => controller.abort();
   }, [citizenSessionStatus]);
 
-  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string) {
+  async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string, quality?: QualityInput) {
     if (enrollmentLock.current) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     const epoch = citizenEpoch.current;
@@ -787,7 +849,7 @@ export default function Home() {
       if (clerkConfigured) {
         const init: RequestInit = {
           method: action === 'refresh-work' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
-          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId }),
+          body: action === 'refresh-work' ? undefined : JSON.stringify({ action, workOrderId: order?.id, shiftId, quality }),
         };
         // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
         // Starting a shift has no request id, so it is never retried automatically.
@@ -821,9 +883,12 @@ export default function Home() {
           const rule = shiftRules[order.id];
           if (!rule) throw new Error('Work order unavailable.');
           const startedAt = new Date().toISOString();
-          setWorkShifts((current) => [{ id: crypto.randomUUID(), orderName: order.name,
+          // Local demo has no server and no answer key, so it never grades: every demo shift pays the base reward.
+          void quality;
+          const demoReward = rewards[order.id];
+          setWorkShifts((current) => [{ id: crypto.randomUUID(), workOrderId: order.id, orderName: order.name,
             output: rule.output, capacitySpent: order.cost, startedAt,
-            wageMinor: rewards[order.id]?.wageMinor, rewardItem: rewards[order.id]?.item, rewardQuantity: rewards[order.id]?.quantity,
+            wageMinor: demoReward?.wageMinor, rewardItem: demoReward?.item, rewardQuantity: demoReward?.quantity,
             completesAt: new Date(Date.now() + rule.hours * 3600000).toISOString(), claimedAt: null }, ...current]);
           setCapacity((current) => current - order.cost);
         } else {
@@ -832,7 +897,7 @@ export default function Home() {
             const item = eligible.rewardItem;
             const inventory = economy.inventory.filter((entry) => entry.item !== item);
             if (item) inventory.push({ item, quantity: (economy.inventory.find((entry) => entry.item === item)?.quantity ?? 0) + (eligible.rewardQuantity ?? 0) });
-            setEconomy({ ...economy, walletMinor: economy.walletMinor + (eligible.wageMinor ?? 0), inventory });
+            setEconomy({ ...economy, walletMinor: economy.walletMinor + withholdIncomeTax(eligible.wageMinor ?? 0, economy.incomeTaxPercent ?? 0).netMinor, inventory });
           }
           setWorkShifts((current) => current.map((shift) => shift.id === shiftId
             && !shift.claimedAt && Date.parse(shift.completesAt) <= Date.now()
@@ -990,7 +1055,21 @@ export default function Home() {
       if (epoch !== citizenEpoch.current) return; workLock.current=false; setGovernmentPending(false); }
   }
 
-  function commitWork(order: WorkOrder) { return runWork('commit-work', order); }
+  // #40: the quality job opens the quality step first; WC is only spent when the player starts from it.
+  async function commitWork(order: WorkOrder) {
+    if (order.id !== qualityWorkOrderId || !rewards[order.id]) return runWork('commit-work', order);
+    if (!clerkConfigured) { setQualityOrder({ order, ticket: null, questions: harvestQuestions }); return; }
+    // #252: the server shuffles this shift's options and signs a ticket; the answer key never leaves the server.
+    // If the step is unavailable, the shift starts for the base reward exactly as before.
+    try {
+      const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'quality-ticket', workOrderId: order.id }) });
+      const result = await response.json() as { ticket?: unknown; questions?: unknown };
+      if (response.ok && typeof result.ticket === 'string' && Array.isArray(result.questions) && result.questions.length === harvestQuestions.length) {
+        setQualityOrder({ order, ticket: result.ticket, questions: result.questions as QualityQuestion[] }); return;
+      }
+    } catch { /* fall through to the base-reward start */ }
+    return runWork('commit-work', order);
+  }
 
   async function runKorundCommand(command: KorundCommand) {
     const confirmingKorundIntent=korundIntent.current?.requestId===command.requestId;
@@ -1031,7 +1110,7 @@ export default function Home() {
     }
   }
 
-  const startKorundAction = (action: KorundAction, shiftId?: string) => void runKorundCommand(action === 'korund-redeem-coupon' ? { action, coupon: shiftId === 'goods' ? 'goods' : 'clothing', gameWeek: korundPlan?.gameWeek, requestId: crypto.randomUUID() } : { action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
+  const startKorundAction = (action: KorundAction, shiftId?: string, preferences?: string[]) => void runKorundCommand(action === 'korund-set-preferences' ? { action, preferences, requestId: crypto.randomUUID() } : action === 'korund-request-assignment' ? { action, requestId: crypto.randomUUID() } : action === 'korund-redeem-coupon' ? { action, coupon: shiftId === 'goods' ? 'goods' : 'clothing', gameWeek: korundPlan?.gameWeek, requestId: crypto.randomUUID() } : { action, shiftId:action==='korund-cancel-ration-queue'?undefined:shiftId,queueId:action==='korund-cancel-ration-queue'?shiftId:undefined, requestId: crypto.randomUUID() });
   async function runAurelleCommand(command: AurelleCommand) {
     const originalAurelleClaim = command.action === 'aurelle-claim-work' && workShifts.some(shift => shift.id === command.shiftId && shift.currency === 'CRN');
     if (marketIntent.current || playerIntent.current || korundIntent.current) return;
@@ -1071,13 +1150,16 @@ export default function Home() {
   }
 
   const startAurelleAction = (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void runAurelleCommand({ action, shiftId, quantity, requestId: crypto.randomUUID() });
-  function changeView(nextView: ViewMode) {
+  function changeView(requestedView: ViewMode) {
+    // #344: with the market flag off, nothing navigates to the Market scene (it falls back to the city square).
+    const nextView: ViewMode = requestedView === 'market' && !marketShown ? 'square' : requestedView;
     if (nextView !== 'world') stopTour();
     const nextNation = nextView === 'country' && !['world','country','nation'].includes(viewMode) && citizenNation ? citizenNation.id : selected.id;
     setSelectedId(nextNation);
     const visitingCity = new URLSearchParams(window.location.search).get('city');
     const cityId = citizenNation?.id === nextNation ? currentCityAccount?.currentCityId : visitingCity && cityForNation(nextNation,visitingCity) ? visitingCity : undefined;
-    const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined);
+    // Civic keeps the nation being viewed (#91); a foreign nation renders read-only.
+    const href = sceneUrl(window.location.href, nextView, nextNation, cityId ?? undefined, nextNation !== citizenNation?.id);
     if (href !== window.location.href) window.history.pushState(sceneHistoryState(window.history.state, window.location.pathname), '', href);
     window.dispatchEvent(new Event('harimu-scenechange'));
   }
@@ -1106,7 +1188,7 @@ export default function Home() {
     cityTravelLock.current=true;setCityTravelPending(true);setCityError('');
     try {
       const response=await fetch('/api/city',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'travel',cityId})});
-      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];error?:string};
+      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];error?:string};
       if(epoch!==citizenEpoch.current)return;
       if(!response.ok || value.nationId!==citizenNation.id || value.currentCityId!==cityId)throw Error(value.error ?? 'Travel could not be confirmed. Refresh your city account before retrying.');
       setCityAccount({key:citizenSessionKey,value});
@@ -1151,6 +1233,8 @@ export default function Home() {
     if ('election' in snapshot)setElection(snapshot.election??null);
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
+    if (snapshot.flags) setMarketFlag(snapshot.flags.market === true);
+    if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
     setDemoStarterGranted(snapshot.demoStarterGranted ?? false);
@@ -1166,6 +1250,8 @@ export default function Home() {
     }
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
+      // #411: an existing citizen's own nation is the viewed nation unless the URL names one (once per citizen nation, so a later visit elsewhere is kept).
+      if (seededNationId.current !== snapshot.profile.nationId) { seededNationId.current = snapshot.profile.nationId; setSelectedId(current => viewedNationAfterLoad(window.location.search, fallbackNations.map(nation => nation.id), snapshot.profile!.nationId, current)); }
       setCitizenshipStatus(snapshot.profile.citizenship);
       setCapacity(snapshot.profile.capacity);
       setInfluence(snapshot.profile.influence);
@@ -1435,10 +1521,12 @@ export default function Home() {
   const aurellePanel = <AurellePlanPanel plan={aurellePlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
     uncertain={Boolean(aurelleCommand || korundCommand || marketCommand || playerCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
     onCommand={startAurelleAction} onRetry={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }} onRefresh={() => void runWork('refresh-work')} />;
+  // #344: Korund's State store and Aurelle's royal store are not the flagged market. The local demo and guest sandbox have no server flag.
+  const marketShown = marketVisible(citizenNation?.id, marketFlag || !clerkConfigured || (citizenSessionStatus === 'anonymous' && guestMode));
   const dailyLoop = citizenNation?.id === 'aurelle' ? <>{priorShiftPanel}{aurellePanel}</> : citizenNation?.id === 'korund' ? <>{priorShiftPanel}{korundPanel}</> : priorNationShift ? priorShiftPanel : citizenNation && <DailyLoop nationName={citizenNation.shortName} supported={citizenNation.id === 'kindle'}
     localDemo={!clerkConfigured} view={viewMode} economy={economy} market={market} shifts={workShifts} capacity={capacity}
     jobs={availableWorkOrders.filter(order => !order.nationId || order.nationId === citizenNation.id)}
-    busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)} onNavigate={changeView}
+    busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand)} marketOpen={marketShown} onNavigate={changeView}
     onStart={id => { const order = availableWorkOrders.find(item => item.id === id); if (order) void commitWork(order); }}
     onClaim={id => void runWork('claim-work', undefined, id)} onRefresh={() => void runWork('refresh-work')}
     onBuyFood={quantity => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side: 'buy', item: 'food', quantity })}
@@ -1455,12 +1543,24 @@ export default function Home() {
     return () => { active = false; };
   }, [citizenNationId]);
   const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
-  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
+  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,copy:starterCopyFor(citizenNation.id,{marketOpen:marketShown}),marketOpen:marketShown,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
-  const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
+  const weekKey = citizenNation ? weekStoreKey : '';
+  const weekDayInfo = weekKey && citizenNation ? visibleWeekDay(firstWeekDay({nationId:citizenNation.id,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,firstLoopActive:Boolean(firstLoop)}), marketShown) : null;
+  const weekDayStart = weekDayInfo ? Date.parse(citizenshipStatus?.enrolledAt ?? '') + (weekDayInfo.day - 1) * 86400000 : 0;
+  const weekStored = weekDone.key===weekKey ? [...new Set([...weekDone.ids, ...(clerkConfigured ? serverWeekIds ?? [] : [])])] : [];
+  const weekTrack = !firstLoop && weekDayInfo ? firstWeekTracker({day:weekDayInfo,done:weekStored,signals:{shifts:[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])],dayStart:weekDayStart,
+    mealReadyAt:citizenNation?.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation?.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt}}) : null;
+  const weekNew = newlyDone(weekTrack, weekStored);
+  // Latch detected completions (server progress for signed-in citizens, #135).
+  if (weekNew.length) { const ids = [...weekStored, ...weekNew]; setWeekDone({key:weekKey,ids}); weekProgressStore.save(weekKey, ids); }
+  const weekTracker = weekTrack && <FirstWeekTracker tracker={weekTrack} onNavigate={screen=>navigateGame(screen)} />;
+  const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
   const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
   const guestActive = guestAllowed && guestMode;
+  const orderBookApi = useOrderBook(viewMode === 'market' && citizenNation?.id === 'kindle' && clerkConfigured && !guestActive); // #200: renders nothing while HARIMU_ORDER_BOOK_ENABLED is off
+  const faithApi = useFaith(Boolean(citizenNation) && !guestActive); // #280: renders nothing while HARIMU_FAITH_ENABLED is off
   useEffect(() => {
     if (!tourOpen || guestAllowed) return;
     const frame = requestAnimationFrame(stopTour);
@@ -1489,7 +1589,10 @@ export default function Home() {
     </div> : <>
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</ActionButton></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</ActionButton></div>}
+      {nationPlanPanelNation(citizenNation.id, viewMode) && dailyLoop}
+      {(viewMode === 'household' || viewMode === 'workplace') && <HolidayBanner faith={faithApi.faith} busy={faithApi.busy} onJoin={faithApi.joinFestival} />}
       {viewMode === 'household' && <>
+        <FaithPanel api={faithApi} />
         {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
         <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
@@ -1531,23 +1634,28 @@ export default function Home() {
         <section className="scene-work-orders"><h2>Available contributions</h2>
           {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <ActionButton key={order.id} type="button"
             reason={pendingActionReason(workPending, Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)) ?? firstActionReason([hasActiveShift, 'Finish and collect your active shift first.'], [capacity < order.cost, `You need ${order.cost} WC. Prepare a meal or wait for recovery.`])} onClick={() => void commitWork(order)}>
-            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></ActionButton>)}
+            <strong>{order.name}</strong><span>{order.detail} · {order.cost} WC{rewards[order.id] ? ` · ${describeKindlePay(rewards[order.id].wageMinor, economy?.incomeTaxPercent ?? 0)} + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}</span></ActionButton>)}
         {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length === 0 && <p>No shifts are available for this nation yet. Kindle has the first supported work and wage programme; other national workplaces are planned.</p>}
-        </section><button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>
+        </section>{marketShown && <button type="button" onClick={() => changeView('market')}>Take your earnings to market</button>}
       </>}
-      {viewMode === 'market' && !['korund','aurelle'].includes(citizenNation.id) && <>
+      {viewMode === 'market' && !marketShown && <section className="scene-market-closed"><h2>Market</h2><p>The market is not open yet. Work a shift and check back soon.</p></section>}
+      {viewMode === 'market' && marketShown && !['korund','aurelle'].includes(citizenNation.id) && <>
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
-        <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
-          onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />
+        <MarketBoard api={orderBookApi} economy={economy} />
+        {(!orderBookApi.book || playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')) && /* the board replaces fixed-lot listings once it is open; open lots stay cancellable */ <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
+          onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />}
         {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
       {viewMode === 'government' && <>
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
+        {citizenNation.id==='kindle'&&clerkConfigured&&<PrimaryCard key={`primary:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={citizenSessionKey} onSnapshot={setElection}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
+        {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={citizenSessionKey}/>}
         {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={citizenSessionKey} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
         <p>{citizenNation.id==='kindle'&&clerkConfigured?'Kindle’s preview ballot status is shown above. Protests and broader public-opinion systems are planned.':'This location has no counted ballot. Protests and broader public-opinion systems are planned under each nation’s rules.'}</p>
       </>}
@@ -1561,12 +1669,23 @@ export default function Home() {
     <p className="eyebrow">Exploring · {selected.shortName}</p>
     {guestEntry}
     <NationComparison nations={worldNations} />
-    <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
+    <dl>{selected.populationBand && <><dt>Population</dt><dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd></>}<dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
+    {selected.populationBand === 'needs-citizens' && <details className="pioneer-note"><summary>Pioneer nation · bonuses planned</summary><p>{pioneerNote}</p></details>}
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>
     <details><summary>Rules and limits</summary><p>Each nation keeps its own rules. Computer-controlled leaders (AI/SI) follow fixed game rules: the same situation produces the same decision. No live AI model is connected. Petitions require a verified phone number to count, but phone verification has not been set up yet, so petition submission is unavailable. Territory ownership and foreign trade are not built yet.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus,formatTime)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <ActionButton type="button" reason={firstActionReason([clerkConfigured && citizenSessionStatus === 'loading', 'Your citizen account is loading. Please wait before choosing citizenship.'], [clerkConfigured && citizenSessionStatus === 'error', 'Your citizen account could not load. Retry loading it before choosing citizenship.'])} onClick={()=>{if (!clerkConfigured || !['loading','error'].includes(citizenSessionStatus)) beginEnrollment(selected.id);}}>Choose citizenship · {selected.shortName}</ActionButton>}
+    <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
+  </section>;
+  const viewedNationParam = new URLSearchParams(locationSearch).get('nation');
+  const foreignCivic = isForeignCivic(viewMode, viewedNationParam, selected.id, citizenNation?.id);
+  const foreignCivicPanel = <section className="game-national-context" aria-label={`${selected.name} government, read-only`}>
+    <p className="eyebrow">Civic · {selected.shortName} · read-only</p>
+    <h2>{selected.government}</h2>
+    <p>{selected.name} follows its own institutions. Computer-controlled leaders hold every government office in this release, following fixed game rules.</p>
+    <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd></dl>
+    <p role="note">You are viewing {selected.name} as a visitor. Petitions and ballots are only available to its citizens{citizenNation ? `; you are a citizen of ${citizenNation.name}` : ''}.</p>
     <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
   </section>;
   const countryNation = selected;
@@ -1577,17 +1696,18 @@ export default function Home() {
   const countryCityId = countryOwnNation ? currentCityAccount?.currentCityId ?? null : clerkConfigured && citizenNation ? null : previewCity?.id ?? capitalCityForNation(countryNation.id)?.id ?? null;
   const countryHomeId = countryOwnNation ? currentCityAccount?.homeCityId ?? null : clerkConfigured && citizenNation ? null : capitalCityForNation(countryNation.id)?.id ?? null;
   const canCityTravel = !clerkConfigured || citizenSessionStatus === 'anonymous' || Boolean(countryOwnNation && currentCityAccount && citizenSessionStatus === 'ready');
-  const countryMap = <CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} />;
+  const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} /></>;
   const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
-  const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : viewMode==='square' ? <>
+  const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
-    {firstLoopHint}{dailyLoop}
+    {firstLoopHint}{weekTracker}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
+    {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
 
-    {(!clerkConfigured || !citizenNationId) && <SceneNews events={worldEvents} title="City noticeboard" />}
+    {(!clerkConfigured || !citizenNationId) && <SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
-    <NationInstitutions nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
+    <NationInstitutions incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
@@ -1628,7 +1748,7 @@ export default function Home() {
     })) : viewMode === 'workplace' ? availableWorkOrders
       .filter(order => Boolean(citizenNation) && (!order.nationId || order.nationId === citizenNation?.id))
       .map(order => ({ id: order.id, label: order.name,
-        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${(rewards[order.id].wageMinor / 100).toFixed(2)} SPK + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${dockStatus(order)}`,
+        detail: `${order.cost} WC · ${order.detail}${rewards[order.id] ? ` · ${describeKindlePay(rewards[order.id].wageMinor, economy?.incomeTaxPercent ?? 0)} + ${rewards[order.id].quantity} ${rewards[order.id].item}` : ''}${dockStatus(order)}`,
       })) : viewMode === 'market' ? [
         ...(market?.quotes ?? []).map(quote => ({ id: quote.item, label: quote.label,
           detail: `Buy ${(quote.buyMinor / 100).toFixed(2)} · Sell ${(quote.sellMinor / 100).toFixed(2)} SPK · ${quote.stock} in stock`,
@@ -1637,25 +1757,37 @@ export default function Home() {
       ] : viewMode === 'government' ? (government?.roles ?? []).map(role => ({
         id: role.name, label: role.name, detail: role.controller,
       })) : viewMode === 'world' || viewMode === 'nation' ? worldNations.map(nation => ({
-        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
+        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, badge: nation.populationBand && populationBandLabel[nation.populationBand], detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
       })) : viewMode === 'square' ? [
         { id: 'household', label: 'Household', detail: 'Belongings and recovery', onSelect: () => changeView('household') },
         { id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings', onSelect: () => changeView('workplace') },
-        { id: 'market', label: citizenNation?.id === 'korund' ? 'State store' : 'Market', detail: citizenNation?.id === 'korund' ? 'Ration coupons and state food' : 'Goods and citizen listings', onSelect: () => changeView('market') },
+        ...(marketShown ? [{ id: 'market', label: citizenNation?.id === 'korund' ? 'State store' : 'Market', detail: citizenNation?.id === 'korund' ? 'Ration coupons and state food' : 'Goods and citizen listings', onSelect: () => changeView('market') }] : []),
         { id: 'government', label: 'Government', detail: 'Policy and petitions', onSelect: () => changeView('government') },
       ] : [];
   const briefInventory = citizenNation?.id === 'aurelle' ? aurellePlan?.foodQuantity : citizenNation?.id === 'korund' ? korundPlan?.foodQuantity : economy ? goods('food') : undefined;
   const briefStorageKey = citizenNation ? `harimu:morning-brief:${citizenNation.id}` : null;
-  const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow,
+  // #73: headlines come from the same /api/news edition as the News panel, fetched only while the brief is open.
+  const [briefHeadlines, setBriefHeadlines] = useState<{ nationId: string; items: MorningBriefHeadline[] } | null>(null);
+  useEffect(() => {
+    if (!morningBriefOpen || !citizenNationId || guestActive || !clerkConfigured || citizenSessionStatus !== 'ready') return;
+    const controller = new AbortController();
+    void fetch('/api/news', { cache: 'no-store', signal: controller.signal }).then(async response => {
+      const data = await response.json() as { nationId?: string; items?: MorningBriefHeadline[] };
+      if (response.ok && data.nationId === citizenNationId && Array.isArray(data.items)) setBriefHeadlines({ nationId: data.nationId, items: data.items.slice(0, 3).map(item => ({ id: item.id, title: item.title, source: item.source, kind: item.kind })) });
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [morningBriefOpen, citizenNationId, guestActive, citizenSessionStatus]); // clerkConfigured is a module-level constant (build-time env), so it is not a dependency.
+  const briefSections = citizenNation && !guestActive ? morningBriefSections({ food: briefInventory, capacity, now: guideNow, nationId: citizenNation.id, marketOpen: marketShown,
     shift: activeShift ? { title: activeShift.orderName, endsAt: Date.parse(activeShift.completesAt) / 1000 } : null,
-    leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null }) : [];
+    leaderOrder: government ? { title: government.decision.title, reason: government.decision.reason } : null,
+    headlines: briefHeadlines?.nationId === citizenNationId ? briefHeadlines.items : [] }) : [];
   const closeMorningBrief = () => { setMorningBriefOpen(false); if (briefStorageKey) try { window.localStorage.setItem(briefStorageKey, briefDayKey(Date.now())); } catch {} };
   const contextTitle = citizenNation?.id === 'korund' && viewMode === 'market' ? 'State rations' : citizenNation?.id === 'korund' && viewMode === 'workplace' ? 'Assigned work' : viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? 'Country travel' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell marketOpen={marketShown} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
@@ -1665,7 +1797,11 @@ export default function Home() {
       socialDock={<CitizenDock key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} collectivePetitions={collectivePetitions} election={election} korund={korundPlan} onNavigate={navigateGame} />}
       accountControls={<>{citizenNation && !guestActive && <button id={MORNING_BRIEF_TRIGGER_ID} type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief" aria-haspopup="dialog" aria-expanded={morningBriefOpen} aria-controls={morningBriefOpen ? 'morning-brief' : undefined}><Newspaper size={17} aria-hidden="true" /><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
-      {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
+      {walletOpen && clerkConfigured && citizenNation?.id === 'kindle' && !guestActive && <WalletPanel sparkMinor={economy?.walletMinor} tesseraMinor={economy?.tesseraMinor} transactions={economy?.transactions} onBuyTessera={kioskOpen ? buyTessera : undefined} onClose={() => { setWalletOpen(false); requestAnimationFrame(() => (document.querySelector('.game-wallet-button') as HTMLElement | null)?.focus()); }} />}
+      {qualityOrder && rewards[qualityOrder.order.id] && <ShiftQualityStep orderName={qualityOrder.order.name} cost={qualityOrder.order.cost} base={rewards[qualityOrder.order.id]} questions={qualityOrder.questions}
+        onCancel={() => setQualityOrder(null)} onStart={(choice) => { const { order, ticket } = qualityOrder; setQualityOrder(null);
+          const quality: QualityInput | undefined = 'skip' in choice ? choice : ticket ? { answers: choice.answers, ticket } : undefined;
+          void runWork('commit-work', order, undefined, quality); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}
