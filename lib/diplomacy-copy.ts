@@ -13,7 +13,7 @@
  * the break penalty is named without a number. No line implies human citizens vote on treaties: every ratifier is an AI
  * body. No real-world treaty, country or leader is named. Placeholders ({nationA}, {nationB}, {treaty}, {endsAt}) are
  * pre-formatted runtime strings capped by the shared name cap, which this module re-exports (COUP_NAME_MAX from
- * lib/palace-coup-copy.ts). Lines that speak for the Crown are AI-badged. All wording is new: `proposal: true`. */
+ * lib/palace-coup-copy.ts). Lines that speak for the Crown, and the Korund line in which the Chairman ratifies (#381, docs ui-ux 23.2), are AI-badged. All wording is new: `proposal: true`. */
 
 export { COUP_NAME_MAX as DIPLOMACY_NAME_MAX } from './palace-coup-copy';
 
@@ -85,7 +85,7 @@ export const ratificationNews:readonly RatificationNews[]=[
   body:'The Assembly ratified the {treaty} between {nationA} and {nationB} by a two-thirds vote.'},
  {key:'kindle:trade',nationId:'kindle',ratifier:'Assembly',aiBadge:false,proposal:true,
   body:'The Assembly ratified the {treaty} between {nationA} and {nationB} by a simple majority.'},
- {key:'korund:any',nationId:'korund',ratifier:'Chairman',aiBadge:false,proposal:true,
+ {key:'korund:any',nationId:'korund',ratifier:'Chairman',aiBadge:true,proposal:true,
   body:'Korund State Media reports: the Chairman has ratified the {treaty} with {nationB}.'},
  {key:'aurelle:any',nationId:'aurelle',ratifier:'Crown',aiBadge:true,proposal:true,
   body:'Be it known: the Crown ratifies the {treaty} with {nationB} by royal decree.'},

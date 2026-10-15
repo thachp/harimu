@@ -115,10 +115,11 @@ test('#334 mobilization-ended news: each nation has ours / against-us / world no
   }
   assert.deepEqual(noticesFor('kindle').byline,kindlePress.byline); assert.deepEqual(noticesFor('korund').byline,korundStateMedia.byline); assert.deepEqual(noticesFor('aurelle').byline,aurelleGazette.byline);
 });
-test('#334 AI badge only on Aurelle "Be it known" Crown lines', () => {
-  for (const x of mobilizationEndedNotices) for (const nt of Object.values(x.notices)) assert.equal(nt.aiBadge,/^Be it known/.test(nt.body),nt.id);
+test('#334 AI badge on Aurelle "Be it known" Crown lines and, per #381, Korund own-war State Media lines', () => {
+  for (const x of mobilizationEndedNotices) for (const nt of Object.values(x.notices)) assert.equal(nt.aiBadge,/^Be it known/.test(nt.body)||(x.nationId==='korund'&&!nt.id.endsWith('-world')),nt.id);
   assert.equal(endedNoticesFor('aurelle').notices.world.aiBadge,false); assert.equal(endedNoticesFor('aurelle').notices.ours.aiBadge,true);
-  for (const id of ['kindle','korund']) for (const nt of Object.values(endedNoticesFor(id).notices)) assert.equal(nt.aiBadge,false);
+  for (const nt of Object.values(endedNoticesFor('kindle').notices)) assert.equal(nt.aiBadge,false);
+  assert.equal(endedNoticesFor('korund').notices.ours.aiBadge,true); assert.equal(endedNoticesFor('korund').notices['against-us'].aiBadge,true); assert.equal(endedNoticesFor('korund').notices.world.aiBadge,false);
 });
 test('#334 ended notices use only {attacker} and {defender}; no time placeholder and no grievance or lock placeholder', () => {
   for (const nt of endNotices()) for (const m of (nt.headline+nt.body).match(/\{[^}]*\}/g)??[]) assert.ok(['{attacker}','{defender}'].includes(m),`${m} in ${nt.id}`);
