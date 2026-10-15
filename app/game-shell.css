@@ -361,3 +361,19 @@ body:has(.harimu-game){overflow:auto}
 /* QA2 #534 (CI fonts differ from local ones): the header never splits a word. With the crest, the title column cannot shrink below its longest word (min-content, and overflow-wrap:break-word so it does not count as breakable),
    and the row wraps: when crest + title + button do not fit side by side the crest takes its own row above. Flag off: no crest, so no :has match and nothing changes. */
 .game-inspector-title:has(>.nation-crest){flex-wrap:wrap;row-gap:10px}.game-inspector-title:has(>.nation-crest)>div{flex:1 1 0;min-width:min-content;overflow-wrap:break-word}.game-inspector-title:has(>.nation-crest) h1{overflow-wrap:break-word}.game-inspector-title:has(>.nation-crest)>button{margin-left:auto}
+/* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
+   this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
+.game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}
+.game-hud-v2 .game-crest{border-color:#d0ad54;color:#ead08a;box-shadow:inset 0 0 0 2px #071820,inset 0 0 0 3px #d0ad5455}
+.game-hud-v2 .game-resources{align-self:center;align-items:stretch;gap:3px}
+.game-hud-v2 .game-resources>div,.game-hud-v2 .game-resources>.game-hud-help,.game-hud-v2 .game-resources>.game-wallet-button{border:1px solid #2f4d57;border-radius:10px;background:#0d2530}
+.game-hud-v2 .game-resources>.game-hud-help:last-child,.game-hud-v2 .game-resources>div:last-child{border-right:1px solid #2f4d57}
+.game-hud-v2 .game-resources>.game-hud-help>summary,.game-hud-v2 .game-resources>.game-wallet-button{border-radius:10px}
+.game-hud-v2 .game-resources>.game-hud-help:hover,.game-hud-v2 .game-resources>.game-wallet-button:hover,.game-hud-v2 .game-resources>.game-hud-help[open]{border-color:#d0ad5499;background:#10303c}
+.game-hud-v2 .game-account>.game-settings-button,.game-hud-v2 .game-notifications{border-radius:10px;border-color:#3f5f69}
+.game-hud-v2 .game-account>.game-settings-button:hover,.game-hud-v2 .game-notifications:hover{border-color:#d0ad5499}
+.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]{display:inline-flex;align-items:center;gap:6px;padding-left:6px;border-radius:999px;border-color:#3f5f69}
+.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]::before{content:'';flex:none;width:18px;height:18px;border-radius:50%;border:1px solid #d0ad54;background:radial-gradient(circle at 50% 36%,#e6d9b8 0 17%,transparent 18%),radial-gradient(ellipse at 50% 112%,#e6d9b8 0 38%,transparent 39%),#25525a}
+.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]:hover{border-color:#d0ad5499}
+@media(max-width:760px){.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]{gap:3px;padding-left:3px}.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]::before{width:14px;height:14px}.game-hud-v2 .game-account{column-gap:3px}.game-hud-v2 .game-resources{gap:3px}.game-hud-v2 .game-resources>*,.game-hud-v2 .game-resources>.game-hud-help{flex-basis:calc(64px * var(--text-scale, 1))}.game-hud-v2 .game-resources>div,.game-hud-v2 .game-resources>.game-hud-help>summary,.game-hud-v2 .game-resources>.game-wallet-button{padding-inline:3px;column-gap:3px}}
+@media(min-width:1101px){.game-hud-v2 .game-account{gap:10px}}

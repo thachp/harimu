@@ -52,7 +52,9 @@ export async function acceptMission(db: GameDatabase, userId: string, command: {
   const mission = rows[0];
   if (!mission) return fail(409, 'no_invitation', 'You have no invitation waiting.');
   if (missionStatus(missionTimes(mission), now) === 'lapsed') return fail(409, 'invitation_expired', 'That invitation has lapsed. Ask for a new one.');
-  const arrives = now + missionTravelSeconds(mission.home_nation, mission.host_nation);
+  const travel = missionTravelSeconds(mission.home_nation, mission.host_nation);
+  if (travel === null) return fail(409, 'not_available', 'That nation is not available for missionaries yet.'); // #491
+  const arrives = now + travel;
   await db.prepare(`UPDATE faith_missions SET accepted_at=?,arrives_at=?,ends_at=?,accept_request_id=? WHERE id=? AND user_id=? AND accepted_at IS NULL AND closed_at IS NULL AND expires_at>?`)
     .bind(now, arrives, arrives + presenceSeconds(), command.requestId, mission.id, userId, now).run();
   const saved = await db.prepare(`SELECT ${missionColumns} FROM faith_missions WHERE accept_request_id=?`).bind(command.requestId).first<MissionRow>();
