@@ -16,7 +16,7 @@ const out=join(mkdtempSync(join(tmpdir(),'assembly-copy-')),'assembly-copy.mjs')
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 const { ballotExplainer, resultsCaption, assemblyPress, assemblyStage, ASSEMBLY_STAGES, ASSEMBLY_PLACEHOLDERS, ASSEMBLY_NAME_MAX, ASSEMBLY_LABEL_MAX, ASSEMBLY_BODY_MAX, ASSEMBLY_BYLINE } = await import(pathToFileURL(out).href);
 
-const lines=()=>[...ballotExplainer.lines,ballotExplainer.aiNote,resultsCaption.humanAndBloc,resultsCaption.districtCounts];
+const lines=()=>[...ballotExplainer.lines,ballotExplainer.aiNote,resultsCaption.humanVotesOnly,resultsCaption.districtCounts];
 const pressTexts=()=>assemblyPress.flatMap(s=>s.items.flatMap(i=>[i.headline,i.body]));
 const all=()=>[ballotExplainer.title,...lines().map(l=>l.text),...pressTexts()];
 const fill=t=>ASSEMBLY_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(ASSEMBLY_NAME_MAX)),t);
@@ -57,18 +57,18 @@ test('no figures: seat counts only through {seats}; "half" and "one list" are do
     assert.doesNotMatch(t.replace('Half the','').replace('Half the','').replace(/\bone (party )?list\b/gi,'').replace('One list per voter',''),/\b(half|one)\b/i, t);
   }
 });
-test('docs-supported claims: half the seats, one list per own district, proportional, secret, AI bloc shown separately (§9.3)', () => {
+test('docs-supported claims: half the seats, one list per own district, proportional, secret, human votes only (§9.3, Decision 65)', () => {
   const e=ballotExplainer.lines.map(l=>l.text).join(' ');
   assert.match(e,/Half the Assembly seats/); assert.match(e,/one party list, in your own district/); assert.match(e,/in proportion to votes in each district/);
   assert.match(e,/ballot is secret/); assert.match(e,/hidden until voting closes/);
-  assert.match(resultsCaption.humanAndBloc.text,/Human votes and the AI bloc are counted and shown separately/); assert.doesNotMatch(resultsCaption.humanAndBloc.text,/Simulated Public/);
+  assert.match(resultsCaption.humanVotesOnly.text,/Only human votes are counted in each district/); assert.doesNotMatch(resultsCaption.humanVotesOnly.text,/Simulated Public/);
   assert.match(ballotExplainer.aiNote.text,/AI candidates/);
   assert.doesNotMatch(all().join(' '),/D'Hondt|Hare|Sainte|Droop|first-past/i);
 });
 test('AI honesty: parties not quoted, no AI citizens voting as individuals, no endorsing body', () => {
   const t=all().join(' ');
   assert.doesNotMatch(t,/["“”]|\bsaid\b|\bsays\b|spokes/i);
-  assert.doesNotMatch(t,/AI citizens?|Simulated Public/i); assert.equal(t.match(/AI bloc/g).length,1); assert.doesNotMatch(t,/endors|backed by|union|guild|church|bank/i);
+  assert.doesNotMatch(t,/AI citizens?|Simulated Public/i); assert.doesNotMatch(t,/AI bloc/); assert.doesNotMatch(t,/endors|backed by|union|guild|church|bank/i);
 });
 test('no real-world references and no Notable', () => {
   const t=all().join(' ');
