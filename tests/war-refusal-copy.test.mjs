@@ -13,7 +13,7 @@ const src=readFileSync('lib/war-refusal-copy.ts','utf8').replace("from './palace
 const out=join(mkdtempSync(join(tmpdir(),'war-refusal-copy-')),'war-refusal-copy.mjs');
 writeFileSync(out,ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 const R = await import(pathToFileURL(out).href);
-const { declarationRefusals:DR, refusalFor, mobilizationCountdown:MC, mobilizationCountdownLabel:ML, REFUSAL_KEYS, REFUSAL_NATIONS, REFUSAL_PLACEHOLDERS, REFUSAL_NAME_MAX, REFUSAL_LABEL_MAX, REFUSAL_CAPTION_MAX, REFUSAL_LINE_MAX, OFFENSIVE_WAR_INTERVAL_DAYS, ACTIVE_OFFENSIVE_WARS_MAX, MOBILIZATION_HOURS } = R;
+const { declarationRefusals:DR, refusalFor, mobilizationCountdown:MC, mobilizationCountdownLabel:ML, REFUSAL_KEYS, REFUSAL_NATIONS, REFUSAL_PLACEHOLDERS, REFUSAL_NAME_MAX, REFUSAL_LABEL_MAX, REFUSAL_CAPTION_MAX, REFUSAL_LINE_MAX, ACTIVE_OFFENSIVE_WARS_MAX, MOBILIZATION_HOURS } = R;
 
 const labels=()=>[...DR.map(x=>x.label),ML.text];
 const refusalLines=()=>DR.flatMap(x=>x.lines.map(l=>l.text));
@@ -23,8 +23,8 @@ const fill=t=>REFUSAL_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(REFUS
 
 test('shared name cap re-exported; limits 40/80/140; placeholders; the docs figures', () => {
   assert.equal(REFUSAL_NAME_MAX,COUP_NAME_MAX); assert.equal(REFUSAL_LABEL_MAX,40); assert.equal(REFUSAL_CAPTION_MAX,80); assert.equal(REFUSAL_LINE_MAX,140);
-  assert.deepEqual([...REFUSAL_PLACEHOLDERS],['{endsAt}','{nextAt}']);
-  assert.equal(OFFENSIVE_WAR_INTERVAL_DAYS,14); assert.equal(ACTIVE_OFFENSIVE_WARS_MAX,2); assert.equal(MOBILIZATION_HOURS,48);
+  assert.deepEqual([...REFUSAL_PLACEHOLDERS],['{endsAt}','{nextAt}','{days}']);
+  assert.equal('OFFENSIVE_WAR_INTERVAL_DAYS' in R,false); assert.equal(ACTIVE_OFFENSIVE_WARS_MAX,2); assert.equal(MOBILIZATION_HOURS,48);
 });
 test('every key is present: three refusals with two variants each, a countdown caption per nation; every line is a proposal', () => {
   assert.deepEqual([...REFUSAL_KEYS],['rate_limit','active_war_cap','casus_belli']); assert.deepEqual(DR.map(x=>x.key),[...REFUSAL_KEYS]);
@@ -40,13 +40,13 @@ test('limits: labels 40, countdown captions 80, refusal lines 140, with every pl
 });
 test('only known placeholders, in the right lines', () => {
   for (const t of all()) for (const m of t.match(/\{[^}]*\}/g)??[]) assert.ok(REFUSAL_PLACEHOLDERS.includes(m),`${m} in ${t}`);
-  assert.match(refusalFor('rate_limit').lines[1].text,/\{nextAt\}/); for (const n of REFUSAL_NATIONS) assert.match(MC[n].text,/\{endsAt\}/);
-  for (const t of [...refusalFor('rate_limit').lines.slice(0,1),...refusalFor('active_war_cap').lines,...refusalFor('casus_belli').lines].map(l=>l.text)) assert.doesNotMatch(t,/\{/,t);
+  assert.match(refusalFor('rate_limit').lines[1].text,/\{nextAt\}/); assert.match(refusalFor('rate_limit').lines[0].text,/every \{days\} real days/); for (const n of REFUSAL_NATIONS) assert.match(MC[n].text,/\{endsAt\}/);
+  for (const t of [...refusalFor('active_war_cap').lines,...refusalFor('casus_belli').lines].map(l=>l.text)) assert.doesNotMatch(t,/\{/,t);
   for (const t of labels()) assert.doesNotMatch(t,/\{/,t);
 });
-test('figures: only the docs\' 1, 14 and 2 (rate limits); no other digits or number words anywhere', () => {
-  assert.match(refusalFor('rate_limit').lines[0].text,/at most 1 new offensive war every 14 real days/); assert.match(refusalFor('active_war_cap').lines[0].text,/at most 2 active offensive wars/);
-  for (const t of all()) { const bare=t.replace(/\{[^}]*\}/g,'').replace(/\bat most 1 new\b|\bevery 14 real days\b|\bat most 2 active\b|\balready has 2 active\b/g,''); assert.doesNotMatch(bare,/\d|%|percent|\b(one|two|three|four|five|six|seven|ten|twice|once|half)\b|\b(hours?|weeks?|months?|years?)\b/i,t); }
+test('figures: only the docs\' 1 and 2 (rate limits), and the interval is the {days} placeholder; no other digits or number words anywhere', () => {
+  assert.match(refusalFor('rate_limit').lines[0].text,/at most 1 new offensive war every \{days\} real days/); assert.match(refusalFor('active_war_cap').lines[0].text,/at most 2 active offensive wars/);
+  for (const t of all()) { const bare=t.replace(/\{[^}]*\}/g,'').replace(/\bat most 1 new\b|\bat most 2 active\b|\balready has 2 active\b/g,''); assert.doesNotMatch(bare,/\d|%|percent|\b(one|two|three|four|five|six|seven|ten|twice|once|half)\b|\b(hours?|weeks?|months?|years?)\b/i,t); }
   for (const t of captions()) assert.doesNotMatch(t.replace(/\{[^}]*\}/g,''),/\d/,t);
 });
 test('refusals give reasons, not threats; the casus belli line names no score or threshold; the rate limit is not blamed on anyone', () => {
