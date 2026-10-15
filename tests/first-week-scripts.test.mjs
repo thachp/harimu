@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { firstWeekScripts, firstWeekScript, kindleFirstWeek, korundFirstWeek, aurelleFirstWeek, TUTORIAL_DAYS, TUTORIAL_TITLE_MAX, TUTORIAL_LINE_MAX, TUTORIAL_BRIEFING_MIN, TUTORIAL_BRIEFING_MAX, GUIDED_DAYS } from '../lib/first-week-scripts.ts';
+import { firstWeekScripts, firstWeekScript, kindleFirstWeek, tutorialDayFor, korundFirstWeek, aurelleFirstWeek, TUTORIAL_DAYS, TUTORIAL_TITLE_MAX, TUTORIAL_LINE_MAX, TUTORIAL_BRIEFING_MIN, TUTORIAL_BRIEFING_MAX, GUIDED_DAYS } from '../lib/first-week-scripts.ts';
 import { nationalServiceDays } from '../lib/varkand-national-service.ts';
 import { citizenNameLists } from '../lib/citizen-names.ts';
 
@@ -64,4 +64,24 @@ test('Aurelle beats from the issue and canon; no noble house named, no claimant 
   assert.doesNotMatch(lines(d3).join(' '),/debase/); assert.match(lines(d3).join(' '),/chartered market/); assert.match(lines(d3).join(' '),/Crown/);
   assert.equal(d4.kind,'optional-tip'); assert.match(d4.briefing.join(' '),/debases/);
   assert.doesNotMatch(text,/\bHouse of\b|of the \w+ House\b/); assert.doesNotMatch(text,/claimant|pretender|pledge|\bcoups?\b|usurp/i);
+});
+
+// #365: flag-off variants. With the market flag off, no Kindle first-week line mentions the Market.
+test('market open or no variant: tutorialDayFor returns the day unchanged', () => {
+  for (const s of scripts) for (const x of s.days) { assert.equal(tutorialDayFor(x,true),x); if (!x.marketOff) assert.equal(tutorialDayFor(x,false),x); }
+});
+test('flag off: no Kindle first-week line mentions the Market, and day 3 buys from the starter merchant', () => {
+  const days=kindleFirstWeek.days.map(x=>tutorialDayFor(x,false));
+  for (const x of days) { assert.doesNotMatch([x.title,x.objective,...x.briefing,x.completion,x.fallback??''].join(' '),/market|order book|order\b|stall/i, `day ${x.day}`); assert.equal(x.marketOff,undefined); assert.equal(x.proposal,true); }
+  const d3=days[2]; assert.match(d3.objective,/starter merchant/); assert.match(d3.fallback,/merchant/); assert.equal(d3.title,'Read the Price Board'); assert.equal(d3.kind,'guided');
+  // Same shape and limits as the live day.
+  for (const [i,x] of days.entries()) { const live=kindleFirstWeek.days[i]; assert.equal(x.day,live.day); assert.equal(x.kind,live.kind); assert.equal(x.title,live.title);
+    assert.ok(x.briefing.length>=TUTORIAL_BRIEFING_MIN&&x.briefing.length<=TUTORIAL_BRIEFING_MAX); for (const l of [x.objective,x.completion,x.fallback??'',...x.briefing]) assert.ok(l.length<=TUTORIAL_LINE_MAX, l); }
+  // Days with no Market line keep the live text.
+  for (const i of [0,1,3,4,5]) assert.equal(days[i],kindleFirstWeek.days[i]);
+  assert.match(days[6].briefing.join(' '),/free economy/); assert.match(days[6].briefing.join(' '),/Inequality/);
+});
+test('flag on: Kindle day 3 still uses the player market with a stall fallback; Korund and Aurelle have no variants', () => {
+  const d3=tutorialDayFor(kindleFirstWeek.days[2],true); assert.match(d3.objective,/player market/); assert.match(d3.fallback,/stall/);
+  for (const s of [korundFirstWeek,aurelleFirstWeek]) for (const x of s.days) assert.equal(x.marketOff,undefined);
 });

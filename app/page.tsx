@@ -35,6 +35,7 @@ import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
 import { SceneNews } from './world-scene';
+import { noticeboardEvents } from '@/lib/noticeboard'; // #375
 import { firstLoopStep } from '@/lib/first-loop';
 import { starterCopyFor } from '@/lib/starter-copy';
 import { CitizenshipDialog } from './citizenship-dialog';
@@ -432,7 +433,6 @@ function ClerkAccountControl() {
 
   return (
     <div className="account-control">
-      {process.env.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW === 'true' && <span className="development-preview-label" title="Fresh development world. Production progress is separate.">Development preview</span>}
       <Show when="signed-out">
         <SignInButton mode="modal">
           <button className="account-sign-in" type="button">Sign in</button>
@@ -1531,7 +1531,7 @@ export default function Home() {
     return () => { active = false; };
   }, [citizenNationId]);
   const goods = (item:string)=>economy?.inventory.find(entry=>entry.item===item)?.quantity ?? 0;
-  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,copy:starterCopyFor(citizenNation.id),enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
+  const firstLoop = citizenNation && firstLoopStep({nationId:citizenNation.id,copy:starterCopyFor(citizenNation.id,{marketOpen:marketShown}),marketOpen:marketShown,enrolledAt:citizenshipStatus?.enrolledAt,now:guideNow,
     shifts:workShifts,food:citizenNation.id==='aurelle' ? aurellePlan?.foodQuantity ?? 0 : citizenNation.id==='korund' ? korundPlan?.foodQuantity ?? 0 : goods('food'),
     mealReadyAt:citizenNation.id==='aurelle' ? aurellePlan?.mealReadyAt : citizenNation.id==='korund' ? korundPlan?.mealReadyAt : market?.mealReadyAt});
   const weekKey = citizenNation ? weekStoreKey : '';
@@ -1691,7 +1691,7 @@ export default function Home() {
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
 
-    {(!clerkConfigured || !citizenNationId) && <SceneNews events={worldEvents} title="City noticeboard" />}
+    {(!clerkConfigured || !citizenNationId) && <SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
     <NationInstitutions incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
