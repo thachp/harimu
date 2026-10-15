@@ -4,6 +4,7 @@ import {useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {displayTimestamp,textScales,type TextScale} from '../lib/display-preferences';
 import {useDisplayPreferences} from './display-preferences';
+import {DevelopmentPreviewNote} from './development-preview-note';
 export function GameSettings(){
  const [open,setOpen]=useState(false);const launcher=useRef<HTMLButtonElement>(null);
  return <><button ref={launcher} type="button" className="game-settings-button" aria-label="Game settings" aria-haspopup="dialog" onClick={()=>setOpen(true)}><Gear size={17} aria-hidden="true"/></button>{open&&createPortal(<SettingsDialog onClose={()=>{setOpen(false);launcher.current?.focus();}}/>,document.body)}</>;
@@ -21,5 +22,6 @@ function SettingsDialog({onClose}:{onClose:()=>void}){
  <label>Audio <select disabled aria-describedby="settings-audio-reason" value="off" onChange={()=>{}}><option value="off">Off</option></select></label><p id="settings-audio-reason">This preview has no music or sound effects.</p>
  <label>Language <select disabled aria-describedby="settings-language-reason" value="en" onChange={()=>{}}><option value="en">English</option></select></label><p id="settings-language-reason">English is the only translated language available in this preview.</p>
  {!storageAvailable&&<p role="status">Browser storage is unavailable. Changes apply for this visit and may not survive reload.</p>}
+ <DevelopmentPreviewNote/>
  </dialog>;
 }
