@@ -1,15 +1,16 @@
 /** AI-leader treaty proposal announcements (issue #440, companion to #400 / #418). Content only: lib/diplomacy.ts owns `runAiTreatyProposals`
  * and the proposals themselves, and no UI imports this. Break notices and the NAP-blocked war refusal live in the separate treaty-break copy module (#435),
  * not here. Canon: harimu-docs trade-diplomacy-sanctions §13.1 (every ratifier is an AI body) and §13.2 (a non-aggression pact bars war
- * declarations between the signatories; a trade agreement brings tariff reductions, quotas and supply contracts), ai-leadership (Kindle's
- * AI Cabinet, Korund's AI Chairman and Aurelle's AI Crown are the AI leaders that propose, matching `treatyAiLeaders`) and the three press
+ * declarations between the signatories; a trade agreement brings tariff reductions, quotas and supply contracts), ai-leadership and the
+ * §13.1 table of AI negotiators (Kindle's President and Secretary of State, Korund's Chairman and Aurelle's Crown; the server's
+ * `treatyAiLeaders` labels Kindle's leader "AI Cabinet", but the docs titles are used here) and the three press
  * voices (Republic Wire Service, Korund State Media, Court Gazette; bylines are checked against lib/press-templates.ts). Wording differs from
  * the status lines in lib/diplomacy-copy.ts, which this does not replace.
  *
  * Each nation has an announcement for both treaty kinds (non-aggression pact, trade agreement) in two roles. `proposer`: our AI leader
  * proposes to another nation ({other}); the leader speaks, so the line is AI-badged. `recipient`: another nation's AI leader proposes to
  * us ({proposer}); the national outlet reports it, so the line carries a byline and no badge. #381 / ui-ux §23.2: lines that speak for an AI
- * leader are badged (the Cabinet's statement, the Chairman's own act in State Media, the Crown's "Be it known"); bylined reports about a
+ * leader are badged (the President's and Secretary of State's statement, the Chairman's own act in State Media, the Crown's "Be it known"); bylined reports about a
  * foreign leader are not. `proposedBy` is a plain system line for the Foreign affairs panel: the leader label comes in through {leader}.
  *
  * Rules: no digits and no number words, no penalties or costs, and no promise of the outcome (a proposal only awaits ratification; nothing
@@ -49,11 +50,11 @@ const p=(id:string,headline:string,body:string,aiBadge=false):ProposalNotice=>({
 export const aiProposalNews:readonly ProposalNationNews[]=[
  {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
   proposer:{
-   'non-aggression':p('kindle-proposer-non-aggression','The Cabinet proposes a pact','Cabinet: we propose a {treaty} to {other}. It would bar war between us. It awaits ratification.',true),
-   trade:p('kindle-proposer-trade','The Cabinet proposes a trade deal','Cabinet: we propose a {treaty} to {other}. It would open trade between us. It awaits ratification.',true)},
+   'non-aggression':p('kindle-proposer-non-aggression','The President proposes a pact','President and Secretary of State: we propose a {treaty} to {other}. It awaits ratification.',true),
+   trade:p('kindle-proposer-trade','The President proposes a trade deal','President and Secretary of State: we propose a {treaty} to {other}. It awaits ratification.',true)},
   recipient:{
-   'non-aggression':p('kindle-recipient-non-aggression','A pact is offered to the Republic','Republic Wire Service: {proposer} proposes a {treaty} to the Republic. It would bar war between them.'),
-   trade:p('kindle-recipient-trade','A trade deal is offered','Republic Wire Service: {proposer} proposes a {treaty} to the Republic. It would open trade between them.')}}},
+   'non-aggression':p('kindle-recipient-non-aggression','A pact is offered to the Republic','Republic Wire Service: {proposer} proposes a {treaty} to the Republic. It awaits ratification.'),
+   trade:p('kindle-recipient-trade','A trade deal is offered','Republic Wire Service: {proposer} proposes a {treaty} to the Republic. It awaits ratification.')}}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
   proposer:{
    'non-aggression':p('korund-proposer-non-aggression','The Chairman offers a pact','Korund State Media reports: the Chairman offers {other} a {treaty}. It would bar war between them.',true),
