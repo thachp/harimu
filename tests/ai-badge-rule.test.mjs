@@ -54,7 +54,9 @@ test('Korund: lines for the state\'s own acts speak for the AI Chairman and Pres
   for (const side of ['ours','against-us']) { assert.equal(war.noticesFor('korund').notices[side].aiBadge,true,`declaration ${side}`); assert.equal(war.endedNoticesFor('korund').notices[side].aiBadge,true,`ended ${side}`); }
   assert.equal(war.noticesFor('korund').notices.world.aiBadge,false); assert.equal(war.endedNoticesFor('korund').notices.world.aiBadge,false);
   assert.equal(dip.ratificationFor('korund:any').aiBadge,true); assert.match(dip.ratificationFor('korund:any').body,/Chairman/);
-  for (const l of Object.values(emb.pressFor('korund').report)) assert.equal(l.aiBadge,true);
+  // Embargo: `{actor}` can be any nation, so the generic Korund report is not an AI leader speaking; the Chairman's own act is (ARC on #407).
+  for (const l of Object.values(emb.pressFor('korund').report)) { assert.equal(l.aiBadge,false); assert.match(l.text,/\{actor\}/); }
+  for (const l of Object.values(emb.pressFor('korund').chairman)) { assert.equal(l.aiBadge,true); assert.match(l.text,/the Chairman/); assert.doesNotMatch(l.text,/\{actor\}/); }
   for (const l of Object.values(peace.peacePressFor('korund').report)) assert.equal(l.aiBadge,true);
   // Same Chairman, same answer in every module: no Korund State Media own-act line is left unbadged.
   assert.equal(war.noticesFor('korund').notices.ours.aiBadge, dip.ratificationFor('korund:any').aiBadge);
