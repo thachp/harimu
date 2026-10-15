@@ -7,7 +7,7 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { mapHeight, mapWidth, mvpNations } from './map-zones';
-import { assaultRefusal, capturableCity, claimSquares, planCapture, recordAssault, siegeCityKey, type CityKind, type SquareFact } from './siege';
+import { assaultRefusal, capturableCity, claimSquares, maxCityIdLength, planCapture, recordAssault, siegeCityKey, validSeconds, type CityKind, type SquareFact } from './siege';
 import { canResolveCityAssault, isWarNation, requestIdOk, warStatus } from './war-rules';
 import { defenseStartHours, readDefenseWindows } from './war';
 
@@ -31,6 +31,8 @@ const progress = async (db: GameDatabase, siegeId: string) => ((await db.prepare
 export async function resolveCityAssault(db: GameDatabase, command: AssaultCommand, now: number, enabled: boolean) {
   if (!enabled) return fail(403, 'disabled', 'War is not open yet.');
   if (!requestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
+  if (!validSeconds(now)) return fail(400, 'bad_request', 'The time must be unix seconds.');
+  if (command.cityId.length > maxCityIdLength) return fail(400, 'bad_request', 'Name the war, the attacking nation and the city.');
   if (!isWarNation(command.nation) || (command.cityKind !== 'outpost' && command.cityKind !== 'founded') || !command.cityId || !command.warId) return fail(400, 'bad_request', 'Name the war, the attacking nation and the city.');
   const kind = command.cityKind as CityKind, key = siegeCityKey(kind, command.cityId);
   const prior = await db.prepare('SELECT a.request_id,a.siege_id,a.assault_day FROM siege_assaults a WHERE a.request_id=?').bind(command.requestId).first<AssaultRow>();
