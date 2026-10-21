@@ -16,8 +16,8 @@ type Row = { id: string; attacker_nation: WarNationId; defender_nation: WarNatio
 /** Unrest added per nation as of `asOf` (epoch seconds), summed over every war the nation is in that is active at that time.
  *  #495: with `losses` on, the frontier squares a nation lost to city captures in those wars during the rolling week before `asOf` (captured_at in (asOf-WEARINESS_WEEK_SECONDS, asOf], docs 15.3
  *  "that week", ARC ruling on #495) feed the capped add-on, netted against the squares the same nation took back by capturing cities in those wars in the same window, floored at 0.
- *  Squares a holder privately kept are not lost (`squares_kept_private` is not counted). [ASSUMPTION] a "recaptured" square is any square the nation won by capture in those wars (captures do not
- *  record which squares were originally whose). Casualties still read zero: nothing in the game records them, and the copy rules ban casualty talk.
+ *  Squares a holder privately kept are not lost (`squares_kept_private` is not counted). [ASSUMPTION, accepted by ARC for now on #495] any square won by capture counts as recaptured, because captures do not
+ *  record the original owner of a square. Casualties still read zero: nothing in the game records them, and the copy rules ban casualty talk.
  *  Read-only SELECTs; a database without the wars or capture table reads as none. */
 export async function readWarWeariness(db: GameDatabase, asOf: number, options: WearinessOptions = {}): Promise<Record<WarNationId, number>> {
   const out = Object.fromEntries(warNations.map(nation => [nation, 0])) as Record<WarNationId, number>;
