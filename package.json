@@ -15,6 +15,7 @@
     "build:cloudflare": "npm run build",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "eval:ai": "node --experimental-strip-types scripts/eval-ai.mjs",
     "test:sql": "python3 scripts/test-sql.py",
     "deploy": "npm run check && npm run build && npm run deploy:cloudflare",
     "check": "npm test && npm run test:sql && npm run lint && tsc --noEmit",
