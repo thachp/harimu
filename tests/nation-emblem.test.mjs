@@ -36,7 +36,7 @@ test('flagged top-bar bell: badge only when unread, polite live count, 44px phon
  assert.match(dock,/\(!topBar\|\|unread>0\)&&<strong>\{unread\}<\/strong>/);
  assert.match(dock,/topBar&&<span className="game-notifications-live" role="status">/);
  assert.equal((dock.match(/unreadInbox\(/g)||[]).length,1,'one unread source feeds the bell, the dock button and the live region');
- assert.match(css,/@media\(max-width:760px\)\{\.game-notifications-topbar\{min-height:44px;min-width:44px\}\}/);
+ assert.match(css,/@media\(max-width:760px\)\{\.game-notifications-topbar\{min-height:44px;min-width:44px\}\.game-notifications-topbar>svg\{display:block\}\}/);
 });
 test('the phone identity-width rule only applies with the emblem on, so the flag-off top bar is unchanged (#78 review)',async()=>{
  const css=await readFile(new URL('../app/game-shell.css',import.meta.url),'utf8'),own=css.slice(css.indexOf('/* #78 nation emblem'));
