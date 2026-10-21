@@ -36,20 +36,24 @@ test('wiring: production keeps the flag "false"; the board renders only in the C
   const prod = await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8');
   assert.match(prod, /"HARIMU_CONFLUENCE_ENABLED"\s*:\s*"false"/);
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
-  assert.match(page, /citizenNation\.id === 'confluence' && priceBoard && <ConfluencePriceBoard board=\{priceBoard\} \/>/);
+  assert.match(page, /citizenNation\.id === 'confluence' && <ConfluencePriceBoard board=\{priceBoard\} \/>/, '#688: Confluence market view only; null board shows the empty state');
   const ui = await readFile(new URL('../app/confluence-price-board.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(ui, /onClick|<button|ActionButton/, 'read-only');
-  assert.match(ui, /The state posts this price within its band\./, 'QA1 copy nit (ARC wording): a posted state price, not an enforced market');
+  assert.match(ui, /from '@\/lib\/confluence-market-copy'/, '#688: wording comes from Content\'s copy module');
   assert.doesNotMatch(ui, /stay inside/);
 });
 
-test('render: the posted-price sentence reads "The state posts this price within its band." beside the 1.00 CUR price and its ±5% band', async t => {
+test('render (#688): Content copy rows with the 1.00 CUR price and its ±5% band; the empty state with no board', async t => {
   const r = await localRuntime(); t.after(() => r.close());
   const m = await r.importModule('lib/confluence-price-band.ts');
   const { loadApp } = await import('./helpers/component-module.mjs');
   const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
   const { ConfluencePriceBoard } = await loadApp('confluence-price-board');
   const html = renderToStaticMarkup(React.createElement(ConfluencePriceBoard, { board: m.confluencePriceBoard('confluence', 'alice', { ...qa, HARIMU_CONFLUENCE_ENABLED: 'true' }) }));
-  assert.ok(html.includes('The state posts this price within its band. This board is read-only.'), html);
-  assert.ok(html.includes('1.00 CUR per bowl') && html.includes('0.95 CUR to 1.05 CUR (±5%)'), html);
+  for (const text of ['Banded price board', 'Rice, per bowl', '<dt>Posted state price</dt><dd>1.00 CUR per bowl</dd>', '<dt>State price band</dt><dd>0.95 CUR to 1.05 CUR (±5%)</dd>',
+    'The state sets a band for each staple and posts a price inside it.', 'This board shows the posted state price. Buying is not open here yet.']) assert.ok(html.includes(text), `${text}\n${html}`);
+  assert.doesNotMatch(html, /\{(staple|portion|price|floor|ceiling|band)\}|No posted state price yet/, 'every placeholder filled; no empty state');
+  const empty = renderToStaticMarkup(React.createElement(ConfluencePriceBoard, { board: null }));
+  assert.ok(empty.includes('Banded price board') && empty.includes('No posted state price yet.'), empty);
+  assert.doesNotMatch(empty, /<dl>|CUR/, 'empty state shows no figures');
 });

@@ -37,7 +37,8 @@ test('no string repeats another lib module; header is scanner-safe', () => {
   for (const t of all()) assert.ok(!others.includes(`'${t}'`)&&!others.includes(`"${t}"`),t);
   assert.doesNotMatch(readFileSync('lib/confluence-market-copy.ts','utf8').split('*/')[0],/\blib\/|\.ts\b|app\/|components\//);
 });
-test('unwired: nothing in app/, components/ or lib/ imports confluence-market-copy', () => {
+test('#688 wired: only the price board imports confluence-market-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('confluence-market-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/confluence-market-copy/,f);
+  const users=[...walk('app'),...walk('components'),...walk('lib')].filter(f=>/\.(t|j)sx?$/.test(f)&&!f.endsWith('confluence-market-copy.ts')&&/confluence-market-copy/.test(readFileSync(f,'utf8')));
+  assert.deepEqual(users,['app/confluence-price-board.tsx']);
 });
