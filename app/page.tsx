@@ -71,6 +71,7 @@ import { FaithPanel, HolidayBanner, useFaith } from './faith-panel';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
+import { ConfluencePillars } from './confluence-pillars';
 import { shiftDeadlineText, shiftDeadlineDelay, deadlineNeedsRefresh } from '@/lib/shift-deadline';
 import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
 import {
@@ -1735,6 +1736,7 @@ export default function Home() {
       </>}
       {viewMode === 'government' && <>
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
+        {citizenNation.id === 'confluence' && <ConfluencePillars />}{/* #487: read-only Four Pillars */}
         {simulation?.sieges && <SiegePanel sieges={simulation.sieges} nationId={citizenNation.id} />}
         <FoundingBanner founding={government?.founding} nationId={citizenNation.id} />
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
