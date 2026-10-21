@@ -21,6 +21,8 @@ test('#688 wired: the panel imports the selector instead of inlining lines', () 
   const panel=readFileSync('app/national-news.tsx','utf8');
   assert.match(panel,/import \{ newsIntroFor \} from '\.\.\/lib\/news-intro-copy'/);
   assert.match(panel,/newsIntroFor\(news\.style,news\.items\.some\(item=>item\.source==='model'\)\)/);
+  for (const k of ['pressWithAi','state','court']) assert.equal(NI[k].proposal,false,k);
+  assert.equal(NI.pressNoAi.proposal,true,'QA1 nit: the AI-off line stays a proposal');
   for (const v of Object.values(NI)) { assert.ok(!panel.includes(`'${v.text}'`),v.text); assert.ok(v.text.length<=NEWS_INTRO_LINE_MAX,v.text); }
 });
 test('the header names no other lib module path', () => {
