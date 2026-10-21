@@ -3,6 +3,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { readVerification } from '@/lib/verification';
+import { readNotEarnedCredits } from '@/lib/tessera-not-earned';
 import { claimReward, parseClaimCommand, readRewardKiosk, tesseraRewardsEnabled, type RewardBindings } from '@/lib/tessera-rewards';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,8 @@ export async function GET(request: Request) {
   if (!tesseraRewardsEnabled(bindings())) return privateJson({ error: 'Not found.', reason: 'disabled' }, 404);
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  return privateJson(await readRewardKiosk(await getDatabase(), userId));
+  const db = await getDatabase();
+  return privateJson({ ...await readRewardKiosk(db, userId), notEarned: await readNotEarnedCredits(db, userId) }); // #466: starter grants and faucet credits, labeled apart, never in the earned totals
 }
 
 export async function POST(request: Request) {

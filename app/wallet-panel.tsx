@@ -51,15 +51,19 @@ function WalletTestFaucet({ grantMinor, granted, claim }: NonNullable<WalletPane
 }
 
 export type WalletRewardRow = { entryId: string; epochDay: number; amountMinor: number; claimedAt?: string };
-export type WalletRewards = { claimable: WalletRewardRow[]; history: WalletRewardRow[]; claimableMinor: number; claimedMinor: number; claimableCount: number; claimedCount: number; claim: (entryId: string) => Promise<string | null> };
+export type WalletNotEarnedRow = { id: string; provenance: 'starter_grant' | 'faucet'; amountMinor: number; occurredAt: string };
+export type WalletRewards = { claimable: WalletRewardRow[]; history: WalletRewardRow[]; notEarned?: WalletNotEarnedRow[]; claimableMinor: number; claimedMinor: number; claimableCount: number; claimedCount: number; claim: (entryId: string) => Promise<string | null> };
 const rewardVoice = kioskNationVoice.kindle; // the wallet is Kindle-only (page.tsx); every line below is from Content's lib/reward-kiosk-copy.ts (#535)
 const rewardsLineWork = 'Tessera earned for settled shift work by verified citizens.'; // ARC's two lines (each under 80 characters); no buy, exchange or cash-out wording, even as a negation
 const rewardsLineCaps = 'Rewards are capped and paid only for verified work.';
 const rewardDay = (epochDay: number) => new Date(epochDay * 86400000).toISOString().slice(0, 10);
 const rewardWork = 'shift work';
 const fillReward = (text: string, minor: number) => text.replace('{reward}', `${formatMinor(minor)} TSR`).replace('{work}', rewardWork);
-/** #466: every row here is provenance "earned" (a settled shift reward). Starter grants and the test faucet are never listed or counted here. */
-function WalletRewardKiosk({ claimable, history, claimableMinor, claimedMinor, claimableCount, claimedCount, claim }: WalletRewards) {
+/** #466: starter grants and test faucet credits get their own labels (Content #535) and sit apart; they are never in the earned totals. */
+const notEarnedLabel = { starter_grant: kioskLabels.starterGrant, faucet: kioskLabels.faucet } as const;
+const notEarnedHelp = { starter_grant: kioskLabels.starterGrantHelp.text, faucet: kioskLabels.faucetHelp.text } as const;
+/** #466: every earned row here is provenance "earned" (a settled shift reward). Starter grants and the test faucet are never listed or counted here. */
+function WalletRewardKiosk({ claimable, history, notEarned = [], claimableMinor, claimedMinor, claimableCount, claimedCount, claim }: WalletRewards) {
   const [state, setState] = useState<{ pending: string | null; message: string | null }>({ pending: null, message: null });
   const more = (shown: number, total: number) => total > shown ? <small>Showing the newest {shown} of {total}.</small> : null;
   const earned = `${kioskLabels.earned} · shift reward`;
@@ -76,6 +80,11 @@ function WalletRewardKiosk({ claimable, history, claimableMinor, claimedMinor, c
     {history.length > 0 && <table className="wallet-history"><caption>{kioskHistory.title}</caption><thead><tr><th scope="col">Day</th><th scope="col">Provenance</th><th scope="col">Amount (TSR)</th></tr></thead>
       <tbody>{history.map((row) => <tr key={row.entryId}><td>{rewardDay(row.epochDay)} UTC</td><td>{earned}</td><td className="wallet-credit">{formatMinor(row.amountMinor, true)}</td></tr>)}</tbody></table>}
     {more(history.length, claimedCount)}
+    {notEarned.length > 0 && <>
+      <table className="wallet-history wallet-not-earned"><caption>Other credits (not earned)</caption><thead><tr><th scope="col">Day</th><th scope="col">Provenance</th><th scope="col">Amount (TSR)</th></tr></thead>
+        <tbody>{notEarned.map((row) => <tr key={row.id}><td>{row.occurredAt.slice(0, 10)} UTC</td><td>{notEarnedLabel[row.provenance]}</td><td>{formatMinor(row.amountMinor, true)}</td></tr>)}</tbody></table>
+      {[...new Set(notEarned.map(row => row.provenance))].map(kind => <p key={kind}><small>{notEarnedHelp[kind]}</small></p>)}
+    </>}
   </section>;
 }
 
