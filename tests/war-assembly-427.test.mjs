@@ -33,6 +33,12 @@ test('the vote: more than half of ALL seats passes; exactly half (a tie) fails; 
   assert.equal(vote('aurelle', { 'steady-hand': 7, 'open-ledger': 6, 'dockside-builders': 5 }).passed, false, '5 of 18');
   assert.equal(vote('korund', { 'steady-hand': 9, 'open-ledger': 9 }).passed, false, 'no quorum: every seat counts in the total, 9 of 18 fails');
   assert.equal(vote('korund', {}).passed, false); assert.equal(vote('korund', { 'open-ledger': -3, 'dockside-builders': NaN, 'steady-hand': 1 }).total, 1);
+  // QA3: the denominator is the whole Assembly. An unknown party is counted as not-yes; a party with empty seats does not shrink the others.
+  const incumbents = { 'steady-hand': 7, 'open-ledger': 6, 'dockside-builders': 5 };
+  assert.deepEqual([vote('korund', { ...incumbents, independents: 3 }).yes, vote('korund', { ...incumbents, independents: 3 }).total, vote('korund', { ...incumbents, independents: 3 }).passed], [11, 21, true], '11 of 21');
+  assert.equal(vote('korund', { ...incumbents, independents: 4 }).passed, false, '11 of 22 is a tie: the unknown party counts against');
+  assert.deepEqual(vote('korund', { 'steady-hand': 0, 'open-ledger': 6, 'dockside-builders': 5, independents: 7 }), { body: 'Assembly', rule: 'majority-of-all-seats', yes: 11, total: 18, passed: true }, 'an empty party is zero, the rest still count');
+  assert.equal(vote('korund', { 'open-ledger': 6, 'dockside-builders': 5, independents: 12 }).passed, false, '11 of 23');
   assert.equal(a.kindleWarVote.length, 2, 'weariness is display only: the vote takes no weariness input');
   assert.doesNotMatch(readFileSync('lib/war-assembly.ts', 'utf8'), /weariness'|readPublicWeariness/, 'the decision never reads weariness');
 });
@@ -62,6 +68,23 @@ for (const backend of [undefined, 'postgres']) {
     assert.equal(counts[0] + counts[1], 1); assert.equal((await c.wars()).length, 1); assert.equal((await c.proposal(k.proposal.id)).status, 'approved');
     const stale = { prepare: sql => { const s = { bind: () => s, first: async () => null, run: async () => ({ meta: {} }), all: async () => ({ results: /status='proposed'/.test(sql) ? [{ id: 'p', request_id: 'req-stale-1', defender_nation: 'aurelle', casus_belli: '', declared_by: 'AI', proposed_at: 1, status: 'proposed', decided_at: null, war_id: null, vote_json: null, reject_reason: null }] : [] }) }; return s; } };
     assert.equal(await c.a.decideKindleWarProposals(stale, c.nowS()), 0, 'no change count, no decision');
+  });
+
+  test(`QA3: the reject path is decided once under concurrent ticks: counts (1,0), never (1,1)${label}`, async t => {
+    const c = await setup(t, backend);
+    const au = await c.declare({ defender: 'aurelle' });
+    const counts = await Promise.all([c.a.decideKindleWarProposals(c.r.db, c.nowS() + 60), c.a.decideKindleWarProposals(c.r.db, c.nowS() + 60)]);
+    assert.deepEqual([...counts].sort(), [0, 1]); assert.equal((await c.proposal(au.proposal.id)).reject_reason, 'assembly_rejected'); assert.deepEqual(await c.wars(), []);
+  });
+
+  test(`QA3: the war vote runs after diplomacy, so a pact ratified on the same tick blocks the declaration${label}`, async t => {
+    const c = await setup(t, backend);
+    const war = await c.declare();
+    const d = await c.r.importModule('lib/diplomacy.ts');
+    assert.equal((await d.proposeTreaty(c.r.db, { proposer: 'kindle', other: 'korund', kind: 'non-aggression', proposedBy: 'AI President', requestId: randomUUID() }, c.nowS(), { enabled: true })).ok, true);
+    await c.sim.runWorldChains(c.sim.worldRunnerChains(c.r.db, c.nowS() + 60, { diplomacy: true, war: true, warAssembly: true }));
+    assert.equal((await c.r.db.prepare("SELECT status FROM treaties WHERE pair_key='kindle:korund'").first()).status, 'in_force', 'ratified this tick');
+    assert.deepEqual([(await c.proposal(war.proposal.id)).status, (await c.proposal(war.proposal.id)).reject_reason], ['rejected', 'non_aggression']); assert.deepEqual(await c.wars(), []);
   });
 
   test(`the Founding Period, a non-aggression pact and the peace lock are checked again at decision time${label}`, async t => {

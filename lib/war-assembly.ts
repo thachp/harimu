@@ -38,7 +38,8 @@ export type WarVote = { body: 'Assembly'; rule: 'majority-of-all-seats'; yes: nu
 /** More than half of ALL seats; no quorum (every seat counts in the total); exactly half is a tie and fails. Integers only. */
 export function kindleWarVote(defender: 'korund' | 'aurelle', seats: PartySeats): WarVote {
   const n = (id: string) => { const v = Math.trunc(Number(seats[id] ?? 0)); return Number.isFinite(v) && v > 0 ? v : 0; };
-  const total = parties.reduce((a, id) => a + n(id), 0), yes = parties.reduce((a, id) => a + (kindleWarStances[defender][id] ? n(id) : 0), 0);
+  // The denominator is the whole Assembly: every seated party, known or not. An unknown party key is counted as not-yes, never dropped.
+  const total = Object.keys(seats).reduce((a, id) => a + n(id), 0), yes = parties.reduce((a, id) => a + (kindleWarStances[defender][id] ? n(id) : 0), 0);
   return { body: 'Assembly', rule: 'majority-of-all-seats', yes, total, passed: total > 0 && yes * 2 > total };
 }
 

@@ -33,8 +33,8 @@ test('advanceWorld runs the chains through runWorldChains and awaits them', () =
   assert.match(source, /\n  await runWorldChains\(worldRunnerChains\(db, now, options\)\);/);
 });
 
-const devOrder = ['spoilage', 'npcSupply', 'aurelleRising', 'aurelleCoup', 'primaries', 'kindleAssembly', 'korundPresidium', 'korundRaids', 'diplomacy', 'targetedSanctions', 'embargo', 'foundingDay30'];
-const allOn = { npcSupply: true, aurelleRising: true, aurelleCoup: true, primaries: {}, kindleAssembly: {}, korundPresidium: true, faithFestivals: true, diplomacy: true, targetedSanctions: true, embargo: true, foundingPeriod: true };
+const devOrder = ['spoilage', 'npcSupply', 'aurelleRising', 'aurelleCoup', 'primaries', 'kindleAssembly', 'korundPresidium', 'korundRaids', 'diplomacy', 'targetedSanctions', 'embargo', 'warAssembly', 'foundingDay30'];
+const allOn = { npcSupply: true, aurelleRising: true, aurelleCoup: true, primaries: {}, kindleAssembly: {}, korundPresidium: true, faithFestivals: true, diplomacy: true, targetedSanctions: true, embargo: true, war: true, warAssembly: true, foundingPeriod: true };
 const fakeDb = { prepare: () => ({ first: async () => null }) };
 
 test('order snapshot: the chains, flattened, are the sequential tick order, and each chain keeps that order when run in parallel', async () => {
