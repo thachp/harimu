@@ -71,6 +71,8 @@ import { FaithPanel, HolidayBanner, useFaith } from './faith-panel';
 import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
+import { ConfluencePriceBoard } from './confluence-price-board';
+import type { PriceBoard } from '@/lib/confluence-price-band';
 import { ConfluencePillars } from './confluence-pillars';
 import { shiftDeadlineText, shiftDeadlineDelay, deadlineNeedsRefresh } from '@/lib/shift-deadline';
 import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
@@ -482,6 +484,7 @@ type CitizenSnapshot = {
   simulation?: SimulationState;
   aurellePlan?: AurellePlanView | null;
   korundPlan?: KorundPlanView | null;
+  confluencePriceBoard?: PriceBoard; // #487
   demoGovernment?: { period: number; counts: Record<string, number> };
   demoReceipts?: string[];
   demoStarterGranted?: boolean;
@@ -575,6 +578,7 @@ export default function Home() {
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
   const aurelleIntent = useRef<AurelleCommand | null>(null);
   const [korundPlan, setKorundPlan] = useState<KorundPlanView | null>(null);
+  const [priceBoard, setPriceBoard] = useState<PriceBoard | null>(null); // #487
   const [korundCommand, setKorundCommand] = useState<KorundCommand | null>(null);
   const korundIntent = useRef<KorundCommand | null>(null);
   const [worldNations, setWorldNations] = useState<Nation[]>(fallbackNations);
@@ -1308,6 +1312,7 @@ export default function Home() {
   const hydrateCitizen = useCallback((snapshot: CitizenSnapshot, requestedAtMs?: number) => {
     setSnapshotRequestedAt(requestedAtMs ?? null);
     setKorundPlan(snapshot.korundPlan ?? null);
+    setPriceBoard(snapshot.confluencePriceBoard ?? null);
     setAurellePlan(snapshot.aurellePlan ?? null);
     if (snapshot.simulation) setSimulation(snapshot.simulation);
     setVerification(snapshot.verification ?? null);
@@ -1729,6 +1734,7 @@ export default function Home() {
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
         <MarketBoard api={orderBookApi} economy={economy} />
+        {citizenNation.id === 'confluence' && priceBoard && <ConfluencePriceBoard board={priceBoard} />}
         {(!orderBookApi.book || playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')) && /* the board replaces fixed-lot listings once it is open; open lots stay cancellable */ <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
           onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />}
         {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
