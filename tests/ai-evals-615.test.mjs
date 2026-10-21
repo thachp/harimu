@@ -1,12 +1,17 @@
 /** #615: AI eval harness v1 (npm run eval:ai). Offline fixtures through each AI feature's real validator; no model call, no secrets. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { evalFeatures, evalTable, featureValidators, readFixtures, runEvals } from './ai-evals/harness.mjs';
+import { evalFeatures, evalTable, featureValidators, modelStageAllowed, readFixtures, runEvals } from './ai-evals/harness.mjs';
+
+const draftRules = ['malformed JSON', 'invented figure', 'illegal action id', 'out-of-bounds parameter', 'markup injection'];
+const answerRules = ['malformed JSON', 'out-of-bounds parameter', 'invented figure', 'private data leak', 'markup injection', 'malformed answer'];
+/** Every rule category each feature's validator enforces must have at least one must_reject fixture. */
+const requiredRules = { news: [...draftRules, 'malformed introduction'], notables: draftRules, cabinet: answerRules, town_hall: answerRules, debate: answerRules };
 
 const load = async t => { const r = await localRuntime(); t.after(() => r.close()); return featureValidators(r.importModule); };
 
@@ -19,6 +24,39 @@ test('every AI feature has at least 5 must_reject and 2 legal fixtures; all must
     assert.ok(r.legal >= 2 && r.accepted === r.legal, `${r.feature} legal`);
   }
   assert.match(evalTable(result), /PASS: zero validator escapes/);
+  for (const f of evalFeatures) {
+    const list = readFixtures(f), cats = new Set(list.filter(x => x.expect === 'must_reject').map(x => x.category));
+    for (const rule of requiredRules[f]) assert.ok(cats.has(rule), `${f}: no must_reject fixture for "${rule}"`);
+    assert.deepEqual(list.filter(x => x.expect === 'model_stage').map(x => [x.id, x.category]).sort(), Object.entries(modelStageAllowed).sort(), `${f}: model_stage is exactly the allowlist`);
+  }
+});
+
+test('each markup fixture breaks only the markup rule: with the markup characters removed the same validator accepts it', async t => {
+  const v = await load(t);
+  for (const f of evalFeatures) for (const x of readFixtures(f).filter(x => x.category === 'markup injection')) {
+    assert.match(x.output, /[<>[\]{}]/); assert.doesNotMatch(x.output.replace(/^\{|\}$/g, ''), /\p{Number}/u, `${f}/${x.id} is digit-free`);
+    const plain = JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(x.output)).map(([k, val]) => [k, typeof val === 'string' ? val.replace(/[<>[\]{}]/g, '') : val])));
+    assert.equal(v[f](x.output), false, `${f}/${x.id}`); assert.equal(v[f](plain), true, `${f}/${x.id} without markup`);
+  }
+});
+
+test('model_stage: off the allowlist, or already refused by the validator, fails the run; ids are printed', async t => {
+  const real = await load(t), all = Object.fromEntries(evalFeatures.map(f => [f, readFixtures(f)]));
+  const relabel = runEvals(real, { ...all, debate: all.debate.map(x => x.id === 'too-short' ? { ...x, expect: 'model_stage' } : x) });
+  assert.ok(relabel.escapes.some(e => e.id === 'too-short' && /not allowlisted/.test(e.why)), 'relabelling a must_reject fixture fails');
+  const recat = runEvals(real, { ...all, news: all.news.map(x => x.id === 'private-data' ? { ...x, category: 'other' } : x) });
+  assert.ok(recat.escapes.some(e => e.id === 'private-data' && /not allowlisted/.test(e.why)), 'an allowlisted id under another category fails');
+  const refused = runEvals(real, { ...all, cabinet: all.cabinet.map(x => x.id === 'injection-echo' ? { ...x, output: '{}' } : x) });
+  assert.ok(refused.escapes.some(e => e.id === 'injection-echo' && /already refuses/.test(e.why)));
+  const table = evalTable(runEvals(real));
+  for (const f of evalFeatures) for (const id of Object.keys(modelStageAllowed)) assert.match(table, new RegExp(`^MODEL_STAGE ${f}/${id}:`, 'm'));
+});
+
+test('real public-figure names appear only in model_stage red-team fixtures: never in legal fixtures or in game content', () => {
+  const names = ['Joe Biden', 'Biden', 'Democratic Party'];
+  for (const f of evalFeatures) for (const x of readFixtures(f)) if (x.expect !== 'model_stage') for (const n of names) assert.ok(!x.output.includes(n), `${f}/${x.id} uses ${n}`);
+  const files = ['lib', 'app', 'worker', 'components', 'public'].filter(d => existsSync(d)).flatMap(d => readdirSync(d, { recursive: true }).map(p => `${d}/${p}`)).filter(p => /\.(tsx?|mdx?|json)$/.test(p));
+  for (const p of files) { const text = readFileSync(p, 'utf8'); for (const n of names) assert.ok(!text.includes(n), `${p} contains ${n}`); }
 });
 
 test('a deliberately broken validator fails the gate (accept-all lets must_reject escape; reject-all refuses legal)', async t => {
