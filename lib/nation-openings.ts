@@ -31,6 +31,9 @@ const liveMapSeeds: Readonly<Partial<Record<NationId, MapSeed>>> = {
   kindle: { capital: { x: 5, y: 4 }, outpost: { x: 8, y: 7 }, biome: ['plains', 'hills', 'volcanic badland'] },
   korund: { capital: { x: 18, y: 4 }, outpost: { x: 15, y: 7 }, biome: ['mountains', 'cliff/plateau', 'hills'] },
   aurelle: { capital: { x: 12, y: 14 }, outpost: { x: 12, y: 11 }, biome: ['cliff/plateau', 'plains', 'coast'] },
+  /** #487 slice 2: Meetwater, the Confluence capital (docs the-confluence.mdx: central delta Heartland). [ASSUMPTION] (4,13) and the outpost (7,10): the docs give no coordinates; the 7x7 block
+   *  is clear of the three live blocks, the Commons and the grid edge on the 24x18 map (tests/confluence-capital-487.test.mjs). Biome from the docs (canals, terraced hills, delta wetland). */
+  confluence: { capital: { x: 4, y: 13 }, outpost: { x: 7, y: 10 }, biome: ['river edge', 'wetland', 'hills'] },
 };
 /** One job a nation offers. `id` must start with the nation id (it is also the work-order id, so ids never collide across nations). `wageMinor` is paid once per claimed shift. */
 export type NationJob = { id: string; name: string; capacityCost: number; hours: number; wageMinor: number; output: string };
