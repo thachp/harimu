@@ -35,6 +35,7 @@ const flagOffPins = {
   HARIMU_FULMARA_ENABLED: 'nation-openings.test.mjs',
   HARIMU_GRAY_MARKET_ENABLED: 'gray-market-43.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',
+  HARIMU_NATION_READINESS_ENABLED: 'nation-readiness-486.test.mjs',
   HARIMU_FAVOR_DECAY_ENABLED: 'favor-decay-529.test.mjs',
   HARIMU_KINDLE_INCOME_TAX_ENABLED: 'kindle-income-tax-86.test.mjs',
   HARIMU_ORDER_BOOK_ENABLED: 'market-flag-off-344.test.mjs',
