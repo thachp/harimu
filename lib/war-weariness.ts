@@ -15,9 +15,9 @@ export type WearinessOptions = { losses?: boolean };
 type Row = { id: string; attacker_nation: WarNationId; defender_nation: WarNationId; mobilization_ends_at: number; ended_at: number | null };
 /** Unrest added per nation as of `asOf` (epoch seconds), summed over every war the nation is in that is active at that time.
  *  #495: with `losses` on, the frontier squares a nation lost to city captures in those wars during the rolling week before `asOf` (captured_at in (asOf-WEARINESS_WEEK_SECONDS, asOf], docs 15.3
- *  "that week", ARC ruling on #495) feed the capped add-on, netted against the squares the same nation took back by capturing cities in those wars in the same window, floored at 0.
- *  Squares a holder privately kept are not lost (`squares_kept_private` is not counted). [ASSUMPTION, accepted by ARC for now on #495] any square won by capture counts as recaptured, because captures do not
- *  record the original owner of a square. Casualties still read zero: nothing in the game records them, and the copy rules ban casualty talk.
+ *  "that week", ARC ruling on #495) feed the capped add-on, netted against the squares the same nation truly recaptured in those wars in the same window, floored at 0.
+ *  A recapture is a square moved to the nation (`city_capture_squares.to_nation`) that an earlier capture had taken from it (`from_nation`); taking an enemy's own square does not net.
+ *  Squares a holder privately kept are not lost (`squares_kept_private` is not counted). Casualties still read zero: nothing in the game records them, and the copy rules ban casualty talk.
  *  Read-only SELECTs; a database without the wars or capture table reads as none. */
 export async function readWarWeariness(db: GameDatabase, asOf: number, options: WearinessOptions = {}): Promise<Record<WarNationId, number>> {
   const out = Object.fromEntries(warNations.map(nation => [nation, 0])) as Record<WarNationId, number>;
@@ -36,7 +36,10 @@ export async function readWarWeariness(db: GameDatabase, asOf: number, options: 
     const none = tolerate(isMissingRelation, { results: [] as Sum[] }), ids = rows.results.map(row => row.id), from = asOf - WEARINESS_WEEK_SECONDS;
     const window = `FROM city_captures WHERE captured_at>? AND captured_at<=? AND war_id IN (${marks})`;
     const losses = await db.prepare(`SELECT defender_nation AS nation,SUM(squares_transferred) AS squares ${window} GROUP BY defender_nation`).bind(from, asOf, ...ids).all<Sum>().catch(none);
-    const gains = await db.prepare(`SELECT attacker_nation AS nation,SUM(squares_transferred) AS squares ${window} GROUP BY attacker_nation`).bind(from, asOf, ...ids).all<Sum>().catch(none);
+    // A true recapture: a square moved to the nation in this window that an earlier capture (any war, at or before it) had taken from that same nation (city_capture_squares.from_nation).
+    const gains = await db.prepare(`SELECT s.to_nation AS nation,COUNT(*) AS squares FROM city_capture_squares s JOIN city_captures c ON c.id=s.capture_id WHERE c.captured_at>? AND c.captured_at<=? AND c.war_id IN (${marks})
+      AND EXISTS (SELECT 1 FROM city_capture_squares ps JOIN city_captures pc ON pc.id=ps.capture_id WHERE ps.x=s.x AND ps.y=s.y AND ps.from_nation=s.to_nation AND pc.id<>c.id AND pc.captured_at<=c.captured_at) GROUP BY s.to_nation`)
+      .bind(from, asOf, ...ids).all<Sum>().catch(none);
     const add = (list: Sum[], sign: number) => { for (const row of list) if ((warNations as readonly string[]).includes(row.nation)) lost[row.nation as WarNationId] += sign * Number(row.squares ?? 0); };
     add(losses.results, 1); add(gains.results, -1);
     for (const nation of warNations) lost[nation] = Math.max(0, lost[nation]);

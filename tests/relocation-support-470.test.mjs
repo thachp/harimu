@@ -137,3 +137,36 @@ test('Postgres 0058 is additive, re-runnable, matches SQLite, and enforces the g
   await assert.rejects(db.exec("INSERT INTO relocation_support_claims VALUES ('c1','ava','r2',100,1)"));
   await db.close();
 });
+
+// QA1 follow-ups on #667: each test below fails under its mutation (weekly-cap re-check removed from the pot insert; lapse `>` to `>=`; before-siege `<` to `<=`).
+for (const backend of ['sqlite', 'postgres']) {
+  test(`weekly cap: two simultaneous first claims on different captures never overrun the cap (${backend})`, async t => {
+    const c = await scene(t, backend, { citizens: [], captures: 4 });
+    for (let i = 1; i <= 3; i++) await c.citizen(`u${i}`, { homeCity: i === 1 ? 'ashby-crossing' : `founded-${i}` });
+    await c.run('INSERT INTO relocation_support_pots (capture_id,protocol_minor,treasury_topup_minor,eligible_count,per_citizen_minor,created_at) VALUES (?,?,?,?,?,?)', 'cap4', 20000, 0, 1, 500, c.now - 3600); // 100.00 left this week
+    const res = await Promise.all([c.claim('u1', 'cap1'), c.claim('u2', 'cap2'), c.claim('u3', 'cap3')].map(p => p.then(body)));
+    const used = Number((await c.r.db.prepare('SELECT SUM(protocol_minor) AS n FROM relocation_support_pots').first()).n);
+    assert.equal(used, rules.reliefWeeklyCapMinor, `the re-check inside the insert holds the weekly cap: ${JSON.stringify(res)}`);
+    assert.equal(res.filter(x => x.ok).length, 1, JSON.stringify(res));
+    assert.equal(res.filter(x => x.reason === 'pot_empty').length, 2, JSON.stringify(res));
+  });
+
+  test(`lapse edge: exactly 30 days after capture still pays; one second later is lapsed (${backend})`, async t => {
+    const c = await scene(t, backend);
+    const capturedAt = Number((await c.r.db.prepare("SELECT captured_at FROM city_captures WHERE id='cap1'").first()).captured_at);
+    c.r.setNow((capturedAt + rules.reliefLapseSeconds) * 1000);
+    for (const id of ['ava', 'ben']) c.r.setVerification(id, evidence(c.r, id)); // fresh evidence at the new clock
+    const atEdge = await body(await c.claim('ava'));
+    assert.equal(atEdge.amountMinor, 500, `exactly at the lapse is still open: ${JSON.stringify(atEdge)}`);
+    c.r.setNow((capturedAt + rules.reliefLapseSeconds + 1) * 1000);
+    assert.equal((await body(await c.claim('ben'))).reason, 'lapsed');
+  });
+
+  test(`siege-start edge: a citizen created exactly at siege start is not eligible; one second before is (${backend})`, async t => {
+    const c = await scene(t, backend, { citizens: [] });
+    const start = Number((await c.r.db.prepare("SELECT created_at FROM city_sieges WHERE id='s1'").first()).created_at);
+    await c.citizen('at', { created: start }); await c.citizen('pre', { created: start - 1 });
+    assert.equal((await body(await c.claim('at'))).reason, 'not_eligible');
+    assert.equal((await body(await c.claim('pre'))).amountMinor, 500);
+  });
+}
