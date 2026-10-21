@@ -33,10 +33,12 @@ test('helper table: live always true; flag off false; flag on + allowlisted true
   for (const bad of [undefined, null, 5, {}, [], '', 'atlantis', 'Kindle', 'KORUND', '__proto__', 'constructor', 'kindle ']) assert.equal(reg.nationPlayable(bad, { ...qa, HARIMU_ATLANTIS_ENABLED: 'true' }, 'qa-1'), false, String(bad));
 });
 
-test('flag names in wrangler match HARIMU_<ID>_ENABLED exactly, are all "false", and are the only opening flags', async () => {
+test('flag names in wrangler match HARIMU_<ID>_ENABLED exactly, are "false" except Confluence in preview (#487), and are the only opening flags', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   const found = Object.fromEntries([...cfg.matchAll(/^\s*"(HARIMU_(CONFLUENCE|MERIDIAN|ILMAR|HOARVALE|VARKAND|VELDWOOD|FULMARA)_ENABLED)"\s*:\s*"([^"]*)"/gm)].map(x => [x[1], x[3]]));
-  assert.deepEqual(found, Object.fromEntries(closed.map(id => [`HARIMU_${id.toUpperCase()}_ENABLED`, 'false'])));
+  assert.deepEqual(found, Object.fromEntries(closed.map(id => [`HARIMU_${id.toUpperCase()}_ENABLED`, id === 'confluence' ? 'true' : 'false'])), '#487: Confluence is on in preview (QA allowlist only)');
+  const prod = await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8');
+  assert.deepEqual(Object.fromEntries([...prod.matchAll(/^\s*"(HARIMU_(CONFLUENCE|MERIDIAN|ILMAR|HOARVALE|VARKAND|VELDWOOD|FULMARA)_ENABLED)"\s*:\s*"([^"]*)"/gm)].map(x => [x[1], x[3]])), Object.fromEntries(closed.map(id => [`HARIMU_${id.toUpperCase()}_ENABLED`, 'false'])), 'production keeps all seven off');
   assert.doesNotMatch(cfg, /HARIMU_(KINDLE|KORUND|AURELLE)_ENABLED/, 'live nations have no opening flag');
 });
 
