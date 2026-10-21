@@ -39,6 +39,7 @@ const flagOffPins = {
   HARIMU_FAVOR_DECAY_ENABLED: 'favor-decay-529.test.mjs',
   HARIMU_KINDLE_INCOME_TAX_ENABLED: 'kindle-income-tax-86.test.mjs',
   HARIMU_ORDER_BOOK_ENABLED: 'market-flag-off-344.test.mjs',
+  HARIMU_MARKET_TICKER_ENABLED: 'market-ticker-459.test.mjs',
   HARIMU_AURELLE_RISING_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_AURELLE_COUP_ENABLED: 'aurelle-coup.test.mjs',
   HARIMU_AURELLE_CHARTERS_ENABLED: 'aurelle-charters-531.test.mjs',
