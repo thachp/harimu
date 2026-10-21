@@ -72,6 +72,7 @@ import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
 import { ConfluencePriceBoard } from './confluence-price-board';
+import { KindleTradingNote } from './kindle-trading-note'; // #688
 import type { PriceBoard } from '@/lib/confluence-price-band';
 import { ConfluencePillars } from './confluence-pillars';
 import { shiftDeadlineText, shiftDeadlineDelay, deadlineNeedsRefresh } from '@/lib/shift-deadline';
@@ -1737,7 +1738,7 @@ export default function Home() {
         {citizenNation.id === 'confluence' && <ConfluencePriceBoard board={priceBoard} />}{/* #688: nothing unless enabled and allowlisted; null = empty state */}
         {citizenNation.id !== 'confluence' && /* #688 (QA2): no Kindle listings form for Confluence citizens */ (!orderBookApi.book || playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')) && /* the board replaces fixed-lot listings once it is open; open lots stay cancellable */ <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
           onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />}
-        {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
+        <KindleTradingNote nationId={citizenNation.id} available={market?.available} />
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
       {viewMode === 'government' && <>
