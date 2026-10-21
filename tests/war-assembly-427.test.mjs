@@ -87,6 +87,20 @@ for (const backend of [undefined, 'postgres']) {
     assert.deepEqual([(await c.proposal(war.proposal.id)).status, (await c.proposal(war.proposal.id)).reject_reason], ['rejected', 'non_aggression']); assert.deepEqual(await c.wars(), []);
   });
 
+  test(`QA3: with a deliberately slow diplomacy runner, the war vote still sees its pact write${label}`, async t => {
+    const c = await setup(t, backend);
+    const war = await c.declare();
+    const d = await c.r.importModule('lib/diplomacy.ts');
+    await d.proposeTreaty(c.r.db, { proposer: 'kindle', other: 'korund', kind: 'non-aggression', proposedBy: 'AI President', requestId: randomUUID() }, c.nowS(), { enabled: true });
+    // Every statement issued from lib/diplomacy waits 40 ms first, so a war vote running in parallel would read the proposals before the pact is in force.
+    const prepare = c.r.db.prepare.bind(c.r.db), slow = s => { const w = Object.create(s); w.bind = (...a) => slow(s.bind(...a));
+      for (const m of ['run', 'first', 'all']) w[m] = async (...a) => { await new Promise(res => setTimeout(res, 40)); return s[m](...a); }; return w; };
+    c.r.db.prepare = sql => new Error().stack.includes('/lib/diplomacy.') ? slow(prepare(sql)) : prepare(sql);
+    try { await c.sim.runWorldChains(c.sim.worldRunnerChains(c.r.db, c.nowS() + 60, { diplomacy: true, war: true, warAssembly: true })); } finally { c.r.db.prepare = prepare; }
+    assert.equal((await c.r.db.prepare("SELECT status FROM treaties WHERE pair_key='kindle:korund'").first()).status, 'in_force');
+    assert.equal((await c.proposal(war.proposal.id)).reject_reason, 'non_aggression', 'the vote ran after the slow pact write'); assert.deepEqual(await c.wars(), []);
+  });
+
   test(`the Founding Period, a non-aggression pact and the peace lock are checked again at decision time${label}`, async t => {
     const c = await setup(t, backend);
     const pact = await c.declare();
