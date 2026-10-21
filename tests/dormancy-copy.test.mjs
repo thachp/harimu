@@ -49,6 +49,7 @@ test('never a penalty: no streak, loss, missed, guilt, pressure or consequence w
     assert.doesNotMatch(t,/\bstreaks?\b|\blost\b|\bloss\w*|\bmiss\w*|missed out|penalt\w*|punish\w*|forfeit\w*|\bexpir\w*|\boverdue\b|\bbehind\b|\bguilt\w*|\bshame\w*|\bfailed?\b|\bfall(en)? behind\b|\bhurry\b|\bsoon\b|\bnow or\b|\bdon't\b|\bwaiting for you\b|\bwe (missed|need) you\b|\bdecay\w*|\bwither\w*|\bneglect\w*|\babandon\w*|!/i,t);
     assert.doesNotMatch(t,/\b(must|have to|need to|should|better)\b/i,t);
   }
+  for (const t of all()) assert.doesNotMatch(t,/\b(staff|odds|chances?)\b/i,t); // ARC (#662): no staff, odds or chance wording
 });
 test('Welcome back frames: a plain civic voice for Kindle, State Media for Korund, the court and Court Gazette for Aurelle; none is badged, none speaks for an AI body or the Crown', () => {
   const w=Object.fromEntries(WB.map(x=>[x.nationId,x]));
@@ -59,9 +60,9 @@ test('Welcome back frames: a plain civic voice for Kindle, State Media for Korun
   for (const t of WB.flatMap(x=>[x.greeting.text,x.news.text])) assert.doesNotMatch(t,/^Be it known|By royal decree|\b(Crown|Monarch|Majesty|decree|Chairman|Presidium|Herald)\b|\bI am an AI\b|["“”]/i,t);
   assert.doesNotMatch(w.kindle.greeting.text+w.kindle.news.text,/State Media|Court|court|Crown|Chairman/);
 });
-test('job-released lines: one per nation, in its own words (job board, Labor Bureau, charter work), each saying the slot was released and how to find work again', () => {
+test('job-released lines: one per nation, in its own words (job board, Labor Bureau, a guild or the chartered markets), each saying the slot was released and how to find work again', () => {
   const j=Object.fromEntries(JR.map(x=>[x.nationId,x.line.text]));
-  assert.match(j.kindle,/job board/); assert.match(j.korund,/Labor Bureau/); assert.match(j.aurelle,/charter work/);
+  assert.match(j.kindle,/job board/); assert.match(j.korund,/Labor Bureau/); assert.match(j.aurelle,/a guild or in the chartered markets/); assert.doesNotMatch(j.aurelle,/charter work/);
   for (const t of Object.values(j)) assert.match(t,/^Your job slot was released\. /);
   assert.equal(new Set(Object.values(j)).size,3);
   assert.doesNotMatch(j.kindle,/Labor Bureau|charter|court/i); assert.doesNotMatch(j.aurelle,/job board|Bureau/i);

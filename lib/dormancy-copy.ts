@@ -9,7 +9,8 @@
  * Voice: each status says what is kept and what pauses, never a penalty, and no line counts days against the player, hurries them or says
  * they were missed. The three Welcome back frames are reports to the citizen, not lines spoken for an AI leader or body, so none carries the
  * AI badge (#381 / ui-ux §23.2): Kindle is a plain civic system voice with no byline, Korund is a State Media briefing and Aurelle a Court
- * Gazette briefing, both with the canon bylines. No frame opens "Be it known" or "By royal decree", and the Crown, the Chairman and the
+ * Gazette briefing, both with the canon bylines. The Aurelle job line follows the nation sheet: guild charters grant trade rights and
+ * commoners trade in chartered markets, so it points to a guild or the chartered markets and does not call a charter a job. No frame opens "Be it known" or "By royal decree", and the Crown, the Chairman and the
  * Presidium never speak.
  *
  * Rules: the only figures are the docs' own 7, 30 and 180 real days, once each, in the status "when" lines. Everything else arrives through
@@ -71,7 +72,7 @@ export const welcomeBack:readonly WelcomeBack[]=[
 export const jobReleased:readonly JobReleased[]=[
  {nationId:'kindle',line:L('Your job slot was released. Open the job board to find work.'),proposal:true},
  {nationId:'korund',line:L('Your job slot was released. Report to the Labor Bureau for a new assignment.'),proposal:true},
- {nationId:'aurelle',line:L('Your job slot was released. Seek charter work to take up a post again.'),proposal:true},
+ {nationId:'aurelle',line:L('Your job slot was released. Look for work with a guild or in the chartered markets.'),proposal:true},
 ];
 
 /** The Dormant Savings Shield, in one line, with no amount, rate or cap. */
