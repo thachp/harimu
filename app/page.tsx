@@ -72,6 +72,7 @@ import { shiftRules, type WorkShift } from '@/lib/work-shifts';
 import { workOrderDockStatus } from '@/lib/work-dock';
 import { fetchIdempotent } from '@/lib/retry-fetch';
 import { ConfluencePriceBoard } from './confluence-price-board';
+import { KindleTradingNote } from './kindle-trading-note'; // #688
 import type { PriceBoard } from '@/lib/confluence-price-band';
 import { ConfluencePillars } from './confluence-pillars';
 import { shiftDeadlineText, shiftDeadlineDelay, deadlineNeedsRefresh } from '@/lib/shift-deadline';
@@ -1735,9 +1736,9 @@ export default function Home() {
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
         <MarketBoard api={orderBookApi} economy={economy} />
         {citizenNation.id === 'confluence' && <ConfluencePriceBoard board={priceBoard} />}{/* #688: nothing unless enabled and allowlisted; null = empty state */}
-        {(!orderBookApi.book || playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')) && /* the board replaces fixed-lot listings once it is open; open lots stay cancellable */ <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
+        {citizenNation.id !== 'confluence' && /* #688 (QA2): no Kindle listings form for Confluence citizens */ (!orderBookApi.book || playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')) && /* the board replaces fixed-lot listings once it is open; open lots stay cancellable */ <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
           onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />}
-        {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}
+        <KindleTradingNote nationId={citizenNation.id} available={market?.available} />
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
       {viewMode === 'government' && <>
@@ -1851,7 +1852,7 @@ export default function Home() {
         ...(market?.quotes ?? []).map(quote => ({ id: quote.item, label: quote.label,
           detail: `Buy ${(quote.buyMinor / 100).toFixed(2)} · Sell ${(quote.sellMinor / 100).toFixed(2)} SPK · ${quote.stock} in stock`,
         })),
-        { id: 'listings', label: 'Citizen listings', detail: `${playerMarket?.listings.filter(lot => lot.status === 'open').length ?? 0} open listings${playerMarket?.available ? '' : ' · Trading unavailable'}` },
+        ...(citizenNation?.id === 'confluence' ? [] : [{ id: 'listings', label: 'Citizen listings', detail: `${playerMarket?.listings.filter(lot => lot.status === 'open').length ?? 0} open listings${playerMarket?.available ? '' : ' · Trading unavailable'}` }]), // #688 (QA2): hidden for Confluence citizens
       ] : viewMode === 'government' ? (government?.roles ?? []).map(role => ({
         id: role.name, label: role.name, detail: role.controller,
       })) : viewMode === 'world' || viewMode === 'nation' ? worldNations.map(nation => ({

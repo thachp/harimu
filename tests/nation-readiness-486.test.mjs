@@ -54,6 +54,10 @@ test('QA1 nit 1: a partial entry is not ready; dropping the currency, wage or jo
 test('QA1 nit 2: map ready also needs the 7x7 block to fit (grid, capitals >= 7, Commons >= 5); a check only', async () => {
   const z = await r.importModule('lib/map-zones.ts');
   assert.equal(mapFitRules.width, z.mapWidth); assert.equal(mapFitRules.height, z.mapHeight);
+  assert.equal(mapFitRules.blockRadius, z.frontierRadius, 'QA1: block radius pinned to map-zones'); assert.deepEqual(mapFitRules.commonsCentre, z.commonsCentre, 'QA1: Commons centre pinned to map-zones');
+  assert.equal(capitalFits({ x: 3, y: 10 }, []), true, 'west edge: x=3 fits'); assert.equal(capitalFits({ x: 2, y: 10 }, []), false, 'x=2 does not');
+  assert.equal(capitalFits({ x: 20, y: 3 }, []), true, 'north edge: y=3 fits'); assert.equal(capitalFits({ x: 20, y: 2 }, []), false, 'y=2 does not');
+  assert.equal(capitalFits({ x: 20, y: 14 }, []), true, 'east and south edges: x=20, y=14 fit');
   const full = nationOpening('confluence');
   const at = capital => openingReadiness({ ...full, capital }).map;
   assert.equal(at({ x: 4, y: 13 }), true, 'Meetwater as placed');
