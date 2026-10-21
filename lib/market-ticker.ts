@@ -46,6 +46,33 @@ export function tickAnnouncement(moves: Moves, goods: readonly TickGood[], lastA
   return changes.length ? tickerCopy.announce.text.replace('{changes}', changes.join(', ')) : null;
 }
 
+/** QA1 nit 1 on #705: Last trade moves seen inside the quiet window are kept (net per good) and said once the window ends, not dropped. */
+type Clock = { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void };
+export function tickAnnouncer(say: (text: string) => void, clock: Clock, windowMs = announceEveryMs) {
+  let lastAt: number | null = null, timer: unknown = null;
+  const pending = new Map<string, { label: string; net: number }>();
+  const flush = (now: number) => {
+    timer = null;
+    const moves: Moves = {}, goods: TickGood[] = [];
+    for (const [good, p] of pending) if (p.net) { moves[good] = { lastTradeMinor: { direction: p.net > 0 ? 'up' : 'down', deltaMinor: Math.abs(p.net) } }; goods.push({ good, label: p.label, bestBidMinor: null, bestAskMinor: null, lastTradeMinor: null }); }
+    pending.clear();
+    const text = tickAnnouncement(moves, goods, null, now);
+    if (text) { lastAt = now; say(text); }
+  };
+  return {
+    offer(moves: Moves, goods: readonly TickGood[], now: number) {
+      for (const g of goods) { const m = moves[g.good]?.lastTradeMinor; if (!m) continue; const p = pending.get(g.good) ?? { label: g.label, net: 0 }; p.net += m.direction === 'up' ? m.deltaMinor : -m.deltaMinor; pending.set(g.good, p); }
+      if (!pending.size || timer !== null) return;
+      if (lastAt === null || now - lastAt >= windowMs) flush(now);
+      else { const at = lastAt + windowMs; timer = clock.setTimeout(() => flush(at), at - now); }
+    },
+    stop() { if (timer !== null) clock.clearTimeout(timer); timer = null; },
+  };
+}
+
+/** QA1 nit 2 on #705: screen readers skip an unchanged live region, so a repeat of the same text alternates a zero-width space suffix. */
+export const freshLiveText = (prev: string, next: string) => (prev === next ? `${next}\u200B` : next);
+
 type Doc = { hidden: boolean; addEventListener(type: 'visibilitychange', fn: () => void): void; removeEventListener(type: 'visibilitychange', fn: () => void): void };
 type Timers = { setInterval(fn: () => void, ms: number): unknown; clearInterval(id: unknown): void };
 /** Polls `load` every interval while the document is visible; pauses when hidden and resumes (with one immediate load) when visible again. Returns stop(). */

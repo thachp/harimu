@@ -9,7 +9,7 @@ import { orderBookLimits, type OrderBookState } from '@/lib/order-book-rules';
 import { shelfLifeDays } from '@/lib/spoilage-rules';
 import { boardLabels, cancelConfirmation, emptyStates, escrowPreview, fillNotice, orderStateLines, rejectionFor, rejectionForReason, rejections, spoilageHints, type Line, type RejectionKey } from '@/lib/market-board-copy';
 import { ActionButton } from './action-button';
-import { moveLabel, priceMoves, startTicker, tickAnnouncement, tickerCopy, type Moves } from '@/lib/market-ticker';
+import { freshLiveText, moveLabel, priceMoves, startTicker, tickAnnouncer, tickerCopy, type Moves } from '@/lib/market-ticker';
 import { useDisplayTimestamp } from './display-preferences';
 
 type Good = OrderBookState['goods'][number];
@@ -53,36 +53,29 @@ export function useOrderBook(active: boolean) {
   const [moves, setMoves] = useState<Moves>({});
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [tick, setTick] = useState('');
-  const announced = useRef<number | null>(null);
+  const [announcer] = useState(() => tickAnnouncer(text => setTick(prev => freshLiveText(prev, text)), { setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: id => clearTimeout(id as ReturnType<typeof setTimeout>) }));
+  useEffect(() => () => announcer.stop(), [announcer]);
   const accept = useCallback((next: OrderBookState, live: boolean) => {
     const found = priceMoves(latest.current?.goods ?? null, next.goods), now = Date.now();
     setMoves(found); setUpdatedAt(now);
-    const say = live ? tickAnnouncement(found, next.goods, announced.current, now) : null;
-    if (say) { announced.current = now; setTick(say); }
+    if (live) announcer.offer(found, next.goods, now);
     setBook(next);
-  }, []);
+  }, [announcer]);
   useEffect(() => { latest.current = book; }, [book]);
-  const load = useCallback(async (signal?: AbortSignal) => {
+  const load = useCallback(async (signal?: AbortSignal, first = false) => { // one fetch-and-parse path for mount and ticks (QA1 nit 4 on #705)
     try {
       const r = await fetch('/api/market/orders', { cache: 'no-store', signal });
       if (!r.ok) return; // signed out or unavailable: no board
       const data = await r.json() as { open?: boolean; book?: OrderBookState; ticker?: boolean };
-      if (data.open && data.book) { setTicker(data.ticker === true); accept(data.book, data.ticker === true); }
+      if (data.open && data.book) { setTicker(data.ticker === true); accept(data.book, !first && data.ticker === true); }
     } catch { /* hidden */ }
   }, [accept]);
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    void (async () => {
-      try {
-        const r = await fetch('/api/market/orders', { cache: 'no-store', signal: controller.signal });
-        if (!r.ok) return; // signed out or unavailable: no board
-        const data = await r.json() as { open?: boolean; book?: OrderBookState; ticker?: boolean };
-        if (data.open && data.book) { setTicker(data.ticker === true); accept(data.book, false); }
-      } catch { /* hidden */ }
-    })();
+    void load(controller.signal, true);
     return () => controller.abort();
-  }, [active, accept]);
+  }, [active, load]);
   useEffect(() => { // #459: poll only while the board is open and the server turned the ticker on; paused while the tab is hidden
     if (!active || !ticker) return;
     return startTicker(() => void load(), document, window);

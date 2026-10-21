@@ -76,3 +76,40 @@ test('reduced motion: the highlight animates only with motion allowed (OS and th
   assert.equal((css.match(/\.board-changed\{animation/g) ?? []).length, 1, 'no unguarded animation');
   assert.doesNotMatch(css.slice(css.indexOf('.board-move{'), css.indexOf('.board-move{') + 200), /animation|transition/);
 });
+
+// QA1 nits on #705 (Refs #459).
+test('a Last trade move inside the quiet window is said once the window ends (net per good), not dropped', async () => {
+  const { tickAnnouncer } = await import('../lib/market-ticker.ts');
+  const said = [], timers = [];
+  const clock = { setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: () => {} };
+  const a = tickAnnouncer(t => said.push(t), clock);
+  const goods = [{ good: 'fruit', label: 'Fruit', bestBidMinor: null, bestAskMinor: null, lastTradeMinor: null }];
+  const mv = (direction, deltaMinor) => ({ fruit: { lastTradeMinor: { direction, deltaMinor } } });
+  a.offer(mv('up', 2), goods, 0);
+  assert.deepEqual(said, ['Market prices updated: Fruit last trade up 0.02 SPK.']);
+  a.offer(mv('up', 5), goods, 20_000); a.offer(mv('down', 1), goods, 40_000);
+  assert.equal(said.length, 1, 'quiet inside the window');
+  assert.equal(timers.length, 1); assert.equal(timers[0].ms, announceEveryMs - 20_000, 'scheduled for the end of the window');
+  timers[0].fn();
+  assert.deepEqual(said.at(-1), 'Market prices updated: Fruit last trade up 0.04 SPK.');
+  a.offer(mv('up', 1), goods, 70_000); a.offer(mv('down', 1), goods, 80_000);
+  timers[1].fn(); assert.equal(said.length, 2, 'a net-zero move says nothing');
+});
+
+test('repeated identical announcements still change the live region (zero-width suffix alternates)', async () => {
+  const { freshLiveText } = await import('../lib/market-ticker.ts');
+  const t = 'Market prices updated: Fruit last trade up 0.02 SPK.';
+  const one = freshLiveText('', t), two = freshLiveText(one, t), three = freshLiveText(two, t);
+  assert.equal(one, t); assert.notEqual(two, one); assert.equal(two, `${t}\u200B`); assert.equal(three, t);
+  assert.equal(freshLiveText(t, 'other'), 'other');
+  assert.match(readFileSync(new URL('../app/market-board.tsx', import.meta.url), 'utf8'), /setTick\(prev => freshLiveText\(prev, text\)\)/);
+});
+
+test('the orders route reads the ticker flag through the shared marketFlagOn helper, with no inline cast compare', async () => {
+  const src = readFileSync(new URL('../app/api/market/orders/route.ts', import.meta.url), 'utf8');
+  assert.match(src, /import \{ marketFlagOn \} from '@\/lib\/market-visibility'/);
+  assert.match(src, /marketFlagOn\(.*HARIMU_MARKET_TICKER_ENABLED\);/);
+  assert.doesNotMatch(src, /HARIMU_MARKET_TICKER_ENABLED === 'true'/);
+  const board = readFileSync(new URL('../app/market-board.tsx', import.meta.url), 'utf8');
+  assert.equal(board.match(/fetch\('\/api\/market\/orders', \{ cache: 'no-store'/g).length, 1, 'one GET fetch-and-parse path');
+});
