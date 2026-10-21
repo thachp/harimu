@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { cronJobFlags, cronJobsOn } from '../lib/cron-gates.ts';
+import { selectStorageBackend } from '../lib/storage-selection.ts';
 
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const configs = { 'wrangler.jsonc': strip(readFileSync('wrangler.jsonc', 'utf8')), 'wrangler.prod.jsonc': strip(readFileSync('wrangler.prod.jsonc', 'utf8')) };
@@ -66,6 +67,33 @@ const flagOffPins = {
   HARIMU_SPARK_SUPPLY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_LEDGER_RECONCILIATION_ENABLED: 'flag-off-audit-384.test.mjs',
 };
+
+// #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.
+const switchOffPins = {
+  HARIMU_REALTIME_PRESENCE: 'city-presence.test.mjs',
+  NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE: 'flag-off-ui-384.test.mjs',
+  HARIMU_QA_TEST_CITIZENS: 'flag-off-audit-384.test.mjs',
+  HARIMU_STORAGE_MAINTENANCE: 'flag-off-audit-384.test.mjs',
+};
+const notSwitches = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_PRODUCTION_STORAGE', 'HARIMU_POSTGRES_CUTOVER_READY', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED',
+  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR'];
+
+test('every boolean wrangler var that is not *_ENABLED is a registered switch (off in both configs) or a listed config value', () => {
+  for (const [file, config] of Object.entries(configs)) {
+    const booleans = Object.entries(config.vars).filter(([name, value]) => !/_ENABLED$/.test(name) && /^(true|false)$/.test(value)).map(([name]) => name);
+    const unknown = booleans.filter(name => !(name in switchOffPins) && !notSwitches.includes(name));
+    assert.deepEqual(unknown, [], `${file}: register each new boolean switch in switchOffPins (or notSwitches)`);
+    for (const name of Object.keys(switchOffPins)) if (name in config.vars) assert.equal(config.vars[name], 'false', `${file}: ${name} ships "false"`);
+  }
+  for (const [name, file] of Object.entries(switchOffPins)) assert.ok(readFileSync(join('tests', file), 'utf8').includes(name), `${name}: ${file} never names it`);
+});
+
+test('HARIMU_STORAGE_MAINTENANCE off: storage selection proceeds; baseline "true" pauses storage', () => {
+  const base = { hyperdriveConfigured: false };
+  assert.equal(selectStorageBackend({ ...base, maintenance: 'false' }), 'd1');
+  assert.equal(selectStorageBackend(base), 'd1', 'unset is off');
+  assert.throws(() => selectStorageBackend({ ...base, maintenance: 'true' }), /paused/);
+});
 
 function sourceFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -284,4 +312,53 @@ test('HARIMU_CITY_FOUNDING_ENABLED off: found-city writes nothing (no city, worl
   r.setCityFounding(true);
   const on = await spy(r, found);
   assert.equal(on.result.status, 200, JSON.stringify(on.result.data)); assert.ok(on.writes.length > 0, 'baseline: flag-on founding writes');
+});
+
+// #384 L4: the QA nation switch with its flags off writes nothing and leaves the nation; flag-on baseline switches and writes.
+test('HARIMU_QA_TEST_CITIZENS off: qa-test-nation is 404, citizens.nation_id unchanged, no writes; flag-on baseline writes', async t => {
+  const r = await runtime(t);
+  const nation = async () => (await r.db.prepare('SELECT nation_id,nation_changes FROM citizens WHERE clerk_user_id=?').bind('alice').first()).nation_id;
+  const qa = () => r.call('citizen', 'alice', { action: 'qa-test-nation', nationId: 'korund' });
+  r.setFixtureEnv('HARIMU_QA_TEST_CITIZEN_IDS', 'alice'); r.setFixtureEnv('NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'true'); r.setFixtureEnv('HARIMU_QA_TEST_CITIZENS', 'false');
+  const off = await spy(r, qa);
+  // Other POST side effects (the preview election close) are not the switch's; the switch must never write citizens.nation_id.
+  assert.equal(off.result.status, 404); assert.deepEqual(off.writes.filter(sql => /UPDATE citizens SET nation_id/.test(sql)), []); assert.equal(await nation(), 'kindle');
+  r.setFixtureEnv('HARIMU_QA_TEST_CITIZENS', 'true');
+  const on = await spy(r, qa);
+  assert.equal(on.result.status, 200, JSON.stringify(on.result.data)); assert.ok(on.writes.some(sql => /UPDATE citizens SET nation_id/.test(sql)), 'baseline: the switch writes citizens.nation_id'); assert.equal(await nation(), 'korund');
+});
+
+// #384 L1: with travel on (so the travel read would run) and the feature flag off, each POST answers before any DB statement.
+test('L1: flag-off POSTs make zero prepare/batch calls (faith, congregations, registry, kiosk, found-city, market orders, travel); baselines make calls', async t => {
+  const r = await runtime(t);
+  const off = { HARIMU_FAITH_ENABLED: 'false', HARIMU_SQUARE_PURCHASE_ENABLED: 'false', HARIMU_TESSERA_EXCHANGE_ENABLED: 'false', HARIMU_CITY_FOUNDING_ENABLED: 'false', HARIMU_ORDER_BOOK_ENABLED: 'false', HARIMU_TRAVEL_ENABLED: 'false' };
+  const cases = [
+    ['HARIMU_FAITH_ENABLED', 'faith', () => ({ action: 'choose-faith', faithId: 'kinward-rite', requestId: randomUUID() })],
+    ['HARIMU_FAITH_ENABLED', 'congregations', () => ({ action: 'join-congregation', requestId: randomUUID() })],
+    ['HARIMU_SQUARE_PURCHASE_ENABLED', 'world/registry', () => ({ action: 'buy-square', x: 9, y: 8, requestId: randomUUID() })],
+    ['HARIMU_TESSERA_EXCHANGE_ENABLED', 'world/registry', () => ({ action: 'buy-tessera', tesseraMinor: 100, requestId: randomUUID() })],
+    ['HARIMU_CITY_FOUNDING_ENABLED', 'world/found-city', () => ({ action: 'kindle-charter', x: 21, y: 13, name: 'Emberford', requestId: `found-${randomUUID().slice(0, 8)}` })],
+    ['HARIMU_ORDER_BOOK_ENABLED', 'market/orders', () => ({ requestId: randomUUID(), side: 'buy', item: 'wood', qty: 1, limitMinor: 10 })],
+    ['HARIMU_TRAVEL_ENABLED', 'travel', () => ({ action: 'start-travel', x: 8, y: 7, requestId: randomUUID() })],
+  ];
+  for (const [flag, endpoint, body] of cases) {
+    for (const [name, value] of Object.entries(off)) r.setFixtureEnv(name, value);
+    if (flag !== 'HARIMU_TRAVEL_ENABLED') r.setFixtureEnv('HARIMU_TRAVEL_ENABLED', 'true');
+    if (flag === 'HARIMU_TESSERA_EXCHANGE_ENABLED') r.setFixtureEnv('HARIMU_SQUARE_PURCHASE_ENABLED', 'true');
+    const quiet = await spy(r, () => r.call(endpoint, 'alice', body()));
+    assert.equal(quiet.result.status, 403, `${flag} ${endpoint}: ${JSON.stringify(quiet.result.data)}`);
+    assert.equal(quiet.calls, 0, `${flag} ${endpoint}: flag off must answer before any DB statement`);
+    r.setFixtureEnv(flag, 'true');
+    const busy = await spy(r, () => r.call(endpoint, 'alice', body()));
+    assert.ok(busy.calls > 0, `${flag} ${endpoint}: baseline makes DB calls (${busy.result.status})`);
+  }
+});
+
+// L1 exception: the Notables POST reads the citizen before the AI flags so a foreign Notable stays 403 (#151); flag off it must still write nothing.
+test('L1: HARIMU_NOTABLES_ENABLED / HARIMU_AI_NEWS_ENABLED off: a Notables question writes nothing (503 for an own-nation Notable)', async t => {
+  const r = await runtime(t);
+  r.setFixtureAiFlags({ news: false, notables: false });
+  const profile = (await r.call('notables', 'alice')).data.profile;
+  const off = await spy(r, () => r.call('notables', 'alice', { requestId: randomUUID(), notableId: profile.id, topic: 'news' }));
+  assert.equal(off.result.status, 503, JSON.stringify(off.result.data)); assert.deepEqual(off.writes, []); assert.ok(off.calls > 0, 'the authorization read runs (documented exception)');
 });
