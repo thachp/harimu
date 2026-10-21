@@ -12,7 +12,7 @@
  *
  * Rules: no figure is written. Placeholders are pre-formatted strings filled at runtime: {from} and {to} (field dates), {candidate} and {rival}
  * (AI candidate names), all capped at a local 24 characters; {n} (the sample size, a number) and {margin} (the margin, already carrying its
- * unit), capped at six characters. Limits: labels 40, lines 100 (the field-dates caption counts as a line, since two dates fill to 48), headlines 70, tested with every placeholder filled to its cap. All wording is
+ * unit), capped at six characters. Limits: labels 40, lines 100 (the field-dates caption counts as a line, since two dates fill to 48), headlines 70, press bodies 140, tested with every placeholder filled to its cap. All wording is
  * new: `proposal: true`. */
 
 export const POLL_NAME_MAX=24;
@@ -20,6 +20,7 @@ export const POLL_NUMBER_MAX=6;
 export const POLL_LABEL_MAX=40;
 export const POLL_LINE_MAX=100;
 export const POLL_HEADLINE_MAX=70;
+export const POLL_BODY_MAX=140;
 export const POLL_NAME_PLACEHOLDERS=['{from}','{to}','{candidate}','{rival}'] as const;
 export const POLL_NUMBER_PLACEHOLDERS=['{n}','{margin}'] as const;
 

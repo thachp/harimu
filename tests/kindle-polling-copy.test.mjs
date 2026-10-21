@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { voterIntentPrompt as VP, pollCard as PC, residentMood as RM, pollPress as PP, pollPressFor, kindlePollingCopy as C, POLL_PRESS_BYLINE, PRESS_FRAME_KEYS, POLL_NAME_PLACEHOLDERS, POLL_NUMBER_PLACEHOLDERS, POLL_NAME_MAX, POLL_NUMBER_MAX, POLL_LABEL_MAX, POLL_LINE_MAX, POLL_HEADLINE_MAX } from '../lib/kindle-polling-copy.ts';
+import { voterIntentPrompt as VP, pollCard as PC, residentMood as RM, pollPress as PP, pollPressFor, kindlePollingCopy as C, POLL_PRESS_BYLINE, PRESS_FRAME_KEYS, POLL_NAME_PLACEHOLDERS, POLL_NUMBER_PLACEHOLDERS, POLL_NAME_MAX, POLL_NUMBER_MAX, POLL_LABEL_MAX, POLL_LINE_MAX, POLL_HEADLINE_MAX, POLL_BODY_MAX } from '../lib/kindle-polling-copy.ts';
 
 const labels=()=>[VP.title,VP.answerButton,VP.declineButton,PC.title,PC.sampleSize,PC.margin,RM.label];
 const lineObjs=()=>[VP.question,VP.voluntary,VP.notAVote,VP.privacy,VP.thanks,PC.marginExplainer,PC.sampleExplainer,PC.empty,RM.explainer,RM.sourceNote];
-const lines=()=>[...lineObjs().map(l=>l.text),PC.fieldDates,...PP.map(f=>f.body)];
+const lines=()=>[...lineObjs().map(l=>l.text),PC.fieldDates];
+const bodies=()=>PP.map(f=>f.body);
 const heads=()=>PP.map(f=>f.headline);
-const all=()=>[...labels(),...lines(),...heads()];
+const all=()=>[...labels(),...lines(),...bodies(),...heads()];
 const PH=[...POLL_NAME_PLACEHOLDERS,...POLL_NUMBER_PLACEHOLDERS];
 const fill=t=>{ let a=t; for (const p of POLL_NAME_PLACEHOLDERS) a=a.replaceAll(p,'W'.repeat(POLL_NAME_MAX)); for (const p of POLL_NUMBER_PLACEHOLDERS) a=a.replaceAll(p,'9'.repeat(POLL_NUMBER_MAX)); return a; };
 
@@ -23,6 +24,7 @@ test('limits: local caps 24 and 6; labels 40, lines 100, headlines 70 with every
   assert.equal(POLL_NAME_MAX,24); assert.equal(POLL_NUMBER_MAX,6); assert.equal(POLL_LABEL_MAX,40); assert.equal(POLL_LINE_MAX,100); assert.equal(POLL_HEADLINE_MAX,70);
   for (const t of labels()) assert.ok(fill(t).length<=POLL_LABEL_MAX,`${t} (${fill(t).length})`);
   for (const t of lines()) assert.ok(fill(t).length<=POLL_LINE_MAX,`${t} (${fill(t).length})`);
+  assert.equal(POLL_BODY_MAX,140); for (const t of bodies()) assert.ok(fill(t).length<=POLL_BODY_MAX,`${t} (${fill(t).length})`);
   for (const t of heads()) assert.ok(fill(t).length<=POLL_HEADLINE_MAX,`${t} (${fill(t).length})`);
 });
 test('placeholders: only the allow-listed six, each used; the card carries dates, sample and margin', () => {
