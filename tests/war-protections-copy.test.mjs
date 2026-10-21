@@ -73,7 +73,7 @@ test('#470 slice 1: no Spark, exchange, kiosk, cash, digit amount, or compensati
     assert.doesNotMatch(t,/cash/i);
     assert.doesNotMatch(t,/compensat/i);
     // Selling, pricing and conversion words: Tessera here is earned and offered, never priced or converted ("buyout" is the one allowed use of "buy"; later conversion is for Patrick, Decisions 76/103/111).
-    assert.doesNotMatch(t,/\b(buy(?!out)|purchas\w*|sell\w*|pric\w*|worth|convert\w*)\b/i,t);
+    assert.doesNotMatch(t,/\b(buy(?!out)\w*|purchas\w*|sell\w*|pric\w*|worth|convert\w*)\b/i,t);
     const bare=t.replace(/\{[^}]*\}/g,'').replace(/\b(14|10) real days\b/g,'');
     assert.doesNotMatch(bare,/\d|%/,t);
   }
