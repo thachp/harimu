@@ -31,7 +31,9 @@ const ledgerTables = ['nation_wage_funds', 'nation_wage_starts', 'nation_wage_se
 
 test('static: the flag ships "false"; migration 0049 is one additive set of tables plus the citizen_faith widening, mirrored in drizzle and db/postgres; nothing periodic', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_NATION_WORK_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_NATION_WORK_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['true'], '#487: on in preview for the Confluence PoC');
+  const prod = await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8');
+  assert.deepEqual([...prod.matchAll(/"HARIMU_NATION_WORK_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
   for (const file of ['../drizzle/0049_nation_wage_ledger.sql', '../db/postgres/0049_nation_wage_ledger.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.deepEqual([...sql.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(\w+)/g)].map(x => x[1]).sort(), [...ledgerTables].sort().concat(file.includes('drizzle') ? ['citizen_faith'] : []).sort());
@@ -63,17 +65,25 @@ test('flag off (shipped default): both commands are 404, nothing is written, the
   assert.deepEqual(Object.fromEntries(await Promise.all(Object.keys(before).map(async x => [x, await count(r, x)]))), before, 'no rows anywhere');
 });
 
-test('flag on but no nation has jobs yet (the registry ships none): 404 unavailable and nothing written; live nations and flag-off nations are unaffected', async t => {
+test('#487: the registry Confluence job runs through the route for an allowlisted account; Confluence flag off, a non-allowlisted account, or a live nation stay 404 with nothing written', async t => {
   const { r } = await setup(t, 'confluence');
-  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true'); r.setFixtureEnv('HARIMU_CONFLUENCE_ENABLED', 'true');
+  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true');
   for (const [k, v] of Object.entries(bindings)) r.setFixtureEnv(k, v);
-  const body = { action: 'nation-start-work', requestId: randomUUID(), jobId: 'confluence-cooperative-harvest' };
-  const res = await r.call('citizen', 'alice', body); assert.equal(res.status, 404); assert.equal(res.data.reason, 'unavailable');
-  assert.equal((await r.call('citizen', 'alice')).data.nationWorkPlan, undefined);
-  await r.db.prepare("UPDATE citizens SET nation_id='kindle'").run();
-  assert.equal((await r.call('citizen', 'alice', { ...body, requestId: randomUUID() })).status, 404);
+  r.setFixtureEnv('HARIMU_CONFLUENCE_ENABLED', 'false');
+  const body = () => ({ action: 'nation-start-work', requestId: randomUUID(), jobId: 'confluence-cooperative-harvest' });
+  let res = await r.call('citizen', 'alice', body()); assert.equal(res.status, 404); assert.equal(res.data.reason, 'unavailable', 'Confluence flag off');
+  r.setFixtureEnv('HARIMU_CONFLUENCE_ENABLED', 'true');
+  r.setFixtureEnv('HARIMU_QA_TEST_CITIZEN_IDS', 'bob');
+  assert.equal((await r.call('citizen', 'alice', body())).status, 404, 'not allowlisted');
+  await r.db.prepare("UPDATE citizens SET nation_id='kindle'").run(); r.setFixtureEnv('HARIMU_QA_TEST_CITIZEN_IDS', bindings.HARIMU_QA_TEST_CITIZEN_IDS);
+  assert.equal((await r.call('citizen', 'alice', body())).status, 404, 'a live nation keeps its own work');
   assert.equal((await r.call('citizen', 'alice', { action: 'nation-start-work', requestId: 'x', jobId: 'y' })).status, 400, 'a malformed command is a 400 once the flag is on');
-  for (const x of ['work_shifts', ...ledgerTables]) assert.equal(await count(r, x), 0, x);
+  for (const x of ['work_shifts', ...ledgerTables.filter(x => x !== 'nation_wage_funds')]) assert.equal(await count(r, x), 0, x);
+  await r.db.prepare("UPDATE citizens SET nation_id='confluence'").run();
+  res = await r.call('citizen', 'alice', body()); assert.equal(res.status, 200, JSON.stringify(res.data));
+  const plan = (await r.call('citizen', 'alice')).data.nationWorkPlan;
+  assert.equal(plan.currency.code, 'CUR'); assert.deepEqual(plan.jobs.map(j => [j.id, j.capacityCost, j.hours, j.wageMinor]), [['confluence-cooperative-harvest', 4, 2, 800]]);
+  assert.equal(plan.fundMinor, 100000); assert.equal(plan.walletMinor, 0); assert.equal(plan.shifts.length, 1);
 });
 
 test('start and claim: one shift pays once, wallet and fund are sums, capacity is spent once, retries and parallel claims cannot pay twice', async t => {

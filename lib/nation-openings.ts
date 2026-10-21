@@ -35,7 +35,18 @@ const liveMapSeeds: Readonly<Partial<Record<NationId, MapSeed>>> = {
 /** One job a nation offers. `id` must start with the nation id (it is also the work-order id, so ids never collide across nations). `wageMinor` is paid once per claimed shift. */
 export type NationJob = { id: string; name: string; capacityCost: number; hours: number; wageMinor: number; output: string };
 
-export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED`, ...liveMapSeeds[id] }));
+/** #487 (Confluence PoC, slice 1): the Confluence wage ledger for the generic work commands (lib/nation-work.ts). Read only while HARIMU_CONFLUENCE_ENABLED and HARIMU_NATION_WORK_ENABLED
+ *  are "true" and the account is QA-allowlisted (nationPlayable). Currency per docs (the-confluence.mdx: Current, CUR); no band, parity or State Bank (excluded by #487).
+ *  [ASSUMPTION] job values copy the Labor Notes / Crowns pattern (capacity 4, 2 hours, 800 minor units; Stage 0 design section 3), and the fund matches Korund's starting wage fund (100000 minor units).
+ *  Name and output are placeholders from the docs' city table (Lanu Terraces: "Cooperative harvest shifts") until Content supplies copy. No capital yet: that is the next slice. */
+export const confluenceWork = {
+  currency: { code: 'CUR', name: 'Current' },
+  wage: { fundMinor: 100_000 },
+  jobs: [{ id: 'confluence-cooperative-harvest', name: 'Cooperative harvest shift', capacityCost: 4, hours: 2, wageMinor: 800, output: 'Rice brought in on the Lanu Terraces' }],
+} as const satisfies Pick<NationOpening, 'currency' | 'wage' | 'jobs'>;
+const workSeeds: Readonly<Partial<Record<NationId, Pick<NationOpening, 'currency' | 'wage' | 'jobs'>>>> = { confluence: confluenceWork };
+
+export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED`, ...liveMapSeeds[id], ...workSeeds[id] }));
 
 export const nationOpening = (id: unknown): NationOpening | undefined => typeof id === 'string' ? nationOpenings.find(opening => opening.id === id) : undefined;
 /** Ids whose rules run: the live nations plus any whose opening flag is exactly "true" in `bindings`, in catalog order. Unknown ids never appear.  */

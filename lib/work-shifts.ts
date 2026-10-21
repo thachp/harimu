@@ -21,7 +21,7 @@ export type WorkShift = {
   orderName: string;
   output: string;
   capacitySpent: number;
-  currency?: 'SPK' | 'LN' | 'CRN';
+  currency?: 'SPK' | 'LN' | 'CRN' | 'CUR';
   wageMinor?: number;
   rewardItem?: string;
   rewardQuantity?: number;
@@ -72,7 +72,7 @@ export async function readShifts(database: GameDatabase, userId: string): Promis
     id: row.id, workOrderId: row.work_order_id, orderName: row.order_name, output: row.output,
     capacitySpent: row.capacity_spent, startedAt: row.started_at,
     completesAt: row.completes_at, claimedAt: row.claimed_at,
-    currency: row.work_order_id==='aurelle-food-estate'?'CRN':row.work_order_id==='korund-food-production'?'LN':'SPK',
+    currency: row.work_order_id==='aurelle-food-estate'?'CRN':row.work_order_id==='korund-food-production'?'LN':row.work_order_id.startsWith('confluence-')?'CUR':'SPK', // #487: generic-ledger job ids start with the nation id
     wageMinor: ['aurelle-food-estate','korund-food-production'].includes(row.work_order_id)?800:row.wage_minor ?? undefined, rewardItem: row.item ?? undefined, rewardQuantity: row.quantity ?? undefined,
     ...(row.multiplier_pct == null ? {} : { qualityGrade: (row.grade ?? null) as WorkShift['qualityGrade'], qualityMultiplierPct: Number(row.multiplier_pct) }),
   })).map((shift) => {
