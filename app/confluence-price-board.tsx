@@ -3,7 +3,9 @@ import { priceBoard as copy } from '@/lib/confluence-market-copy';
 
 /** #487 / #688: read-only banded price board for one Confluence staple. All wording from lib/confluence-market-copy.ts (Content, #687); figures from lib/confluence-price-band.ts. */
 const fill = (template: string, values: Record<string, string>) => template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
-export function ConfluencePriceBoard({ board }: { board: PriceBoard | null }) {
+/** board: undefined = flag off or citizen not allowlisted (the server sends no key; render nothing, as in #676); null = on and allowlisted but no posted price (empty state). */
+export function ConfluencePriceBoard({ board }: { board?: PriceBoard | null }) {
+  if (board === undefined) return null;
   if (!board) return <section className="citizen-market" aria-labelledby="confluence-price-board-heading">
     <h3 id="confluence-price-board-heading">{copy.title}</h3>
     <p>{copy.empty.text}</p>

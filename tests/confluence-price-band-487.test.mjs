@@ -53,7 +53,29 @@ test('render (#688): Content copy rows with the 1.00 CUR price and its ±5% band
   for (const text of ['Banded price board', 'Rice, per bowl', '<dt>Posted state price</dt><dd>1.00 CUR per bowl</dd>', '<dt>State price band</dt><dd>0.95 CUR to 1.05 CUR (±5%)</dd>',
     'The state sets a band for each staple and posts a price inside it.', 'This board shows the posted state price. Buying is not open here yet.']) assert.ok(html.includes(text), `${text}\n${html}`);
   assert.doesNotMatch(html, /\{(staple|portion|price|floor|ceiling|band)\}|No posted state price yet/, 'every placeholder filled; no empty state');
+  const title = (await import('../lib/confluence-market-copy.ts')).priceBoard.title;
+  assert.ok(html.includes(`<h3 id="confluence-price-board-heading">${title}</h3>`), 'QA1 nit: title comes from the copy module');
+  assert.doesNotMatch(await readFile(new URL('../app/confluence-price-board.tsx', import.meta.url), 'utf8'), /Banded price board/, 'title not hardcoded');
   const empty = renderToStaticMarkup(React.createElement(ConfluencePriceBoard, { board: null }));
   assert.ok(empty.includes('Banded price board') && empty.includes('No posted state price yet.'), empty);
   assert.doesNotMatch(empty, /<dl>|CUR/, 'empty state shows no figures');
+});
+
+test('gating (#688 follow-up): flag off or not allowlisted renders nothing; on + allowlisted + no price shows the empty state', async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  const { loadApp } = await import('./helpers/component-module.mjs');
+  const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
+  const { ConfluencePriceBoard } = await loadApp('confluence-price-board');
+  const render = board => renderToStaticMarkup(React.createElement(ConfluencePriceBoard, board === undefined ? {} : { board }));
+  const m = await r.importModule('lib/confluence-price-band.ts');
+  const sent = (user, flag) => { const b = m.confluencePriceBoard('confluence', user, { ...qa, HARIMU_CONFLUENCE_ENABLED: flag }); return b ?? undefined; }; // route omits the key when null
+  assert.equal(render(sent('alice', 'false')), '', 'flag off: nothing, no empty state');
+  assert.equal(render(sent('bob', 'true')), '', 'not allowlisted: nothing');
+  assert.equal(render(undefined), '');
+  const empty = render(null);
+  assert.ok(empty.includes('No posted state price yet.'), 'on + allowlisted + no price: empty state');
+  assert.ok(render(sent('alice', 'true')).includes('1.00 CUR per bowl'));
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /useState<PriceBoard \| null \| undefined>\(undefined\)/);
+  assert.match(page, /setPriceBoard\(snapshot\.confluencePriceBoard\);/, 'absent key stays undefined, never coerced to null');
 });
