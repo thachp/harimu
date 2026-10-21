@@ -6,7 +6,7 @@ import ts from 'typescript';
 import {localRuntime} from './helpers/local-runtime.mjs';
 import {markAiReservationSent,expireStaleAiReservations,aiBudgetConfig,readAiBudget,reserveAiSequence,aiPendingExpirySeconds,aiNewsSequenceReservation} from '../lib/ai-budget.ts';
 // #92: preview showed 959,000/970,000 reserved for today and tomorrow with zero gateway requests.
-const load=async(patch=s=>s)=>{const source=patch((await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace('30000','5'));return import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64')}`);};
+const load=async(patch=s=>s)=>{const source=patch((await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace("'./ai-denylist'",JSON.stringify(new URL('../lib/ai-denylist.ts',import.meta.url).href)).replace('30000','5'));return import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64')}`);};
 const now=Math.floor(Date.now()/1000),budget={dailyBudgetMicro:970000,gatewayId:'harimu-test'};
 const news={nationId:'kindle',title:'Kindle Press',style:'press',fetchedAt:now*1000,statistics:{citizens:2,completedShifts:3,food:12},items:[]};
 const count=async r=>(await r.db.prepare('SELECT COUNT(*) AS n FROM harimu_ai_reservations').first()).n;

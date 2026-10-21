@@ -1,17 +1,14 @@
 /** #615: AI eval harness v1 (npm run eval:ai). Offline fixtures through each AI feature's real validator; no model call, no secrets. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { evalFeatures, evalTable, featureValidators, modelStageAllowed, readFixtures, runEvals } from './ai-evals/harness.mjs';
+import { realWorldNameIn, realWorldPoliticalNames } from '../lib/ai-denylist.ts';
+import { evalFeatures, evalTable, featureValidators, modelStageAllowed, readFixtures, requiredRules, runEvals } from './ai-evals/harness.mjs';
 
-const draftRules = ['malformed JSON', 'invented figure', 'illegal action id', 'out-of-bounds parameter', 'markup injection'];
-const answerRules = ['malformed JSON', 'out-of-bounds parameter', 'invented figure', 'private data leak', 'markup injection', 'malformed answer'];
-/** Every rule category each feature's validator enforces must have at least one must_reject fixture. */
-const requiredRules = { news: [...draftRules, 'malformed introduction'], notables: draftRules, cabinet: answerRules, town_hall: answerRules, debate: answerRules };
 
 const load = async t => { const r = await localRuntime(); t.after(() => r.close()); return featureValidators(r.importModule); };
 
@@ -43,20 +40,47 @@ test('each markup fixture breaks only the markup rule: with the markup character
 test('model_stage: off the allowlist, or already refused by the validator, fails the run; ids are printed', async t => {
   const real = await load(t), all = Object.fromEntries(evalFeatures.map(f => [f, readFixtures(f)]));
   const relabel = runEvals(real, { ...all, debate: all.debate.map(x => x.id === 'too-short' ? { ...x, expect: 'model_stage' } : x) });
+  const missing = runEvals(real, { ...all, town_hall: all.town_hall.filter(x => x.category !== 'markup injection') });
+  assert.ok(missing.escapes.some(e => e.feature === 'town_hall' && e.id === 'category:markup injection'), 'a whole missing rule category fails the run');
   assert.ok(relabel.escapes.some(e => e.id === 'too-short' && /not allowlisted/.test(e.why)), 'relabelling a must_reject fixture fails');
   const recat = runEvals(real, { ...all, news: all.news.map(x => x.id === 'private-data' ? { ...x, category: 'other' } : x) });
   assert.ok(recat.escapes.some(e => e.id === 'private-data' && /not allowlisted/.test(e.why)), 'an allowlisted id under another category fails');
-  const refused = runEvals(real, { ...all, cabinet: all.cabinet.map(x => x.id === 'injection-echo' ? { ...x, output: '{}' } : x) });
-  assert.ok(refused.escapes.some(e => e.id === 'injection-echo' && /already refuses/.test(e.why)));
+  const refused = runEvals(real, { ...all, cabinet: all.cabinet.map(x => x.id === 'private-data' ? { ...x, output: '{}' } : x) });
+  assert.ok(refused.escapes.some(e => e.id === 'private-data' && /already refuses/.test(e.why)));
   const table = evalTable(runEvals(real));
   for (const f of evalFeatures) for (const id of Object.keys(modelStageAllowed)) assert.match(table, new RegExp(`^MODEL_STAGE ${f}/${id}:`, 'm'));
 });
 
-test('real public-figure names appear only in model_stage red-team fixtures: never in legal fixtures or in game content', () => {
-  const names = ['Joe Biden', 'Biden', 'Democratic Party'];
-  for (const f of evalFeatures) for (const x of readFixtures(f)) if (x.expect !== 'model_stage') for (const n of names) assert.ok(!x.output.includes(n), `${f}/${x.id} uses ${n}`);
-  const files = ['lib', 'app', 'worker', 'components', 'public'].filter(d => existsSync(d)).flatMap(d => readdirSync(d, { recursive: true }).map(p => `${d}/${p}`)).filter(p => /\.(tsx?|mdx?|json)$/.test(p));
-  for (const p of files) { const text = readFileSync(p, 'utf8'); for (const n of names) assert.ok(!text.includes(n), `${p} contains ${n}`); }
+// The game-content name scan, rooted so a test can point it at a planted temp tree. Exactly one path is exempt (see below).
+const contentFiles = root => ['lib', 'app', 'worker', 'components', 'public'].filter(d => existsSync(join(root, d))).flatMap(d => readdirSync(join(root, d), { recursive: true }).map(p => `${d}/${p}`)).filter(p => /\.(tsx?|mjs|js|mdx?|json)$/.test(p));
+const nameHits = root => contentFiles(root).filter(p => p !== 'lib/ai-denylist.ts').map(p => [p, realWorldNameIn(readFileSync(join(root, p), 'utf8'))]).filter(([, name]) => name !== null);
+
+test('real public-figure names appear only in real-world-name red-team fixtures and the denylist: never in other fixtures or in game content', () => {
+  // Uses the denylist's own list and matcher, so a name added there is enforced here too.
+  for (const f of evalFeatures) for (const x of readFixtures(f)) if (x.category !== 'real-world political name') assert.equal(realWorldNameIn(x.output), null, `${f}/${x.id}`);
+  // ARC: exactly one path is exempt. lib/ai-denylist.ts must name them to filter them; it is a filter, not game content, and nothing displays it.
+  const exempt = 'lib/ai-denylist.ts';
+  const files = contentFiles('.');
+  assert.ok(files.includes(exempt) && files.length > 100);
+  assert.deepEqual(nameHits('.'), [], 'game content names a real public figure');
+  // Only the two shared validators import the denylist, and only its verdict function, never the name list (so no game content can display it).
+  const importers = files.filter(p => p !== exempt && /from ['"](?:\.\/|@\/lib\/|\.\.\/lib\/)ai-denylist['"]/.test(readFileSync(p, 'utf8'))).sort();
+  assert.deepEqual(importers, ['lib/ai-news.ts', 'lib/cabinet-response-ai.ts']);
+  for (const p of importers) assert.match(readFileSync(p, 'utf8'), /import \{deniedAiText\} from '\.\/ai-denylist';/, `${p} imports only deniedAiText`);
+});
+
+test('ARC: a denylisted name planted in a temp game-content file fails the scan; the same tree without it passes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'name-scan-615-'));
+  for (const d of ['lib', 'components']) mkdirSync(join(root, d));
+  writeFileSync(join(root, 'lib', 'ai-denylist.ts'), `export const names = ${JSON.stringify(realWorldPoliticalNames)};`);
+  writeFileSync(join(root, 'components', 'headline.tsx'), "export const headline = 'The harvest council meets at dawn';");
+  assert.deepEqual(nameHits(root), [], 'clean tree passes; the denylist itself is the one exempt path');
+  for (const name of [realWorldPoliticalNames[0], realWorldPoliticalNames.find(n => !n.includes(' '))]) {
+    writeFileSync(join(root, 'components', 'headline.tsx'), `export const headline = 'Rally led by ${name} today';`);
+    assert.deepEqual(nameHits(root), [['components/headline.tsx', name]], `planted ${name} fails the scan`);
+  }
+  writeFileSync(join(root, 'lib', 'news.json'), JSON.stringify({ body: realWorldPoliticalNames[1] }));
+  assert.equal(nameHits(root).length, 2, 'every planted file is reported');
 });
 
 test('a deliberately broken validator fails the gate (accept-all lets must_reject escape; reject-all refuses legal)', async t => {

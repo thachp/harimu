@@ -8,7 +8,11 @@ import { readFileSync } from 'node:fs';
 
 export const evalFeatures = ['news', 'notables', 'cabinet', 'town_hall', 'debate'];
 /** ARC: the only fixtures allowed to be `model_stage`, by id and category, in every feature. Relabelling any other fixture fails the run. */
-export const modelStageAllowed = { 'injection-echo': 'prompt-injection echo', 'real-world-name': 'real-world political name', 'private-data': 'private data leak' };
+export const modelStageAllowed = { 'private-data': 'private data leak' }; // injection echoes and real names are must_reject since the shared denylist (lib/ai-denylist.ts)
+const draftRules = ['malformed JSON', 'invented figure', 'illegal action id', 'out-of-bounds parameter', 'markup injection', 'prompt-injection echo', 'real-world political name'];
+const answerRules = ['malformed JSON', 'out-of-bounds parameter', 'invented figure', 'private data leak', 'markup injection', 'malformed answer', 'prompt-injection echo', 'real-world political name'];
+/** Every rule category each feature enforces needs at least one must_reject fixture; a missing category fails the run. */
+export const requiredRules = { news: [...draftRules, 'malformed introduction'], notables: draftRules, cabinet: answerRules, town_hall: answerRules, debate: answerRules };
 const parse = raw => { try { return JSON.parse(raw); } catch { return null; } };
 
 /** The deterministic validator stage each feature applies to its draft reply, as the feature source does it. */
@@ -40,6 +44,8 @@ export function runEvals(validators, fixtures = Object.fromEntries(evalFeatures.
       }
       else escapes.push({ feature, id: fixture.id, why: 'fixture has no expect label' });
     }
+    const covered = new Set((fixtures[feature] ?? []).filter(x => x.expect === 'must_reject').map(x => x.category));
+    for (const rule of requiredRules[feature]) if (!covered.has(rule)) escapes.push({ feature, id: `category:${rule}`, why: 'no must_reject fixture for this rule category' });
     rows.push(row);
   }
   return { rows, escapes, modelStage };

@@ -26,7 +26,8 @@ function quotedOnly(seen, text, label) {
     assert.notEqual(m.role, 'system', `${label}: citizen text inside a system prompt`);
     if (model === guard) continue; // the safety classifier reads the text as the content it classifies
     let parsed; try { parsed = JSON.parse(m.content); } catch { assert.fail(`${label}: citizen text sent unquoted to ${model}`); }
-    assert.ok(fields(parsed).includes(text), `${label}: citizen text is one exact JSON field`); carried++;
+    const holding = fields(parsed).filter(f => f.includes(text));
+    assert.ok(holding.length > 0 && holding.every(f => f === text), `${label}: every field holding the citizen text is exactly it (an exact JSON field)`); carried++;
   }
   assert.ok(carried > 0, `${label}: the citizen text reached the drafting model as quoted data`);
 }
@@ -60,28 +61,39 @@ test('Cabinet petition demand: hostile text is quoted data and the response is e
   }
 });
 
-async function hallRun(r, { hallId, candidateId, h, run, table }) {
-  const now = Math.floor(r.now / 1000), qid = `q-${h.id}`;
-  await r.db.prepare(`DELETE FROM ${table}`).run(); await r.db.prepare('DELETE FROM town_hall_questions').run();
-  await r.db.prepare('INSERT INTO town_halls (id,election_id,candidate_id,opens_at,closes_at) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING').bind(hallId, 'eval-615', candidateId, now - 2 * 86400, now - 86400).run();
-  await r.db.prepare('INSERT INTO town_hall_questions (id,hall_id,author_id,request_id,body,created_at) VALUES (?,?,?,?,?,?)').bind(qid, hallId, 'alice', randomUUID(), h.text, now - 90000).run();
-  const ai = recorder({ response: answer }), out = await run(r.db, now, ai, { enabled: true, budget });
-  assert.equal(out.status, 'recorded', h.id);
-  const rows = (await r.db.prepare(`SELECT answer_text FROM ${table} WHERE question_id=?`).bind(qid).all()).results;
-  assert.ok(rows.length >= 1 && rows.every(x => x.answer_text === answer), `${h.id}: the published answer is the draft`);
-  return ai.seen;
+const previewEnv = { NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW: 'true', HARIMU_ACCOUNT_ELECTION_POC_ENABLED: 'true' };
+/** Submits the hostile question through the real route (`POST /api/town-hall` or `/api/debate`, action ask), closes the hall by moving
+ *  the clock past it, and runs the answer job until idle. A question the route refuses at intake never reaches a model, which is reported. */
+async function routeRun(t, { endpoint, flag, extra, run, table }) {
+  const r = await localRuntime({ accountElectionBindings: previewEnv }); t.after(() => r.close());
+  const open = Math.floor(r.now / 1000), later = open + 86400 + 60, iso = new Date(r.now).toISOString(), refused = [];
+  r.setFixtureEnv(flag, 'true'); r.setFixtureEnv(`${flag.replace(/_ENABLED$/, '')}_OPEN_AT`.replace('TOWN_HALLS', 'TOWN_HALL'), String(open));
+  for (const h of hostile) {
+    for (const tbl of [table, 'town_hall_votes', 'town_hall_questions', 'harimu_ai_reservations']) await r.db.prepare(`DELETE FROM ${tbl}`).run(); // one question at a time
+    const user = `eval-${h.id}`;
+    await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'kindle',?,18,0,'Good standing',?,?)").bind(user, 'Eval citizen', iso, iso).run();
+    const asked = await r.call(endpoint, user, { action: 'ask', requestId: randomUUID(), text: h.text, ...extra });
+    if (asked.status !== 200) { refused.push(h.id); continue; }
+    const q = await r.db.prepare('SELECT id FROM town_hall_questions WHERE body=?').bind(h.text).first();
+    const ai = recorder({ response: answer });
+    for (let i = 0; i < 5 && (await run(r.db, later, ai, { enabled: true, budget })).status === 'recorded'; i++);
+    const rows = (await r.db.prepare(`SELECT answer_text FROM ${table} WHERE question_id=?`).bind(q.id).all()).results;
+    assert.ok(rows.length >= 1 && rows.every(x => x.answer_text === answer), `${endpoint}/${h.id}: the published answer is the draft`);
+    quotedOnly(ai.seen, h.text, `${endpoint}/${h.id}`);
+  }
+  return refused;
 }
 
-test('Town hall question: hostile text is quoted data and the published answer is exactly the model draft', async t => {
-  const r = await localRuntime(); t.after(() => r.close());
-  const { prepareTownHallAnswer } = await r.importModule('lib/town-hall-ai.ts');
-  for (const h of hostile) quotedOnly(await hallRun(r, { hallId: 'eval-615-hall', candidateId: 'ines-varro', h, run: prepareTownHallAnswer, table: 'town_hall_answers' }), h.text, `town_hall/${h.id}`);
+test('Town hall question via POST /api/town-hall: hostile text is quoted data and the published answer is exactly the model draft', async t => {
+  const r0 = await localRuntime(); const { prepareTownHallAnswer } = await r0.importModule('lib/town-hall-ai.ts'); await r0.close();
+  const refused = await routeRun(t, { endpoint: 'town-hall', flag: 'HARIMU_TOWN_HALLS_ENABLED', extra: { candidateId: 'ines-varro' }, run: prepareTownHallAnswer, table: 'town_hall_answers' });
+  assert.deepEqual(refused, ['role-tag'], 'only the tag-bearing text is refused at intake (no < or >); every other text reached the model');
 });
 
-test('Debate question: hostile text is quoted data and the published answer is exactly the model draft', async t => {
-  const r = await localRuntime(); t.after(() => r.close());
-  const { prepareDebateAnswer } = await r.importModule('lib/debate-ai.ts'), { debateHallId } = await r.importModule('lib/debate.ts');
-  for (const h of hostile) quotedOnly(await hallRun(r, { hallId: debateHallId, candidateId: 'debate', h, run: prepareDebateAnswer, table: 'debate_answers' }), h.text, `debate/${h.id}`);
+test('Debate question via POST /api/debate: hostile text is quoted data and the published answer is exactly the model draft', async t => {
+  const r0 = await localRuntime(); const { prepareDebateAnswer } = await r0.importModule('lib/debate-ai.ts'); await r0.close();
+  const refused = await routeRun(t, { endpoint: 'debate', flag: 'HARIMU_DEBATE_ENABLED', extra: {}, run: prepareDebateAnswer, table: 'debate_answers' });
+  assert.deepEqual(refused, ['role-tag'], 'only the tag-bearing text is refused at intake (no < or >); every other text reached the model');
 });
 
 test('the quoted-data check bites: text in a system prompt, or sent raw to a drafting model, fails it', () => {
@@ -91,4 +103,5 @@ test('the quoted-data check bites: text in a system prompt, or sent raw to a dra
   assert.throws(() => quotedOnly([{ model: 'm', messages: [{ role: 'user', content: `Question: ${text}` }] }, ...ok.slice(1)], text, 'raw'), /unquoted/);
   assert.throws(() => quotedOnly([ok[1], ok[1], ok[2]], text, 'absent'), /reached the drafting model/);
   assert.throws(() => quotedOnly([{ model: 'm', messages: [{ role: 'user', content: JSON.stringify({ prompt: `Answer this: ${text}` }) }] }, ...ok.slice(1)], text, 'spliced'), /exact JSON field/);
+  assert.throws(() => quotedOnly([{ model: 'm', messages: [{ role: 'user', content: JSON.stringify({ question: text, note: `Q: ${text}` }) }] }, ...ok.slice(1)], text, 'also spliced'), /exact JSON field/);
 });
