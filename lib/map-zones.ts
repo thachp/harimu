@@ -24,8 +24,8 @@ export const mappedNations: readonly MapNation[] = nationOpenings.flatMap(o => o
 export const mvpNations: readonly MapNation[] = mappedNations.filter(n => nationOpenings.find(o => o.id === n.id)?.openingFlag === null);
 /** The nations whose squares the original seed (migration 0011 / `worldSquaresSeedSql`) already wrote; any other nation with a capital is added by `nationSquaresUpsertSql`. */
 export const originallySeededNations: readonly string[] = ['kindle', 'korund', 'aurelle'];
-const commonsCentre = { x: 12, y: 6 };
-const heartlandRadius = 2, frontierRadius = 3;
+export const commonsCentre = { x: 12, y: 6 }; // #486: exported so lib/nation-openings.ts mapFitRules is pinned to it
+export const heartlandRadius = 2, frontierRadius = 3;
 const wildTerrain = ['plains', 'forest', 'hills', 'wetland', 'river edge', 'old-growth forest'];
 const ordinaryResources = ['food', 'timber', 'stone', 'ore', 'fuel', 'cloth fiber'];
 const rareResources = ['Emberstone', 'Riverpearl', 'Ironroot', 'Skysilk', 'Sunglass'];
