@@ -28,6 +28,17 @@ test('rules: food goods are humanitarian, lists are sorted, de-duplicated and ca
   assert.equal(rules.goodsColumn(['materials', 'wood']), ',materials,wood,'); assert.deepEqual(rules.goodsFromColumn(',materials,wood,'), ['materials', 'wood']);
 });
 
+test('a missing change count is never success: decide counts 0 and lift is not_in_force', async () => {
+  const r = await localRuntime(); try {
+    const g = await r.importModule('lib/goods-sanctions.ts');
+    const row = { id: 's1', actor_nation: 'korund', target_nation: 'kindle', goods: ',wood,', proposed_by: 'AI', status: 'proposed', imposed_at: null, lifted_at: null, ratification_json: null };
+    const stmt = sql => ({ bind: () => stmt(sql), run: async () => ({}), first: async () => /FROM goods_sanctions WHERE id=/.test(sql) ? { ...row, status: 'in_force' } : null, all: async () => ({ results: /status='proposed'/.test(sql) ? [row] : [] }) });
+    const db = { prepare: stmt, batch: async () => [] };
+    assert.equal(await g.decideProposedGoodsSanctions(db, 100), 0);
+    refused(await g.liftGoodsSanction(db, 's1', 'korund', 100, true), 409, 'not_in_force');
+  } finally { await r.close(); }
+});
+
 for (const backend of ['sqlite', 'postgres']) {
   test(`flag off: no sanction created, zero prepare/batch calls, trade guard is the embargo alone (${backend})`, async t => {
     const c = await setup(t, backend, { flag: false });
@@ -39,6 +50,33 @@ for (const backend of ['sqlite', 'postgres']) {
     // A row written behind the flag's back still changes nothing while the flag is off.
     await c.r.db.prepare("INSERT INTO goods_sanctions (id,request_id,pair_key,actor_nation,target_nation,goods,proposed_by,proposed_at,status,decided_at,imposed_at) VALUES ('s-x','req-xxxxxxxx','kindle:korund','korund','kindle',',wood,','AI',1,'in_force',1,1)").run();
     assert.deepEqual(await c.trade('kindle', 'korund', 'wood', { embargo: true, sanctions: false }), { ok: true });
+    // Baseline: the same spy records calls for the same propose, lift and trade calls with the flag on.
+    let on = 0; c.r.db.prepare = sql => { on++; return prepare(sql); };
+    await c.g.proposeGoodsSanction(c.r.db, { actor: 'korund', target: 'aurelle', goods: ['wood'], proposedBy: 'AI Chairman', requestId: 'req-baseline-1' }, c.nowS(), { enabled: true });
+    await c.g.liftGoodsSanction(c.r.db, 'x', 'korund', c.nowS(), true); await c.trade('kindle', 'korund', 'wood', { embargo: false, sanctions: true });
+    c.r.db.prepare = prepare; assert.ok(on > 0, 'the spy fires when the flag is on');
+  });
+
+  test(`decide once: concurrent ticks decide a row once and keep its first decided_at; concurrent lifts succeed once (${backend})`, async t => {
+    const c = await setup(t, backend);
+    const p = await c.propose(), first = c.nowS();
+    const [a, b] = await Promise.all([c.g.decideProposedGoodsSanctions(c.r.db, first), c.g.decideProposedGoodsSanctions(c.r.db, first + 60)]);
+    assert.equal(a + b, 1, `decided ${a}+${b}`);
+    const row = await c.r.db.prepare('SELECT status,decided_at,imposed_at FROM goods_sanctions WHERE id=?').bind(p.sanction.id).first();
+    assert.equal(row.status, 'in_force'); assert.equal(Number(row.decided_at), Number(row.imposed_at));
+    const lifts = await Promise.all([1, 2].map(() => c.g.liftGoodsSanction(c.r.db, p.sanction.id, 'korund', first + 120, true)));
+    assert.equal(lifts.filter(x => x.ok).length, 1, JSON.stringify(lifts)); refused(lifts.find(x => !x.ok), 409, 'not_in_force');
+  });
+
+  test(`a food row that reaches the table directly is rejected by the tick and never blocks food (${backend})`, async t => {
+    const c = await setup(t, backend);
+    const ins = (id, goods, status) => c.r.db.prepare(`INSERT INTO goods_sanctions (id,request_id,pair_key,actor_nation,target_nation,goods,proposed_by,proposed_at,status,decided_at,imposed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .bind(id, `req-${id}-0000`, 'kindle:korund', ...(id === 'f2' ? ['kindle', 'korund'] : ['korund', 'kindle']), goods, 'AI', 1, status, status === 'proposed' ? null : 1, status === 'proposed' ? null : 1).run();
+    await ins('f1', ',food,wood,', 'proposed');
+    assert.equal(await c.decide(), 1); assert.equal(await c.status('f1'), 'rejected');
+    assert.deepEqual(await c.trade('kindle', 'korund', 'food'), { ok: true }); assert.deepEqual(await c.trade('kindle', 'korund', 'wood'), { ok: true }, 'the whole row is refused');
+    await ins('f2', ',fruit,meat,', 'in_force');
+    for (const good of ['fruit', 'meat']) assert.deepEqual(await c.trade('korund', 'kindle', good), { ok: true }, `${good} trades even under an in-force food row`);
   });
 
   test(`a sanctioned good is refused both ways while in force, other goods trade, allowed after lift; idempotent (${backend})`, async t => {

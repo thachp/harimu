@@ -4,7 +4,7 @@ import { kindleSeats } from './diplomacy';
 import { cleanTreatyLabel, treatyActorMax, type Ratification, type TreatyNationId } from './diplomacy-rules';
 import { EMBARGO_NAME_MAX, targetedSanctions } from './embargo-copy';
 import { checkTrade, embargoNationNames, embargoPairKey, embargoRatification, embargoRequestIdOk, isEmbargoNation } from './embargo';
-import { checkSanctionGoods, goodsColumn, goodsFromColumn, isSanctionGood, sanctionGoodLabels, type SanctionGood } from './goods-sanction-rules';
+import { checkSanctionGoods, goodsColumn, goodsFromColumn, humanitarianGoods, isSanctionGood, sanctionGoodLabels, type SanctionGood } from './goods-sanction-rules';
 
 /** #601: targeted goods sanctions PoC behind HARIMU_TARGETED_SANCTIONS_ENABLED (default "false"), on top of the #363 embargo. One nation bans named goods to another; other trade goes on.
  *  Same shape as #363: written only by server code (a proposal from the AI leadership path, decided by the world tick with the 13.1 trade-measure ratification, the same placeholder Kindle
@@ -74,12 +74,18 @@ export async function decideProposedGoodsSanctions(db: GameDatabase, now: number
   if (!rows.length) return 0;
   const seats = await kindleSeats(db);
   let decided = 0;
+  const changed = (result: unknown) => Number((result as { meta?: { changes?: number } })?.meta?.changes ?? 0) > 0; // a missing count is never success
   for (const row of rows) {
+    // 13.3.1: a row that lists a food good (however it reached the table) is refused, never put in force.
+    if (goodsFromColumn(row.goods).some(g => humanitarianGoods.includes(g))) {
+      if (changed(await db.prepare("UPDATE goods_sanctions SET status='rejected',decided_at=?,ratification_json=? WHERE id=? AND status='proposed'").bind(now, JSON.stringify([{ refused: 'humanitarian_good' }]), row.id).run())) decided++;
+      continue;
+    }
     const ratification = embargoRatification(row.actor_nation, row.target_nation, seats), json = JSON.stringify([ratification]);
     const result = ratification.passed
       ? await db.prepare("UPDATE goods_sanctions SET status='in_force',decided_at=?,imposed_at=?,ratification_json=? WHERE id=? AND status='proposed'").bind(now, now, json, row.id).run()
       : await db.prepare("UPDATE goods_sanctions SET status='rejected',decided_at=?,ratification_json=? WHERE id=? AND status='proposed'").bind(now, json, row.id).run();
-    if ((result as { meta?: { changes?: number } }).meta?.changes !== 0) decided++;
+    if (changed(result)) decided++;
   }
   return decided;
 }
@@ -91,8 +97,9 @@ export async function liftGoodsSanction(db: GameDatabase, sanctionId: string, li
   if (!row) return fail(409, 'not_found', 'No such sanction.');
   if (row.actor_nation !== liftingNation) return fail(403, 'not_actor', 'Only the nation that imposed a sanction can lift it.');
   if (row.status !== 'in_force') return fail(409, 'not_in_force', 'That sanction is not in force.');
-  await db.prepare("UPDATE goods_sanctions SET status='lifted',lifted_at=? WHERE id=? AND status='in_force'").bind(now, sanctionId).run();
-  return { ok: true as const };
+  const result = await db.prepare("UPDATE goods_sanctions SET status='lifted',lifted_at=? WHERE id=? AND status='in_force'").bind(now, sanctionId).run();
+  // Only a strict row count is a lift: a concurrent lift that lost the race, or a missing count, is not_in_force.
+  return Number((result as { meta?: { changes?: number } })?.meta?.changes ?? 0) > 0 ? { ok: true as const } : fail(409, 'not_in_force', 'That sanction is not in force.');
 }
 
 /** Read-only. A database without migration 0059 reads as none. */
@@ -103,7 +110,7 @@ export async function readGoodsSanctions(db: GameDatabase) {
 
 /** True if either nation bans this good to the other while in force. Does not include the embargo (see sanctionedGood). */
 export async function goodBanned(db: GameDatabase, a: string, b: string, good: string) {
-  if (!isSanctionGood(good)) return false;
+  if (!isSanctionGood(good) || humanitarianGoods.includes(good)) return false; // food always trades (13.3.1), even if a food row exists
   return Boolean(await db.prepare("SELECT 1 AS found FROM goods_sanctions WHERE pair_key=? AND status='in_force' AND goods LIKE ?").bind(embargoPairKey(a, b), `%,${good},%`).first().catch(tolerate(isMissingRelation, null)));
 }
 
