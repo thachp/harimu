@@ -633,6 +633,7 @@ async function handlePost(request: Request) {
     const shift = await database.prepare('SELECT claimed_at, completes_at, work_order_id FROM work_shifts WHERE id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first<{ claimed_at: string | null; completes_at: string; work_order_id: string }>();
     if (!shift) return privateJson({ error: 'Shift unavailable.' }, { status: 404 });
+    if (shift.work_order_id.startsWith('confluence-')) return privateJson({ error: 'Collect this cooperative shift with nation-claim-work; the reward stays in Current.' }, { status:409 }); // #487
     if (shift.work_order_id === 'aurelle-food-estate') return privateJson({ error: 'Collect this charter shift with aurelle-claim-work; the reward stays in Crowns.', aurellePlan:await readAurelleView(database,userId) }, { status:409 });
     if (shift.completes_at > now) {
       return privateJson({ error: 'Your shift is still underway.' }, { status: 409 });

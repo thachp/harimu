@@ -898,6 +898,19 @@ export default function Home() {
     return () => controller.abort();
   }, [citizenSessionStatus]);
 
+  /** #487: collect a generic-ledger (lib/nation-work.ts) shift, e.g. Confluence's CUR job. Idempotent per shift, so a dropped request is retried as-is. */
+  async function claimNationShift(shiftId: string) {
+    if (workLock.current || !clerkConfigured) return;
+    workLock.current = true; setWorkPending(true); setWorkError(null);
+    try {
+      const response = await fetchIdempotent(fetch, '/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'nation-claim-work', shiftId }) });
+      const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number };
+      if (result.shifts) setWorkShifts(result.shifts);
+      if (typeof result.capacity === 'number') setCapacity(result.capacity);
+      if (!response.ok) setWorkError(result.error ?? 'Your shift could not be collected. Try again.');
+    } catch { setWorkError('Your shift could not be collected. Try again.'); }
+    finally { workLock.current = false; setWorkPending(false); }
+  }
   async function runWork(action: 'commit-work' | 'claim-work' | 'refresh-work', order?: WorkOrder, shiftId?: string, quality?: QualityInput) {
     if (enrollmentLock.current) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
@@ -1576,13 +1589,14 @@ export default function Home() {
     setPendingEnrollment(nationId);
   }
 
-  const priorNationShift = workShifts.find(shift => !shift.claimedAt && ((shift.currency ?? 'SPK') !== (citizenNation?.id === 'korund' ? 'LN' : citizenNation?.id === 'aurelle' ? 'CRN' : 'SPK')));
+  const priorNationShift = workShifts.find(shift => !shift.claimedAt && ((shift.currency ?? 'SPK') !== (citizenNation?.id === 'korund' ? 'LN' : citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'confluence' ? 'CUR' : 'SPK')));
   const priorShiftPanel = priorNationShift && <PriorNationShift shift={priorNationShift}
     currency={priorNationShift.currency ?? 'SPK'} pending={workPending} uncertain={Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
     onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current);
       else if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); else if (marketIntent.current) void runMarket(marketIntent.current); else if (playerIntent.current) void runPlayerCommand(playerIntent.current); }}
     onClaim={() => { if (priorNationShift.currency === 'LN') startKorundAction('korund-claim-work', priorNationShift.id);
       else if (priorNationShift.currency === 'CRN') startAurelleAction('aurelle-claim-work', priorNationShift.id);
+      else if (priorNationShift.currency === 'CUR') void claimNationShift(priorNationShift.id); // #487: generic wage ledger
       else void runWork('claim-work', undefined, priorNationShift.id); }} />;
   const korundPanel = <KorundPlanPanel plan={korundPlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
     uncertain={Boolean(korundCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
