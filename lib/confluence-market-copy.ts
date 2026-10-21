@@ -5,22 +5,22 @@
  *
  * Voice: quiet, collective, plain system lines; no AI body speaks, so nothing is badged (#381 / ui-ux §23.2). Rules: no figure is written. The
  * price, the band floor and ceiling and the band width come only through pre-formatted placeholders ({price}, {floor}, {ceiling}, each
- * already carrying its currency; {band}, a width already carrying its unit), capped at a local 24 characters, and {staple} and {unit} name the
+ * already carrying its currency; {band}, a width already carrying its unit), capped at a local 24 characters, and {staple} and {portion} name the
  * good. Limits: labels 40, lines 100, tested with every placeholder filled to its cap. All wording is new: `proposal: true`. */
 
 export const MARKET_NAME_MAX=24;
 export const MARKET_LABEL_MAX=40;
 export const MARKET_LINE_MAX=100;
-export const MARKET_PLACEHOLDERS=['{staple}','{unit}','{price}','{floor}','{ceiling}','{band}'] as const;
+export const MARKET_PLACEHOLDERS=['{staple}','{portion}','{price}','{floor}','{ceiling}','{band}'] as const;
 
 export type Line={text:string;proposal:true};
 const L=(text:string):Line=>({text,proposal:true});
 
 export const priceBoard={
  title:'Banded price board',
- stapleLine:'{staple}, per {unit}',
+ stapleLine:'{staple}, per {portion}',
  postedPriceLabel:'Posted state price',
- postedPriceValue:'{price} per {unit}',
+ postedPriceValue:'{price} per {portion}',
  bandLabel:'State price band',
  bandValue:'{floor} to {ceiling} (±{band})',
  explainer:L('The state sets a band for each staple and posts a price inside it.'),
