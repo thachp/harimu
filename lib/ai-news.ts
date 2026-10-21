@@ -1,4 +1,5 @@
 import type {GameDatabase} from './database-contract';
+import {deniedAiText} from './ai-denylist';
 import type {NationalNews,NewsItem} from './national-news';
 import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiMeteredCall,type AiBudgetConfig} from './ai-budget';
 export const aiNewsEnabled=true; // Preview activation approved 2026-10-14; runtime flags and pricing expiry still gate inference.
@@ -18,7 +19,7 @@ export function publicNewsFacts(news:NationalNews):Facts{
 const quantitative=/\p{Number}|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|dozen|half|double|triple|twice|percent|majority|minority|everyone|all|many|most|more|less|fewer|higher|lower)\b/iu;
 export function validatedNewsDraft(value:unknown):Draft|null{
  if(!value||typeof value!=='object')return null;const d=value as Record<string,unknown>;
- if(typeof d.title!=='string'||typeof d.summary!=='string'||!d.title.trim()||!d.summary.trim()||d.title.length>100||d.summary.length>500||quantitative.test(d.title+' '+d.summary)||/[<>\[\]{}]/.test(d.title+d.summary)||!Array.isArray(d.claims)||d.claims.length<1||d.claims.length>3||new Set(d.claims).size!==d.claims.length||d.claims.some(v=>typeof v!=='string'||!['citizens','completedShifts','food'].includes(v)))return null;
+ if(typeof d.title!=='string'||typeof d.summary!=='string'||!d.title.trim()||!d.summary.trim()||d.title.length>100||d.summary.length>500||quantitative.test(d.title+' '+d.summary)||/[<>\[\]{}]/.test(d.title+d.summary)||deniedAiText(d.title+'\n'+d.summary)!==null||!Array.isArray(d.claims)||d.claims.length<1||d.claims.length>3||new Set(d.claims).size!==d.claims.length||d.claims.some(v=>typeof v!=='string'||!['citizens','completedShifts','food'].includes(v)))return null;
  return {title:d.title.trim(),summary:d.summary.trim(),claims:d.claims as Draft['claims']};
 }
 export function validatedNewsIntroduction(value:unknown){const draft=validatedNewsDraft(value);return draft&&/[.!?]$/.test(draft.summary)?draft:null;}
