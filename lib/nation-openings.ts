@@ -58,12 +58,27 @@ export const openNationIds = (bindings: Readonly<Record<string, string | undefin
 /** #486 (Stage 0 closeout, slice 1): the map-size-independent opening checklist, read from the registry entry alone. A live nation is always ready (it keeps its own modules).
  *  `map`: a capital and biome are set (checked present, not where; placement is #486's map-fit measurement). `work`: currency, wage fund and at least one job. */
 export type NationReadiness = { map: boolean; work: boolean; ready: boolean };
+/** #486 (QA1 nit): the map check also asks whether the capital's block fits, using the same rules as the map-fit measurement on #486. Values mirror lib/map-zones.ts
+ *  (mapWidth 24, mapHeight 18, frontierRadius 3, Commons centre 12,6); that file imports this one, so they are repeated here and pinned equal by tests/nation-readiness-486.test.mjs. */
+export const mapFitRules = { width: 24, height: 18, blockRadius: 3, commonsCentre: { x: 12, y: 6 }, minCapitalDistance: 7, minCommonsDistance: 5 } as const;
+const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+/** Does a capital's 7x7 block fit: wholly on the grid, Chebyshev >= 7 from every other capital and >= 5 from the Commons centre? A check only; it places nothing. */
+export const capitalFits = (capital: { x: number; y: number }, others: readonly { x: number; y: number }[]): boolean => {
+  const { width, height, blockRadius: r, commonsCentre, minCapitalDistance, minCommonsDistance } = mapFitRules;
+  return capital.x >= r && capital.y >= r && capital.x + r < width && capital.y + r < height
+    && cheb(capital, commonsCentre) >= minCommonsDistance && others.every(other => cheb(capital, other) >= minCapitalDistance);
+};
+/** Readiness of one registry entry, checked against the other entries' capitals. Exported so a partial entry can be tested directly. */
+export const openingReadiness = (opening: NationOpening, all: readonly NationOpening[] = nationOpenings): NationReadiness => {
+  if (opening.openingFlag === null) return { map: true, work: true, ready: true };
+  const others = all.flatMap(o => o.id !== opening.id && o.capital ? [o.capital] : []);
+  const map = Boolean(opening.capital && opening.biome?.length && capitalFits(opening.capital, others));
+  const work = Boolean(opening.currency && opening.wage && opening.jobs?.length);
+  return { map, work, ready: map && work };
+};
 export const nationReadiness = (id: unknown): NationReadiness | undefined => {
   const opening = nationOpening(id);
-  if (!opening) return undefined;
-  if (opening.openingFlag === null) return { map: true, work: true, ready: true };
-  const map = Boolean(opening.capital && opening.biome?.length), work = Boolean(opening.currency && opening.wage && opening.jobs?.length);
-  return { map, work, ready: map && work };
+  return opening ? openingReadiness(opening) : undefined;
 };
 /** Behind HARIMU_NATION_READINESS_ENABLED (preview "true", production "false"): when on, a nation whose opening flag is "true" but whose registry entry is incomplete stays closed,
  *  so flipping a flag early opens nothing. Off: exactly the behaviour before #486 (the opening flag and the QA allowlist decide). */
