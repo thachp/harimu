@@ -54,7 +54,21 @@ export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ i
 export const nationOpening = (id: unknown): NationOpening | undefined => typeof id === 'string' ? nationOpenings.find(opening => opening.id === id) : undefined;
 /** Ids whose rules run: the live nations plus any whose opening flag is exactly "true" in `bindings`, in catalog order. Unknown ids never appear.  */
 export const openNationIds = (bindings: Readonly<Record<string, string | undefined>> = {}): readonly NationId[] =>
-  nationOpenings.filter(opening => opening.openingFlag === null || bindings[opening.openingFlag] === 'true').map(opening => opening.id);
+  nationOpenings.filter(opening => opening.openingFlag === null || (bindings[opening.openingFlag] === 'true' && readinessAllows(opening, bindings))).map(opening => opening.id);
+/** #486 (Stage 0 closeout, slice 1): the map-size-independent opening checklist, read from the registry entry alone. A live nation is always ready (it keeps its own modules).
+ *  `map`: a capital and biome are set (checked present, not where; placement is #486's map-fit measurement). `work`: currency, wage fund and at least one job. */
+export type NationReadiness = { map: boolean; work: boolean; ready: boolean };
+export const nationReadiness = (id: unknown): NationReadiness | undefined => {
+  const opening = nationOpening(id);
+  if (!opening) return undefined;
+  if (opening.openingFlag === null) return { map: true, work: true, ready: true };
+  const map = Boolean(opening.capital && opening.biome?.length), work = Boolean(opening.currency && opening.wage && opening.jobs?.length);
+  return { map, work, ready: map && work };
+};
+/** Behind HARIMU_NATION_READINESS_ENABLED (preview "true", production "false"): when on, a nation whose opening flag is "true" but whose registry entry is incomplete stays closed,
+ *  so flipping a flag early opens nothing. Off: exactly the behaviour before #486 (the opening flag and the QA allowlist decide). */
+const readinessAllows = (opening: NationOpening, bindings?: Readonly<Record<string, string | undefined>>) =>
+  bindings?.HARIMU_NATION_READINESS_ENABLED !== 'true' || nationReadiness(opening.id)?.ready === true;
 type OpeningBindings = Readonly<Record<string, string | undefined>> & QaBindings;
 /** #489 (Stage 0c): may this account enroll in, switch to, or play this nation? Fails closed.
  *  A live nation: always. An unknown id, or a nation whose opening flag is not exactly "true": never. A flag-on nation: only a QA-allowlisted account (`qaTestCitizenAllowed`:
@@ -65,6 +79,7 @@ export const nationPlayable = (id: unknown, bindings?: OpeningBindings, userId?:
   if (!opening) return false;
   if (opening.openingFlag === null) return true;
   if (typeof userId !== 'string' || !userId || bindings?.[opening.openingFlag] !== 'true') return false;
+  if (!readinessAllows(opening, bindings)) return false; // #486
   return qaTestCitizenAllowed(bindings, userId);
 };
 export { liveNations };
