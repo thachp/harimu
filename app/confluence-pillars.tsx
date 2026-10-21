@@ -5,8 +5,8 @@ import { AiBadge } from './ai-disclosure';
  *  (Party Congress and Assembly ballots are excluded by #487). Rendered only for a Confluence citizen, who can exist only while HARIMU_CONFLUENCE_ENABLED is on for a QA-allowlisted account. */
 export const confluencePillars = draftLeaderPersonas.confluence;
 export function ConfluencePillars() {
-  return <section className="citizen-market" aria-label="The Four Pillars">
-    <h3>The Four Pillars</h3>
+  return <section className="citizen-market" aria-labelledby="confluence-pillars-heading">
+    <h3 id="confluence-pillars-heading">The Four Pillars</h3>
     <ul>{confluencePillars.map(p => <li key={p.office}><strong>{p.office}</strong> · {p.name} <AiBadge /><br /><span>{p.biography}</span></li>)}</ul>
   </section>;
 }

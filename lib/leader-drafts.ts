@@ -1,8 +1,8 @@
 /** Draft AI leader personas for the seven non-playable nations, plus Aurelle claimant houses (issue #107).
  * Same fields as lib/leader-personas.ts (name, office, affiliation, color, biography). INACTIVE: leader-panel and
  * weekly addresses read only leaderPersonas, so nothing here is shown until a nation opens and moves its
- * persona there. #487: the Confluence Four Pillars are shown read-only (app/confluence-pillars.tsx) to QA-allowlisted Confluence citizens; the rest stay inactive. Before #487:
- * persona there. Offices match the nation pages exactly; every officeholder is an AI persona (GDD §8).
+ * persona there. #487: the Confluence Four Pillars are shown read-only (app/confluence-pillars.tsx) to QA-allowlisted Confluence citizens; the rest stay inactive.
+ * Offices match the nation pages exactly; every officeholder is an AI persona (GDD §8).
  * Source: nation pages and culture bible, thachp/harimu-docs#3. */
 export type DraftLeaderPersona={name:string;office:string;affiliation:string;color:string;biography:string};
 export type DraftLeaderNation='confluence'|'meridian'|'ilmar'|'hoarvale'|'varkand'|'veldwood'|'fulmara';
