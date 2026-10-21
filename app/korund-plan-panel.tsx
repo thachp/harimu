@@ -79,7 +79,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
 }
 
 export function PriorNationShift({ shift, currency, pending, uncertain, onClaim, onRetry }: {
-  shift: WorkShift; currency: 'LN' | 'SPK' | 'CRN'; pending: boolean; uncertain: boolean; onClaim: () => void;
+  shift: WorkShift; currency: 'LN' | 'SPK' | 'CRN' | 'CUR'; pending: boolean; uncertain: boolean; onClaim: () => void;
   onRetry: () => void;
 }) {
   const formatTime=useDisplayTimestamp();
@@ -88,7 +88,7 @@ export function PriorNationShift({ shift, currency, pending, uncertain, onClaim,
   const ready = now > 0 && Date.parse(shift.completesAt) <= now;
   return <section className="citizen-market" aria-label="Earlier nation shift">
     <h3>Earlier nation’s shift · {shift.orderName}</h3>
-    <p>Your citizenship changed during this shift. Its original reward remains payable in {currency === 'LN' ? 'Labor Notes' : currency === 'CRN' ? 'Crowns' : 'Sparks'}; no currency conversion takes place.</p>
+    <p>Your citizenship changed during this shift. Its original reward remains payable in {currency === 'LN' ? 'Labor Notes' : currency === 'CRN' ? 'Crowns' : currency === 'CUR' ? 'Current' : 'Sparks'}; no currency conversion takes place.</p>
     <p>{shift.wageMinor === undefined ? 'Reward terms are recorded with the shift.' : `${(shift.wageMinor / 100).toFixed(2)} ${currency}`} · {ready ? 'Ready to collect' : `Finishes ${formatTime(shift.completesAt)}`}</p>
     <GameTimer endsAt={shift.completesAt} label="Original shift ready" />
     {currency === 'LN' && <p>The output replenishes Korund’s state ration pool. Labor Notes remain in your Korund ledger.</p>}

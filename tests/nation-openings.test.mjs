@@ -49,5 +49,7 @@ test('wiring: one direction only, the list file stays import-free, gates read it
   assert.match(await read('app/api/citizen/route.ts'), /if \(!nationPlayable\(nationId, env as never, userId\)\) return privateJson\(\{ error: 'Choose a nation/, 'the QA switch uses nationPlayable');
   assert.match(await read('app/api/world/route.ts'), /populationBands\([^;]*nationIsPreview/s, 'population bands treat exactly the non-live nations as Coming soon, through nationIsPreview');
   for (const file of ['app/government-panel.tsx', 'lib/onboarding-preferences.ts']) assert.doesNotMatch(await read(file), /\['kindle','korund','aurelle'\]/, file);
-  assert.equal([...(await read('wrangler.jsonc')).matchAll(/"HARIMU_(CONFLUENCE|MERIDIAN|ILMAR|HOARVALE|VARKAND|VELDWOOD|FULMARA)_ENABLED"\s*:\s*"false"/g)].length, 7, 'the seven opening flags are defined and off (#489)');
+  assert.equal([...(await read('wrangler.jsonc')).matchAll(/"HARIMU_(MERIDIAN|ILMAR|HOARVALE|VARKAND|VELDWOOD|FULMARA)_ENABLED"\s*:\s*"false"/g)].length, 6, 'the other six opening flags are defined and off (#489)');
+  assert.match(await read('wrangler.jsonc'), /"HARIMU_CONFLUENCE_ENABLED"\s*:\s*"true"/, '#487: Confluence is on in preview (QA allowlist only)');
+  assert.equal([...(await read('wrangler.prod.jsonc')).matchAll(/"HARIMU_(CONFLUENCE|MERIDIAN|ILMAR|HOARVALE|VARKAND|VELDWOOD|FULMARA)_ENABLED"\s*:\s*"false"/g)].length, 7, 'production keeps all seven off');
 });

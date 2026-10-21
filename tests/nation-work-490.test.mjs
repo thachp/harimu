@@ -31,7 +31,9 @@ const ledgerTables = ['nation_wage_funds', 'nation_wage_starts', 'nation_wage_se
 
 test('static: the flag ships "false"; migration 0049 is one additive set of tables plus the citizen_faith widening, mirrored in drizzle and db/postgres; nothing periodic', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_NATION_WORK_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_NATION_WORK_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['true'], '#487: on in preview for the Confluence PoC');
+  const prod = await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8');
+  assert.deepEqual([...prod.matchAll(/"HARIMU_NATION_WORK_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
   for (const file of ['../drizzle/0049_nation_wage_ledger.sql', '../db/postgres/0049_nation_wage_ledger.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.deepEqual([...sql.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(\w+)/g)].map(x => x[1]).sort(), [...ledgerTables].sort().concat(file.includes('drizzle') ? ['citizen_faith'] : []).sort());
@@ -63,17 +65,25 @@ test('flag off (shipped default): both commands are 404, nothing is written, the
   assert.deepEqual(Object.fromEntries(await Promise.all(Object.keys(before).map(async x => [x, await count(r, x)]))), before, 'no rows anywhere');
 });
 
-test('flag on but no nation has jobs yet (the registry ships none): 404 unavailable and nothing written; live nations and flag-off nations are unaffected', async t => {
+test('#487: the registry Confluence job runs through the route for an allowlisted account; Confluence flag off, a non-allowlisted account, or a live nation stay 404 with nothing written', async t => {
   const { r } = await setup(t, 'confluence');
-  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true'); r.setFixtureEnv('HARIMU_CONFLUENCE_ENABLED', 'true');
+  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true');
   for (const [k, v] of Object.entries(bindings)) r.setFixtureEnv(k, v);
-  const body = { action: 'nation-start-work', requestId: randomUUID(), jobId: 'confluence-cooperative-harvest' };
-  const res = await r.call('citizen', 'alice', body); assert.equal(res.status, 404); assert.equal(res.data.reason, 'unavailable');
-  assert.equal((await r.call('citizen', 'alice')).data.nationWorkPlan, undefined);
-  await r.db.prepare("UPDATE citizens SET nation_id='kindle'").run();
-  assert.equal((await r.call('citizen', 'alice', { ...body, requestId: randomUUID() })).status, 404);
+  r.setFixtureEnv('HARIMU_CONFLUENCE_ENABLED', 'false');
+  const body = () => ({ action: 'nation-start-work', requestId: randomUUID(), jobId: 'confluence-cooperative-harvest' });
+  let res = await r.call('citizen', 'alice', body()); assert.equal(res.status, 404); assert.equal(res.data.reason, 'unavailable', 'Confluence flag off');
+  r.setFixtureEnv('HARIMU_CONFLUENCE_ENABLED', 'true');
+  r.setFixtureEnv('HARIMU_QA_TEST_CITIZEN_IDS', 'bob');
+  assert.equal((await r.call('citizen', 'alice', body())).status, 404, 'not allowlisted');
+  await r.db.prepare("UPDATE citizens SET nation_id='kindle'").run(); r.setFixtureEnv('HARIMU_QA_TEST_CITIZEN_IDS', bindings.HARIMU_QA_TEST_CITIZEN_IDS);
+  assert.equal((await r.call('citizen', 'alice', body())).status, 404, 'a live nation keeps its own work');
   assert.equal((await r.call('citizen', 'alice', { action: 'nation-start-work', requestId: 'x', jobId: 'y' })).status, 400, 'a malformed command is a 400 once the flag is on');
-  for (const x of ['work_shifts', ...ledgerTables]) assert.equal(await count(r, x), 0, x);
+  for (const x of ['work_shifts', ...ledgerTables.filter(x => x !== 'nation_wage_funds')]) assert.equal(await count(r, x), 0, x);
+  await r.db.prepare("UPDATE citizens SET nation_id='confluence'").run();
+  res = await r.call('citizen', 'alice', body()); assert.equal(res.status, 200, JSON.stringify(res.data));
+  const plan = (await r.call('citizen', 'alice')).data.nationWorkPlan;
+  assert.equal(plan.currency.code, 'CUR'); assert.deepEqual(plan.jobs.map(j => [j.id, j.capacityCost, j.hours, j.wageMinor]), [['confluence-cooperative-harvest', 4, 2, 800]]);
+  assert.equal(plan.fundMinor, 100000); assert.equal(plan.walletMinor, 0); assert.equal(plan.shifts.length, 1);
 });
 
 test('start and claim: one shift pays once, wallet and fund are sums, capacity is spent once, retries and parallel claims cannot pay twice', async t => {
@@ -256,4 +266,38 @@ test('migration 0049 on Postgres (PGlite, mutation check): every earlier migrati
   assert.deepEqual((await pg.query("SELECT COUNT(*)::int AS n FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid WHERE c.relname='citizen_faith' AND k.contype='c'")).rows[0].n >= 3, true, 'the CHECK count the deploy guard compares is not lower than 0025 declared');
   for (const x of ledgerTables) assert.equal((await pg.query('SELECT 1 FROM pg_tables WHERE tablename=$1', [x])).rows.length, 1, x);
   await pg.close();
+});
+
+test('#487: a confluence-* shift is labeled CUR (never SPK), and Kindle claim-work refuses it so Collect goes to nation-claim-work', async t => {
+  const { r } = await setup(t, 'confluence');
+  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true'); for (const [k, v] of Object.entries(bindings)) r.setFixtureEnv(k, v);
+  const id = randomUUID();
+  assert.equal((await r.call('citizen', 'alice', { action: 'nation-start-work', requestId: id, jobId: 'confluence-cooperative-harvest' })).status, 200);
+  const shifts = (await r.call('citizen', 'alice')).data.shifts.filter(s => s.workOrderId.startsWith('confluence-'));
+  assert.equal(shifts.length, 1); for (const s of shifts) assert.equal(s.currency, 'CUR');
+  r.setNow(r.now + 2 * 3600 * 1000);
+  const kindle = await r.call('citizen', 'alice', { action: 'claim-work', shiftId: id }); assert.equal(kindle.status, 409); assert.match(kindle.data.error, /nation-claim-work/);
+  const res = await r.call('citizen', 'alice', { action: 'nation-claim-work', shiftId: id }); assert.equal(res.status, 200, JSON.stringify(res.data));
+  assert.equal(res.data.nationWorkPlan.walletMinor, 800);
+  const src = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(src, /priorNationShift\.currency === 'CUR'\) void claimNationShift/, 'the earlier-nation Collect routes CUR to nation-claim-work');
+  assert.match(src, /action: 'nation-claim-work', shiftId/);
+});
+
+test('#487 spy: with HARIMU_NATION_WORK_ENABLED off, GET /api/citizen and both commands run zero nation-work queries; on, they run some', async t => {
+  const { r } = await setup(t, 'confluence');
+  for (const [k, v] of Object.entries(bindings)) r.setFixtureEnv(k, v);
+  const sqls = [], prepare = r.db.prepare.bind(r.db);
+  // ready()'s citizen SELECT is shared with other routes, so the spy keys on the ledger tables and the job upsert.
+  r.db.prepare = sql => { if (/nation_wage_|INSERT OR IGNORE INTO work_orders/.test(sql)) sqls.push(sql.slice(0, 60)); return prepare(sql); };
+  t.after(() => { r.db.prepare = prepare; });
+  const calls = async () => {
+    await r.call('citizen', 'alice');
+    await r.call('citizen', 'alice', { action: 'nation-start-work', requestId: randomUUID(), jobId: 'confluence-cooperative-harvest' });
+    await r.call('citizen', 'alice', { action: 'nation-claim-work', shiftId: randomUUID() });
+  };
+  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'false'); await calls();
+  assert.deepEqual(sqls, [], 'flag off: no nation-work query on any path');
+  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true'); await calls();
+  assert.ok(sqls.length > 0, 'flag on baseline: the spy sees nation-work queries');
 });
