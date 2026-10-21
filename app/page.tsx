@@ -1734,7 +1734,7 @@ export default function Home() {
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
         <MarketBoard api={orderBookApi} economy={economy} />
-        {citizenNation.id === 'confluence' && priceBoard && <ConfluencePriceBoard board={priceBoard} />}
+        {citizenNation.id === 'confluence' && <ConfluencePriceBoard board={priceBoard} />}{/* #688: empty state when the server sends no board */}
         {(!orderBookApi.book || playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')) && /* the board replaces fixed-lot listings once it is open; open lots stay cancellable */ <PlayerMarket state={playerMarket} economy={economy} demo={!clerkConfigured} busy={workPending || Boolean(marketCommand) || Boolean(korundCommand)} uncertain={Boolean(playerCommand)}
           onCommand={(command) => void runPlayerCommand({ ...command, requestId: crypto.randomUUID() })} onRetry={() => { if (playerCommand) void runPlayerCommand(playerCommand); }} />}
         {!market?.available && <p>Trading is currently supported in Kindle. Other nation markets are planned.</p>}

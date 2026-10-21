@@ -17,16 +17,12 @@ test('State Media and court intros are unchanged and ignore the flag; none menti
     for (const s of ['state','court']) assert.doesNotMatch(newsIntroFor(s,ai),/AI articles/);
   }
 });
-test('existing lines match the live panel and are not marked proposal; only the AI-off line is new', () => {
+test('#688 wired: the panel imports the selector instead of inlining lines', () => {
   const panel=readFileSync('app/national-news.tsx','utf8');
-  for (const k of ['pressWithAi','state','court']) { assert.equal(NI[k].proposal,false); assert.ok(panel.includes(`'${NI[k].text}'`),k); }
-  assert.equal(NI.pressNoAi.proposal,true);
-  for (const v of Object.values(NI)) assert.ok(v.text.length<=NEWS_INTRO_LINE_MAX,v.text);
+  assert.match(panel,/import \{ newsIntroFor \} from '\.\.\/lib\/news-intro-copy'/);
+  assert.match(panel,/newsIntroFor\(news\.style,news\.items\.some\(item=>item\.source==='model'\)\)/);
+  for (const v of Object.values(NI)) { assert.ok(!panel.includes(`'${v.text}'`),v.text); assert.ok(v.text.length<=NEWS_INTRO_LINE_MAX,v.text); }
 });
 test('the header names no other lib module path', () => {
   assert.doesNotMatch(readFileSync('lib/news-intro-copy.ts','utf8').split('*/')[0],/\blib\/|\.ts\b|app\/|components\//);
-});
-test('unwired: nothing in app/, components/ or lib/ imports news-intro-copy', () => {
-  const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('news-intro-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/news-intro-copy/,f);
 });

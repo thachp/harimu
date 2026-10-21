@@ -1,14 +1,23 @@
 import type { PriceBoard } from '@/lib/confluence-price-band';
+import { priceBoard as copy } from '@/lib/confluence-market-copy';
 
-/** #487: read-only banded price board for one Confluence staple. Placeholder wording until Content supplies copy. */
-export function ConfluencePriceBoard({ board }: { board: PriceBoard }) {
+/** #487 / #688: read-only banded price board for one Confluence staple. All wording from lib/confluence-market-copy.ts (Content, #687); figures from lib/confluence-price-band.ts. */
+const fill = (template: string, values: Record<string, string>) => template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
+export function ConfluencePriceBoard({ board }: { board: PriceBoard | null }) {
+  if (!board) return <section className="citizen-market" aria-labelledby="confluence-price-board-heading">
+    <h3 id="confluence-price-board-heading">{copy.title}</h3>
+    <p>{copy.empty.text}</p>
+  </section>;
   const cur = (minor: number) => `${(minor / 100).toFixed(2)} ${board.currency}`;
-  return <section className="citizen-market" aria-label="Banded price board">
-    <h3>Banded price board</h3>
+  const values = { staple: board.staple, portion: board.unit, price: cur(board.priceMinor), floor: cur(board.floorMinor), ceiling: cur(board.ceilingMinor), band: `${board.bandPct}%` };
+  return <section className="citizen-market" aria-labelledby="confluence-price-board-heading">
+    <h3 id="confluence-price-board-heading">{copy.title}</h3>
+    <p>{fill(copy.stapleLine, values)}</p>
     <dl>
-      <div><dt>{board.staple}</dt><dd>{cur(board.priceMinor)} per {board.unit}</dd></div>
-      <div><dt>State price band</dt><dd>{cur(board.floorMinor)} to {cur(board.ceilingMinor)} (±{board.bandPct}%)</dd></div>
+      <div><dt>{copy.postedPriceLabel}</dt><dd>{fill(copy.postedPriceValue, values)}</dd></div>
+      <div><dt>{copy.bandLabel}</dt><dd>{fill(copy.bandValue, values)}</dd></div>
     </dl>
-    <p>The state posts this price within its band. This board is read-only.</p>
+    <p>{copy.explainer.text}</p>
+    <p>{copy.readOnly.text}</p>
   </section>;
 }
