@@ -1,7 +1,7 @@
 /** #615: AI eval harness v1 (npm run eval:ai). Offline fixtures through each AI feature's real validator; no model call, no secrets. */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -69,8 +69,8 @@ test('real public-figure names appear only in real-world-name red-team fixtures 
   for (const p of importers) assert.match(readFileSync(p, 'utf8'), /import \{deniedAiText\} from '\.\/ai-denylist';/, `${p} imports only deniedAiText`);
 });
 
-test('ARC: a denylisted name planted in a temp game-content file fails the scan; the same tree without it passes', () => {
-  const root = mkdtempSync(join(tmpdir(), 'name-scan-615-'));
+test('ARC: a denylisted name planted in a temp game-content file fails the scan; the same tree without it passes', t => {
+  const root = mkdtempSync(join(tmpdir(), 'name-scan-615-')); t.after(() => rmSync(root, { recursive: true, force: true })); // QA3: no leftover temp dir
   for (const d of ['lib', 'components']) mkdirSync(join(root, d));
   writeFileSync(join(root, 'lib', 'ai-denylist.ts'), `export const names = ${JSON.stringify(realWorldPoliticalNames)};`);
   writeFileSync(join(root, 'components', 'headline.tsx'), "export const headline = 'The harvest council meets at dawn';");
