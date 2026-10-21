@@ -149,6 +149,10 @@ body:has(.harimu-game){overflow:auto}
 .wallet-history th, .wallet-history td { padding: 4px 6px; border-bottom: 1px solid rgba(255, 255, 255, .08); text-align: left; }
 .wallet-history td:last-child, .wallet-history th:last-child { text-align: right; }
 .wallet-credit { color: #9fd59a; }
+.wallet-rewards ul { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.wallet-rewards li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.wallet-rewards button { min-height: 44px; }
+.wallet-rewards caption { text-align: left; color: #a9a58f; padding: 4px 0; }
 .wallet-debit { color: #e59a8a; }
 .game-resources>.game-wallet-button{display:grid;grid-template-columns:19px auto;column-gap:8px;align-items:center;min-width:82px;height:100%;padding:8px 12px;border-left:1px solid #263d46}
 .notable-transcript{list-style:none;padding:0;margin:0.5rem 0;display:grid;gap:0.5rem;max-height:40vh;overflow-y:auto}

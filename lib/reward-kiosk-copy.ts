@@ -1,5 +1,5 @@
 /** Reward-claim kiosk and earned-reward history copy for Kindle, Korund and Aurelle (issue #525, companion to the reward work in #466 and #472).
- * Content only; nothing imports this until the kiosk is built. Canon: harimu-docs decisions-log rows 110 and 111 and the economy kiosk-direction note
+ * Content only; imported by the #466 kiosk panel (app/wallet-panel.tsx). Canon: harimu-docs decisions-log rows 110 and 111 and the economy kiosk-direction note
  * (the kiosk is repurposed to claim earned rewards and view their history; rewards come from verified work or contributions within a capped
  * reward budget; starter grants and test faucets are labeled separately from earned rewards; the currency exchange stays disabled).
  *
