@@ -42,6 +42,15 @@ export function placementNotice(before: OrderBookState | null, after: OrderBookS
 }
 
 /** One fetch for the board and the commands that change it. A retry of the same command reuses its requestId. */
+type BookResponse = { open?: boolean; book?: OrderBookState; ticker?: boolean };
+/** One fetch-and-parse path for the board's GET, shared by mount and ticks (QA1 nit 4 on #705). Null when signed out, unavailable or aborted. */
+async function fetchBook(signal?: AbortSignal): Promise<BookResponse | null> {
+  try {
+    const r = await fetch('/api/market/orders', { cache: 'no-store', signal });
+    return r.ok ? await r.json() as BookResponse : null;
+  } catch { return null; }
+}
+
 export function useOrderBook(active: boolean) {
   const [book, setBook] = useState<OrderBookState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -62,20 +71,16 @@ export function useOrderBook(active: boolean) {
     setBook(next);
   }, [announcer]);
   useEffect(() => { latest.current = book; }, [book]);
-  const load = useCallback(async (signal?: AbortSignal, first = false) => { // one fetch-and-parse path for mount and ticks (QA1 nit 4 on #705)
-    try {
-      const r = await fetch('/api/market/orders', { cache: 'no-store', signal });
-      if (!r.ok) return; // signed out or unavailable: no board
-      const data = await r.json() as { open?: boolean; book?: OrderBookState; ticker?: boolean };
-      if (data.open && data.book) { setTicker(data.ticker === true); accept(data.book, !first && data.ticker === true); }
-    } catch { /* hidden */ }
+  const apply = useCallback((data: BookResponse | null, first: boolean) => {
+    if (data?.open && data.book) { setTicker(data.ticker === true); accept(data.book, !first && data.ticker === true); }
   }, [accept]);
+  const load = useCallback(() => fetchBook().then(data => apply(data, false)), [apply]);
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    void load(controller.signal, true);
+    void fetchBook(controller.signal).then(data => apply(data, true)); // state is set in the callback, not the effect body
     return () => controller.abort();
-  }, [active, load]);
+  }, [active, apply]);
   useEffect(() => { // #459: poll only while the board is open and the server turned the ticker on; paused while the tab is hidden
     if (!active || !ticker) return;
     return startTicker(() => void load(), document, window);
