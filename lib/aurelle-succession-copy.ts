@@ -13,14 +13,14 @@
  *
  * Rules: no figures, no timing, no medical detail, no cause of death, no mourning length and no real-world royal reference. The illness bulletins say
  * only that the Monarch keeps to the royal chambers or is gravely ill. Runtime names are placeholders capped at a local 24 characters:
- * {monarch} = the reigning AI Monarch, {heir} = the AI heir, {house} = the full house name as the server stores it, including the word House. Limits: labels 40,
+ * {ruler} = the reigning AI Monarch, {heir} = the AI heir, {house} = the full house name as the server stores it, including the word House. The names match the succession server's gazette placeholders (#613), so wiring needs no mapping. Limits: labels 40,
  * headlines 70, bodies and lines 140, tested with every placeholder filled to its cap. All wording is new: `proposal: true`. */
 
 export const SUCCESSION_NAME_MAX=24;
 export const SUCCESSION_LABEL_MAX=40;
 export const SUCCESSION_HEADLINE_MAX=70;
 export const SUCCESSION_BODY_MAX=140;
-export const SUCCESSION_PLACEHOLDERS=['{monarch}','{heir}','{house}'] as const;
+export const SUCCESSION_PLACEHOLDERS=['{ruler}','{heir}','{house}'] as const;
 
 export const SUCCESSION_GAZETTE_BYLINE={name:'Court Gazette',proposal:false} as const;
 
@@ -37,18 +37,18 @@ const st=(stage:SuccessionStage,gazette:GazetteItem[]):StageCopy=>({stage,gazett
 
 export const aurelleSuccessionCopy:readonly StageCopy[]=[
  st('heirs-naming',[
-  g('heirs-naming-proclamation','The Heir is named','Be it known: {monarch} names {heir} of {house} as heir to the Sky Throne.',true),
+  g('heirs-naming-proclamation','The Heir is named','Be it known: {ruler} names {heir} of {house} as heir to the Sky Throne.',true),
  ]),
  st('illness',[
-  g('illness-first','The Monarch keeps to the royal chambers','The Court Gazette reports that {monarch} keeps to the royal chambers. The court asks the realm for calm.',false),
-  g('illness-worse','The Monarch is gravely ill','The Court Gazette reports that the illness of {monarch} has grown graver. The Royal House keeps watch.',false),
+  g('illness-first','The Monarch keeps to the royal chambers','The Court Gazette reports that {ruler} keeps to the royal chambers. The court asks the realm for calm.',false),
+  g('illness-worse','The Monarch is gravely ill','The Court Gazette reports that the illness of {ruler} has grown graver. The Royal House keeps watch.',false),
  ]),
  st('accession-death',[
-  g('death-report','The Sky Throne mourns','The Court Gazette reports with sorrow that {monarch} has died. The court is in mourning.',false),
-  g('death-accession','A new reign begins','Be it known: {heir} takes the Sky Throne on the passing of {monarch}.',true),
+  g('death-report','The Sky Throne mourns','The Court Gazette reports with sorrow that {ruler} has died. The court is in mourning.',false),
+  g('death-accession','A new reign begins','Be it known: {heir} takes the Sky Throne on the passing of {ruler}.',true),
  ]),
  st('accession-abdication',[
-  g('abdication-accession','The crown is laid down','Be it known: {monarch} lays down the crown, and {heir} takes the Sky Throne.',true),
+  g('abdication-accession','The crown is laid down','Be it known: {ruler} lays down the crown, and {heir} takes the Sky Throne.',true),
  ]),
  st('fallback-seniority',[
   g('seniority-report','No heir was named','The Court Gazette reports that no heir was named. By Royal House custom, the crown passes by seniority to {heir}.',false),
@@ -60,7 +60,7 @@ export const aurelleSuccessionCopy:readonly StageCopy[]=[
 ];
 
 /** The mourning line and the leader panel: plain system lines, not spoken for the Crown. */
-export const mourning=L('The court is in mourning for {monarch}.');
+export const mourning=L('The court is in mourning for {ruler}.');
 export const leaderPanel={
  heirLabel:'Heir apparent: {heir}',
  noHeir:L('No heir is named.'),

@@ -26,8 +26,8 @@ test('limits: local name cap 24, labels 40, headlines 70, bodies and lines 140, 
   assert.ok(fill(LP.heirLabel).length<=SUCCESSION_LABEL_MAX,LP.heirLabel);
   for (const t of lines()) assert.ok(fill(t).length<=SUCCESSION_BODY_MAX,t);
 });
-test('placeholders: only {monarch}, {heir} and {house}, each used, and none in a headline', () => {
-  assert.deepEqual([...SUCCESSION_PLACEHOLDERS],['{monarch}','{heir}','{house}']);
+test('placeholders: only {ruler}, {heir} and {house}, each used, and none in a headline', () => {
+  assert.deepEqual([...SUCCESSION_PLACEHOLDERS],['{ruler}','{heir}','{house}']);
   const t=all().join(' '); for (const m of t.matchAll(/\{[^}]*\}/g)) assert.ok(SUCCESSION_PLACEHOLDERS.includes(m[0]),m[0]);
   for (const p of SUCCESSION_PLACEHOLDERS) assert.ok(t.includes(p),p);
   for (const i of items()) assert.doesNotMatch(i.headline,/\{/,i.headline);
@@ -51,9 +51,9 @@ test('docs facts: the Monarch names the heir, then seniority, then the Great Cou
   assert.match(byId('seniority-report').body,/no heir was named/); assert.match(byId('seniority-report').body,/seniority/);
   assert.match(byId('council-convenes').body,/no eligible heir remains/); assert.match(byId('council-convenes').body,/Great Council of lords convenes to elect a new house/);
   assert.match(byId('council-elects').body,/^The Great Council declares: \{house\} is elected/);
-  assert.match(byId('death-accession').body,/takes the Sky Throne on the passing of \{monarch\}/); assert.match(byId('abdication-accession').body,/lays down the crown/);
+  assert.match(byId('death-accession').body,/takes the Sky Throne on the passing of \{ruler\}/); assert.match(byId('abdication-accession').body,/lays down the crown/);
   assert.match(CE.hereditary.text,/heredity among the AI of the Royal House/); assert.match(CE.rising.text,/only through a Rising behind a claimant/);
-  assert.equal(LP.noHeir.text,'No heir is named.'); assert.match(MO.text,/mourning for \{monarch\}/);
+  assert.equal(LP.noHeir.text,'No heir is named.'); assert.match(MO.text,/mourning for \{ruler\}/);
 });
 test('the Great Council is the last resort, not the first: the seniority line never mentions it, and no line says an heir is guaranteed', () => {
   assert.doesNotMatch(byId('seniority-report').body,/Council/);
@@ -81,4 +81,9 @@ test('the header names no other lib module path', () => {
 test('unwired: nothing in app/, components/ or lib/ imports aurelle-succession-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('aurelle-succession-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/aurelle-succession-copy/,f);
+});
+test('placeholder names match the succession server (#613): {ruler}, {heir}, {house}; no doubled House', () => {
+  const src=readFileSync('lib/aurelle-succession-rules.ts','utf8');
+  for (const p of SUCCESSION_PLACEHOLDERS) assert.ok(src.includes(`'${p}'`),p);
+  for (const t of all()) { assert.doesNotMatch(t,/House \{house\}/,t); assert.doesNotMatch(t,/\{monarch\}/,t); }
 });
