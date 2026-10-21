@@ -18,18 +18,21 @@ export const injectionMarkers = [
   /\b[a-z][a-z0-9+.-]*:\/\/|\bwww\./i, // URLs
 ] as const;
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const phrase = (list: readonly string[], flags: string) => new RegExp(`\\b(?:${[...list].sort((a, b) => b.length - a.length).map(n => escape(n).replace(/ /g, '\\s+')).join('|')})\\b`, flags);
+// Word edges are letters only (QA3): a digit, '#', '/' or any punctuation next to a name is an edge, so 'Biden2024' and '#Putin' are refused.
+const phrase = (list: readonly string[], flags: string) => new RegExp(`(?<!\\p{L})(?:${[...list].sort((a, b) => b.length - a.length).map(n => escape(n).replace(/ /g, '\\s+')).join('|')})(?!\\p{L})`, flags + 'u');
 const fullNames = phrase(realWorldPoliticalNames.filter(n => n.includes(' ')), 'i'), surnames = phrase(realWorldPoliticalNames.filter(n => !n.includes(' ')), '');
 // A lone surname: ALL CAPS or all lowercase, with nothing but punctuation, a line break or the text's edge on both sides. "a trump card",
 // "TRUMP CARD" and "his trump." are not lone, so plain English still passes.
-const edge = `["'()\\[\\]{}.!?;:\u2014\u2013-]`;
-const loneSurname = new RegExp(`(?:^|\\n|${edge})\\s*(${realWorldPoliticalNames.filter(n => !n.includes(' ')).flatMap(n => [n.toUpperCase(), n.toLowerCase()]).map(escape).join('|')})(?=\\s*(?:$|\\n|,|${edge}))`);
+const edge = `["'()\\[\\]{}.!?;:,/#0-9\u2018\u2019\u201c\u201d\u2026\u2014\u2013-]`;
+const loneSurname = new RegExp(`(?:^|\\n|${edge})\\s*(${realWorldPoliticalNames.filter(n => !n.includes(' ')).flatMap(n => [n.toUpperCase(), n.toLowerCase()]).map(escape).join('|')})(?=\\s*(?:$|\\n|${edge}))`);
 
 /** The first listed real-world political name in a text, or null. Exact: multi-word names ignore case, one-word surnames do not, unless one stands alone in ALL CAPS or all lowercase. */
-export function realWorldNameIn(text: string): string | null { return text.match(fullNames)?.[0] ?? text.match(surnames)?.[0] ?? text.match(loneSurname)?.[1] ?? null; }
+/** QA3: NFKC folds fullwidth and compatibility forms ('ＰＵＴＩＮ' -> 'PUTIN'); the Turkish dotted and dotless I are folded too, since NFKC keeps them. */
+export const normalizeForMatch = (text: string) => text.normalize('NFKC').replace(/\u0130/g, 'I').replace(/\u0131/g, 'i');
+export function realWorldNameIn(raw: string): string | null { const text = normalizeForMatch(raw); return text.match(fullNames)?.[0] ?? text.match(surnames)?.[0] ?? text.match(loneSurname)?.[1] ?? null; }
 
 /** Why a text is denied, or null when it passes. */
 export function deniedAiText(text: string): 'real-world-name' | 'injection-marker' | null {
   if (realWorldNameIn(text) !== null) return 'real-world-name';
-  return injectionMarkers.some(p => p.test(text)) ? 'injection-marker' : null;
+  return injectionMarkers.some(p => p.test(normalizeForMatch(text))) ? 'injection-marker' : null;
 }
