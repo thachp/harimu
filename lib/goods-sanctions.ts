@@ -1,5 +1,5 @@
 import type { GameDatabase } from './database-contract';
-import { isMissingRelation, tolerate } from './db-errors';
+import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { kindleSeats } from './diplomacy';
 import { cleanTreatyLabel, treatyActorMax, type Ratification, type TreatyNationId } from './diplomacy-rules';
 import { EMBARGO_NAME_MAX, targetedSanctions } from './embargo-copy';
@@ -9,7 +9,7 @@ import { checkSanctionGoods, goodsColumn, goodsFromColumn, humanitarianGoods, is
 /** #601: targeted goods sanctions PoC behind HARIMU_TARGETED_SANCTIONS_ENABLED (default "false"), on top of the #363 embargo. One nation bans named goods to another; other trade goes on.
  *  Same shape as #363: written only by server code (a proposal from the AI leadership path, decided by the world tick with the 13.1 trade-measure ratification, the same placeholder Kindle
  *  stances [ASSUMPTION]); no route proposes, ratifies or lifts one, and no GET writes. [ASSUMPTION] one live sanction per direction (to change the list, lift and propose again), no fixed term,
- *  and the imposing nation lifts it without a vote, as for #363. Food goods are refused (13.3.1). Flag off: nothing is created and the trade guard is exactly #363's. */
+ *  and (ARC) a lift is a proposal ratified by the same body as the impose; one pending lift per sanction, kept on the sanction row. Food goods are refused (13.3.1). Flag off: nothing is created and the trade guard is exactly #363's. */
 export const goodsSanctionSchemas = [
   `CREATE TABLE IF NOT EXISTS goods_sanctions (
  id TEXT PRIMARY KEY,
@@ -21,10 +21,11 @@ export const goodsSanctionSchemas = [
  proposed_by TEXT NOT NULL CHECK(length(proposed_by) BETWEEN 1 AND 60),
  proposed_at INTEGER NOT NULL,
  status TEXT NOT NULL DEFAULT 'proposed' CHECK(status IN ('proposed','in_force','rejected','lifted')),
- decided_at INTEGER,
- imposed_at INTEGER,
- lifted_at INTEGER,
+ decided_at INTEGER, imposed_at INTEGER, lifted_at INTEGER,
  ratification_json TEXT,
+ lift_request_id TEXT UNIQUE, lift_status TEXT CHECK(lift_status IN ('proposed','rejected','ratified')), lift_proposed_at INTEGER, lift_ratification_json TEXT,
+ CHECK((lift_status IS NULL)=(lift_request_id IS NULL)),
+ CHECK(lift_status IS NULL OR lift_status<>'ratified' OR status='lifted'),
  CHECK(actor_nation<>target_nation),
  CHECK(status IN ('proposed') OR decided_at IS NOT NULL),
  CHECK(status NOT IN ('in_force','lifted') OR imposed_at IS NOT NULL),
@@ -71,7 +72,6 @@ export async function proposeGoodsSanction(db: GameDatabase, command: ProposeGoo
 /** World tick (flag on): decides each `proposed` sanction with the imposing nation's ratifying body (13.1 trade rule). Each update is guarded by status='proposed', so a repeated tick decides once. */
 export async function decideProposedGoodsSanctions(db: GameDatabase, now: number) {
   const rows = (await db.prepare(`SELECT ${columns} FROM goods_sanctions WHERE status='proposed' ORDER BY proposed_at,id LIMIT 20`).all<Row>()).results;
-  if (!rows.length) return 0;
   const seats = await kindleSeats(db);
   let decided = 0;
   const changed = (result: unknown) => Number((result as { meta?: { changes?: number } })?.meta?.changes ?? 0) > 0; // a missing count is never success
@@ -87,19 +87,33 @@ export async function decideProposedGoodsSanctions(db: GameDatabase, now: number
       : await db.prepare("UPDATE goods_sanctions SET status='rejected',decided_at=?,ratification_json=? WHERE id=? AND status='proposed'").bind(now, json, row.id).run();
     if (changed(result)) decided++;
   }
+  // Lift proposals: the same 13.1 ratification (ARC). Ratified ends the sanction (the lift news line follows lifted_at); rejected leaves it in force. Guarded by lift_status='proposed'.
+  const lifts = (await db.prepare(`SELECT ${columns} FROM goods_sanctions WHERE status='in_force' AND lift_status='proposed' ORDER BY lift_proposed_at,id LIMIT 20`).all<Row>()).results;
+  for (const row of lifts) {
+    const ratification = embargoRatification(row.actor_nation, row.target_nation, seats), json = JSON.stringify([ratification]);
+    const result = ratification.passed
+      ? await db.prepare("UPDATE goods_sanctions SET status='lifted',lifted_at=?,lift_status='ratified',lift_ratification_json=? WHERE id=? AND status='in_force' AND lift_status='proposed'").bind(now, json, row.id).run()
+      : await db.prepare("UPDATE goods_sanctions SET lift_status='rejected',lift_ratification_json=? WHERE id=? AND status='in_force' AND lift_status='proposed'").bind(json, row.id).run();
+    if (changed(result)) decided++;
+  }
   return decided;
 }
 
-/** Server-side only: the imposing nation lifts its own in-force sanction. */
-export async function liftGoodsSanction(db: GameDatabase, sanctionId: string, liftingNation: string, now: number, enabled: boolean) {
+/** Server-side only: the imposing nation proposes lifting its own in-force sanction; the world tick ratifies or rejects it. Idempotent per requestId; one pending lift per sanction. */
+export async function proposeGoodsSanctionLift(db: GameDatabase, command: { sanctionId: string; liftingNation: string; requestId: string }, now: number, enabled: boolean) {
   if (!enabled) return fail(403, 'disabled', 'Targeted sanctions are not open yet.');
-  const row = await db.prepare(`SELECT ${columns} FROM goods_sanctions WHERE id=?`).bind(sanctionId).first<Row>();
+  if (!embargoRequestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
+  const prior = await db.prepare('SELECT id FROM goods_sanctions WHERE lift_request_id=?').bind(command.requestId).first<{ id: string }>();
+  if (prior) return prior.id === command.sanctionId ? { ok: true as const, replay: true as const } : fail(409, 'request_reused', 'That request id was already used for a different lift.');
+  const row = await db.prepare(`SELECT ${columns} FROM goods_sanctions WHERE id=?`).bind(command.sanctionId).first<Row>();
   if (!row) return fail(409, 'not_found', 'No such sanction.');
-  if (row.actor_nation !== liftingNation) return fail(403, 'not_actor', 'Only the nation that imposed a sanction can lift it.');
+  if (row.actor_nation !== command.liftingNation) return fail(403, 'not_actor', 'Only the nation that imposed a sanction can propose lifting it.');
   if (row.status !== 'in_force') return fail(409, 'not_in_force', 'That sanction is not in force.');
-  const result = await db.prepare("UPDATE goods_sanctions SET status='lifted',lifted_at=? WHERE id=? AND status='in_force'").bind(now, sanctionId).run();
-  // Only a strict row count is a lift: a concurrent lift that lost the race, or a missing count, is not_in_force.
-  return Number((result as { meta?: { changes?: number } })?.meta?.changes ?? 0) > 0 ? { ok: true as const } : fail(409, 'not_in_force', 'That sanction is not in force.');
+  const result = await db.prepare("UPDATE goods_sanctions SET lift_request_id=?,lift_status='proposed',lift_proposed_at=?,lift_ratification_json=NULL WHERE id=? AND status='in_force' AND (lift_status IS NULL OR lift_status='rejected')")
+    .bind(command.requestId, now, command.sanctionId).run().catch(error => { if (isUniqueViolation(error)) return null; throw error; }); // only a request-id clash is a lost race, read back below
+  if (Number((result as { meta?: { changes?: number } } | null)?.meta?.changes ?? 0) > 0) return { ok: true as const };
+  const again = await db.prepare('SELECT id FROM goods_sanctions WHERE lift_request_id=?').bind(command.requestId).first<{ id: string }>();
+  return again?.id === command.sanctionId ? { ok: true as const, replay: true as const } : fail(409, 'lift_pending', 'A lift of that sanction is already proposed.');
 }
 
 /** Read-only. A database without migration 0059 reads as none. */

@@ -14,10 +14,11 @@ async function setup(t, backend, { flag = true } = {}) {
   let n = 0;
   const propose = (over = {}) => g.proposeGoodsSanction(r.db, { actor: 'korund', target: 'kindle', goods: ['wood'], proposedBy: 'AI Chairman', requestId: `req-sanction-${++n}`, ...over }, nowS(), { enabled: flag });
   const decide = () => g.decideProposedGoodsSanctions(r.db, nowS());
+  const lift = (sanctionId, requestId, liftingNation = 'korund') => g.proposeGoodsSanctionLift(r.db, { sanctionId, liftingNation, requestId }, nowS(), flag);
   const trade = (from, to, good, flags = { embargo: true, sanctions: flag }) => g.sanctionedGood(r.db, from, to, good, 'post', flags);
   const assembly = s => r.db.prepare("INSERT INTO assembly_elections (id,nation_id,policy,opens_at,closes_at,closed_at,result_json) VALUES ('a1','kindle','preview-citizen-v1',?,?,?,?)").bind(nowS() - 4 * D, nowS() - D, nowS() - D, JSON.stringify({ totals: { after: s } })).run();
   const status = async id => (await r.db.prepare('SELECT status FROM goods_sanctions WHERE id=?').bind(id).first())?.status;
-  return { r, g, e, propose, decide, trade, assembly, status, nowS };
+  return { r, g, e, propose, decide, lift, trade, assembly, status, nowS };
 }
 const refused = (res, status, reason) => { assert.equal(res.ok, false, JSON.stringify(res)); assert.deepEqual([res.status, res.reason], [status, reason], res.error); };
 
@@ -28,14 +29,14 @@ test('rules: food goods are humanitarian, lists are sorted, de-duplicated and ca
   assert.equal(rules.goodsColumn(['materials', 'wood']), ',materials,wood,'); assert.deepEqual(rules.goodsFromColumn(',materials,wood,'), ['materials', 'wood']);
 });
 
-test('a missing change count is never success: decide counts 0 and lift is not_in_force', async () => {
+test('a missing change count is never success: decide counts 0 and a lift proposal is not ok', async () => {
   const r = await localRuntime(); try {
     const g = await r.importModule('lib/goods-sanctions.ts');
     const row = { id: 's1', actor_nation: 'korund', target_nation: 'kindle', goods: ',wood,', proposed_by: 'AI', status: 'proposed', imposed_at: null, lifted_at: null, ratification_json: null };
     const stmt = sql => ({ bind: () => stmt(sql), run: async () => ({}), first: async () => /FROM goods_sanctions WHERE id=/.test(sql) ? { ...row, status: 'in_force' } : null, all: async () => ({ results: /status='proposed'/.test(sql) ? [row] : [] }) });
     const db = { prepare: stmt, batch: async () => [] };
     assert.equal(await g.decideProposedGoodsSanctions(db, 100), 0);
-    refused(await g.liftGoodsSanction(db, 's1', 'korund', 100, true), 409, 'not_in_force');
+    refused(await g.proposeGoodsSanctionLift(db, { sanctionId: 's1', liftingNation: 'korund', requestId: 'req-lift-0001' }, 100, true), 409, 'lift_pending');
   } finally { await r.close(); }
 });
 
@@ -44,7 +45,7 @@ for (const backend of ['sqlite', 'postgres']) {
     const c = await setup(t, backend, { flag: false });
     let calls = 0; const prepare = c.r.db.prepare.bind(c.r.db), batch = c.r.db.batch.bind(c.r.db);
     c.r.db.prepare = sql => { calls++; return prepare(sql); }; c.r.db.batch = x => { calls++; return batch(x); };
-    const res = await c.propose(), lift = await c.g.liftGoodsSanction(c.r.db, 'x', 'korund', c.nowS(), false), open = await c.trade('kindle', 'korund', 'wood', { embargo: false, sanctions: false });
+    const res = await c.propose(), lift = await c.g.proposeGoodsSanctionLift(c.r.db, { sanctionId: 'x', liftingNation: 'korund', requestId: 'req-lift-off1' }, c.nowS(), false), open = await c.trade('kindle', 'korund', 'wood', { embargo: false, sanctions: false });
     c.r.db.prepare = prepare; c.r.db.batch = batch;
     refused(res, 403, 'disabled'); refused(lift, 403, 'disabled'); assert.deepEqual(open, { ok: true }); assert.equal(calls, 0);
     // A row written behind the flag's back still changes nothing while the flag is off.
@@ -53,7 +54,7 @@ for (const backend of ['sqlite', 'postgres']) {
     // Baseline: the same spy records calls for the same propose, lift and trade calls with the flag on.
     let on = 0; c.r.db.prepare = sql => { on++; return prepare(sql); };
     await c.g.proposeGoodsSanction(c.r.db, { actor: 'korund', target: 'aurelle', goods: ['wood'], proposedBy: 'AI Chairman', requestId: 'req-baseline-1' }, c.nowS(), { enabled: true });
-    await c.g.liftGoodsSanction(c.r.db, 'x', 'korund', c.nowS(), true); await c.trade('kindle', 'korund', 'wood', { embargo: false, sanctions: true });
+    await c.g.proposeGoodsSanctionLift(c.r.db, { sanctionId: 'x', liftingNation: 'korund', requestId: 'req-lift-base' }, c.nowS(), true); await c.trade('kindle', 'korund', 'wood', { embargo: false, sanctions: true });
     c.r.db.prepare = prepare; assert.ok(on > 0, 'the spy fires when the flag is on');
   });
 
@@ -64,8 +65,23 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(a + b, 1, `decided ${a}+${b}`);
     const row = await c.r.db.prepare('SELECT status,decided_at,imposed_at FROM goods_sanctions WHERE id=?').bind(p.sanction.id).first();
     assert.equal(row.status, 'in_force'); assert.equal(Number(row.decided_at), Number(row.imposed_at));
-    const lifts = await Promise.all([1, 2].map(() => c.g.liftGoodsSanction(c.r.db, p.sanction.id, 'korund', first + 120, true)));
-    assert.equal(lifts.filter(x => x.ok).length, 1, JSON.stringify(lifts)); refused(lifts.find(x => !x.ok), 409, 'not_in_force');
+    const lifts = await Promise.all(['req-lift-0001', 'req-lift-0002'].map(requestId => c.lift(p.sanction.id, requestId)));
+    assert.equal(lifts.filter(x => x.ok).length, 1, JSON.stringify(lifts)); refused(lifts.find(x => !x.ok), 409, 'lift_pending');
+    const [x, y] = await Promise.all([c.g.decideProposedGoodsSanctions(c.r.db, first + 180), c.g.decideProposedGoodsSanctions(c.r.db, first + 240)]);
+    assert.equal(x + y, 1, `lift decided ${x}+${y}`); assert.equal(await c.status(p.sanction.id), 'lifted');
+    assert.equal(Number((await c.r.db.prepare('SELECT lifted_at FROM goods_sanctions WHERE id=?').bind(p.sanction.id).first()).lifted_at), first + 180, 'the first tick decides; the second does not overwrite');
+  });
+
+  test(`a lift the Kindle Assembly rejects keeps the sanction in force; a later ratified lift ends it (${backend})`, async t => {
+    const c = await setup(t, backend), elect = (id, at, s) => c.r.db.prepare("INSERT INTO assembly_elections (id,nation_id,policy,opens_at,closes_at,closed_at,result_json) VALUES (?,'kindle','preview-citizen-v1',?,?,?,?)").bind(id, at - 3 * D, at, at, JSON.stringify({ totals: { after: s } })).run();
+    await elect('a1', c.nowS() - 2 * D, seats(7, 6, 5)); const p = await c.propose({ actor: 'kindle', target: 'aurelle', proposedBy: 'AI President' }); await c.decide(); assert.equal(await c.status(p.sanction.id), 'in_force');
+    await elect('a2', c.nowS() - D, seats(9, 9, 0)); assert.deepEqual(await c.lift(p.sanction.id, 'req-lift-rej1', 'kindle'), { ok: true }); // 9 of 18 is not a majority
+    assert.equal(await c.decide(), 1); assert.equal(await c.status(p.sanction.id), 'in_force'); refused(await c.trade('aurelle', 'kindle', 'wood'), 403, 'sanctioned_good');
+    assert.equal((await c.r.db.prepare('SELECT lift_status FROM goods_sanctions WHERE id=?').bind(p.sanction.id).first()).lift_status, 'rejected');
+    assert.equal(c.g.goodsSanctionNewsItems((await c.g.readGoodsSanctions(c.r.db)).sanctions, 'kindle').length, 1, 'no lift line for a rejected lift');
+    await elect('a3', c.nowS() - 1, seats(5, 8, 5)); assert.deepEqual(await c.lift(p.sanction.id, 'req-lift-rej2', 'kindle'), { ok: true }, 'a rejected lift may be proposed again');
+    assert.equal(await c.decide(), 1); assert.equal(await c.status(p.sanction.id), 'lifted'); assert.deepEqual(await c.trade('aurelle', 'kindle', 'wood'), { ok: true });
+    assert.equal(c.g.goodsSanctionNewsItems((await c.g.readGoodsSanctions(c.r.db)).sanctions, 'kindle').length, 2, 'the ratified lift posts the lift line');
   });
 
   test(`a food row that reaches the table directly is rejected by the tick and never blocks food (${backend})`, async t => {
@@ -91,9 +107,11 @@ for (const backend of ['sqlite', 'postgres']) {
     refused(await c.trade('korund', 'kindle', 'knowledge'), 403, 'sanctioned_good');
     for (const good of ['materials', 'food', 'fruit']) assert.deepEqual(await c.trade('kindle', 'korund', good), { ok: true }, good);
     assert.deepEqual(await c.trade('kindle', 'aurelle', 'wood'), { ok: true }, 'another pair is untouched');
-    refused(await c.g.liftGoodsSanction(c.r.db, p.sanction.id, 'kindle', c.nowS(), true), 403, 'not_actor');
-    assert.equal((await c.g.liftGoodsSanction(c.r.db, p.sanction.id, 'korund', c.nowS(), true)).ok, true);
-    refused(await c.g.liftGoodsSanction(c.r.db, p.sanction.id, 'korund', c.nowS(), true), 409, 'not_in_force');
+    refused(await c.lift(p.sanction.id, 'req-lift-kind', 'kindle'), 403, 'not_actor'); refused(await c.lift('nope', 'req-lift-none'), 409, 'not_found'); refused(await c.lift(p.sanction.id, 'x'), 400, 'bad_request');
+    assert.deepEqual(await c.lift(p.sanction.id, 'req-lift-0001'), { ok: true }); assert.deepEqual(await c.lift(p.sanction.id, 'req-lift-0001'), { ok: true, replay: true });
+    refused(await c.lift('other', 'req-lift-0001'), 409, 'request_reused'); refused(await c.lift(p.sanction.id, 'req-lift-0002'), 409, 'lift_pending');
+    refused(await c.trade('kindle', 'korund', 'wood'), 403, 'sanctioned_good'); // pending until ratified
+    assert.equal(await c.decide(), 1); assert.equal(await c.status(p.sanction.id), 'lifted'); refused(await c.lift(p.sanction.id, 'req-lift-0003'), 409, 'not_in_force');
     assert.deepEqual(await c.trade('kindle', 'korund', 'wood'), { ok: true }, 'allowed after lift');
     const news = c.g.goodsSanctionNewsItems((await c.g.readGoodsSanctions(c.r.db)).sanctions, 'kindle');
     assert.deepEqual(news.map(x => x.title), ['Targeted sanction imposed', 'Targeted sanction lifted']); for (const x of news) assert.ok(x.text.length <= 80, x.text);
@@ -122,7 +140,7 @@ for (const backend of ['sqlite', 'postgres']) {
 
 test('no route proposes, decides or lifts a sanction; GET paths never pass the decide flag', async () => {
   const walk = async dir => (await Promise.all((await readdir(dir, { withFileTypes: true })).map(x => x.isDirectory() ? walk(new URL(`${x.name}/`, dir)) : [new URL(x.name, dir)]))).flat();
-  for (const file of await walk(new URL('../app/', import.meta.url))) if (/\.(ts|tsx)$/.test(file.pathname)) assert.doesNotMatch(await readFile(file, 'utf8'), /proposeGoodsSanction|liftGoodsSanction|decideProposedGoodsSanctions/, file.pathname);
+  for (const file of await walk(new URL('../app/', import.meta.url))) if (/\.(ts|tsx)$/.test(file.pathname)) assert.doesNotMatch(await readFile(file, 'utf8'), /proposeGoodsSanction|proposeGoodsSanctionLift|decideProposedGoodsSanctions/, file.pathname);
   assert.doesNotMatch(await readFile(new URL('../app/api/world/route.ts', import.meta.url), 'utf8'), /TARGETED_SANCTIONS/, 'the world GET never decides sanctions');
   const citizen = await readFile(new URL('../app/api/citizen/route.ts', import.meta.url), 'utf8');
   assert.equal((citizen.match(/targetedSanctions:/g) ?? []).length, 1); assert.ok(citizen.indexOf('targetedSanctions:') > citizen.indexOf('async function handlePost'), 'only the POST world tick decides');
