@@ -23,7 +23,7 @@ export async function readAiCosts(db: GameDatabase, now: number, budgetMicro: nu
   const day = (offset: number) => new Date((now - offset * 86400) * 1000).toISOString().slice(0, 10);
   const days = Array.from({ length: aiCostDays }, (_, i) => day(i));
   const rows = (await db.prepare('SELECT utc_day, model, status, request_id, reserved_micro FROM harimu_ai_reservations WHERE utc_day >= ? AND utc_day <= ?').bind(days[aiCostDays - 1], days[0])
-    .all<{ utc_day: string; model: string; status: Status; request_id: string; reserved_micro: number }>().catch(() => ({ results: [] }))).results;
+    .all<{ utc_day: string; model: string; status: Status; request_id: string; reserved_micro: number }>()).results; // a read error throws (the route answers 500), never an empty $0 dashboard
   const out = new Map(days.map(d => [d, { day: d, budgetMicro, ...empty(), byStatus: { pending: 0, finished: 0, uncertain: 0 }, byModel: {}, byPurpose: {} } as AiCostDay]));
   for (const row of rows) {
     const entry = out.get(row.utc_day); if (!entry) continue;
