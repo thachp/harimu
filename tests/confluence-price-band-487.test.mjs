@@ -39,4 +39,16 @@ test('wiring: production keeps the flag "false"; the board renders only in the C
   assert.match(page, /citizenNation\.id === 'confluence' && priceBoard && <ConfluencePriceBoard board=\{priceBoard\} \/>/);
   const ui = await readFile(new URL('../app/confluence-price-board.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(ui, /onClick|<button|ActionButton/, 'read-only');
+  assert.match(ui, /The state posts a \{board\.staple\.toLowerCase\(\)\} price of \{cur\(board\.priceMinor\)\}, with a ±\{board\.bandPct\}% band\./, 'QA1 copy nit: a posted state price, not an enforced market');
+  assert.doesNotMatch(ui, /stay inside/);
+});
+
+test('render: the posted-price sentence reads "The state posts a rice price of 1.00 CUR, with a ±5% band."', async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  const m = await r.importModule('lib/confluence-price-band.ts');
+  const { loadApp } = await import('./helpers/component-module.mjs');
+  const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
+  const { ConfluencePriceBoard } = await loadApp('confluence-price-board');
+  const html = renderToStaticMarkup(React.createElement(ConfluencePriceBoard, { board: m.confluencePriceBoard('confluence', 'alice', { ...qa, HARIMU_CONFLUENCE_ENABLED: 'true' }) }));
+  assert.ok(html.includes('The state posts a rice price of 1.00 CUR, with a ±5% band. This board is read-only.'), html);
 });

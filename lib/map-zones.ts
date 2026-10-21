@@ -18,7 +18,10 @@ type Point = { x: number; y: number };
 export type MapNation = { id: string; capital: Point; outpost?: Point; biome: readonly string[] };
 /** Capitals, border outposts and biomes of the nations on the map (#491): derived from the registry (`lib/nation-openings.ts`), the nations that have a capital there.
  *  Today that is exactly the three live nations, in the same order and with the same values as the old literal. */
-export const mvpNations: readonly MapNation[] = nationOpenings.flatMap(o => o.capital && o.biome?.length ? [{ id: o.id, capital: o.capital, outpost: o.outpost, biome: o.biome }] : []);
+export const mappedNations: readonly MapNation[] = nationOpenings.flatMap(o => o.capital && o.biome?.length ? [{ id: o.id, capital: o.capital, outpost: o.outpost, biome: o.biome }] : []);
+/** #487: the live nations on the map (travel, missionaries, sieges, city founding and the original seed keep using these). A flag-gated nation's squares are on the map
+ *  (`mappedNations`, added by `nationSquaresUpsertSql`), but it is not reachable by travel or missionaries until it opens for the public. */
+export const mvpNations: readonly MapNation[] = mappedNations.filter(n => nationOpenings.find(o => o.id === n.id)?.openingFlag === null);
 /** The nations whose squares the original seed (migration 0011 / `worldSquaresSeedSql`) already wrote; any other nation with a capital is added by `nationSquaresUpsertSql`. */
 export const originallySeededNations: readonly string[] = ['kindle', 'korund', 'aurelle'];
 const commonsCentre = { x: 12, y: 6 };
@@ -62,7 +65,7 @@ export function seedWorldSquares(nations: readonly MapNation[] = mvpNations): Wo
 }
 
 /** One nation's Heartland + Frontier squares exactly as `seedWorldSquares(nations)` would write them (a square two nations' blocks share belongs to the first in `nations`). */
-export function nationBlockSquares(nationId: string, nations: readonly MapNation[] = mvpNations): WorldSquare[] {
+export function nationBlockSquares(nationId: string, nations: readonly MapNation[] = mappedNations): WorldSquare[] {
   const nation = nations.find(n => n.id === nationId);
   if (!nation) return [];
   const out: WorldSquare[] = [];
@@ -108,7 +111,7 @@ export function worldSquaresSeedSql(chunk = 100, conflict: 'sqlite' | 'postgres'
 }
 /** Idempotent upsert that adds only one nation's squares to an already-seeded `world_squares` (#491), keyed by (x,y). It overwrites a square only while it is still untouched Wildlands (no owner, no feature),
  *  so the three live nations, the Commons and any purchased or founded square are never changed, and a second run changes nothing. The same statement runs on SQLite (3.24+, D1) and Postgres. Literal values from the fixed seed only. */
-export function nationSquaresUpsertSql(nationId: string, nations: readonly MapNation[] = mvpNations, chunk = 100): string[] {
+export function nationSquaresUpsertSql(nationId: string, nations: readonly MapNation[] = mappedNations, chunk = 100): string[] {
   const rows = nationBlockSquares(nationId, nations).map(s => `(${[s.x, s.y, s.zone, s.owner, s.terrain, s.resource, s.feature].map(lit).join(',')})`);
   const out: string[] = [];
   for (let i = 0; i < rows.length; i += chunk)
@@ -116,9 +119,9 @@ export function nationSquaresUpsertSql(nationId: string, nations: readonly MapNa
       + `WHERE world_squares.zone='wildlands' AND world_squares.owner IS NULL AND world_squares.feature IS NULL`);
   return out;
 }
-/** Boot step (lib/db.ts, SQLite/D1): the upsert for every mapped nation the original seed did not write. Empty today (only the three live nations have capitals), so it adds no statement. A Postgres
+/** Boot step (lib/db.ts, SQLite/D1): the upsert for every mapped nation the original seed did not write. #487: today that is Confluence's block. A Postgres
  *  database has no boot DDL path: the PR that gives the first new nation its capital runs `nationSquaresUpsertSql(id)` as its (additive) migration. */
-export function bootNationSquaresSql(nations: readonly MapNation[] = mvpNations): string[] {
+export function bootNationSquaresSql(nations: readonly MapNation[] = mappedNations): string[] {
   return nations.filter(n => !originallySeededNations.includes(n.id)).flatMap(n => nationSquaresUpsertSql(n.id, nations));
 }
 

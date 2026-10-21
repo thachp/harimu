@@ -9,6 +9,6 @@ export function ConfluencePriceBoard({ board }: { board: PriceBoard }) {
       <div><dt>{board.staple}</dt><dd>{cur(board.priceMinor)} per {board.unit}</dd></div>
       <div><dt>State price band</dt><dd>{cur(board.floorMinor)} to {cur(board.ceilingMinor)} (±{board.bandPct}%)</dd></div>
     </dl>
-    <p>Staple prices stay inside the state band. This board is read-only.</p>
+    <p>The state posts a {board.staple.toLowerCase()} price of {cur(board.priceMinor)}, with a ±{board.bandPct}% band. This board is read-only.</p>
   </section>;
 }

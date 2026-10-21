@@ -37,6 +37,28 @@ jobs:
       # TAP logs retain per-test durations for profiling; no coverage filters.
       - run: node --experimental-strip-types --test --test-shard=${{ matrix.shard }}/2 tests/*.test.mjs
 
+  # #591: the Postgres suite (HARIMU_TEST_STORAGE=postgres on PGlite), the same files as npm run test:postgres.
+  # Sharded like the Node tests; --test-concurrency=1 inside a shard, as in the npm script (PGlite instances are memory-heavy).
+  # Not yet a prerequisite of `check`: #591 asks to gate on it only once it has proved stable.
+  postgres-tests:
+    name: Postgres tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --experimental-strip-types --test --test-concurrency=1 --test-shard=${{ matrix.shard }}/4 tests/*.test.mjs
+        env:
+          HARIMU_TEST_STORAGE: postgres
+
   validation:
     runs-on: ubuntu-latest
     timeout-minutes: 20

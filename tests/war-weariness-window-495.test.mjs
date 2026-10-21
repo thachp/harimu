@@ -51,3 +51,17 @@ test('netting: only true recaptures (cells taken from the nation earlier) offset
   await capture('korund', 'kindle', old, asOf - 50);
   assert.equal((await read(asOf)).korund, base.korund, 'more recaptured than lost this week: floor 0, not below the weeks-at-war base');
 });
+
+test('recapture window edges (QA1 nit; ARC ruling: recapturing a square lost before the window still offsets this week\'s losses)', async t => {
+  const { asOf, capture, read, base } = await setup(t);
+  const early = await capture('kindle', 'korund', 3, asOf - 3 * WEEK); // lost long before this week
+  await capture('kindle', 'korund', 4, asOf - 1000);                   // this week's losses
+  assert.equal((await read(asOf)).korund, base.korund + 4);
+  await capture('korund', 'kindle', early.slice(0, 1), asOf - WEEK);   // exactly one week old: outside (asOf-WEEK, asOf]
+  assert.equal((await read(asOf)).korund, base.korund + 4, 'a recapture exactly at the lower edge does not net');
+  await capture('korund', 'kindle', early.slice(1, 2), asOf - WEEK + 1); // first second inside
+  assert.equal((await read(asOf)).korund, base.korund + 3, 'a recapture one second inside the window nets, even though the loss was weeks earlier');
+  await capture('korund', 'kindle', early.slice(2, 3), asOf);           // upper edge, inclusive
+  assert.equal((await read(asOf)).korund, base.korund + 2, 'a recapture at the tick time nets');
+  assert.equal((await read(asOf - 1)).korund, base.korund + 2, 'one second earlier the window shifts: the upper-edge recapture is not yet in, the lower-edge one now is');
+});
