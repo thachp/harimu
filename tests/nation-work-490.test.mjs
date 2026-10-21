@@ -267,3 +267,37 @@ test('migration 0049 on Postgres (PGlite, mutation check): every earlier migrati
   for (const x of ledgerTables) assert.equal((await pg.query('SELECT 1 FROM pg_tables WHERE tablename=$1', [x])).rows.length, 1, x);
   await pg.close();
 });
+
+test('#487: a confluence-* shift is labeled CUR (never SPK), and Kindle claim-work refuses it so Collect goes to nation-claim-work', async t => {
+  const { r } = await setup(t, 'confluence');
+  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true'); for (const [k, v] of Object.entries(bindings)) r.setFixtureEnv(k, v);
+  const id = randomUUID();
+  assert.equal((await r.call('citizen', 'alice', { action: 'nation-start-work', requestId: id, jobId: 'confluence-cooperative-harvest' })).status, 200);
+  const shifts = (await r.call('citizen', 'alice')).data.shifts.filter(s => s.workOrderId.startsWith('confluence-'));
+  assert.equal(shifts.length, 1); for (const s of shifts) assert.equal(s.currency, 'CUR');
+  r.setNow(r.now + 2 * 3600 * 1000);
+  const kindle = await r.call('citizen', 'alice', { action: 'claim-work', shiftId: id }); assert.equal(kindle.status, 409); assert.match(kindle.data.error, /nation-claim-work/);
+  const res = await r.call('citizen', 'alice', { action: 'nation-claim-work', shiftId: id }); assert.equal(res.status, 200, JSON.stringify(res.data));
+  assert.equal(res.data.nationWorkPlan.walletMinor, 800);
+  const src = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(src, /priorNationShift\.currency === 'CUR'\) void claimNationShift/, 'the earlier-nation Collect routes CUR to nation-claim-work');
+  assert.match(src, /action: 'nation-claim-work', shiftId/);
+});
+
+test('#487 spy: with HARIMU_NATION_WORK_ENABLED off, GET /api/citizen and both commands run zero nation-work queries; on, they run some', async t => {
+  const { r } = await setup(t, 'confluence');
+  for (const [k, v] of Object.entries(bindings)) r.setFixtureEnv(k, v);
+  const sqls = [], prepare = r.db.prepare.bind(r.db);
+  // ready()'s citizen SELECT is shared with other routes, so the spy keys on the ledger tables and the job upsert.
+  r.db.prepare = sql => { if (/nation_wage_|INSERT OR IGNORE INTO work_orders/.test(sql)) sqls.push(sql.slice(0, 60)); return prepare(sql); };
+  t.after(() => { r.db.prepare = prepare; });
+  const calls = async () => {
+    await r.call('citizen', 'alice');
+    await r.call('citizen', 'alice', { action: 'nation-start-work', requestId: randomUUID(), jobId: 'confluence-cooperative-harvest' });
+    await r.call('citizen', 'alice', { action: 'nation-claim-work', shiftId: randomUUID() });
+  };
+  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'false'); await calls();
+  assert.deepEqual(sqls, [], 'flag off: no nation-work query on any path');
+  r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true'); await calls();
+  assert.ok(sqls.length > 0, 'flag on baseline: the spy sees nation-work queries');
+});

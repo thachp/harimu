@@ -37,7 +37,7 @@ export type NationJob = { id: string; name: string; capacityCost: number; hours:
 
 /** #487 (Confluence PoC, slice 1): the Confluence wage ledger for the generic work commands (lib/nation-work.ts). Read only while HARIMU_CONFLUENCE_ENABLED and HARIMU_NATION_WORK_ENABLED
  *  are "true" and the account is QA-allowlisted (nationPlayable). Currency per docs (the-confluence.mdx: Current, CUR); no band, parity or State Bank (excluded by #487).
- *  [ASSUMPTION] job values copy the Labor Notes / Crowns pattern (capacity 4, 2 hours, 800 minor units; Stage 0 design section 3), and the fund matches Korund's starting wage fund (100000 minor units).
+ *  [ASSUMPTION] job values copy the Labor Notes / Crowns pattern (capacity 4, 2 hours, 800 minor units; Stage 0 design section 3), and the fund (100000 minor units) is an [ASSUMPTION] accepted by ARC, matching Korund's seeded `korund_resources.initial_minor` (lib/db.ts).
  *  Name and output are placeholders from the docs' city table (Lanu Terraces: "Cooperative harvest shifts") until Content supplies copy. No capital yet: that is the next slice. */
 export const confluenceWork = {
   currency: { code: 'CUR', name: 'Current' },
