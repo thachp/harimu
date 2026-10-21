@@ -4,6 +4,9 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { draftLeaderPersonas } from '../lib/leader-drafts.ts';
 import { leaderPersonas } from '../lib/leader-personas.ts';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { loadApp } from './helpers/component-module.mjs';
 
 const read = f => readFile(new URL(`../${f}`, import.meta.url), 'utf8');
 
@@ -24,4 +27,16 @@ test('page: rendered only in a Confluence citizen\'s government view', async () 
   const page = await read('app/page.tsx');
   assert.equal([...page.matchAll(/<ConfluencePillars \/>/g)].length, 1);
   assert.match(page, /citizenNation\.id === 'confluence' && <ConfluencePillars \/>/);
+});
+
+test('render (QA3 nit on #677): the section is labelled by its heading and lists the four offices, each with an AI badge, and no controls', async () => {
+  const { ConfluencePillars } = await loadApp('confluence-pillars');
+  const html = renderToStaticMarkup(React.createElement(ConfluencePillars));
+  assert.match(html, /<section[^>]*aria-labelledby="confluence-pillars-heading"/);
+  assert.match(html, /<h3 id="confluence-pillars-heading">The Four Pillars<\/h3>/);
+  assert.doesNotMatch(html, /aria-label="/, 'no aria-label repeating the heading');
+  const offices = [...html.matchAll(/<li><strong>([^<]+)<\/strong>/g)].map(m => m[1].replace(/&#x27;/g, "'"));
+  assert.deepEqual(offices, ['General Secretary', 'President', 'Premier', "Chair of the People's Assembly"]);
+  for (const p of draftLeaderPersonas.confluence) assert.ok(html.includes(p.name), p.name);
+  assert.doesNotMatch(html, /<button|<form|<input/);
 });
