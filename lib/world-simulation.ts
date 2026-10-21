@@ -61,7 +61,7 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
 export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
-  for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
+  await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
   await db.prepare("INSERT OR IGNORE INTO world_clock (id,epoch_seconds) VALUES ('main',?)")
     .bind(Math.floor(now/tickSeconds)*tickSeconds).run();
   const epoch = (await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>())!.epoch_seconds;
@@ -90,33 +90,53 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       await db.batch(await stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})}));
     }
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
-  // Market day, only while the order book is on (write paths only). Idempotent per tick:
-  // #199 fruit and meat spoil first, then #198 NPC farm asks are posted for the current game day.
-  if (options.npcSupply) {
-    const current = await db.prepare('SELECT tick,scheduled_at FROM world_ticks ORDER BY tick DESC LIMIT 1').first<{tick:number;scheduled_at:number}>();
-    if (current) {
-      await runSpoilage(db, Number(current.tick), now);
-      await runNpcSupply(db, Number(current.tick), Number(current.scheduled_at), now, tickSeconds);
-    }
-  }
-  // #71: Aurelle Rising thresholds and Crisis Window resolution, only while HARIMU_AURELLE_RISING_ENABLED is on (write paths only).
-  if (options.aurelleRising) await runAurelleRising(db, now);
-  // #281: Aurelle AI palace coup, only while HARIMU_AURELLE_COUP_ENABLED is on (write paths only).
-  if (options.aurelleCoup) await runAurelleCoup(db, now, options.favorDecay === true);
-  // #307: Kindle party primaries open at their configured time and are counted when due, only while HARIMU_PRIMARIES_ENABLED is on and the privacy gate is open (write paths only).
-  if (options.primaries) await runPrimaries(db, now, options.primaries).catch(error => { console.warn('[world] primaries tick failed', error instanceof Error ? error.name : 'unknown'); });
-  // #283: Kindle mid-term Assembly opens at its configured time and is counted when due, only while HARIMU_KINDLE_ASSEMBLY_ENABLED is on and the privacy gate is open (write paths only).
-  if (options.kindleAssembly) await runKindleAssembly(db, now, options.kindleAssembly).catch(error => { console.warn('[world] Assembly tick failed', error instanceof Error ? error.name : 'unknown'); });
-  // #70: Korund emergency Presidium session and succession, only while HARIMU_KORUND_PRESIDIUM_ENABLED is on (write paths only).
-  if (options.korundPresidium) await runKorundPresidium(db, now);
-  // #295: Korund underground inspections (capped), only while HARIMU_FAITH_ENABLED is on (write paths only).
-  if (options.faithFestivals) await runKorundRaids(db, now).catch(error => { console.warn('[world] Korund inspection tick failed', error instanceof Error ? error.name : 'unknown'); });
-  // #308: AI treaties (decide proposals, expire terms), only while HARIMU_DIPLOMACY_ENABLED is on (write paths only).
-  if (options.diplomacy) await runDiplomacy(db, now).catch(error => { console.warn('[world] diplomacy tick failed', error instanceof Error ? error.name : 'unknown'); });
-  // #363: embargoes (decide proposals), only while HARIMU_EMBARGO_ENABLED is on (write paths only).
-  if (options.embargo) await runEmbargo(db, now).catch(error => { console.warn('[world] embargo tick failed', error instanceof Error ? error.name : 'unknown'); });
-  // #612: the Founding Period's one day-30 event per MVP nation, only while HARIMU_FOUNDING_PERIOD_ENABLED is on (write paths only, idempotent).
-  if (options.foundingPeriod) await runFoundingDay30(db, now).catch(error => { console.warn('[world] founding day-30 tick failed', error instanceof Error ? error.name : 'unknown'); });
+  // #668: the flag-gated runners below each cost several sequential database round trips, and over Hyperdrive every round trip is slow, so one GET /api/world
+  // with the preview flags on waited for all of them in a row (about 80 round trips, ~30 s on preview). Runners that touch separate state now run as concurrent
+  // chains; inside a chain the old order is kept (spoilage before NPC asks, Rising before the coup, primaries before the Assembly, Presidium before inspections,
+  // treaties before embargoes). Every chain is idempotent per tick or time as before. A runner that used to throw still fails the request, but only after the
+  // other chains have finished, so no write is left running behind a 500.
+  const chains: Promise<void>[] = [
+    // Market day, only while the order book is on (write paths only). Idempotent per tick:
+    // #199 fruit and meat spoil first, then #198 NPC farm asks are posted for the current game day.
+    (async () => {
+      if (!options.npcSupply) return;
+      const current = await db.prepare('SELECT tick,scheduled_at FROM world_ticks ORDER BY tick DESC LIMIT 1').first<{tick:number;scheduled_at:number}>();
+      if (current) {
+        await runSpoilage(db, Number(current.tick), now);
+        await runNpcSupply(db, Number(current.tick), Number(current.scheduled_at), now, tickSeconds);
+      }
+    })(),
+    (async () => {
+      // #71: Aurelle Rising thresholds and Crisis Window resolution, only while HARIMU_AURELLE_RISING_ENABLED is on (write paths only).
+      if (options.aurelleRising) await runAurelleRising(db, now);
+      // #281: Aurelle AI palace coup, only while HARIMU_AURELLE_COUP_ENABLED is on (write paths only).
+      if (options.aurelleCoup) await runAurelleCoup(db, now, options.favorDecay === true);
+    })(),
+    (async () => {
+      // #307: Kindle party primaries open at their configured time and are counted when due, only while HARIMU_PRIMARIES_ENABLED is on and the privacy gate is open (write paths only).
+      if (options.primaries) await runPrimaries(db, now, options.primaries).catch(error => { console.warn('[world] primaries tick failed', error instanceof Error ? error.name : 'unknown'); });
+      // #283: Kindle mid-term Assembly opens at its configured time and is counted when due, only while HARIMU_KINDLE_ASSEMBLY_ENABLED is on and the privacy gate is open (write paths only).
+      if (options.kindleAssembly) await runKindleAssembly(db, now, options.kindleAssembly).catch(error => { console.warn('[world] Assembly tick failed', error instanceof Error ? error.name : 'unknown'); });
+    })(),
+    (async () => {
+      // #70: Korund emergency Presidium session and succession, only while HARIMU_KORUND_PRESIDIUM_ENABLED is on (write paths only).
+      if (options.korundPresidium) await runKorundPresidium(db, now);
+      // #295: Korund underground inspections (capped), only while HARIMU_FAITH_ENABLED is on (write paths only).
+      if (options.faithFestivals) await runKorundRaids(db, now).catch(error => { console.warn('[world] Korund inspection tick failed', error instanceof Error ? error.name : 'unknown'); });
+    })(),
+    (async () => {
+      // #308: AI treaties (decide proposals, expire terms), only while HARIMU_DIPLOMACY_ENABLED is on (write paths only).
+      if (options.diplomacy) await runDiplomacy(db, now).catch(error => { console.warn('[world] diplomacy tick failed', error instanceof Error ? error.name : 'unknown'); });
+      // #363: embargoes (decide proposals), only while HARIMU_EMBARGO_ENABLED is on (write paths only).
+      if (options.embargo) await runEmbargo(db, now).catch(error => { console.warn('[world] embargo tick failed', error instanceof Error ? error.name : 'unknown'); });
+    })(),
+    (async () => {
+      // #612: the Founding Period's one day-30 event per MVP nation, only while HARIMU_FOUNDING_PERIOD_ENABLED is on (write paths only, idempotent).
+      if (options.foundingPeriod) await runFoundingDay30(db, now).catch(error => { console.warn('[world] founding day-30 tick failed', error instanceof Error ? error.name : 'unknown'); });
+    })(),
+  ];
+  const failed = (await Promise.allSettled(chains)).find((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected');
+  if (failed) throw failed.reason;
   return readWorldSimulation(db, now, { war: options.war, warWeariness: options.warWeariness, warWearinessLosses: options.warWearinessLosses, diplomacy: options.diplomacy, embargo: options.embargo, reserve: options.reserve });
 
 }
@@ -126,20 +146,28 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
 /** #309: `war` (HARIMU_WAR_ENABLED) adds the derived war state; with it off nothing is queried or returned. */
 export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { war?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; diplomacy?: boolean; embargo?: boolean; reserve?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
-  const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
-  const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
-  const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
-  const [latest,execution,supply,stability] = await Promise.all([
+  // #668: every read here is independent, so they share one round of round trips instead of queueing (the flag-gated war, treaty, embargo and reserve reads included).
+  const none = Promise.resolve(undefined);
+  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,embargoes,reserve] = await Promise.all([
+    db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>(),
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')
       .first<{tick:number;nation_id:string;topic:string;food_quantity:number;spend_minor:number;scheduled_at:number;executed_at:number}>(),
     db.prepare("SELECT initial_food-COALESCE((SELECT SUM(food_quantity) FROM government_policy_executions),0) AS food, COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS cash FROM world_supply WHERE id='kindle-food-supplier'")
       .first<{food:number;cash:number}>(),
     readPublicStability(db),
+    options.war ? readWars(db,now) : none,
+    options.war ? readSiegeSnapshot(db,now) : none,
+    options.war && options.warWeariness ? readPublicWeariness(db,now,{ losses: options.warWearinessLosses }) : none,
+    options.diplomacy ? readTreaties(db,now) : none,
+    options.embargo ? readEmbargoes(db) : none,
+    options.reserve ? readReserveBoard(db,now) : none,
   ]);
+  const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
+  const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
   return {clock:{compression:12,epochSeconds:epoch,nowSeconds:now,gameDay:Math.floor(Math.max(0,now-epoch)*12/86400)+1,
     latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation'},
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:await readWars(db,now),sieges:await readSiegeSnapshot(db,now)}:{}),...(options.war&&options.warWeariness?{weariness:await readPublicWeariness(db,now,{ losses: options.warWearinessLosses })}:{}),...(options.diplomacy?{treaties:await readTreaties(db,now)}:{}),...(options.embargo?{embargoes:await readEmbargoes(db)}:{}),...(options.reserve?{reserve:await readReserveBoard(db,now)}:{})};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
 }
