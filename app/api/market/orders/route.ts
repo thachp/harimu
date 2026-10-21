@@ -18,7 +18,8 @@ export async function GET(request: Request) {
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   if (!enabled()) return privateJson({ open: false });
   const db = await getDatabase();
-  return privateJson({ open: true, book: await readOrderBook(db, userId) });
+  const ticker = (env as unknown as { HARIMU_MARKET_TICKER_ENABLED?: string }).HARIMU_MARKET_TICKER_ENABLED === 'true'; // #459: the board polls only when this key is present
+  return privateJson({ open: true, book: await readOrderBook(db, userId), ...(ticker ? { ticker: true } : {}) });
 }
 
 export async function POST(request: Request) {

@@ -59,6 +59,8 @@
     "HARIMU_KINDLE_INCOME_TAX_ENABLED": "true",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "true",
+    // #459: the market board re-reads GET /api/market/orders every 20 s while open and visible, with up/down markers. Off: no ticker key, no polling.
+    "HARIMU_MARKET_TICKER_ENABLED": "true",
     "HARIMU_AURELLE_RISING_ENABLED": "true",
     // #281: Aurelle AI palace coup (plot, Power Weight, Crisis Window). Off until QA.
     "HARIMU_AURELLE_COUP_ENABLED": "true",
