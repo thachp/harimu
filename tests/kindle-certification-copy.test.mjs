@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { votingOpen as VO, certStates as CS, resultsCaption as RC, transitionBanner as TB, certPress as CP, certStateFor, certPressFor, kindleCertificationCopy as C, CERT_PRESS_BYLINE, CERT_STATE_KEYS, CERT_PRESS_KEYS, CERT_NAME_PLACEHOLDERS, CERT_NUMBER_PLACEHOLDERS, CERT_NAME_MAX, CERT_NUMBER_MAX, CERT_LABEL_MAX, CERT_LINE_MAX, CERT_HEADLINE_MAX, CERT_BODY_MAX } from '../lib/kindle-certification-copy.ts';
+import { kindlePress } from '../lib/press-templates.ts';
+import { votingOpen as VO, certStates as CS, resultsCaption as RC, transitionBanner as TB, certPress as CP, certStateFor, certPressFor, kindleCertificationCopy as C, CERT_STATE_KEYS, CERT_PRESS_KEYS, CERT_NAME_PLACEHOLDERS, CERT_NUMBER_PLACEHOLDERS, CERT_NAME_MAX, CERT_NUMBER_MAX, CERT_LABEL_MAX, CERT_LINE_MAX, CERT_HEADLINE_MAX, CERT_BODY_MAX } from '../lib/kindle-certification-copy.ts';
 
 const labels=()=>[VO.closesAt,...CS.map(s=>s.label),RC.turnout,RC.district,TB.label,TB.inauguration];
 const lineObjs=()=>[VO.hidden,...CS.map(s=>s.line),RC.npcNote,TB.line];
@@ -20,7 +21,7 @@ test('shape: voting-open lines, four states in order, results caption, transitio
   for (const s of CS) { assert.equal(s.proposal,true); assert.equal(certStateFor(s.key),s); }
   assert.deepEqual([...CERT_PRESS_KEYS],['certified','under-review']); assert.deepEqual(CP.map(f=>f.key),[...CERT_PRESS_KEYS]);
   for (const f of CP) { assert.equal(f.proposal,true); assert.equal(certPressFor(f.key),f); }
-  assert.equal(certStateFor('nope'),undefined); assert.deepEqual(CERT_PRESS_BYLINE,{name:'Republic Wire Service',proposal:true});
+  assert.equal(certStateFor('nope'),undefined);
   assert.equal(new Set(all()).size,all().length);
 });
 test('limits: local caps 24 and 6; labels 40, lines 100, headlines 70, bodies 140 with every placeholder filled', () => {
@@ -76,4 +77,10 @@ test('the header names no other lib module path', () => {
 test('unwired: nothing in app/, components/ or lib/ imports kindle-certification-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('kindle-certification-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/kindle-certification-copy/,f);
+});
+test('one canonical byline: the press bodies open with the Kindle pack byline from the press templates, and this module defines none of its own', () => {
+  assert.deepEqual(kindlePress.byline,{name:'Republic Wire Service',proposal:true});
+  const src=readFileSync('lib/kindle-certification-copy.ts','utf8');
+  assert.doesNotMatch(src,/name:'Republic Wire Service'/); assert.doesNotMatch(src,/BYLINE=/); assert.doesNotMatch(src,/^import /m);
+  for (const b of bodies()) assert.ok(b.startsWith(`${kindlePress.byline.name}: `),b);
 });

@@ -5,7 +5,8 @@
  * Decision 65 (one verified human person, one election vote; NPCs cast no election ballots) and §9.5 (AI candidates cannot see who voted how;
  * they see only published results and polls).
  *
- * Voice: Kindle is plain and civic. The press frames are bylined Republic Wire Service reports about a poll, not lines spoken for an AI leader
+ * Voice: Kindle is plain and civic. The byline is not defined here: it is the Kindle pack's Republic Wire Service byline in the separate press
+ * templates module, the one canonical form, and the press bodies open with that name. The press frames are bylined Republic Wire Service reports about a poll, not lines spoken for an AI leader
  * or body, so none carries the AI badge (#381 / ui-ux §23.2), and nothing here is badged. No line says or implies that answering a poll casts a
  * ballot, and every resident-mood line says it is not a vote. The privacy line says only what the docs say: AI candidates see the published
  * poll, not an answer. Nothing promises how long an answer is kept.
@@ -30,7 +31,6 @@ export type PressFrame={key:PressFrameKey;headline:string;body:string;aiBadge:fa
 
 const L=(text:string):Line=>({text,proposal:true});
 
-export const POLL_PRESS_BYLINE={name:'Republic Wire Service',proposal:true} as const;
 export const PRESS_FRAME_KEYS:readonly PressFrameKey[]=['lead-change','race-tightens'];
 
 /** The voluntary voter-intent prompt, the decline option and the privacy lines. */
@@ -75,4 +75,4 @@ export const pollPress:readonly PressFrame[]=[
 ];
 export const pollPressFor=(key:PressFrameKey)=>pollPress.find(f=>f.key===key);
 
-export const kindlePollingCopy={prompt:voterIntentPrompt,card:pollCard,mood:residentMood,press:pollPress,byline:POLL_PRESS_BYLINE,proposal:true} as const;
+export const kindlePollingCopy={prompt:voterIntentPrompt,card:pollCard,mood:residentMood,press:pollPress,proposal:true} as const;
