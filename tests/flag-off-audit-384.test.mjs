@@ -20,9 +20,9 @@ const flagOffPins = {
   HARIMU_AI_NEWS_ENABLED: 'ai-news-gateway-140.test.mjs',
   HARIMU_NOTABLES_ENABLED: 'ai-captured-drafts.test.mjs',
   HARIMU_AI_CABINET_RESPONSES_ENABLED: 'cabinet-response-ai.test.mjs',
-  HARIMU_CITY_FOUNDING_ENABLED: 'city-founding.test.mjs',
-  HARIMU_SQUARE_PURCHASE_ENABLED: 'world-registry.test.mjs',
-  HARIMU_TESSERA_EXCHANGE_ENABLED: 'tessera-exchange-flag-626.test.mjs',
+  HARIMU_CITY_FOUNDING_ENABLED: 'flag-off-audit-384.test.mjs',
+  HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
+  HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
   HARIMU_LABOR_BUREAU_ENABLED: 'labor-bureau-235.test.mjs',
   HARIMU_CONFLUENCE_ENABLED: 'nation-playable.test.mjs',
@@ -97,6 +97,26 @@ test('each registered pin file exists and names its flag (or its fixture setter)
     const names = text.includes(flag) || /openingFlag/.test(text) || new RegExp(`setFixtureAiFlags\\([^)]*${short.split('_').pop()}`).test(text);
     assert.ok(names, `${flag}: ${file} never names the flag`);
     assert.match(text, /flag[- ]?off|flag is off|while off|off flag|disabled|=== ?'true'|: ?false/i, `${flag}: ${file} has no flag-off case`);
+  }
+});
+
+// QA3 on #684: the job-to-flags map is pinned here, so dropping (or adding) a flag in lib/cron-gates.ts fails.
+const expectedCronJobFlags = {
+  cabinet: ['HARIMU_AI_CABINET_RESPONSES_ENABLED'],
+  diplomacy: ['HARIMU_DIPLOMACY_ENABLED'],
+  crown: ['HARIMU_CROWN_DEBASEMENT_ENABLED'],
+  townHall: ['HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED'],
+  debate: ['HARIMU_DEBATE_ENABLED', 'HARIMU_AI_DEBATE_ANSWERS_ENABLED'],
+  spark: ['HARIMU_SPARK_SUPPLY_ENABLED'],
+  ledger: ['HARIMU_LEDGER_RECONCILIATION_ENABLED'],
+  tesseraRewards: ['HARIMU_TESSERA_REWARDS_ENABLED'],
+};
+test('cron gates: lib/cron-gates.ts matches the pinned job-to-flags map, and each job turns on only with every pinned flag', () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(cronJobFlags)), expectedCronJobFlags);
+  for (const [job, flags] of Object.entries(expectedCronJobFlags)) {
+    const all = Object.fromEntries(flags.map(flag => [flag, 'true']));
+    assert.equal(cronJobsOn(all)[job], true, job);
+    for (const flag of flags) assert.equal(cronJobsOn({ ...all, [flag]: 'false' })[job], false, `${job} without ${flag}`);
   }
 });
 
@@ -182,4 +202,86 @@ test('HARIMU_FAITH_ENABLED off: choose-faith and attend-worship write nothing; f
   r.setFaith(true);
   const on = await spy(r, choose);
   assert.equal(on.result.status, 200, JSON.stringify(on.result.data)); assert.ok(on.writes.length > 0, 'baseline: the spy sees the flag-on write');
+});
+
+// #384 M3: flag off, each command writes nothing and the GET keeps the same keys; flag-on baselines show the same spy sees the writes.
+const offKeys = (res, keys) => assert.deepEqual(Object.keys(res.data).sort(), [...keys].sort(), 'no new keys while off');
+
+test('HARIMU_FAITH_ENABLED off: attend-worship by a citizen who already has a faith writes nothing; flag-on baseline worship writes (QA3 on #684)', async t => {
+  const r = await runtime(t);
+  r.setFaith(true);
+  assert.equal((await r.call('faith', 'alice', { action: 'choose-faith', faithId: 'kinward-rite', requestId: randomUUID() })).status, 200);
+  const worship = () => r.call('faith', 'alice', { action: 'attend-worship', requestId: randomUUID() });
+  r.setFaith(false);
+  const off = await spy(r, worship);
+  assert.notEqual(off.result.status, 200); assert.deepEqual(off.writes, []);
+  r.setFaith(true);
+  const on = await spy(r, worship);
+  assert.equal(on.result.status, 200, JSON.stringify(on.result.data)); assert.ok(on.writes.length > 0, 'baseline: flag-on worship writes');
+});
+
+test('HARIMU_FAITH_ENABLED off: join-congregation and leave-congregation write nothing, GET keeps its keys; flag-on baseline join writes', async t => {
+  const r = await runtime(t);
+  r.setFaith(true);
+  assert.equal((await r.call('faith', 'alice', { action: 'choose-faith', faithId: 'kinward-rite', requestId: randomUUID() })).status, 200);
+  const cmd = action => r.call('congregations', 'alice', { action, requestId: randomUUID() });
+  const keys = Object.keys((await r.call('congregations', 'alice')).data);
+  r.setFaith(false);
+  const off = await spy(r, async () => [await cmd('join-congregation'), await cmd('leave-congregation'), await r.call('congregations', 'alice')]);
+  for (const res of off.result.slice(0, 2)) assert.equal(res.data.reason, 'disabled');
+  assert.deepEqual(off.writes, []); offKeys(off.result[2], keys); assert.equal(off.result[2].data.enabled, false);
+  r.setFaith(true);
+  const on = await spy(r, () => cmd('join-congregation'));
+  assert.equal(on.result.status, 200, JSON.stringify(on.result.data)); assert.ok(on.writes.length > 0, 'baseline: flag-on join writes');
+});
+
+const fundTessera = (r, user, tesseraMinor) => r.db.prepare("INSERT INTO citizen_tessera_exchanges(request_id,clerk_user_id,nation_id,spark_minor,tessera_minor,occurred_at) VALUES (?,?,'kindle',?,?,0)")
+  .bind(randomUUID(), user, tesseraMinor * 4, tesseraMinor).run();
+const registryKeys = ['currency', 'kiosk', 'open', 'priceMinor', 'tesseraMinor'];
+
+test('HARIMU_SQUARE_PURCHASE_ENABLED off: buy-square writes nothing (world_squares and Tessera unchanged), GET keeps its keys with open:false; flag-on baseline writes', async t => {
+  const r = await runtime(t); await fundTessera(r, 'alice', 5000);
+  const buy = () => r.call('world/registry', 'alice', { action: 'buy-square', x: 9, y: 8, requestId: randomUUID() });
+  const square = () => r.db.prepare('SELECT owner,zone FROM world_squares WHERE x=9 AND y=8').first();
+  const before = { ...(await square()) };
+  r.setSquarePurchase(false);
+  const off = await spy(r, async () => [await buy(), await r.call('world/registry', 'alice')]);
+  assert.equal(off.result[0].data.reason, 'disabled'); assert.deepEqual(off.writes, []);
+  offKeys(off.result[1], registryKeys); assert.equal(off.result[1].data.open, false); assert.equal(off.result[1].data.tesseraMinor, 5000);
+  assert.deepEqual({ ...(await square()) }, before);
+  r.setSquarePurchase(true);
+  const on = await spy(r, buy);
+  assert.equal(on.result.status, 200, JSON.stringify(on.result.data)); assert.ok(on.writes.length > 0, 'baseline: flag-on buy writes');
+});
+
+test('HARIMU_TESSERA_EXCHANGE_ENABLED off: the kiosk buy-tessera writes nothing (wallet and ledger unchanged), GET keeps its keys; flag-on baseline writes', async t => {
+  const r = await runtime(t); r.setSquarePurchase(true);
+  await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'harvest' });
+  const shift = (await r.call('citizen', 'alice')).data.shifts.find(s => !s.claimedAt); r.setNow(Date.parse(shift.completesAt));
+  assert.equal((await r.call('citizen', 'alice', { action: 'claim-work', shiftId: shift.id })).status, 200);
+  const wallet = async () => (await r.call('citizen', 'alice')).data.economy.walletMinor, spark = await wallet();
+  const kiosk = () => r.call('world/registry', 'alice', { action: 'buy-tessera', tesseraMinor: 100, requestId: randomUUID() });
+  r.setTesseraExchange(false);
+  const off = await spy(r, async () => [await kiosk(), await r.call('world/registry', 'alice')]);
+  assert.equal(off.result[0].data.reason, 'disabled'); assert.deepEqual(off.writes, []);
+  offKeys(off.result[1], registryKeys); assert.equal(off.result[1].data.tesseraMinor, 0);
+  assert.equal(await wallet(), spark);
+  r.setTesseraExchange(true);
+  const on = await spy(r, kiosk);
+  assert.equal(on.result.status, 200, JSON.stringify(on.result.data)); assert.ok(on.writes.length > 0, 'baseline: flag-on kiosk writes');
+});
+
+test('HARIMU_CITY_FOUNDING_ENABLED off: found-city writes nothing (no city, world_squares owner and zone unchanged); flag-on baseline writes', async t => {
+  const r = await runtime(t);
+  const found = () => r.call('world/found-city', 'alice', { action: 'kindle-charter', x: 21, y: 13, name: 'Emberford', requestId: `found-${randomUUID().slice(0, 8)}` });
+  const block = async () => (await r.db.prepare('SELECT x,y,owner,zone FROM world_squares WHERE x BETWEEN 19 AND 23 AND y BETWEEN 11 AND 15 ORDER BY y,x').all()).results.map(s => ({ ...s }));
+  const before = await block();
+  r.setCityFounding(false);
+  const off = await spy(r, found);
+  assert.notEqual(off.result.status, 200); assert.deepEqual(off.writes, []);
+  assert.deepEqual(Object.keys(off.result.data).sort(), ['error', 'reason']);
+  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM world_cities').first()).n), 0); assert.deepEqual(await block(), before);
+  r.setCityFounding(true);
+  const on = await spy(r, found);
+  assert.equal(on.result.status, 200, JSON.stringify(on.result.data)); assert.ok(on.writes.length > 0, 'baseline: flag-on founding writes');
 });
