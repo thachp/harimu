@@ -46,7 +46,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/aurelle.ts',
     'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts','lib/war-authority.ts','lib/war-actions.ts','lib/war-weariness.ts','lib/war-weariness-copy.ts','lib/siege.ts','lib/siege-actions.ts','lib/siege-copy.ts', // #309, #350, #423, #419
     'lib/labor-bureau-rules.ts','lib/labor-bureau-text.ts','lib/labor-bureau-copy.ts','lib/labor-bureau.ts','lib/korund-wallet.ts','lib/gray-market.ts','lib/gray-market-rules.ts','lib/gray-market-text.ts','lib/gray-market-copy.ts','lib/nation-work.ts','lib/diplomacy.ts','lib/diplomacy-rules.ts','lib/diplomacy-copy.ts','lib/game-time.ts', // #308
-    'lib/embargo.ts','lib/embargo-rules.ts','lib/embargo-copy.ts', // #363
+    'lib/embargo.ts','lib/embargo-rules.ts','lib/embargo-copy.ts','lib/goods-sanction-rules.ts','lib/goods-sanctions.ts', // #363, #601
     'lib/crown-debasement.ts','lib/crown-debasement-rules.ts','lib/press-templates.ts', // #362
     'lib/canvassing.ts','lib/canvassing-rules.ts','app/api/canvassing/route.ts', // #442
     'lib/town-hall.ts','lib/town-hall-rules.ts','lib/town-hall-ai.ts','lib/campaign-copy.ts','app/api/town-hall/route.ts', // #441

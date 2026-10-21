@@ -80,6 +80,8 @@
     "HARIMU_AURELLE_SUCCESSION_ENABLED": "true",
     // #470 slice 2: relocation support claims after a city capture (Decision 109): one flat Tessera payout per eligible Kindle defender citizen from a capped protocol pot; no exchange, cash-out or conversion. Off: the claim route is a 404 and nothing is read.
     "HARIMU_RELOCATION_SUPPORT_ENABLED": "true",
+    // #601: targeted goods sanctions PoC (docs 13.3): a nation bans named goods to another on top of the #363 embargo; food is never listed. Server-side proposals, decided on the citizen POST world tick. Off: nothing is created and trade checks are #363's alone.
+    "HARIMU_TARGETED_SANCTIONS_ENABLED": "true",
     "HARIMU_WAR_ENABLED": "true",
     // #423: war weariness PoC (weekly Unrest from an active war, docs 15.3). Needs HARIMU_WAR_ENABLED too. Off until QA.
     "HARIMU_WAR_WEARINESS_ENABLED": "true",
