@@ -16,6 +16,7 @@ import { readWars, type WarState } from './war'; // #309
 import { readSiegeSnapshot, type SiegeSnapshotItem } from './siege-actions'; // #620
 import { readTreaties, runDiplomacy, type TreatyState } from './diplomacy'; // #308
 import { readEmbargoes, runEmbargo, type EmbargoState } from './embargo'; // #363
+import { decideProposedGoodsSanctions } from './goods-sanctions'; // #601
 import { readReserveBoard, type ReserveBoard } from './spark-supply'; // #431
 import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
@@ -58,7 +59,7 @@ export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecut
   supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; sieges?: SiegeSnapshotItem[]; weariness?: PublicWeariness; treaties?: TreatyState; embargoes?: EmbargoState; reserve?: ReserveBoard };
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; war?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   for (const electionDb of [db, accountElectionDatabase(db)]) await finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); });
@@ -114,6 +115,8 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   // #308: AI treaties (decide proposals, expire terms), only while HARIMU_DIPLOMACY_ENABLED is on (write paths only).
   if (options.diplomacy) await runDiplomacy(db, now).catch(error => { console.warn('[world] diplomacy tick failed', error instanceof Error ? error.name : 'unknown'); });
   // #363: embargoes (decide proposals), only while HARIMU_EMBARGO_ENABLED is on (write paths only).
+  // #601: targeted goods sanctions (decide proposals), only while HARIMU_TARGETED_SANCTIONS_ENABLED is on; only the citizen POST path passes it, never a GET.
+  if (options.targetedSanctions) await decideProposedGoodsSanctions(db, now).catch(error => { console.warn('[world] goods sanction tick failed', error instanceof Error ? error.name : 'unknown'); });
   if (options.embargo) await runEmbargo(db, now).catch(error => { console.warn('[world] embargo tick failed', error instanceof Error ? error.name : 'unknown'); });
   // #612: the Founding Period's one day-30 event per MVP nation, only while HARIMU_FOUNDING_PERIOD_ENABLED is on (write paths only, idempotent).
   if (options.foundingPeriod) await runFoundingDay30(db, now).catch(error => { console.warn('[world] founding day-30 tick failed', error instanceof Error ? error.name : 'unknown'); });
