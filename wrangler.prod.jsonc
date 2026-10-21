@@ -80,6 +80,8 @@
     "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
     "HARIMU_AURELLE_SUCCESSION_ENABLED": "false",
+    // #470 slice 2: relocation support claims after a city capture (Decision 109): one flat Tessera payout per eligible Kindle defender citizen from a capped protocol pot; no exchange, cash-out or conversion. Off: the claim route is a 404 and nothing is read.
+    "HARIMU_RELOCATION_SUPPORT_ENABLED": "false",
     "HARIMU_WAR_ENABLED": "false",
     // #423: war weariness PoC (weekly Unrest from an active war, docs 15.3). Needs HARIMU_WAR_ENABLED too. Off until QA.
     "HARIMU_WAR_WEARINESS_ENABLED": "false",
