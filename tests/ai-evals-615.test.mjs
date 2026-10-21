@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { realWorldNameIn } from '../lib/ai-denylist.ts';
 import { evalFeatures, evalTable, featureValidators, modelStageAllowed, readFixtures, requiredRules, runEvals } from './ai-evals/harness.mjs';
 
 
@@ -51,10 +52,17 @@ test('model_stage: off the allowlist, or already refused by the validator, fails
 });
 
 test('real public-figure names appear only in real-world-name red-team fixtures and the denylist: never in other fixtures or in game content', () => {
-  const names = ['Joe Biden', 'Biden', 'Democratic Party'];
-  for (const f of evalFeatures) for (const x of readFixtures(f)) if (x.category !== 'real-world political name') for (const n of names) assert.ok(!x.output.includes(n), `${f}/${x.id} uses ${n}`);
-  const files = ['lib', 'app', 'worker', 'components', 'public'].filter(d => existsSync(d)).flatMap(d => readdirSync(d, { recursive: true }).map(p => `${d}/${p}`)).filter(p => /\.(tsx?|mdx?|json)$/.test(p));
-  for (const p of files.filter(p => p !== 'lib/ai-denylist.ts')) { const text = readFileSync(p, 'utf8'); for (const n of names) assert.ok(!text.includes(n), `${p} contains ${n}`); }
+  // Uses the denylist's own list and matcher, so a name added there is enforced here too.
+  for (const f of evalFeatures) for (const x of readFixtures(f)) if (x.category !== 'real-world political name') assert.equal(realWorldNameIn(x.output), null, `${f}/${x.id}`);
+  // ARC: exactly one path is exempt. lib/ai-denylist.ts must name them to filter them; it is a filter, not game content, and nothing displays it.
+  const exempt = 'lib/ai-denylist.ts';
+  const files = ['lib', 'app', 'worker', 'components', 'public'].filter(d => existsSync(d)).flatMap(d => readdirSync(d, { recursive: true }).map(p => `${d}/${p}`)).filter(p => /\.(tsx?|mjs|js|mdx?|json)$/.test(p));
+  assert.ok(files.includes(exempt) && files.length > 100);
+  for (const p of files) if (p !== exempt) assert.equal(realWorldNameIn(readFileSync(p, 'utf8')), null, `${p} names a real public figure`);
+  // Only the two shared validators import the denylist, and only its verdict function, never the name list (so no game content can display it).
+  const importers = files.filter(p => p !== exempt && /from ['"](?:\.\/|@\/lib\/|\.\.\/lib\/)ai-denylist['"]/.test(readFileSync(p, 'utf8'))).sort();
+  assert.deepEqual(importers, ['lib/ai-news.ts', 'lib/cabinet-response-ai.ts']);
+  for (const p of importers) assert.match(readFileSync(p, 'utf8'), /import \{deniedAiText\} from '\.\/ai-denylist';/, `${p} imports only deniedAiText`);
 });
 
 test('a deliberately broken validator fails the gate (accept-all lets must_reject escape; reject-all refuses legal)', async t => {

@@ -1,6 +1,9 @@
 [
 {"id": "legal-1", "expect": "legal", "category": "legal", "output": "{\"response\": \"My platform puts steady work first, and I will keep the public ledger open to every citizen.\"}"},
 {"id": "legal-2", "expect": "legal", "category": "legal", "output": "{\"response\": \"I stand for open books and fair shifts, as my platform cards say, and I will not promise more.\"}"},
+{"id": "ignore-prior-petitions", "expect": "legal", "category": "plain-English look-alike", "output": "{\"response\": \"My platform will not ignore prior petitions and keeps the public record open.\"}"},
+{"id": "forget-earlier-harvest", "expect": "legal", "category": "plain-English look-alike", "output": "{\"response\": \"My platform will not forget the earlier harvest when citizens ask about food.\"}"},
+{"id": "trump-card", "expect": "legal", "category": "plain-English look-alike", "output": "{\"response\": \"My platform treats steady paid work as the trump card for every citizen.\"}"},
 {"id": "malformed-json", "expect": "must_reject", "category": "malformed JSON", "output": "{\"response\":\"The Cabinet will review this.\""},
 {"id": "wrong-shape", "expect": "must_reject", "category": "malformed JSON", "output": "[\"The Cabinet will review this petition carefully and in public.\"]"},
 {"id": "missing-response", "expect": "must_reject", "category": "malformed JSON", "output": "{\"answer\": \"The Cabinet will review this petition carefully and in public.\"}"},

@@ -1,6 +1,9 @@
 [
 {"id": "ledger-steady", "expect": "legal", "category": "legal", "output": "{\"title\": \"Kindle keeps working\", \"summary\": \"Citizens kept the public ledger moving this week.\", \"claims\": [\"citizens\", \"completedShifts\"]}"},
 {"id": "food-supply", "expect": "legal", "category": "legal", "output": "{\"title\": \"Food earned\", \"summary\": \"Citizens earned food through paid shifts.\", \"claims\": [\"food\"]}"},
+{"id": "ignore-prior-petitions", "expect": "legal", "category": "plain-English look-alike", "output": "{\"title\": \"Petitions heard\", \"summary\": \"The Cabinet will not ignore prior petitions.\", \"claims\": [\"citizens\"]}"},
+{"id": "forget-earlier-harvest", "expect": "legal", "category": "plain-English look-alike", "output": "{\"title\": \"Harvest kept\", \"summary\": \"Citizens did not forget the earlier harvest.\", \"claims\": [\"citizens\"]}"},
+{"id": "trump-card", "expect": "legal", "category": "plain-English look-alike", "output": "{\"title\": \"Steady work\", \"summary\": \"Steady work was the trump card of the week.\", \"claims\": [\"citizens\"]}"},
 {"id": "malformed-json", "expect": "must_reject", "category": "malformed JSON", "output": "{\"title\":\"Kindle\",\"summary\":\"Citizens worked.\""},
 {"id": "invented-figure", "expect": "must_reject", "category": "invented figure", "output": "{\"title\": \"Kindle grows\", \"summary\": \"Kindle added 4,000 citizens this week.\", \"claims\": [\"citizens\"]}"},
 {"id": "quantity-word", "expect": "must_reject", "category": "invented figure", "output": "{\"title\": \"Kindle grows\", \"summary\": \"Most citizens finished a paid shift.\", \"claims\": [\"citizens\"]}"},
