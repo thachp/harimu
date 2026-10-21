@@ -6,12 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { evalFeatures, evalTable, featureValidators, modelStageAllowed, readFixtures, runEvals } from './ai-evals/harness.mjs';
+import { evalFeatures, evalTable, featureValidators, modelStageAllowed, readFixtures, requiredRules, runEvals } from './ai-evals/harness.mjs';
 
-const draftRules = ['malformed JSON', 'invented figure', 'illegal action id', 'out-of-bounds parameter', 'markup injection'];
-const answerRules = ['malformed JSON', 'out-of-bounds parameter', 'invented figure', 'private data leak', 'markup injection', 'malformed answer'];
-/** Every rule category each feature's validator enforces must have at least one must_reject fixture. */
-const requiredRules = { news: [...draftRules, 'malformed introduction'], notables: draftRules, cabinet: answerRules, town_hall: answerRules, debate: answerRules };
 
 const load = async t => { const r = await localRuntime(); t.after(() => r.close()); return featureValidators(r.importModule); };
 
@@ -43,20 +39,22 @@ test('each markup fixture breaks only the markup rule: with the markup character
 test('model_stage: off the allowlist, or already refused by the validator, fails the run; ids are printed', async t => {
   const real = await load(t), all = Object.fromEntries(evalFeatures.map(f => [f, readFixtures(f)]));
   const relabel = runEvals(real, { ...all, debate: all.debate.map(x => x.id === 'too-short' ? { ...x, expect: 'model_stage' } : x) });
+  const missing = runEvals(real, { ...all, town_hall: all.town_hall.filter(x => x.category !== 'markup injection') });
+  assert.ok(missing.escapes.some(e => e.feature === 'town_hall' && e.id === 'category:markup injection'), 'a whole missing rule category fails the run');
   assert.ok(relabel.escapes.some(e => e.id === 'too-short' && /not allowlisted/.test(e.why)), 'relabelling a must_reject fixture fails');
   const recat = runEvals(real, { ...all, news: all.news.map(x => x.id === 'private-data' ? { ...x, category: 'other' } : x) });
   assert.ok(recat.escapes.some(e => e.id === 'private-data' && /not allowlisted/.test(e.why)), 'an allowlisted id under another category fails');
-  const refused = runEvals(real, { ...all, cabinet: all.cabinet.map(x => x.id === 'injection-echo' ? { ...x, output: '{}' } : x) });
-  assert.ok(refused.escapes.some(e => e.id === 'injection-echo' && /already refuses/.test(e.why)));
+  const refused = runEvals(real, { ...all, cabinet: all.cabinet.map(x => x.id === 'private-data' ? { ...x, output: '{}' } : x) });
+  assert.ok(refused.escapes.some(e => e.id === 'private-data' && /already refuses/.test(e.why)));
   const table = evalTable(runEvals(real));
   for (const f of evalFeatures) for (const id of Object.keys(modelStageAllowed)) assert.match(table, new RegExp(`^MODEL_STAGE ${f}/${id}:`, 'm'));
 });
 
-test('real public-figure names appear only in model_stage red-team fixtures: never in legal fixtures or in game content', () => {
+test('real public-figure names appear only in real-world-name red-team fixtures and the denylist: never in other fixtures or in game content', () => {
   const names = ['Joe Biden', 'Biden', 'Democratic Party'];
-  for (const f of evalFeatures) for (const x of readFixtures(f)) if (x.expect !== 'model_stage') for (const n of names) assert.ok(!x.output.includes(n), `${f}/${x.id} uses ${n}`);
+  for (const f of evalFeatures) for (const x of readFixtures(f)) if (x.category !== 'real-world political name') for (const n of names) assert.ok(!x.output.includes(n), `${f}/${x.id} uses ${n}`);
   const files = ['lib', 'app', 'worker', 'components', 'public'].filter(d => existsSync(d)).flatMap(d => readdirSync(d, { recursive: true }).map(p => `${d}/${p}`)).filter(p => /\.(tsx?|mdx?|json)$/.test(p));
-  for (const p of files) { const text = readFileSync(p, 'utf8'); for (const n of names) assert.ok(!text.includes(n), `${p} contains ${n}`); }
+  for (const p of files.filter(p => p !== 'lib/ai-denylist.ts')) { const text = readFileSync(p, 'utf8'); for (const n of names) assert.ok(!text.includes(n), `${p} contains ${n}`); }
 });
 
 test('a deliberately broken validator fails the gate (accept-all lets must_reject escape; reject-all refuses legal)', async t => {

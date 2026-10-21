@@ -2,6 +2,7 @@ import type {GameDatabase} from './database-contract';
 import {reserveAiCabinetSequence,markAiReservationSent,releaseAiReservation,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiGatewayOptions,type AiBudgetConfig,type AiModel,type AiMeteredCall} from './ai-budget';
 import {inferenceText,supportedNewsDraft,newsVerificationResponseFormat,type NewsAiBinding} from './ai-news';
 import {validPetitionText} from './collective-petitions';
+import {deniedAiText} from './ai-denylist';
 /** Issue #20: the mandatory public Cabinet response to a petition that reached 3%.
  * Follows the ai-news pattern: off unless the runtime flag, binding and a valid
  * aiBudgetConfig are present; one reservation (own ledger operation) covers draft, check and guard,
@@ -13,7 +14,7 @@ const model:AiModel='@cf/meta/llama-3.2-3b-instruct';
 export function validatedCabinetResponse(value:unknown){
  if(!value||typeof value!=='object'||Array.isArray(value))return null;const r=(value as Record<string,unknown>).response;
  if(typeof r!=='string')return null;const text=r.trim();
- if(!validPetitionText(text,40,600)||/[<>\[\]{}]/.test(text)||!/[.!?]$/.test(text)||/\p{Number}|[a-z][a-z0-9+.-]*:\/\/|\b(?:mailto|tel|data|javascript|ftp|file):|www\.|\b[a-z0-9-]+\.[a-z]{2,}\b|@/iu.test(text))return null;
+ if(!validPetitionText(text,40,600)||/[<>\[\]{}]/.test(text)||deniedAiText(text)!==null||!/[.!?]$/.test(text)||/\p{Number}|[a-z][a-z0-9+.-]*:\/\/|\b(?:mailto|tel|data|javascript|ftp|file):|www\.|\b[a-z0-9-]+\.[a-z]{2,}\b|@/iu.test(text))return null;
  return text;
 }
 type Awaiting={id:string;title:string;demand:string;reached_at:number};
