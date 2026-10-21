@@ -72,17 +72,37 @@ test('14 UTC days of totals with per-model, per-purpose and per-status breakdown
   assert.doesNotMatch(res.result.text, /request_id|ai-news:|notable:a|cabinet:p1|legacy-row|clerk|alice/, 'no ids leave the server');
 });
 
+// Every file (lib/, app/, worker/, any depth) that calls reserveAi*, plus debate-ai.ts, which reserves through town-hall-ai's generateAnswer.
+const sources = dir => readdirSync(dir, { recursive: true }).map(f => `${dir}/${f}`).filter(f => /\.tsx?$/.test(f));
+// The exact expression each caller builds its reservation id with; the captured group is the prefix that reaches harimu_ai_reservations.
+const idBuilders = {
+  'lib/ai-news.ts': /const reservation=`([^`$:]*):\$\{/, 'lib/cabinet-response-ai.ts': /const reservation=`([^`$:]*):\$\{/,
+  'lib/debate-ai.ts': /const reservationFor = \([^)]*\) => `([^`$:]*):\$\{/, 'lib/notables.ts': /async function ownerPrefix[^]*?return '([^':]*):'\+/,
+  'lib/town-hall-ai.ts': /const reservation = `([^`$:]*):\$\{/,
+};
 test('every existing AI caller reserves under a mapped purpose prefix (no reservation can report as unknown)', () => {
-  const callers = readdirSync('lib').filter(f => /\.ts$/.test(f) && f !== 'ai-budget.ts' && /\breserveAi(Call|Sequence|CabinetSequence)\(/.test(readFileSync(`lib/${f}`, 'utf8'))).sort();
-  // debate-ai.ts reserves through town-hall-ai's generateAnswer with its own `debate:` reservation id.
-  assert.deepEqual(callers, ['ai-news.ts', 'cabinet-response-ai.ts', 'notables.ts', 'town-hall-ai.ts'], 'a new AI caller must use a mapped reservation prefix (lib/ai-costs.ts)');
-  const prefixes = { 'ai-news.ts': 'ai-news', 'cabinet-response-ai.ts': 'cabinet', 'debate-ai.ts': 'debate', 'notables.ts': 'notable', 'town-hall-ai.ts': 'townhall' };
-  for (const [file, prefix] of Object.entries(prefixes)) {
-    assert.match(readFileSync(`lib/${file}`, 'utf8'), new RegExp(`[\`']${prefix}:`), `${file} reserves under ${prefix}:`);
-    assert.notEqual(aiCostPurpose(`${prefix}:x`), 'unknown', prefix);
+  const callers = ['lib', 'app', 'worker'].flatMap(sources).filter(f => f !== 'lib/ai-budget.ts' && /\breserveAi(Call|Sequence|CabinetSequence)\(/.test(readFileSync(f, 'utf8'))).sort();
+  assert.deepEqual(callers, ['lib/ai-news.ts', 'lib/cabinet-response-ai.ts', 'lib/notables.ts', 'lib/town-hall-ai.ts'], 'a new AI caller must use a mapped reservation prefix (lib/ai-costs.ts)');
+  assert.match(readFileSync('lib/debate-ai.ts', 'utf8'), /generateAnswer\(db[^]*?\breservation,/, 'debate-ai reserves through generateAnswer with its own id');
+  for (const [file, builder] of Object.entries(idBuilders)) {
+    const prefix = readFileSync(file, 'utf8').match(builder)?.[1];
+    assert.ok(prefix, `${file}: reservation id builder not found`);
+    assert.notEqual(aiCostPurpose(`${prefix}:x`), 'unknown', `${file} reserves under ${prefix}:, which lib/ai-costs.ts does not map`);
   }
   assert.equal(aiCostPurpose('no-prefix'), 'unknown'); assert.equal(aiCostPurpose('debate'), 'unknown', 'a bare word is not a prefix'); assert.equal(aiCostPurpose(':x'), 'unknown'); assert.equal(aiCostPurpose('constructor:x'), 'unknown');
   assert.deepEqual(Object.values(aiCostPurposes).sort(), ['cabinet', 'debate', 'news', 'notable', 'town_hall']);
+});
+
+test('a failed read is an explicit 500 with an error field, never 200 with $0', async t => {
+  const { r, get } = await setup(t);
+  const prepare = r.db.prepare.bind(r.db);
+  r.db.prepare = sql => /FROM harimu_ai_reservations/.test(sql) ? { bind: () => ({ all: () => Promise.reject(new Error('fixture read failure')) }) } : prepare(sql); // the query itself fails
+  try {
+    const res = await get();
+    assert.equal(res.status, 500); assert.equal(res.cache, 'private, no-store');
+    const body = JSON.parse(res.text);
+    assert.equal(typeof body.error, 'string'); assert.equal(body.days, undefined); assert.doesNotMatch(res.text, /fixture read failure/);
+  } finally { r.db.prepare = prepare; }
 });
 
 test('flag: "false" in preview and production with the same own-line comment; no route besides the admin GET reads the dashboard', () => {

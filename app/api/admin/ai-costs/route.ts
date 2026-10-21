@@ -16,5 +16,9 @@ export async function GET(request: Request) {
   if (!configured) return privateJson({ error: 'Not found.' }, 404);
   if (!(await bearerMatches(request.headers.get('Authorization'), bindings.HARIMU_ADMIN_TOKEN))) return privateJson({ error: 'A server credential is required.' }, 401);
   const now = Math.floor(Date.now() / 1000);
-  return privateJson(await readAiCosts(await getDatabase(), now, aiBudgetConfig(bindings, now)?.dailyBudgetMicro ?? null));
+  try {
+    return privateJson(await readAiCosts(await getDatabase(), now, aiBudgetConfig(bindings, now)?.dailyBudgetMicro ?? null));
+  } catch { // a failed read is an explicit 500, never 200 with $0 (no error detail leaves the server)
+    return privateJson({ error: 'AI cost data is unavailable.' }, 500);
+  }
 }
