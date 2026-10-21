@@ -298,6 +298,14 @@ test('#487 spy: with HARIMU_NATION_WORK_ENABLED off, GET /api/citizen and both c
   };
   r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'false'); await calls();
   assert.deepEqual(sqls, [], 'flag off: no nation-work query on any path');
+  // QA3 nit (#674): the direct lib calls with the flag off run no query at all, so nothing (not even ready()'s citizen SELECT) runs before the inner flag checks.
+  const all = []; r.db.prepare = sql => { all.push(sql.slice(0, 60)); return prepare(sql); };
+  const m = await r.importModule('lib/nation-work.ts');
+  assert.equal((await start(m, r, 'alice', randomUUID(), live({ enabled: false }))).reason, 'disabled');
+  assert.equal((await claim(m, r, 'alice', randomUUID(), live({ enabled: false }))).reason, 'disabled');
+  assert.equal(await m.readNationWork(r.db, 'alice', live({ enabled: false })), null);
+  assert.deepEqual(all, [], 'flag off: zero queries from executeNationWork and readNationWork');
+  r.db.prepare = sql => { if (/nation_wage_|INSERT OR IGNORE INTO work_orders/.test(sql)) sqls.push(sql.slice(0, 60)); return prepare(sql); };
   r.setFixtureEnv('HARIMU_NATION_WORK_ENABLED', 'true'); await calls();
   assert.ok(sqls.length > 0, 'flag on baseline: the spy sees nation-work queries');
 });
