@@ -6,7 +6,7 @@ import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { readVerification } from '@/lib/verification';
 import { recordVerifiedHumanVisit } from '@/lib/collective-petitions';
 import { advanceWorld } from '@/lib/world-simulation';
-import { pledge, readAurelleRising, validPledgeCommand } from '@/lib/aurelle-rising';
+import { pledge, readAurelleRising, readCrown, validPledgeCommand } from '@/lib/aurelle-rising';
 import { readCoupView } from '@/lib/aurelle-coup';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +21,8 @@ const orderBook = () => (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string 
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
+  // #384: flag off returns only the crown (public history) and the #281 coup window: no claimant counts, unrest, weekly humans or pledge, and no verification read.
+  if (!enabled()) { const db = await getDatabase(), off = { enabled: false as const, crown: await readCrown(db) }; return privateJson(coupOn() ? { ...off, coup: await readCoupView(db) } : off); }
   const verification = await readVerification(userId);
   const db = await getDatabase();
   const state = await readAurelleRising(db, userId, Math.floor(Date.now() / 1000), { tier1: verification.countedActionsEligible, reason: verification.reason }, enabled());
