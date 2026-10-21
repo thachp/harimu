@@ -5,7 +5,8 @@
  * flags; Transition: the outgoing AI President cannot spend treasury or declare war), §9.5 (fraud flags quarantine suspicious ballots for
  * review; results, verified-human turnout and per-district counts are published) and Decision 65 (NPCs cast no election ballots).
  *
- * Voice: Kindle is plain and civic. Every state line and caption is a system notice about the count, and the two press frames are bylined
+ * Voice: Kindle is plain and civic. The byline is not defined here: it is the Kindle pack's Republic Wire Service byline in the separate press
+ * templates module, the one canonical form, and the press bodies open with that name. Every state line and caption is a system notice about the count, and the two press frames are bylined
  * Republic Wire Service reports about the court's work, not lines spoken for an AI leader or body, so nothing here carries the AI badge
  * (#381 / ui-ux §23.2). The review line is neutral: it accuses nobody, names no candidate and gives no count of flagged ballots.
  *
@@ -31,7 +32,6 @@ export type PressFrame={key:PressFrameKey;headline:string;body:string;aiBadge:fa
 
 const L=(text:string):Line=>({text,proposal:true});
 
-export const CERT_PRESS_BYLINE={name:'Republic Wire Service',proposal:true} as const;
 export const CERT_STATE_KEYS:readonly CertStateKey[]=['counting','awaiting','certified','under-review'];
 export const CERT_PRESS_KEYS:readonly PressFrameKey[]=['certified','under-review'];
 
@@ -75,4 +75,4 @@ export const certPress:readonly PressFrame[]=[
 export const certStateFor=(key:CertStateKey)=>certStates.find(s=>s.key===key);
 export const certPressFor=(key:PressFrameKey)=>certPress.find(f=>f.key===key);
 
-export const kindleCertificationCopy={votingOpen,states:certStates,results:resultsCaption,transition:transitionBanner,press:certPress,byline:CERT_PRESS_BYLINE,proposal:true} as const;
+export const kindleCertificationCopy={votingOpen,states:certStates,results:resultsCaption,transition:transitionBanner,press:certPress,proposal:true} as const;

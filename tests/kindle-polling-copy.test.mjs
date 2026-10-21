@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { voterIntentPrompt as VP, pollCard as PC, residentMood as RM, pollPress as PP, pollPressFor, kindlePollingCopy as C, POLL_PRESS_BYLINE, PRESS_FRAME_KEYS, POLL_NAME_PLACEHOLDERS, POLL_NUMBER_PLACEHOLDERS, POLL_NAME_MAX, POLL_NUMBER_MAX, POLL_LABEL_MAX, POLL_LINE_MAX, POLL_HEADLINE_MAX, POLL_BODY_MAX } from '../lib/kindle-polling-copy.ts';
+import { kindlePress } from '../lib/press-templates.ts';
+import { voterIntentPrompt as VP, pollCard as PC, residentMood as RM, pollPress as PP, pollPressFor, kindlePollingCopy as C, PRESS_FRAME_KEYS, POLL_NAME_PLACEHOLDERS, POLL_NUMBER_PLACEHOLDERS, POLL_NAME_MAX, POLL_NUMBER_MAX, POLL_LABEL_MAX, POLL_LINE_MAX, POLL_HEADLINE_MAX, POLL_BODY_MAX } from '../lib/kindle-polling-copy.ts';
 
 const labels=()=>[VP.title,VP.answerButton,VP.declineButton,PC.title,PC.sampleSize,PC.margin,RM.label];
 const lineObjs=()=>[VP.question,VP.voluntary,VP.notAVote,VP.privacy,VP.thanks,PC.marginExplainer,PC.sampleExplainer,PC.empty,RM.explainer,RM.sourceNote];
@@ -17,7 +18,7 @@ test('shape: prompt, card, mood strip and two press frames; every line proposal 
   for (const l of lineObjs()) assert.equal(l.proposal,true);
   assert.deepEqual([...PRESS_FRAME_KEYS],['lead-change','race-tightens']); assert.deepEqual(PP.map(f=>f.key),[...PRESS_FRAME_KEYS]);
   for (const f of PP) { assert.equal(f.proposal,true); assert.equal(pollPressFor(f.key),f); }
-  assert.equal(pollPressFor('nope'),undefined); assert.deepEqual(POLL_PRESS_BYLINE,{name:'Republic Wire Service',proposal:true});
+  assert.equal(pollPressFor('nope'),undefined);
   assert.equal(new Set(all()).size,all().length);
 });
 test('limits: local caps 24 and 6; labels 40, lines 100, headlines 70 with every placeholder filled to its cap', () => {
@@ -75,4 +76,10 @@ test('the header names no other lib module path', () => {
 test('unwired: nothing in app/, components/ or lib/ imports kindle-polling-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('kindle-polling-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/kindle-polling-copy/,f);
+});
+test('one canonical byline: the press bodies open with the Kindle pack byline from the press templates, and this module defines none of its own', () => {
+  assert.deepEqual(kindlePress.byline,{name:'Republic Wire Service',proposal:true});
+  const src=readFileSync('lib/kindle-polling-copy.ts','utf8');
+  assert.doesNotMatch(src,/name:'Republic Wire Service'/); assert.doesNotMatch(src,/BYLINE=/); assert.doesNotMatch(src,/^import /m);
+  for (const b of bodies()) assert.ok(b.startsWith(`${kindlePress.byline.name}: `),b);
 });
