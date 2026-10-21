@@ -79,6 +79,8 @@
     "HARIMU_WAR_ENABLED": "true",
     // #423: war weariness PoC (weekly Unrest from an active war, docs 15.3). Needs HARIMU_WAR_ENABLED too. Off until QA.
     "HARIMU_WAR_WEARINESS_ENABLED": "true",
+    // #495: lost frontier squares (city captures) feed the war weariness add-on. Needs HARIMU_WAR_ENABLED and HARIMU_WAR_WEARINESS_ENABLED too. Casualties are not tracked, so they stay zero.
+    "HARIMU_WAR_WEARINESS_LOSSES_ENABLED": "true",
     // #426: war declaration rate limits (1 per nation per 14 real days, 2 active offensive wars) and the casus belli (grievance score >= 40) gate. Needs HARIMU_WAR_ENABLED too. Off until QA.
     "HARIMU_WAR_DECLARATION_LIMITS_ENABLED": "true",
     // #308: AI treaties PoC (non-aggression pact, trade agreement). Off until QA; treaties are proposed and ratified by server code only.
@@ -105,10 +107,10 @@
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",
     "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false",
-    "NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "false",
-    "NEXT_PUBLIC_HARIMU_UI_V2_CREST": "false",
-    "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false",
-    "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "false",
+    "NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "true",
+    "NEXT_PUBLIC_HARIMU_UI_V2_CREST": "true",
+    "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "true",
+    "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "true",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"
   },

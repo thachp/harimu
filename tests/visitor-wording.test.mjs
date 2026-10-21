@@ -96,3 +96,18 @@ test('#379: the context strip and footer note do not call a visitor a citizen; a
   assert.match(text(render({...panelProps,visitorSession:true,localDemo:true})),/Browser-local demo/);
   assert.match(text(render({...panelProps,visitorSession:true,view:'country'})),/Static lore · opt-in presence/);
 });
+
+test('#379: the World tab is a real GET submit before hydration (?view=world&nation=…), and onClick still navigates client-side without a reload',()=>{
+  const calls=[];let prevented=0;
+  const tree=render({visitorSession:true,onNavigate:v=>calls.push(v),nation:{id:'aurelle',name:'Aurelle'}});
+  const el=type=>tree.filter(n=>n&&typeof n==='object'&&n.type===type);
+  const form=el('form').find(f=>f.props.id==='world-tab-form');
+  assert.ok(form,'a hidden GET form carries the World tab target');assert.equal(form.props.method,'get');assert.equal(form.props.hidden,true);
+  const hidden=el('input').find(i=>i.props.name==='nation');assert.equal(hidden.props.type,'hidden');assert.equal(hidden.props.value,'aurelle','the viewed nation travels with the click');
+  const dock=el('button').filter(b=>/^Open /.test(b.props['aria-label']??''));
+  const world=dock.find(b=>b.props['aria-label']==='Open World');
+  assert.equal(world.props.type,'submit');assert.equal(world.props.form,'world-tab-form');assert.equal(world.props.name,'view');assert.equal(world.props.value,'world','submits ?view=world');
+  for(const b of dock.filter(b=>b!==world))assert.equal(b.props.type,'button',`${b.props['aria-label']} stays a plain button`);
+  world.props.onClick({preventDefault(){prevented++;}});
+  assert.equal(prevented,1,'after hydration the default submit is cancelled, so there is no page reload');assert.deepEqual(calls,['world']);
+});

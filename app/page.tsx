@@ -26,7 +26,7 @@ import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWee
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
 import { cityDestinations } from '@/lib/city-destinations';
-import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, nationForNavigation, identityHold, identityHoldTimeoutMs, readSignedInHint, viewedNationHeld, sceneUrl, isVisitorSession, viewedNationAfterLoad, type SceneView, type SignedInHint } from '@/lib/scene-navigation';
+import { isForeignCivic, isGamePopstate, isSceneTraversal, normalizeSceneSearch, sceneHistoryState, sceneFromSearch, nationFromSearch, nationForNavigation, identityHold, identityHoldTimeoutMs, readSignedInHint, viewedNationHeld, sceneUrl, isVisitorSession, guestDemoAllowed, viewedNationAfterLoad, type SceneView, type SignedInHint } from '@/lib/scene-navigation';
 import { useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {useDisplayTimestamp} from './display-preferences';
@@ -1573,7 +1573,7 @@ export default function Home() {
     uncertain={Boolean(aurelleCommand || korundCommand || marketCommand || playerCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
     onCommand={startAurelleAction} onRetry={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }} onRefresh={() => void runWork('refresh-work')} />;
   // #344: Korund's State store and Aurelle's royal store are not the flagged market. The local demo and guest sandbox have no server flag.
-  const marketShown = marketVisible(citizenNation?.id, marketFlag || !clerkConfigured || (citizenSessionStatus === 'anonymous' && guestMode));
+  const marketShown = marketVisible(citizenNation?.id, marketFlag || !clerkConfigured || (guestDemoAllowed(Boolean(citizenNation), clerkConfigured, citizenSessionStatus) && guestMode));
   const dailyLoop = citizenNation?.id === 'aurelle' ? <>{priorShiftPanel}{aurellePanel}</> : citizenNation?.id === 'korund' ? <>{priorShiftPanel}{korundPanel}</> : priorNationShift ? priorShiftPanel : citizenNation && <DailyLoop nationName={citizenNation.shortName} supported={citizenNation.id === 'kindle'}
     localDemo={!clerkConfigured} view={viewMode} economy={economy} market={market} shifts={workShifts} capacity={capacity}
     jobs={availableWorkOrders.filter(order => !order.nationId || order.nationId === citizenNation.id)}
@@ -1608,7 +1608,7 @@ export default function Home() {
   if (weekNew.length) { const ids = [...weekStored, ...weekNew]; setWeekDone({key:weekKey,ids}); weekProgressStore.save(weekKey, ids); }
   const weekTracker = weekTrack && <FirstWeekTracker tracker={weekTrack} onNavigate={screen=>navigateGame(screen)} />;
   const firstLoopHint = firstLoop && <p className="game-first-loop" role="status">{firstLoop.welcome && <span className="game-first-loop-welcome">{firstLoop.welcome} </span>}Getting started · {firstLoop.step}/3 · {firstLoop.label}</p>;
-  const guestAllowed = !clerkConfigured || citizenSessionStatus === 'anonymous';
+  const guestAllowed = guestDemoAllowed(Boolean(citizenNation), clerkConfigured, citizenSessionStatus); // #379: a signed-in account with no citizen yet is a visitor too
   const guestActive = guestAllowed && guestMode;
   const orderBookApi = useOrderBook(viewMode === 'market' && citizenNation?.id === 'kindle' && clerkConfigured && !guestActive); // #200: renders nothing while HARIMU_ORDER_BOOK_ENABLED is off
   const faithApi = useFaith(Boolean(citizenNation) && !guestActive); // #280: renders nothing while HARIMU_FAITH_ENABLED is off

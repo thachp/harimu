@@ -57,7 +57,7 @@ export const unitCard={
 /** Three short orders spoken by the AI officer. Badged: they speak for an AI. */
 export const officerOrders:readonly OfficerLine[]=[
  O('Stay with your unit. We move together.'),
- O('Hold the line and watch your supply.'),
+ O('Keep your place and watch your supply.'),
  O('Rest when you can. The next round is coming.'),
 ];
 
@@ -87,7 +87,7 @@ export const squadStance={
  proposal:true,
 } as const;
 
-/** Supply notices. The daily strength loss is neutral; cut and restored captions have a hint of each nation's voice (80). */
+/** Supply notices. The daily strength loss is neutral; cut and restored captions have a hint of each nation's voice (captions 80; the daily loss is a line, 100). */
 export const supplyNotices={
  cut:{
   kindle:L('Supply is cut. The unit is on its own.'),
