@@ -389,7 +389,7 @@ body:has(.harimu-game){overflow:auto}
 @media(max-width:760px){.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]{gap:3px;padding-left:3px}.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]::before{width:14px;height:14px}.game-hud-v2 .game-account{column-gap:3px}.game-hud-v2 .game-resources{gap:3px}.game-hud-v2 .game-resources>*,.game-hud-v2 .game-resources>.game-hud-help{flex-basis:calc(64px * var(--text-scale, 1))}.game-hud-v2 .game-resources>div,.game-hud-v2 .game-resources>.game-hud-help>summary,.game-hud-v2 .game-resources>.game-wallet-button{padding-inline:3px;column-gap:3px}}
 @media(min-width:1101px){.game-hud-v2 .game-account{gap:10px}}
 /* #82 slice 1: Overlays group, bottom-right, directly left of the zoom cluster (teal panel, gold for the pressed state). */
-.map-overlays{position:relative;display:flex;align-items:center}
+.map-overlays{position:relative;display:flex;align-items:center;flex:none}
 .map-overlays-trigger{display:none}
 .map-overlays-panel{display:flex;flex-direction:column;align-items:flex-end}
 .map-overlays-group{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding-right:6px;margin-right:2px;border-right:1px solid #365c69}
@@ -406,15 +406,16 @@ body:has(.harimu-game){overflow:auto}
 .map-overlays-scale li:nth-child(1){background:#1d4a3f}.map-overlays-scale li:nth-child(2){background:#6b5a25}.map-overlays-scale li:nth-child(3){background:#6e2a24}
 .map-overlays-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(max-width:390px){
-  .game-stage .viewport-controls:has(.map-overlays){position:relative}.map-overlays{position:static}
+  .game-stage .viewport-controls:has(.map-overlays){position:relative;inset:auto}.map-overlays{position:static}
   .map-overlays-trigger{display:inline-flex;align-items:center;justify-content:center}
   .map-overlays-panel{display:none;position:absolute;bottom:calc(100% + 6px);right:8px;z-index:4;padding:6px;background:#0b2631f2;border:1px solid #365c69;border-radius:3px;width:max-content;max-width:calc(100vw - 24px);max-height:max(160px,calc(44dvh - 130px));overflow:hidden}
   .map-overlays-panel[data-sheet]{width:auto}
   .map-overlays[data-open="true"] .map-overlays-panel{display:flex;align-items:stretch}
   .harimu-game .game-stage:has(.map-overlays-panel[data-sheet]){z-index:30}.map-overlays-panel[data-sheet]{z-index:30;box-shadow:0 -8px 24px #0009}
   .map-overlays[data-open="true"] .map-overlays-trigger{border-color:#d8b35a;color:#f2d88f}
-  .map-overlays-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,128px),1fr));flex:none;border-right:0;padding-right:0;margin-right:0}.map-overlays-unavailable{display:grid}
+  .map-overlays-panel{min-width:0}.map-overlays-group button{white-space:normal;overflow-wrap:normal}.map-overlays-scale li{min-width:0}
+  .map-overlays-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:none;border-right:0;padding-right:0;margin-right:0}.map-overlays-unavailable{display:grid}
   .map-overlays-title{display:none}
-  .map-overlays-legend{position:static;order:2;max-width:none;margin-top:6px;flex:1 1 auto;min-height:0;overflow-y:auto}
+  .map-overlays-legend{position:static;order:2;width:auto;max-width:none;margin-top:6px;flex:1 1 auto;min-height:0;overflow-y:auto}
   .map-overlays-unavailable [role="tooltip"]{right:auto;left:0;max-width:calc(100vw - 48px)}
 }

@@ -39,7 +39,7 @@ const probe = () => {
   if (!legend) issues.push('legend missing');
   const popover = document.querySelector('.map-overlays[data-open="true"] .map-overlays-panel');
   if (legend && !popover) for (const c of controls) if (overlap(box(legend), box(c))) issues.push(`legend overlaps "${c.textContent.trim() || c.getAttribute('aria-label')}"`);
-  if (legend && (box(legend).left < 0 || box(legend).right > vw + 0.5 || box(legend).top < 0)) issues.push('legend is off-screen');
+  if (legend && (box(legend).left < 0 || box(legend).right > vw + 0.5 || box(legend).top < 0)) issues.push(`legend is off-screen (${Math.round(box(legend).left)}..${Math.round(box(legend).right)}, top ${Math.round(box(legend).top)})`);
   const midWord = [];
   for (const el of [...controls, ...document.querySelectorAll('.map-overlays-legend strong, .map-overlays-legend li, .map-overlays-legend span')].filter(shown)) {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
