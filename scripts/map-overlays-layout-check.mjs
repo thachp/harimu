@@ -14,7 +14,7 @@ const entry = `import React from 'react'; import { createRoot } from 'react-dom/
 async function bundle() {
   const stubs = { './game-timer': 'export function GameTimer(){return null}', './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useUser=()=>({isSignedIn:false});export const useClerk=()=>({});export const SignInButton=()=>null;export const UserButton=()=>null;' };
   const result = await build({ stdin: { resolveDir: root, loader: 'tsx', contents: entry }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', target: 'es2022', logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': '"production"', 'process.env': '{}' }, loader: { '.css': 'empty' },
+    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR': '"false"', 'process.env': '{}' }, loader: { '.css': 'empty' },
     plugins: [{ name: 'stubs', setup(b) {
       b.onResolve({ filter: /^(\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ }, a => ({ path: a.path, namespace: 'stub' }));
       b.onResolve({ filter: /\.module\.css$/ }, () => ({ path: 'css-module', namespace: 'stub' }));
@@ -39,7 +39,7 @@ const probe = () => {
   if (!legend) issues.push('legend missing');
   const popover = document.querySelector('.map-overlays[data-open="true"] .map-overlays-panel');
   if (legend && !popover) for (const c of controls) if (overlap(box(legend), box(c))) issues.push(`legend overlaps "${c.textContent.trim() || c.getAttribute('aria-label')}"`);
-  if (legend && (box(legend).left < 0 || box(legend).right > vw + 0.5 || box(legend).top < 0)) issues.push(`legend is off-screen (${Math.round(box(legend).left)}..${Math.round(box(legend).right)}, top ${Math.round(box(legend).top)})`);
+  if (legend && (box(legend).left < 0 || box(legend).right > vw + 0.5 || box(legend).top < 0)) issues.push('legend is off-screen');
   const midWord = [];
   for (const el of [...controls, ...document.querySelectorAll('.map-overlays-legend strong, .map-overlays-legend li, .map-overlays-legend span')].filter(shown)) {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
