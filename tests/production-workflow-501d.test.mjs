@@ -40,9 +40,11 @@ test('rollback: validated version id, dry run spawns nothing, a real run needs m
   assert.match(found([`--rollback=${version}`], ok), /refs\/heads\/main[^]*CLOUDFLARE_API_TOKEN is not set/); assert.doesNotMatch(found([`--rollback=${version}`], ok), /ADMIN_URL|qa2-go-sha/);
   const run = { ...ok, GITHUB_ACTIONS: 'true', GITHUB_REF: 'refs/heads/main', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_ACCOUNT_ID: readProductionConfigRaw().account_id };
   assert.equal(found([`--rollback=${version}`], run), ''); assert.match(found([`--rollback=${version}`], { ...run, HARIMU_DEPLOY_ENVIRONMENT: '' }), /HARIMU_DEPLOY_ENVIRONMENT/);
-  const calls = [], spawn = (cmd, args, options) => { calls.push({ cmd, args, options }); return { status: 0 }; };
+  // #486: a real rollback first reads the target version's commit tag and checks the floor (git), then rolls back
+  const tagged = JSON.stringify({ annotations: { 'workers/tag': 'a'.repeat(40) } });
+  const calls = [], spawn = (cmd, args, options) => { calls.push({ cmd, args, options }); return { status: 0, stdout: args[0] === 'versions' ? tagged : '' }; };
   assert.equal(await deployMain([`--rollback=${version}`, '--dry-run'], ok, { spawn }), 0); assert.equal(calls.length, 0, 'a dry run spawns nothing');
-  assert.equal(await deployMain([`--rollback=${version}`], run, { spawn }), 0); assert.equal(calls.length, 1);
+  assert.equal(await deployMain([`--rollback=${version}`], run, { spawn }), 0); assert.equal(calls.length, 3); calls.splice(0, 2);
   assert.deepEqual(calls[0].args, productionRollbackArgs(version)); assert.deepEqual(calls[0].args.slice(0, 4), ['rollback', version, '--name', 'harimu-production']); assert.ok(calls[0].args.includes('wrangler.prod.jsonc'));
   await assert.rejects(deployMain([`--rollback=${version}`], { ...run, GITHUB_REF: 'refs/heads/dev' }, { spawn }), /only from refs\/heads\/main/); assert.equal(calls.length, 1);
 });
