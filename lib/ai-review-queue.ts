@@ -1,4 +1,4 @@
-import type {GameDatabase} from './db';
+import type {GameDatabase} from './database-contract';
 // #753 slice 1 (docs §21.4 "Human review"): flagged AI outputs plus a deterministic ~1% sample of passing public outputs go to a staff review queue.
 // Flag HARIMU_AI_REVIEW_QUEUE_ENABLED ("true" in preview, "false" in production). Flag off = nothing is written and the admin route is 404.
 // Writes never change what the AI decided or what the player sees: a failed enqueue is swallowed.
