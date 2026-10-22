@@ -134,14 +134,13 @@ export async function dutyDevotionEvents(db: GameDatabase, userId: string): Prom
 export type SuspicionOptions = { graySuspicion?: boolean };
 /** #749/#752: the one source of the private Suspicion indicator for both panels (Korund plan and faith). Flag off: discoveries only, exactly #382.
  *  Flag on: discoveries plus this citizen's completed gray-market trades (either side). Gray Suspicion feeds ONLY this band: raids, Correction Duty
- *  and duty length stay discoveries-only (deriveDuties/dutyView never see trades). Trades are read only inside the decay window (suspicionMax days):
- *  an older trade has fully decayed, so dropping it can't change the level. Read-only; null at 0. */
+ *  and duty length stay discoveries-only (deriveDuties/dutyView never see trades). All of the citizen's trades are read (no window: see below). Read-only; null at 0. */
 export async function suspicionIndicatorFor(db: GameDatabase, userId: string, times: readonly number[], now: number, options: SuspicionOptions = {}): Promise<UndergroundView['suspicion']> {
   let level = suspicionLevel(times, now);
   if (options.graySuspicion) {
     try {
-      const from = now - cfg.suspicionMax * cfg.suspicionDecaySeconds;
-      const trades = (await db.prepare('SELECT traded_at FROM gray_trades WHERE (seller_id=? OR buyer_id=?) AND traded_at>=?').bind(userId, userId, from).all<{ traded_at: number }>()).results.map(r => Number(r.traded_at));
+      // QA1 on #756: no time window. A trade's effect lasts as long as the level never returns to 0, so any cut-off can change the band; read the full history.
+      const trades = (await db.prepare('SELECT traded_at FROM gray_trades WHERE seller_id=? OR buyer_id=?').bind(userId, userId).all<{ traded_at: number }>()).results.map(r => Number(r.traded_at));
       level = suspicionLevelWithGray(times, trades, now);
     } catch (error) { if (!isMissingRelation(error)) throw error; }
   }

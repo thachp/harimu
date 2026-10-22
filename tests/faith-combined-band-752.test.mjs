@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { suspicionLevelWithGray } from '../lib/underground-rules.ts';
+
+test('QA1 on #756: no time window on the trade read (a cut-off can change the band); steady trading still decays', () => {
+  const DAY = 86400, T = 500 * DAY, old = [T - 150 * DAY], steady = [];
+  for (let d = 149; d >= 0; d--) steady.push(T - d * DAY + 60);      // one trade a day keeps the level above 0 for 150 days
+  const full = [...old, ...steady]; assert.notEqual(suspicionLevelWithGray([], full, T), 0);
+  assert.ok(suspicionLevelWithGray([], full, T) >= suspicionLevelWithGray([], full.filter(t => t >= T - 101 * DAY), T), 'a window can only lose Suspicion, so the read takes every trade');
+  const two = []; for (let d = 0; d < 30; d++) two.push(T + d * DAY + 60, T + d * DAY + 3600);
+  assert.equal(suspicionLevelWithGray([], two, T + 29 * DAY + 7200), 4 * 30 - 29, 'two trades a day for 30 days: 4 in, 1 out per midnight, not the max');
+});
 
 async function setup(t, on = true) {
   const r = await localRuntime(); t.after(() => r.close());
@@ -34,7 +44,7 @@ test('flag off: faith panel stays discoveries-only (no band from trades)', async
   assert.equal((await faith(r)).suspicion, null);
 });
 
-test('trades older than the decay window are not read and cannot change the band', async t => {
+test('a single old trade has decayed away after 101 days', async t => {
   const r = await setup(t);
   r.setNow(r.now + 101 * 86400 * 1000); assert.equal((await faith(r)).suspicion, null);
 });
