@@ -1,3 +1,4 @@
+import { parked } from './parked'; // #679
 import { readCrown } from './aurelle-rising';
 import { readPresidium } from './korund-presidium';
 import type {GameDatabase} from './database-contract';
@@ -61,7 +62,7 @@ type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;s
 export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean } = {}) {
   // #679: the Aurelle crown read touches only the Rising and coup tables, which nothing below writes, so it starts with the first reads instead of last
   // (parked so a run that returns early never leaves an unhandled rejection; the crown branch still rethrows).
-  const crownRead = nationId === 'aurelle' ? readCrown(db) : null; crownRead?.catch(() => {});
+  const crownRead = nationId === 'aurelle' ? parked(readCrown(db)) : null;
   const [budget, needs, days] = await Promise.all([
     db.prepare("SELECT initial_minor AS cap, initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number; cap: number }>(),
     db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN CASE WHEN c.nation_id='korund' THEN COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=c.clerk_user_id),0) WHEN c.nation_id='aurelle' THEN COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=c.clerk_user_id),0) ELSE COALESCE(i.quantity,0) END >= 2 THEN 1 ELSE 0 END) AS supplied
