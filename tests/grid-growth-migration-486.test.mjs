@@ -45,3 +45,12 @@ test('SQLite/D1 accepts the same statements with the same guarantees', () => {
   const after = db.prepare('SELECT * FROM world_squares WHERE x < ? AND y < ? ORDER BY y,x').all(from.width, from.height);
   assert.deepEqual(after, before); assert.equal(db.prepare('SELECT COUNT(*) AS n FROM world_squares').get().n, to.width * to.height);
 });
+
+test('guard (ARC on #486): once 0066 is recorded, the #501 deploy refuses any commit without 0066, such as pre-#724 or pre-0066 code', async t => {
+  const { assertDatabaseNotAhead, postgresMigrations, schemaMigrationsTable } = await import('../scripts/postgres-migrations.mjs');
+  const all = postgresMigrations(); assert.ok(all.some(m => m.id === '0066_world_grid_30x24'));
+  const pg = new PGlite(); t.after(() => pg.close()); await pg.exec(schemaMigrationsTable);
+  for (const m of all) await pg.query('INSERT INTO schema_migrations (id, checksum) VALUES ($1, $2)', [m.id, m.checksum]);
+  await assert.rejects(assertDatabaseNotAhead(pg, all.filter(m => m.number !== '0066')), /0066_world_grid_30x24/);
+  await assertDatabaseNotAhead(pg, all);
+});
