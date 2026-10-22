@@ -46,10 +46,10 @@ test('the crest component renders nothing with the flag off, and a named svg wit
  assert.equal(out.off,'');assert.equal(out.unknown,'');
  assert.match(out.forced,/data-nation-crest="aurelle"/);assert.match(out.forced,/data-nation-pattern="diagonal"/);assert.match(out.forced,/title="Aurelle crest: a winged crown"/);assert.match(out.forced,/<svg[^>]*aria-hidden="true"/);assert.doesNotMatch(out.forced,/role="img"|aria-label/);assert.match(out.labelled,/<svg[^>]*role="img"[^>]*aria-label="Aurelle crest: a winged crown"/);assert.doesNotMatch(out.labelled,/aria-hidden/);
 });
-test('the inspector header and the #78 top-bar emblem are the only consumers, every pattern has crest CSS, and the layout stays clipped to the shield',async()=>{
+test('the inspector header, the #78 top-bar emblem and the S5 World chips are the only consumers, every pattern has crest CSS, and the layout stays clipped to the shield',async()=>{
  const shell=await read('app/game-shell.tsx'),css=await read('app/game-shell.css');
  assert.match(shell,/<header className="game-inspector-title">\{identityHold === .none. && !viewedNationHeld && <NationCrest id=\{nation\.id\} size=\{44\} \/>\}/); // not while the identity is loading or the viewed nation is held (#455, #533, #571)
- assert.equal((shell.match(/<NationCrest /g)||[]).length,2);assert.match(shell,/<NationCrest id=\{id\} size=\{20\} force \/><span className="nation-emblem-glyph" aria-hidden="true">/); // inspector header + the #78 top-bar emblem
+ assert.equal((shell.match(/<NationCrest /g)||[]).length,3);assert.match(shell,/worldChips \? <NationCrest id=\{item\.id\} size=\{30\} force \/> : <NationSymbol id=\{item\.id\} \/>/); // + #392 S5 World crest chipsassert.match(shell,/<NationCrest id=\{id\} size=\{20\} force \/><span className="nation-emblem-glyph" aria-hidden="true">/); // inspector header + the #78 top-bar emblem
  for(const mark of Object.values(nationMarks))assert.match(css,new RegExp(`\\.nation-crest\\[data-nation-pattern="${mark.pattern}"\\]`),mark.pattern);
  assert.match(css,/\.nation-crest\{[^}]*clip-path:polygon\(/);
 });

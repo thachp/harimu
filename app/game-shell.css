@@ -416,6 +416,12 @@ body:has(.harimu-game){overflow:auto}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
 .game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}
+/* #392 S5 World crest chips (flag NEXT_PUBLIC_HARIMU_UI_V2_WORLD; class .game-world-v2 on the World strip): crest, name and the existing badges; the detail line stays for screen readers (the selected nation's facts are in the panel). */
+.game-world-v2 .game-context-items>button{flex:1 0 calc(92px * var(--text-scale, 1));max-width:160px;align-items:center;text-align:center;padding:10px 8px 12px;gap:4px;min-height:44px}
+.game-world-v2 .game-context-items>button>strong{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:calc(12px * var(--text-scale, 1))}
+.game-world-v2 .game-context-items .nation-crest svg{position:static}.game-world-v2 .game-context-items>button>svg{display:none}
+.game-world-v2 .game-context-items>button>span{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+@media(max-width:760px){.game-world-v2 .game-context-items{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(96px * var(--text-scale, 1))),1fr))}.game-world-v2 .game-context-items>button{max-width:none}}
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
    this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
 .game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}
