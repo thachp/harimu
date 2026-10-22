@@ -129,6 +129,8 @@
     "HARIMU_LEDGER_RECONCILIATION_ENABLED": "true",
     // #614: read-only admin AI cost dashboard (GET /api/admin/ai-costs, JSON only). "false" in preview too (ARC exception): it needs the HARIMU_ADMIN_TOKEN Worker secret, set in the dashboard, never in this file.
     "HARIMU_AI_COST_DASHBOARD_ENABLED": "false",
+    // #753: staff AI review queue (docs §21.4): filter-failed Notable replies plus a ~1% sample of passing ones; admin list at /api/admin/ai-review-queue behind HARIMU_ADMIN_TOKEN.
+    "HARIMU_AI_REVIEW_QUEUE_ENABLED": "true",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",
