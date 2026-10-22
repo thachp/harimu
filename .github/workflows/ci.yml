@@ -39,7 +39,7 @@ jobs:
 
   # #591: the Postgres suite (HARIMU_TEST_STORAGE=postgres on PGlite), the same files as npm run test:postgres.
   # Sharded like the Node tests; --test-concurrency=1 inside a shard, as in the npm script (PGlite instances are memory-heavy).
-  # Not yet a prerequisite of `check`: #591 asks to gate on it only once it has proved stable.
+  # A prerequisite of `check` since #706: a failing Postgres shard must fail the required gate.
   postgres-tests:
     name: Postgres tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
@@ -88,14 +88,20 @@ jobs:
 
   # Keep the existing required context. A skipped required job can otherwise
   # appear green: explicitly accept only success from every prerequisite.
+  # #706: `check` waits for every test job (both Node shards, all four Postgres shards,
+  # validation); any failure, cancellation or skip in any shard fails the gate.
   check:
     if: ${{ always() }}
-    needs: [node-tests, validation]
+    needs: [node-tests, postgres-tests, validation]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Require every validation job to succeed
+      - name: Require every test job to succeed
         env:
-          NODE_TEST_RESULT: ${{ needs.node-tests.result }}
-          VALIDATION_RESULT: ${{ needs.validation.result }}
-        run: test "$NODE_TEST_RESULT" = success && test "$VALIDATION_RESULT" = success
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          for job in node-tests postgres-tests validation; do
+            result=$(echo "$NEEDS_JSON" | jq -r --arg j "$job" '.[$j].result // "missing"')
+            if [ "$result" != success ]; then echo "::error::$job result is $result"; exit 1; fi
+          done
