@@ -152,7 +152,12 @@ export function sqliteWorldSquaresMigration(): string {
 
 /** #486 (30x24 additive grid, slice 1): the rows of `world_squares` that lie on this build's grid. A table may hold more rows than the grid (the additive migration that grows
  *  the map runs before the build that reads the larger grid), so readers count and use only on-grid rows; a table missing any on-grid row is still incomplete. */
-export const onGrid = <T extends { x: number | string; y: number | string }>(rows: readonly T[]): T[] => rows.filter(r => Number(r.x) >= 0 && Number(r.y) >= 0 && Number(r.x) < mapWidth && Number(r.y) < mapHeight);
+// QA1 on #724: a non-integer coordinate is never on the grid. Travel and sieges read single squares and keep their own bounds checks (lib/travel.ts, lib/siege-actions.ts),
+// so they never see rows beyond the grid either.
+export const onGrid = <T extends { x: number | string; y: number | string }>(rows: readonly T[]): T[] => rows.filter(r => {
+  const x = Number(r.x), y = Number(r.y);
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < mapWidth && y < mapHeight;
+});
 type Row = { x: number; y: number; zone: Zone; owner: string | null; terrain: string; resource: string | null; feature: string | null };
 export async function readWorldSquares(db: GameDatabase): Promise<{ squares: WorldSquare[]; source: 'table' | 'seed' }> {
   try {
