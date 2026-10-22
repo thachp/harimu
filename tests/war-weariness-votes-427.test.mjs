@@ -12,6 +12,10 @@ const incumbents = { 'steady-hand': 7, 'open-ledger': 6, 'dockside-builders': 5 
 test('pure: each party turns toward peace at its tolerance (Open Ledger at 8, the others at 20): no on war, yes on surrender and ceding; receiving is not weighed', async t => {
   const r = await localRuntime(); t.after(() => r.close());
   const [rules, a, e] = await Promise.all(['lib/war-rules.ts', 'lib/war-assembly.ts', 'lib/war-endings.ts'].map(m => r.importModule(m)));
+  // ARC: one named constant holds the thresholds, and nothing else hard-codes them.
+  assert.deepEqual({ ...rules.KINDLE_WEARINESS_TOLERANCE }, { 'steady-hand': 20, 'open-ledger': 8, 'dockside-builders': 20 });
+  const { readFileSync } = await import('node:fs');
+  for (const f of ['lib/war-assembly.ts', 'lib/war-endings.ts', 'lib/war-weariness.ts']) assert.doesNotMatch(readFileSync(f, 'utf8'), /Tolerance|tolerance\s*[:=]\s*\d/, `${f} uses KINDLE_WEARINESS_TOLERANCE through lib/war-rules.ts`);
   assert.deepEqual([7, 8, 19, 20].map(w => rules.wearyKindleParties(w)), [[], ['open-ledger'], ['open-ledger'], ['steady-hand', 'open-ledger', 'dockside-builders']]);
   assert.equal(rules.kindlePartyWeary('independents', 99), false, 'an unknown party is never weary'); assert.equal(rules.kindlePartyWeary('open-ledger', NaN), false);
   assert.deepEqual([0, 7, 8, 20].map(w => [a.kindleWarVote('korund', incumbents, w).yes, a.kindleWarVote('korund', incumbents, w).passed]), [[11, true], [11, true], [5, false], [0, false]], 'war on Korund');
@@ -47,6 +51,15 @@ for (const backend of [undefined, 'postgres']) {
     const off = await setup(t), q = await off.command({ action: 'declare', nation: 'kindle', role: 'President', defender: 'korund' });
     await off.tick(false);
     const before = await off.row('war_proposals', q.proposal.id); assert.equal(before.status, 'approved'); assert.equal('weariness' in JSON.parse(before.vote_json), false);
+  });
+
+  test(`QA3: the world tick hands the ending votes the weariness while the flag is on (hardcoding it off in the tick fails this); off, nothing is weighed${label}`, async t => {
+    for (const [weariness, expected] of [[true, 15], [false, undefined]]) {
+      const c = await setup(t), s = await c.command({ action: 'surrender', nation: 'kindle', role: 'President', warId: 'w-old' });
+      await c.tick(weariness);
+      const row = await c.row('war_end_terms', s.terms.id); assert.equal(row.status, 'enacted');
+      assert.equal(JSON.parse(row.ratification_json)[0].weariness, expected, `warWeariness ${weariness}`);
+    }
   });
 
   test(`endings: Kindle's surrender vote records the weariness it weighed; read once per tick at decision time, and never with the flag off (spy, with a flag-on baseline)${label}`, async t => {
