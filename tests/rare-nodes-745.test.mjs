@@ -117,6 +117,18 @@ for (const backend of ['sqlite', 'pglite']) {
     const v = await world(backend, t); await v.exec("UPDATE world_squares SET owner='kindle' WHERE (x,y) IN ((12,5),(12,7),(13,8),(14,5))"); await v.exec(v.sql);
     const p = placed(await v.all()); assert.deepEqual([p.Heartwood, p.Stormcells], ['13,4', '11,8'], 'equal-distance ties go to the lower y, then the lower x');
   });
+  for (const zone of ['frontier', 'heartland']) test(`0067 + withRareNodes (${backend}): an unowned ${zone} square nearest an occupied target is skipped for a farther eligible one`, async t => {
+    // Ironroot's target (12,5) and the empty Commons squares are owned; the nearest free square (12,4) is ${zone}; the next eligible one is Wildlands (13,4).
+    const setup = ["UPDATE world_squares SET owner='kindle' WHERE (x,y) IN ((12,5),(13,6),(12,7))", `UPDATE world_squares SET zone='${zone}' WHERE x=12 AND y=4`];
+    const w = await world(backend, t); for (const s of setup) await w.exec(s);
+    const before = await w.all(), at = (rows, x, y) => rows.find(r => r.x === x && r.y === y);
+    assert.deepEqual([at(before, 12, 4).zone, at(before, 12, 4).owner, at(before, 12, 4).resource, at(before, 13, 4).zone, at(before, 13, 4).resource], [zone, null, null, 'wildlands', null], 'fixture');
+    await w.exec(w.sql); const after = await w.all();
+    assert.equal(placed(after).Ironroot, '13,4', 'SQL skips the nearer non-Commons/Wildlands square');
+    assert.deepEqual(at(after, 12, 4), at(before, 12, 4), `the ${zone} square is untouched`);
+    const seed = zones.withRareNodes(before.map(r => ({ ...r, x: Number(r.x), y: Number(r.y) })));
+    assert.equal(placed(seed).Ironroot, '13,4', 'withRareNodes skips it too'); assert.equal(at(seed, 12, 4).zone, zone);
+  });
   test(`0067 check (${backend}): with no eligible square left, the migration errors`, async t => {
     const w = await world(backend, t); await w.exec("UPDATE world_squares SET owner='kindle' WHERE x BETWEEN 10 AND 14 AND y BETWEEN 4 AND 8");
     await assert.rejects(w.exec(w.sql), /NOT NULL|null value/i);    const v = await world(backend, t); // a type already on a buyable Wildlands square is skipped, so the check must refuse it (all seven must be Commons)
