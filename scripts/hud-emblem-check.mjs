@@ -12,7 +12,7 @@ import { bundleShell, shellProps } from './hud-tooltip-check.mjs';
 const entry = `
   import React from 'react'; import { createRoot } from 'react-dom/client'; import { GameShell } from './app/game-shell.tsx'; import { CitizenDock } from './app/citizen-dock.tsx';
   window.mountShell = (props, dock) => { window.__root?.unmount(); window.__root = createRoot(document.getElementById('root'));
-    window.__root.render(<><GameShell {...props} onNavigate={() => {}} accountControls={<><button type="button" className="game-glossary" aria-label="Open morning brief"><svg width="17" height="17" /><span>Brief</span></button><button type="button" className="account-menu-trigger" aria-label="Account menu"></button></>} /><CitizenDock {...dock} onNavigate={() => {}} /></>); };`;
+    window.__root.render(<><GameShell {...props} onNavigate={() => {}} accountControls={<><button type="button" className="game-glossary" aria-label="Open morning brief"><svg width="17" height="17" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9v11h-9z M4.5 5.5h5 M4.5 8h5 M4.5 10.5h3" fill="none" stroke="currentColor" /></svg><span>Brief</span></button><button type="button" className="account-menu-trigger" aria-label="Account menu"></button></>} /><CitizenDock {...dock} onNavigate={() => {}} /></>); };`;
 
 const measure = () => {
   const vw = document.documentElement.clientWidth, issues = [], hud = document.querySelector('.game-hud');
@@ -33,7 +33,8 @@ const measure = () => {
     for (const node of sub.childNodes) { if (node === e) continue; const range = document.createRange(); range.selectNodeContents(node); textRects.push(...[...range.getClientRects()].filter(x => x.width > 0)); }
     if (textRects.some(x => x.left < r.right - 0.5 && r.left < x.right - 0.5 && x.top < r.bottom - 0.5 && r.top < x.bottom - 0.5)) issues.push('the emblem overlaps the nation name');
     if (r.left < -0.5 || r.right > vw + 0.5 || r.width < 8) issues.push('the emblem is off-screen or too small');
-    emblem = { label: e.getAttribute('aria-label'), role: e.getAttribute('role'), text: e.textContent, size: Math.round(r.width) };
+    const crest = e.querySelector('.nation-crest'), glyph = e.querySelector('.nation-emblem-glyph');
+    emblem = { label: e.getAttribute('aria-label'), role: e.getAttribute('role'), text: e.textContent, size: Math.round(r.width), crest: !!crest?.querySelector('svg') && crest.getBoundingClientRect().width > 8, glyphShown: !!glyph && getComputedStyle(glyph).display !== 'none' };
   }
   return { issues, count: emblems.length, emblem, status: sub.textContent };
 };
@@ -72,7 +73,8 @@ export async function checkTopBarEmblem({ browser, css, preflight, failures, row
       if (m.count !== 1) fail(`expected one emblem, found ${m.count}`);
       else {
         if (m.emblem.label !== `${nation.name} emblem` || m.emblem.role !== 'img') fail(`emblem name/role wrong: ${JSON.stringify(m.emblem)}`);
-        if (nid === 'varkand' && m.emblem.text !== 'V') fail(`unthemed nation should show its initial, got "${m.emblem.text}"`);
+        if (nid === 'varkand' && m.emblem.text !== 'V') fail(`unthemed nation should keep its initial as the fallback glyph, got "${m.emblem.text}"`);
+        if (!m.emblem.crest || m.emblem.glyphShown) fail(`the emblem should show the nation's crest (an SVG, font-independent) with the glyph hidden: ${JSON.stringify(m.emblem)}`); // QA3: a framed glyph read as an empty square
       }
       if (who === 'visitor' && !m.status.includes('Visiting')) fail(`visitor line should say Visiting: "${m.status}"`);
       if (who === 'citizen' && !m.status.includes('Your citizen')) fail(`citizen line wrong: "${m.status}"`);
