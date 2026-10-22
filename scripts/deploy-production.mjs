@@ -14,6 +14,18 @@ export const databaseUrlEnv = argv => argv.find(a => a.startsWith('--database-ur
 /** #501d: --rollback=<Worker version id> rolls the production Worker back to an earlier Cloudflare version (no rebuild, no migration, no config assertion: it must work when a bad commit is on main). The journal is off in production, so a journal replay is not a rollback path. */
 export const rollbackVersion = argv => argv.find(a => a.startsWith('--rollback='))?.slice('--rollback='.length);
 export const productionRollbackArgs = version => ['rollback', version, '--name', productionTarget.worker, '--config', productionConfigPath, '--message', 'harimu production rollback', '--yes'];
+/** #486 (ARC): the rollback floor. A rollback target must be a version built from a commit that contains #724's merge (world_squares readers that tolerate the 30x24 rows),
+ *  because once 0066 is on the shared database an older Worker would serve a broken map. It is the one check --rollback never skips; anything uncertain refuses. */
+export const rollbackFloorCommit = '36fe66ed8682286c0178ea6b4ecf19a49877060c';
+export function rollbackFloorProblem(version, spawn = spawnSync) {
+  const view = spawn('node_modules/.bin/wrangler', ['versions', 'view', version, '--name', productionTarget.worker, '--config', productionConfigPath, '--json'], { encoding: 'utf8', env: { ...process.env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' } });
+  if (view.status !== 0) return 'could not read the target version from Cloudflare';
+  let tag; try { tag = JSON.parse(view.stdout ?? '')?.annotations?.['workers/tag']; } catch { return 'the target version could not be parsed'; }
+  if (!/^[a-f0-9]{40}$/.test(tag ?? '')) return 'the target version carries no commit tag (built before the rollback floor)';
+  const ancestor = spawn('git', ['merge-base', '--is-ancestor', rollbackFloorCommit, tag], { encoding: 'utf8' });
+  if (ancestor.status !== 0) return `the target version's commit ${tag} does not contain ${rollbackFloorCommit} (#724)`;
+  return null;
+}
 export function productionDeployProblems({ argv, env, head }) {
   const problems = [], urlEnv = databaseUrlEnv(argv), sha = argv.find(a => a.startsWith('--qa2-go-sha='))?.slice('--qa2-go-sha='.length), dryRun = argv.includes('--dry-run'), rollback = rollbackVersion(argv);
   if (env.HARIMU_DEPLOY_ENVIRONMENT !== 'production') problems.push('HARIMU_DEPLOY_ENVIRONMENT=production is required.');
@@ -31,7 +43,7 @@ export function productionDeployProblems({ argv, env, head }) {
   }
   return problems;
 }
-export const productionDeployArgs = dryRun => ['deploy', '--config', 'dist/server/wrangler.json', ...(dryRun ? ['--dry-run', '--outdir', '.wrangler/dry-run'] : [])]; // no --keep-vars (QA3): every production setting must live in wrangler.prod.jsonc, because a deploy replaces dashboard-set vars. Secrets are set by name in the dashboard; after the FIRST deploy, check they are all still present (names only) before opening traffic.
+export const productionDeployArgs = (dryRun, head) => ['deploy', '--config', 'dist/server/wrangler.json', ...(dryRun ? ['--dry-run', '--outdir', '.wrangler/dry-run'] : []), ...(head ? ['--tag', head] : [])]; // #486: --tag records the commit, for the rollback floor. No --keep-vars (QA3): every production setting must live in wrangler.prod.jsonc, because a deploy replaces dashboard-set vars. Secrets are set by name in the dashboard; after the FIRST deploy, check they are all still present (names only) before opening traffic.
 
 export async function main(argv = process.argv.slice(2), env = process.env, deps = {}) {
   const { journalProblems = productionJournalProblems, spawn = spawnSync } = deps;
@@ -41,19 +53,20 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
   const rollback = rollbackVersion(argv);
   if (rollback !== undefined) {
     if (argv.includes('--dry-run')) { console.log(`Dry run: would run: wrangler ${productionRollbackArgs(rollback).join(' ')}`); return 0; }
+    const floor = rollbackFloorProblem(rollback, spawn); if (floor) throw new Error(`Production rollback refused (#486 floor): ${floor}.`);
     return spawn('node_modules/.bin/wrangler', productionRollbackArgs(rollback), { stdio: 'inherit', env: { ...env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' } }).status ?? 1;
   }
   const journal = journalProblems(); if (journal.length) throw new Error(`Production deploy refused:\n- ${journal.join('\n- ')}`);
   const config = assertProductionConfig(readProductionConfigRaw()); // the checked-in config; a Hyperdrive placeholder stops here
   if (sharesPreviewHyperdrive(config)) console.warn('Note: production uses the same Hyperdrive config as preview (shared database).');
-  if (argv.includes('--dry-run')) { console.log(`Dry run for ${head}: inputs and wrangler.prod.jsonc are valid. Would verify migrations, assert the built config, then run: wrangler ${productionDeployArgs(false).join(' ')}`); return 0; }
+  if (argv.includes('--dry-run')) { console.log(`Dry run for ${head}: inputs and wrangler.prod.jsonc are valid. Would verify migrations, assert the built config, then run: wrangler ${productionDeployArgs(false, head).join(' ')}`); return 0; }
   const { assertPinnedWrangler } = await import('./wrangler-pin.mjs'), { assertPostgresMigrationsApplied, assertDatabaseNotAhead, connectPostgres } = await import('./postgres-migrations.mjs');
   assertPinnedWrangler(JSON.parse(readFileSync('node_modules/wrangler/package.json', 'utf8')).version, JSON.parse(readFileSync('package.json', 'utf8')).devDependencies.wrangler);
   const built = assertProductionConfig(JSON.parse(readFileSync('dist/server/wrangler.json', 'utf8'))); // the bundle that would be uploaded
   if (built.main !== 'index.js' || !built.assets?.directory) throw new Error('Build production first (scripts/build-production.mjs).');
   const db = await connectPostgres(env[databaseUrlEnv(argv)]);
   try { await assertPostgresMigrationsApplied(db); await assertDatabaseNotAhead(db); } finally { await db.close(); } // #486: never ship code older than the shared database
-  return spawn('node_modules/.bin/wrangler', productionDeployArgs(false), { stdio: 'inherit', env: { ...env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' } }).status ?? 1;
+  return spawn('node_modules/.bin/wrangler', productionDeployArgs(false, head), { stdio: 'inherit', env: { ...env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' } }).status ?? 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().then(code => process.exit(code), error => { console.error(error.message); process.exit(1); }); // messages carry names only, never values

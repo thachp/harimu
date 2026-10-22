@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { assertDevelopmentConfig, readDevelopmentConfig } from './development-config.mjs';
-import { assertPostgresMigrationsApplied, connectPostgres } from './postgres-migrations.mjs';
+import { assertDatabaseNotAhead, assertPostgresMigrationsApplied, connectPostgres } from './postgres-migrations.mjs';
 import { redactSecrets } from './redact.mjs';
 import { assertPinnedWrangler, deployArgs, isDryRun, withoutDashboardVars, withoutLegacyEnv } from './wrangler-pin.mjs';
 
@@ -56,7 +56,7 @@ if (storageBackend === 'postgres') {
   const url = process.env.HARIMU_POSTGRES_URL ?? process.env.PREVIEW_DATABASE_ADMIN_URL;
   if (!url) throw new Error('HARIMU_STORAGE_BACKEND=postgres: set HARIMU_POSTGRES_URL (read access is enough) so deploy can verify Postgres migrations.');
   const db = await connectPostgres(url);
-  try { await assertPostgresMigrationsApplied(db); } finally { await db.close(); }
+  try { await assertPostgresMigrationsApplied(db); await assertDatabaseNotAhead(db); } finally { await db.close(); } // #486: never ship code older than the shared database
 }
 const result = spawnSync('node_modules/.bin/wrangler', deployArgs(false), {
   stdio: 'inherit', env: { ...process.env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' },
