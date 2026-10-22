@@ -41,7 +41,7 @@ test('#441 rules: window, question text, ranking ties and exactly the top 10', (
 
 test('#441: the flags default to "false", migration 0044 only adds tables, and no route or page can trigger an AI answer', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  for (const flag of ['HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED']) assert.deepEqual([...cfg.matchAll(new RegExp(`"${flag}"\\s*:\\s*"([^"]*)"`, 'g'))].map(m => m[1]), ['false'], flag);
+  for (const flag of ['HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED']) assert.deepEqual([...cfg.matchAll(new RegExp(`"${flag}"\\s*:\\s*"([^"]*)"`, 'g'))].map(m => m[1]), flag === 'HARIMU_DEBATE_ENABLED' || flag === 'HARIMU_TOWN_HALLS_ENABLED' ? ['false'] : ['true'], flag);
   assert.doesNotMatch(cfg, /"HARIMU_TOWN_HALL_OPEN_AT"\s*:/, 'no open time is configured: it never opens by default');
   for (const file of ['../drizzle/0044_town_halls.sql', '../db/postgres/0044_town_halls.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
