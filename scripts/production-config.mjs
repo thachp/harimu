@@ -43,6 +43,10 @@ export function runtimeRoleGrantSql(role) {
 
 const forbiddenVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_AI_PRICE_REVIEWED_UNTIL', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED'];
 // The only vars that may be anything but "false" on production, with the exact value (or a pattern).
+// #742: the AI kill switch is the one operator setting that may differ from "false" on production: "" (off), "all", or a comma list of nation ids. Named, not a pattern, so no other var is loosened.
+export const aiTemplatesOnlyNations = ['kindle', 'korund', 'aurelle']; // must match lib/ai-kill-switch.ts (checked by tests/production-deploy-501c)
+const nationAlt = aiTemplatesOnlyNations.join('|');
+export const operatorVars = Object.freeze({ HARIMU_AI_TEMPLATES_ONLY: new RegExp(`^(|all|(${nationAlt})(,(${nationAlt}))*)$`) });
 const requiredVars = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_PRODUCTION_STORAGE: 'true', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_AI_DAILY_BUDGET_MICRO: /^\d+$/, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: /^pk_live_/ };
 export const readPreviewHyperdriveId = () => JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, '')).hyperdrive?.[0]?.id;
 
@@ -82,7 +86,8 @@ export function productionConfigProblems(config) {
   for (const name of forbiddenVars) if (name in vars) problems.push(`${name} must not exist on production.`);
   for (const [name, expected] of Object.entries(requiredVars)) if (typeof vars[name] !== 'string' || (expected instanceof RegExp ? !expected.test(vars[name]) : vars[name] !== expected)) problems.push(`${name} is missing or has the wrong value.`);
   for (const [name, value] of Object.entries(vars)) {
-    if (!(name in requiredVars) && value !== 'false') problems.push(`${name} must be "false" on production.`);
+    if (name in operatorVars) { if (typeof value !== 'string' || !operatorVars[name].test(value)) problems.push(`${name} must be "", "all" or a comma list of nation ids on production.`); }
+    else if (!(name in requiredVars) && value !== 'false') problems.push(`${name} must be "false" on production.`);
     if (/SECRET|TOKEN|PASSWORD|ADMIN_URL|PRIVATE/.test(name) || /^(sk_|postgres(ql)?:\/\/)/.test(String(value))) problems.push(`${name} looks like a secret and must not be in the config.`);
   }
   return problems;
