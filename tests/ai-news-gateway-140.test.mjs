@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 import {localRuntime} from './helpers/local-runtime.mjs';
 // #140: with the news flag on and budget available, prepareAiNews must call the gateway. No live AI is used.
-const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace("'./ai-denylist'",JSON.stringify(new URL('../lib/ai-denylist.ts',import.meta.url).href)).replace('30000','5');
+const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace("'./ai-denylist'",JSON.stringify(new URL('../lib/ai-denylist.ts',import.meta.url).href)).replace("'./ai-kill-switch'",JSON.stringify(new URL('../lib/ai-kill-switch.ts',import.meta.url).href)).replace('30000','5');
 const {prepareAiNews,readAiNews,aiNewsStaleLeaseSeconds,aiNewsRetrySeconds}=await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64')}`);
 // #160 flake: a real-clock `now` near 00:00 UTC let now+i or now-60+aiNewsRetrySeconds fall on the next UTC day,
 // so prepareAiNews keyed a fresh job id and called the gateway (3 !== 0). Pin a fixed mid-day UTC instant instead.

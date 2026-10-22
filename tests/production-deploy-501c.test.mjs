@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
-import { assertProductionConfig, productionConfigProblems, sharesPreviewHyperdrive, productionJournalProblems, readProductionConfigRaw, wranglerConfigPath } from '../scripts/production-config.mjs';
+import { aiTemplatesOnlyNations, assertProductionConfig, productionConfigProblems, sharesPreviewHyperdrive, productionJournalProblems, readProductionConfigRaw, wranglerConfigPath } from '../scripts/production-config.mjs';
 import { databaseUrlEnv, productionDeployArgs, productionDeployProblems, main as deployMain } from '../scripts/deploy-production.mjs';
 import { productionBuildEnv } from '../scripts/build-production.mjs';
 import ts from 'typescript';
@@ -85,4 +85,13 @@ test('journal optional: production writes keep no journal and need no retention 
   assert.match(productionJournalProblems(storage.replace('productionKeepsWriteJournal=false', 'productionKeepsWriteJournal=true'), db).join(), /unbounded write journal/, 'the gate refuses a production that keeps the journal');
   assert.match(productionJournalProblems(storage, db.replace("||productionKeepsWriteJournal)", ")")).join(), /no longer passes/);
   await assert.rejects(deployMain([`--qa2-go-sha=${head}`, '--dry-run'], { HARIMU_DEPLOY_ENVIRONMENT: 'production', PATH: process.env.PATH }), /Production config refused/, 'with the journal fixed, the remaining refusal is the placeholder');
+});
+
+test('#742: HARIMU_AI_TEMPLATES_ONLY is the one named operator exemption; other HARIMU_* vars must still be "false"', () => {
+  const withVars = extra => { const c = good(); return productionConfigProblems({ ...c, vars: { ...c.vars, ...extra } }); };
+  for (const v of ['', 'all', 'korund', 'korund,aurelle']) assert.deepEqual(withVars({ HARIMU_AI_TEMPLATES_ONLY: v }).filter(p => /TEMPLATES_ONLY/.test(p)), [], v);
+  const libNations = JSON.parse(readFileSync('lib/ai-kill-switch.ts', 'utf8').match(/aiTemplatesOnlyNations = (\[[^\]]*\])/)[1].replaceAll("'", '"'));
+  assert.deepEqual(aiTemplatesOnlyNations, libNations);
+  for (const v of ['true', 'false', 'ALL', 'korund,', ' all', 'atlantis', 'x;y']) assert.ok(withVars({ HARIMU_AI_TEMPLATES_ONLY: v }).some(p => /HARIMU_AI_TEMPLATES_ONLY must be/.test(p)), v);
+  for (const v of ['', 'all', 'true']) assert.ok(withVars({ HARIMU_AI_NEWS_ENABLED: v }).some(p => p === 'HARIMU_AI_NEWS_ENABLED must be "false" on production.'), v);
 });
