@@ -366,7 +366,7 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/world/unrest: 404 w
   const on = await r.call('world/unrest');
   assert.equal(on.status, 200); assert.ok(sql.length > 0, 'baseline: the same spy sees the read');
   assert.ok(sql.every(q => /^\s*SELECT/i.test(q)), `GET is read-only: ${sql.join(' | ')}`);
-  assert.deepEqual([on.data.width, on.data.height], [24, 18]);
+  assert.deepEqual([on.data.width, on.data.height], [30, 24], "#486: the 30x24 grid");
   assert.deepEqual(on.data.nations, [{ nationId: 'kindle', unrest: 45, band: 'Tense' }], 'only scored nations');
   assert.ok(on.data.cells.length > 0 && on.data.cells.some(([x, y]) => x === 5 && y === 4), 'Kindle\'s squares, capital included');
   assert.ok(on.data.cells.every(([, , band]) => on.data.nations.some(n => n.band === band)));
