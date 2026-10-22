@@ -51,7 +51,7 @@ test('deploy-production refuses without explicit production env and approval inp
   assert.match(found([sha], { ...ok, ...run, GITHUB_REF: 'refs/heads/dev' }), /only from refs\/heads\/main/); assert.match(found([sha], { ...ok, ...run, CLOUDFLARE_ACCOUNT_ID: 'x' }), /not the approved account/); assert.equal(found([sha], { ...ok, ...run }), '');
   await assert.rejects(deployMain([], { PATH: '' }), /Production deploy refused/);
   await assert.rejects(deployMain([sha, '--dry-run'], { ...ok, PATH: process.env.PATH }), /Production config refused[^]*placeholder/, 'even a dry run stops on the Hyperdrive placeholder');
-  assert.deepEqual(productionDeployArgs(false), ['deploy', '--config', 'dist/server/wrangler.json']); assert.ok(productionDeployArgs(true).includes('--dry-run')); assert.ok(!productionDeployArgs(false).includes('--keep-vars'));
+  assert.deepEqual(productionDeployArgs(false), ['deploy', '--config', 'dist/server/wrangler.json']); assert.deepEqual(productionDeployArgs(false, 'b'.repeat(40)).slice(-2), ['--tag', 'b'.repeat(40)], '#486: tagged with its commit'); assert.ok(productionDeployArgs(true).includes('--dry-run')); assert.ok(!productionDeployArgs(false).includes('--keep-vars'));
   for (const script of ['deploy-production.mjs', 'build-production.mjs']) { const r = spawnSync(process.execPath, [`scripts/${script}`], { env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 20000 }); assert.equal(r.status, 1, script); assert.match(r.stderr, /refused|required/); }
 });
 

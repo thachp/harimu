@@ -133,12 +133,17 @@ export function migrationProblems(migrations, recordedMap, live) {
 /** #486 (ARC): applied migrations this commit does not have. Non-empty means the commit is older than the database (e.g. pre-#724 code against a database that already has 0066). */
 export function unknownAppliedMigrations(migrations, recordedMap) { const known = new Set(migrations.map(m => m.id)); return [...(recordedMap?.keys() ?? [])].filter(id => !known.has(id)).sort(); }
 /** #486 (ARC) deploy guard for the #501 production path: refuses, fail closed, to ship a commit older than the shared database. No schema_migrations table also refuses. */
-export async function assertDatabaseNotAhead(db, migrations = postgresMigrations()) {
-  const done = await recorded(db);
-  if (done === null) throw new Error('Production deploy refused: schema_migrations is missing, so this commit cannot be checked against the database.');
+/** #486 (QA1): which deploy a guard refuses, as a fixed choice, never free text. Anything else throws. */
+export const deployKinds = Object.freeze({ production: 'Production deploy', preview: 'Preview deploy' });
+export function deployLabel(kind) { if (!Object.hasOwn(deployKinds, kind)) throw new Error(`Unknown deploy kind ${JSON.stringify(kind)}; expected 'production' or 'preview'.`); return deployKinds[kind]; }
+export async function assertDatabaseNotAhead(db, migrations = postgresMigrations(), kind = 'production') {
+  const deploy = deployLabel(kind), done = await recorded(db);
+  if (done === null) throw new Error(`${deploy} refused: schema_migrations is missing, so this commit cannot be checked against the database.`);
   const ahead = unknownAppliedMigrations(migrations, done);
-  if (ahead.length) throw new Error(`Production deploy refused: the database has migrations this commit does not have (${ahead.join(', ')}). This commit is older than the database; deploy a release that includes them.`);
+  if (ahead.length) throw new Error(`${deploy} refused: the database has migrations this commit does not have (${ahead.join(', ')}). This commit is older than the database; deploy a release that includes them.`);
 }
+/** #486: the preview deploy's database checks, in order: every migration applied (#119), then the database is not ahead of this commit. */
+export async function assertDeployDatabase(db, migrations = postgresMigrations()) { await assertPostgresMigrationsApplied(db, migrations, 'preview'); await assertDatabaseNotAhead(db, migrations, 'preview'); }
 /** #486 (ARC): this build's world grid, read from its single definition in lib/globe-mapping.ts (scripts run without TypeScript, so the source is parsed; a missing match throws). */
 export function worldGridOfBuild(source = readFileSync('lib/globe-mapping.ts', 'utf8')) {
   const m = source.match(/export const WORLD_GRID = \{ width: (\d+), height: (\d+) \} as const;/);
@@ -151,9 +156,10 @@ export async function assertWorldGridCovered(db, grid = worldGridOfBuild()) {
   if (n !== grid.width * grid.height) throw new Error(`Production deploy refused: world_squares has ${n} of the ${grid.width * grid.height} squares of this build's ${grid.width}x${grid.height} grid. Apply the grid migration first.`);
 }
 /** #119 deploy guard: throws, listing every problem, unless all migrations are applied. */
-export async function assertPostgresMigrationsApplied(db, migrations = postgresMigrations()) {
+export async function assertPostgresMigrationsApplied(db, migrations = postgresMigrations(), kind) { // kind ('production' | 'preview') prefixes the refusal; omitted keeps the #119 message
+  const prefix = kind === undefined ? '' : `${deployLabel(kind)} refused: `;
   const problems = migrationProblems(migrations, await recorded(db), await liveSchema(db));
-  if (problems.length) throw new Error(`Postgres migrations are not applied: ${problems.map(p => `${p.file} (${p.reason})`).join('; ')}. Run "npm run db:postgres:migrate" with the admin URL; nothing was deployed.`);
+  if (problems.length) throw new Error(`${prefix}Postgres migrations are not applied: ${problems.map(p => `${p.file} (${p.reason})`).join('; ')}. Run "npm run db:postgres:migrate" with the admin URL; nothing was deployed.`);
 }
 
 /**

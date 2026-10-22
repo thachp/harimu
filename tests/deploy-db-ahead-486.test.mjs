@@ -29,5 +29,5 @@ test('no schema_migrations table: refused (fail closed)', async t => {
 test('the #501 deploy runs the guard against the database right after the #119 check, before wrangler deploy', () => {
   const src = readFileSync('scripts/deploy-production.mjs', 'utf8');
   assert.match(src, /await assertPostgresMigrationsApplied\(db\); await assertDatabaseNotAhead\(db\);/);
-  assert.ok(src.indexOf('assertDatabaseNotAhead(db)') < src.indexOf("productionDeployArgs(false), { stdio"), 'checked before the deploy runs');
+  assert.ok(src.indexOf('assertDatabaseNotAhead(db)') < src.indexOf("productionDeployArgs(false, head), { stdio"), 'checked before the deploy runs');
 });
