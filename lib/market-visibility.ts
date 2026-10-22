@@ -12,3 +12,6 @@ export function marketVisible(nationId:string|null|undefined,flag:boolean):boole
 export const marketFlagOn=(value:unknown):boolean=>value==='true';
 /** Dock / location tabs: only the Market entry is flag-gated. */
 export const locationVisible=(location:string,nationId:string|null|undefined,flag:boolean):boolean=>location!=='market'||marketVisible(nationId,flag);
+/** #459: the market ticker flag, read straight from the Worker bindings (no cast at the call site). */
+export type MarketTickerBindings = { readonly HARIMU_MARKET_TICKER_ENABLED?: unknown };
+export const marketTickerOn = (bindings: MarketTickerBindings): boolean => marketFlagOn(bindings.HARIMU_MARKET_TICKER_ENABLED);
