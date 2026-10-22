@@ -18,7 +18,7 @@ export type NationOpening = {
   capital?: { x: number; y: number };
   /** Border outpost square, when the nation has one (the three live nations do). */
   outpost?: { x: number; y: number };
-  /** Heartland terrain mix, used to seed the nation's squares. Present exactly when `capital` is. */
+  /** Heartland terrain mix, used to seed the nation's squares. Set with the capital by the nation's opening PR; #486 placed six capitals before their biomes. */
   biome?: readonly string[];
   /** #490 (Stage 0d): the nation's wage currency, wage fund and jobs for the generic wage ledger (lib/nation-work.ts). Absent for every nation today:
    *  the opening PR for a nation fills these in, and until then HARIMU_NATION_WORK_ENABLED has nothing to run. Kindle, Korund and Aurelle keep their own ledgers. */
@@ -36,6 +36,14 @@ const liveMapSeeds: Readonly<Partial<Record<NationId, MapSeed>>> = {
    *  is clear of the three live blocks, the Commons and the grid edge on the 24x18 map (tests/confluence-capital-487.test.mjs). Biome from the docs (canals, terraced hills, delta wetland). */
   confluence: { capital: { x: 4, y: 13 }, outpost: { x: 7, y: 10 }, biome: ['river edge', 'wetland', 'hills'] },
 };
+/** #486 (ARC on #486: 30x24 additive): the six unopened nations' capitals, each replacing that nation's stand-in marker (lib/globe-mapping.ts nationGlobeSquares).
+ *  Each capital went to the stand-in it was closest to on the globe (the assignment with the least total arc from the 24x18 stand-ins; unique, tests/world-grid-30x24-486.test.mjs).
+ *  Position only: no biome, outpost or squares yet, so the nation is not on the square map (`mappedNations`) and its readiness `map` stays false; its opening PR adds the biome and
+ *  runs `nationSquaresUpsertSql`. [ASSUMPTION] the docs give no capital coordinates. */
+const newCapitals: Readonly<Partial<Record<NationId, { capital: { x: number; y: number } }>>> = {
+  meridian: { capital: { x: 26, y: 17 } }, ilmar: { capital: { x: 25, y: 3 } }, hoarvale: { capital: { x: 3, y: 20 } },
+  varkand: { capital: { x: 19, y: 11 } }, veldwood: { capital: { x: 26, y: 10 } }, fulmara: { capital: { x: 19, y: 18 } },
+};
 /** One job a nation offers. `id` must start with the nation id (it is also the work-order id, so ids never collide across nations). `wageMinor` is paid once per claimed shift. */
 export type NationJob = { id: string; name: string; capacityCost: number; hours: number; wageMinor: number; output: string };
 
@@ -50,7 +58,7 @@ export const confluenceWork = {
 } as const satisfies Pick<NationOpening, 'currency' | 'wage' | 'jobs'>;
 const workSeeds: Readonly<Partial<Record<NationId, Pick<NationOpening, 'currency' | 'wage' | 'jobs'>>>> = { confluence: confluenceWork };
 
-export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED`, ...liveMapSeeds[id], ...workSeeds[id] }));
+export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED`, ...newCapitals[id], ...liveMapSeeds[id], ...workSeeds[id] }));
 
 export const nationOpening = (id: unknown): NationOpening | undefined => typeof id === 'string' ? nationOpenings.find(opening => opening.id === id) : undefined;
 /** Ids whose rules run: the live nations plus any whose opening flag is exactly "true" in `bindings`, in catalog order. Unknown ids never appear.  */
@@ -61,7 +69,9 @@ export const openNationIds = (bindings: Readonly<Record<string, string | undefin
 export type NationReadiness = { map: boolean; work: boolean; ready: boolean };
 /** #486 (QA1 nit): the map check also asks whether the capital's block fits, using the same rules as the map-fit measurement on #486. Values mirror lib/map-zones.ts
  *  (width and height are WORLD_GRID, lib/globe-mapping.ts; frontierRadius 3, Commons centre 12,6 are repeated here, since that file imports this one, and pinned equal by tests/nation-readiness-486.test.mjs). */
-export const mapFitRules = { width: WORLD_GRID.width, height: WORLD_GRID.height, blockRadius: 3, commonsCentre: { x: 12, y: 6 }, minCapitalDistance: 7, minCommonsDistance: 5 } as const;
+/** #486: the capital spacing rules, in one place: a 7x7 block (radius 3) wholly on the grid, capitals at least 7 apart and at least 5 from the Commons centre (Chebyshev). */
+export const capitalSpacing = { blockRadius: 3, minCapitalDistance: 7, minCommonsDistance: 5 } as const;
+export const mapFitRules = { width: WORLD_GRID.width, height: WORLD_GRID.height, commonsCentre: { x: 12, y: 6 }, ...capitalSpacing } as const;
 const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 /** Does a capital's 7x7 block fit: wholly on the grid, Chebyshev >= 7 from every other capital and >= 5 from the Commons centre? A check only; it places nothing. */
 export const capitalFits = (capital: { x: number; y: number }, others: readonly { x: number; y: number }[]): boolean => {

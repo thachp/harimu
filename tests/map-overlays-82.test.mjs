@@ -174,7 +174,7 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/world/ownership: 40
   const on = await r.call('world/ownership');
   assert.equal(on.status, 200); assert.ok(sql.length > 0, 'baseline: the same spy sees the read');
   assert.ok(sql.every(q => /^\s*SELECT/i.test(q)), `GET is read-only: ${sql.join(' | ')}`);
-  assert.equal(on.data.width, 24); assert.equal(on.data.height, 18);
+  assert.equal(on.data.width, 30); assert.equal(on.data.height, 24); // #486: 30x24
   assert.deepEqual(on.data.cells.find(c => c[0] === 5 && c[1] === 4), [5, 4, 'kindle'], 'the Kindle capital square');
   assert.ok(on.data.cells.every(([, , owner]) => typeof owner === 'string' && owner), 'only owned squares');
   assert.equal(on.data.totals.reduce((n, t) => n + t.squares, 0), on.data.cells.length);
@@ -189,7 +189,7 @@ function scene(rx, ry, zoom = 1) { // the world-mode camera of GameViewport: glo
   const camera = new THREE.OrthographicCamera(-16 / zoom, 16 / zoom, 12 / zoom, -12 / zoom, .1, 120); camera.position.set(0, 0, 25); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
   return { group, camera };
 }
-const spots = (cells, s) => projectOwnershipCells({ width: 24, height: 18 }, cells, s.group, s.camera, { w: 800, h: 600 }, new THREE.Vector3());
+const spots = (cells, s) => projectOwnershipCells({ width: 30, height: 24 }, cells, s.group, s.camera, { w: 800, h: 600 }, new THREE.Vector3());
 
 test('anchoring rule: square (x, y) maps to latitude/longitude equirectangularly and its screen spot follows rotation and zoom', () => {
   assert.deepEqual(ownershipCellLatLon(0, 0, 24, 18), { latitude: 85, longitude: -172.5 });
@@ -199,7 +199,7 @@ test('anchoring rule: square (x, y) maps to latitude/longitude equirectangularly
     const marker = new THREE.Vector3(7.05 * Math.cos(lat) * Math.sin(lon), 7.05 * Math.sin(lat), 7.05 * Math.cos(lat) * Math.cos(lon)).applyMatrix4(s.group.matrixWorld).project(s.camera);
     const [cell] = spots([[5, 4]], s); assert.ok(Math.abs(cell.left - (marker.x + 1) * 400) < 1e-6 && Math.abs(cell.top - (1 - marker.y) * 300) < 1e-6);
   }
-  const centre = [[11, 8]], back = [[0, 8]];
+  const centre = [[14, 11]], back = [[0, 11]]; // #486: the centre of the 30x24 grid
   const [a] = spots(centre, scene(0, 0)); assert.equal(a.hidden, false, 'facing square shown'); assert.ok(Math.abs(a.left - 400) < 30 && Math.abs(a.top - 300) < 30, 'near the screen centre');
   assert.equal(spots(back, scene(0, 0))[0].hidden, true, 'back hemisphere hidden');
   const [r] = spots(centre, scene(0, .6)); assert.ok(r.left - a.left > 40, 'rotating the globe moves the square');

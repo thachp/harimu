@@ -1,8 +1,9 @@
 /** #82 (ARC on #720): the one square-to-globe mapping. Import-free so plain-Node tests and the client both load it.
  *  Nation markers and regions (lib/game-art.ts, via GameViewport) and the Ownership overlay all place squares through squareLatLon. */
 
-/** The world grid size: the single definition (lib/map-zones.ts mapWidth/mapHeight read it). Patrick has not chosen between 24x18 and 128x128 yet; change it here only. */
-export const WORLD_GRID = { width: 24, height: 18 } as const;
+/** The world grid size: the single definition (lib/map-zones.ts mapWidth/mapHeight read it); change it here only.
+ *  #486 (ARC on #486): 30x24, grown additively from 24x18 to the right and bottom (migration 0066, lib/map-zones.ts gridGrowth486), so every existing square keeps its x,y. */
+export const WORLD_GRID = { width: 30, height: 24 } as const;
 export type Grid = { width: number; height: number };
 export type Square = { x: number; y: number };
 
