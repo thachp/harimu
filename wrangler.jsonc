@@ -57,6 +57,8 @@
     "HARIMU_GRAY_DAILY_CAP_ENABLED": "true",
     // #749: each completed Korund gray-market trade adds private Suspicion (capped per day, never starts Correction Duty). Off: Suspicion from discoveries only.
     "HARIMU_GRAY_SUSPICION_ENABLED": "true",
+    // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
+    "HARIMU_KORUND_MEDALS_ENABLED": "true",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).
     // #487: "true" in preview only so the Confluence cooperative job runs for QA-allowlisted accounts; production "false".
     "HARIMU_NATION_WORK_ENABLED": "true",

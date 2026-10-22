@@ -10,7 +10,7 @@ import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
-import { quotaPercent } from '@/lib/korund-coupons';
+import { quotaPercent, korundMedalCopy, korundQuotaValueText } from '@/lib/korund-coupons';
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
 import { grayText, grayRefusal, ln, fc, rate, rumorLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
@@ -48,7 +48,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
     <ActionButton type="button" reason={pendingActionReason(pending)} onClick={onRefresh}>Refresh assignment and ration book</ActionButton>
     {scene === 'workplace' ? <>
       <h4>{plan.assignment.name}</h4><p>{plan.assignment.capacityCost} WC · {formatDuration(plan.assignment.hours * 3600000)} real / {formatDuration(plan.assignment.hours * 3600000 * gameTimeCompression)} game · {(plan.assignment.wageMinor / 100).toFixed(2)} LN wages · {plan.assignment.foodOutput} food added to the state pool on collection.</p>
-      {plan.quota && <QuotaBar quota={plan.quota} />}
+      {plan.quota && <QuotaBar quota={plan.quota} medals={plan.medals} />}
       {plan.bureau ? <LaborBureau bureau={plan.bureau} pending={pending} uncertain={uncertain} formatTime={formatTime} onCommand={onCommand} /> : null}
       <p>One assigned shift at a time. {plan.bureau ? 'Bureau placement is recorded; shift pay is unchanged.' : 'Job preferences, reassignment and production-drive progression are planned.'}</p>
       {active ? <><GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" /><p>{active.orderName} · {ready ? 'Complete · collect your Labor Notes' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remaining` : 'Checking timing…'}</p>
@@ -97,15 +97,19 @@ export function PriorNationShift({ shift, currency, pending, uncertain, onClaim,
   </section>;
 }
 
-export function QuotaBar({ quota }: { quota: NonNullable<KorundPlanView['quota']> }) {
+export function QuotaBar({ quota, medals }: { quota: NonNullable<KorundPlanView['quota']>; medals?: KorundPlanView['medals'] }) {
+  // #737 (only with HARIMU_KORUND_MEDALS_ENABLED on): unclamped over-fulfilment percent, same formula as lib/korund-medals-rules overFulfilledPercent (inlined: the panel's test loaders map each import)
+  const over = medals && quota.targetFood > 0 && quota.unitFood > quota.targetFood ? Math.round(quota.unitFood * 100 / quota.targetFood) : 0;
   const unit = quotaPercent(quota.unitFood, quota.targetFood);
   const own = quotaPercent(quota.ownFood, quota.targetFood);
   return <section className="korund-quota" aria-label="Work-unit quota">
     <h4>{quota.workUnit} · weekly quota</h4>
-    <div className="korund-quota-track" role="progressbar" aria-label="Work-unit quota progress" aria-valuemin={0} aria-valuemax={quota.targetFood} aria-valuenow={Math.min(quota.unitFood, quota.targetFood)} aria-valuetext={`${quota.unitFood} of ${quota.targetFood} food; your contribution ${quota.ownFood}`}>
+    <div className="korund-quota-track" role="progressbar" aria-label="Work-unit quota progress" aria-valuemin={0} aria-valuemax={quota.targetFood} aria-valuenow={Math.min(quota.unitFood, quota.targetFood)} aria-valuetext={korundQuotaValueText(quota.unitFood, quota.targetFood, quota.ownFood, over)}>
       <span className="korund-quota-unit" style={{ width: `${unit}%` }} /><span className="korund-quota-own" style={{ width: `${own}%` }} />
     </div>
-    <p>Unit: {quota.unitFood} / {quota.targetFood} food ({unit}%) · Your contribution: {quota.ownFood} food. Quota resets with the coupon week.</p>
+    <p>Unit: {quota.unitFood} / {quota.targetFood} food ({over || unit}%) · Your contribution: {quota.ownFood} food. Quota resets with the coupon week.</p>
+    {over > 0 && <p className="korund-quota-over">{korundMedalCopy.over(over)}<br /><small>{korundMedalCopy.overSub}</small></p>}
+    {medals && <p title={korundMedalCopy.rule}>{korundMedalCopy.count(medals.total)} <small>{korundMedalCopy.rule}</small></p>}
   </section>;
 }
 
