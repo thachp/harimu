@@ -10,7 +10,7 @@ import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
-import { quotaPercent, korundMedalCopy } from '@/lib/korund-coupons';
+import { quotaPercent, korundMedalCopy, korundQuotaValueText } from '@/lib/korund-coupons';
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
 import { grayText, grayRefusal, ln, fc, rate, rumorLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
@@ -104,7 +104,7 @@ export function QuotaBar({ quota, medals }: { quota: NonNullable<KorundPlanView[
   const own = quotaPercent(quota.ownFood, quota.targetFood);
   return <section className="korund-quota" aria-label="Work-unit quota">
     <h4>{quota.workUnit} · weekly quota</h4>
-    <div className="korund-quota-track" role="progressbar" aria-label="Work-unit quota progress" aria-valuemin={0} aria-valuemax={quota.targetFood} aria-valuenow={Math.min(quota.unitFood, quota.targetFood)} aria-valuetext={`${quota.unitFood} of ${quota.targetFood} food; your contribution ${quota.ownFood}`}>
+    <div className="korund-quota-track" role="progressbar" aria-label="Work-unit quota progress" aria-valuemin={0} aria-valuemax={quota.targetFood} aria-valuenow={Math.min(quota.unitFood, quota.targetFood)} aria-valuetext={korundQuotaValueText(quota.unitFood, quota.targetFood, quota.ownFood, over)}>
       <span className="korund-quota-unit" style={{ width: `${unit}%` }} /><span className="korund-quota-own" style={{ width: `${own}%` }} />
     </div>
     <p>Unit: {quota.unitFood} / {quota.targetFood} food ({over || unit}%) · Your contribution: {quota.ownFood} food. Quota resets with the coupon week.</p>

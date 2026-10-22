@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { korundMedalCopy, korundWeeklyQuotaFood } from '../lib/korund-coupons.ts';
+import { korundMedalCopy, korundWeeklyQuotaFood, korundQuotaValueText } from '../lib/korund-coupons.ts';
 import { readFile } from 'node:fs/promises';
 import { korundMedalOwnFood, earnsMedal, planMedals, overFulfilledPercent } from '../lib/korund-medals-rules.ts';
 
@@ -114,6 +114,9 @@ test('QA3 S1: Korund only; a citizen who earned a medal in Korund and then left 
   assert.deepEqual((await plan(r, 'bob')).medals, { total: 1, lastWeek: true });
   await r.db.prepare("UPDATE citizens SET nation_id='kindle' WHERE clerk_user_id='bob'").run();
   const left = await plan(r, 'bob'); assert.equal(left?.medals, undefined, 'left Korund: no medals');
+  assert.equal(left?.medals?.total ?? 0, 0, 'ARC/QA2: a non-Korund citizen has zero medals');
+  await r.db.prepare(`INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES ('carol','kindle','carol',18,0,'Good standing',?,?)`).bind(new Date(r.now).toISOString(), new Date(r.now).toISOString()).run();
+  const never = await plan(r, 'carol'); assert.equal(never?.medals, undefined); assert.equal(never?.medals?.total ?? 0, 0, 'never-Korund citizen: zero medals');
   assert.equal((await sqlDuring(r, () => plan(r, 'bob'))).filter(isMedalQuery).length, 0, 'and no medal query for a non-Korund citizen');
 });
 
@@ -122,4 +125,12 @@ test('QA3: repeated flag-on GETs make no writes', async t => {
   r.setNow((epoch + WEEK + 100) * 1000); await plan(r);
   const sql = await sqlDuring(r, async () => { for (let i = 0; i < 3; i++) await plan(r); });
   assert.ok(sql.some(isMedalQuery)); assert.deepEqual(sql.filter(isWrite), [], 'GET /citizen with medals on is read-only');
+});
+
+test('ARC: the quota bar screen-reader text says over-fulfilled above 100%, and is unchanged otherwise', async () => {
+  assert.equal(korundQuotaValueText(52, 40, 8, 130), '52 of 40 food, over-fulfilled at 130%; your contribution 8');
+  assert.equal(korundQuotaValueText(40, 40, 8, 0), '40 of 40 food; your contribution 8', 'at target: unchanged #41 text');
+  assert.equal(korundQuotaValueText(52, 40, 8), '52 of 40 food; your contribution 8', 'flag off (over = 0): unchanged');
+  const panel = await readFile(new URL('../app/korund-plan-panel.tsx', import.meta.url), 'utf8');
+  assert.match(panel, /aria-valuetext=\{korundQuotaValueText\(quota\.unitFood, quota\.targetFood, quota\.ownFood, over\)\}/);
 });

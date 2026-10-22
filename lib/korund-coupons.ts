@@ -58,3 +58,6 @@ export const korundMedalCopy={
  count:(n:number)=>n>0?`Plan medals: ${n}`:'Plan medals: none yet',
  rule:'One medal per closed week when your unit reaches its 40-food target and you supplied at least 8 food yourself.',
 } as const;
+/** #737 (ARC): the quota bar's screen-reader text; says "over-fulfilled" when the unit is over target (only with medals on, `over` > 0). */
+export const korundQuotaValueText=(unitFood:number,targetFood:number,ownFood:number,over=0)=>
+ `${unitFood} of ${targetFood} food${over>0?`, over-fulfilled at ${Math.round(over)}%`:''}; your contribution ${ownFood}`;
