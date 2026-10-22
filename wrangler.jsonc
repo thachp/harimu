@@ -51,6 +51,8 @@
     // #486 (Stage 0 closeout): a flag-on nation opens only when its registry entry is complete (capital and biome, currency, wage fund, jobs). Off: unchanged.
     "HARIMU_NATION_READINESS_ENABLED": "true",
     "HARIMU_GRAY_MARKET_ENABLED": "true",
+    // #736: per-citizen daily gray-market volume cap (posted + accepted LN per UTC day). Off: no cap, exactly the #43 behaviour.
+    "HARIMU_GRAY_DAILY_CAP_ENABLED": "true",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).
     // #487: "true" in preview only so the Confluence cooperative job runs for QA-allowlisted accounts; production "false".
     "HARIMU_NATION_WORK_ENABLED": "true",
