@@ -8,18 +8,20 @@ const workflow = await readFile(new URL('../.github/workflows/ci.yml', import.me
 test('required check rejects failed, cancelled, skipped and absent prerequisite results', () => {
   const gate = workflow.slice(workflow.indexOf('\n  check:\n'));
   assert.match(gate, /if: \$\{\{ always\(\) \}\}/);
-  assert.match(gate, /needs: \[node-tests, validation\]/);
-  assert.match(gate, /NODE_TEST_RESULT: \$\{\{ needs\.node-tests\.result \}\}/);
-  assert.match(gate, /VALIDATION_RESULT: \$\{\{ needs\.validation\.result \}\}/);
-  const command = gate.match(/        run: (.+)/)[1];
-  for (const node of ['success', 'failure', 'cancelled', 'skipped', '']) {
-    for (const validation of ['success', 'failure', 'cancelled', 'skipped', '']) {
-      const result = spawnSync('bash', ['-e', '-c', command], {
-        env: { ...process.env, NODE_TEST_RESULT: node, VALIDATION_RESULT: validation },
-      });
-      assert.equal(result.status === 0, node === 'success' && validation === 'success',
-        `Node=${node}, validation=${validation}`);
-    }
+  // #706: every test job, including all Postgres shards, gates the required check.
+  assert.match(gate, /needs: \[node-tests, postgres-tests, validation\]/);
+  assert.match(gate, /NEEDS_JSON: \$\{\{ toJSON\(needs\) \}\}/);
+  assert.match(gate, /for job in node-tests postgres-tests validation; do/);
+  const command = gate.match(/        run: \|\n((?:          .*\n?)+)/)[1].replace(/^ {10}/gm, '');
+  const results = ['success', 'failure', 'cancelled', 'skipped', undefined];
+  for (const node of results) for (const postgres of results) for (const validation of results) {
+    const needs = {};
+    if (node) needs['node-tests'] = { result: node };
+    if (postgres) needs['postgres-tests'] = { result: postgres };
+    if (validation) needs.validation = { result: validation };
+    const result = spawnSync('bash', ['-e', '-c', command], { env: { ...process.env, NEEDS_JSON: JSON.stringify(needs) } });
+    assert.equal(result.status === 0, node === 'success' && postgres === 'success' && validation === 'success',
+      `Node=${node}, postgres=${postgres}, validation=${validation}`);
   }
 });
 
