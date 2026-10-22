@@ -34,3 +34,19 @@ test('every esbuild harness that defines UI_V2_TOPBAR also defines UI_V2_PANEL',
     if (/['"]process\.env\.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR['"]\s*:/.test(src)) assert.match(src, /['"]process\.env\.NEXT_PUBLIC_HARIMU_UI_V2_PANEL['"]\s*:/, `${f} must define UI_V2_PANEL`);
   }
 });
+
+test('Status: Capital comes from the city catalog: shown on every capital, hidden on every other city', async () => {
+  const { cityStatusStat } = await import('../lib/ui-v2-panel.ts');
+  const { citiesForNation, outpostCityForNation } = await import('../lib/cities.ts');
+  assert.match(await read('app/page.tsx'), /stats=\{\[\.\.\.\[cityStatusStat\(activeCity\)\]\.filter\(stat => stat !== null\)/);
+  let capitals = 0, others = 0;
+  for (const nation of ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']) {
+    const outpost = outpostCityForNation(nation);
+    for (const city of [...citiesForNation(nation), ...(outpost ? [outpost] : [])]) {
+      if (city.capital) { assert.deepEqual(cityStatusStat(city), { label: 'Status', value: 'Capital' }, city.id); capitals++; }
+      else { assert.equal(cityStatusStat(city), null, city.id); others++; }
+    }
+  }
+  assert.equal(capitals, 10); assert.ok(others >= 20);
+  assert.equal(cityStatusStat(null), null); assert.equal(cityStatusStat(undefined), null);
+});

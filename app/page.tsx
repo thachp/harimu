@@ -19,7 +19,7 @@ import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/gu
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { PanelV2 } from './panel-v2';
-import { uiV2PanelEnabled } from '@/lib/ui-v2-panel';
+import { cityStatusStat, uiV2PanelEnabled } from '@/lib/ui-v2-panel';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
@@ -1808,7 +1808,7 @@ export default function Home() {
   const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
     {panelV2 && (() => { const cityNation = citizenNation ?? selected, destinations = cityDestinations(cityNation.id, marketVisible(cityNation.id, marketShown)), home = destinations.find(card => card.id === 'household');
-      return <PanelV2 nationId={cityNation.id} title={activeCity?.name ?? cityNation.capital} subtitle={cityNation.name} stats={[{ label: 'Capital', value: cityNation.capital }, { label: 'Currency', value: cityNation.currency }]}
+      return <PanelV2 nationId={cityNation.id} title={activeCity?.name ?? cityNation.capital} subtitle={cityNation.name} stats={[...[cityStatusStat(activeCity)].filter(stat => stat !== null), { label: 'Capital', value: cityNation.capital }, { label: 'Currency', value: cityNation.currency }]}
         rowsLabel="City destinations" rows={destinations.map(card => ({ id: card.id, label: card.label, detail: card.detail, onSelect: () => changeView(card.id) }))}
         primary={home ? { label: `Open ${home.label}`, onSelect: () => changeView('household') } : undefined} />; })()}
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
