@@ -17,7 +17,7 @@ import { NationCrest } from './nation-crest';
 import { NationSymbol } from './nation-symbol';
 import { nationIsPreview } from '@/lib/nation-discovery';
 import { locationVisible, marketVisible } from '@/lib/market-visibility';
-import { railCurrent, railKeyTarget, railLevels, uiV2RailEnabled } from '@/lib/ui-v2-rail';
+import { countryWord, railCurrent, railKeyTarget, railLevels, uiV2RailEnabled } from '@/lib/ui-v2-rail';
 import { contextStripStatus } from '@/lib/context-strip-copy'; // #379: a visitor's strip says "Visitor preview", not "Citizen snapshot"
 
 type GameNation = { id: string; name: string; capital?: string; color?: string };
@@ -105,7 +105,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
     const timer = setTimeout(() => setDismissedNotice(notice), 8000);
     return () => clearTimeout(timer);
   }, [notice, noticeKind]);
-  const sceneTitle = view === 'world' ? nation.name : nation.id === 'korund' && view === 'market' ? 'State ration store' : nation.id === 'aurelle' && view === 'market' ? 'Chartered food counter' : nation.id === 'korund' && view === 'workplace' ? 'Assignment board' : titles[view];
+  const sceneTitle = view === 'country' ? `${countryWord()} map` : view === 'world' ? nation.name : nation.id === 'korund' && view === 'market' ? 'State ration store' : nation.id === 'aurelle' && view === 'market' ? 'Chartered food counter' : nation.id === 'korund' && view === 'workplace' ? 'Assignment board' : titles[view];
   const resourceNation = citizenNation ?? nation;
   const shownNationName = viewedNationHeld ? 'Your nation' : nation.name; // #455, #533
   const emblemOn = topBarEmblemEnabled(), topbarV2 = uiV2TopbarEnabled(); // #392 S2: topbarV2 adds the restyle (class game-hud-v2); it implies emblemOn

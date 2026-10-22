@@ -14,6 +14,8 @@ test('flag: preview on, production off, only the exact string "true" enables it'
   for (const v of [undefined, '', 'false', 'TRUE', '1']) assert.equal(uiV2RailEnabled(v), false);
 });
 
+test('countryWord follows the flag', async () => { const { countryWord } = await import('../lib/ui-v2-rail.ts'); assert.equal(countryWord(true), 'Nation'); assert.equal(countryWord(false), 'Country'); });
+
 test('levels, current level and arrow-key targets', () => {
   assert.deepEqual(railLevels.map(l => l.name), ['World', 'Nation', 'City']);
   assert.deepEqual(['world', 'country', 'nation', 'square', 'household', 'workplace', 'market', 'government'].map(railLevelOf), ['world', 'country', 'country', 'square', 'square', 'square', 'square', 'square']);
@@ -43,6 +45,8 @@ const expectFor = (flag, view, html) => {
   assert.equal(rail(html) !== null, on, `${view}: rail with the flag ${flag}`);
   assert.equal(html.includes('game-breadcrumbs'), !on, `${view}: the breadcrumb only with the flag off (the rail replaces it)`);
   assert.deepEqual(tabs(html), on ? ['Household', 'Work', 'Market', 'Civic'] : ['World', 'Country', 'City', 'Household', 'Work', 'Market', 'Civic'], `${view}: top tabs with the flag ${flag}`);
+  if (view === 'country') assert.match(html, on ? /<h1 id="game-panel-title"[^>]*>Nation map<\/h1>/ : /<h1 id="game-panel-title"[^>]*>Country map<\/h1>/, 'ARC #755: "Nation" with the rail on');
+  assert.equal(/>Country( map| travel)?</.test(html), !on, `no visible "Country" with the flag on (${view})`);
   if (on) {
     const r = rail(html);
     assert.deepEqual([...r.matchAll(/aria-label="Open ([^"]+)"/g)].map(m => m[1]), ['World', 'Nation', 'City']);

@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import { PanelV2 } from './panel-v2';
 import { cityStatusStat, uiV2PanelEnabled } from '@/lib/ui-v2-panel';
+import { countryWord } from '@/lib/ui-v2-rail';
 import type { CityDestination } from '@/lib/city-destinations';
 
 /** #392 S3: the World and City side-panel pieces that change with NEXT_PUBLIC_HARIMU_UI_V2_PANEL. Each piece reads the build-time flag itself, so
@@ -14,7 +15,7 @@ export function WorldSummary({ nation, population, onView, enabled = uiV2PanelEn
   if (!enabled) return null;
   return <PanelV2 title={nation.name} subtitle={nation.government} rowsLabel="Game locations"
     stats={[...(population ? [{ label: 'Population', value: population }] : []), { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
-    rows={[{ id: 'country', label: 'Country travel', onSelect: () => onView('country') }, { id: 'square', label: 'Open City', onSelect: () => onView('square') }]}
+    rows={[{ id: 'country', label: `${countryWord()} travel`, onSelect: () => onView('country') }, { id: 'square', label: 'Open City', onSelect: () => onView('square') }]}
     primary={{ label: 'Inspect national institutions', onSelect: () => onView('nation') }} />;
 }
 

@@ -1,6 +1,8 @@
 /** Build-time flag NEXT_PUBLIC_HARIMU_UI_V2_RAIL (UI v2, stage S4 of #392): the zoom levels World / Nation / City move to a left rail and the top tabs keep
  *  only the places (Household, Work, Market, Civic), per Patrick's #392 decision 1. "true" in preview, "false" in production; only the exact string "true" enables it. */
 export function uiV2RailEnabled(value: string | undefined = process.env.NEXT_PUBLIC_HARIMU_UI_V2_RAIL): boolean { return value === 'true'; }
+/** ARC on #755: with the rail on, the zoom level is called "Nation" everywhere it was "Country" ("Country map" becomes "Nation map", "Country travel" becomes "Nation travel"). */
+export function countryWord(on: boolean = uiV2RailEnabled()): 'Nation' | 'Country' { return on ? 'Nation' : 'Country'; }
 /** The rail's levels, in zoom order. Labels are Patrick's #392 wording (decision 1): World / Nation / City. */
 export const railLevels = [{ id: 'world', name: 'World' }, { id: 'country', name: 'Nation' }, { id: 'square', name: 'City' }] as const;
 export type RailLevelId = typeof railLevels[number]['id'];
