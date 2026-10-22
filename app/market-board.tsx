@@ -9,7 +9,7 @@ import { orderBookLimits, type OrderBookState } from '@/lib/order-book-rules';
 import { shelfLifeDays } from '@/lib/spoilage-rules';
 import { boardLabels, cancelConfirmation, emptyStates, escrowPreview, fillNotice, orderStateLines, rejectionFor, rejectionForReason, rejections, spoilageHints, type Line, type RejectionKey } from '@/lib/market-board-copy';
 import { ActionButton } from './action-button';
-import { moveLabel, priceMoves, startTicker, tickAnnouncement, tickerCopy, type Moves } from '@/lib/market-ticker';
+import { freshLiveText, moveLabel, priceMoves, startTicker, tickAnnouncer, tickerCopy, type Moves } from '@/lib/market-ticker';
 import { useDisplayTimestamp } from './display-preferences';
 
 type Good = OrderBookState['goods'][number];
@@ -42,6 +42,15 @@ export function placementNotice(before: OrderBookState | null, after: OrderBookS
 }
 
 /** One fetch for the board and the commands that change it. A retry of the same command reuses its requestId. */
+type BookResponse = { open?: boolean; book?: OrderBookState; ticker?: boolean };
+/** One fetch-and-parse path for the board's GET, shared by mount and ticks (QA1 nit 4 on #705). Null when signed out, unavailable or aborted. */
+async function fetchBook(signal?: AbortSignal): Promise<BookResponse | null> {
+  try {
+    const r = await fetch('/api/market/orders', { cache: 'no-store', signal });
+    return r.ok ? await r.json() as BookResponse : null;
+  } catch { return null; }
+}
+
 export function useOrderBook(active: boolean) {
   const [book, setBook] = useState<OrderBookState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,36 +62,25 @@ export function useOrderBook(active: boolean) {
   const [moves, setMoves] = useState<Moves>({});
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [tick, setTick] = useState('');
-  const announced = useRef<number | null>(null);
+  const [announcer] = useState(() => tickAnnouncer(text => setTick(prev => freshLiveText(prev, text)), { setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: id => clearTimeout(id as ReturnType<typeof setTimeout>) }));
+  useEffect(() => () => announcer.stop(), [announcer]);
   const accept = useCallback((next: OrderBookState, live: boolean) => {
     const found = priceMoves(latest.current?.goods ?? null, next.goods), now = Date.now();
     setMoves(found); setUpdatedAt(now);
-    const say = live ? tickAnnouncement(found, next.goods, announced.current, now) : null;
-    if (say) { announced.current = now; setTick(say); }
+    if (live) announcer.offer(found, next.goods, now);
     setBook(next);
-  }, []);
+  }, [announcer]);
   useEffect(() => { latest.current = book; }, [book]);
-  const load = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const r = await fetch('/api/market/orders', { cache: 'no-store', signal });
-      if (!r.ok) return; // signed out or unavailable: no board
-      const data = await r.json() as { open?: boolean; book?: OrderBookState; ticker?: boolean };
-      if (data.open && data.book) { setTicker(data.ticker === true); accept(data.book, data.ticker === true); }
-    } catch { /* hidden */ }
+  const apply = useCallback((data: BookResponse | null, first: boolean) => {
+    if (data?.open && data.book) { setTicker(data.ticker === true); accept(data.book, !first && data.ticker === true); }
   }, [accept]);
+  const load = useCallback(() => fetchBook().then(data => apply(data, false)), [apply]);
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    void (async () => {
-      try {
-        const r = await fetch('/api/market/orders', { cache: 'no-store', signal: controller.signal });
-        if (!r.ok) return; // signed out or unavailable: no board
-        const data = await r.json() as { open?: boolean; book?: OrderBookState; ticker?: boolean };
-        if (data.open && data.book) { setTicker(data.ticker === true); accept(data.book, false); }
-      } catch { /* hidden */ }
-    })();
+    void fetchBook(controller.signal).then(data => apply(data, true)); // state is set in the callback, not the effect body
     return () => controller.abort();
-  }, [active, accept]);
+  }, [active, apply]);
   useEffect(() => { // #459: poll only while the board is open and the server turned the ticker on; paused while the tab is hidden
     if (!active || !ticker) return;
     return startTicker(() => void load(), document, window);
