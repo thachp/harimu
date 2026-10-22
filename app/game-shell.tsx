@@ -78,7 +78,8 @@ const titles: Record<SceneView, string> = { world: 'World globe', country: 'Coun
 /** #78: the nation's emblem next to its name in the top bar (decorative glyph with an accessible name, e.g. "Kindle Republic emblem"). */
 function NationEmblemMark({ id, name }: { id: string; name: string }) {
   const emblem = nationEmblem(nationTheme(id) ?? (nationSymbolsEnabled() ? nationMark(id) : null), name);
-  return <span className="nation-emblem" role="img" aria-label={emblem.label} data-fallback={emblem.fallback || undefined} style={emblem.accent ? { color: emblem.accent, borderColor: emblem.accent } : undefined}>{emblem.symbol}</span>;
+  // #78: nations with an S1 crest show it as the emblem (an SVG, so it never depends on which fonts have the glyph); the symbol glyph is the fallback, hidden by CSS when a crest rendered.
+  return <span className="nation-emblem" role="img" aria-label={emblem.label} data-fallback={emblem.fallback || undefined} style={emblem.accent ? { color: emblem.accent, borderColor: emblem.accent } : undefined}><NationCrest id={id} size={20} force /><span className="nation-emblem-glyph" aria-hidden="true">{emblem.symbol}</span></span>;
 }
 /** Escape presses already used to dismiss a HUD tooltip, so the same press doesn't also collapse the details panel. */
 const helpEscapes = new WeakSet<Event>();
