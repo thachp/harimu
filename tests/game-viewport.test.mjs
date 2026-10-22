@@ -16,8 +16,10 @@ for (let i = 0; i < 11; i++) saveCameraSnapshot(`city:test${i}`, { x: i, z: 0, z
 assert.deepEqual(readCameraSnapshot('city:kindle', 14), { x: 0, z: 0, zoom: 1 });
 console.log('Camera remount snapshots, bounds, context isolation and eviction passed');
 
-const { createRegionWorld, globePoint, globeNationCoordinates } = await import('../lib/game-art.ts');
-const nations = Array.from({ length: 10 }, (_, i) => ({ id: `nation-${i}`, name: `Nation ${i}` }));
+const { createRegionWorld, globePoint } = await import('../lib/game-art.ts');
+const { nationGlobeCoordinates } = await import('../lib/globe-mapping.ts');
+const globeNationCoordinates = (i, n) => nationGlobeCoordinates(Array(n).fill(undefined))[i];
+const nations = Array.from({ length: 10 }, (_, i) => ({ id: `nation-${i}`, name: `Nation ${i}`, ...globeNationCoordinates(i, 10) }));
 const globe = createRegionWorld(nations);
 assert.equal(globe.selectables.length, 10);
 assert.equal(new Set(globe.selectables.map(marker => marker.userData.nationId)).size, 10);

@@ -182,7 +182,8 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/world/ownership: 40
 
 // QA3 #720: the layer rides the globe squares, is hidden where it does not apply, and storage failures fall back to all off.
 const THREE = require('three');
-const { ownershipCellLatLon, projectOwnershipCells } = require('../lib/map-ownership.ts');
+const { squareLatLon, projectOwnershipCells, nationGlobeCoordinates } = require('../lib/globe-mapping.ts');
+const ownershipCellLatLon = (x, y, width, height) => squareLatLon({ x, y }, { width, height });
 function scene(rx, ry, zoom = 1) { // the world-mode camera of GameViewport: globe group rotated by the target, ortho camera at z 25
   const group = new THREE.Group(); group.rotation.set(rx, ry, 0); group.updateMatrixWorld();
   const camera = new THREE.OrthographicCamera(-16 / zoom, 16 / zoom, 12 / zoom, -12 / zoom, .1, 120); camera.position.set(0, 0, 25); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
@@ -193,6 +194,11 @@ const spots = (cells, s) => projectOwnershipCells({ width: 24, height: 18 }, cel
 test('anchoring rule: square (x, y) maps to latitude/longitude equirectangularly and its screen spot follows rotation and zoom', () => {
   assert.deepEqual(ownershipCellLatLon(0, 0, 24, 18), { latitude: 85, longitude: -172.5 });
   assert.deepEqual(ownershipCellLatLon(12, 9, 24, 18), { latitude: -5, longitude: 7.5 });
+  { // ARC: the overlay and the nation markers share one mapping, so Kindle's capital cell projects onto Kindle's marker
+    const s = scene(.3, 1.2), [kindle] = nationGlobeCoordinates([{ x: 5, y: 4 }]), lat = kindle.latitude * Math.PI / 180, lon = kindle.longitude * Math.PI / 180;
+    const marker = new THREE.Vector3(7.05 * Math.cos(lat) * Math.sin(lon), 7.05 * Math.sin(lat), 7.05 * Math.cos(lat) * Math.cos(lon)).applyMatrix4(s.group.matrixWorld).project(s.camera);
+    const [cell] = spots([[5, 4]], s); assert.ok(Math.abs(cell.left - (marker.x + 1) * 400) < 1e-6 && Math.abs(cell.top - (1 - marker.y) * 300) < 1e-6);
+  }
   const centre = [[11, 8]], back = [[0, 8]];
   const [a] = spots(centre, scene(0, 0)); assert.equal(a.hidden, false, 'facing square shown'); assert.ok(Math.abs(a.left - 400) < 30 && Math.abs(a.top - 300) < 30, 'near the screen centre');
   assert.equal(spots(back, scene(0, 0))[0].hidden, true, 'back hemisphere hidden');
