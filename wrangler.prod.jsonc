@@ -140,7 +140,8 @@
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_PANEL": "false",
-    "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "false"
+    "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]
