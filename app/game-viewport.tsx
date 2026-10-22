@@ -136,6 +136,10 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
         const spots = placeLabels(shown.map(({ button }) => ({ x: parseFloat(button.style.left), y: parseFloat(button.style.top), w: button.offsetWidth, h: button.offsetHeight })), { w, h }, 4, blocked);
         shown.forEach(({ button }, index) => { button.style.left = `${spots[index].x}px`; button.style.top = `${spots[index].y}px`; });
       }
+      if (mode === 'world' && window.matchMedia?.('(max-width: 760px)').matches) { // #486: on the 30x24 grid northern capitals (Korund, y=4) sit at higher latitude, so a label drawn above its marker can rise past the canvas top on a phone; keep each label box inside (desktop untouched)
+        labels.forEach(({ button }) => { if (button.hidden || !button.offsetWidth) return; const bw = button.offsetWidth, bh = button.offsetHeight; // translate(-50%,-100%): left is the centre, top is the bottom edge
+          button.style.left = `${Math.min(Math.max(parseFloat(button.style.left), bw / 2), Math.max(bw / 2, w - bw / 2))}px`; button.style.top = `${Math.min(Math.max(parseFloat(button.style.top), bh), h)}px`; });
+      }
       const layers = mode === 'world' ? container.closest('.game-viewport')?.querySelectorAll<HTMLElement>('.map-ownership, .map-resources') ?? [] : []; // #82: Ownership and Resources cells ride the globe squares
       for (const owned of layers) { const spans = [...owned.querySelectorAll<HTMLElement>('span[data-x]')];
         projectOwnershipCells({ width: Number(owned.dataset.width), height: Number(owned.dataset.height) }, spans.map(s => [Number(s.dataset.x), Number(s.dataset.y)]), world.group, camera, { w, h }, new THREE.Vector3())
