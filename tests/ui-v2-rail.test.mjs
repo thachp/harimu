@@ -75,7 +75,8 @@ test('S4 CSS sits before the S2 block (whose rules must all be .game-hud-v2 scop
   const css = await read('app/game-shell.css');
   const start = css.indexOf('/* #392 S4 zoom rail'), end = css.indexOf('/* #392 S2:');
   assert.ok(start > 0 && start < end);
-  const next = css.indexOf('/* #392 S', start + 1), block = css.slice(css.indexOf('*/', start) + 2, next > 0 && next < end ? next : end) // up to the next stage's block (S5 sits between S4 and S2).replace(/@media\([^)]*\)\{/g, '');
+  // up to the next stage's block (S5 sits between S4 and S2)
+  const next = css.indexOf('/* #392 S', start + 1), block = css.slice(css.indexOf('*/', start) + 2, next > 0 && next < end ? next : end).replace(/@media\([^)]*\)\{/g, '');
   for (const sel of [...block.matchAll(/([^{}]+)\{[^{}]*\}/g)].map(m => m[1].trim()).filter(Boolean)) for (const part of sel.split(',')) assert.match(part, /\.game-rail-on|\.game-zoom-rail/, `unscoped S4 selector: ${part}`);
 });
 
