@@ -37,7 +37,7 @@ test('placements: the seven missing types, each on the grid, on an empty square 
 
 test('0067 is generated (identical in drizzle/ and db/postgres/), additive, and the boot seed and fallback apply the same placements', async () => {
   for (const f of ['drizzle/0067_rare_nodes.sql', 'db/postgres/0067_rare_nodes.sql']) assert.equal(await read(f), zones.rareNodesMigration(), f);
-  assert.doesNotMatch(zones.rareNodesMigration(), /DROP|DELETE|TRUNCATE|INSERT/i);
+  assert.doesNotMatch(zones.rareNodesMigration(), /DROP|DELETE|TRUNCATE/i); assert.equal((zones.rareNodesMigration().match(/INSERT/g) ?? []).length, 1, 'the only INSERT is the post-seed check');
   assert.match(await read('lib/db.ts'), /\.\.\.rareNodesSql\(\)\.map\(sql => database\.prepare\(sql\)\)/);
   const db = new DatabaseSync(':memory:'); db.exec(zones.worldSquaresSchema); for (const s of zones.worldSquaresSeedSql()) db.exec(s); for (const s of zones.rareNodesSql()) db.exec(s);
   const { squares, source } = await zones.readWorldSquares({ prepare: q => ({ all: async () => ({ results: db.prepare(q).all() }) }) });
@@ -74,5 +74,41 @@ test('0067 is generated (identical in drizzle/ and db/postgres/), additive, and 
     assert.deepEqual((await m.applyPostgresMigrations(db, m.postgresMigrations(dir))).applied, [], 'a second run applies nothing');
     const fresh = new PGlite(); t.after(() => fresh.close()); await m.bootstrapEmptyPostgres(adapter(fresh), { dir }); // a new database gets both, in file order
     assert.ok((await fresh.query("SELECT COUNT(*)::int AS n FROM schema_migrations WHERE id IN ('0066_world_grid_30x24','0067_rare_nodes')")).rows[0].n === 2);
+  });
+}
+
+// QA3 + ARC on #751: 0067's guards, nearest-square fallback and post-seed check, on SQLite and PGlite.
+async function world(backend, t) {
+  if (backend === 'sqlite') {
+    const db = new DatabaseSync(':memory:'); db.exec(await read('drizzle/0011_world_squares.sql'));
+    return { exec: async s => db.exec(s), all: async () => db.prepare('SELECT x,y,zone,owner,terrain,resource,feature FROM world_squares ORDER BY y,x').all().map(r => ({ ...r })), sql: await read('drizzle/0067_rare_nodes.sql') };
+  }
+  const { PGlite } = await import('@electric-sql/pglite'); const pg = new PGlite(); t.after(() => pg.close()); await pg.exec(zones.postgresWorldSquaresMigration());
+  return { exec: s => pg.exec(s), all: async () => (await pg.query('SELECT x,y,zone,owner,terrain,resource,feature FROM world_squares ORDER BY y,x')).rows, sql: await read('db/postgres/0067_rare_nodes.sql') };
+}
+const placed = rows => Object.fromEntries(rows.filter(r => zones.rareNodePlacements.some(p => p.resource === r.resource)).map(r => [r.resource, `${r.x},${r.y}`]));
+for (const backend of ['sqlite', 'pglite']) {
+  test(`0067 guards (${backend}): owned, resourced and city target squares are untouched across two runs; the second run is a no-op`, async t => {
+    const w = await world(backend, t), [owned, resourced, city] = zones.rareNodePlacements;
+    await w.exec(`UPDATE world_squares SET owner='kindle' WHERE x=${owned.x} AND y=${owned.y}`); await w.exec(`UPDATE world_squares SET resource='stone' WHERE x=${resourced.x} AND y=${resourced.y}`);
+    await w.exec(`UPDATE world_squares SET feature='city' WHERE x=${city.x} AND y=${city.y}`);
+    const at = (rows, p) => rows.find(r => r.x === p.x && r.y === p.y), before = await w.all();
+    await w.exec(w.sql); const once = await w.all();
+    for (const p of [owned, resourced, city]) assert.deepEqual(at(once, p), at(before, p), `${p.x},${p.y} unchanged`);
+    assert.equal(Object.keys(placed(once)).length, 7, 'all seven types still placed');
+    assert.deepEqual(placed(once), placed(zones.withRareNodes(before)), 'SQL and the in-code fallback agree');
+    await w.exec(w.sql); assert.deepEqual(await w.all(), once, 'second run is a no-op');
+  });
+  test(`0067 fallback (${backend}): an occupied target moves its type to the nearest eligible square (fixed tie-break)`, async t => {
+    const w = await world(backend, t); await w.exec("UPDATE world_squares SET owner='kindle' WHERE x=12 AND y=5");
+    await w.exec(w.sql);
+    assert.deepEqual(placed(await w.all()), { Ironroot: '12,4', Frostcore: '13,4', Hazequartz: '10,6', Sunglass: '13,6', 'Geotherm core': '12,7', Heartwood: '14,7', Stormcells: '12,8' },
+      'Ironroot: (12,4) wins the distance-1 tie on y; Frostcore, displaced, takes (13,4)');
+    const v = await world(backend, t); await v.exec("UPDATE world_squares SET owner='kindle' WHERE x=13 AND y=6"); await v.exec(v.sql);
+    assert.equal(placed(await v.all()).Sunglass, '14,5', 'Sunglass: of the diagonal ties, lowest y first (x-first would pick another)');
+  });
+  test(`0067 check (${backend}): with no eligible square left, the migration errors`, async t => {
+    const w = await world(backend, t); await w.exec("UPDATE world_squares SET owner='kindle' WHERE x BETWEEN 10 AND 14 AND y BETWEEN 4 AND 8");
+    await assert.rejects(w.exec(w.sql), /NOT NULL|null value/i);
   });
 }
