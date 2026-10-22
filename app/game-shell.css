@@ -404,8 +404,9 @@ body:has(.harimu-game){overflow:auto}
   .map-overlays-unavailable [role="tooltip"]{right:auto;left:0;max-width:calc(100vw - 48px)}
 }
 /* #82 slice 2: Ownership grid over the map (decorative, under the controls). Low graphics: symbols only, no tint. */
-.map-ownership{position:absolute;z-index:1;left:50%;top:50%;transform:translate(-50%,-50%);width:min(80%,calc(70dvh * 4 / 3));aspect-ratio:4/3;display:grid;pointer-events:none}
-.map-ownership>span{display:flex;align-items:center;justify-content:center;font-size:calc(10px * var(--text-scale, 1));line-height:1;outline:1px solid #0b263155}
+.map-ownership{position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none}
+.map-ownership>span[hidden]{display:none}
+.map-ownership>span{position:absolute;transform:translate(-50%,-50%);width:calc(14px * var(--text-scale, 1));height:calc(14px * var(--text-scale, 1));border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:calc(10px * var(--text-scale, 1));line-height:1;outline:1px solid #0b263155}
 .map-ownership[data-low-graphics]>span{outline:0}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);

@@ -7,12 +7,13 @@ import type { OwnershipMap } from '../lib/map-ownership';
 import { MAP_OVERLAYS, UNAVAILABLE_OVERLAYS, UNREST_SCALE, LEGEND_TEXT, toggleOverlay, overlayLabel, phonePopoverPlacement, readSessionOverlays, writeSessionOverlays, type OverlayId } from '../lib/map-overlays';
 
 /** Renders nothing unless the server sent flags.mapOverlays === true. */
-export function MapOverlaysControl({ enabled, lowGraphics = false }: { enabled: boolean; lowGraphics?: boolean }) {
-  return enabled ? <MapOverlays lowGraphics={lowGraphics} /> : null;
+/** mapLayer: the view draws world squares (the globe); false in the city view, where the Ownership layer is hidden. */
+export function MapOverlaysControl({ enabled, lowGraphics = false, mapLayer = true }: { enabled: boolean; lowGraphics?: boolean; mapLayer?: boolean }) {
+  return enabled ? <MapOverlays lowGraphics={lowGraphics} mapLayer={mapLayer} /> : null;
 }
 const session = () => { try { return window.sessionStorage; } catch { return undefined; } };
 
-export function MapOverlays({ lowGraphics = false }: { lowGraphics?: boolean }) {
+export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraphics?: boolean; mapLayer?: boolean }) {
   const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session())); // ARC: remembered for the browser session, off in a new one
   const [ownership, setOwnership] = useState<OwnershipMap | null>(null);
   const [open, setOpen] = useState(false); // the phone popover (390px and below)
@@ -54,7 +55,7 @@ export function MapOverlays({ lowGraphics = false }: { lowGraphics?: boolean }) 
         {active.map(id => <section key={id}>
           <strong>{overlayLabel(id)}</strong>
           {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}>{step}</li>)}</ol> : null}
-          {id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} squares</li>; })}</ul>
+          {id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} {squares === 1 ? 'square' : 'squares'}</li>; })}</ul>
             : <span>{id === 'ownership' ? 'Loading owners.' : LEGEND_TEXT[id]}</span>}
         </section>)}
       </div>}
@@ -68,13 +69,14 @@ export function MapOverlays({ lowGraphics = false }: { lowGraphics?: boolean }) 
       </div>
     </div>
     <span className="map-overlays-status" aria-live="polite">{announcement}</span>
-    {ownershipOn && ownership && viewport ? createPortal(<OwnershipLayer map={ownership} lowGraphics={lowGraphics} />, viewport) : null}
+    {ownershipOn && mapLayer && ownership && viewport ? createPortal(<OwnershipLayer map={ownership} lowGraphics={lowGraphics} />, viewport) : null}
   </div>;
 }
 
-/** The owned squares as a grid over the map: each nation's symbol (not color alone), tinted with its accent unless graphics are low. Decorative; the legend carries the text. */
+/** Owned squares, each its nation's symbol (not color alone), tinted unless graphics are low. GameViewport places every cell on its globe square each frame
+ *  (projectOwnershipCells); until then they stay hidden. Decorative; the legend carries the text. */
 function OwnershipLayer({ map, lowGraphics }: { map: OwnershipMap; lowGraphics: boolean }) {
-  return <div className="map-ownership" data-low-graphics={lowGraphics ? 'true' : undefined} aria-hidden="true" style={{ gridTemplateColumns: `repeat(${map.width}, 1fr)`, gridTemplateRows: `repeat(${map.height}, 1fr)` }}>
-    {map.cells.map(([x, y, nationId]) => { const mark = nationMark(nationId); return <span key={`${x},${y}`} data-nation={nationId} style={{ gridColumn: x + 1, gridRow: y + 1, color: mark?.accent, ...(lowGraphics ? {} : { backgroundColor: `${mark?.accent ?? '#888888'}55` }) }}>{mark?.symbol ?? '■'}</span>; })}
+  return <div className="map-ownership" data-low-graphics={lowGraphics ? 'true' : undefined} data-width={map.width} data-height={map.height} aria-hidden="true">
+    {map.cells.map(([x, y, nationId]) => { const mark = nationMark(nationId); return <span key={`${x},${y}`} hidden data-nation={nationId} data-x={x} data-y={y} style={{ color: mark?.accent, ...(lowGraphics ? {} : { backgroundColor: `${mark?.accent ?? '#888888'}55` }) }}>{mark?.symbol ?? '■'}</span>; })}
   </div>;
 }
