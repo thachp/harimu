@@ -32,6 +32,8 @@
     "HARIMU_NOTABLES_ENABLED": "true",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "true",
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
+    // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
+    "HARIMU_AI_TEMPLATES_ONLY": "",
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
     // #626 (Decision 111): the Spark-to-Tessera kiosk exchange, separate from square purchases. Off: buy-tessera is refused and the kiosk stays closed.
@@ -134,6 +136,7 @@
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_PANEL": "true",
+    "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "true",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"

@@ -1,4 +1,5 @@
 import type { GameDatabase } from './database-contract';
+import { skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
 import { electionCandidates } from './elections';
 import { kindleCandidatePlatforms, pledge } from './kindle-parties';
 import { aiBudgetConfig, aiGatewayOptions, markAiReservationSent, markAiReservationUncertain, meteredAiCost, releaseAiReservation, reserveAiCabinetSequence, settleAiReservation, type AiBudgetConfig, type AiMeteredCall, type AiModel } from './ai-budget';
@@ -8,7 +9,7 @@ import { debateHallCandidateId, topQuestions } from './town-hall-rules';
 
 /** #441: the AI candidates' town hall answers. Scheduled Worker only (`runTownHallCron`), never a route and never a read. Off unless HARIMU_TOWN_HALLS_ENABLED and
  *  HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED are both "true" and the AI binding and a valid daily AI budget are present. */
-export type TownHallCronBindings = { AI?: NewsAiBinding; HARIMU_TOWN_HALLS_ENABLED?: string; HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string };
+export type TownHallCronBindings = { AI?: NewsAiBinding; HARIMU_TOWN_HALLS_ENABLED?: string; HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string; HARIMU_AI_TEMPLATES_ONLY?: string };
 export const townHallCronMaxAnswers = 3; // per run, bounds inference time and spend
 const model: AiModel = '@cf/meta/llama-3.2-3b-instruct';
 export function townHallAnswersConfigured(b: TownHallCronBindings) {
@@ -72,8 +73,10 @@ export async function generateAnswer(db: GameDatabase, now: number, binding: New
   }
 }
 /** One town hall answer attempt: draft in character from the platform cards, check it stays inside them, then the safety model. */
-export async function prepareTownHallAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number } = {}) {
+export async function prepareTownHallAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number; killSwitch?: AiTemplatesOnlyEnv | null } = {}) {
   if (!options.enabled || !binding || !options.budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
+  // #742: templates-only mode (the candidates are Kindle's) makes no model call and no reservation; the question stays unanswered.
+  if (skipForTemplates('town-hall', options.killSwitch, 'kindle', now)) return { status: 'templates-only' as const };
   const day = new Date(now * 1000).toISOString().slice(0, 10);
   const q = await nextPending(db, now, day);
   if (!q) return { status: 'idle' as const };
@@ -98,9 +101,9 @@ export async function runTownHallCron(db: GameDatabase, now: number, bindings: T
   if (!townHallAnswersConfigured(bindings)) return { status: 'disabled' as const, results: [] as string[] };
   const budget = aiBudgetConfig(bindings)!, results: string[] = [];
   for (let i = 0; i < townHallCronMaxAnswers; i++) {
-    const result = await prepareTownHallAnswer(db, now, bindings.AI, { enabled: true, budget });
+    const result = await prepareTownHallAnswer(db, now, bindings.AI, { enabled: true, budget, killSwitch: bindings });
     results.push(result.status);
-    if (result.status === 'idle' || result.status === 'disabled' || result.status === 'budget-unavailable') break;
+    if (result.status === 'idle' || result.status === 'disabled' || result.status === 'budget-unavailable' || result.status === 'templates-only') break;
   }
   return { status: 'ran' as const, results };
 }

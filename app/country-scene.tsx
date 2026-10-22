@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { citiesForNation, cityForNation } from '../lib/cities';
 import styles from './country-scene.module.css';
 
+import { countryWord } from '../lib/ui-v2-rail';
 export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pending = false, presence, travelEnabled = true, preview = false }: {
   nationId: string; currentCityId: string | null; homeCityId: string | null;
   onTravel: (cityId: string) => void; pending?: boolean;
@@ -16,7 +17,7 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
   const home = homeCityId ? cityForNation(nationId, homeCityId) : undefined;
   const pins = [{x:50,y:32},{x:26,y:76},{x:76,y:76}];
   return <section className={styles.country} aria-labelledby="country-scene-title">
-    <h2 id="country-scene-title">Country map</h2>
+    <h2 id="country-scene-title">{countryWord()} map</h2>
     <p>{preview ? 'Sample visit · no citizen changes. ' : ''}Free, instant travel within this nation · home city unchanged.</p>
     <p>Current city: <strong>{current?.name ?? 'Not visiting'}</strong> · Home city: <strong>{home?.name ?? 'None in this nation'}</strong></p>
     <div className={styles.map} aria-label="Illustrative country map">

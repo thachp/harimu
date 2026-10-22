@@ -10,7 +10,7 @@ const compile=async file=>ts.transpileModule(await readFile(new URL(`../app/${fi
 const tags={};new Function('exports','require',await compile('ai-disclosure.tsx'))(tags,require);
 const documents={};new Function('exports','require',await compile('nation-document.tsx'))(documents,name=>name==='../lib/nation-themes'?require('../lib/nation-themes.ts'):require(name));
 const source=await compile('national-news.tsx');
-const real={};new Function('exports','require',source)(real,name=>name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name));
+const real={};new Function('exports','require',source)(real,name=>name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/kill-switch-copy'?require('../lib/kill-switch-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name));
 const edition=nationId=>({nationId,title:{kindle:'Kindle Press',korund:'Korund State Media',aurelle:'Aurelle Court Gazette'}[nationId],style:{kindle:'press',korund:'state',aurelle:'court'}[nationId],fetchedAt:1768489200000,statistics:{citizens:2,completedShifts:1,food:4},items:[{id:'record',title:'Work recorded',text:'4 food recorded',source:'system',occurredAt:1768489200000},{id:'policy',title:'Statement',text:'A bounded proposal.',source:'deterministic',occurredAt:1768489200000}]});
 const all=n=>[n,...[n?.props?.children].flat(Infinity).filter(Boolean).flatMap(c=>typeof c==='object'?all(c):[c])];
 test('all national editions show truthful statistics and distinguish system, SI and actual AI content',()=>{
@@ -35,7 +35,7 @@ function harness(){
  let cursor=0,effects=[],slots=[],requests=[],closeOrder=[];
  const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useRef(){const i=cursor++;if(!(i in slots))slots[i]={current:{showModal(){},close(){closeOrder.push('native-close');},focus(){}}};return slots[i];},useEffect(fn){effects.push(fn);}};
  const fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
- const exports={};new Function('exports','require','fetch','document',source)(exports,name=>name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react-dom'?{createPortal:node=>node}:name==='react'?react:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name),fetch,{body:{}});
+ const exports={};new Function('exports','require','fetch','document',source)(exports,name=>name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/kill-switch-copy'?require('../lib/kill-switch-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react-dom'?{createPortal:node=>node}:name==='react'?react:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name),fetch,{body:{}});
  let dialogType;
  const props={nationId:'kindle',session:'ready',configured:true};
  const renderControl=()=>{cursor=0;effects=[];return exports.NationalNewsControl(props);};
@@ -76,4 +76,10 @@ test('#688 intro: a Kindle edition with no model-written item reads "Free press 
  const on=edition('kindle');on.items.push({...on.items[1],id:'m',source:'model'});
  const a=render(on);assert.match(a,/Free press · system records and AI articles\./);assert.match(a,/AI-generated/);
  for(const nationId of ['korund','aurelle'])assert.doesNotMatch(render(edition(nationId)),/AI articles/,nationId);
+});
+test('#742: an edition in templates-only mode shows the template-mode footer; a normal edition does not',()=>{
+ const footer=require('../lib/kill-switch-copy.ts').templateMode.footer.text;
+ assert.doesNotMatch(renderToStaticMarkup(React.createElement(real.NewsEdition,{news:edition('korund')})),new RegExp(footer));
+ const html=renderToStaticMarkup(React.createElement(real.NewsEdition,{news:{...edition('korund'),templatesOnly:true}}));
+ assert.equal(html.split(footer).length-1,2,'one edition footer plus one on the non-system item');assert.match(html,/data-template-mode="true"/);
 });

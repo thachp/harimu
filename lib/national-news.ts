@@ -12,7 +12,7 @@ import { undergroundNewsItems } from './korund-underground'; // #295
 export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model';kind?:NewsItemKind};
 /** record: system ledger fact; template: Korund State Media template built only from ledger figures; decree: Aurelle court gazette entry; article: model-written article. */
 export type NewsItemKind='record'|'template'|'decree'|'article';
-export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'court';fetchedAt:number;statistics:{citizens:number;completedShifts:number;food:number};items:NewsItem[]};
+export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'court';fetchedAt:number;statistics:{citizens:number;completedShifts:number;food:number};items:NewsItem[];templatesOnly?:boolean};
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
