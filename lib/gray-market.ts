@@ -1,4 +1,5 @@
 import type { GameDatabase } from './database-contract';
+import { readGraySuspicion } from './korund-underground'; // #749
 import { laborNoteSql, laborNoteBinds } from './korund-wallet';
 import { GRAY_AMOUNT_CAP_MINOR, GRAY_OFFER_LIFETIME_SECONDS, GRAY_STARTING_GRANT_MINOR, GRAY_RATE_MIN, GRAY_RATE_MAX, GRAY_RUMOR_TRADES, GRAY_RUMOR_WINDOW_SECONDS,
   GRAY_DAILY_VOLUME_CAP_MINOR, grayDayStart, grayDailyRemaining, grayCashFor, rumoredRate, validGrayOffer, type GrayOfferInput } from './gray-market-rules';
@@ -50,7 +51,7 @@ const grayVolumeSql = (user: string): string => `(COALESCE((SELECT SUM(amount_mi
 const grayVolumeBinds = (userId: string, now: number): (string | number)[] => [userId, grayDayStart(now), userId, grayDayStart(now)];
 const volume = async (db: GameDatabase, userId: string, now: number) => Number((await db.prepare(`SELECT ${grayVolumeSql('?')} AS n`).bind(...grayVolumeBinds(userId, now)).first<{ n: number }>())?.n ?? 0);
 const capError = (remaining: number): GrayResult => ({ status: 409, reason: 'daily_cap', error: `Today's limit: ${(remaining / 100).toFixed(2)} LN left.` });
-export type GrayOptions = { dailyCap?: boolean };
+export type GrayOptions = { dailyCap?: boolean; suspicion?: boolean };
 
 export type GrayOfferView = { id: string; amountMinor: number; askRate: number; cashMinor: number; createdAt: string; expiresAt: string };
 export type GrayView = {
@@ -64,6 +65,8 @@ export type GrayView = {
   limits: { amountCapMinor: number; rateMin: number; rateMax: number; lifetimeSeconds: number };
   /** #736: present only with HARIMU_GRAY_DAILY_CAP_ENABLED on. */
   dailyRemainingMinor?: number; dailyCapMinor?: number;
+  /** #749: private Suspicion band (never the number); present only with HARIMU_GRAY_SUSPICION_ENABLED on, null at 0. */
+  suspicion?: { line: string; privateTag: string; tooltip: string[] } | null;
 };
 export type GrayResult = { status: number; error?: string; reason?: string; replayed?: boolean };
 
@@ -74,13 +77,14 @@ const offerView = (r: OfferRow): GrayOfferView => ({ id: r.id, amountMinor: Numb
 
 /** The read model. Never writes: expired offers are simply not listed, and the starting grant is shown but not recorded until the first action. */
 export async function readGray(db: GameDatabase, userId: string, now: number, options: GrayOptions = {}): Promise<GrayView> {
-  const [grant, flows, mine, others, trades, used] = await Promise.all([
+  const [grant, flows, mine, others, trades, used, suspicion] = await Promise.all([
     db.prepare('SELECT amount_minor FROM gray_cash_grants WHERE clerk_user_id=?').bind(userId).first<{ amount_minor: number }>(),
     db.prepare(`SELECT COALESCE((SELECT SUM(cash_minor) FROM gray_trades WHERE seller_id=?),0)-COALESCE((SELECT SUM(cash_minor) FROM gray_trades WHERE buyer_id=?),0) AS net`).bind(userId, userId).first<{ net: number }>(),
     db.prepare(`SELECT o.*, EXISTS(SELECT 1 FROM gray_trades t WHERE t.offer_id=o.id) AS traded FROM gray_offers o WHERE o.clerk_user_id=? ORDER BY o.created_at DESC, o.id DESC LIMIT 1`).bind(userId).first<OfferRow & { traded: number }>(),
     db.prepare(`SELECT o.* FROM gray_offers o WHERE o.clerk_user_id<>? AND ${openOffer('o')} ORDER BY o.created_at DESC, o.id DESC LIMIT 20`).bind(userId, now).all<OfferRow>(),
     db.prepare('SELECT offer_id, ask_rate, traded_at FROM gray_trades WHERE traded_at>=? ORDER BY traded_at DESC, offer_id DESC LIMIT ?').bind(now - GRAY_RUMOR_WINDOW_SECONDS, GRAY_RUMOR_TRADES).all<{ offer_id: string; ask_rate: number; traded_at: number }>(),
     options.dailyCap ? volume(db, userId, now) : Promise.resolve(0),
+    options.suspicion ? readGraySuspicion(db, userId, now) : Promise.resolve(undefined),
   ]);
   const myStatus = mine ? (Number(mine.traded) ? 'accepted' : Number(mine.expires_at) > now ? 'open' : 'expired') as 'open' | 'accepted' | 'expired' : null;
   return {
@@ -90,6 +94,7 @@ export async function readGray(db: GameDatabase, userId: string, now: number, op
     myOffer: mine && myStatus ? { ...offerView(mine), status: myStatus } : null,
     offers: (others.results ?? []).map(offerView),
     limits: { amountCapMinor: GRAY_AMOUNT_CAP_MINOR, rateMin: GRAY_RATE_MIN, rateMax: GRAY_RATE_MAX, lifetimeSeconds: GRAY_OFFER_LIFETIME_SECONDS },
+    ...(options.suspicion ? { suspicion } : {}),
     ...(options.dailyCap ? { dailyRemainingMinor: grayDailyRemaining(used), dailyCapMinor: GRAY_DAILY_VOLUME_CAP_MINOR } : {}),
   };
 }

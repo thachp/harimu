@@ -249,7 +249,8 @@ test('the panel: the gray market is a collapsed, optional entry shown only when 
   const text = await readFile(new URL('../lib/gray-market-text.ts', import.meta.url), 'utf8');
   assert.match(text, /from '\.\/gray-market-copy'/); assert.doesNotMatch(text, /GRAY_MARKET_WARNING_DEFERRED|streetWhispers/, 'no Suspicion or seizure lines in the PoC');
   const live = value => value.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/.*$/gm, '');
-  assert.doesNotMatch(live(panel) + live(text), /Suspicion|seiz|penalt|checkpoint/i);
+  // #749 adds the private Suspicion band (flag-gated, copy from lib/korund-suspicion-copy.ts); seizure, penalties and checkpoints stay out of scope.
+  assert.doesNotMatch(live(panel) + live(text), /seiz|penalt|checkpoint/i);
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'); assert.match(page, /onGray=\{startGrayAction\}/);
   assert.match(panel, /Asking rate/); assert.match(panel, /<dt>Amount<\/dt>/, 'offer cards show amount and rate as separate fields');
 });
