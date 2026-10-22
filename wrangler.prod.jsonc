@@ -61,6 +61,8 @@
     "HARIMU_GRAY_SUSPICION_ENABLED": "false",
     // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
     "HARIMU_KORUND_MEDALS_ENABLED": "false",
+    // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
+    "HARIMU_KORUND_SHORTFALL_ENABLED": "false",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).
     // #487: "true" in preview only so the Confluence cooperative job runs for QA-allowlisted accounts; production "false".
     "HARIMU_NATION_WORK_ENABLED": "false",
