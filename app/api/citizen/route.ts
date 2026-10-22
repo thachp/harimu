@@ -65,7 +65,9 @@ const graySuspicionOn = () => (env as unknown as { HARIMU_GRAY_SUSPICION_ENABLED
 const korundMedalsOn = () => (env as unknown as { HARIMU_KORUND_MEDALS_ENABLED?: string }).HARIMU_KORUND_MEDALS_ENABLED === 'true';
 // #759: weekly quota shortfall inspection notice and zero-bonus ledger line (HARIMU_KORUND_SHORTFALL_ENABLED); off = no shortfall read, panel unchanged.
 const korundShortfallOn = () => (env as unknown as { HARIMU_KORUND_SHORTFALL_ENABLED?: string }).HARIMU_KORUND_SHORTFALL_ENABLED === 'true';
-const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn() });
+// #758: rumored LN street rate in the Korund wallet (HARIMU_WALLET_STREET_RATE_ENABLED); off = no read, wallet unchanged.
+const walletStreetRateOn = () => (env as unknown as { HARIMU_WALLET_STREET_RATE_ENABLED?: string }).HARIMU_WALLET_STREET_RATE_ENABLED === 'true';
+const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';
