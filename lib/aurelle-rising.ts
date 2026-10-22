@@ -1,3 +1,4 @@
+import { parked } from './parked'; // #679
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { claimant, claimants, pledgeThreshold, risingConfig, risingReady, risingSucceeds, unrestSustainedSeconds, type ClaimantId } from './aurelle-rising-rules';
@@ -158,7 +159,8 @@ const gazette = (headline: string, detail: string) => `INSERT INTO world_events 
 export async function runAurelleRising(db: GameDatabase, now: number) {
   // #679: every read below is read-only and independent of the others, so they start together (one round trip instead of about six in a row).
   // A read whose branch is not taken is never awaited, so its rejection is parked (no unhandled rejection); a branch that uses it still rethrows as before.
-  const parked = <T,>(promise: Promise<T>) => { promise.catch(() => {}); return promise; };
+  // While a Rising is open, only the open row, scores, counts and weekly reads are used: up to 3 reads (coup window, last resolution, crown) run unused.
+  // That is the cost of one round trip instead of about six; they are read-only.
   const openRead = db.prepare('SELECT id, claimant_id, closes_at FROM aurelle_risings WHERE resolved_at IS NULL ORDER BY opened_at LIMIT 1')
     .first<{ id: string; claimant_id: ClaimantId; closes_at: number }>();
   const scoresRead = parked(aurelleScores(db)), countsRead = parked(counts(db)), weeklyRead = parked(weeklyAurelleHumans(db, now));
