@@ -137,11 +137,14 @@ export function sqliteWorldSquaresMigration(): string {
     worldSquaresSchema + ';', ...worldSquaresSeedSql().map(s => s + ';'), ''].join('\n');
 }
 
+/** #486 (30x24 additive grid, slice 1): the rows of `world_squares` that lie on this build's grid. A table may hold more rows than the grid (the additive migration that grows
+ *  the map runs before the build that reads the larger grid), so readers count and use only on-grid rows; a table missing any on-grid row is still incomplete. */
+export const onGrid = <T extends { x: number | string; y: number | string }>(rows: readonly T[]): T[] => rows.filter(r => Number(r.x) >= 0 && Number(r.y) >= 0 && Number(r.x) < mapWidth && Number(r.y) < mapHeight);
 type Row = { x: number; y: number; zone: Zone; owner: string | null; terrain: string; resource: string | null; feature: string | null };
 export async function readWorldSquares(db: GameDatabase): Promise<{ squares: WorldSquare[]; source: 'table' | 'seed' }> {
   try {
     const result = await db.prepare('SELECT x,y,zone,owner,terrain,resource,feature FROM world_squares ORDER BY y,x').all<Row>();
-    const rows = result.results ?? [];
+    const rows = onGrid(result.results ?? []); // #486: ignore rows beyond this build's grid
     // Only a complete grid counts; a partially applied seed falls back to the identical in-code seed.
     if (rows.length === mapWidth * mapHeight) return { squares: rows.map(r => ({ x: Number(r.x), y: Number(r.y), zone: r.zone, owner: r.owner, terrain: r.terrain, resource: r.resource, feature: r.feature })), source: 'table' };
   } catch { /* table not migrated yet on this backend: serve the identical deterministic seed */ }
