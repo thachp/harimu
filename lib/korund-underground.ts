@@ -10,7 +10,7 @@ import { isMissingRelation } from './db-errors';
 import { capitalCityForNation, cityForNation } from './cities';
 import { korundUndergroundCopy as copy } from './faith-copy';
 import { correctionDuty, dutyEnded, suspicionIndicator } from './korund-suspicion-copy';
-import { appealGranted, deriveDuties, dutyDays, isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionWord, pickIndex, raidDue, raidId, undergroundConfig as cfg, undergroundGameDay } from './underground-rules';
+import { appealGranted, deriveDuties, dutyDays, isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionLevelWithGray, suspicionWord, pickIndex, raidDue, raidId, undergroundConfig as cfg, undergroundGameDay } from './underground-rules';
 
 export * from './underground-rules';
 
@@ -128,6 +128,16 @@ export async function dutyDevotionEvents(db: GameDatabase, userId: string): Prom
     const { duties, appeals } = await loadDuties(db, userId);
     return duties.filter(d => !lifted(appeals.get(d.startAt))).map(d => ({ day: undergroundGameDay(d.startAt), amount: -dutyDays(d) * cfg.dutyDevotionPerDay }));
   } catch (error) { if (isMissingRelation(error)) return []; throw error; }
+}
+
+/** #749: the private Suspicion indicator for the Korund panel: discoveries plus this citizen's completed gray-market trades (either side). Read-only; null at 0. */
+export async function readGraySuspicion(db: GameDatabase, userId: string, now: number): Promise<UndergroundView['suspicion']> {
+  let times: number[] = [];
+  try { times = (await db.prepare('SELECT raided_at FROM korund_raid_hits WHERE user_id=? ORDER BY raided_at').bind(userId).all<{ raided_at: number }>()).results.map(r => Number(r.raided_at)); }
+  catch (error) { if (!isMissingRelation(error)) throw error; }
+  const trades = (await db.prepare('SELECT traded_at FROM gray_trades WHERE seller_id=? OR buyer_id=?').bind(userId, userId).all<{ traded_at: number }>()).results.map(r => Number(r.traded_at));
+  const band = suspicionBand(suspicionLevelWithGray(times, trades, now));
+  return band === 'none' ? null : { line: suspicionIndicator.levelLine.replace('{level}', suspicionWord[band]), privateTag: suspicionIndicator.privateTag, tooltip: suspicionIndicator.tooltip.map(t => t.text) };
 }
 
 /** What a hidden-faith holder sees (private, derived on read). A recent inspection of them shows the first or repeat "found a shrine" notice and the Devotion note;

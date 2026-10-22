@@ -30,6 +30,10 @@ export const undergroundConfig = {
   suspicionDecaySeconds: 86400,
   repeatWindowSeconds: 30 * 86400,
   suspicionBands: { low: 1, raised: 30, high: 60 },
+  /** #749 (docs 12.9 "each illicit trade adds Suspicion where it is a crime"; no number given, every figure an [ASSUMPTION]): each completed Korund gray-market trade adds 2 to each party,
+   *  at most 4 per real UTC day from trades. Both stay below one discovery (the repeat step, 5), and gray-market Suspicion never starts Correction Duty (duties derive from discoveries only). */
+  graySuspicionStep: 2,
+  graySuspicionDailyCap: 4,
   /** #382 PR B Correction Duty (ARC ruling; docs 14.6 and 8.18 fix only the 7-real-day cap, everything else is an [ASSUMPTION]): a repeat discovery starts it, 3 real days by default, longer by the Suspicion band after that
    *  discovery (raised 5, high 7), never more than 7 real days from its start. A new discovery during an active duty extends it, up to that cap (no stacking). Effect: Devotion (social standing) only, 1 point per duty day, taken
    *  at the start; no wage, production or market effect. One automatic appeal per duty (docs 8.18: automatic rule, not staff): granted when the holder had no discovery in the 14 real days before the discovery that started the duty. */
@@ -98,3 +102,20 @@ export function deriveDuties(discoveredAt: readonly number[]): { startAt: number
 export const appealGranted = (discoveredAt: readonly number[], dutyStartAt: number) => !discoveredAt.some(at => at < dutyStartAt && at > dutyStartAt - undergroundConfig.appealWindowSeconds);
 /** Whole real days of a duty, rounded up (the Devotion cost is 1 per day). */
 export const dutyDays = (duty: { startAt: number; endsAt: number }) => Math.ceil((duty.endsAt - duty.startAt) / 86400);
+
+/** #749: Suspicion at `now` from discoveries plus gray-market trades (seconds), one fold with the same decay, bands and max. Gray trades add `graySuspicionStep`
+ *  each, at most `graySuspicionDailyCap` per real UTC day. With no trades this equals suspicionLevel(discoveredAt, now). */
+export function suspicionLevelWithGray(discoveredAt: readonly number[], grayTradedAt: readonly number[], now: number): number {
+  const cfg = undergroundConfig, perDay = new Map<number, number>();
+  const events: { at: number; step: number }[] = foldDiscoveries(discoveredAt).map(d => ({ at: d.at, step: d.repeat ? cfg.suspicionRepeatStep : cfg.suspicionFirstStep }));
+  for (const at of [...grayTradedAt].sort((a, b) => a - b)) {
+    const day = Math.floor(at / 86400), used = perDay.get(day) ?? 0, step = Math.min(cfg.graySuspicionStep, cfg.graySuspicionDailyCap - used);
+    if (step > 0) { perDay.set(day, used + step); events.push({ at, step }); }
+  }
+  let level = 0, last: number | null = null;
+  for (const e of events.sort((a, b) => a.at - b.at)) {
+    if (last !== null) level = Math.max(0, level - Math.floor(Math.max(0, e.at - last) / cfg.suspicionDecaySeconds));
+    level = Math.min(cfg.suspicionMax, level + e.step); last = e.at;
+  }
+  return last === null ? 0 : Math.max(0, level - Math.floor(Math.max(0, now - last) / cfg.suspicionDecaySeconds));
+}
