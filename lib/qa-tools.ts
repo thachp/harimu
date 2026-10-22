@@ -5,7 +5,6 @@
  * for production. The id list is account ids, not credentials.
  */
 export type QaBindings={HARIMU_QA_TEST_CITIZENS?:string;HARIMU_QA_TEST_CITIZEN_IDS?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string};
-export const qaTestNations=['kindle','korund','aurelle'] as const;
 export function qaTestCitizenAllowed(bindings:QaBindings|undefined,userId:string):boolean{
  if(bindings?.HARIMU_QA_TEST_CITIZENS!=='true'||bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW!=='true')return false;
  return (bindings.HARIMU_QA_TEST_CITIZEN_IDS??'').split(',').map(id=>id.trim()).filter(Boolean).includes(userId);

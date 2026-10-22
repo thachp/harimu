@@ -5,7 +5,7 @@ import { kindleParties } from './kindle-parties';
 import { assemblyDistricts, assemblyIncumbents, assemblyPartyIds, assemblyResult, assemblyHeadlines, assemblySeatsPerDistrict, assemblySeatsUp, capitalDistrict, carryIncumbents, isDistrict, nextAssemblyOpen, planAssembly, type AssemblyPlan, type AssemblyResult, type AssemblyTiming, type Incumbents, type PartySeats } from './assembly-rules';
 export * from './assembly-rules';
 
-/** #283: Kindle mid-term Assembly election (party list, D'Hondt per district; the AI bloc is a fixed separate block).
+/** #283: Kindle mid-term Assembly election (party list, D'Hondt per district, human ballots only since #449).
  *  Three additive tables, separate from the presidential civic_* tables. The ballot table has no timestamp and no citizen, and its
  *  random id is not the receipt id, so a ballot cannot be tied to a voter by a column, an id or an insertion time. Writes to the
  *  two ballot tables are fenced on PostgreSQL exactly like the civic_* ones (lib/postgres/database.ts). */
@@ -151,7 +151,7 @@ export type AssemblySnapshot = {
 };
 
 function legacyResult(json: string): AssemblyResult | null {
-  try { const parsed = JSON.parse(json) as AssemblyResult; return Array.isArray(parsed?.districts) && parsed.districts.length > 0 && parsed.districts.every(d => !Array.isArray(d.belowThreshold)) ? parsed : null; } catch { return null; }
+  try { const parsed = JSON.parse(json) as AssemblyResult; return Array.isArray(parsed?.districts) && parsed.districts.length > 0 && parsed.districts.every(d => !Array.isArray(d.belowThreshold) || 'bloc' in d || !('belowMinimum' in d)) ? parsed : null; } catch { return null; }
 }
 
 /** Read-only (GETs write nothing, not even the election row): a due open or close is shown as the write path will record it. */
@@ -180,7 +180,7 @@ export async function readAssembly(db: GameDatabase, userId: string, now: number
   let result: AssemblyResult | null = null;
   if (closed) {
     result = await counted(db, scope, id, incumbents);
-    // A count saved before #351 has no `belowThreshold` (it was made without the 5% share): it stays as published, not recounted under the new rule.
+    // A count saved before #351 (no `belowThreshold`), before #449 (it carries the AI `bloc`) or before #463 (no `belowMinimum`) was made under the old rules: it stays as published, not recounted.
     const legacy = election.result_json ? legacyResult(election.result_json) : null;
     if (legacy) result = legacy;
     else if (election.result_json && election.result_json !== JSON.stringify(result)) throw Error('Saved Assembly count does not match the confirmed count.');

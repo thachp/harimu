@@ -1,6 +1,8 @@
 import { aurelleRisingSchemas } from './aurelle-rising';
 import { aurelleCoupSchemas } from './aurelle-coup';
 import { laborBureauSchemas } from './labor-bureau';
+import { grayMarketSchemas } from './gray-market';
+import { nationWorkSchemas } from './nation-work'; // #490
 import { presidiumSchemas } from './korund-presidium';
 import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView } from './market-orders';
 import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
@@ -14,7 +16,7 @@ import {travelSchema} from './travel';
 import {faithSchemas} from './faith';
 import {congregationSchemas} from './congregations';
 import {stabilitySchemas} from './stability';
-import {selectStorageBackend,assertPostgresApplicationRole,postgresRuntimeEnabled} from './storage-selection';
+import {selectStorageBackend,assertPostgresApplicationRole,assertStorageMarker,storageMarkerIds,postgresRuntimeEnabled,productionKeepsWriteJournal} from './storage-selection';
 import type {GameDatabase} from './database-contract';
 import {addressSchemas} from './weekly-addresses';
 import {electionSchemas} from './elections';
@@ -22,13 +24,27 @@ import {assemblySchemas} from './assembly';
 import {primarySchemas} from './primaries';
 import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
-import { worldSquaresSchema, worldSquaresSeedSql } from './map-zones';
+import { worldSquaresSchema, worldSquaresSeedSql, bootNationSquaresSql } from './map-zones';
 import { worldCitiesSchema } from './city-founding';
-import { aurelleSchemas, royalFavorSchemas } from './aurelle';
+import { aurelleCharterSchemas } from './aurelle-charters';
+import { tesseraRewardSchemas } from './tessera-rewards'; // #465
+import { relocationSupportSchemas } from './relocation-support'; // #470
+import { aurelleFavorIndexes, aurelleSchemas, royalFavorSchemas } from './aurelle';
 import { warSchemas } from './war'; // #309
+import { siegeSchemas } from './siege'; // #419
+import { foundingSchema } from './founding-period'; // #612
+import { aurelleSuccessionSchemas } from './aurelle-succession'; // #613
+import { hallSchema } from './diplomatic-hall'; // #599
 import { treatySchemas } from './diplomacy'; // #308
 import { embargoSchemas } from './embargo'; // #363
+import { goodsSanctionSchemas } from './goods-sanctions'; // #601
+import { warAssemblySchemas } from './war-assembly'; // #427
 import { crownDecreeSchemas } from './crown-debasement'; // #362
+import { canvassSchemas } from './canvassing'; // #442
+import { townHallSchemas } from './town-hall'; // #441
+import { debateSchemas } from './debate'; // #282
+import { sparkIssuanceSchemas } from './spark-supply'; // #431
+import { reconciliationSchemas } from './ledger-reconciliation'; // #432
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
@@ -216,7 +232,9 @@ async function initialize(database: GameDatabase) {
     database.prepare(travelSchema),
     ...faithSchemas.map(sql=>database.prepare(sql)),
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
-    ...warSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362
+    ...aurelleCharterSchemas.map(sql=>database.prepare(sql)), // #531
+    ...tesseraRewardSchemas.map(sql=>database.prepare(sql)), // #465
+    ...warSchemas.map(sql=>database.prepare(sql)), ...warAssemblySchemas.map(sql=>database.prepare(sql)), ...siegeSchemas.map(sql=>database.prepare(sql)), ...relocationSupportSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...goodsSanctionSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), ...sparkIssuanceSchemas.map(sql=>database.prepare(sql)), ...reconciliationSchemas.map(sql=>database.prepare(sql)), ...townHallSchemas.map(sql=>database.prepare(sql)), ...debateSchemas.map(sql=>database.prepare(sql)), ...canvassSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362, #431, #432, #441, #442
     ...congregationSchemas.map(sql=>database.prepare(sql)),
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
@@ -228,13 +246,14 @@ async function initialize(database: GameDatabase) {
     database.prepare(cityLocationSchema),
     database.prepare(worldSquaresSchema),
     ...worldSquaresSeedSql().map(sql => database.prepare(sql)),
+    ...bootNationSquaresSql().map(sql => database.prepare(sql)), // #491: nothing today; adds a new nation's squares once it has a capital
     database.prepare(worldCitiesSchema),
-    ...squareSchema.map(sql => database.prepare(sql)),
+    ...squareSchema.map(sql => database.prepare(sql)), ...hallSchema.map(sql => database.prepare(sql)), ...foundingSchema.map(sql => database.prepare(sql)), ...aurelleSuccessionSchemas.map(sql => database.prepare(sql)), // #599, #612, #613
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
-    ...marketSchemas.map(sql => database.prepare(sql)), ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
+    ...marketSchemas.map(sql => database.prepare(sql)), ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
@@ -291,6 +310,7 @@ async function initialize(database: GameDatabase) {
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));
+  await database.batch(aurelleFavorIndexes.map(sql => database.prepare(sql))); // #616: both tables exist by now (royalFavorSchemas ran in the batch above)
   await database.prepare("INSERT OR IGNORE INTO aurelle_resources(id,initial_food,initial_minor) VALUES ('estate',40,100000)").run();
   await database.prepare("INSERT OR IGNORE INTO world_supply (id,initial_food,unit_minor) VALUES ('kindle-food-supplier',40,100)").run();
   await database.prepare("INSERT OR IGNORE INTO korund_resources(id,initial_food,initial_minor) VALUES ('state',40,100000)").run();
@@ -423,19 +443,20 @@ async function initialize(database: GameDatabase) {
   await database.prepare('PRAGMA optimize').run();
 }
 
-type PostgresBindings={HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
+type PostgresBindings={HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HARIMU_PRODUCTION_STORAGE?:string;HYPERDRIVE?:{connectionString:string}};
 /** Readiness identity: a changed connection or trust flag must re-verify. */
 /** SHA-256 so the connection string (a secret) never sits in memory as a map key. */
-async function readinessKey(bindings:PostgresBindings){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([bindings.HYPERDRIVE?.connectionString,bindings.HARIMU_ACCOUNT_ELECTION_POC_ENABLED,bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED,bindings.HARIMU_AI_DAILY_BUDGET_MICRO,bindings.HARIMU_AI_GATEWAY_ID])));return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');}
+async function readinessKey(bindings:PostgresBindings){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([bindings.HYPERDRIVE?.connectionString,bindings.HARIMU_ACCOUNT_ELECTION_POC_ENABLED,bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED,bindings.HARIMU_PRODUCTION_STORAGE,bindings.HARIMU_AI_DAILY_BUDGET_MICRO,bindings.HARIMU_AI_GATEWAY_ID])));return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');}
 // Fresh database and bindings are passed on every call; the memo never closes over a request's objects.
 const postgresReady=isolateOnce(async(database:GameDatabase,bindings:PostgresBindings)=>{
     const role=await database.prepare("SELECT has_schema_privilege(current_user,'public','CREATE') AS can_create_schema,has_any_column_privilege(current_user,'harimu_storage_migrations','UPDATE') AS can_change_marker,(SELECT rolsuper FROM pg_roles WHERE rolname=current_user) AS superuser").first<{can_create_schema:number;can_change_marker:number;superuser:number}>();
     if(!role)throw Error('PostgreSQL application role could not be verified.');
-    assertPostgresApplicationRole({canCreateSchema:role.can_create_schema,canChangeMarker:role.can_change_marker,superuser:role.superuser},bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true'&&bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED==='true');
+    assertPostgresApplicationRole({canCreateSchema:role.can_create_schema,canChangeMarker:role.can_change_marker,superuser:role.superuser},bindings.HARIMU_PRODUCTION_STORAGE!=='true'&&bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true'&&bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED==='true'); // #501a: production never gets the waiver
     // Imported schema/data must have passed validation. Do not bootstrap or
     // rewrite an imported world using the old SQLite compatibility migrations.
-    const marker=await database.prepare("SELECT validated,backup_sha256 FROM harimu_storage_migrations WHERE id='d1-to-postgres-v1'").first<{validated:number;backup_sha256:string}>();
-    if(marker?.validated!==1||!/^[a-f0-9]{64}$/.test(marker.backup_sha256))throw Error('PostgreSQL import has not been validated.');
+    const ids=storageMarkerIds(bindings.HARIMU_PRODUCTION_STORAGE==='true'); // #501a: preview reads only d1-to-postgres-v1, production also fresh-world-v1
+    const markers=await database.prepare(`SELECT id,validated,backup_sha256 FROM harimu_storage_migrations WHERE id IN (${ids.map(()=>'?').join(',')})`).bind(...ids).all<{id:string;validated:number;backup_sha256:string}>();
+    assertStorageMarker(markers.results,bindings.HARIMU_PRODUCTION_STORAGE==='true');
     if(accountElectionEnabled(bindings)){
       const schema=await database.prepare("SELECT COUNT(*) AS count FROM pg_tables WHERE schemaname='public' AND tablename IN ('poc_elections','poc_voter_receipts','poc_anonymous_ballots')").first<{count:number}>();
       if(schema?.count!==3){if(bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED!=='true')throw Error('Approved preview election migration required.');const {initializeAccountElectionSchema}=await import('./postgres/driver');await initializeAccountElectionSchema(bindings.HYPERDRIVE!.connectionString);}
@@ -444,12 +465,12 @@ const postgresReady=isolateOnce(async(database:GameDatabase,bindings:PostgresBin
 // #92: readiness never writes AI reservations. Only a real, enabled, gateway-routed inference reserves budget.
 
 export async function getDatabase():Promise<GameDatabase> {
-  const bindings=env as unknown as {HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HYPERDRIVE?:{connectionString:string}};
+  const bindings=env as unknown as {HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string;HARIMU_AI_DAILY_BUDGET_MICRO?:string;HARIMU_AI_GATEWAY_ID?:string;HARIMU_STORAGE_BACKEND?:string;NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_STORAGE_MAINTENANCE?:string;HARIMU_POSTGRES_CUTOVER_READY?:string;HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED?:string;HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED?:string;HARIMU_PRODUCTION_STORAGE?:string;HYPERDRIVE?:{connectionString:string}};
   const journalRetentionApproved=bindings.HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED==='true';
-  const selected=selectStorageBackend({backend:bindings.HARIMU_STORAGE_BACKEND,implementationEnabled:postgresRuntimeEnabled,developmentPreview:bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,maintenance:bindings.HARIMU_STORAGE_MAINTENANCE,cutoverReady:bindings.HARIMU_POSTGRES_CUTOVER_READY,hyperdriveConfigured:Boolean(bindings.HYPERDRIVE),journalRetentionApproved});
+  const selected=selectStorageBackend({backend:bindings.HARIMU_STORAGE_BACKEND,implementationEnabled:postgresRuntimeEnabled,developmentPreview:bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW,maintenance:bindings.HARIMU_STORAGE_MAINTENANCE,cutoverReady:bindings.HARIMU_POSTGRES_CUTOVER_READY,hyperdriveConfigured:Boolean(bindings.HYPERDRIVE),journalRetentionApproved,productionStorage:bindings.HARIMU_PRODUCTION_STORAGE,temporaryAdminApproved:bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED,accountElectionEnabled:accountElectionEnabled(bindings)});
   if(selected==='postgres'){
     const {postgresConnection}=await import('./postgres/driver');
-    const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved,accountElectionEnabled(bindings));
+    const database=postgresConnection(bindings.HYPERDRIVE!.connectionString,journalRetentionApproved,accountElectionEnabled(bindings),bindings.HARIMU_PRODUCTION_STORAGE!=='true'||productionKeepsWriteJournal); // #501c: production keeps no rollback journal (there is no D1 to roll back to)
     const key=await readinessKey(bindings);
     await postgresReady(key,database,bindings);
     return database;

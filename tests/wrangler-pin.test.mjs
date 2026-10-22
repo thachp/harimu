@@ -29,11 +29,14 @@ test('legacy_env=true is stripped for current wrangler; false is refused', async
 });
 test('#394: dashboard-managed QA vars are left out of the deploy config so --keep-vars preserves them', async () => {
   const { withoutDashboardVars, dashboardManagedVars, withoutLegacyEnv } = await import('../scripts/wrangler-pin.mjs');
-  assert.deepEqual([...dashboardManagedVars], ['HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS']);
+  assert.deepEqual([...dashboardManagedVars], ['HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_EXCHANGE_ENABLED']); // #627; the test faucet (#631) is deliberately not dashboard-managed
   const built = { name: 'w', vars: { A: '1', HARIMU_QA_TEST_CITIZENS: 'false', HARIMU_QA_TEST_CITIZEN_IDS: 'x', HARIMU_FAITH_ENABLED: 'false' } };
   assert.deepEqual(withoutDashboardVars(built), { name: 'w', vars: { A: '1', HARIMU_FAITH_ENABLED: 'false' } }, 'every other var is still deployed');
   assert.equal(built.vars.HARIMU_QA_TEST_CITIZENS, 'false', 'the input is not mutated');
   assert.deepEqual(withoutDashboardVars({ name: 'w' }), { name: 'w' });
+  // #627: the square and exchange flags are kept from the dashboard too; their checked-in default stays "false" (and the other flags are still deployed)
+  assert.deepEqual(withoutDashboardVars({ vars: { HARIMU_SQUARE_PURCHASE_ENABLED: 'false', HARIMU_TESSERA_EXCHANGE_ENABLED: 'false', HARIMU_LABOR_BUREAU_ENABLED: 'false' } }), { vars: { HARIMU_LABOR_BUREAU_ENABLED: 'false' } });
+  const checked = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'); assert.match(checked, /"HARIMU_SQUARE_PURCHASE_ENABLED": "false"/);
   assert.deepEqual(withoutDashboardVars(withoutLegacyEnv({ legacy_env: true, vars: { HARIMU_QA_TEST_CITIZENS: 'false' } })), { vars: {} });
   // The deploy script applies it to the built config, still deploys with --keep-vars, and the checked-in default stays off with no ids.
   const script = await readFile(new URL('../scripts/deploy-cloudflare.mjs', import.meta.url), 'utf8');

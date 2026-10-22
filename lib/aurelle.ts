@@ -17,14 +17,41 @@ export const aurelleSchemas=[
 /** #289: Royal Favor is spent here (docs 14.2 / daily loops: "spent on petitions, ranks, estates, pardons"; leaving the Kinward Rite costs Royal Favor).
  * Each spend is one immutable row keyed by its request id, so a retry can never debit twice. Balance = min(100, earned) - spent, never below 0. */
 export const royalFavorSchemas=[
- `CREATE TABLE IF NOT EXISTS aurelle_favor_spends(request_id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,amount INTEGER NOT NULL CHECK(amount>0),reason TEXT NOT NULL CHECK(reason IN ('leave-kinward')),spent_at INTEGER NOT NULL)`,
+ `CREATE TABLE IF NOT EXISTS aurelle_favor_spends(request_id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,amount INTEGER NOT NULL CHECK(amount>0),reason TEXT NOT NULL CHECK(reason IN ('leave-kinward','charter-grant','charter-renew')),spent_at INTEGER NOT NULL)`,
 ] as const;
-/** SQL for the spendable balance of the citizen bound to the first `?` (twice: earned, spent). */
-export const royalFavorBalanceSql=`MAX(0,MIN(100,COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0))-COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=?),0))`;
-/** Spendable Royal Favor. A database without migration 0028 yet has nothing spent, but nothing can be spent either (see faith.ts). */
-export async function royalFavorBalance(db:GameDatabase,userId:string):Promise<number>{
- try{const row=await db.prepare(`SELECT ${royalFavorBalanceSql} AS favor`).bind(userId,userId).first<{favor:number}>();return Number(row?.favor??0);}
- catch(error){if(!/no such table|does not exist|42P01/i.test(String((error as {code?:string})?.code??'')+' '+String((error as Error)?.message??error)))throw error;/* only a missing aurelle_favor_spends falls back: any other failure must not read as a balance (inline: tests/aurelle.test.py loads this file without a resolver, so no ./db-errors import) */const row=await db.prepare('SELECT MIN(100,COALESCE(SUM(favor),0)) AS favor FROM aurelle_settlements WHERE clerk_user_id=?').bind(userId).first<{favor:number}>();return Number(row?.favor??0);}
+/** #529 and #585: the one Royal Favor rule. Favor is earned at settlement (aurelle_settlements.favor), capped at 100, and spent (aurelle_favor_spends); no balance is stored.
+ *  With the decay flag off (decayAt undefined) the rule is exactly the pre-#529 one. With HARIMU_FAVOR_DECAY_ENABLED on, decayAt is the current time in seconds and each
+ *  settled Favor point fades linearly to nothing over favorDecaySeconds (ARC accepted 14 real days on #567). All of it is scaled by the window W so there is one truncation:
+ *  earned = SUM(favor x max(0, W - age)); a spend counts only against Favor earned before it (ARC on #585: earn 20, spend 10, wait 14 days, earn 10 reads 10, not 0), so each
+ *  spend is charged MIN(amount x W, the faded Favor earned at or before its spent_at); balance = trunc(max(0, min(100 x W, earned) - charged) / W). Read-time only: no cron, no write.
+ *  A spend still can never take the balance below zero. Fresh spends (made while their Favor has not faded) cost their full amount, exactly as the flat rule. */
+export const favorCap=100;
+export const favorDecaySeconds=14*86400;
+const fadedFavor=(table:string)=>`SUM(${table}favor*(CASE WHEN ${table}settled_at>? THEN MIN(${table}settled_at,?)-? ELSE 0 END))`; // binds: cutoff, decayAt, cutoff
+const favorSpentFlat=(user:string)=>`COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=${user}),0)`;
+const favorEarnedFlat=(user:string)=>`COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=${user}),0)`;
+const favorEarnedDecayed=(user:string)=>`COALESCE((SELECT ${fadedFavor('')} FROM aurelle_settlements WHERE clerk_user_id=${user}),0)`;
+const favorChargedDecayed=(user:string)=>`COALESCE((SELECT SUM(MIN(s.amount*${favorDecaySeconds},COALESCE((SELECT ${fadedFavor('r.')} FROM aurelle_settlements r WHERE r.clerk_user_id=s.clerk_user_id AND r.settled_at<=s.spent_at),0))) FROM aurelle_favor_spends s WHERE s.clerk_user_id=${user}),0)`;
+/** SQL for the spendable Favor of one citizen and its binds, in order (see royalFavorBinds). `user` is `?` (the default) or a column of an outer query (then no user bind). */
+export const royalFavorSql=(decayAt?:number,user='?')=>decayAt===undefined?`MAX(0,MIN(${favorCap},${favorEarnedFlat(user)})-${favorSpentFlat(user)})`:`CAST(MAX(0,MIN(${favorCap*favorDecaySeconds},${favorEarnedDecayed(user)})-${favorChargedDecayed(user)})/${favorDecaySeconds} AS INTEGER)`;
+const fadeBinds=(decayAt:number)=>[decayAt-favorDecaySeconds,decayAt,decayAt-favorDecaySeconds];
+export const royalFavorBinds=(userId:string,decayAt?:number):unknown[]=>decayAt===undefined?[userId,userId]:[...fadeBinds(decayAt),userId,...fadeBinds(decayAt),userId];
+/** The binds of royalFavorSql(decayAt, column): the two fade windows and no user. */
+export const royalFavorColumnBinds=(decayAt:number):unknown[]=>[...fadeBinds(decayAt),...fadeBinds(decayAt)];
+/** #585/#616: the average Royal Favor over settling citizens, each citizen's balance by the rule above (read by the Aurelle coup while HARIMU_FAVOR_DECAY_ENABLED is on; binds: royalFavorColumnBinds). */
+export const royalFavorAverageSql=(decayAt:number)=>`SELECT AVG(f) AS favor FROM (SELECT ${royalFavorSql(decayAt,'u.clerk_user_id')} AS f FROM (SELECT DISTINCT clerk_user_id FROM aurelle_settlements) u) t`;
+/** #616: the decayed balance reads one citizen's settlements and spends by clerk_user_id (the spend charge also by settled_at <= spent_at), once per settling citizen. Without these the coup average scans both tables
+ *  for every citizen (quadratic: 12 s at 3,000 citizens). Covering, so the sums never touch the table rows. The same statements are in migration 0051 (drizzle and db/postgres). */
+export const aurelleFavorIndexes=[
+ 'CREATE INDEX IF NOT EXISTS idx_aurelle_settlements_user_settled ON aurelle_settlements(clerk_user_id, settled_at, favor)',
+ 'CREATE INDEX IF NOT EXISTS idx_aurelle_favor_spends_user_spent ON aurelle_favor_spends(clerk_user_id, spent_at, amount)',
+] as const;
+/** Flag off: the SQL the balance has always used (the first `?` twice: earned, spent). Kept as a constant for the guarded leave-kinward spend. */
+export const royalFavorBalanceSql=royalFavorSql();
+/** Spendable Royal Favor; decayAt (seconds) applies the #529 decay. A database without migration 0028 yet has nothing spent, but nothing can be spent either (see faith.ts). */
+export async function royalFavorBalance(db:GameDatabase,userId:string,decayAt?:number):Promise<number>{
+ try{const row=await db.prepare(`SELECT ${royalFavorSql(decayAt)} AS favor`).bind(...royalFavorBinds(userId,decayAt)).first<{favor:number}>();return Number(row?.favor??0);}
+ catch(error){if(!/no such table|does not exist|42P01/i.test(String((error as {code?:string})?.code??'')+' '+String((error as Error)?.message??error)))throw error;/* only a missing aurelle_favor_spends falls back: any other failure must not read as a balance (inline: tests/aurelle.test.py loads this file without a resolver, so no ./db-errors import) */const row=decayAt===undefined?await db.prepare('SELECT MIN(100,COALESCE(SUM(favor),0)) AS favor FROM aurelle_settlements WHERE clerk_user_id=?').bind(userId).first<{favor:number}>():await db.prepare(`SELECT CAST(MIN(${favorCap*favorDecaySeconds},${favorEarnedDecayed('?')})/${favorDecaySeconds} AS INTEGER) AS favor`).bind(...fadeBinds(decayAt),userId).first<{favor:number}>();return Number(row?.favor??0);}
 }
 const publicFood=`initial_food+COALESCE((SELECT SUM(food_output) FROM aurelle_settlements),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_purchases),0)`;
 const publicFunds=`initial_minor+COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements),0)`;
@@ -76,25 +103,25 @@ export function validAurelleCommand(body:Record<string,unknown>):body is Record<
  if(body.action==='aurelle-buy-food') return body.quantity===1||body.quantity===2;
  return (body.action==='aurelle-start-work'||body.action==='aurelle-household-meal')&&body.quantity===undefined;
 }
-export async function readAurelle(db:GameDatabase,userId:string):Promise<AurellePlan>{
+export async function readAurelle(db:GameDatabase,userId:string,options:{favorDecayAt?:number;mealSeconds?:number}={}):Promise<AurellePlan>{
  const [citizen,ledger,shifts,favor]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
  db.prepare(`SELECT ${publicFood} AS public_food,${publicFunds} AS funds,
  COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id=?),0) AS wallet,
  COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=?),0) AS food,
- MIN(100,COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0)) AS favor,
  (SELECT MAX(occurred_at) FROM aurelle_meals WHERE clerk_user_id=?) AS last_meal FROM aurelle_resources WHERE id='estate'`)
- .bind(userId,userId,userId,userId,userId,userId).first<{public_food:number;funds:number;wallet:number;food:number;favor:number;last_meal:number|null}>(),
+ .bind(userId,userId,userId,userId,userId).first<{public_food:number;funds:number;wallet:number;food:number;last_meal:number|null}>(),
  db.prepare("SELECT * FROM work_shifts WHERE clerk_user_id=? AND work_order_id='aurelle-food-estate' ORDER BY started_at DESC LIMIT 20").bind(userId)
  .all<{id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
- royalFavorBalance(db,userId), // #289: earned (capped at 100) minus what was spent
+ royalFavorBalance(db,userId,options.favorDecayAt), // #289, #529: the one Favor rule (earned, capped at 100, decayed when the flag is on, minus spent)
  ]);
  return {available:citizen?.nation_id==='aurelle',mode:'bounded charter economy',charter:{id:'food-estate',name:'Highspire food-estate charter',active:true},job:aurelleJob,
  walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,favor:favor,publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,
- mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),
+ mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+(options.mealSeconds??aurelleMealSeconds))*1000).toISOString(),
  shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,rewardItem:'estate food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number){
+/** #531: mealSeconds is the household-meal cooldown; only a chartered citizen (flag on) passes a shorter one. The SQL keeps its literal 7200, so the shorter window is a shifted reference time. */
+export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds){
  const id=command.requestId.toLowerCase(),shiftId=command.shiftId?.toLowerCase()??null;
  const quantity=command.action==='aurelle-buy-food'?command.quantity!:command.action==='aurelle-household-meal'?2:0;
  const receipt=()=>db.prepare('SELECT clerk_user_id,action,quantity,shift_id FROM aurelle_receipts WHERE id=?').bind(id).first<{clerk_user_id:string;action:string;quantity:number;shift_id:string|null}>();
@@ -117,7 +144,7 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  db.prepare(aurelleBuyReceiptSql).bind(id,quantity,now,userId,quantity,quantity,quantity,id),db.prepare(aurelleBuySql).bind(id,userId,quantity),
  ]);
  else await db.batch([
- db.prepare(aurelleMealReceiptSql).bind(id,now,userId,now,id),db.prepare(aurelleMealSql).bind(id,userId),db.prepare(aurelleMealCapacitySql).bind(iso,userId,id),
+ db.prepare(aurelleMealReceiptSql).bind(id,now,userId,now+aurelleMealSeconds-mealSeconds,id),db.prepare(aurelleMealSql).bind(id,userId),db.prepare(aurelleMealCapacitySql).bind(iso,userId,id),
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-household-meal'").bind(id,userId),
  ]);
  const recorded=await receipt();

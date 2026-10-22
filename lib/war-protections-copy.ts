@@ -2,17 +2,20 @@
  * recovery, the newcomer shield and the foundation truce, and no UI imports this. Canon: harimu-docs territory-cities-warfare §15.4
  * (citizens are never killed; soldiers whose units are destroyed are wounded, out of action for 1-3 real days, and keep their gear
  * insurance; homes and personal belongings are never looted; if a city is captured its citizens are evacuated to the nearest home city,
- * keep their personal items and receive a housing voucher; immovable property is compensated at a set share by their state; new
- * citizens cannot be conscripted for 14 real days; newly founded cities have a 10-real-day foundation truce) and §15.3 (sieges).
- * Companion to the two `citizenSafety` lines in lib/war-copy.ts (#312): these lines say the same things and never contradict them
+ * keep their personal items and receive a housing voucher; new
+ * citizens cannot be conscripted for 14 real days; newly founded cities have a 10-real-day foundation truce) and §15.3 (sieges), plus Decision 109 (private land titles stay with their owners and existing leases are honored; funded
+ * relocation support and voluntary buyouts replace the earlier blanket compensation promise, and no compensation is promised without a
+ * budget; funding caps and amounts are open). #470 slice 1 adds dedicated relocationSupport and landBuyout lines (Tessera only, no funds when
+ * the pot is empty, voluntary buyout) that stay unwired. Companion to the two `citizenSafety` lines in lib/war-copy.ts (#312): these lines say the same things and never contradict them
  * (a test loads both).
  *
  * Voice: plain, calm, non-graphic system notices. They have no byline and no AI voice, so none is AI-badged.
  *
  * Rules: the only figures are the docs' 14 real days (newcomer shield) and 10 real days (foundation truce), each in its own lines. The
  * wounded length comes only through {days}, a pre-formatted string that already carries its unit, so the docs' 1-3 range is never
- * written in. Compensation is "a set share": the docs' 50-80% is an [ASSUMPTION] and no percentage appears. {city} is the captured or
- * newly founded city, {safeCity} the nearest home city; both are runtime values capped by the shared name cap, which this module
+ * written in. No compensation is promised: relocation support is only offered, any buyout is
+ * voluntary, and no share, percentage or payment for land is written. Support and buyouts are paid in Tessera only.
+ * {city} is the captured or newly founded city, {safeCity} the nearest home city; both are runtime values capped by the shared name cap, which this module
  * re-exports (COUP_NAME_MAX from lib/palace-coup-copy.ts). Limits: labels 40, lines 80, tested with every placeholder filled to 24
  * characters. Capture, conscription and truce mechanics are not described beyond the docs. All wording is new: `proposal: true`. */
 
@@ -34,7 +37,7 @@ export const safetyReminders=[
  L('Wounded, not killed. Your gear insurance still applies.'),
 ] as const;
 
-/** On city capture: the citizen is evacuated, keeps personal items, and immovable property is compensated at a set share. */
+/** On city capture: the citizen is evacuated and keeps personal items; land stays with its owner; relocation support may be offered and any buyout is voluntary (Decision 109). */
 export const evacuation={
  headline:'You were moved to safety',
  notice:[
@@ -42,7 +45,8 @@ export const evacuation={
   L('You were evacuated from {city} to {safeCity}.'),
  ],
  belongings:L('Your home was not looted. Your personal items are safe.'),
- compensation:L('Your state compensates shops and land at a set share.'),
+ title:L('Your land stays yours, and existing leases are honored.'),
+ relocation:L('Relocation support may be offered. Any buyout is voluntary.'),
  proposal:true,
 } as const;
 
@@ -81,5 +85,22 @@ export const foundationTruce={
  label:'Foundation truce',
  notice:L('{city} is newly founded. No assaults on it for 10 real days.'),
  ended:L('The foundation truce on {city} has ended.'),
+ proposal:true,
+} as const;
+
+/** Relocation support (#470 / Decision 109): Tessera only when a pot is funded; empty pot says so. Unwired until later slices. */
+export const relocationSupport={
+ label:'Relocation support',
+ funded:L('Relocation support, when funded, is in Tessera only.'),
+ empty:L('No funds are available for relocation support.'),
+ proposal:true,
+} as const;
+
+/** Voluntary land buyout (#470 / Decision 109): Tessera offers only; never forced. Unwired until later slices. */
+export const landBuyout={
+ label:'Land buyout',
+ voluntary:L('A land buyout is always voluntary. You may decline.'),
+ currency:L('Buyout offers are in Tessera only.'),
+ decline:L('Declining a buyout has no penalty.'),
  proposal:true,
 } as const;

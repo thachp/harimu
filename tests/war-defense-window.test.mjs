@@ -66,9 +66,9 @@ test('the local-time range is right for a viewer in UTC-7 and one in UTC+9 (and 
   assert.deepEqual(defenseWindowLocal(20, Number.NaN), { start: '20:00', end: '00:00' }, 'an unknown offset reads as UTC');
 });
 
-test('the war flag stays "false", migration 0033 only adds a table, and no route or app code sets a window', async () => {
+test('the war flag is "true" in preview wrangler, migration 0033 only adds a table, and no route or app code sets a window', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0033_war_defense_windows.sql', '../db/postgres/0033_war_defense_windows.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS war_defense_windows/);
@@ -97,7 +97,7 @@ test('flag off: nothing is saved, nothing is sent, and the Country view shows no
   const rules = await r.importModule('lib/war-rules.ts'), copy = await r.importModule('lib/war-copy.ts');
   const src = await readFile(new URL('../app/war-banner.tsx', import.meta.url), 'utf8');
   const exports = {}; new Function('exports', 'require', ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText)(exports,
-    name => ({ '@/lib/war-copy': copy, '@/lib/war-rules': rules, './game-timer': { GameTimer: () => null }, './display-preferences': { useDisplayTimestamp: () => v => String(v) }, '@/lib/war': {} })[name] ?? require(name));
+    name => ({ '@/lib/war-copy': copy, '@/lib/war-rules': rules, '@/lib/war-weariness-copy': { wearinessBanners: {}, wearinessStrip: {} }, './game-timer': { GameTimer: () => null }, './display-preferences': { useDisplayTimestamp: () => v => String(v) }, '@/lib/war': {} })[name] ?? require(name));
   const { DefenseWindow } = exports;
   assert.equal(renderToStaticMarkup(createElement(DefenseWindow, { windows: world.data.simulation.wars?.defenseWindows, nationId: 'korund', offsetMinutes: -420 })), '', 'flag off: nothing renders');
   const windows = { korund: { startHourUtc: 14, changedAt: null, nextChangeAt: null }, kindle: { startHourUtc: 22, changedAt: null, nextChangeAt: null } };

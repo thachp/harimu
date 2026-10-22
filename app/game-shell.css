@@ -83,7 +83,7 @@ body:has(.harimu-game){overflow:auto}
 .game-account .account-menu-trigger{min-height:36px;min-width:64px;padding:7px 11px;border:1px solid #45636d;border-radius:3px;background:#15323d;color:#d6ebe8}
 .game-account .account-menu-trigger::after{content:'Account';font-size:calc(11px * var(--text-scale, 1))}
 @media(max-width:760px){.game-account .account-menu-trigger{min-height:44px}}
-.game-mode-world{--context-height:calc(205px * var(--text-scale, 1))}.game-nation-strip{display:grid;grid-template-columns:166px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}.game-nation-strip>div:first-child{grid-column:1/-1}.game-nation-strip .game-context-heading{grid-row:2}.game-nation-strip .game-context-items{grid-row:2}.nation-preview-badge{display:inline-block;margin-left:6px;border:1px solid #647779;border-radius:3px;padding:1px 4px;font-size:calc(8px * var(--text-scale, 1));color:#b8caca;vertical-align:middle}
+.game-mode-world{--context-height:calc(205px * var(--text-scale, 1))}.game-nation-strip{display:grid;grid-template-columns:166px minmax(0,1fr);grid-template-rows:minmax(0,1fr)}.nation-preview-badge{display:inline-block;margin-left:6px;border:1px solid #647779;border-radius:3px;padding:1px 4px;font-size:calc(8px * var(--text-scale, 1));color:#b8caca;vertical-align:middle}
 @media(max-width:760px){.game-mode-world{--context-height:calc(210px * var(--text-scale, 1));grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,44dvh) minmax(calc(210px * var(--text-scale, 1)),auto) minmax(0,auto)}.game-mode-world .game-context-strip{height:210px}.game-nation-strip{grid-template-columns:105px minmax(0,1fr)}.game-mode-world.inspector-collapsed{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,54dvh) minmax(calc(210px * var(--text-scale, 1)),auto) auto}}
 
 .game-country-stage{overflow:auto;padding:76px 20px 20px;background:radial-gradient(ellipse at center,#20404a,#0b1c24)}
@@ -149,6 +149,10 @@ body:has(.harimu-game){overflow:auto}
 .wallet-history th, .wallet-history td { padding: 4px 6px; border-bottom: 1px solid rgba(255, 255, 255, .08); text-align: left; }
 .wallet-history td:last-child, .wallet-history th:last-child { text-align: right; }
 .wallet-credit { color: #9fd59a; }
+.wallet-rewards ul { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 6px; }
+.wallet-rewards li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.wallet-rewards button { min-height: 44px; }
+.wallet-rewards caption { text-align: left; color: #a9a58f; padding: 4px 0; }
 .wallet-debit { color: #e59a8a; }
 .game-resources>.game-wallet-button{display:grid;grid-template-columns:19px auto;column-gap:8px;align-items:center;min-width:82px;height:100%;padding:8px 12px;border-left:1px solid #263d46}
 .notable-transcript{list-style:none;padding:0;margin:0.5rem 0;display:grid;gap:0.5rem;max-height:40vh;overflow-y:auto}
@@ -183,11 +187,14 @@ body:has(.harimu-game){overflow:auto}
  .game-context-strip>.game-context-heading{flex:1 1 100%;border-right:0;border-bottom:1px solid #2c4651;padding:10px 12px}
  .game-context-items{flex:1 1 100%;flex-wrap:nowrap;min-width:0}
  .game-nation-strip .game-context-heading,.game-nation-strip .game-context-items{grid-column:1/-1}
- .game-nation-strip .game-context-items{grid-row:3}
+ .game-nation-strip .game-context-items{grid-row:2}
  .game-identity span:not(.game-crest){white-space:normal;overflow:visible;max-width:none;overflow-wrap:normal}
  .game-dock{flex-wrap:wrap}
  .game-dock button span{overflow-wrap:anywhere;text-align:center;line-height:1.15}
 }
+/* #377: on a phone the destination cards and the nation strip wrap into a grid inside the page width instead of a row that scrolls sideways (text such as
+   "Goods and citizen listings" and "Stability 81" was cut off at the right edge). Cards are at least 44px tall; at big text they drop to one column. */
+@media(max-width:760px){.game-context-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(150px * var(--text-scale, 1))),1fr));overflow:visible}.game-context-items>button{flex:none;min-width:0;max-width:none;min-height:44px}.game-context-items>p{grid-column:1/-1}}
 /* #186: at 150% the clock's <details> shrank below its text (115px box, 142px clock), so the clock ran under the Glossary link. Keep the clock at its content width so the account row's gap holds at every text size. */
 .game-account>.game-hud-help{flex:none;min-width:max-content}
 /* #186 (QA3 on #220): on phones the clock had a fixed 65px box with nowrap text, so at 125/150% the text ran under Glossary.
@@ -276,6 +283,32 @@ body:has(.harimu-game){overflow:auto}
 @media(max-width:1100px) and (min-width:761px){.game-context-heading{flex-basis:calc(200px * var(--text-scale, 1))}}
 /* #346 very narrow screens (320px, or a phone at big text): the account group wraps inside the top bar instead of pushing Account off-screen. */
 @media(max-width:420px){.game-hud>.game-account{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;min-width:0;max-width:100%}.game-hud>.game-identity{flex:1 1 0;min-width:0}}
+/* #528 phones (<=760px): every control in the game frame is at least 44x44 CSS px (the phone target of #131 and #464). Only sizes and the placement of the camera bar change, nothing is behind a flag and nothing above 760px changes.
+   The .harimu-game prefix keeps these ahead of the older per-control rules (e.g. the 30px settings button at <=420px) whatever their order. */
+@media(max-width:760px){
+  .harimu-game .game-account .game-glossary{min-width:44px;min-height:44px;justify-content:center}
+  .harimu-game .game-account>.game-settings-button{width:44px;min-width:44px;min-height:44px}
+  .harimu-game .game-account .account-sign-in{min-width:44px;min-height:44px}
+  .harimu-game .game-account .game-notifications{min-width:44px;min-height:44px;justify-content:center}
+  .harimu-game .game-account>.game-hud-help>summary{display:flex;align-items:center;min-width:44px;min-height:44px}
+  .harimu-game .game-resources>.game-hud-help>summary,.harimu-game .game-resources>.game-wallet-button{min-height:44px}
+  /* The identity column keeps a floor (the <=420px rule above lets it shrink to 0), so the wider 44px account controls wrap to a second row instead of squeezing it under the clock text (QA3 on #552). */
+  .harimu-game .game-hud>.game-identity{min-width:calc(120px * var(--text-scale, 1))}
+  .harimu-game .game-breadcrumbs button{min-width:44px;min-height:44px}
+  .harimu-game .game-shift-chip{min-height:44px}
+  .harimu-game .game-dock button{min-height:max(44px,calc(39px * var(--text-scale, 1)))}
+  .harimu-game .citizen-dock{height:45px}.harimu-game .citizen-dock>button{min-height:44px}.harimu-game:has(.citizen-dock){padding-bottom:45px}
+  .harimu-game .game-inspector-body summary{min-height:44px}
+  /* The breadcrumb and shift chip stack in the stage's own grid cell instead of at fixed top offsets (148/160/194px) that assumed a 110px top bar: with 44px controls the top bar and the chip grow, and the old offsets put the chip on top of the breadcrumb. */
+  .harimu-game .game-stage-overlay{grid-row:3;grid-column:1;align-self:start;position:relative;z-index:3;display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:10px 12px;min-width:0;pointer-events:none}
+  .harimu-game .game-stage-overlay>*{position:static;top:auto;left:auto;max-width:100%;pointer-events:auto}
+  /* Camera bar: a strip under the globe/city canvas rather than an overlay on it, so it can never cover a globe label (QA2: at 320px the wrapped bar covered "Ilmar Sanctum"). */
+  .game-stage .game-viewport{display:flex;flex-direction:column}
+  .game-stage .viewport-canvas{flex:1 1 0;height:auto!important;min-height:0!important}
+  .game-stage .viewport-controls,.has-inspector .game-stage .viewport-controls{position:static;flex:none;justify-content:center;max-width:none;gap:4px;padding:4px;border-width:1px 0 0;border-radius:0}
+  .game-stage .viewport-controls button{min-width:44px;min-height:44px;padding:5px 8px}
+  .game-stage .viewport-controls>span{min-width:44px}
+}
 /* #347 shift quality step: card per question, whole-row options, spaced buttons (all >= 44px, text scales). */
 .shift-quality{width:min(560px,calc(100vw - 32px));font-size:calc(14px * var(--text-scale, 1));line-height:1.45}
 .shift-quality h2{margin:0 0 8px;font:600 calc(20px * var(--text-scale, 1))/1.25 Georgia,serif;color:#efd69c}
@@ -297,17 +330,56 @@ body:has(.harimu-game){overflow:auto}
 .shift-quality-actions button:focus-visible{outline:2px solid #f7d080;outline-offset:2px}
 .shift-quality-actions button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:480px){.shift-quality-actions button,.shift-quality-actions button.shift-quality-cancel{flex:1 1 100%}}
+/* #79: color-blind-safe nation symbol chip (NEXT_PUBLIC_HARIMU_NATION_SYMBOLS): shape + fill pattern + accent, never color alone */
+.nation-symbol{--nation-pattern-ink:color-mix(in srgb,currentColor 40%,transparent);display:inline-grid;place-items:center;flex:none;box-sizing:border-box;width:calc(20px * var(--text-scale, 1));height:calc(20px * var(--text-scale, 1));margin-right:6px;border:1px solid currentColor;border-radius:3px;background-color:#071820;font:700 calc(13px * var(--text-scale, 1))/1 system-ui,"Segoe UI Symbol","Apple Symbols","DejaVu Sans",sans-serif;vertical-align:middle;text-shadow:0 0 2px #071820,0 0 2px #071820}
+.nation-symbol[data-nation-pattern="ruled"],.nation-crest[data-nation-pattern="ruled"]{background-image:repeating-linear-gradient(0deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="grid"],.nation-crest[data-nation-pattern="grid"]{background-image:repeating-linear-gradient(0deg,transparent 0 4px,var(--nation-pattern-ink) 4px 5px),repeating-linear-gradient(90deg,transparent 0 4px,var(--nation-pattern-ink) 4px 5px)}
+.nation-symbol[data-nation-pattern="diagonal"],.nation-crest[data-nation-pattern="diagonal"]{background-image:repeating-linear-gradient(135deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="reverse-diagonal"],.nation-crest[data-nation-pattern="reverse-diagonal"]{background-image:repeating-linear-gradient(45deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="crosshatch"],.nation-crest[data-nation-pattern="crosshatch"]{background-image:repeating-linear-gradient(45deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px),repeating-linear-gradient(135deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="dots"],.nation-crest[data-nation-pattern="dots"]{background-image:radial-gradient(var(--nation-pattern-ink) 1.2px,transparent 1.6px);background-size:5px 5px}
+.nation-symbol[data-nation-pattern="checks"],.nation-crest[data-nation-pattern="checks"]{background-image:conic-gradient(var(--nation-pattern-ink) 25%,transparent 0 50%,var(--nation-pattern-ink) 0 75%,transparent 0);background-size:8px 8px}
+.nation-symbol[data-nation-pattern="waves"],.nation-crest[data-nation-pattern="waves"]{background-image:repeating-radial-gradient(circle at 0 100%,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.nation-symbol[data-nation-pattern="chevrons"],.nation-crest[data-nation-pattern="chevrons"]{background-image:linear-gradient(135deg,var(--nation-pattern-ink) 25%,transparent 25%),linear-gradient(225deg,var(--nation-pattern-ink) 25%,transparent 25%);background-size:6px 6px;background-position:-3px 0}
+.nation-symbol[data-nation-pattern="vertical"],.nation-crest[data-nation-pattern="vertical"]{background-image:repeating-linear-gradient(90deg,transparent 0 3px,var(--nation-pattern-ink) 3px 4px)}
+.game-context-items .nation-symbol,.viewport-world-label .nation-symbol{margin-right:6px}
 
 /* #78 nation emblem in the top bar (behind NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM): a small outlined glyph in the nation's accent next to its name. */
 .nation-emblem{display:inline-grid;place-items:center;flex:none;width:calc(20px * var(--text-scale, 1));height:calc(20px * var(--text-scale, 1));margin-right:6px;border:1px solid #738b88;border-radius:3px;color:#c8d7c4;font:600 calc(13px * var(--text-scale, 1))/1 system-ui,sans-serif;letter-spacing:0;vertical-align:middle}
 .game-identity span:has(>.nation-emblem){display:flex;align-items:center;flex-wrap:wrap}
 .game-identity .nation-emblem{font-size:calc(13px * var(--text-scale, 1));overflow:visible;max-width:none;white-space:nowrap;text-overflow:clip}
+/* #683: `.game-identity span:not(.game-crest)` (more specific) made the emblem block-level at 10px (8px on phones) with a top margin; this selector outranks it and comes later. */
+.game-identity span.nation-emblem{flex-shrink:0;display:inline-grid;place-items:center;margin-top:0;font-size:calc(13px * var(--text-scale, 1));line-height:1;overflow:visible;max-width:none;white-space:nowrap;text-overflow:clip}
 @media(max-width:420px){.game-identity span:has(>.nation-emblem){max-width:calc(110px + 28px * var(--text-scale, 1))}}
 /* #78: top-bar notifications bell (NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM): count badge only when something is unread; a polite live region announces changes */
 .game-notifications-live{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .game-notifications-topbar{position:relative;min-width:calc(32px * var(--text-scale, 1));justify-content:center}
 .game-notifications-topbar.has-unread{border-color:#e0b64c}
 .game-notifications-topbar.has-unread strong{min-width:1.4em;padding:0 4px;border-radius:999px;background:#e0b64c;color:#10181c;text-align:center;line-height:1.5}
-@media(max-width:760px){.game-notifications-topbar{min-height:44px;min-width:44px}}
+@media(max-width:760px){.game-notifications-topbar{min-height:44px;min-width:44px}.game-notifications-topbar{flex-shrink:0;white-space:nowrap;box-sizing:border-box;width:44px;max-width:44px;padding:0}.game-notifications-topbar>svg{display:block;flex:none;width:16px;height:16px}.game-notifications-topbar.has-unread>strong{position:absolute;top:2px;right:2px;min-width:0;max-width:40px;padding:0 3px;font-size:calc(8px * var(--text-scale, 1));line-height:1.35;white-space:nowrap}} /* #682: on phones the unread badge sits over the icon's top-right corner, inside the 44px bell, so it adds no width */ /* #682: the top-bar bell keeps its icon on phones (the legacy dock rule hides it there, and the top bar shows no count at 0) */
 /* #78: on phones, with the emblem on, the identity keeps its own width so the account group wraps to the next row instead of sliding under it (citizen at 150% text). Scoped to the emblem so the flag-off top bar is untouched. */
 @media(max-width:420px){.harimu-game .game-hud>.game-identity:has(.nation-emblem){flex:1 0 auto;max-width:100%}}
+
+/* #392 S1: nation crest (NEXT_PUBLIC_HARIMU_UI_V2_CREST). The wrapper is clipped to the shield and carries the #79 pattern under the motif, so the crest is never told apart by colour alone. */
+.nation-crest{--nation-pattern-ink:color-mix(in srgb,var(--crest-mark) 22%,transparent);display:inline-block;flex:none;width:calc(var(--crest-size, 36px) * var(--text-scale, 1) * .857);height:calc(var(--crest-size, 36px) * var(--text-scale, 1));background-color:var(--crest-field);clip-path:polygon(50% 3%,93% 15%,93% 52%,84% 79%,50% 97%,16% 79%,7% 52%,7% 15%);vertical-align:middle}
+.nation-crest svg{display:block;width:100%;height:100%;overflow:visible}
+.game-inspector-title:has(>.nation-crest){justify-content:flex-start}.game-inspector-title:has(>.nation-crest)>div{flex:1 1 auto;min-width:0}
+/* QA2 #534 (CI fonts differ from local ones): the header never splits a word. With the crest, the title column cannot shrink below its longest word (min-content, and overflow-wrap:break-word so it does not count as breakable),
+   and the row wraps: when crest + title + button do not fit side by side the crest takes its own row above. Flag off: no crest, so no :has match and nothing changes. */
+.game-inspector-title:has(>.nation-crest){flex-wrap:wrap;row-gap:10px}.game-inspector-title:has(>.nation-crest)>div{flex:1 1 0;min-width:min-content;overflow-wrap:break-word}.game-inspector-title:has(>.nation-crest) h1{overflow-wrap:break-word}.game-inspector-title:has(>.nation-crest)>button{margin-left:auto}
+/* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
+   this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
+.game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}
+.game-hud-v2 .game-crest{border-color:#d0ad54;color:#ead08a;box-shadow:inset 0 0 0 2px #071820,inset 0 0 0 3px #d0ad5455}
+.game-hud-v2 .game-resources{align-self:center;align-items:stretch;gap:3px}
+.game-hud-v2 .game-resources>div,.game-hud-v2 .game-resources>.game-hud-help,.game-hud-v2 .game-resources>.game-wallet-button{border:1px solid #2f4d57;border-radius:10px;background:#0d2530}
+.game-hud-v2 .game-resources>.game-hud-help:last-child,.game-hud-v2 .game-resources>div:last-child{border-right:1px solid #2f4d57}
+.game-hud-v2 .game-resources>.game-hud-help>summary,.game-hud-v2 .game-resources>.game-wallet-button{border-radius:10px}
+.game-hud-v2 .game-resources>.game-hud-help:hover,.game-hud-v2 .game-resources>.game-wallet-button:hover,.game-hud-v2 .game-resources>.game-hud-help[open]{border-color:#d0ad5499;background:#10303c}
+.game-hud-v2 .game-account>.game-settings-button,.game-hud-v2 .game-notifications{border-radius:10px;border-color:#3f5f69}
+.game-hud-v2 .game-account>.game-settings-button:hover,.game-hud-v2 .game-notifications:hover{border-color:#d0ad5499}
+.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]{display:inline-flex;align-items:center;gap:6px;padding-left:6px;border-radius:999px;border-color:#3f5f69}
+.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]::before{content:'';flex:none;width:18px;height:18px;border-radius:50%;border:1px solid #d0ad54;background:radial-gradient(circle at 50% 36%,#e6d9b8 0 17%,transparent 18%),radial-gradient(ellipse at 50% 112%,#e6d9b8 0 38%,transparent 39%),#25525a}
+.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]:hover{border-color:#d0ad5499}
+@media(max-width:760px){.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]{gap:3px;padding-left:3px}.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]::before{width:14px;height:14px}.game-hud-v2 .game-account{column-gap:3px}.game-hud-v2 .game-resources{gap:3px}.game-hud-v2 .game-resources>*,.game-hud-v2 .game-resources>.game-hud-help{flex-basis:calc(64px * var(--text-scale, 1))}.game-hud-v2 .game-resources>div,.game-hud-v2 .game-resources>.game-hud-help>summary,.game-hud-v2 .game-resources>.game-wallet-button{padding-inline:3px;column-gap:3px}}
+@media(min-width:1101px){.game-hud-v2 .game-account{gap:10px}}

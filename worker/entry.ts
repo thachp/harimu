@@ -4,8 +4,15 @@ import { authenticatedUserId } from '../lib/auth';
 import { getDatabase } from '../lib/db';
 import { readCityLocation } from '../lib/city-location';
 import { runCabinetCron } from '../lib/cabinet-cron';
+import { cronJobsOn, type CronFlagBindings } from '../lib/cron-gates';
 import { runDiplomacyCron } from '../lib/diplomacy';
 import { runCrownCron } from '../lib/crown-debasement';
+import { runTownHallCron } from '../lib/town-hall-ai';
+import { runDebateCron } from '../lib/debate-ai';
+import { runSparkCron } from '../lib/spark-supply';
+import { runLedgerReconciliationCron } from '../lib/ledger-reconciliation';
+import { runTesseraRewardCron } from '../lib/tessera-rewards';
+import { readVerification } from '../lib/verification';
 import { presenceSocketPath, presenceUpgrade, type PresenceEnv } from '../lib/city-presence';
 export { CityPresence } from './city-presence';
 
@@ -17,14 +24,31 @@ const worker = {
   },
   // #247: Cron Trigger (wrangler.jsonc "triggers.crons"). AI Cabinet petition responses; a no-op unless enabled.
   async scheduled(controller: ScheduledController, _workerEnv: unknown, ctx: ExecutionContext) {
-    ctx.waitUntil((async () => runCabinetCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000)))()
+    // #384: a job whose flag is off never opens the database.
+    const on = cronJobsOn(env as unknown as CronFlagBindings);
+    if (on.cabinet) ctx.waitUntil((async () => runCabinetCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000)))()
       .then(() => undefined, error => { console.warn('[cron] AI Cabinet responses failed', error instanceof Error ? error.name : 'unknown'); }));
     // #400: scheduled AI-leader treaty proposals; a no-op unless HARIMU_DIPLOMACY_ENABLED is "true" (default "false").
-    ctx.waitUntil((async () => runDiplomacyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string }))()
+    if (on.diplomacy) ctx.waitUntil((async () => runDiplomacyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string }))()
       .then(() => undefined, error => { console.warn('[cron] AI treaty proposals failed', error instanceof Error ? error.name : 'unknown'); }));
     // #362: the AI Monarch's yearly Crown debasement decree; a no-op unless HARIMU_CROWN_DEBASEMENT_ENABLED="true". Never runs on a read.
-    ctx.waitUntil((async () => runCrownCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true' }))()
+    if (on.crown) ctx.waitUntil((async () => runCrownCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true' }))()
       .then(() => undefined, error => { console.warn('[cron] Crown debasement failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #441: AI town hall answers for closed halls; a no-op unless HARIMU_TOWN_HALLS_ENABLED and HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED are "true" (both default "false"), with the AI binding and budget. Never runs on a read.
+    if (on.townHall) ctx.waitUntil((async () => runTownHallCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as Parameters<typeof runTownHallCron>[2]))()
+      .then(() => undefined, error => { console.warn('[cron] Town hall answers failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #282: AI debate answers for a closed debate; a no-op unless HARIMU_DEBATE_ENABLED and HARIMU_AI_DEBATE_ANSWERS_ENABLED are "true" (both default "false"), with the AI binding and budget. Never runs on a read.
+    if (on.debate) ctx.waitUntil((async () => runDebateCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as Parameters<typeof runDebateCron>[2]))()
+      .then(() => undefined, error => { console.warn('[cron] Debate answers failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #431: the AI Reserve Board's monthly Spark issuance; a no-op unless HARIMU_SPARK_SUPPLY_ENABLED="true". Never runs on a read.
+    if (on.spark) ctx.waitUntil((async () => runSparkCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true' }))()
+      .then(() => undefined, error => { console.warn('[cron] Spark supply failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #432: daily ledger reconciliation (read-only on money, one report per game day); a no-op unless HARIMU_LEDGER_RECONCILIATION_ENABLED="true". Never runs on a read.
+    if (on.ledger) ctx.waitUntil((async () => runLedgerReconciliationCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_LEDGER_RECONCILIATION_ENABLED?: string }).HARIMU_LEDGER_RECONCILIATION_ENABLED === 'true' }))()
+      .then(() => undefined, error => { console.warn('[cron] Ledger reconciliation failed', error instanceof Error ? error.name : 'unknown'); }));
+    // #465: earned-Tessera epoch close (one entry per verified settled shift, pro-rata from a fixed daily pool); a no-op unless HARIMU_TESSERA_REWARDS_ENABLED="true" (default "false"). Idempotent; never runs on a read.
+    if (on.tesseraRewards) ctx.waitUntil((async () => runTesseraRewardCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_TESSERA_REWARDS_ENABLED?: string }, async userId => (await readVerification(userId)).countedActionsEligible))()
+      .then(() => undefined, error => { console.warn('[cron] Tessera reward epoch close failed', error instanceof Error ? error.name : 'unknown'); }));
   },
 };
 export default worker;

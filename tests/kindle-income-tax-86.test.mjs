@@ -85,7 +85,7 @@ test('flag off (shipped default): nothing is withheld, the full wage is credited
   assert.equal((await treasury(r)).balance, 0);
   assert.equal(activeIncomeTaxPercent(undefined), 0); assert.equal(activeIncomeTaxPercent('false'), 0); assert.equal(activeIncomeTaxPercent('true'), 15);
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_KINDLE_INCOME_TAX_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_KINDLE_INCOME_TAX_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['true']);
 });
 test('flag on: the snapshot reports the 15% rate used for the gross/tax/net copy', async t => {
   const r = await taxed(t);

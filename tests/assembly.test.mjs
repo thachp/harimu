@@ -1,4 +1,4 @@
-/** #283: Kindle mid-term Assembly (party list, D'Hondt per district, fixed AI bloc). HARIMU_TEST_STORAGE=postgres runs the runtime tests on PGlite. */
+/** #283: Kindle mid-term Assembly (party list, D'Hondt per district, human ballots only since #449). HARIMU_TEST_STORAGE=postgres runs the runtime tests on PGlite. */
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -8,7 +8,7 @@ import { postgresMigrations, isDestructive, transactionProblem } from '../script
 
 // The lib modules use extensionless imports, so load them through the runtime's transpiled copies.
 const rt = await localRuntime(); after(() => rt.close());
-const { dHondt, districtResult, assemblyResult, assemblyHeadlines, assemblyDistricts, assemblyPartyIds, assemblyIncumbents, assemblyBlocShares, assemblySeatsUp, assemblySeatsPerDistrict } = await rt.importModule('lib/assembly-rules.ts');
+const { dHondt, districtResult, assemblyResult, assemblyHeadlines, assemblyDistricts, assemblyPartyIds, assemblyIncumbents, assemblySeatsUp, assemblySeatsPerDistrict } = await rt.importModule('lib/assembly-rules.ts');
 const { kindleParties } = await rt.importModule('lib/kindle-parties.ts');
 const { ASSEMBLY_NAME_MAX } = await rt.importModule('lib/assembly-copy.ts');
 
@@ -25,34 +25,34 @@ test('#283 rules: D\'Hondt matches the hand-computed quotient table', () => {
 });
 
 test('#283 rules: two districts against hand-computed tables; half the seats up, the other half untouched', () => {
-  // Forgehaven: humans S3 O1 D2 (N=6). AI bloc = 6 x shares 40/35/25 = S240 O210 D150. Weighted S 300+240=540, O 100+210=310, D 200+150=350.
-  // Quotients: S 540 270 180 | D 350 175 | O 310 155. Top three: 540 (S), 350 (D), 310 (O) -> S1 D1 O1.
+  // Forgehaven: humans S3 O1 D2 (N=6), all at least 5%. D'Hondt weights are the human votes: quotients S 3 1.5 1 | D 2 1 | O 1.
+  // Top three: 3 (S), 2 (D), 1.5 (S) -> S2 D1 O0.
   const f = districtResult('forgehaven', { [S]: 3, [O]: 1, [D]: 2 });
-  assert.deepEqual(f.weighted, { [S]: 540, [O]: 310, [D]: 350 }); assert.deepEqual(f.bloc, { [S]: 240, [O]: 210, [D]: 150 });
-  assert.deepEqual(f.seatsWon, { [S]: 1, [O]: 1, [D]: 1 });
+  assert.deepEqual(f.human, { [S]: 3, [O]: 1, [D]: 2 }); assert.deepEqual(f.belowThreshold, []); assert.equal('bloc' in f, false, '#449: no AI bloc in the count');
+  assert.deepEqual(f.seatsWon, { [S]: 2, [O]: 0, [D]: 1 });
   assert.deepEqual(f.seatsUp, { [S]: 2, [O]: 1, [D]: 0 }); assert.deepEqual(f.seatsHeld, { [S]: 1, [O]: 1, [D]: 1 });
-  assert.deepEqual(f.seatsAfter, { [S]: 2, [O]: 2, [D]: 2 }); // held + won
-  // Tarrek Foundry: humans S0 O1 D1 (N=2). Bloc = 2 x 25/20/55 = S50 O40 D110. Weighted S 50, O 100+40=140, D 100+110=210.
-  // Quotients: D 210 105 70 | O 140 70 | S 50. Top three: 210 (D), 140 (O), 105 (D) -> D2 O1 S0.
-  const t = districtResult('tarrek-foundry', { [O]: 1, [D]: 1 });
-  assert.deepEqual(t.weighted, { [S]: 0, [O]: 140, [D]: 210 }, '#351: Steady Hand has no human ballot here, under the 5% share, so its bloc weight (50) takes no part'); assert.deepEqual(t.belowThreshold, [S]); assert.deepEqual(t.seatsWon, { [S]: 0, [O]: 1, [D]: 2 });
-  assert.deepEqual(t.seatsAfter, { [S]: 1, [O]: 2, [D]: 3 });
+  assert.deepEqual(f.seatsAfter, { [S]: 3, [O]: 1, [D]: 2 }); // held + won
+  // Tarrek Foundry: humans S0 O5 D5 (N=10; #463 needs at least 5 ballots to count, the quotients scale with the ballots). Steady Hand has no ballot, so it is under the 5% share and out. O and D tie at 1: quotients O 1 .5 | D 1 .5.
+  // Seat 1 goes to O (a tie goes to the declared order), seat 2 to D (1 > .5), seat 3 ties .5 .5 and goes to O -> O2 D1 S0.
+  const t = districtResult('tarrek-foundry', { [O]: 5, [D]: 5 });
+  assert.deepEqual(t.human, { [S]: 0, [O]: 5, [D]: 5 }); assert.deepEqual(t.belowThreshold, [S]); assert.deepEqual(t.seatsWon, { [S]: 0, [O]: 2, [D]: 1 });
+  assert.deepEqual(t.seatsAfter, { [S]: 1, [O]: 3, [D]: 2 });
   // A district nobody voted in contests nothing: the seats up stay with their incumbents.
   const k = districtResult('kolt-savanna', {});
-  assert.equal(k.contested, false); assert.deepEqual(k.seatsWon, k.seatsUp); assert.deepEqual(k.bloc, { [S]: 0, [O]: 0, [D]: 0 });
-  const all = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 1, [D]: 1 } });
-  assert.equal(all.humanBallots, 8); assert.deepEqual(all.districts.map(d => d.districtId), assemblyDistricts.map(d => d.id));
+  assert.equal(k.contested, false); assert.deepEqual(k.seatsWon, k.seatsUp); assert.deepEqual(k.human, { [S]: 0, [O]: 0, [D]: 0 });
+  const all = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 5, [D]: 5 } });
+  assert.equal(all.humanBallots, 16); assert.deepEqual(all.districts.map(d => d.districtId), assemblyDistricts.map(d => d.id));
   assert.equal(sumOf(all.totals.before), 18); assert.equal(sumOf(all.totals.after), 18);
 });
 
 test('#283 rules: invariants hold for every ballot mix', () => {
   assert.equal(assemblySeatsPerDistrict, 6); assert.equal(assemblySeatsUp, 3);
-  for (const d of assemblyDistricts) { assert.equal(sumOf(assemblyIncumbents[d.id].up), 3, d.id); assert.equal(sumOf(assemblyIncumbents[d.id].held), 3, d.id); assert.equal(sumOf(assemblyBlocShares[d.id]), 100, d.id); }
+  for (const d of assemblyDistricts) { assert.equal(sumOf(assemblyIncumbents[d.id].up), 3, d.id); assert.equal(sumOf(assemblyIncumbents[d.id].held), 3, d.id); }
   let seed = 7; const next = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
   for (let i = 0; i < 300; i++) for (const d of assemblyDistricts) {
     const r = districtResult(d.id, { [S]: next(9), [O]: next(9), [D]: next(9) });
     assert.equal(sumOf(r.seatsWon), 3); assert.equal(sumOf(r.seatsAfter), 6); assert.deepEqual(r.seatsHeld, assemblyIncumbents[d.id].held);
-    assert.equal(sumOf(r.bloc), r.humanBallots * 100, 'the AI bloc totals exactly the human ballots, as 100 units each');
+    assert.equal(sumOf(r.human), r.humanBallots, 'the count is the human ballots, nothing else');
   }
   assert.throws(() => districtResult('nowhere', {}), RangeError); assert.throws(() => districtResult('forgehaven', { [S]: -1 }), RangeError);
 });
@@ -60,10 +60,10 @@ test('#283 rules: invariants hold for every ballot mix', () => {
 test('#283 rules: Content #299 headlines are filled, capped and follow the seat change', () => {
   for (const p of kindleParties) assert.ok(p.name.length <= ASSEMBLY_NAME_MAX, p.name);
   for (const d of assemblyDistricts) assert.ok(d.name.length <= ASSEMBLY_NAME_MAX, d.name);
-  const res = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 1, [D]: 1 } });
+  const res = assemblyResult({ forgehaven: { [S]: 3, [O]: 1, [D]: 2 }, 'tarrek-foundry': { [O]: 5, [D]: 5 } });
   const lines = assemblyHeadlines(res), pick = (district, party) => lines.find(l => l.districtId === district && l.partyId === party);
-  assert.equal(pick('forgehaven', S).stage, 'results-loss'); assert.equal(pick('forgehaven', O).stage, 'results-hold'); assert.equal(pick('forgehaven', D).stage, 'results-gain');
-  assert.equal(pick('tarrek-foundry', D).stage, 'results-hold'); assert.equal(pick('tarrek-foundry', O).stage, 'results-gain'); assert.equal(pick('tarrek-foundry', S).stage, 'results-loss');
+  assert.equal(pick('forgehaven', S).stage, 'results-hold'); assert.equal(pick('forgehaven', O).stage, 'results-loss'); assert.equal(pick('forgehaven', D).stage, 'results-gain');
+  assert.equal(pick('tarrek-foundry', D).stage, 'results-loss'); assert.equal(pick('tarrek-foundry', O).stage, 'results-gain'); assert.equal(pick('tarrek-foundry', S).stage, 'results-loss');
   assert.equal(pick('kolt-savanna', S).stage, 'results-hold', 'seats up with no ballots are held');
   assert.equal(pick('forgehaven', D).body.includes('Dockside Builders') || pick('forgehaven', D).headline.includes('Dockside Builders'), true);
   for (const l of lines) assert.doesNotMatch(l.headline + l.body, /\{(party|district|seats)\}/);
@@ -173,19 +173,24 @@ test(`#283 ${backend}: a ballot carries no citizen, receipt id or time; the stor
 
 test(`#283 ${backend}: the closed count is recorded once by the tick and matches the hand-computed table; seats up only`, async t => {
   const c = await setup(t); const { r } = c;
-  const plan = [['forgehaven', S, 3], ['forgehaven', O, 1], ['forgehaven', D, 2], ['tarrek-foundry', O, 1], ['tarrek-foundry', D, 1]];
+  const plan = [['forgehaven', S, 3], ['forgehaven', O, 1], ['forgehaven', D, 2], ['tarrek-foundry', O, 5], ['tarrek-foundry', D, 5]]; // #463: Tarrek Foundry has the 5 ballots it needs to count
   let n = 0; for (const [district, party, votes] of plan) for (let i = 0; i < votes; i++) { const user = `v${n++}`; await c.citizen(user, district); assert.equal((await c.vote(user, party)).status, 200, user); }
   assert.equal((await r.call('assembly', 'v0')).data.result, null, 'results stay hidden until close');
   r.setNow((c.open + W + 1) * 1000); await c.tick(); await c.tick();
   const { data } = await r.call('assembly', 'v0'); assert.equal(data.status, 'closed');
   const byId = Object.fromEntries(data.result.districts.map(d => [d.districtId, d]));
-  assert.deepEqual(byId.forgehaven.seatsWon, { [S]: 1, [O]: 1, [D]: 1 }); assert.deepEqual(byId.forgehaven.seatsAfter, { [S]: 2, [O]: 2, [D]: 2 });
-  assert.deepEqual(byId['tarrek-foundry'].seatsWon, { [S]: 0, [O]: 1, [D]: 2 }); assert.deepEqual(byId['kolt-savanna'].seatsWon, byId['kolt-savanna'].seatsUp);
+  assert.deepEqual(byId.forgehaven.seatsWon, { [S]: 2, [O]: 0, [D]: 1 }); assert.deepEqual(byId.forgehaven.seatsAfter, { [S]: 3, [O]: 1, [D]: 2 });
+  assert.deepEqual(byId['tarrek-foundry'].seatsWon, { [S]: 0, [O]: 2, [D]: 1 }); assert.deepEqual(byId['kolt-savanna'].seatsWon, byId['kolt-savanna'].seatsUp);
   for (const d of data.result.districts) { assert.equal(sumOf(d.seatsAfter), 6); assert.deepEqual(d.seatsHeld, assemblyIncumbents[d.districtId].held, 'the held half never changes'); }
-  assert.deepEqual(byId.forgehaven.human, { [S]: 3, [O]: 1, [D]: 2 }); assert.deepEqual(byId.forgehaven.bloc, { [S]: 240, [O]: 210, [D]: 150 }, 'the AI bloc is its own block');
+  assert.deepEqual(byId.forgehaven.human, { [S]: 3, [O]: 1, [D]: 2 }); assert.equal('bloc' in byId.forgehaven, false, 'no AI bloc in the published count');
   assert.ok(data.headlines.length >= 7); const stored = (await r.db.prepare('SELECT closed_at,result_json FROM assembly_elections').all()).results;
   assert.equal(stored.length, 1); assert.equal(stored[0].result_json, JSON.stringify(data.result));
   await c.tick(); assert.equal((await r.db.prepare('SELECT result_json FROM assembly_elections').first()).result_json, stored[0].result_json, 'recorded once');
+  // #449: a count saved with the fixed AI bloc before it was removed stays exactly as published, not recounted.
+  const old = JSON.parse(stored[0].result_json); for (const d of old.districts) d.bloc = { [S]: 1, [O]: 1, [D]: 1 };
+  await r.db.prepare('UPDATE assembly_elections SET result_json=?').bind(JSON.stringify(old)).run();
+  assert.deepEqual((await r.call('assembly', 'v0')).data.result, old, 'a saved bloc count is shown as published');
+  await r.db.prepare('UPDATE assembly_elections SET result_json=?').bind(stored[0].result_json).run();
   // A tampered ballot count is caught, not published.
   await r.db.prepare('DELETE FROM assembly_anonymous_ballots WHERE id=(SELECT id FROM assembly_anonymous_ballots LIMIT 1)').run();
   await assert.rejects(r.call('assembly', 'v0'), /could not be confirmed|does not match/);

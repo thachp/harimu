@@ -58,7 +58,8 @@ export function AurelleRisingPanel() {
     catch { setError('Pledge status is uncertain. Refresh to check.'); }
     finally { setBusy(false); }
   };
-  if (!state) return <section aria-label="Aurelle claimants and the Rising"><p role="status">{error || 'Loading claimants…'}</p></section>;
+  // #384 L2: nothing renders before the first read, so a flag-off Aurelle citizen never sees a placeholder; a failed read still shows its error.
+  if (!state) return error ? <section aria-label="Aurelle claimants and the Rising"><p role="status">{error}</p></section> : null;
   if (!state.enabled) return null;
   return <AurelleRisingView state={state} busy={busy} error={error} onPledge={claimantId => void onPledge(claimantId)} />;
 }

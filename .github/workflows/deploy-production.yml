@@ -1,0 +1,129 @@
+# #501 slice d: deploy harimu-production. INACTIVE until Patrick sets the real Hyperdrive id in wrangler.prod.jsonc and approves the run.
+# Manual only: workflow_dispatch from refs/heads/main, never push, PR or schedule. The `production` environment needs manual approval (required reviewers: Patrick and PM).
+# Secret NAMES only (set as `production` environment secrets): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, PREVIEW_DATABASE_ADMIN_URL (production shares preview's database for now; PRODUCTION_DATABASE_ADMIN_URL once split).
+# Defaults to a dry run: validates the inputs, the journal gate and wrangler.prod.jsonc, and calls nothing (no Cloudflare, PlanetScale or Clerk). A real run also needs dry_run=false, the QA2 go commit, and backup_confirmed (the pre-deploy
+# PlanetScale backup is taken by hand; it also covers preview data while the database is shared). Migrations run for preview AND production on one schema: expand/contract only.
+# Rollback: dry_run=false plus rollback_version=<Cloudflare Worker version id> rolls the Worker back (no rebuild, no migration). The write journal is off in production, so journal replay is NOT a rollback path.
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      qa2_go_sha:
+        description: Full 40-character commit sha QA2 approved (must equal the run's commit on main). Not used for a rollback.
+        type: string
+        default: ''
+      dry_run:
+        description: Validate only; deploy and migrate nothing
+        type: boolean
+        default: true
+      backup_confirmed:
+        description: I took the PlanetScale backup for this release (required for a real deploy)
+        type: boolean
+        default: false
+      database_url_env:
+        description: Admin-URL secret for migrations (preview's while the database is shared)
+        type: choice
+        options: [PREVIEW_DATABASE_ADMIN_URL, PRODUCTION_DATABASE_ADMIN_URL]
+        default: PREVIEW_DATABASE_ADMIN_URL
+      rollback_version:
+        description: Roll back to this Cloudflare Worker version id instead of deploying (leave empty to deploy)
+        type: string
+        default: ''
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    env:
+      SHA: ${{ github.sha }}
+      QA2_GO_SHA: ${{ inputs.qa2_go_sha }}
+      ROLLBACK_VERSION: ${{ inputs.rollback_version }}
+      DATABASE_URL_ENV: ${{ inputs.database_url_env }}
+      HARIMU_DEPLOY_ENVIRONMENT: production
+    steps:
+      # Pinned by commit sha (the v4 tag target on Oct 15, 2026): a moved tag cannot reach the secret-bearing steps below. Bump deliberately.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check
+        if: inputs.rollback_version == ''
+        run: npm run check
+      - name: Dry run (validates inputs, journal gate and wrangler.prod.jsonc; calls nothing)
+        run: |
+          if [ -n "$ROLLBACK_VERSION" ]; then args=("--rollback=$ROLLBACK_VERSION"); else args=("--qa2-go-sha=$QA2_GO_SHA" "--database-url-env=$DATABASE_URL_ENV"); fi
+          node scripts/deploy-production.mjs --dry-run "${args[@]}"
+      - name: Roll back the Worker
+        if: inputs.dry_run == false && inputs.rollback_version != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node scripts/deploy-production.mjs "--rollback=$ROLLBACK_VERSION"
+      - name: Smoke checks after rollback (no secrets)
+        if: inputs.dry_run == false && inputs.rollback_version != ''
+        run: node scripts/smoke-production.mjs --sha=any
+      - name: Refuse a real deploy without the backup confirmation
+        if: inputs.dry_run == false && inputs.rollback_version == '' && inputs.backup_confirmed != true
+        run: |
+          echo "backup_confirmed is required for a real production deploy." >&2
+          exit 1
+      - name: Build production (clean environment; no secrets; before any database change)
+        if: inputs.dry_run == false && inputs.rollback_version == ''
+        run: node scripts/build-production.mjs
+      - name: Apply pending Postgres migrations with the production admin secret (fails closed; expand/contract only)
+        if: inputs.dry_run == false && inputs.rollback_version == '' && inputs.database_url_env == 'PRODUCTION_DATABASE_ADMIN_URL'
+        env:
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PRODUCTION_DATABASE_ADMIN_URL }}
+        run: |
+          test -n "$PREVIEW_DATABASE_ADMIN_URL" || { echo "PRODUCTION_DATABASE_ADMIN_URL is empty; refusing to fall back to preview's." >&2; exit 1; }
+          npm run db:postgres:migrate
+      - name: Apply pending Postgres migrations with preview's admin secret (shared database; fails closed; expand/contract only)
+        if: inputs.dry_run == false && inputs.rollback_version == '' && inputs.database_url_env == 'PREVIEW_DATABASE_ADMIN_URL'
+        env:
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+        run: |
+          test -n "$PREVIEW_DATABASE_ADMIN_URL" || { echo "PREVIEW_DATABASE_ADMIN_URL is empty." >&2; exit 1; }
+          npm run db:postgres:migrate
+      - name: Deploy production
+        if: inputs.dry_run == false && inputs.rollback_version == ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+          PRODUCTION_DATABASE_ADMIN_URL: ${{ secrets.PRODUCTION_DATABASE_ADMIN_URL }}
+        run: |
+          set -o pipefail
+          node scripts/deploy-production.mjs "--qa2-go-sha=$QA2_GO_SHA" "--database-url-env=$DATABASE_URL_ENV" 2>&1 | tee deploy.log
+          version=$(grep -oE 'Current Version ID: [0-9a-f-]+' deploy.log | tail -1 | cut -d' ' -f4)
+          {
+            echo "### harimu-production deployed"
+            echo "- Commit: \`$SHA\`"
+            echo "- Cloudflare version ID: \`${version:-unknown}\` (to roll back later: run this workflow with rollback_version set to the PREVIOUS version id)"
+            echo "- After the first deploy: confirm every required secret is still present (names only)."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Smoke checks
+        if: inputs.dry_run == false && inputs.rollback_version == ''
+        run: |
+          if ! node scripts/smoke-production.mjs --sha="$SHA"; then
+            echo "### Smoke checks FAILED: roll back by running this workflow with rollback_version set to the previous Worker version id." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

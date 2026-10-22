@@ -27,7 +27,7 @@ const rows = async (pg, sql) => (await pg.query(sql)).rows;
 
 test('inventory lists numbered migrations in order, never schema/compatibility', () => {
   const migrations = postgresMigrations();
-  assert.ok(migrations.length >= 2 && migrations.every(m => /^\d{4}_/.test(m.file) && (m.tables.length || /^\s*INSERT INTO/m.test(m.sql) || /^\s*ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN\b/im.test(m.sql)) && m.checksum.length === 64)); // #196: 0020 is data-only (seed rows); #400: 0040 is an additive column on an existing table (ALTER TABLE ... ADD COLUMN, no new table)
+  assert.ok(migrations.length >= 2 && migrations.every(m => /^\d{4}_/.test(m.file) && (m.tables.length || /^\s*INSERT INTO/m.test(m.sql) || /^\s*ALTER\s+TABLE\s+\S+\s+ADD\s+COLUMN\b/im.test(m.sql) || /^\s*CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\b/im.test(m.sql)) && m.checksum.length === 64)); // #196: 0020 is data-only (seed rows); #400: 0040 is an additive column on an existing table (ALTER TABLE ... ADD COLUMN, no new table); #616: 0051 is indexes only (CREATE INDEX IF NOT EXISTS)
   assert.deepEqual(migrations.map(m => m.file), [...migrations.map(m => m.file)].sort());
   assert.ok(!migrations.some(m => /schema|compatibility/.test(m.file)));
   assert.deepEqual(createdTables('CREATE TABLE IF NOT EXISTS "a_b"(x int); create table `c` (y int); CREATE TABLE d(z int);'), ['a_b', 'c', 'd']);
@@ -43,7 +43,8 @@ test('destructive SQL is detected, comments ignored', () => {
   assert.ok(!isDestructive('/* DROP TABLE x */ CREATE INDEX IF NOT EXISTS i ON x(a);'));
   assert.ok(hasReviewMarker(`${destructiveReviewedMarker}\nDROP TABLE x;`));
   assert.ok(!hasReviewMarker(`CREATE TABLE a(x int); -- ${destructiveReviewedMarker}`), 'marker must be on its own line');
-  for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql), `${m.file} must stay additive`);
+  // #490: 0049 swaps the citizen_faith nation CHECK for a foreign key (a DROP CONSTRAINT), and #531: 0054 widens the aurelle_favor_spends reason CHECK the same way; both reviewed and marked, every other migration stays additive.
+  for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql) || (['0049_nation_wage_ledger.sql', '0054_aurelle_charters.sql'].includes(m.file) && hasReviewMarker(m.sql)), `${m.file} must stay additive`);
   assert.deepEqual(createdObjects('CREATE TABLE t(a int, "b" text, PRIMARY KEY(a), UNIQUE(a,b), CHECK(a>0)); ALTER TABLE t ADD COLUMN IF NOT EXISTS c int; CREATE UNIQUE INDEX IF NOT EXISTS i_t ON t(a);'),
     { columns: [['t', 'a'], ['t', 'b'], ['t', 'c']], indexes: ['i_t'], checks: [['t', 1]] });
 });

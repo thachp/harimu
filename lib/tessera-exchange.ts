@@ -5,7 +5,7 @@ import type { GameDatabase } from './database-contract';
  * Clearing House kiosk (a licensed exchange) at the official rate. Replaces the temporary 50.00 TSR starter grant.
  * PoC: the official rate is the fixed placeholder quote (1 SPK = 0.25 TSR, lib/wallet.ts), buy-only, no kiosk fee,
  * Kindle only (unlimited in Kindle apart from the verification-tier limits of Section 20, which do not exist yet;
- * Korund is non-convertible). Opens together with the World Registry (HARIMU_SQUARE_PURCHASE_ENABLED).
+ * Korund is non-convertible). Behind its own flag HARIMU_TESSERA_EXCHANGE_ENABLED, default off (#626, Decision 111); HARIMU_SQUARE_PURCHASE_ENABLED is squares only.
  * Integer minor units; the SPK cost rounds up so the kiosk never mints Tessera for less than the official rate.
  */
 export const kioskNations = ['kindle'] as const;
@@ -24,9 +24,13 @@ export const tesseraExchangeSchema = `CREATE TABLE IF NOT EXISTS citizen_tessera
 )`;
 export const tesseraExchangeIndex = 'CREATE INDEX IF NOT EXISTS idx_tessera_exchanges_citizen ON citizen_tessera_exchanges(clerk_user_id, occurred_at)';
 
-/** Tessera balance for one citizen (bind the user id twice): World Registry ledger plus kiosk purchases. */
+/** THE Tessera balance for one citizen, the single copy every reader and spend guard uses (#465 slice 2): World Registry ledger, kiosk purchases, claimed earned rewards (tessera_reward_claims) and relocation support (relocation_support_claims, #470).
+ *  It has four `clerk_user_id=?` placeholders: always bind them with tesseraBalanceBinds(userId). The ledger reconciliation rewrites each `clerk_user_id=?` to the citizen row. */
 export const tesseraBalanceSql = `COALESCE((SELECT SUM(delta_minor) FROM citizen_tessera_ledger WHERE clerk_user_id=?),0)
-  + COALESCE((SELECT SUM(tessera_minor) FROM citizen_tessera_exchanges WHERE clerk_user_id=?),0)`;
+  + COALESCE((SELECT SUM(tessera_minor) FROM citizen_tessera_exchanges WHERE clerk_user_id=?),0)
+  + COALESCE((SELECT SUM(amount_minor) FROM tessera_reward_claims WHERE clerk_user_id=?),0)
+  + COALESCE((SELECT SUM(amount_minor) FROM relocation_support_claims WHERE clerk_user_id=?),0)`;
+export const tesseraBalanceBinds = (userId: string): [string, string, string, string] => [userId, userId, userId, userId];
 
 export function sparkCost(tesseraMinor: number): number {
   return Math.ceil(tesseraMinor * sparkPerTessera);
@@ -48,7 +52,7 @@ export function parseExchangeCommand(body: Record<string, unknown>): ExchangeCom
 
 async function balances(db: GameDatabase, userId: string) {
   const row = await db.prepare(`SELECT ${tesseraBalanceSql} AS tessera,
-    COALESCE((SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id=?),0) AS spark`).bind(userId, userId, userId)
+    COALESCE((SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id=?),0) AS spark`).bind(...tesseraBalanceBinds(userId), userId)
     .first<{ tessera: number; spark: number }>();
   return { tesseraMinor: Number(row?.tessera ?? 0), sparkMinor: Number(row?.spark ?? 0) };
 }

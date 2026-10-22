@@ -34,9 +34,9 @@ test('pure rules: 48 real hours, 30-day Founding Period, 10-day peace lock, each
   assert.equal(cleanLabel('x'.repeat(100), 40).length, 40); assert.equal(cleanLabel(42, 40), '');
 });
 
-test('the war flag defaults to "false" in wrangler.jsonc and migration 0031 only adds a table', async () => {
+test('the war flag is "true" in preview wrangler.jsonc and migration 0031 only adds a table', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_WAR_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
   for (const file of ['../drizzle/0031_wars.sql', '../db/postgres/0031_wars.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS wars/);
@@ -46,8 +46,8 @@ test('the war flag defaults to "false" in wrangler.jsonc and migration 0031 only
   for (const file of await walk(new URL('../app/', import.meta.url))) if (/\.(ts|tsx)$/.test(file.pathname)) assert.doesNotMatch(await readFile(file, 'utf8'), /declareWar|endWar/, file.pathname);
 });
 
-async function setup(t, { flag = true, shardDaysAgo = 31 } = {}) {
-  const r = await localRuntime(); t.after(() => r.close());
+async function setup(t, { flag = true, shardDaysAgo = 31, backend } = {}) {
+  const r = await localRuntime({ backend }); t.after(() => r.close());
   const nowS = () => Math.floor(r.now / 1000);
   if (shardDaysAgo !== null) r.setFixtureEnv('HARIMU_SHARD_STARTED_AT', String(nowS() - shardDaysAgo * D));
   const war = await r.importModule('lib/war.ts');
@@ -176,7 +176,7 @@ test('war banner: both nations see a mobilization countdown; the third nation an
     new Function('exports', 'require', ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText)(exports, name => name in stubs ? stubs[name] : require(name)); return exports; };
   const GameTimer = ({ endsAt, label }) => require('react').createElement('span', { 'data-timer': endsAt }, label);
   const rules = await runtimeForCopy.importModule('lib/war-rules.ts'), copy = warCopy;
-  const { WarBanner } = await load('../app/war-banner.tsx', { '@/lib/war-copy': copy, '@/lib/war-rules': rules, './game-timer': { GameTimer }, './display-preferences': { useDisplayTimestamp: () => v => new Date(v).toISOString() }, '@/lib/war': {} });
+  const { WarBanner } = await load('../app/war-banner.tsx', { '@/lib/war-copy': copy, '@/lib/war-rules': rules, '@/lib/war-weariness-copy': { wearinessBanners: {}, wearinessStrip: {} }, './game-timer': { GameTimer }, './display-preferences': { useDisplayTimestamp: () => v => new Date(v).toISOString() }, '@/lib/war': {} });
   const base = { id: 'w1', attacker: 'kindle', defender: 'korund', casusBelli: 'Border incidents', declaredBy: 'AI President', declaredAt: 1000, mobilizationEndsAt: 1000 + 48 * H, status: 'mobilizing', endedAt: null, endKind: null, peaceLockEndsAt: null };
   const html = nation => renderToStaticMarkup(WarBanner({ wars: [base], nationId: nation }));
   assert.match(html('kindle'), /Kindle declares war/); assert.match(html('kindle'), /data-timer="\d+"/); assert.match(html('kindle'), /At war with Korund/); assert.match(html('kindle'), /Mobilization ends 1970-01-03\S+ No attack can begin before then/);
@@ -247,11 +247,12 @@ test('#402 no pact, a proposed, rejected, expired or broken pact, or a term that
   assert.equal((await lock.declare()).reason, 'peace_lock', 'the peace lock still applies without a pact');
 });
 
+// #584: pinned to SQLite: the DROP TABLE below fails on the PGlite fixture, which `npm run test:postgres` (HARIMU_TEST_STORAGE=postgres) would otherwise select.
 test('#402 a database without the treaties table reads as no pact; other read errors still surface', async t => {
-  const { r, declare } = await setup(t);
+  const { r, declare } = await setup(t, { backend: 'sqlite' });
   await r.db.prepare('DROP TABLE treaties').run();
   assert.equal((await declare()).ok, true, 'missing table: fails open');
-  const { r: r2, declare: declare2 } = await setup(t); const prepare = r2.db.prepare.bind(r2.db);
+  const { r: r2, declare: declare2 } = await setup(t, { backend: 'sqlite' }); const prepare = r2.db.prepare.bind(r2.db);
   r2.db.prepare = sql => { if (/FROM treaties/.test(sql)) throw new Error('disk on fire'); return prepare(sql); };
   await assert.rejects(declare2(), /disk on fire/);
 });

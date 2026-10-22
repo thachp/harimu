@@ -4,9 +4,9 @@ import { assemblyStage, ASSEMBLY_NAME_MAX } from './assembly-copy';
 
 /** #283: Kindle mid-term Assembly rules. Pure and deterministic: no clock, no database.
  *  Canon: harimu-docs politics/elections §9.1 (half the seats up, secret ballots, results hidden until close), §9.3 (party-list
- *  proportional representation within the district; human votes and the AI bloc shown separately), §9.5 (per-district counts public).
- *  Assumptions are marked [ASSUMPTION] and listed in the PR: the D'Hondt method, six seats per district, the fixed AI bloc shares
- *  and the incumbent seat tables are placeholders until Design rules otherwise. */
+ *  proportional representation within the district; #449: human ballots only, Decision 65), §9.5 (per-district counts public).
+ *  Assumptions are marked [ASSUMPTION] and listed in the PR: the D'Hondt method, six seats per district and the incumbent seat tables
+ *  are placeholders until Design rules otherwise. */
 export const assemblySeatsPerDistrict = 6; // [ASSUMPTION]
 export const assemblySeatsUp = 3; // half
 export const assemblyWindowSeconds = 72 * 3600; // same 72 real hours as the presidential PoC
@@ -16,8 +16,10 @@ export const assemblyCycleSeconds = 120 * 86400;
 export const assemblyMidtermOffsetSeconds = 60 * 86400;
 /** #351 (ARC, #356 item 2): a party needs at least this share of the district's human ballots to take part in the D'Hondt award. No separate turnout floor. */
 export const assemblyMinSharePercent = 5;
-/** Human ballots weigh this many units each; the AI bloc gets the same total as the humans (a 1:1 split), spread by fixed shares. */
-export const assemblyHumanUnit = 100;
+/** #463 (ARC ruling): a district counts only with at least this many human ballots. An absolute count floor, not a turnout share, applied before the
+ *  5% party share. Under it the district takes the zero-ballot path: the seats up stay with their incumbents and the rotation does not advance. [ASSUMPTION]
+ *  The number lives here only; ARC may change it. */
+export const assemblyMinBallotsPerDistrict = 5;
 
 export const assemblyDistricts = citiesForNation('kindle').map(city => ({ id: city.id, name: city.name }));
 export const assemblyPartyIds = kindleParties.map(party => party.id);
@@ -33,13 +35,6 @@ export const assemblyIncumbents: Readonly<Record<string, { up: PartySeats; held:
   'tarrek-foundry': { up: { 'steady-hand': 1, 'open-ledger': 0, 'dockside-builders': 2 }, held: { 'steady-hand': 1, 'open-ledger': 1, 'dockside-builders': 1 } },
   'kolt-savanna': { up: { 'steady-hand': 1, 'open-ledger': 2, 'dockside-builders': 0 }, held: { 'steady-hand': 1, 'open-ledger': 1, 'dockside-builders': 1 } },
 };
-/** [ASSUMPTION] Fixed AI bloc shares per district, whole percents summing to 100. Not a simulation; shown separately from human votes. */
-export const assemblyBlocShares: Readonly<Record<string, PartySeats>> = {
-  forgehaven: { 'steady-hand': 40, 'open-ledger': 35, 'dockside-builders': 25 },
-  'tarrek-foundry': { 'steady-hand': 25, 'open-ledger': 20, 'dockside-builders': 55 },
-  'kolt-savanna': { 'steady-hand': 30, 'open-ledger': 50, 'dockside-builders': 20 },
-};
-
 export type AssemblyTiming = { openAt: number | null; cycleStartAt: number | null };
 export type AssemblyPlan = { id: string; cycle: number | null; opensAt: number; closesAt: number };
 /** The election the clock points at, or null when nothing is configured (never opens). `cycleStartAt` (the start of day 0 of cycle 0, epoch seconds) drives
@@ -90,26 +85,27 @@ export function dHondt(weights: PartySeats, seats: number, order: readonly strin
 }
 
 export type DistrictResult = {
-  districtId: string; name: string; humanBallots: number; contested: boolean; belowThreshold: string[];
-  human: PartySeats; bloc: PartySeats; weighted: PartySeats;
+  districtId: string; name: string; humanBallots: number; contested: boolean; belowMinimum: boolean; belowThreshold: string[];
+  human: PartySeats;
   seatsUp: PartySeats; seatsHeld: PartySeats; seatsWon: PartySeats; seatsAfter: PartySeats;
 };
 export type AssemblyResult = { humanBallots: number; districts: DistrictResult[]; totals: { before: PartySeats; after: PartySeats } };
 
-/** One district. Without a human ballot the AI bloc is zero too, nothing is contested, and the seats up stay with their incumbents. */
+/** One district, counted from human ballots only (#449, Decision 65: no AI ballots, no simulated bloc). Under `assemblyMinBallotsPerDistrict` human ballots (none included) nothing is contested and the seats up stay with their incumbents (#463). */
 export function districtResult(districtId: string, humanVotes: PartySeats, carried: Incumbents = assemblyIncumbents): DistrictResult {
-  const incumbents = carried[districtId], shares = assemblyBlocShares[districtId];
-  if (!incumbents || !shares) throw new RangeError('Unknown Assembly district.');
+  const incumbents = carried[districtId];
+  if (!incumbents) throw new RangeError('Unknown Assembly district.');
   const human = zero(); for (const id of assemblyPartyIds) { const n = humanVotes[id] ?? 0; if (!Number.isSafeInteger(n) || n < 0) throw new RangeError('Invalid ballot count.'); human[id] = n; }
   const humanBallots = sum(human);
-  const bloc = zero(), weighted = zero();
-  // #351: a party under the minimum share of the human ballots takes no part in the award (its bloc weight goes with it). Integers only.
-  const belowThreshold = humanBallots > 0 ? assemblyPartyIds.filter(id => human[id] * 100 < assemblyMinSharePercent * humanBallots) : [];
-  for (const id of assemblyPartyIds) { bloc[id] = humanBallots * shares[id]; weighted[id] = belowThreshold.includes(id) ? 0 : human[id] * assemblyHumanUnit + bloc[id]; }
-  const contested = humanBallots > 0;
+  const weighted = zero(); // the D'Hondt weights: each party's human ballots
+  // #351: a party under the minimum share of the human ballots takes no part in the award. Integers only.
+  const contested = humanBallots >= assemblyMinBallotsPerDistrict;
+  const belowMinimum = humanBallots > 0 && !contested; // some ballots, too few to count: published, but they award nothing
+  const belowThreshold = contested ? assemblyPartyIds.filter(id => human[id] * 100 < assemblyMinSharePercent * humanBallots) : [];
+  for (const id of assemblyPartyIds) weighted[id] = belowThreshold.includes(id) ? 0 : human[id];
   const seatsWon = contested ? dHondt(weighted, assemblySeatsUp) : { ...incumbents.up };
   const seatsAfter = zero(); for (const id of assemblyPartyIds) seatsAfter[id] = incumbents.held[id] + seatsWon[id];
-  return { districtId, name: districtName(districtId), humanBallots, contested, belowThreshold, human, bloc, weighted, seatsUp: { ...incumbents.up }, seatsHeld: { ...incumbents.held }, seatsWon, seatsAfter };
+  return { districtId, name: districtName(districtId), humanBallots, contested, belowMinimum, belowThreshold, human, seatsUp: { ...incumbents.up }, seatsHeld: { ...incumbents.held }, seatsWon, seatsAfter };
 }
 
 export function assemblyResult(byDistrict: Readonly<Record<string, PartySeats>>, carried: Incumbents = assemblyIncumbents): AssemblyResult {

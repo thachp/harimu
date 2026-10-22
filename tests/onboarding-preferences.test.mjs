@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {suggestNations} from '../lib/onboarding-preferences.ts';
+import {localRuntime} from './helpers/local-runtime.mjs';
+const {suggestNations} = await (async()=>{const r=await localRuntime();try{return await r.importModule('lib/onboarding-preferences.ts');}finally{await r.close();}})(); // imports the live list from nation-discovery (#488)
 const ids=['kindle','confluence','meridian','korund','aurelle','ilmar','hoarvale','varkand','veldwood','fulmara'];
 test('neutral preferences return three stable distinct valid choices',()=>{
  const result=suggestNations({});assert.equal(result.length,3);assert.equal(new Set(result).size,3);assert.deepEqual(result,suggestNations({}));assert.deepEqual(result,['kindle','korund','aurelle']);assert.ok(result.every(id=>ids.includes(id)));

@@ -1,3 +1,4 @@
+import {liveNations} from './nation-discovery';
 export type OnboardingPreferences = {power?: string; money?: string; faith?: string};
 // GDD 19.1 power families and money/faith lenses. Equal scores favor playable
 // prototype economies Kindle, Korund, Aurelle, then stable catalog order;
@@ -15,7 +16,7 @@ const profiles = [
  {id:'fulmara',name:'Fulmara',power:'bloc',money:'markets',faith:'free'},
 ] as const;
 function tieRank(id: string, index: number): number {
- const playable = ['kindle','korund','aurelle'].indexOf(id);
+ const playable = (liveNations as readonly string[]).indexOf(id); // #488: the live nations, in list order
  return playable >= 0 ? playable : 3 + index;
 }
 export function suggestNations(preferences: OnboardingPreferences): string[] {

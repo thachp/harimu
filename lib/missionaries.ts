@@ -70,9 +70,10 @@ const fill = (text: string, values: Record<string, string>) => text.replace(/\{(
 export const faithName = (id: string) => isMissionFaith(id) ? faithCopy[id].name : id;
 export const hostCityId = (nation: MissionNation) => capitalCityForNation(nation)?.id ?? nation;
 /** Seconds a missionary travels between two capitals: the existing travel formula (5 real minutes per square, capped at 1 hour), capital to capital. */
-export function missionTravelSeconds(home: MissionNation, host: MissionNation) {
-  const a = mvpNations.find(n => n.id === home)!.capital, b = mvpNations.find(n => n.id === host)!.capital;
-  return travelSeconds(a, b);
+export function missionTravelSeconds(home: MissionNation, host: MissionNation): number | null {
+  // #491: a nation with no capital on the map (every flag-off nation) has no travel time; callers treat null as "not available" instead of throwing.
+  const a = mvpNations.find(n => n.id === home)?.capital, b = mvpNations.find(n => n.id === host)?.capital;
+  return a && b ? travelSeconds(a, b) : null;
 }
 /** Why a host refuses a faith, from Content's host-permission notices (#266); null when it allows it. */
 export function hostRefusal(home: string, host: string, faith: string): string | null {

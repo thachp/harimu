@@ -7,8 +7,11 @@ export function nationEmblem(theme:{symbol:string;accent:string}|null,nationName
  if(theme)return{symbol:theme.symbol,accent:theme.accent,label,fallback:false};
  return{symbol:(nationName.trim().charAt(0)||'?').toUpperCase(),accent:null,label,fallback:true};
 }
-/** Build-time switch (wrangler.jsonc var NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM), off by default. */
-export function topBarEmblemEnabled(value:string|undefined=process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM):boolean{return value==='true';}
+/** Build-time switch (wrangler.jsonc var NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM), "true" in preview, off when unset and in production. #392 S2: the UI v2 top bar flag turns the same emblem, "Visiting" label and live-count bell on
+ *  (one code path, not a copy), so `NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR=true` implies it; the emblem flag still works alone. */
+export function topBarEmblemEnabled(value:string|undefined=process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM,v2:string|undefined=process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR):boolean{return value==='true'||v2==='true';}
+/** Build-time flag NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR (UI v2, stage S2): the restyled top bar is "true" in preview and off in production. Only the exact string "true" enables it. */
+export function uiV2TopbarEnabled(value:string|undefined=process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR):boolean{return value==='true';}
 /** The line under HARIMU: visitors are told they are visiting; the other states keep their existing wording. */
 export function identityStatus(state:{guestDemo:boolean;localDemo:boolean;hasCitizenNation:boolean},emblemOn:boolean):string{
  if(state.guestDemo)return 'Guest example';

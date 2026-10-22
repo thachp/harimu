@@ -1,0 +1,49 @@
+# Nation marks under colour-vision simulation (Machado 2009, severity 1.0; dE76 between accents; < 20 = not reliably separable by colour)
+
+25 of 45 pairs are colour-ambiguous in at least one view; all of them differ in symbol and pattern.
+
+AMBIGUOUS  kindle     aurelle    worst dE   2.5 (tritanopia)  ▣/◇  ruled/diagonal
+AMBIGUOUS  confluence meridian   worst dE   4.1 (protanopia)  ◐/▲  waves/crosshatch
+AMBIGUOUS  aurelle    ilmar      worst dE   5.3 (tritanopia)  ◇/⬢  diagonal/dots
+AMBIGUOUS  kindle     veldwood   worst dE   6.9 (protanopia)  ▣/❖  ruled/reverse-diagonal
+AMBIGUOUS  korund     veldwood   worst dE   7.0 (tritanopia)  ▦/❖  grid/reverse-diagonal
+AMBIGUOUS  kindle     ilmar      worst dE   7.2 (tritanopia)  ▣/⬢  ruled/dots
+AMBIGUOUS  korund     hoarvale   worst dE   8.9 (protanopia)  ▦/✚  grid/chevrons
+AMBIGUOUS  confluence fulmara    worst dE   9.1 (deuteranopia)  ◐/✦  waves/vertical
+AMBIGUOUS  meridian   hoarvale   worst dE   9.3 (deuteranopia)  ▲/✚  crosshatch/chevrons
+AMBIGUOUS  varkand    fulmara    worst dE  10.2 (tritanopia)  ◆/✦  checks/vertical
+AMBIGUOUS  varkand    veldwood   worst dE  11.0 (deuteranopia)  ◆/❖  checks/reverse-diagonal
+AMBIGUOUS  aurelle    veldwood   worst dE  13.3 (protanopia)  ◇/❖  diagonal/reverse-diagonal
+AMBIGUOUS  meridian   fulmara    worst dE  13.4 (tritanopia)  ▲/✦  crosshatch/vertical
+AMBIGUOUS  kindle     meridian   worst dE  13.4 (tritanopia)  ▣/▲  ruled/crosshatch
+AMBIGUOUS  meridian   varkand    worst dE  14.0 (tritanopia)  ▲/◆  crosshatch/checks
+AMBIGUOUS  meridian   korund     worst dE  14.0 (deuteranopia)  ▲/▦  crosshatch/grid
+AMBIGUOUS  meridian   aurelle    worst dE  14.3 (tritanopia)  ▲/◇  crosshatch/diagonal
+AMBIGUOUS  confluence hoarvale   worst dE  16.3 (tritanopia)  ◐/✚  waves/chevrons
+AMBIGUOUS  hoarvale   fulmara    worst dE  16.3 (deuteranopia)  ✚/✦  chevrons/vertical
+AMBIGUOUS  korund     varkand    worst dE  17.4 (tritanopia)  ▦/◆  grid/checks
+AMBIGUOUS  korund     fulmara    worst dE  17.5 (tritanopia)  ▦/✦  grid/vertical
+AMBIGUOUS  ilmar      veldwood   worst dE  18.1 (protanopia)  ⬢/❖  dots/reverse-diagonal
+AMBIGUOUS  meridian   ilmar      worst dE  18.5 (tritanopia)  ▲/⬢  crosshatch/dots
+AMBIGUOUS  hoarvale   veldwood   worst dE  18.6 (tritanopia)  ✚/❖  chevrons/reverse-diagonal
+AMBIGUOUS  aurelle    varkand    worst dE  19.6 (tritanopia)  ◇/◆  diagonal/checks
+ok         kindle     varkand    worst dE  20.3 (tritanopia)  ▣/◆  ruled/checks
+ok         veldwood   fulmara    worst dE  20.4 (tritanopia)  ❖/✦  reverse-diagonal/vertical
+ok         aurelle    fulmara    worst dE  22.9 (tritanopia)  ◇/✦  diagonal/vertical
+ok         ilmar      varkand    worst dE  23.1 (tritanopia)  ⬢/◆  dots/checks
+ok         kindle     fulmara    worst dE  23.4 (tritanopia)  ▣/✦  ruled/vertical
+ok         confluence korund     worst dE  24.3 (protanopia)  ◐/▦  waves/grid
+ok         ilmar      fulmara    worst dE  25.6 (tritanopia)  ⬢/✦  dots/vertical
+ok         confluence veldwood   worst dE  27.7 (tritanopia)  ◐/❖  waves/reverse-diagonal
+ok         hoarvale   varkand    worst dE  30.3 (protanopia)  ✚/◆  chevrons/checks
+ok         meridian   veldwood   worst dE  30.4 (tritanopia)  ▲/❖  crosshatch/reverse-diagonal
+ok         korund     aurelle    worst dE  33.4 (tritanopia)  ▦/◇  grid/diagonal
+ok         korund     ilmar      worst dE  34.7 (tritanopia)  ▦/⬢  grid/dots
+ok         kindle     korund     worst dE  34.8 (tritanopia)  ▣/▦  ruled/grid
+ok         confluence varkand    worst dE  40.3 (protanopia)  ◐/◆  waves/checks
+ok         kindle     hoarvale   worst dE  50.4 (protanopia)  ▣/✚  ruled/chevrons
+ok         aurelle    hoarvale   worst dE  51.8 (tritanopia)  ◇/✚  diagonal/chevrons
+ok         ilmar      hoarvale   worst dE  53.2 (tritanopia)  ⬢/✚  dots/chevrons
+ok         confluence aurelle    worst dE  60.9 (tritanopia)  ◐/◇  waves/diagonal
+ok         kindle     confluence worst dE  61.9 (tritanopia)  ▣/◐  ruled/waves
+ok         confluence ilmar      worst dE  63.4 (tritanopia)  ◐/⬢  waves/dots

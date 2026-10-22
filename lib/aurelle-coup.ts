@@ -1,6 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { aurelleScores, readCrown } from './aurelle-rising';
+import { royalFavorAverageSql, royalFavorColumnBinds } from './aurelle';
 import { boundedName, coupConfig, coupSucceeds, formationOdds, plotForms, plotRuler, plotState, pressureSeconds, roll } from './aurelle-coup-rules';
 import { coupStage, type CoupStage } from './palace-coup-copy';
 import { leaderPersonas } from './leader-personas';
@@ -56,7 +57,10 @@ function gazette(stage: CoupStage, seed: string, names: { leader: string; newLea
     WHERE ${guard} AND NOT EXISTS (SELECT 1 FROM world_events WHERE kind = 'court-gazette' AND occurred_at = ? AND headline = ${lit(headline)})`, binds: [iso(now), -now, ...guardBinds, iso(now)] };
 }
 
-const royalFavorSql = `SELECT AVG(CASE WHEN f > 100 THEN 100 ELSE f END) AS favor FROM (SELECT SUM(favor) AS f FROM aurelle_settlements GROUP BY clerk_user_id) t`;
+const flatFavorAverageSql = `SELECT AVG(CASE WHEN f > 100 THEN 100 ELSE f END) AS favor FROM (SELECT SUM(favor) AS f FROM aurelle_settlements GROUP BY clerk_user_id) t`;
+/** #585: the average Royal Favor the plot odds read. Flag off (decayAt undefined): the flat query of before, byte for byte. With HARIMU_FAVOR_DECAY_ENABLED on: the average of each
+ *  settling citizen's balance by the one shared rule (royalFavorSql in lib/aurelle.ts), so the plot odds and the Favor a citizen sees can never disagree. */
+export const readFavorAverage = async (db: GameDatabase, decayAt?: number) => Number((await (decayAt === undefined ? db.prepare(flatFavorAverageSql) : db.prepare(royalFavorAverageSql(decayAt)).bind(...royalFavorColumnBinds(decayAt))).first<{ favor: number | string | null }>())?.favor ?? 0);
 const unresolvedRisingSql = '(SELECT 1 FROM aurelle_risings WHERE resolved_at IS NULL)';
 
 /**
@@ -66,7 +70,7 @@ const unresolvedRisingSql = '(SELECT 1 FROM aurelle_risings WHERE resolved_at IS
  * a window; (4) the window resolves once, deterministically from Power Weight, Stability and a seeded roll.
  * Every step is one batch whose row change and Court Gazette entry share a guard, so a retry or racing request adds nothing.
  */
-export async function runAurelleCoup(db: GameDatabase, now: number) {
+export async function runAurelleCoup(db: GameDatabase, now: number, favorDecay = false) {
   const active = await db.prepare('SELECT id, formed_at, ruler_id, ruler_name, house, window_opened_at, window_closes_at, guard_pct_at_open, great_lords_at_open FROM aurelle_coups WHERE resolved_at IS NULL ORDER BY formed_at LIMIT 1').first<Row>();
   const reigning = async () => (await readCrown(db))?.name ?? leaderPersonas.aurelle.name;
   if (active) {
@@ -105,7 +109,7 @@ export async function runAurelleCoup(db: GameDatabase, now: number) {
   if (last?.t != null && now < Number(last.t) + coupConfig.cooldownSeconds) return;
   const scores = await aurelleScores(db);
   if (!scores.length) return;
-  const favor = Number((await db.prepare(royalFavorSql).first<{ favor: number | string | null }>())?.favor ?? 0);
+  const favor = await readFavorAverage(db, favorDecay ? now : undefined); // #585: decayed only while HARIMU_FAVOR_DECAY_ENABLED is on
   const odds = formationOdds({ unrest: scores[0].unrest, stability: scores[0].stability, favor, sustainedSeconds: pressureSeconds(scores, now) });
   const id = `coup:${Math.floor(now / 86400)}`;
   if (odds <= 0 || !plotForms(id, odds)) return;

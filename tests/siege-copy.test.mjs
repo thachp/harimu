@@ -84,7 +84,7 @@ test('system lines carry no byline or AI badge: strip, rules and private notices
   for (const o of [ST,SR,CP]) assert.equal('aiBadge' in o,false);
   for (const l of [ST.caption,...SR.lines,CP.defender,CP.attacker]) { assert.equal('aiBadge' in l,false); assert.doesNotMatch(l.text,/Republic Wire|State Media|Court Gazette|Be it known/); }
 });
-test('unwired: nothing in app/, components/ or lib/ imports siege-copy', () => {
+test('wired only through app/siege-panel.tsx (#620): nothing else in app/, components/ or lib/ imports siege-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('siege-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/\bsiege-copy\b/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('siege-copy.ts')&&f!=='app/siege-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/\bsiege-copy\b/, f);
 });

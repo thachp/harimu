@@ -1,22 +1,9 @@
-/** Discovery groupings from official GDD 19.1; filters never select a nation. */
-export const nationFamilies = [
-  {id:'all',label:'All nations',members:[]},
-  {id:'democracies',label:'Democracies',members:['kindle','hoarvale','veldwood']},
-  {id:'party',label:'Party states',members:['confluence','meridian','korund']},
-  {id:'crown',label:'Crown & Canon',members:['aurelle','ilmar']},
-  {id:'power',label:'Power blocs',members:['varkand','fulmara']},
-] as const;
-export type NationFamily = typeof nationFamilies[number]['id'];
-export type NationLens = 'power' | 'money' | 'faith';
 export type DiscoveryNation = {id:string;name:string;government?:string;economy?:string;currency?:string;religion?:string};
-const lensGroups = [['kindle','hoarvale','veldwood','fulmara'],['confluence','meridian','varkand'],['aurelle','ilmar'],['korund']];
-const labels = {money:['Free floating','Managed or pegged','Gold or faith rules','No market money'],faith:['Free faith','Registered or supervised','State faith','No faith allowed']};
-export function nationLensLabel(id:string,lens:NationLens){if(lens==='power')return '';const index=lensGroups.findIndex(group=>group.includes(id));return index<0?'':labels[lens][index];}
-export function discoverNations<T extends {id:string}>(nations:readonly T[],family:NationFamily,lens:NationLens):T[]{
-  const members:readonly string[]=nationFamilies.find(group=>group.id===family)?.members ?? [];
-  const filtered=nations.filter(nation=>!members.length||members.includes(nation.id));
-  if(lens==='power')return filtered;
-  const rank=(id:string)=>{const index=lensGroups.flat().indexOf(id);return index<0?Number.MAX_SAFE_INTEGER:index;};
-  return filtered.toSorted((a,b)=>rank(a.id)-rank(b.id));
-}
-export function nationIsPreview(id:string){return !['kindle','korund','aurelle'].includes(id);}
+/** #485: the one list of nations a citizen can enroll in today (Kindle, Korund, Aurelle); the other seven are seeded in `nations` but their economies are not built.
+ *  Every gate reads it so they cannot drift: the enroll route (server gate, before any write), the QA nation switch (`qa-test-nation`) and the client "Coming soon" gate (`nationIsPreview`).
+ *  This file imports nothing on purpose: many component tests load it directly. The Stage 0 registry (lib/nation-openings.ts, #488) imports this list (one direction only) and derives each nation's `openingFlag` from it. */
+export const liveNations = ['kindle','korund','aurelle'] as const;
+export type LiveNationId = typeof liveNations[number];
+export const isLiveNation = (id: unknown): id is LiveNationId => typeof id === 'string' && (liveNations as readonly string[]).includes(id);
+/** The ten nations always show in default order; the discovery filter and sort rows were removed. A nation is a preview until its economy is playable. */
+export function nationIsPreview(id:string){return !isLiveNation(id);}

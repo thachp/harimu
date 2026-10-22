@@ -1,5 +1,6 @@
 'use client';
 import {useDisplayTimestamp} from './display-preferences';
+import { isLiveNation } from '@/lib/nation-discovery'; // #488
 import { disabledReasonProps } from '@/lib/action-reasons';
 import { NationDocument } from './nation-document';
 import { LeaderPanel } from './leader-panel';
@@ -13,6 +14,14 @@ import type { SimulationState } from '@/lib/world-simulation';
 import type { VerificationState } from '@/lib/verification';
 import type { GovernmentSnapshot, PetitionTopic } from '@/lib/government';
 
+// #619: only Kindle has a food programme that executes allocations (the Kindle-only block in the simulation section below), so only Kindle's page may mention Kindle allocations or proposals.
+// [ASSUMPTION] wording for Content: the non-Kindle sentences are neutral rewrites of the old "other prototype nations have no automatic policy-appropriation fund" line. Kept in this file because component tests load it under plain Node.
+const civicNationNames: Readonly<Record<string, string>> = { korund: 'Korund', aurelle: 'Aurelle' };
+const civicSpendingNote = (nationId: string) => nationId === 'kindle' ? ' This proposal itself does not spend funds; executed Kindle allocations are recorded separately above.' : ' This proposal itself does not spend funds.';
+const civicBudgetNote = (nationId: string) => nationId === 'kindle'
+  ? 'Kindle proposals and executed allocations use the remaining work-programme budget; other prototype nations have no automatic policy-appropriation fund.'
+  : `${civicNationNames[nationId] ? `${civicNationNames[nationId]}’s proposals` : 'Proposals here'} are saved for review only: there is no automatic policy-appropriation fund, so nothing is allocated or spent.`;
+
 export function GovernmentPanel({ simulation, verification, snapshot, localDemo, pending, error, onPetition, nationId, onRetry }: {
   nationId?: string;
   onRetry?: () => void;
@@ -25,7 +34,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
   onPetition: (topic: PetitionTopic) => void;
 }) {
   const formatTime=useDisplayTimestamp();
-  if (!snapshot) return <section className="citizen-market" aria-label="Government preview status">{['kindle','korund','aurelle'].includes(nationId ?? '') ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>}</section>;
+  if (!snapshot) return <section className="citizen-market" aria-label="Government preview status">{isLiveNation(nationId) ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>}</section>;
   const petitionReason = pending ? 'An action is being saved. Please wait before submitting a priority request.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : null;
   return <NationDocument nationId={snapshot.nationId} className="citizen-market government-document" label="Government decisions and citizen petitions"><div aria-busy={pending}>
     <LeaderPanel snapshot={snapshot} simulation={localDemo ? undefined : simulation} />
@@ -34,7 +43,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     {localDemo && <p>Local demo · petitions and decisions stay in this browser.</p>}
     {!localDemo && <section aria-label="Civic verification"><h4>Phone verification for petitions</h4><p>Petitions need a verified phone number to help protect each citizen’s voice. You can read policy previews while petition submission is unavailable.</p><p role="status">{verification?.reason ?? 'Checking whether your petitions can count…'}</p></section>}
     <ul>{snapshot.roles.map((role) => <li key={role.name}><strong>{role.name}</strong> <AiBadge /> · {role.controller}</li>)}</ul>
-    {!localDemo && simulation?.wars && <WarBanner wars={simulation.wars.wars} nationId={snapshot.nationId} />}
+    {!localDemo && simulation?.wars && <WarBanner wars={simulation.wars.wars} nationId={snapshot.nationId} weariness={simulation.weariness?.[snapshot.nationId as 'kindle' | 'korund' | 'aurelle']} />}
     {!localDemo && simulation?.wars?.defenseWindows && <DefenseWindow windows={simulation.wars.defenseWindows} nationId={snapshot.nationId} />}
     {!localDemo && (simulation?.treaties || simulation?.embargoes) && <ForeignAffairsPanel treaties={simulation.treaties?.treaties} embargoes={simulation.embargoes?.embargoes} nationId={snapshot.nationId} />}
     {!localDemo && simulation?.stability && <StabilityPanel score={simulation.stability.find(score => score.nationId === snapshot.nationId)} />}
@@ -48,12 +57,12 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
       </> : <p>{snapshot.nationId === 'korund' ? 'Korund’s assigned work fills its separate ration store; your Household and State store show current food and coupons. Automatic government policy spending is not implemented here.' : 'This nation receives saved rule-bound proposals; policy spending and economic execution are not implemented here yet.'}</p>}
     </section>}
     <h4>{snapshot.decision.title}</h4>
-    <p>Spending proposal: {snapshot.decision.proposedSpendMinor} minor units from {snapshot.availableBudgetMinor} available. This proposal itself does not spend funds; executed Kindle allocations are recorded separately above.</p>
+    <p>Spending proposal: {snapshot.decision.proposedSpendMinor} minor units from {snapshot.availableBudgetMinor} available.{civicSpendingNote(snapshot.nationId)}</p>
     <p>{snapshot.influenceSummary}</p>
     <h4>Daily priority requests</h4>
     <p>Ask your government to prioritize a need. Completed UTC days receive one recorded review on the next government visit. The selected topic sets the following UTC day’s policy proposal; other topics are deferred. Food safety emergencies can override that priority. Priority requests do not guarantee spending.</p>
     <p>One priority request per UTC day. A request is a political act and ends your citizenship grace period.</p>
-    <p>Kindle proposals and executed allocations use the remaining work-programme budget; other prototype nations have no automatic policy-appropriation fund.</p>
+    <p>{civicBudgetNote(snapshot.nationId)}</p>
     {!localDemo && snapshot.review && <p>Last recorded review: {formatTime(snapshot.review.reviewedAt*1000)} · {snapshot.review.petitionCount} priority requests. {snapshot.review.active ? `Priority active until ${formatTime(snapshot.review.expiresAt*1000)}.` : 'Priority expired; the current proposal uses live needs.'} Review inputs and reasons are saved permanently; live proposal funds are recalculated. No model is called.</p>}
     {!localDemo && snapshot.review?.active && <GameTimer endsAt={snapshot.review.expiresAt * 1000} label="Policy priority expires" />}
     {!localDemo && <section aria-label="Your priority request history">

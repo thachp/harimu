@@ -30,11 +30,11 @@ export function AssemblyPanel({ snapshot, selected, onSelect, onVote, reason, er
     </form>}
     {error && <p role="alert">{error}</p>}
     {snapshot.status === 'closed' && result && <section aria-label="Published Assembly count">
-      <p>{resultsCaption.humanAndBloc.text} {resultsCaption.districtCounts.text}</p>
+      <p>{resultsCaption.humanVotesOnly.text} {resultsCaption.districtCounts.text}</p>
       {result.districts.map(d => <div key={d.districtId}><h4>{d.name}</h4>
-        <table><thead><tr><th>Party list</th><th>Human votes</th><th>AI bloc</th><th>Seats won</th><th>Seats now</th></tr></thead>
-          <tbody>{snapshot.parties.map(p => <tr key={p.id}><td>{name(p.id)}</td><td>{d.human[p.id]}</td><td>{d.bloc[p.id]}</td><td>{d.seatsWon[p.id]}</td><td>{d.seatsAfter[p.id]}</td></tr>)}</tbody></table>
-        {!d.contested && <p>No ballots were cast here, so the seats up stay as they were.</p>}
+        <table><thead><tr><th>Party list</th><th>Human votes</th><th>Seats won</th><th>Seats now</th></tr></thead>
+          <tbody>{snapshot.parties.map(p => <tr key={p.id}><td>{name(p.id)}</td><td>{d.human[p.id]}</td><td>{d.seatsWon[p.id]}</td><td>{d.seatsAfter[p.id]}</td></tr>)}</tbody></table>
+        {!d.contested && <p>{d.belowMinimum ? 'Too few ballots were cast here to count, so they are published but the seats up stay as they were.' : 'No ballots were cast here, so the seats up stay as they were.'}</p>}
       </div>)}
       <h4>Republic Wire Service</h4>
       <ul>{snapshot.headlines.map(h => <li key={`${h.districtId}:${h.partyId}`}><strong>{h.headline}</strong> {h.body}</li>)}</ul>
