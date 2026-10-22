@@ -48,3 +48,15 @@ test('each new capital\'s 7x7 block is untouched Wildlands today, so its opening
   assert.deepEqual(z.mappedNations.map(n => n.id), ['kindle', 'confluence', 'korund', 'aurelle'], 'no new nation is on the square map yet');
   assert.deepEqual(z.bootNationSquaresSql(), z.nationSquaresUpsertSql('confluence'), 'the boot step writes no new nation squares');
 });
+
+test('guard (ARC): the #501 deploy refuses a 30x24 build until world_squares holds all 720 squares (0066 applied)', async t => {
+  const { PGlite } = await import('@electric-sql/pglite'), { readFileSync } = await import('node:fs');
+  const { assertWorldGridCovered, worldGridOfBuild } = await import('../scripts/postgres-migrations.mjs');
+  assert.deepEqual(worldGridOfBuild(), { width: 30, height: 24 }); assert.throws(() => worldGridOfBuild('nothing'), /could not be read/);
+  const pg = new PGlite(); t.after(() => pg.close()); const db = { query: (q, p) => pg.query(q, p) };
+  await pg.exec(z.postgresWorldSquaresMigration());
+  await assert.rejects(assertWorldGridCovered(db), /432 of the 720 squares/);
+  for (const s of z.gridGrowthSql()) await pg.exec(s);
+  await assertWorldGridCovered(db);
+  assert.match(readFileSync('scripts/deploy-production.mjs', 'utf8'), /await assertDatabaseNotAhead\(db\); await assertWorldGridCovered\(db\);/);
+});

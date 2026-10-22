@@ -139,6 +139,17 @@ export async function assertDatabaseNotAhead(db, migrations = postgresMigrations
   const ahead = unknownAppliedMigrations(migrations, done);
   if (ahead.length) throw new Error(`Production deploy refused: the database has migrations this commit does not have (${ahead.join(', ')}). This commit is older than the database; deploy a release that includes them.`);
 }
+/** #486 (ARC): this build's world grid, read from its single definition in lib/globe-mapping.ts (scripts run without TypeScript, so the source is parsed; a missing match throws). */
+export function worldGridOfBuild(source = readFileSync('lib/globe-mapping.ts', 'utf8')) {
+  const m = source.match(/export const WORLD_GRID = \{ width: (\d+), height: (\d+) \} as const;/);
+  if (!m) throw new Error('Production deploy refused: WORLD_GRID could not be read from lib/globe-mapping.ts.');
+  return { width: Number(m[1]), height: Number(m[2]) };
+}
+/** #486 (ARC) deploy guard: refuses unless world_squares holds every square of this build's grid (so a 30x24 build never ships before 0066). Fail closed. */
+export async function assertWorldGridCovered(db, grid = worldGridOfBuild()) {
+  const n = Number((await db.query('SELECT COUNT(*)::int AS n FROM world_squares WHERE x >= 0 AND y >= 0 AND x < $1 AND y < $2', [grid.width, grid.height])).rows[0]?.n ?? 0);
+  if (n !== grid.width * grid.height) throw new Error(`Production deploy refused: world_squares has ${n} of the ${grid.width * grid.height} squares of this build's ${grid.width}x${grid.height} grid. Apply the grid migration first.`);
+}
 /** #119 deploy guard: throws, listing every problem, unless all migrations are applied. */
 export async function assertPostgresMigrationsApplied(db, migrations = postgresMigrations()) {
   const problems = migrationProblems(migrations, await recorded(db), await liveSchema(db));

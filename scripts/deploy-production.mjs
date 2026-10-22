@@ -47,12 +47,12 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
   const config = assertProductionConfig(readProductionConfigRaw()); // the checked-in config; a Hyperdrive placeholder stops here
   if (sharesPreviewHyperdrive(config)) console.warn('Note: production uses the same Hyperdrive config as preview (shared database).');
   if (argv.includes('--dry-run')) { console.log(`Dry run for ${head}: inputs and wrangler.prod.jsonc are valid. Would verify migrations, assert the built config, then run: wrangler ${productionDeployArgs(false).join(' ')}`); return 0; }
-  const { assertPinnedWrangler } = await import('./wrangler-pin.mjs'), { assertPostgresMigrationsApplied, assertDatabaseNotAhead, connectPostgres } = await import('./postgres-migrations.mjs');
+  const { assertPinnedWrangler } = await import('./wrangler-pin.mjs'), { assertPostgresMigrationsApplied, assertDatabaseNotAhead, assertWorldGridCovered, connectPostgres } = await import('./postgres-migrations.mjs');
   assertPinnedWrangler(JSON.parse(readFileSync('node_modules/wrangler/package.json', 'utf8')).version, JSON.parse(readFileSync('package.json', 'utf8')).devDependencies.wrangler);
   const built = assertProductionConfig(JSON.parse(readFileSync('dist/server/wrangler.json', 'utf8'))); // the bundle that would be uploaded
   if (built.main !== 'index.js' || !built.assets?.directory) throw new Error('Build production first (scripts/build-production.mjs).');
   const db = await connectPostgres(env[databaseUrlEnv(argv)]);
-  try { await assertPostgresMigrationsApplied(db); await assertDatabaseNotAhead(db); } finally { await db.close(); } // #486: never ship code older than the shared database
+  try { await assertPostgresMigrationsApplied(db); await assertDatabaseNotAhead(db); await assertWorldGridCovered(db); } finally { await db.close(); } // #486: never ship code older than the shared database
   return spawn('node_modules/.bin/wrangler', productionDeployArgs(false), { stdio: 'inherit', env: { ...env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' } }).status ?? 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

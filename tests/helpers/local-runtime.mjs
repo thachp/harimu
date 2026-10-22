@@ -51,6 +51,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/canvassing.ts','lib/canvassing-rules.ts','app/api/canvassing/route.ts', // #442
     'lib/town-hall.ts','lib/town-hall-rules.ts','lib/town-hall-ai.ts','lib/campaign-copy.ts','app/api/town-hall/route.ts', // #441
     'lib/kindle-eligibility.ts', // #520
+    'lib/nation-opening-guard.ts', // #486
     'lib/debate.ts','lib/debate-rules.ts','lib/debate-ai.ts','lib/debate-copy.ts','lib/palace-coup-copy.ts','app/api/debate/route.ts', // #282
     'lib/spark-supply.ts','lib/spark-supply-rules.ts','lib/reserve-board-copy.ts','lib/reserve-board-view.ts', // #431
     'lib/ledger-reconciliation.ts','lib/ledger-reconciliation-rules.ts','app/api/admin/ledger-reconciliation/route.ts', // #432
