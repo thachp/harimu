@@ -61,7 +61,9 @@ const nationWorkOptions = () => ({ enabled: (env as unknown as { HARIMU_NATION_W
 const grayDailyCapOn = () => (env as unknown as { HARIMU_GRAY_DAILY_CAP_ENABLED?: string }).HARIMU_GRAY_DAILY_CAP_ENABLED === 'true';
 // #749: completed gray-market trades add private Suspicion (HARIMU_GRAY_SUSPICION_ENABLED); off = no read, view unchanged.
 const graySuspicionOn = () => (env as unknown as { HARIMU_GRAY_SUSPICION_ENABLED?: string }).HARIMU_GRAY_SUSPICION_ENABLED === 'true';
-const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn() });
+// #737: Plan medals for weekly quota over-fulfilment (HARIMU_KORUND_MEDALS_ENABLED); off = no medal read, panel unchanged.
+const korundMedalsOn = () => (env as unknown as { HARIMU_KORUND_MEDALS_ENABLED?: string }).HARIMU_KORUND_MEDALS_ENABLED === 'true';
+const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), medals: korundMedalsOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';
