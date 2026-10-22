@@ -36,6 +36,9 @@ export async function runSpoilage(db: GameDatabase, tick: number, now: number, t
       c.orders.push({ id: o.id, remaining: Number(o.remaining) }); citizens.set(o.citizen_id, c);
     }
     for (const [citizen, c] of citizens) {
+      // RULE (intentional, ARC's ruling on #721 / PR #729): goods bought or received during the current game day start spoiling the NEXT day; stock held
+      // before the day began spoils as before. Do not "fix" this back to charging fresh goods: spoilage runs on every market write, so that would eat a
+      // just-bought basket before the citizen can sell it.
       const total = spoilQuantity(good, Math.max(0, c.free + c.orders.reduce((s, o) => s + o.remaining, 0) - (freshBy.get(citizen) ?? 0)));
       if (!total) continue;
       const plan = allocateSpoilage(total, c.free, c.orders);
