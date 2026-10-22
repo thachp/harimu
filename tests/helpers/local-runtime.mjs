@@ -178,6 +178,7 @@ export async function readVerification(userId) {
     setOrderBook:on=>{env.HARIMU_ORDER_BOOK_ENABLED=String(on);}, // #197
     setTravel:on=>{env.HARIMU_TRAVEL_ENABLED=String(on);}, // #123
     setDiplomaticHall:on=>{env.HARIMU_DIPLOMATIC_HALL_ENABLED=String(on);}, // #599
+    setMapOverlays:on=>{env.HARIMU_MAP_OVERLAYS_ENABLED=String(on);}, // #82
     setFaith:on=>{env.HARIMU_FAITH_ENABLED=String(on);}, // #67
     reopen() { if(postgres){postgres.reopen();return;}env.DB.close(); env.DB = new LocalD1(path); },
     async close() { if(postgres)await postgres.close();else env.DB.close(); await rm(directory, { recursive: true, force: true }); },

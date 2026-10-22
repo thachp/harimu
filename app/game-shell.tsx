@@ -58,6 +58,8 @@ export type GameShellProps = {
   onNavigate: (view: SceneView) => void;
   /** #344: server market flag (HARIMU_ORDER_BOOK_ENABLED). False hides the Market tab and map building; defaults to true so other callers are unchanged. */
   marketOpen?: boolean;
+  /** #82: flags.mapOverlays from GET /api/citizen. */
+  mapOverlays?: boolean;
   onSelectNation?: (id: string) => void;
   accountControls?: ReactNode;
   socialDock?: ReactNode;
@@ -87,7 +89,7 @@ function HudHelp({ label, children, help, open = false }: { label: string; child
   return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ worldClock, holidayName, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ worldClock, holidayName, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, mapOverlays = false, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -145,7 +147,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   const shiftChip = shiftSummary ? <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong>{shiftSummary.endsAt !== undefined ? <GameTimer compact endsAt={shiftSummary.endsAt * 1000} label="Shift" expiredText={shiftSummary.expiredText} /> : <span>Active shift</span>}<CaretRight /></button> : null;
   return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}`}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
-    <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} visitor={visitor} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
+    <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} visitor={visitor} overlays={mapOverlays} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
     <header className={topbarV2 ? 'game-hud game-hud-v2' : 'game-hud'} {...hudHelpHandlers}>
       <div className="game-identity"><span className="game-crest" aria-hidden="true">H</span><div><strong>HARIMU</strong><span><span role="status">{identityHold === 'loading' ? 'Loading your citizen…' : null}</span>{identityHold !== 'none' ? null : <>{emblemOn && <NationEmblemMark id={resourceNation.id} name={resourceNation.name} />}{resourceNation.name}<i />{identityStatus({ guestDemo, localDemo, hasCitizenNation: Boolean(citizenNation) }, emblemOn)}</>}</span></div></div>
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>

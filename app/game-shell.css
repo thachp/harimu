@@ -372,6 +372,37 @@ body:has(.harimu-game){overflow:auto}
 .board-move{font-size:calc(11px * var(--text-scale, 1));color:#c8d7c4;white-space:nowrap}.board-updated{margin:6px 0 0;color:#a1bdc5;font-size:calc(11px * var(--text-scale, 1))}.board-tick-live{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media(prefers-reduced-motion:no-preference){html:not([data-harimu-reduced-motion]) .board-changed{animation:board-tick 1.2s ease-out 1}}
 @keyframes board-tick{from{background:#e0b64c33}to{background:transparent}}
+/* #82 slice 1: Overlays group, bottom-right, directly left of the zoom cluster (teal panel, gold for the pressed state). */
+.map-overlays{position:relative;display:flex;align-items:center;flex:none}
+.map-overlays-trigger{display:none}
+.map-overlays-panel{display:flex;flex-direction:column;align-items:flex-end}
+.map-overlays-group{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding-right:6px;margin-right:2px;border-right:1px solid #365c69}
+.map-overlays-title{font-size:calc(11px * var(--text-scale, 1));color:#a9c8d0;padding:0 4px}
+.viewport-controls:has(.map-overlays) button{min-width:44px;min-height:44px}
+.viewport-controls .map-overlays button[aria-pressed="true"]{background:#2a3a2c;border-color:#d8b35a;color:#f2d88f}
+.viewport-controls .map-overlays button[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.map-overlays-unavailable{position:relative;display:inline-flex}
+.map-overlays-unavailable [role="tooltip"]{display:none;position:absolute;bottom:calc(100% + 6px);right:0;width:max-content;max-width:220px;padding:6px 8px;background:#0b2631;border:1px solid #d8b35a;border-radius:3px;color:#e6f0f0;font-size:calc(11px * var(--text-scale, 1));z-index:5}
+.map-overlays-unavailable:hover [role="tooltip"],.map-overlays-unavailable:focus-within [role="tooltip"]{display:block}
+.map-overlays-legend:focus-visible{outline:2px solid #d8b35a}.map-overlays-legend{position:absolute;bottom:calc(100% + 8px);right:0;display:flex;flex-direction:column;gap:6px;width:max-content;max-width:260px;padding:8px 10px;background:#0b2631e8;border:1px solid #365c69;border-radius:3px;color:#c9e3e5;font-size:calc(11px * var(--text-scale, 1))}
+.map-overlays-legend section{display:flex;flex-direction:column;gap:3px}.map-overlays-legend strong{color:#f2d88f}
+.map-overlays-scale{display:flex;gap:0;margin:0;padding:0;list-style:none}.map-overlays-scale li{flex:1;padding:2px 6px;text-align:center;border:1px solid #365c69}
+.map-overlays-scale li:nth-child(1){background:#1d4a3f}.map-overlays-scale li:nth-child(2){background:#6b5a25}.map-overlays-scale li:nth-child(3){background:#6e2a24}
+.map-overlays-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:390px){
+  .game-stage .viewport-controls:has(.map-overlays){position:relative;inset:auto}.map-overlays{position:static}
+  .map-overlays-trigger{display:inline-flex;align-items:center;justify-content:center}
+  .map-overlays-panel{display:none;position:absolute;bottom:calc(100% + 6px);right:8px;z-index:4;padding:6px;background:#0b2631f2;border:1px solid #365c69;border-radius:3px;width:max-content;max-width:calc(100vw - 24px);max-height:max(160px,calc(44dvh - 130px));overflow:hidden}
+  .map-overlays-panel[data-sheet]{width:auto}
+  .map-overlays[data-open="true"] .map-overlays-panel{display:flex;align-items:stretch}
+  .harimu-game .game-stage:has(.map-overlays-panel[data-sheet]){z-index:30}.map-overlays-panel[data-sheet]{z-index:30;box-shadow:0 -8px 24px #0009}
+  .map-overlays[data-open="true"] .map-overlays-trigger{border-color:#d8b35a;color:#f2d88f}
+  .map-overlays-panel{min-width:0}.map-overlays-group button{white-space:normal;overflow-wrap:normal}.map-overlays-scale li{min-width:0}
+  .map-overlays-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:none;border-right:0;padding-right:0;margin-right:0}.map-overlays-unavailable{display:grid}
+  .map-overlays-title{display:none}
+  .map-overlays-legend{position:static;order:2;width:auto;max-width:none;margin-top:6px;flex:1 1 auto;min-height:0;overflow-y:auto}
+  .map-overlays-unavailable [role="tooltip"]{right:auto;left:0;max-width:calc(100vw - 48px)}
+}
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
    this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
 .game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}
