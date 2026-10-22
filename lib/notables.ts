@@ -4,13 +4,14 @@ import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiRes
 import {readNationalNews} from './national-news';
 import {notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 import {nationNotables} from './notable-choice';
+import {skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
 export {notableFor,nationNotables} from './notable-choice';
 export {notableProfile,notableTopics,notableDailyLimit,validNotableCommand} from './notable-profiles';
 export const notablesEnabled=true; // Explicit preview approval; independent runtime switch and shared pricing gate remain required.
 async function ownerPrefix(userId:string){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(userId));return 'notable:'+Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')+':';}
 
 /** No conversation history, household drafts, account IDs or private chat enter a model prompt. */
-export async function answerNotable(db:GameDatabase,userId:string,command:NotableCommand,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null}={}){
+export async function answerNotable(db:GameDatabase,userId:string,command:NotableCommand,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,killSwitch=null as AiTemplatesOnlyEnv|null}={}){
  const fail=(status:number,error:string)=>({status,error});
  if(!validNotableCommand(command))return fail(400,'Choose a listed public topic and a valid request.');
  const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();const nation=citizen?.nation_id??null;
@@ -19,6 +20,8 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
  const profile=nationNotables(nation).find(p=>p.id===command.notableId)??null;
  if(!profile)return fail(403,'Only your nation’s Notable is available.');
  if(!enabled||!binding||!budget)return fail(503,'AI conversations are disabled. Authored topic examples remain available.');
+ // #742: templates-only mode answers with the authored topic example: no model call, no reservation, nothing charged.
+ if(skipForTemplates('notables',killSwitch,nation!,now))return {status:200,reply:notableTopics[command.topic].authored,source:'authored' as const,templatesOnly:true};
  const prefix=await ownerPrefix(userId),id=prefix+command.requestId.toLowerCase();
  if(await db.prepare('SELECT request_id FROM harimu_ai_reservations WHERE request_id=?').bind(id).first())return fail(409,'This request was already attempted. Repeating it makes no further inference call.');
  const news=await readNationalNews(db,citizen!.nation_id,now*1000);if(!news)return fail(503,'Public context is unavailable.');const facts=publicNewsFacts(news);
