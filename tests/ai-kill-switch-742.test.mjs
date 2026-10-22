@@ -85,3 +85,15 @@ test('notables: templates-only answers with the authored example, with no model 
   assert.equal(live.status, 200); assert.ok(ai.calls.length > 0); assert.equal(await reservations(r.db), 1);
 }));
 // The rendered footer is tested in tests/national-news-ui.test.mjs.
+
+test('POST /api/notables passes the switch: "all" answers authored with no model call; "korund" leaves a Kindle citizen on the model', quiet(async t => {
+  const r = await localRuntime(); t.after(() => r.close()); const ai = counting(); r.setFixtureAiBinding(ai); r.setFixtureAiFlags({notables: true});
+  const command = () => ({requestId: randomUUID(), notableId: 'kindle-journalist', topic: 'news'});
+  r.setFixtureEnv('HARIMU_AI_TEMPLATES_ONLY', 'all');
+  const off = await r.call('notables', 'alice', command());
+  assert.equal(off.status, 200); assert.equal(off.data.source, 'authored'); assert.equal(off.data.templatesOnly, true); assert.ok(off.data.reply.length > 0);
+  assert.equal(ai.calls.length, 0); assert.equal(await reservations(r.db), 0);
+  r.setFixtureEnv('HARIMU_AI_TEMPLATES_ONLY', 'korund');
+  const live = await r.call('notables', 'alice', command());
+  assert.equal(live.status, 200); assert.equal(live.data.templatesOnly, undefined); assert.ok(ai.calls.length > 0); assert.equal(await reservations(r.db), 1);
+}));
