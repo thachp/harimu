@@ -28,3 +28,13 @@ export function toggleOverlay(active: readonly OverlayId[], id: OverlayId): Over
 }
 
 export function overlayLabel(id: OverlayId): string { return MAP_OVERLAYS.find(o => o.id === id)?.label ?? id; }
+
+export const POPOVER_GAP = 8, POPOVER_MIN_WIDTH = 260;
+type Box = { right: number };
+/** Phone popover placement. Beside the chip, right-anchored to the camera bar, when at least POPOVER_MIN_WIDTH fits right of it;
+ *  otherwise a bottom sheet fixed to the bottom of the screen whose top stays below the chip. Either way it never overlaps the chip. */
+export function phonePopoverPlacement(viewport: { width: number; height: number }, bar: Box, chip: { right: number; bottom: number } | null) {
+  const besideWidth = viewport.width - (chip ? chip.right : 0) - 2 * POPOVER_GAP;
+  if (!chip || besideWidth >= POPOVER_MIN_WIDTH) return { right: Math.max(0, bar.right - viewport.width) + POPOVER_GAP, maxWidth: besideWidth };
+  return { position: 'fixed' as const, left: POPOVER_GAP, right: POPOVER_GAP, bottom: POPOVER_GAP, maxWidth: 'none', maxHeight: Math.max(0, viewport.height - Math.max(0, chip.bottom) - 2 * POPOVER_GAP) };
+}

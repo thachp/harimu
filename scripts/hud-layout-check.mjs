@@ -36,6 +36,7 @@ import { checkPhoneTapTargets } from './phone-tap-targets-check.mjs';
 import { checkCityDestinations } from './city-destinations-check.mjs';
 import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { checkGlobeLabelPressed } from './globe-label-pressed-check.mjs';
+import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
@@ -195,6 +196,7 @@ try {
   await checkPhoneTapTargets({ browser, css, preflight, failures, rows }); // #528: phone controls are at least 44x44; the camera bar sits under the canvas
   await checkCityDestinations({ browser, css, preflight, failures, rows }); // #378: Korund cards say Assignment / State store like the tabs; country pins fit city names
   await checkGlobeLabelPressed({ browser, failures, rows }); // #618: the selected nation's globe label keeps aria-pressed after the scene rebuilds
+  await checkMapOverlays({ browser, css, preflight, failures, rows }); // #82: Overlays bar at 1280 (no overlap/clip, 44px, no mid-word breaks); phone popover never covers the World chip
   await checkVisitorWording({ browser, css, preflight, failures, rows }); // #379: visitor wording (VISITOR PREVIEW, Household) and guide/pin text fit
 } finally { await browser.close(); }
 console.log(rows.join('\n'));

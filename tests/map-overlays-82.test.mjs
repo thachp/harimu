@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { Window } from 'happy-dom';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { toggleOverlay, MAP_OVERLAYS, UNREST_SCALE } from '../lib/map-overlays.ts';
+import { toggleOverlay, MAP_OVERLAYS, UNREST_SCALE, phonePopoverPlacement, POPOVER_GAP } from '../lib/map-overlays.ts';
 const require = createRequire(import.meta.url);
 
 const w = new Window({ url: 'http://localhost/' }); globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -78,8 +78,27 @@ test('phone trigger opens and Escape closes the popover', async () => {
   const m = await mount(true); const trigger = m.button('Overlays'); const root = m.el.querySelector('.map-overlays');
   assert.equal(trigger.getAttribute('aria-expanded'), 'false'); assert.equal(trigger.getAttribute('aria-controls'), 'map-overlays-panel');
   await click(trigger); assert.equal(root.dataset.open, 'true'); assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+  await click(m.button('Resources'));
+  const legend = m.el.querySelector('.map-overlays-legend');
+  assert.deepEqual([legend.getAttribute('role'), legend.tabIndex, legend.getAttribute('aria-label')], ['region', 0, 'Overlay legend'], 'the scrolling legend is keyboard-reachable');
+  m.button('Ownership').focus();
   await act(async () => m.button('Ownership').dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  assert.equal(root.dataset.open, 'false'); await m.close();
+  assert.equal(root.dataset.open, 'false'); assert.equal(document.activeElement, trigger, 'Escape returns focus to Overlays');
+  await click(trigger); trigger.blur();
+  await act(async () => m.button('Unrest').dispatchEvent(new w.PointerEvent('pointerdown', { bubbles: true })));
+  assert.equal(root.dataset.open, 'true', 'a tap inside keeps it open');
+  await act(async () => document.body.dispatchEvent(new w.PointerEvent('pointerdown', { bubbles: true })));
+  assert.equal(root.dataset.open, 'false', 'an outside tap closes it'); assert.equal(document.activeElement, trigger, 'and returns focus to Overlays');
+  await m.close();
+});
+
+test('phone placement: beside the World chip when it fits, else a bottom sheet whose top stays below the chip', () => {
+  const chip = { right: 92, bottom: 355 };
+  const beside = phonePopoverPlacement({ width: 390, height: 844 }, { right: 390 }, chip);
+  assert.equal(beside.position, undefined); assert.equal(390 - beside.right - beside.maxWidth, chip.right + POPOVER_GAP, 'its left edge clears the chip');
+  const sheet = phonePopoverPlacement({ width: 320, height: 640 }, { right: 320 }, chip);
+  assert.equal(sheet.position, 'fixed'); assert.equal(640 - sheet.bottom - sheet.maxHeight, chip.bottom + POPOVER_GAP, 'its top clears the chip');
+  assert.equal(phonePopoverPlacement({ width: 320, height: 300 }, { right: 320 }, chip).maxHeight, 0);
 });
 
 test('wiring: the group sits first in viewport-controls (left of the zoom cluster) and gets the flag through GameShell and page', async () => {
@@ -91,7 +110,7 @@ test('wiring: the group sits first in viewport-controls (left of the zoom cluste
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
   assert.match(page, /const \[overlaysFlag, setOverlaysFlag\] = useState\(false\)/); assert.match(page, /setOverlaysFlag\(snapshot\.flags\.mapOverlays === true\)/); assert.match(page, /<GameShell .*marketOpen=\{marketShown\} mapOverlays=\{overlaysFlag\}/);
   const css = await readFile(new URL('../app/game-shell.css', import.meta.url), 'utf8');
-  assert.match(css, /\.viewport-controls \.map-overlays button\{min-width:44px;min-height:44px\}/);
+  assert.match(css, /\.viewport-controls:has\(\.map-overlays\) button\{min-width:44px;min-height:44px\}/);
   assert.match(css, /@media\(max-width:390px\)\{\n.*\n  \.map-overlays-trigger\{display:inline-flex/);
 });
 
