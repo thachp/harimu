@@ -47,6 +47,11 @@ export async function readWarWeariness(db: GameDatabase, asOf: number, options: 
   for (const nation of warNations) out[nation] = warWearinessUnrest(nation, weeks[nation], { lostSquares: lost[nation] });
   return out;
 }
+/** #427 slice 3: Kindle's weariness points for the Assembly's war and ending votes, read at decision time. Zero unless the weariness flag is on (then the vote is unchanged). */
+export type VoteWearinessOptions = { enabled?: boolean; losses?: boolean };
+export async function kindleVoteWeariness(db: GameDatabase, now: number, options: VoteWearinessOptions = {}): Promise<number> {
+  return options.enabled ? (await readWarWeariness(db, now, { losses: options.losses === true })).kindle : 0;
+}
 /** What citizens may see: a level name per nation at war with weariness (never the amount, so Korund's true Unrest cannot be read off it). */
 export type PublicWeariness = Partial<Record<WarNationId, WearinessLevelId>>;
 export async function readPublicWeariness(db: GameDatabase, asOf: number, options: WearinessOptions = {}): Promise<PublicWeariness> {

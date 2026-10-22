@@ -90,9 +90,9 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
      { name: 'embargo', on: options.embargo === true, run: () => runEmbargo(db, now).catch(warnOnly('embargo')) },
      // #427: the Kindle Assembly votes on pending war declarations after diplomacy, so a pact ratified this tick blocks the declaration on re-check
      // (only while HARIMU_WAR_ENABLED and HARIMU_WAR_ASSEMBLY_ENABLED are on; citizen POST path only).
-     { name: 'warAssembly', on: options.war === true && options.warAssembly === true, run: () => decideKindleWarProposals(db, now, options.warLimits === true).catch(warnOnly('war assembly')) },
+     { name: 'warAssembly', on: options.war === true && options.warAssembly === true, run: () => decideKindleWarProposals(db, now, options.warLimits === true, { enabled: options.warWeariness === true, losses: options.warWearinessLosses === true }).catch(warnOnly('war assembly')) },
      // #427 slice 2: surrender and concession endings, decided once, also after diplomacy (HARIMU_WAR_ENABLED and HARIMU_WAR_ENDINGS_ENABLED; citizen POST path only).
-     { name: 'warEndings', on: options.war === true && options.warEndings === true, run: () => decideWarEndings(db, now).catch(warnOnly('war endings')) }],
+     { name: 'warEndings', on: options.war === true && options.warEndings === true, run: () => decideWarEndings(db, now, { enabled: options.warWeariness === true, losses: options.warWearinessLosses === true }).catch(warnOnly('war endings')) }],
     // #612: the Founding Period's one day-30 event per MVP nation (idempotent).
     [{ name: 'foundingDay30', on: options.foundingPeriod === true, run: () => runFoundingDay30(db, now).catch(warnOnly('founding day-30')) }],
   ];
