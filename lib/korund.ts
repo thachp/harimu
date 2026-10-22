@@ -64,7 +64,7 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean}={}):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -83,12 +83,12 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  const extra=await readCouponsAndQuota(db,userId,w.number,Boolean(ledger?.coupon_used),w.start,w.end);
  const bureau=options.laborBureau&&citizen?.nation_id==='korund'?{bureau:await readBureau(db,userId,now)}:{};
  // #43: the gray market is in the plan only with HARIMU_GRAY_MARKET_ENABLED on, and only for a Korund citizen.
- const gray=options.grayMarket&&citizen?.nation_id==='korund'?{gray:await readGray(db,userId,now,{dailyCap:options.grayDailyCap===true})}:{};
+ const gray=options.grayMarket&&citizen?.nation_id==='korund'?{gray:await readGray(db,userId,now,{dailyCap:options.grayDailyCap===true,suspicion:options.graySuspicion===true})}:{};
  return {...extra,...bureau,...gray,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean}={}) {
+export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean}={}) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  if(command.action==='korund-gray-post-offer'||command.action==='korund-gray-accept-offer'){
   // #43: the gray market ships off; with the flag off these actions are not found and change nothing.

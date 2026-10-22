@@ -59,7 +59,9 @@ const grayMarketOn = () => (env as unknown as { HARIMU_GRAY_MARKET_ENABLED?: str
 const nationWorkOptions = () => ({ enabled: (env as unknown as { HARIMU_NATION_WORK_ENABLED?: string }).HARIMU_NATION_WORK_ENABLED === 'true', bindings: env as never });
 // #736: per-citizen daily gray-market volume cap (HARIMU_GRAY_DAILY_CAP_ENABLED); off = today's behaviour.
 const grayDailyCapOn = () => (env as unknown as { HARIMU_GRAY_DAILY_CAP_ENABLED?: string }).HARIMU_GRAY_DAILY_CAP_ENABLED === 'true';
-const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn() });
+// #749: completed gray-market trades add private Suspicion (HARIMU_GRAY_SUSPICION_ENABLED); off = no read, view unchanged.
+const graySuspicionOn = () => (env as unknown as { HARIMU_GRAY_SUSPICION_ENABLED?: string }).HARIMU_GRAY_SUSPICION_ENABLED === 'true';
+const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';

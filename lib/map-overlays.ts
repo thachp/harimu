@@ -17,7 +17,7 @@ export const UNREST_SCALE = ['Calm', 'Tense', 'Riot'] as const;
 export const LEGEND_TEXT: Record<OverlayId, string> = {
   ownership: 'Nation symbols and colors.',
   resources: 'Resource node icons.',
-  unrest: 'Not drawn yet.',
+  unrest: 'Each nation\'s latest Unrest on its squares.',
 };
 
 /** The active overlays after pressing `id`, in the fixed button order. */

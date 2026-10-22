@@ -68,7 +68,11 @@ test('strip and preview panel show the band as text; pioneer note is a keyboard-
   const shell=await readFile(new URL('../app/game-shell.tsx',import.meta.url),'utf8');
   assert.match(page,/badge: nation\.populationBand && populationBandLabel\[nation\.populationBand\]/);
   assert.match(shell,/item\.badge && <small className="population-band-badge" data-band=\{item\.badge\}>\{item\.badge\}<\/small>/);
-  assert.match(page,/<dt>Population<\/dt><dd className="population-band" data-band=\{selected\.populationBand\}>\{populationBandLabel\[selected\.populationBand\]\}<\/dd>/);
+  // #392 S3: the band <dd> is built in page.tsx and placed under its Population label by app/scene-panels-v2.tsx (flag off: facts list; flag on: stats row)
+  assert.match(page,/const populationFact = selected\.populationBand \? <dd className="population-band" data-band=\{selected\.populationBand\}>\{populationBandLabel\[selected\.populationBand\]\}<\/dd> : null;/);
+  const panels=await readFile(new URL('../app/scene-panels-v2.tsx',import.meta.url),'utf8');
+  assert.match(panels,/\{population && <><dt>Population<\/dt>\{population\}<\/>\}/);
+  assert.match(panels,/population \? \[\{ label: 'Population', value: population \}\]/);
   assert.match(page,/selected\.populationBand === 'needs-citizens' && <details className="pioneer-note"><summary>/);
   const css=await readFile(new URL('../app/game-shell.css',import.meta.url),'utf8');
   assert.match(css,/\.population-band-badge\[data-band="Needs citizens"\]\{border-style:dashed/,'not colour alone');
