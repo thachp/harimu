@@ -12,7 +12,7 @@ import { devotionTier, faithCopy, unaffiliatedCopy } from './faith-copy';
 import { devotionPerFestival, festivalCalendar, festivalJoins, festivalSchemas } from './festivals';
 import { mvpFestival } from './mvp-festival-copy';
 import { royalFavorBalance, royalFavorBinds, royalFavorSql } from './aurelle';
-import { appealCorrectionDuty, dutyDevotionEvents, holderCity, readUndergroundView, undergroundHits, undergroundSchemas } from './korund-underground'; // #295, #382
+import { appealCorrectionDuty, dutyDevotionEvents, holderCity, readGraySuspicion, readUndergroundView, undergroundHits, undergroundSchemas, type SuspicionOptions } from './korund-underground'; // #295, #382
 import { korundUndergroundCopy } from './faith-copy';
 import { missionarySchemas, readMissionary, isMissionNation } from './missionaries'; // #225
 
@@ -119,7 +119,7 @@ const label = (id: FaithChoice) => id === 'unaffiliated' ? unaffiliatedCopy.name
 const fail = (status: 400 | 403 | 409 | 503, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 
 /** Pure read (GET). The hidden faith is returned only to its holder, labelled private. */
-export async function readFaith(db: GameDatabase, userId: string, now: number, enabled: boolean, favorDecayAt?: number) {
+export async function readFaith(db: GameDatabase, userId: string, now: number, enabled: boolean, favorDecayAt?: number, suspicionOptions: SuspicionOptions = {}) {
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id ?? null;
   const options = faithOptions(nationId ?? '');
@@ -146,7 +146,7 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
   const undergroundHitEvents = hiddenFaith ? await undergroundHits(db, userId, Number(row?.chosen_at ?? 0)) : [];
   const dutyEvents = hiddenFaith ? await dutyDevotionEvents(db, userId) : []; // #382 PR B: Correction Duty costs Devotion (social standing) only
   const undergroundDevotion = hiddenFaith ? devotionFromEvents([...undergroundDays.map(day => ({ day, amount: devotionPerWorship })), ...undergroundHitEvents, ...dutyEvents], today) : null;
-  const underground = hiddenFaith ? await undergroundState(db, userId, hiddenFaith, undergroundDays.includes(today), Number(row?.chosen_at ?? 0), today, now) : null;
+  const underground = hiddenFaith ? await undergroundState(db, userId, hiddenFaith, undergroundDays.includes(today), Number(row?.chosen_at ?? 0), today, now, suspicionOptions) : null;
   // #225: cross-border missionaries (derived on read; null with the flag off or in an unsupported nation).
   // #404: Korund has no public faith (docs 14.6), so it gets no missionary state or block.
   const missionary = enabled && supported && nationId !== 'korund' && isMissionNation(nationId ?? '') ? await readMissionary(db, userId, now, { nationId: nationId!, currentFaith: faith, worshipFaith, devotion, changeAvailableAt }) : null;
@@ -170,8 +170,8 @@ export async function readFaith(db: GameDatabase, userId: string, now: number, e
 }
 
 /** #295: the holder's private underground-worship state: the action label, whether it can be used today, and what an inspection left (derived on read). */
-async function undergroundState(db: GameDatabase, userId: string, faithId: WorshipFaithId, worshippedToday: boolean, since: number, today: number, now: number) {
-  const view = await readUndergroundView(db, userId, await holderCity(db, userId), since, now);
+async function undergroundState(db: GameDatabase, userId: string, faithId: WorshipFaithId, worshippedToday: boolean, since: number, today: number, now: number, options: SuspicionOptions = {}) {
+  const view = await readUndergroundView(db, userId, await holderCity(db, userId), since, now, options);
   return {
     faithId, label: korundUndergroundCopy.worshipAction.label, worshippedToday,
     blockedReason: worshippedToday ? korundUndergroundCopy.worshipAction.alreadyToday.text : null,
@@ -353,4 +353,12 @@ export async function joinFestival(db: GameDatabase, userId: string, command: { 
   const saved = await db.prepare('SELECT user_id FROM citizen_festival_joins WHERE request_id=?').bind(command.requestId).first<{ user_id: string }>();
   if (!saved) return fail(409, 'already_joined', `You already joined ${copy.name}.`);
   return { ok: true as const, completion: copy.joinToast, state: await readFaith(db, userId, now, enabled) };
+}
+
+/** #752: POST results build their state with the discoveries-only default; with HARIMU_GRAY_SUSPICION_ENABLED on, the route swaps in the combined band so every faith response matches the Korund panel. */
+export async function withGraySuspicion<T>(db: GameDatabase, userId: string, now: number, result: T): Promise<T> {
+  const u = (result as { ok?: boolean; state?: { underground?: { suspicion: unknown } | null } }).state?.underground;
+  if (!(result as { ok?: boolean }).ok || !u) return result;
+  u.suspicion = await readGraySuspicion(db, userId, now);
+  return result;
 }
