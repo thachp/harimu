@@ -408,6 +408,10 @@ body:has(.harimu-game){overflow:auto}
 .map-ownership>span[hidden]{display:none}
 .map-ownership>span{position:absolute;transform:translate(-50%,-50%);width:calc(14px * var(--text-scale, 1));height:calc(14px * var(--text-scale, 1));border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:calc(10px * var(--text-scale, 1));line-height:1;outline:1px solid #0b263155}
 .map-ownership[data-low-graphics]>span{outline:0}
+.map-resources{position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none}
+.map-resources>span[hidden]{display:none}
+.map-resources>span{position:absolute;transform:translate(15%,-115%);font-size:calc(11px * var(--text-scale, 1));line-height:1;color:#f3ecd6;text-shadow:0 0 2px #0b2631,0 0 2px #0b2631}
+.map-resources>span[data-rare]{border:1px solid #d0ad54;border-radius:50%;padding:1px}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
 .game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}

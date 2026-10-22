@@ -16,7 +16,7 @@ const EXCLUDES: Record<OverlayId, OverlayId | null> = { ownership: 'unrest', unr
 export const UNREST_SCALE = ['Calm', 'Tense', 'Riot'] as const;
 export const LEGEND_TEXT: Record<OverlayId, string> = {
   ownership: 'Nation symbols and colors.',
-  resources: 'Resource icons. Not drawn yet.',
+  resources: 'Resource node icons.',
   unrest: 'Not drawn yet.',
 };
 
