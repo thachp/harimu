@@ -7,7 +7,8 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { kindleSeats } from './diplomacy';
 import { soleRatification, type PartySeats, type Ratification } from './diplomacy-rules';
-import { isWarNation, requestIdOk, type WarNationId } from './war-rules';
+import { isWarNation, kindlePartyWeary, requestIdOk, wearyKindleParties, type WarNationId } from './war-rules';
+import { kindleVoteWeariness, type VoteWearinessOptions } from './war-weariness'; // #427 slice 3
 
 export const warEndingsSchemas = [
   `CREATE TABLE IF NOT EXISTS war_end_terms (
@@ -39,15 +40,16 @@ export const kindleEndingStances = {
   receive: { 'steady-hand': true, 'open-ledger': true, 'dockside-builders': true },
 } as const satisfies Record<string, Record<typeof parties[number], boolean>>;
 /** Kindle's Assembly: the whole Assembly is the denominator (an unknown party counts as not-yes). Surrender: more than half; a concession: two-thirds, the treaty rule. */
-export function kindleEndingVote(stance: keyof typeof kindleEndingStances, seats: PartySeats): Ratification {
+/** #427 slice 3: a weary party (Kindle's weariness at or above its tolerance) votes yes on surrendering or ceding; receiving squares is not weighed. */
+export function kindleEndingVote(stance: keyof typeof kindleEndingStances, seats: PartySeats, weariness = 0): Ratification & { weariness?: number; weary?: string[] } {
   const n = (id: string) => { const v = Math.trunc(Number(seats[id] ?? 0)); return Number.isFinite(v) && v > 0 ? v : 0; };
-  const total = Object.keys(seats).reduce((a, id) => a + n(id), 0), yes = parties.reduce((a, id) => a + (kindleEndingStances[stance][id] ? n(id) : 0), 0);
+  const total = Object.keys(seats).reduce((a, id) => a + n(id), 0), yes = parties.reduce((a, id) => a + (kindleEndingStances[stance][id] || (stance !== 'receive' && kindlePartyWeary(id, weariness)) ? n(id) : 0), 0);
   const rule = stance === 'surrender' ? 'simple-majority' as const : 'two-thirds' as const;
-  return { nation: 'kindle', body: 'Assembly', rule, yes, total, passed: total > 0 && (rule === 'two-thirds' ? yes * 3 >= total * 2 : yes * 2 > total) };
+  return { nation: 'kindle', body: 'Assembly', rule, yes, total, passed: total > 0 && (rule === 'two-thirds' ? yes * 3 >= total * 2 : yes * 2 > total), ...(weariness > 0 && stance !== 'receive' ? { weariness, weary: wearyKindleParties(weariness) } : {}) };
 }
 /** Surrender: the surrendering nation's own body alone. Concession: the ceding and the receiving nation's bodies both (Korund's Chairman, Aurelle's Crown, Kindle's Assembly). */
-export function decideEnding(kind: 'surrender' | 'concession', proposer: WarNationId, other: WarNationId, seats: PartySeats) {
-  const side = (nation: WarNationId, stance: keyof typeof kindleEndingStances) => nation === 'kindle' ? kindleEndingVote(stance, seats) : soleRatification(nation);
+export function decideEnding(kind: 'surrender' | 'concession', proposer: WarNationId, other: WarNationId, seats: PartySeats, weariness = 0) {
+  const side = (nation: WarNationId, stance: keyof typeof kindleEndingStances) => nation === 'kindle' ? kindleEndingVote(stance, seats, weariness) : soleRatification(nation);
   const ratifications = kind === 'surrender' ? [side(proposer, 'surrender')] : [side(proposer, 'cede'), side(other, 'receive')];
   return { passed: ratifications.every(r => r.passed), ratifications };
 }
@@ -104,13 +106,13 @@ const changes = (result: unknown) => Number((result as { meta?: { changes?: numb
  *  re-checks in its own WHERE (war still open; every square still Frontier, governed by the ceding nation and never privately bought), and the square moves and the war's
  *  end in the same batch are gated on that row now being enacted at this tick, so a failed re-check moves nothing and ends nothing. A decision counts only on a strict
  *  rowcount of 1; when the enacting UPDATE changes nothing, a guarded reject records why. Enacted: the war ends as a treaty (peace lock). */
-export async function decideWarEndings(db: GameDatabase, now: number) {
+export async function decideWarEndings(db: GameDatabase, now: number, wearinessOptions: VoteWearinessOptions = {}) {
   const rows = (await db.prepare(`SELECT ${columns} FROM war_end_terms WHERE status='proposed' ORDER BY proposed_at,id LIMIT 20`).all<Row>()).results;
   if (!rows.length) return 0;
-  const seats = await kindleSeats(db);
+  const seats = await kindleSeats(db), weariness = await kindleVoteWeariness(db, now, wearinessOptions); // #427 slice 3: read once, at decision time
   let decided = 0;
   for (const row of rows) {
-    const vote = decideEnding(row.kind, row.proposer_nation, row.other_nation, seats), json = JSON.stringify(vote.ratifications);
+    const vote = decideEnding(row.kind, row.proposer_nation, row.other_nation, seats, weariness), json = JSON.stringify(vote.ratifications);
     const squares: Square[] = row.squares_json ? JSON.parse(row.squares_json) : [];
     const reject = (reason: string) => db.prepare("UPDATE war_end_terms SET status='rejected',decided_at=?,ratification_json=?,reject_reason=? WHERE id=? AND status='proposed'").bind(now, json, reason, row.id).run();
     if (!vote.passed) { if (changes(await reject('not_ratified')) === 1) decided++; continue; }

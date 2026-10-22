@@ -39,8 +39,8 @@ test('the vote: more than half of ALL seats passes; exactly half (a tie) fails; 
   assert.equal(vote('korund', { ...incumbents, independents: 4 }).passed, false, '11 of 22 is a tie: the unknown party counts against');
   assert.deepEqual(vote('korund', { 'steady-hand': 0, 'open-ledger': 6, 'dockside-builders': 5, independents: 7 }), { body: 'Assembly', rule: 'majority-of-all-seats', yes: 11, total: 18, passed: true }, 'an empty party is zero, the rest still count');
   assert.equal(vote('korund', { 'open-ledger': 6, 'dockside-builders': 5, independents: 12 }).passed, false, '11 of 23');
-  assert.equal(a.kindleWarVote.length, 2, 'weariness is display only: the vote takes no weariness input');
-  assert.doesNotMatch(readFileSync('lib/war-assembly.ts', 'utf8'), /weariness'|readPublicWeariness/, 'the decision never reads weariness');
+  // #427 slice 3 weighs weariness (tests/war-weariness-votes-427.test.mjs); with no weariness the vote is unchanged.
+  assert.deepEqual(a.kindleWarVote('korund', { 'steady-hand': 7, 'open-ledger': 6, 'dockside-builders': 5 }, 0), vote('korund', { 'steady-hand': 7, 'open-ledger': 6, 'dockside-builders': 5 }));
 });
 
 for (const backend of [undefined, 'postgres']) {

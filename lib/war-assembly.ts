@@ -7,7 +7,8 @@ import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { kindleSeats } from './diplomacy';
 import type { PartySeats } from './diplomacy-rules';
 import { declareWar } from './war';
-import { cleanLabel, isWarNation, requestIdOk, warConfig } from './war-rules';
+import { cleanLabel, isWarNation, kindlePartyWeary, requestIdOk, warConfig, wearyKindleParties } from './war-rules';
+import { kindleVoteWeariness, type VoteWearinessOptions } from './war-weariness'; // #427 slice 3
 
 export const warAssemblySchemas = [
   `CREATE TABLE IF NOT EXISTS war_proposals (
@@ -34,13 +35,14 @@ export const kindleWarStances: Readonly<Record<'korund' | 'aurelle', Readonly<Re
   korund: { 'steady-hand': false, 'open-ledger': true, 'dockside-builders': true },
   aurelle: { 'steady-hand': false, 'open-ledger': false, 'dockside-builders': true },
 };
-export type WarVote = { body: 'Assembly'; rule: 'majority-of-all-seats'; yes: number; total: number; passed: boolean };
-/** More than half of ALL seats; no quorum (every seat counts in the total); exactly half is a tie and fails. Integers only. */
-export function kindleWarVote(defender: 'korund' | 'aurelle', seats: PartySeats): WarVote {
+export type WarVote = { body: 'Assembly'; rule: 'majority-of-all-seats'; yes: number; total: number; passed: boolean; weariness?: number; weary?: string[] };
+/** More than half of ALL seats; no quorum (every seat counts in the total); exactly half is a tie and fails. Integers only.
+ *  #427 slice 3: a party that backs the war votes no once Kindle's weariness reaches its tolerance (lib/war-rules.ts). The weariness is recorded with the vote when it is above zero. */
+export function kindleWarVote(defender: 'korund' | 'aurelle', seats: PartySeats, weariness = 0): WarVote {
   const n = (id: string) => { const v = Math.trunc(Number(seats[id] ?? 0)); return Number.isFinite(v) && v > 0 ? v : 0; };
   // The denominator is the whole Assembly: every seated party, known or not. An unknown party key is counted as not-yes, never dropped.
-  const total = Object.keys(seats).reduce((a, id) => a + n(id), 0), yes = parties.reduce((a, id) => a + (kindleWarStances[defender][id] ? n(id) : 0), 0);
-  return { body: 'Assembly', rule: 'majority-of-all-seats', yes, total, passed: total > 0 && yes * 2 > total };
+  const total = Object.keys(seats).reduce((a, id) => a + n(id), 0), yes = parties.reduce((a, id) => a + (kindleWarStances[defender][id] && !kindlePartyWeary(id, weariness) ? n(id) : 0), 0);
+  return { body: 'Assembly', rule: 'majority-of-all-seats', yes, total, passed: total > 0 && yes * 2 > total, ...(weariness > 0 ? { weariness, weary: wearyKindleParties(weariness) } : {}) };
 }
 
 const fail = (status: 400 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
@@ -67,14 +69,14 @@ export async function proposeKindleWar(db: GameDatabase, command: { defender: st
 
 /** World tick only (never a route, never a GET): decides each pending proposal once. Approval goes through declareWar, which re-checks the Founding Period,
  *  the pact and the peace lock (and the #426 limits when on) at decision time; a block rejects the proposal with that reason. A decision counts only on a strict rowcount of 1. */
-export async function decideKindleWarProposals(db: GameDatabase, now: number, limits = false) {
+export async function decideKindleWarProposals(db: GameDatabase, now: number, limits = false, wearinessOptions: VoteWearinessOptions = {}) {
   const rows = (await db.prepare(`SELECT ${columns} FROM war_proposals WHERE status='proposed' ORDER BY proposed_at,id LIMIT 20`).all<Row>()).results;
   if (!rows.length) return 0;
-  const seats = await kindleSeats(db);
+  const seats = await kindleSeats(db), weariness = await kindleVoteWeariness(db, now, wearinessOptions); // #427 slice 3: read once, at decision time
   const one = (result: unknown) => Number((result as { meta?: { changes?: number } })?.meta?.changes ?? 0) === 1;
   let decided = 0;
   for (const row of rows) {
-    const vote = kindleWarVote(row.defender_nation, seats), json = JSON.stringify(vote);
+    const vote = kindleWarVote(row.defender_nation, seats, weariness), json = JSON.stringify(vote);
     const reject = (reason: string) => db.prepare("UPDATE war_proposals SET status='rejected',decided_at=?,vote_json=?,reject_reason=? WHERE id=? AND status='proposed'").bind(now, json, reason.slice(0, 40), row.id).run();
     if (!vote.passed) { if (one(await reject('assembly_rejected'))) decided++; continue; }
     const declared = await declareWar(db, { attacker: 'kindle', defender: row.defender_nation, casusBelli: row.casus_belli, declaredBy: row.declared_by, requestId: row.request_id }, now, { enabled: true, limits }); // #426 limits too, when that flag is on
