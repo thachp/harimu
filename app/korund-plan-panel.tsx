@@ -10,7 +10,7 @@ import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
-import { quotaPercent } from '@/lib/korund-coupons';
+import { quotaPercent, korundMedalCopy } from '@/lib/korund-coupons';
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
 import { grayText, grayRefusal, ln, fc, rate, rumorLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
@@ -108,8 +108,8 @@ export function QuotaBar({ quota, medals }: { quota: NonNullable<KorundPlanView[
       <span className="korund-quota-unit" style={{ width: `${unit}%` }} /><span className="korund-quota-own" style={{ width: `${own}%` }} />
     </div>
     <p>Unit: {quota.unitFood} / {quota.targetFood} food ({over || unit}%) · Your contribution: {quota.ownFood} food. Quota resets with the coupon week.</p>
-    {over > 0 && <p className="korund-quota-over">Plan over-fulfilled: {over}% of target.</p>}
-    {medals && <p>Plan medals: {medals.total}{medals.lastWeek ? ' · awarded for last week' : ''}</p>}
+    {over > 0 && <p className="korund-quota-over">{korundMedalCopy.over(over)}<br /><small>{korundMedalCopy.overSub}</small></p>}
+    {medals && <p title={korundMedalCopy.rule}>{korundMedalCopy.count(medals.total)} <small>{korundMedalCopy.rule}</small></p>}
   </section>;
 }
 

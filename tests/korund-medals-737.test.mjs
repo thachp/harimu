@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { korundMedalCopy, korundWeeklyQuotaFood } from '../lib/korund-coupons.ts';
+import { readFile } from 'node:fs/promises';
 import { korundMedalOwnFood, earnsMedal, planMedals, overFulfilledPercent } from '../lib/korund-medals-rules.ts';
 
 const WEEK = 50400;
@@ -56,4 +58,16 @@ test('flag off: no medals field, quota unchanged', async t => {
   await settle(r, 'alice', epoch + 100, 2); await settle(r, 'bob', epoch + 200, 8);
   r.setNow((epoch + WEEK + 100) * 1000);
   assert.equal('medals' in (await plan(r)), false);
+});
+
+test('copy (Content, #737): exact strings, whole-number percent, none-yet at 0; the rule line matches the constants; panel uses the copy module only', async () => {
+  assert.equal(korundMedalCopy.over(130), 'Plan over-fulfilled: 130% of the weekly target');
+  assert.equal(korundMedalCopy.over(112.6), 'Plan over-fulfilled: 113% of the weekly target');
+  assert.equal(korundMedalCopy.overSub, "The unit's quota is met. Extra food still counts.");
+  assert.equal(korundMedalCopy.count(0), 'Plan medals: none yet'); assert.equal(korundMedalCopy.count(3), 'Plan medals: 3');
+  assert.equal(korundMedalCopy.rule, `One medal per closed week when your unit reaches its ${korundWeeklyQuotaFood}-food target and you supplied at least ${korundMedalOwnFood} food yourself.`);
+  const panel = await readFile(new URL('../app/korund-plan-panel.tsx', import.meta.url), 'utf8');
+  assert.match(panel, /korundMedalCopy\.over\(over\)/); assert.match(panel, /korundMedalCopy\.count\(medals\.total\)/); assert.match(panel, /korundMedalCopy\.rule/);
+  assert.doesNotMatch(panel, /Plan medals:|Plan over-fulfilled/, 'no hard-coded medal copy in the panel');
+  assert.match(panel, /const over = medals &&/, 'flag off (no medals): no over-fulfilled line');
 });
