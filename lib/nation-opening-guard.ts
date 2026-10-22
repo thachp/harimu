@@ -25,13 +25,16 @@ export async function nationOpeningBlockers(db: GameDatabase, nationId: string, 
 
 /** Seeds one nation's block, or refuses (and logs) when a player holds any square in it. */
 export async function openNationSquares(db: GameDatabase, nationId: string, nations: readonly MapNation[] = mappedNations, log: (message: string) => void = console.warn):
-  Promise<{ ok: true } | { ok: false; blockers: OpeningBlocker[] }> {
+  Promise<{ ok: true } | { ok: false; reason: 'unmapped' | 'unreadable' | 'player squares'; blockers: OpeningBlocker[] }> {
+  if (!nations.some(n => n.id === nationId)) { // #486 (QA1): an unmapped nation has no block; never report success for an empty batch
+    log(`[#486] opening of ${nationId} refused: it is not a mapped nation (no capital), so there is no block to open.`); return { ok: false, reason: 'unmapped', blockers: [] };
+  }
   let blockers: OpeningBlocker[];
   try { blockers = await nationOpeningBlockers(db, nationId, nations); }
-  catch { log(`[#486] opening of ${nationId} refused: could not read player squares in its block (fail closed).`); return { ok: false, blockers: [] }; }
+  catch { log(`[#486] opening of ${nationId} refused: could not read player squares in its block (fail closed).`); return { ok: false, reason: 'unreadable', blockers: [] }; }
   if (blockers.length) {
     log(`[#486] opening of ${nationId} refused: player squares in its block ${blockers.map(b => `(${b.x},${b.y}) ${b.reason}`).join(', ')}. Move the capital.`);
-    return { ok: false, blockers };
+    return { ok: false, reason: 'player squares', blockers };
   }
   await db.batch(nationSquaresUpsertSql(nationId, nations).map(sql => db.prepare(sql)));
   return { ok: true };

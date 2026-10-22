@@ -56,6 +56,9 @@ test('the preview deploy refuses a database ahead of this commit (behavioural, P
   await assert.rejects(assertDeployDatabase(pg, migrations.slice(0, -1)), new RegExp(`${migrations.at(-1).id}.*older than the database`, 's'));
   await pg.query('INSERT INTO schema_migrations (id, checksum) VALUES ($1, $2)', ['9999_newer_release', 'x']);
   await assert.rejects(assertDeployDatabase(pg, migrations), /^Error: Preview deploy refused: .*9999_newer_release/);
+  await pg.query("DELETE FROM schema_migrations WHERE id = '9999_newer_release'"); await assertDeployDatabase(pg, migrations);
+  await pg.query('DELETE FROM world_squares WHERE x = 29 AND y = 23'); // #486 (QA1): the preview path also checks the build's grid is covered
+  await assert.rejects(assertDeployDatabase(pg, migrations), /^Error: Preview deploy refused: world_squares has 719 of the 720 squares/);
   const bare = new PGlite(); t.after(() => bare.close());
   await assert.rejects(assertDatabaseNotAhead(bare, migrations, 'preview'), /^Error: Preview deploy refused: schema_migrations is missing/, 'no schema_migrations table: refused (fail closed)');
   await assert.rejects(assertDeployDatabase(bare, migrations), /^Error: Preview deploy refused: Postgres migrations are not applied/, 'the preview #119 refusal is labelled too');

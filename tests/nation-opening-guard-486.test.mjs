@@ -47,6 +47,13 @@ test('a player square just outside the block does not block; an unreadable table
   assert.equal((await g.openNationSquares(db, 'hoarvale', hoarvale, m => logs.push(m))).ok, false); assert.match(logs[0], /fail closed/);
 });
 
+test('an unmapped nation is refused with a clear reason, logged, and writes nothing', async t => {
+  const { db, pg } = await world(t), before = (await pg.query('SELECT * FROM world_squares ORDER BY y,x')).rows, logs = [];
+  assert.deepEqual(await g.openNationSquares(db, 'atlantis', hoarvale, m => logs.push(m)), { ok: false, reason: 'unmapped', blockers: [] });
+  assert.equal(logs.length, 1); assert.match(logs[0], /opening of atlantis refused: it is not a mapped nation/);
+  assert.deepEqual((await pg.query('SELECT * FROM world_squares ORDER BY y,x')).rows, before, 'nothing written');
+});
+
 test('opening PRs go through the guard: only the guard and the existing boot step (Confluence) call nationSquaresUpsertSql', async () => {
   const { readdirSync } = await import('node:fs');
   const callers = ['lib', 'app'].flatMap(d => readdirSync(d, { recursive: true }).filter(f => /\.tsx?$/.test(f)).map(f => `${d}/${f}`))

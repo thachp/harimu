@@ -143,7 +143,7 @@ export async function assertDatabaseNotAhead(db, migrations = postgresMigrations
   if (ahead.length) throw new Error(`${deploy} refused: the database has migrations this commit does not have (${ahead.join(', ')}). This commit is older than the database; deploy a release that includes them.`);
 }
 /** #486: the preview deploy's database checks, in order: every migration applied (#119), then the database is not ahead of this commit. */
-export async function assertDeployDatabase(db, migrations = postgresMigrations()) { await assertPostgresMigrationsApplied(db, migrations, 'preview'); await assertDatabaseNotAhead(db, migrations, 'preview'); }
+export async function assertDeployDatabase(db, migrations = postgresMigrations()) { await assertPostgresMigrationsApplied(db, migrations, 'preview'); await assertDatabaseNotAhead(db, migrations, 'preview'); await assertWorldGridCovered(db, worldGridOfBuild(), 'preview'); } // #486 (QA1): the grid check runs on preview too
 /** #486 (ARC): this build's world grid, read from its single definition in lib/globe-mapping.ts (scripts run without TypeScript, so the source is parsed; a missing match throws). */
 export function worldGridOfBuild(source = readFileSync('lib/globe-mapping.ts', 'utf8')) {
   const m = source.match(/export const WORLD_GRID = \{ width: (\d+), height: (\d+) \} as const;/);
@@ -151,9 +151,9 @@ export function worldGridOfBuild(source = readFileSync('lib/globe-mapping.ts', '
   return { width: Number(m[1]), height: Number(m[2]) };
 }
 /** #486 (ARC) deploy guard: refuses unless world_squares holds every square of this build's grid (so a 30x24 build never ships before 0066). Fail closed. */
-export async function assertWorldGridCovered(db, grid = worldGridOfBuild()) {
-  const n = Number((await db.query('SELECT COUNT(*)::int AS n FROM world_squares WHERE x >= 0 AND y >= 0 AND x < $1 AND y < $2', [grid.width, grid.height])).rows[0]?.n ?? 0);
-  if (n !== grid.width * grid.height) throw new Error(`Production deploy refused: world_squares has ${n} of the ${grid.width * grid.height} squares of this build's ${grid.width}x${grid.height} grid. Apply the grid migration first.`);
+export async function assertWorldGridCovered(db, grid = worldGridOfBuild(), kind = 'production') {
+  const deploy = deployLabel(kind), n = Number((await db.query('SELECT COUNT(*)::int AS n FROM world_squares WHERE x >= 0 AND y >= 0 AND x < $1 AND y < $2', [grid.width, grid.height])).rows[0]?.n ?? 0);
+  if (n !== grid.width * grid.height) throw new Error(`${deploy} refused: world_squares has ${n} of the ${grid.width * grid.height} squares of this build's ${grid.width}x${grid.height} grid. Apply the grid migration first.`);
 }
 /** #119 deploy guard: throws, listing every problem, unless all migrations are applied. */
 export async function assertPostgresMigrationsApplied(db, migrations = postgresMigrations(), kind) { // kind ('production' | 'preview') prefixes the refusal; omitted keeps the #119 message
