@@ -114,3 +114,14 @@ test(`#198 ${backend}: a player ask at the price cap means no NPC ask and yester
   assert.equal(Number((await r.db.prepare("SELECT COUNT(*) AS n FROM market_open_orders WHERE npc_id='kindle-farm' AND good='fruit'").first()).n), 0, "yesterday's fruit ask is still retired");
   assert.equal(Number((await npc('meat', 2)).limit_unit_minor), 345);
 });
+
+test(`#679 ${backend}: a resting player bid fills against the new NPC ask on the tick (the book is read alongside the order)`, async t => {
+  const { r, day, place } = await setup(t);
+  day(1); await r.call('world', null);
+  assert.equal((await place('alice', 'buy', 40, 150)).status, 200, "takes the whole day-1 NPC ask");
+  assert.equal((await place('alice', 'buy', 5, 150)).status, 200, 'rests: nothing left to cross');
+  day(2); await r.call('world', null);
+  const sold = await r.db.prepare("SELECT COALESCE(SUM(t.qty),0) AS n, MAX(t.unit_minor) AS p FROM market_trades t JOIN market_orders s ON s.id=t.sell_order_id WHERE s.id=?").bind(npcOrderId('fruit', 2)).first();
+  assert.deepEqual([Number(sold.n), Number(sold.p)], [5, 150], 'the NPC ask fills the resting bid at its price, as before');
+});
+

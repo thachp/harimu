@@ -39,14 +39,21 @@ const sameIntent = (r: Receipt | null, userId: string, c: OrderCommand) => !!r &
   ? r.kind === 'place' && r.side === c.side && r.good === c.good && Number(r.qty) === c.qty && Number(r.limit_unit_minor) === c.limitUnitMinor
   : r.kind === 'cancel' && r.order_id === c.orderId);
 
-/** Match an open order against the book. Re-reads after each guarded batch so a concurrent change only shortens the fill. */
-export async function matchOpen(db: GameDatabase, orderId: string, now: number) {
+/** Match an open order against the book. Re-reads after each guarded batch so a concurrent change only shortens the fill.
+ *  #679: `known` is the order's own city, good and side when the caller already has them (the NPC farm just posted it), so each round reads the
+ *  order and its opposite book together instead of one after the other. A mismatch with the stored order falls back to reading the book again. */
+export async function matchOpen(db: GameDatabase, orderId: string, now: number, known?: { cityId: string; good: string; side: 'buy' | 'sell' }) {
+  const readBook = (cityId: string, good: string, side: string) => db.prepare(`SELECT id, citizen_id, side, limit_unit_minor, remaining, created_at FROM market_open_orders
+      WHERE city_id = ? AND good = ? AND side != ? AND id != ?`).bind(cityId, good, side, orderId).all<RestingOrder>();
   for (let round = 0; round < orderBookLimits.matchRounds; round++) {
-    const me = await db.prepare('SELECT id, citizen_id, side, good, city_id, limit_unit_minor, remaining, created_at FROM market_open_orders WHERE id = ?').bind(orderId)
-      .first<RestingOrder & { good: string; city_id: string }>();
+    const [me, early] = await Promise.all([
+      db.prepare('SELECT id, citizen_id, side, good, city_id, limit_unit_minor, remaining, created_at FROM market_open_orders WHERE id = ?').bind(orderId)
+        .first<RestingOrder & { good: string; city_id: string }>(),
+      known ? readBook(known.cityId, known.good, known.side) : null,
+    ]);
     if (!me) return;
-    const book = (await db.prepare(`SELECT id, citizen_id, side, limit_unit_minor, remaining, created_at FROM market_open_orders
-      WHERE city_id = ? AND good = ? AND side != ? AND id != ?`).bind(me.city_id, me.good, me.side, orderId).all<RestingOrder>()).results
+    const sameKey = known && me.city_id === known.cityId && me.good === known.good && me.side === known.side;
+    const book = (sameKey && early ? early : await readBook(me.city_id, me.good, me.side)).results
       .map(o => ({ ...o, limit_unit_minor: Number(o.limit_unit_minor), remaining: Number(o.remaining), created_at: Number(o.created_at) }));
     const fills = matchOrder({ side: me.side, limitUnitMinor: Number(me.limit_unit_minor), remaining: Number(me.remaining), citizenId: me.citizen_id }, book);
     if (!fills.length) return;
