@@ -1,6 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import {deniedAiText} from './ai-denylist';
 import type {NationalNews,NewsItem} from './national-news';
+import {skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
 import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiMeteredCall,type AiBudgetConfig} from './ai-budget';
 export const aiNewsEnabled=true; // Preview activation approved 2026-10-14; runtime flags and pricing expiry still gate inference.
 export const aiNewsSchemas=[aiBudgetSchema,
@@ -45,8 +46,10 @@ export function inferenceText(value:unknown,json=false){
 export const aiNewsStaleLeaseSeconds=600;
 /** #160: a job that failed before the gateway is retried at most once per this many seconds, not on every page load. */
 export const aiNewsRetrySeconds=300;
-export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null}={}){
+export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,killSwitch=null as AiTemplatesOnlyEnv|null}={}){
  if(!enabled||!Number.isSafeInteger(now))return;
+ // #742: templates-only mode skips the model call and the reservation; the edition keeps its deterministic items.
+ if(skipForTemplates('ai-news',killSwitch,news.nationId,now))return;
  // #140: flag on but no binding/budget used to return silently; say why so preview checks can see it.
  if(!binding||!budget){console.warn(`[ai-news] enabled but skipped: ${!binding?'no AI binding':'invalid HARIMU_AI_DAILY_BUDGET_MICRO/HARIMU_AI_GATEWAY_ID'}`);return;}
  const facts=publicNewsFacts(news),id=`${facts.nationId}:${new Date(now*1000).toISOString().slice(0,10)}`;
@@ -86,4 +89,10 @@ export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number
 export async function readAiNews(db:GameDatabase,nationId:string):Promise<NewsItem[]>{
  const result=await db.prepare('SELECT id,title,body,created_at FROM ai_news_articles WHERE nation_id=? ORDER BY created_at DESC LIMIT 6').bind(nationId).all<{id:string;title:string;body:string;created_at:number}>();
  return result.results.map(r=>({id:`model:${r.id}`,title:r.title,text:r.body,occurredAt:r.created_at*1000,source:'model'}));
+}
+/** #742: merge model articles into the edition, unless templates-only mode covers it: then no model article is shown and the edition is
+ * marked templatesOnly so the feed shows the template-mode footer from lib/kill-switch-copy.ts. */
+export function withAiNews(news:NationalNews,aiItems:NewsItem[],templatesOnly:boolean):NationalNews{
+ if(templatesOnly)return {...news,templatesOnly:true,items:news.items.filter(item=>item.source!=='model')};
+ return {...news,items:[...aiItems,...news.items].sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12)};
 }

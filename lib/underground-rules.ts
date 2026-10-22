@@ -103,19 +103,22 @@ export const appealGranted = (discoveredAt: readonly number[], dutyStartAt: numb
 /** Whole real days of a duty, rounded up (the Devotion cost is 1 per day). */
 export const dutyDays = (duty: { startAt: number; endsAt: number }) => Math.ceil((duty.endsAt - duty.startAt) / 86400);
 
-/** #749: Suspicion at `now` from discoveries plus gray-market trades (seconds), one fold with the same decay, bands and max. Gray trades add `graySuspicionStep`
- *  each, at most `graySuspicionDailyCap` per real UTC day. With no trades this equals suspicionLevel(discoveredAt, now). */
+/** #749/#752: Suspicion at `now` from discoveries plus gray-market trades (seconds), same bands and max. Gray trades add `graySuspicionStep`
+ *  each, at most `graySuspicionDailyCap` per real UTC day. Used only with HARIMU_GRAY_SUSPICION_ENABLED on (flag off: suspicionLevel, #382 unchanged).
+ *  Decay is 1 per real UTC midnight crossed (QA1 on #756): the per-gap floor of the #382 fold lost all decay for trades under a day
+ *  apart, so steady traders never decayed. Callers pass the full trade history (no window). */
 export function suspicionLevelWithGray(discoveredAt: readonly number[], grayTradedAt: readonly number[], now: number): number {
-  const cfg = undergroundConfig, perDay = new Map<number, number>();
+  const cfg = undergroundConfig, day = cfg.suspicionDecaySeconds, perDay = new Map<number, number>();
   const events: { at: number; step: number }[] = foldDiscoveries(discoveredAt).map(d => ({ at: d.at, step: d.repeat ? cfg.suspicionRepeatStep : cfg.suspicionFirstStep }));
   for (const at of [...grayTradedAt].sort((a, b) => a - b)) {
-    const day = Math.floor(at / 86400), used = perDay.get(day) ?? 0, step = Math.min(cfg.graySuspicionStep, cfg.graySuspicionDailyCap - used);
-    if (step > 0) { perDay.set(day, used + step); events.push({ at, step }); }
+    const d = Math.floor(at / 86400), used = perDay.get(d) ?? 0, step = Math.min(cfg.graySuspicionStep, cfg.graySuspicionDailyCap - used);
+    if (step > 0) { perDay.set(d, used + step); events.push({ at, step }); }
   }
+  const midnights = (from: number, to: number) => Math.max(0, Math.floor(to / day) - Math.floor(from / day));
   let level = 0, last: number | null = null;
   for (const e of events.sort((a, b) => a.at - b.at)) {
-    if (last !== null) level = Math.max(0, level - Math.floor(Math.max(0, e.at - last) / cfg.suspicionDecaySeconds));
+    if (last !== null) level = Math.max(0, level - midnights(last, e.at));
     level = Math.min(cfg.suspicionMax, level + e.step); last = e.at;
   }
-  return last === null ? 0 : Math.max(0, level - Math.floor(Math.max(0, now - last) / cfg.suspicionDecaySeconds));
+  return last === null ? 0 : Math.max(0, level - midnights(last, now));
 }

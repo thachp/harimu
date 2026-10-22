@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { NationalNews } from '../lib/national-news';
 import { openNewsEvent } from '../lib/morning-brief';
 import { AiTextTag } from './ai-disclosure';
+import { templateMode } from '../lib/kill-switch-copy'; // #742: footer for editions in templates-only mode
 import { newsIntroFor } from '../lib/news-intro-copy'; // #688: AI wording only when this edition holds a model-written item (the server never writes one with HARIMU_AI_NEWS_ENABLED off)
 
 export function NewsEdition({news}:{news:NationalNews}) {
@@ -14,8 +15,9 @@ export function NewsEdition({news}:{news:NationalNews}) {
  return <NationDocument nationId={news.nationId} className={`national-news news-${news.style}`} label={news.title} documentLabel={news.style==='press'?'National press':news.style==='state'?'State Media':'Court gazette'}>
   <h2>{news.title}</h2><p>{newsIntroFor(news.style,news.items.some(item=>item.source==='model'))} Recorded events and rule-bound statements. {news.items.some(item=>item.source==='model')?'Model-written articles are labeled AI-generated.':'No model-written articles in this edition.'}</p>
   <section className="news-statistics" aria-label="Verified system statistics"><h3>{news.style==='state'?'System statistics · truthful':'System statistics'}</h3>{news.style==='state'&&<p className="news-truth-note">These figures come straight from the system ledger. State Media can spin the words in its templates, but it cannot change these numbers.</p>}<dl><div><dt>Registered citizens</dt><dd>{news.statistics.citizens}</dd></div><div><dt>Completed paid shifts</dt><dd>{news.statistics.completedShifts}</dd></div><div><dt>{news.nationId==='kindle'?'Food earned by citizens':'Food contributed to public supply'}</dt><dd>{news.statistics.food}</dd></div></dl><small>Durable ledger totals · as of <time dateTime={new Date(news.fetchedAt).toISOString()}>{formatTime(news.fetchedAt)}</time>. These figures count completed settlements; they do not measure progress against a production quota.</small></section>
+  {news.templatesOnly&&<p className="news-template-mode" data-template-mode="true">{templateMode.footer.text}</p>}
   {!news.items.length && <p>No recorded national articles yet. Your statistics above are current; sample city noticeboard stories are separate.</p>}
-  <ol className="national-news-items">{news.items.map(item=><li key={item.id} data-news-id={item.id} tabIndex={-1}><article><h3>{item.title}</h3>{item.source==='system'?<small className="news-source">System record</small>:<AiTextTag provenance={item.source==='model'?'model':'deterministic'}/>}{item.kind==='template'&&<small className="news-source">State Media template</small>}{item.kind==='decree'&&<small className="news-source">Court gazette · decree</small>}<p>{item.text}</p><time dateTime={new Date(item.occurredAt).toISOString()}>{formatTime(item.occurredAt)}</time></article></li>)}</ol>
+  <ol className="national-news-items">{news.items.map(item=><li key={item.id} data-news-id={item.id} tabIndex={-1}><article><h3>{item.title}</h3>{item.source==='system'?<small className="news-source">System record</small>:<AiTextTag provenance={item.source==='model'?'model':'deterministic'}/>}{item.kind==='template'&&<small className="news-source">State Media template</small>}{item.kind==='decree'&&<small className="news-source">Court gazette · decree</small>}<p>{item.text}</p>{news.templatesOnly&&item.source!=='system'&&<small className="news-source news-template-mode">{templateMode.footer.text}</small>}<time dateTime={new Date(item.occurredAt).toISOString()}>{formatTime(item.occurredAt)}</time></article></li>)}</ol>
  </NationDocument>;
 }
 

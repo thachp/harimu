@@ -34,6 +34,8 @@
     "HARIMU_NOTABLES_ENABLED": "false",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
+    // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
+    "HARIMU_AI_TEMPLATES_ONLY": "",
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
     // #626 (Decision 111): the Spark-to-Tessera kiosk exchange, separate from square purchases. Off: buy-tessera is refused and the kiosk stays closed.
@@ -135,7 +137,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_CREST": "false",
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "false",
-    "NEXT_PUBLIC_HARIMU_UI_V2_PANEL": "false"
+    "NEXT_PUBLIC_HARIMU_UI_V2_PANEL": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]

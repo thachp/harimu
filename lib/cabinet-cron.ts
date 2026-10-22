@@ -9,7 +9,7 @@ import type { NewsAiBinding } from './ai-news';
  *  Idempotent: each petition gets at most one attempt per UTC day (the `cabinet:<petition>:<day>` reservation), and the
  *  response is written only while `response_text IS NULL`, so overlapping or repeated cron runs never double-publish. */
 export const cabinetCronMaxPetitions = 3; // per run, bounds inference time and spend
-type Bindings = { AI?: NewsAiBinding; HARIMU_AI_CABINET_RESPONSES_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string };
+type Bindings = { AI?: NewsAiBinding; HARIMU_AI_CABINET_RESPONSES_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string; HARIMU_AI_TEMPLATES_ONLY?: string };
 
 export function cabinetResponsesConfigured(bindings: Bindings = env as unknown as Bindings) {
   return bindings.HARIMU_AI_CABINET_RESPONSES_ENABLED === 'true' && Boolean(bindings.AI) && aiBudgetConfig(bindings) !== null;
@@ -20,9 +20,9 @@ export async function runCabinetCron(db: GameDatabase, now: number, bindings: Bi
   const budget = aiBudgetConfig(bindings)!;
   const results: string[] = [];
   for (let i = 0; i < cabinetCronMaxPetitions; i++) {
-    const result = await prepareAiCabinetResponse(db, now, bindings.AI, { enabled: true, budget });
+    const result = await prepareAiCabinetResponse(db, now, bindings.AI, { enabled: true, budget, killSwitch: bindings });
     results.push(result.status);
-    if (result.status === 'idle' || result.status === 'disabled' || result.status === 'budget-unavailable') break;
+    if (result.status === 'idle' || result.status === 'disabled' || result.status === 'budget-unavailable' || result.status === 'templates-only') break;
   }
   return { status: 'ran' as const, results };
 }
