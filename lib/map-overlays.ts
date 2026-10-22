@@ -15,7 +15,7 @@ export const UNAVAILABLE_OVERLAYS: readonly { id: string; label: string; reason:
 const EXCLUDES: Record<OverlayId, OverlayId | null> = { ownership: 'unrest', unrest: 'ownership', resources: null };
 export const UNREST_SCALE = ['Calm', 'Tense', 'Riot'] as const;
 export const LEGEND_TEXT: Record<OverlayId, string> = {
-  ownership: 'Nation colors and patterns. Not drawn yet.',
+  ownership: 'Nation symbols and colors.',
   resources: 'Resource icons. Not drawn yet.',
   unrest: 'Not drawn yet.',
 };
@@ -37,4 +37,18 @@ export function phonePopoverPlacement(viewport: { width: number; height: number 
   const besideWidth = viewport.width - (chip ? chip.right : 0) - 2 * POPOVER_GAP;
   if (!chip || besideWidth >= POPOVER_MIN_WIDTH) return { right: Math.max(0, bar.right - viewport.width) + POPOVER_GAP, maxWidth: besideWidth };
   return { position: 'fixed' as const, left: POPOVER_GAP, right: POPOVER_GAP, bottom: POPOVER_GAP, maxWidth: 'none', maxHeight: Math.max(0, viewport.height - Math.max(0, chip.bottom) - 2 * POPOVER_GAP) };
+}
+
+/** ARC: the toggles are remembered for the browser session (sessionStorage), never across sessions. */
+export const OVERLAYS_SESSION_KEY = 'harimu.mapOverlays';
+export function readSessionOverlays(storage: Pick<Storage, 'getItem'> | undefined): OverlayId[] {
+  try {
+    const saved: unknown = JSON.parse(storage?.getItem(OVERLAYS_SESSION_KEY) ?? '[]');
+    if (!Array.isArray(saved)) return [];
+    const known = new Set<string>(MAP_OVERLAYS.map(o => o.id));
+    return saved.filter((id): id is OverlayId => typeof id === 'string' && known.has(id)).reduce<OverlayId[]>((on, id) => on.includes(id) ? on : toggleOverlay(on, id), []); // replays the presses, so a tampered value keeps the Ownership/Unrest rule
+  } catch { return []; }
+}
+export function writeSessionOverlays(storage: Pick<Storage, 'setItem'> | undefined, active: readonly OverlayId[]) {
+  try { storage?.setItem(OVERLAYS_SESSION_KEY, JSON.stringify(active)); } catch { /* storage full or blocked: the toggles still work for this view */ }
 }

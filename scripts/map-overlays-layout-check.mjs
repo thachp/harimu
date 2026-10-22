@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const entry = `import React from 'react'; import { createRoot } from 'react-dom/client'; import { GameShell } from './app/game-shell.tsx';
   const nation = { id: 'kindle', name: 'Kindle Republic', capital: 'Forgehaven' };
+  // #82 slice 2: a fixed owner read so the Ownership layer and legend render offline.
+  const owned = [[3, 2, 'kindle'], [4, 2, 'kindle'], [3, 3, 'kindle'], [16, 2, 'korund'], [17, 3, 'korund'], [8, 12, 'aurelle']];
+  window.fetch = async () => new Response(JSON.stringify({ width: 24, height: 18, cells: owned, totals: [{ nationId: 'kindle', squares: 3 }, { nationId: 'korund', squares: 2 }, { nationId: 'aurelle', squares: 1 }] }));
   window.mountOverlays = () => createRoot(document.getElementById('root')).render(<GameShell mapOverlays view="world" nation={nation} nations={[nation]} capacity={18} localDemo={false} inventory={{ food: 6, materials: 2, knowledge: 2 }} walletMinor={4000} citizenNation={null} contextTitle="Nations" onNavigate={() => {}} panel={<p>Kindle Republic</p>} />);`;
 
 async function bundle() {
@@ -69,8 +72,8 @@ export async function checkMapOverlays({ browser, css, preflight, failures, rows
     await page.addScriptTag({ content: script }); await page.evaluate(() => window.mountOverlays());
     await page.waitForSelector('.map-overlays', { state: 'attached' });
     if (w <= 390) await page.click('.map-overlays-trigger');
-    for (const name of ['Resources', 'Unrest']) await page.click(`.map-overlays-group button:text-is("${name}")`);
-    await page.mouse.move(1, h - 1); await page.evaluate(() => document.activeElement?.blur()); await page.waitForTimeout(100);
+    for (const name of ['Resources', 'Ownership']) await page.click(`.map-overlays-group button:text-is("${name}")`);
+    await page.mouse.move(1, h - 1); await page.evaluate(() => document.activeElement?.blur()); await page.waitForSelector('.map-ownership > span'); await page.waitForTimeout(100);
     const r = await page.evaluate(probe);
     rows.push(`${id}: ${r.controls} controls, ${r.mode}${r.issues.length ? ' ✗ ' + r.issues.join('; ') : ''}`);
     for (const i of r.issues) failures.push(`${id}: ${i}`);

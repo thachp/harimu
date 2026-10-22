@@ -403,6 +403,11 @@ body:has(.harimu-game){overflow:auto}
   .map-overlays-legend{position:static;order:2;width:auto;max-width:none;margin-top:6px;flex:1 1 auto;min-height:0;overflow-y:auto}
   .map-overlays-unavailable [role="tooltip"]{right:auto;left:0;max-width:calc(100vw - 48px)}
 }
+/* #82 slice 2: Ownership grid over the map (decorative, under the controls). Low graphics: symbols only, no tint. */
+.map-ownership{position:absolute;z-index:1;left:50%;top:50%;transform:translate(-50%,-50%);width:min(80%,calc(70dvh * 4 / 3));aspect-ratio:4/3;display:grid;pointer-events:none}
+.map-ownership>span{display:flex;align-items:center;justify-content:center;font-size:calc(10px * var(--text-scale, 1));line-height:1;outline:1px solid #0b263155}
+.map-ownership[data-low-graphics]>span{outline:0}
+.map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
    this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
 .game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}

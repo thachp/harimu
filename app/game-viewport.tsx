@@ -243,7 +243,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       }} />
     {fallback && <p className="viewport-fallback">3D unavailable. Use the bottom strip to continue.</p>}
     <div className="viewport-controls" aria-label="Camera controls">
-      <MapOverlaysControl enabled={overlays} />
+      <MapOverlaysControl enabled={overlays} lowGraphics={graphics === 'low'} />
       <button type="button" onClick={() => controls.current?.zoom(.15)} aria-label="Zoom in">+</button>
       <span aria-live="polite">{cameraLabel}</span>
       <button type="button" onClick={() => controls.current?.zoom(-.15)} aria-label="Zoom out">−</button>

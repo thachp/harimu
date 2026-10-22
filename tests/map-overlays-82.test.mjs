@@ -15,9 +15,10 @@ const js = ts.transpileModule(await readFile(new URL('../app/map-overlays.tsx', 
 const mod = { exports: {} }; new Function('exports', 'require', 'module', js)(mod.exports, n => n.startsWith('../lib/') ? require(`${n}.ts`) : require(n), mod);
 const { MapOverlaysControl } = mod.exports;
 
-async function mount(enabled) {
-  const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
-  await act(async () => root.render(React.createElement(MapOverlaysControl, { enabled })));
+// The viewport the Ownership layer portals into; the control sits inside its camera bar, as in GameViewport.
+async function mount(enabled, props = {}) {
+  const el = document.createElement('div'); el.className = 'game-viewport'; document.body.appendChild(el); const root = createRoot(el);
+  await act(async () => root.render(React.createElement(MapOverlaysControl, { enabled, ...props })));
   return { el, root, button: name => [...el.querySelectorAll('button')].find(b => b.textContent === name), close: () => act(async () => root.unmount()) };
 }
 const pressed = m => MAP_OVERLAYS.map(o => o.label).filter(l => m.button(l).getAttribute('aria-pressed') === 'true');
@@ -58,7 +59,7 @@ test('aria-pressed toggles, all start off, mutual exclusion and the legend follo
   await click(m.button('Ownership')); await click(m.button('Resources')); assert.deepEqual(pressed(m), []);
   assert.equal(m.el.querySelector('[aria-live="polite"]').textContent, 'All overlays off');
   await m.close();
-  const again = await mount(true); assert.deepEqual(pressed(again), [], 'state is not persisted across mounts'); await again.close();
+  window.sessionStorage.clear();
 });
 
 test('Army positions and Fog are aria-disabled, focusable, inert, with a reason tooltip', async () => {
@@ -103,7 +104,7 @@ test('phone placement: beside the World chip when it fits, else a bottom sheet w
 
 test('wiring: the group sits first in viewport-controls (left of the zoom cluster) and gets the flag through GameShell and page', async () => {
   const vp = await readFile(new URL('../app/game-viewport.tsx', import.meta.url), 'utf8');
-  assert.match(vp, /<div className="viewport-controls" aria-label="Camera controls">\s*<MapOverlaysControl enabled=\{overlays\} \/>\s*<button type="button".*aria-label="Zoom in"/);
+  assert.match(vp, /<div className="viewport-controls" aria-label="Camera controls">\s*<MapOverlaysControl enabled=\{overlays\} lowGraphics=\{graphics === 'low'\} \/>\s*<button type="button".*aria-label="Zoom in"/);
   assert.match(vp, /overlays = false \}: GameViewportProps/);
   const shell = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
   assert.match(shell, /mapOverlays = false,/); assert.match(shell, /<GameViewport marketOpen=\{marketVisible\([^)]*\)\} visitor=\{visitor\} overlays=\{mapOverlays\}/);
@@ -122,4 +123,59 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/citizen flags.mapOv
   const on = (await r.call('citizen', 'alice')).data;
   assert.equal(on.flags.mapOverlays, true, 'baseline: the flag reaches the client');
   assert.deepEqual({ ...on, flags: { ...on.flags, mapOverlays: false } }, off, 'only flags.mapOverlays differs');
+});
+
+// #82 slice 2 (ARC): toggles are remembered for the browser session; the Ownership overlay reads owners only while it is on.
+const fixture = { width: 24, height: 18, cells: [[3, 2, 'kindle'], [4, 2, 'kindle'], [16, 2, 'korund']], totals: [{ nationId: 'kindle', squares: 2 }, { nationId: 'korund', squares: 1 }] };
+function spyFetch() { const calls = []; globalThis.fetch = async url => { calls.push(String(url)); return new Response(JSON.stringify(fixture), { status: 200 }); }; return calls; }
+
+test('ARC: the toggles survive leaving for the country view and coming back, but not a new session or a tampered value', async () => {
+  window.sessionStorage.clear(); spyFetch();
+  const world = await mount(true);
+  await click(world.button('Unrest')); await click(world.button('Resources'));
+  await world.close(); // the country view has no GameViewport, so the group unmounts
+  const back = await mount(true);
+  assert.deepEqual(pressed(back), ['Resources', 'Unrest'], 'back on the map, the same overlays are on'); await back.close();
+  window.sessionStorage.clear();
+  const fresh = await mount(true); assert.deepEqual(pressed(fresh), [], 'a new session starts with all off'); await fresh.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['ownership', 'unrest', 'army', 7]));
+  const tampered = await mount(true); assert.deepEqual(pressed(tampered), ['Unrest'], 'unknown ids dropped, Ownership/Unrest stay exclusive'); await tampered.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', '{bad'); const broken = await mount(true); assert.deepEqual(pressed(broken), []); await broken.close();
+  window.sessionStorage.clear();
+});
+
+test('Ownership: flag off reads nothing; on, one read draws each owned square with its nation symbol and the legend counts squares', async () => {
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['ownership']));
+  let calls = spyFetch();
+  const off = await mount(false); await act(async () => {}); assert.equal(calls.length, 0, 'flag off: no read even with Ownership remembered'); assert.equal(document.querySelector('.map-ownership'), null); await off.close();
+  calls = spyFetch();
+  const on = await mount(true); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.deepEqual(calls, ['/api/world/ownership'], 'baseline: the same spy sees the one read');
+  const cells = [...on.el.querySelectorAll('.map-ownership > span')];
+  assert.deepEqual(cells.map(c => [c.dataset.nation, c.textContent, c.style.gridColumn, c.style.gridRow]), [['kindle', '▣', '4', '3'], ['kindle', '▣', '5', '3'], ['korund', '▦', '17', '3']], 'symbol per square, not color alone');
+  assert.ok(cells.every(c => c.style.backgroundColor), 'standard graphics tint the squares');
+  assert.equal(on.el.querySelector('.map-ownership').getAttribute('aria-hidden'), 'true');
+  assert.deepEqual([...on.el.querySelectorAll('.map-ownership-key li')].map(li => li.textContent), ['▣ Kindle Republic: 2 squares', '▦ Korund: 1 squares']);
+  await click(on.button('Ownership')); assert.equal(document.querySelector('.map-ownership'), null, 'off removes the layer');
+  await click(on.button('Ownership')); assert.equal(calls.length, 1, 'turning it back on reuses the read'); await on.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['ownership'])); spyFetch();
+  const low = await mount(true, { lowGraphics: true }); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  const layer = low.el.querySelector('.map-ownership');
+  assert.equal(layer.dataset.lowGraphics, 'true'); assert.ok([...layer.children].every(c => !c.style.backgroundColor && c.textContent), 'low graphics: symbols only, no tint');
+  await low.close(); window.sessionStorage.clear();
+});
+
+for (const backend of ['sqlite', 'postgres']) test(`GET /api/world/ownership: 404 with no database read while off; read-only owners while on (${backend})`, async t => {
+  const r = await localRuntime({ backend }); t.after(() => r.close());
+  const sql = []; const prepare = r.db.prepare.bind(r.db); r.db.prepare = q => { sql.push(q); return prepare(q); };
+  const off = await r.call('world/ownership');
+  assert.equal(off.status, 404); assert.equal(sql.length, 0, 'flag off opens no database');
+  r.setMapOverlays(true);
+  const on = await r.call('world/ownership');
+  assert.equal(on.status, 200); assert.ok(sql.length > 0, 'baseline: the same spy sees the read');
+  assert.ok(sql.every(q => /^\s*SELECT/i.test(q)), `GET is read-only: ${sql.join(' | ')}`);
+  assert.equal(on.data.width, 24); assert.equal(on.data.height, 18);
+  assert.deepEqual(on.data.cells.find(c => c[0] === 5 && c[1] === 4), [5, 4, 'kindle'], 'the Kindle capital square');
+  assert.ok(on.data.cells.every(([, , owner]) => typeof owner === 'string' && owner), 'only owned squares');
+  assert.equal(on.data.totals.reduce((n, t) => n + t.squares, 0), on.data.cells.length);
 });
