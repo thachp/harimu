@@ -18,7 +18,7 @@ test('flag off: GET /api/market/orders has no ticker key (so no polling); on: ti
   r.setFixtureEnv('HARIMU_MARKET_TICKER_ENABLED', 'true');
   assert.equal((await r.call('market/orders', 'alice')).data.ticker, true);
   const board = readFileSync('app/market-board.tsx', 'utf8');
-  assert.match(board, /if \(!active \|\| !ticker\) return;\n\s+return startTicker\(/, 'the only timer starts behind the server key');
+  assert.match(board, /if \(!active \|\| !ticker\) \{ announcer\.stop\(\); return; \}[^\n]*\n\s+const stopTicker = startTicker\(/, 'the only timer starts behind the server key');
   assert.match(board, /setTicker\(data\.ticker === true\)/);
   assert.equal((board.match(/startTicker\(/g) ?? []).length, 1); assert.doesNotMatch(board, /setInterval|WebSocket|EventSource/);
 });
@@ -107,9 +107,42 @@ test('repeated identical announcements still change the live region (zero-width 
 
 test('the orders route reads the ticker flag through the shared marketFlagOn helper, with no inline cast compare', async () => {
   const src = readFileSync(new URL('../app/api/market/orders/route.ts', import.meta.url), 'utf8');
-  assert.match(src, /import \{ marketFlagOn \} from '@\/lib\/market-visibility'/);
-  assert.match(src, /marketFlagOn\(.*HARIMU_MARKET_TICKER_ENABLED\);/);
-  assert.doesNotMatch(src, /HARIMU_MARKET_TICKER_ENABLED === 'true'/);
+  assert.match(src, /import \{ marketTickerOn \} from '@\/lib\/market-visibility'/);
+  assert.match(src, /marketTickerOn\(env\);/);
+  assert.doesNotMatch(src, /env as unknown as \{ HARIMU_MARKET_TICKER/);
   const board = readFileSync(new URL('../app/market-board.tsx', import.meta.url), 'utf8');
   assert.equal(board.match(/fetch\('\/api\/market\/orders', \{ cache: 'no-store'/g).length, 1, 'one GET fetch-and-parse path');
+});
+
+// QA1 on #706: a deferred announcement never fires after hide, flag off or unmount.
+test('stop() cancels a deferred Last-trade announcement and drops what was pending', async () => {
+  const { tickAnnouncer } = await import('../lib/market-ticker.ts');
+  const said = [], live = new Map(); let id = 0;
+  const clock = { setTimeout: (fn) => { live.set(++id, fn); return id; }, clearTimeout: i => live.delete(i) };
+  const a = tickAnnouncer(t => said.push(t), clock);
+  const goods = [{ good: 'fruit', label: 'Fruit', bestBidMinor: null, bestAskMinor: null, lastTradeMinor: null }];
+  const mv = d => ({ fruit: { lastTradeMinor: { direction: 'up', deltaMinor: d } } });
+  a.offer(mv(1), goods, 0); a.offer(mv(2), goods, 10_000);
+  assert.equal(live.size, 1, 'deferred timer scheduled');
+  a.stop();
+  assert.equal(live.size, 0, 'timer cleared');
+  a.offer(mv(3), goods, announceEveryMs + 1);
+  assert.deepEqual(said.at(-1), 'Market prices updated: Fruit last trade up 0.03 SPK.', 'the cancelled 0.02 move is not carried over');
+});
+
+test('the board stops the announcer on hide, on flag off and on unmount; the route reads the flag with no env cast', () => {
+  const board = readFileSync(new URL('../app/market-board.tsx', import.meta.url), 'utf8');
+  assert.match(board, /if \(!active \|\| !ticker\) \{ announcer\.stop\(\); return; \}/);
+  assert.match(board, /if \(document\.hidden\) announcer\.stop\(\);/);
+  assert.match(board, /return \(\) => \{ stopTicker\(\); document\.removeEventListener\('visibilitychange', onVisibility\); announcer\.stop\(\); \};/);
+  assert.match(board, /useEffect\(\(\) => \(\) => announcer\.stop\(\), \[announcer\]\)/);
+  const route = readFileSync(new URL('../app/api/market/orders/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /marketTickerOn\(env\)/);
+  assert.doesNotMatch(route, /HARIMU_MARKET_TICKER_ENABLED/);
+});
+
+test('marketTickerOn is on only for the exact string "true"', async () => {
+  const { marketTickerOn } = await import('../lib/market-visibility.ts');
+  assert.equal(marketTickerOn({ HARIMU_MARKET_TICKER_ENABLED: 'true' }), true);
+  for (const v of [undefined, 'false', 'TRUE', true, '1']) assert.equal(marketTickerOn({ HARIMU_MARKET_TICKER_ENABLED: v }), false);
 });

@@ -82,9 +82,12 @@ export function useOrderBook(active: boolean) {
     return () => controller.abort();
   }, [active, apply]);
   useEffect(() => { // #459: poll only while the board is open and the server turned the ticker on; paused while the tab is hidden
-    if (!active || !ticker) return;
-    return startTicker(() => void load(), document, window);
-  }, [active, ticker, load]);
+    if (!active || !ticker) { announcer.stop(); return; } // flag off or board closed: cancel any deferred announcement
+    const stopTicker = startTicker(() => void load(), document, window);
+    const onVisibility = () => { if (document.hidden) announcer.stop(); }; // hidden tab: never announce later
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { stopTicker(); document.removeEventListener('visibilitychange', onVisibility); announcer.stop(); };
+  }, [active, ticker, load, announcer]);
   async function post(body: Record<string, unknown>, success: (after: OrderBookState, before: OrderBookState | null) => string) {
     if (busy) return;
     const key = JSON.stringify(body);
