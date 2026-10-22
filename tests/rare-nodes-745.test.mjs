@@ -56,7 +56,7 @@ test('0067 is generated (identical in drizzle/ and db/postgres/), additive, and 
   const late0066 = "-- stand-in for #725's insert-only 0066\nINSERT INTO world_squares (x,y,zone,owner,terrain,resource,feature) VALUES (24,0,'wildlands',NULL,'wetland',NULL,NULL) ON CONFLICT (x,y) DO NOTHING;\n";
   test('ARC on #751: bootstrap/guard/record accept a missing 0066 and apply it cleanly when it lands after 0067', async t => {
     const dir = mkdtempSync(join(tmpdir(), 'pg745-'));
-    for (const f of readdirSync('db/postgres').filter(f => f.endsWith('.sql'))) copyFileSync(join('db/postgres', f), join(dir, f));
+    for (const f of readdirSync('db/postgres').filter(f => f.endsWith('.sql') && !f.startsWith('0066'))) copyFileSync(join('db/postgres', f), join(dir, f));
     assert.ok(!readdirSync(dir).some(f => f.startsWith('0066')) && readdirSync(dir).includes('0067_rare_nodes.sql'), 'the gap is real');
     const pg = new PGlite(); t.after(() => pg.close()); const db = adapter(pg);
     await m.bootstrapEmptyPostgres(db, { dir });
