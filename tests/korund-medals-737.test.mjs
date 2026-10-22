@@ -61,8 +61,9 @@ test('flag off: no medals field, quota unchanged', async t => {
 });
 
 test('copy (Content, #737): exact strings, whole-number percent, none-yet at 0; the rule line matches the constants; panel uses the copy module only', async () => {
-  assert.equal(korundMedalCopy.over(130), 'Plan over-fulfilled: 130% of the weekly target');
-  assert.equal(korundMedalCopy.over(112.6), 'Plan over-fulfilled: 113% of the weekly target');
+  assert.equal(korundMedalCopy.over(130), 'Plan over-fulfilled: 130%');
+  assert.equal(korundMedalCopy.over(112.6), 'Plan over-fulfilled: 113%');
+  assert.ok(korundMedalCopy.over(1000).length <= 40 && korundMedalCopy.count(999).length <= 40, '40-character label rule');
   assert.equal(korundMedalCopy.overSub, "The unit's quota is met. Extra food still counts.");
   assert.equal(korundMedalCopy.count(0), 'Plan medals: none yet'); assert.equal(korundMedalCopy.count(3), 'Plan medals: 3');
   assert.equal(korundMedalCopy.rule, `One medal per closed week when your unit reaches its ${korundWeeklyQuotaFood}-food target and you supplied at least ${korundMedalOwnFood} food yourself.`);
@@ -70,4 +71,55 @@ test('copy (Content, #737): exact strings, whole-number percent, none-yet at 0; 
   assert.match(panel, /korundMedalCopy\.over\(over\)/); assert.match(panel, /korundMedalCopy\.count\(medals\.total\)/); assert.match(panel, /korundMedalCopy\.rule/);
   assert.doesNotMatch(panel, /Plan medals:|Plan over-fulfilled/, 'no hard-coded medal copy in the panel');
   assert.match(panel, /const over = medals &&/, 'flag off (no medals): no over-fulfilled line');
+});
+
+/** Every SQL statement prepared while `fn` runs. */
+async function sqlDuring(r, fn) {
+  const seen = [], prepare = r.db.prepare.bind(r.db);
+  r.db.prepare = sql => { seen.push(sql.replace(/\s+/g, ' ').trim()); return prepare(sql); };
+  try { await fn(); } finally { r.db.prepare = prepare; }
+  return seen;
+}
+const isMedalQuery = sql => /FROM korund_settlements WHERE clerk_user_id=\? AND settled_at>=\? AND settled_at<\?/.test(sql) || /SUM\(food_output\),0\) AS n FROM korund_settlements/.test(sql);
+const isWrite = sql => /^\s*(INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|REPLACE)/i.test(sql);
+
+test('QA3 B1/B2/B3/B5: half-open week windows at exact boundaries (epoch+W-1, epoch+W, epoch+2W); a 40-food unit reached only by a boundary shift', async t => {
+  const { r, epoch } = await setup(t);
+  assert.equal(epoch % 7200, 0, 'epoch is tick-aligned epoch seconds from world_clock (no timezone)');
+  const W = WEEK;
+  // week 1: alice 1 inside + 1 at epoch+W-1 (own 8); bob 7 inside -> unit 36: no medal for anyone in week 1
+  await settle(r, 'alice', epoch + 100, 1); await settle(r, 'alice', epoch + W - 1, 1); await settle(r, 'bob', epoch + 200, 7);
+  // week 2: bob 1 at exactly epoch+W (the boundary shift that reaches 40) + 8 inside; alice 1 inside -> unit 40, bob medal, alice own 4
+  await settle(r, 'bob', epoch + W, 1); await settle(r, 'bob', epoch + W + 200, 8); await settle(r, 'alice', epoch + W + 100, 1);
+  // week 3 (open): alice 2 at exactly epoch+2W, bob 10 inside -> must not count
+  await settle(r, 'alice', epoch + 2 * W, 2); await settle(r, 'bob', epoch + 2 * W + 200, 10);
+  r.setNow((epoch + 2 * W + 5000) * 1000);
+  assert.deepEqual((await plan(r, 'bob')).medals, { total: 1, lastWeek: true }, 'bob: week 2 only (B1 would add week 1 = 40 by double-counting epoch+W; B2 would drop it from week 2)');
+  assert.deepEqual((await plan(r, 'alice')).medals, { total: 0, lastWeek: false }, 'alice: epoch+W-1 is week 1 (B5 +1h would move it into week 2 and award one); week 3 is open');
+  r.setNow((epoch + 2 * W) * 1000);
+  assert.deepEqual((await plan(r, 'bob')).medals, { total: 1, lastWeek: true }, 'at exactly the week-3 start, week 2 is closed and week 3 shifts are not read as closed');
+});
+
+test('QA3 F1: flag off runs no medal query at all (spy), against a flag-on baseline that does', async t => {
+  const on = await setup(t); await settle(on.r, 'alice', on.epoch + 100, 2); await settle(on.r, 'bob', on.epoch + 200, 8); on.r.setNow((on.epoch + WEEK + 100) * 1000);
+  assert.ok((await sqlDuring(on.r, () => plan(on.r))).some(isMedalQuery), 'baseline: flag on reads the medal queries');
+  const off = await setup(t, false); await settle(off.r, 'alice', off.epoch + 100, 2); await settle(off.r, 'bob', off.epoch + 200, 8); off.r.setNow((off.epoch + WEEK + 100) * 1000);
+  const sql = await sqlDuring(off.r, () => plan(off.r));
+  assert.equal(sql.filter(isMedalQuery).length, 0, 'flag off: no medal query'); assert.equal('medals' in (await plan(off.r)), false);
+});
+
+test('QA3 S1: Korund only; a citizen who earned a medal in Korund and then left gets no medals field', async t => {
+  const { r, epoch } = await setup(t); await settle(r, 'alice', epoch + 100, 2); await settle(r, 'bob', epoch + 200, 8);
+  r.setNow((epoch + WEEK + 100) * 1000);
+  assert.deepEqual((await plan(r, 'bob')).medals, { total: 1, lastWeek: true });
+  await r.db.prepare("UPDATE citizens SET nation_id='kindle' WHERE clerk_user_id='bob'").run();
+  const left = await plan(r, 'bob'); assert.equal(left?.medals, undefined, 'left Korund: no medals');
+  assert.equal((await sqlDuring(r, () => plan(r, 'bob'))).filter(isMedalQuery).length, 0, 'and no medal query for a non-Korund citizen');
+});
+
+test('QA3: repeated flag-on GETs make no writes', async t => {
+  const { r, epoch } = await setup(t); await settle(r, 'alice', epoch + 100, 2); await settle(r, 'bob', epoch + 200, 8);
+  r.setNow((epoch + WEEK + 100) * 1000); await plan(r);
+  const sql = await sqlDuring(r, async () => { for (let i = 0; i < 3; i++) await plan(r); });
+  assert.ok(sql.some(isMedalQuery)); assert.deepEqual(sql.filter(isWrite), [], 'GET /citizen with medals on is read-only');
 });

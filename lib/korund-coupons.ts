@@ -53,7 +53,7 @@ export function quotaPercent(food:number,target=korundWeeklyQuotaFood){return ta
 
 /** #737 Content copy for Plan medals (lives beside the quota bar's data so the panel's existing import carries it; HARIMU_KORUND_MEDALS_ENABLED only). */
 export const korundMedalCopy={
- over:(pct:number)=>`Plan over-fulfilled: ${Math.round(pct)}% of the weekly target`,
+ over:(pct:number)=>`Plan over-fulfilled: ${Math.round(pct)}%`, // QA3: label under 40 characters
  overSub:"The unit's quota is met. Extra food still counts.",
  count:(n:number)=>n>0?`Plan medals: ${n}`:'Plan medals: none yet',
  rule:'One medal per closed week when your unit reaches its 40-food target and you supplied at least 8 food yourself.',
