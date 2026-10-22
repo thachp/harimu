@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { civicLadders, civicRank, citizenRankShifts } from '../lib/civic-rank-rules.ts';
+import * as rules from '../lib/civic-rank-rules.ts';
+const { civicLadders, civicRank, citizenRankShifts, civicInputsSql } = rules;
 
 const at = (shifts, civicActs = 0, walletMinor = 0) => civicRank('kindle', { shifts, civicActs, walletMinor });
 test('rules: the Kindle ladder, its [ASSUMPTION] thresholds in one place, and every boundary', () => {
@@ -18,6 +19,7 @@ test('rules: the Kindle ladder, its [ASSUMPTION] thresholds in one place, and ev
   assert.deepEqual(at(30, 6, 50000).next, null); assert.equal(at(30, 6, 50000).progress.needs, null);
   assert.equal(at(-5, -1, -9).rank, 'Resident', 'negative inputs clamp to 0');
   for (const nation of ['korund', 'aurelle', null, undefined]) assert.equal(civicRank(nation, { shifts: 99, civicActs: 99, walletMinor: 1e9 }), null, `${nation}: no ladder yet`);
+  assert.deepEqual([rules.CITIZEN_MIN_SHIFTS, rules.EMBERWARDEN_MIN_SHIFTS, rules.EMBERWARDEN_MIN_CIVIC_ACTS, rules.LEADING_CITIZEN_MIN_SHIFTS, rules.LEADING_CITIZEN_MIN_CIVIC_ACTS, rules.LEADING_CITIZEN_MIN_WALLET_MINOR], [3, 10, 2, 30, 6, 50000], 'named threshold exports (ARC-approved on #778)');
   assert.equal(citizenRankShifts, 3); assert.deepEqual([civicLadders.kindle[1].needs.civicActs, civicLadders.kindle[1].needs.walletMinor], [0, 0], 'the first-week probe counts shifts only, so Citizen must need nothing else');
 });
 
@@ -57,6 +59,9 @@ for (const backend of ['sqlite', 'postgres']) {
       await r.db.prepare("INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,ballot_written,policy) VALUES (?,?,?,0,1,'tier1-human-v1')").bind(id, 'alice', `rq-${id}`).run();
     }
     for (let i = 3; i < 10; i++) await r.db.prepare("INSERT INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at,claimed_at) VALUES (?,'alice','harvest','Harvest','food',1,?,?,?)").bind(`s741-alice-${i}`, iso(r.now - 7200000), iso(r.now - 3600000), iso(r.now - 1000)).run();
+    // #778 dedupe: re-signing / re-voting the same ballot must not add a civic act (rejected by the PK, and COUNT(DISTINCT) would collapse it anyway).
+    await assert.rejects(r.db.prepare("INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,ballot_written,policy) VALUES ('e741a','alice','rq-dup',0,1,'tier1-human-v1')").run());
+    assert.match(civicInputsSql, /COUNT\(DISTINCT petition_id\)/); assert.equal(civicInputsSql.match(/COUNT\(DISTINCT election_id\)/g).length, 3, 'one act per ballot in each receipt table');
     const rank = (await r.call('citizen/civic-rank', 'alice')).data.civicRank;
     assert.deepEqual([rank.rank, rank.progress.have.shifts, rank.progress.have.civicActs], ['Emberwarden', 10, 2]);
     await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
