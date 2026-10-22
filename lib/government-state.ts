@@ -59,6 +59,9 @@ type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;s
 /** Completed UTC days are reviewed once. By default this persists bounded, idempotent reviews (POST and world-tick paths).
  *  With readOnly (#205, GET /api/citizen) the same reviews are projected in memory and nothing is written. */
 export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean } = {}) {
+  // #679: the Aurelle crown read touches only the Rising and coup tables, which nothing below writes, so it starts with the first reads instead of last
+  // (parked so a run that returns early never leaves an unhandled rejection; the crown branch still rethrows).
+  const crownRead = nationId === 'aurelle' ? readCrown(db) : null; crownRead?.catch(() => {});
   const [budget, needs, days] = await Promise.all([
     db.prepare("SELECT initial_minor AS cap, initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number; cap: number }>(),
     db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN CASE WHEN c.nation_id='korund' THEN COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=c.clerk_user_id),0) WHEN c.nation_id='aurelle' THEN COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=c.clerk_user_id),0) ELSE COALESCE(i.quantity,0) END >= 2 THEN 1 ELSE 0 END) AS supplied
@@ -132,7 +135,7 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       reason:!r.eligibility_receipt ? 'Legacy prototype petition retained for your records; it has no Tier 1 receipt and is not counted in new reviews.' : r.snapshot_json ? `${r.status === 'accepted' ? 'Accepted as the reviewed policy priority.' : 'Deferred because another priority took precedence.'} ${JSON.parse(r.snapshot_json).decision.reason}`
         : 'Pending until the UTC day ends; the next government visit records the daily review.'}));
   }
-  if (nationId === 'aurelle') { const crown = await readCrown(db); if (crown) snapshot.crown = crown; } // #71
+  if (crownRead) { const crown = await crownRead; if (crown) snapshot.crown = crown; } // #71
   if (nationId === 'korund' && options.korundPresidium) { // #70/#74 (flag off = no roster at all): roster derived from session records; never exposes the vote.
     const p = await readPresidium(db);
     snapshot.presidium = { chairman: { name: p.chairman.name }, seats: p.seats.map(s => ({ id: s.id, name: s.name, role: s.role, status: s.status })),
