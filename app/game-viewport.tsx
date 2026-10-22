@@ -8,8 +8,8 @@ import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisi
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 import { nationSymbolElement } from './nation-symbol';
 import { MapOverlaysControl } from './map-overlays';
-import { nationGlobeCoordinates, projectOwnershipCells } from '../lib/globe-mapping';
-import { nationOpenings } from '../lib/nation-openings';
+import { nationPlaces, projectOwnershipCells, WORLD_GRID } from '../lib/globe-mapping';
+import { mapFitRules, nationOpenings } from '../lib/nation-openings';
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
@@ -40,7 +40,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
   const controls = useRef<CameraControls | null>(null);
   const [fallback, setFallback] = useState(false);
   const [cameraLabel, setCameraLabel] = useState('100%');
-  const places = nationGlobeCoordinates((nations ?? []).map(({ id }) => nationOpenings.find(o => o.id === id)?.capital)); // #82: markers stand on their capital square
+  const places = nationPlaces(nationOpenings, (nations ?? []).map(({ id }) => id), WORLD_GRID, { centre: mapFitRules.commonsCentre, minCommons: mapFitRules.minCommonsDistance }); // #82: markers stand on their capital square
   const nationSignature = JSON.stringify(nations?.map(({ id, name, color }, i) => ({ id, name, color, ...places[i] })) ?? []);
   useEffect(() => { callback.current = onSelect; }, [onSelect]);
   useEffect(() => {
