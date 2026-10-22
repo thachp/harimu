@@ -1,6 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import type { Zone } from './map-zone-labels';
 import { nationOpenings } from './nation-openings';
+import { WORLD_GRID } from './globe-mapping';
 
 /**
  * World map zones PoC (#66, docs 6.1/6.2). A reduced-scale, deterministic
@@ -9,8 +10,8 @@ import { nationOpenings } from './nation-openings';
  */
 export type WorldSquare = { x: number; y: number; zone: Zone; owner: string | null; terrain: string; resource: string | null; feature: string | null };
 
-export const mapWidth = 24;
-export const mapHeight = 18;
+export const mapWidth = WORLD_GRID.width; // the grid size lives in lib/globe-mapping.ts
+export const mapHeight = WORLD_GRID.height;
 export { zoneOrder, zoneLabels, acquisitionRules } from './map-zone-labels';
 export type { Zone } from './map-zone-labels';
 

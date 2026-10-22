@@ -8,6 +8,8 @@ import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisi
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 import { nationSymbolElement } from './nation-symbol';
 import { MapOverlaysControl } from './map-overlays';
+import { nationGlobeCoordinates } from '../lib/globe-mapping';
+import { nationOpenings } from '../lib/nation-openings';
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
@@ -38,7 +40,8 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
   const controls = useRef<CameraControls | null>(null);
   const [fallback, setFallback] = useState(false);
   const [cameraLabel, setCameraLabel] = useState('100%');
-  const nationSignature = JSON.stringify(nations?.map(({ id, name, color }) => ({ id, name, color })) ?? []);
+  const places = nationGlobeCoordinates((nations ?? []).map(({ id }) => nationOpenings.find(o => o.id === id)?.capital)); // #82: markers stand on their capital square
+  const nationSignature = JSON.stringify(nations?.map(({ id, name, color }, i) => ({ id, name, color, ...places[i] })) ?? []);
   useEffect(() => { callback.current = onSelect; }, [onSelect]);
   useEffect(() => {
     const container = host.current;
