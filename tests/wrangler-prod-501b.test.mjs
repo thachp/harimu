@@ -88,7 +88,8 @@ test('identity and bindings: own Worker, same account and runtime shape, no D1, 
 });
 
 test('observability: on in preview only; production carries no observability block', () => {
-  assert.deepEqual(preview.observability, { enabled: true });
+  assert.deepEqual(preview.observability, { enabled: true, logs: { invocation_logs: false } }, 'invocation logs (which capture request headers, e.g. Cookie/Authorization) must stay off; console logs stay on');
+  assert.strictEqual(preview.observability.logs.invocation_logs, false);
   assert.equal(prod.observability, undefined, 'production stays unchanged');
   assert.equal(previewOnlyTopLevelKeys.every(key => key in preview), true, 'every listed preview-only key exists in preview');
 });
