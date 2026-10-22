@@ -6,6 +6,7 @@
  *  No behaviour changes: all ten nations answer exactly as the old three-id literals did. */
 import { isLiveNation, liveNations } from './nation-discovery';
 import { qaTestCitizenAllowed, type QaBindings } from './qa-tools';
+import { WORLD_GRID } from './globe-mapping'; // the grid size, defined once
 
 export const nationIds = ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara'] as const;
 export type NationId = typeof nationIds[number];
@@ -59,8 +60,8 @@ export const openNationIds = (bindings: Readonly<Record<string, string | undefin
  *  `map`: a capital and biome are set (checked present, not where; placement is #486's map-fit measurement). `work`: currency, wage fund and at least one job. */
 export type NationReadiness = { map: boolean; work: boolean; ready: boolean };
 /** #486 (QA1 nit): the map check also asks whether the capital's block fits, using the same rules as the map-fit measurement on #486. Values mirror lib/map-zones.ts
- *  (mapWidth 24, mapHeight 18, frontierRadius 3, Commons centre 12,6); that file imports this one, so they are repeated here and pinned equal by tests/nation-readiness-486.test.mjs. */
-export const mapFitRules = { width: 24, height: 18, blockRadius: 3, commonsCentre: { x: 12, y: 6 }, minCapitalDistance: 7, minCommonsDistance: 5 } as const;
+ *  (width and height are WORLD_GRID, lib/globe-mapping.ts; frontierRadius 3, Commons centre 12,6 are repeated here, since that file imports this one, and pinned equal by tests/nation-readiness-486.test.mjs). */
+export const mapFitRules = { width: WORLD_GRID.width, height: WORLD_GRID.height, blockRadius: 3, commonsCentre: { x: 12, y: 6 }, minCapitalDistance: 7, minCommonsDistance: 5 } as const;
 const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 /** Does a capital's 7x7 block fit: wholly on the grid, Chebyshev >= 7 from every other capital and >= 5 from the Commons centre? A check only; it places nothing. */
 export const capitalFits = (capital: { x: number; y: number }, others: readonly { x: number; y: number }[]): boolean => {
