@@ -39,6 +39,7 @@ const expectFor = (flag, { world, city, town = '' }) => {
   assert.equal(count(world, 'Inspect national institutions'), 1, 'one institutions action');
   assert.equal(world.includes('<button type="button">Inspect national institutions</button>'), !on, 'the old institutions button only with the flag off');
   assert.equal(world.includes('panel-v2-primary'), on);
+  assert.doesNotMatch(world, /<dt>Status<\/dt>/, 'Status is a City stat only, never on the World panel'); // QA3 nit on #748
   if (on) {
     assert.equal(count(city, '>Household<'), 1, 'Household shows once (promoted to the primary action)');
     assert.match(city, /class="panel-v2-primary"><span>Household<\/span>/);
