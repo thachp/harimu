@@ -63,7 +63,9 @@ const grayDailyCapOn = () => (env as unknown as { HARIMU_GRAY_DAILY_CAP_ENABLED?
 const graySuspicionOn = () => (env as unknown as { HARIMU_GRAY_SUSPICION_ENABLED?: string }).HARIMU_GRAY_SUSPICION_ENABLED === 'true';
 // #737: Plan medals for weekly quota over-fulfilment (HARIMU_KORUND_MEDALS_ENABLED); off = no medal read, panel unchanged.
 const korundMedalsOn = () => (env as unknown as { HARIMU_KORUND_MEDALS_ENABLED?: string }).HARIMU_KORUND_MEDALS_ENABLED === 'true';
-const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), medals: korundMedalsOn() });
+// #759: weekly quota shortfall inspection notice and zero-bonus ledger line (HARIMU_KORUND_SHORTFALL_ENABLED); off = no shortfall read, panel unchanged.
+const korundShortfallOn = () => (env as unknown as { HARIMU_KORUND_SHORTFALL_ENABLED?: string }).HARIMU_KORUND_SHORTFALL_ENABLED === 'true';
+const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';

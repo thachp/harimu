@@ -10,7 +10,7 @@ import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
-import { quotaPercent, korundMedalCopy, korundQuotaValueText } from '@/lib/korund-coupons';
+import { quotaPercent, korundMedalCopy, korundQuotaValueText, korundShortfallCopy } from '@/lib/korund-coupons';
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
 import { grayText, grayRefusal, ln, fc, rate, rumorLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
@@ -49,6 +49,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
     {scene === 'workplace' ? <>
       <h4>{plan.assignment.name}</h4><p>{plan.assignment.capacityCost} WC · {formatDuration(plan.assignment.hours * 3600000)} real / {formatDuration(plan.assignment.hours * 3600000 * gameTimeCompression)} game · {(plan.assignment.wageMinor / 100).toFixed(2)} LN wages · {plan.assignment.foodOutput} food added to the state pool on collection.</p>
       {plan.quota && <QuotaBar quota={plan.quota} medals={plan.medals} />}
+      {plan.shortfall && <section className="korund-shortfall" aria-label="Plan inspection"><p role="status">{korundShortfallCopy.notice(plan.shortfall.workUnit, plan.shortfall.percent)}</p><p>{korundShortfallCopy.ledger(plan.shortfall.week)}</p><p><small>City feed: {plan.shortfall.press}</small></p></section>}
       {plan.bureau ? <LaborBureau bureau={plan.bureau} pending={pending} uncertain={uncertain} formatTime={formatTime} onCommand={onCommand} /> : null}
       <p>One assigned shift at a time. {plan.bureau ? 'Bureau placement is recorded; shift pay is unchanged.' : 'Job preferences, reassignment and production-drive progression are planned.'}</p>
       {active ? <><GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" /><p>{active.orderName} · {ready ? 'Complete · collect your Labor Notes' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remaining` : 'Checking timing…'}</p>
