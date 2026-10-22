@@ -1,5 +1,5 @@
 import type { GameDatabase } from './database-contract';
-import { mapHeight, mapWidth, type Zone } from './map-zones';
+import { mapHeight, mapWidth, onGrid, type Zone } from './map-zones';
 import { tesseraBalanceBinds, tesseraBalanceSql as balanceSql } from './tessera-exchange';
 
 /**
@@ -86,7 +86,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
     return { ok: true, square: { x: command.x, y: command.y, owner: prior.nation_id, zone: 'frontier' }, priceMinor: Number(prior.price_minor), tesseraMinor: await readTessera(db, userId), replay: true };
   }
   const { results } = await db.prepare('SELECT x,y,zone,owner FROM world_squares').all<Square>();
-  const squares = (results ?? []).map(s => ({ ...s, x: Number(s.x), y: Number(s.y) }));
+  const squares = onGrid(results ?? []).map(s => ({ ...s, x: Number(s.x), y: Number(s.y) })); // #486: rows beyond the grid are ignored
   if (squares.length !== mapWidth * mapHeight) return fail(409, 'map_unavailable', 'The world map is not available right now.');
   const site = checkPurchaseSite(squares, nationId, command.x, command.y); if (site) return site;
   const balance = await readTessera(db, userId);

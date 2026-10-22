@@ -1,5 +1,5 @@
 import type { GameDatabase } from './database-contract';
-import { mapHeight, mapWidth, mvpNations, type Zone } from './map-zones';
+import { mapHeight, mapWidth, onGrid, mvpNations, type Zone } from './map-zones';
 
 /**
  * Found a T1 city on Wildlands (#124, docs 15.1 Founding). PoC: one flag-gated stub action per MVP nation.
@@ -96,7 +96,7 @@ export async function foundCity(db: GameDatabase, userId: string, nationId: stri
     return { ok: true, city: { id: prior.id, nationId: prior.nation_id, name: prior.name, tier: 1, x: Number(prior.center_x), y: Number(prior.center_y) }, claimed: (2 * claimRadius + 1) ** 2, replay: true };
   }
   const { results } = await db.prepare('SELECT x,y,zone,owner,feature FROM world_squares').all<Square>();
-  const squares = (results ?? []).map(s => ({ ...s, x: Number(s.x), y: Number(s.y) }));
+  const squares = onGrid(results ?? []).map(s => ({ ...s, x: Number(s.x), y: Number(s.y) })); // #486: rows beyond the grid are ignored
   if (squares.length !== mapWidth * mapHeight) return fail(409, 'map_unavailable', 'The world map is not available right now.');
   const site = checkFoundingSite(squares, command.x, command.y); if (site) return site;
   const { x, y } = command, r = claimRadius, d = minCityDistance - 1, size = (2 * r + 1) ** 2;
