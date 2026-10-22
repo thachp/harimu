@@ -18,6 +18,7 @@ import { readTreaties, runDiplomacy, type TreatyState } from './diplomacy'; // #
 import { readEmbargoes, runEmbargo, type EmbargoState } from './embargo'; // #363
 import { decideProposedGoodsSanctions } from './goods-sanctions'; // #601
 import { decideKindleWarProposals, readWarProposals } from './war-assembly'; // #427
+import { decideWarEndings, readWarEndings } from './war-endings'; // #427 slice 2
 import { readReserveBoard, type ReserveBoard } from './spark-supply'; // #431
 import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
@@ -89,7 +90,9 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
      { name: 'embargo', on: options.embargo === true, run: () => runEmbargo(db, now).catch(warnOnly('embargo')) },
      // #427: the Kindle Assembly votes on pending war declarations after diplomacy, so a pact ratified this tick blocks the declaration on re-check
      // (only while HARIMU_WAR_ENABLED and HARIMU_WAR_ASSEMBLY_ENABLED are on; citizen POST path only).
-     { name: 'warAssembly', on: options.war === true && options.warAssembly === true, run: () => decideKindleWarProposals(db, now, options.warLimits === true).catch(warnOnly('war assembly')) }],
+     { name: 'warAssembly', on: options.war === true && options.warAssembly === true, run: () => decideKindleWarProposals(db, now, options.warLimits === true).catch(warnOnly('war assembly')) },
+     // #427 slice 2: surrender and concession endings, decided once, also after diplomacy (HARIMU_WAR_ENABLED and HARIMU_WAR_ENDINGS_ENABLED; citizen POST path only).
+     { name: 'warEndings', on: options.war === true && options.warEndings === true, run: () => decideWarEndings(db, now).catch(warnOnly('war endings')) }],
     // #612: the Founding Period's one day-30 event per MVP nation (idempotent).
     [{ name: 'foundingDay30', on: options.foundingPeriod === true, run: () => runFoundingDay30(db, now).catch(warnOnly('founding day-30')) }],
   ];
@@ -104,7 +107,7 @@ export async function runWorldChains(chains: WorldRunner[][]): Promise<void> {
 }
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
@@ -147,18 +150,18 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   // preview flags on waited for all of them in a row (about 80 round trips, ~30 s on preview). Runners that touch separate state run as concurrent chains (see
   // worldRunnerChains); inside a chain the old order is kept. Every runner is idempotent per tick or time as before.
   await runWorldChains(worldRunnerChains(db, now, options));
-  return readWorldSimulation(db, now, { war: options.war, warAssembly: options.warAssembly, warWeariness: options.warWeariness, warWearinessLosses: options.warWearinessLosses, diplomacy: options.diplomacy, embargo: options.embargo, reserve: options.reserve });
+  return readWorldSimulation(db, now, { war: options.war, warAssembly: options.warAssembly, warEndings: options.warEndings, warWeariness: options.warWeariness, warWearinessLosses: options.warWearinessLosses, diplomacy: options.diplomacy, embargo: options.embargo, reserve: options.reserve });
 
 }
 
 /** #205: the same snapshot advanceWorld returns, computed without any write. Due-but-unprocessed ticks show as
  *  pendingTicks; the next write path (or GET /api/world) processes them. */
 /** #309: `war` (HARIMU_WAR_ENABLED) adds the derived war state; with it off nothing is queried or returned. */
-export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { war?: boolean; warAssembly?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; diplomacy?: boolean; embargo?: boolean; reserve?: boolean } = {}): Promise<SimulationState> {
+export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { war?: boolean; warAssembly?: boolean; warEndings?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; diplomacy?: boolean; embargo?: boolean; reserve?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #668: every read here is independent, so they share one round of round trips instead of queueing (the flag-gated war, treaty, embargo and reserve reads included).
   const none = Promise.resolve(undefined);
-  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,embargoes,reserve,warProposals] = await Promise.all([
+  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,embargoes,reserve,warProposals,warEndings] = await Promise.all([
     db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>(),
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')
@@ -173,6 +176,7 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     options.embargo ? readEmbargoes(db) : none,
     options.reserve ? readReserveBoard(db,now) : none,
     options.war && options.warAssembly ? readWarProposals(db) : none, // #427: the Assembly's pending and recent votes, read-only
+    options.war && options.warEndings ? readWarEndings(db) : none, // #427 slice 2: pending and recent endings, read-only
   ]);
   const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
   const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
@@ -180,5 +184,5 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation'},
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
 }

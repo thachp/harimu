@@ -9,6 +9,7 @@ import { authorizeWarRole, bearerMatches, isWarEndKind, warAuthority, type WarEn
 import { leaderPersonas } from './leader-personas';
 import { resolveCityAssault } from './siege-actions'; // #419
 import { proposeKindleWar } from './war-assembly'; // #427
+import { proposeWarEnding } from './war-endings'; // #427 slice 2
 
 const fail = (status: 400 | 401 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 const disabled = () => fail(403, 'disabled', 'War is not open yet.');
@@ -90,7 +91,7 @@ export async function acceptEnd(db: GameDatabase, command: AcceptEndCommand, now
   return ended.ok ? { ok: true as const, kind: proposal.end_kind, war: ended.war, authority: who.authority } : ended;
 }
 
-export type WarCommandInput = { enabled: boolean; /** #426: HARIMU_WAR_DECLARATION_LIMITS_ENABLED, default off. */ limits?: boolean; /** #427: HARIMU_WAR_ASSEMBLY_ENABLED, default off. */ assembly?: boolean; secret: string | undefined; authorization: string | null; body: Record<string, unknown>; now: number };
+export type WarCommandInput = { enabled: boolean; /** #426: HARIMU_WAR_DECLARATION_LIMITS_ENABLED, default off. */ limits?: boolean; /** #427: HARIMU_WAR_ASSEMBLY_ENABLED, default off. */ assembly?: boolean; /** #427 slice 2: HARIMU_WAR_ENDINGS_ENABLED, default off. */ endings?: boolean; secret: string | undefined; authorization: string | null; body: Record<string, unknown>; now: number };
 const text = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max ? value : '';
 /** `authorizeWarCaller` is also called by the route before it parses the body, so a bad body without credentials is 401, not 400. The server-only entry point: flag first (403, nothing read or written), then the bearer secret (HARIMU_WAR_ADMIN_SECRET; missing or wrong never authorizes), then the command. */
 export async function authorizeWarCaller(input: { enabled: boolean; secret: string | undefined; authorization: string | null }) {
@@ -106,6 +107,9 @@ export async function handleWarCommand(db: GameDatabase, input: WarCommandInput)
   if (body.action === 'declare') return declareByAuthority(db, { ...base, defender: text(body.defender, 20), casusBelli: typeof body.casusBelli === 'string' ? body.casusBelli : undefined, declaredBy: typeof body.declaredBy === 'string' ? body.declaredBy : undefined }, now, true, input.limits === true, input.assembly === true);
   if (body.action === 'propose-end') return proposeEnd(db, { ...base, warId: text(body.warId, 80), kind: text(body.kind, 20) }, now, true);
   if (body.action === 'accept-end') return acceptEnd(db, { ...base, warId: text(body.warId, 80) }, now, true);
+  // #427 slice 2: only while HARIMU_WAR_ENDINGS_ENABLED is on; off, these actions are refused exactly like any unknown action.
+  if (input.endings === true && (body.action === 'surrender' || body.action === 'concede')) { const who = actor(base.nation, base.role); if (!who.ok) return who;
+    const proposed = await proposeWarEnding(db, { nation: who.nation, warId: text(body.warId, 80), kind: body.action === 'surrender' ? 'surrender' : 'concession', squares: body.squares, requestId: base.requestId }, now); return proposed.ok ? { ...proposed, status: 'proposed' as const, authority: who.authority } : proposed; }
   if (body.action === 'assault') return resolveCityAssault(db, { nation: base.nation, warId: text(body.warId, 80), cityKind: text(body.cityKind, 20), cityId: text(body.cityId, 80), requestId: base.requestId }, now, true); // #419: one successful city assault (siege PoC)
   return fail(400, 'bad_request', 'Send action "declare", "propose-end", "accept-end" or "assault".');
 }
