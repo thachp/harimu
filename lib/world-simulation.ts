@@ -1,4 +1,4 @@
-import { mapLimited } from './parked'; // #679
+import { mapLimited } from './async-limits'; // #679
 import { runFoundingDay30 } from './founding-period'; // #612
 import { finalizeDueElection } from './elections';
 import { runKindleAssembly, type AssemblyTickConfig } from './assembly';

@@ -1,4 +1,4 @@
-import { parked } from './parked'; // #679
+import { parked } from './async-limits'; // #679
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { claimant, claimants, pledgeThreshold, risingConfig, risingReady, risingSucceeds, unrestSustainedSeconds, type ClaimantId } from './aurelle-rising-rules';
