@@ -33,9 +33,9 @@ test('crest colours are readable: motif on field 4.5:1, gold edge on the dark ba
   for(const n of nums)assert.ok(n>=-4&&n<=56,`${id} coordinate ${n} outside the crest box`);
  }
 });
-test('the crest flag is exactly "true" and ships off in wrangler.jsonc (flag-off pin)',async()=>{
+test('the crest flag is exactly "true" and is on in preview wrangler.jsonc and off in wrangler.prod.jsonc',async()=>{
  assert.equal(uiV2CrestEnabled('true'),true);for(const v of [undefined,'false','','1','TRUE'])assert.equal(uiV2CrestEnabled(v),false);
- assert.match(await read('wrangler.jsonc'),/"NEXT_PUBLIC_HARIMU_UI_V2_CREST": "false"/);
+ assert.match(await read('wrangler.jsonc'),/"NEXT_PUBLIC_HARIMU_UI_V2_CREST": "true"/);assert.match(await read('wrangler.prod.jsonc'),/"NEXT_PUBLIC_HARIMU_UI_V2_CREST": "false"/);
 });
 test('the crest component renders nothing with the flag off, and a named svg with it on (flag-off pin)',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'crest-'));

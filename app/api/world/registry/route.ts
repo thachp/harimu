@@ -24,13 +24,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  { // #123: location-bound while travelling (QA1 on #264); no-op unless HARIMU_TRAVEL_ENABLED=true.
-    const blocked = await travelBlock(await getDatabase(), userId, Math.floor(Date.now() / 1000), (env as unknown as { HARIMU_TRAVEL_ENABLED?: string }).HARIMU_TRAVEL_ENABLED === 'true');
-    if (blocked) return privateJson({ error: blocked, reason: 'traveling' }, 409);
-  }
   if (!isSameOriginCommand(request)) return privateJson({ error: 'Same-origin request required.' }, 403);
   let body: Record<string, unknown>;
   try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send a buy-square or buy-tessera command.', reason: 'bad_request' }, 400); }
+  // #384 L1: the travel read runs only when the command's own flag is on; flag off, the lib refuses before any DB statement.
+  if (body.action === 'buy-tessera' ? exchangeEnabled() : enabled()) { // #123: location-bound while travelling (QA1 on #264); no-op unless HARIMU_TRAVEL_ENABLED=true.
+    const blocked = await travelBlock(await getDatabase(), userId, Math.floor(Date.now() / 1000), (env as unknown as { HARIMU_TRAVEL_ENABLED?: string }).HARIMU_TRAVEL_ENABLED === 'true');
+    if (blocked) return privateJson({ error: blocked, reason: 'traveling' }, 409);
+  }
   if (body.action === 'buy-tessera') {
     const exchange = parseExchangeCommand(body);
     if (!exchange) {

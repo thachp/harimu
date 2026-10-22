@@ -102,7 +102,8 @@ const TSR: CurrencySpec = {
   currency: 'TSR',
   legs: `SELECT clerk_user_id AS acct, delta_minor AS delta FROM citizen_tessera_ledger
     UNION ALL SELECT clerk_user_id, tessera_minor FROM citizen_tessera_exchanges
-    UNION ALL SELECT clerk_user_id, amount_minor FROM tessera_reward_claims`, // #465: claimed earned rewards are credits against the epoch reward pool
+    UNION ALL SELECT clerk_user_id, amount_minor FROM tessera_reward_claims
+    UNION ALL SELECT clerk_user_id, amount_minor FROM relocation_support_claims`, // #465: claimed earned rewards are credits against the epoch reward pool
   appBalances: `SELECT c.clerk_user_id AS acct, ${tesseraPerCitizen} AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('TSR', 'citizen_tessera_ledger', 'clerk_user_id', 'delta_minor', false),
@@ -114,6 +115,10 @@ const TSR: CurrencySpec = {
     { currency: 'TSR', check: 'reward_epoch_claimed_over_allocated', sql: `SELECT CAST(p.epoch_day AS TEXT) AS acct FROM tessera_reward_epochs p WHERE COALESCE((SELECT SUM(c.amount_minor) FROM tessera_reward_claims c JOIN tessera_reward_entries e ON e.id = c.entry_id WHERE e.epoch_day = p.epoch_day), 0) > p.allocated_minor` },
     { currency: 'TSR', check: 'reward_entry_without_settled_shift', sql: `SELECT e.clerk_user_id AS acct FROM tessera_reward_entries e LEFT JOIN shift_settlements s ON s.shift_id = e.source_shift_id WHERE s.shift_id IS NULL OR s.clerk_user_id <> e.clerk_user_id` },
     { currency: 'TSR', check: 'reward_claim_not_its_entry', sql: `SELECT c.clerk_user_id AS acct FROM tessera_reward_claims c LEFT JOIN tessera_reward_entries e ON e.id = c.entry_id WHERE e.id IS NULL OR e.clerk_user_id <> c.clerk_user_id OR e.amount_minor <> c.amount_minor` },
+    // #470 relocation support: claims never exceed their pot, and each claim is exactly its pot's flat amount.
+    ...integerAndSign('TSR', 'relocation_support_claims', 'clerk_user_id', 'amount_minor', true),
+    { currency: 'TSR', check: 'relocation_claims_over_pot', sql: `SELECT p.capture_id AS acct FROM relocation_support_pots p WHERE COALESCE((SELECT SUM(c.amount_minor) FROM relocation_support_claims c WHERE c.capture_id = p.capture_id), 0) > p.protocol_minor + p.treasury_topup_minor` },
+    { currency: 'TSR', check: 'relocation_claim_not_its_pot', sql: `SELECT c.clerk_user_id AS acct FROM relocation_support_claims c LEFT JOIN relocation_support_pots p ON p.capture_id = c.capture_id WHERE p.capture_id IS NULL OR p.per_citizen_minor <> c.amount_minor` },
     { currency: 'TSR', check: 'square_purchase_not_ledger_debit', sql: `SELECT p.clerk_user_id AS acct FROM world_square_purchases p LEFT JOIN citizen_tessera_ledger l ON l.id = 'tsr-square-' || p.request_id WHERE l.id IS NULL OR l.delta_minor <> -p.price_minor` },
     { currency: 'TSR', check: 'square_ledger_debit_without_purchase', sql: `SELECT l.clerk_user_id AS acct FROM citizen_tessera_ledger l WHERE l.reason = 'square-purchase' AND NOT EXISTS (SELECT 1 FROM world_square_purchases p WHERE 'tsr-square-' || p.request_id = l.id)` },
   ],

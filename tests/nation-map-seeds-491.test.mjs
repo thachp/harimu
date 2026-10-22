@@ -22,9 +22,9 @@ test('derived mvpNations: same ids, order, capitals, outposts and biomes as befo
   assert.equal(sha(z.mvpNations), golden.mvp, 'mvpNations is identical to the old literal');
   assert.equal(sha(z.seedWorldSquares()), golden.squares, 'all 432 squares are byte-identical');
   assert.equal(sha(z.worldSquaresSeedSql()), golden.seedSql); assert.equal(sha(z.worldSquaresSeedSql(200, 'postgres')), golden.seedSqlPg);
-  assert.deepEqual(reg.nationOpenings.filter(o => o.capital).map(o => o.id), ['kindle', 'korund', 'aurelle'], 'only the live nations have a capital; no new capital in this PR');
-  for (const o of reg.nationOpenings.filter(o => o.openingFlag !== null)) assert.deepEqual([o.capital, o.outpost, o.biome], [undefined, undefined, undefined], o.id);
-  assert.deepEqual(z.bootNationSquaresSql(), [], 'the boot step adds no statement today');
+  assert.deepEqual(reg.nationOpenings.filter(o => o.capital).map(o => o.id), ['kindle', 'confluence', 'korund', 'aurelle'], '#487: Confluence is the only new capital');
+  for (const o of reg.nationOpenings.filter(o => o.openingFlag !== null && o.id !== 'confluence')) assert.deepEqual([o.capital, o.outpost, o.biome], [undefined, undefined, undefined], o.id);
+  assert.deepEqual(z.bootNationSquaresSql(), z.nationSquaresUpsertSql('confluence'), '#487: the boot step adds only Confluence');
 });
 
 test('capital spacing still holds (seedCapitalsSpaced), a nation with no capital is simply absent, and blocks never overlap', async t => {
@@ -33,9 +33,9 @@ test('capital spacing still holds (seedCapitalsSpaced), a nation with no capital
   assert.equal(founding.seedCapitalsSpaced(), true);
   const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
   for (const a of z.mvpNations) for (const b of z.mvpNations) if (a !== b) assert.ok(cheb(a.capital, b.capital) >= 7, 'frontier blocks (radius 3) do not touch');
-  assert.equal(z.mvpNations.find(n => n.id === 'confluence'), undefined);
-  assert.deepEqual(z.nationBlockSquares('confluence'), [], 'no capital: no squares');
-  assert.deepEqual(z.nationSquaresUpsertSql('confluence'), []);
+  assert.equal(z.mvpNations.find(n => n.id === 'confluence'), undefined, '#487: Confluence is mapped but not a live (travel/missionary) nation');
+  assert.deepEqual(z.nationBlockSquares('meridian'), [], 'no capital: no squares');
+  assert.deepEqual(z.nationSquaresUpsertSql('meridian'), []);
 });
 
 test('a nation with no capital never throws: missionary travel is "not available" and travel has no city squares', async t => {
@@ -106,10 +106,12 @@ test('the same upsert runs on Postgres (PGlite) and is idempotent there', async 
   assert.equal(sha(once), sha(z.seedWorldSquares(nations)), 'equals a fresh seed that already had the nation');
 });
 
-test('the shipped local runtime still seeds exactly the original grid (boot step adds nothing)', async t => {
+test('the shipped local runtime seeds the original grid plus, via the boot step, only Confluence\'s block (#487)', async t => {
   const { r, z } = await load(t);
   const { squares, source } = await z.readWorldSquares(r.db);
-  assert.equal(source, 'table'); assert.equal(sha(squares), golden.squares);
+  assert.equal(source, 'table'); assert.equal(sha(squares), sha(z.seedWorldSquares(z.mappedNations)));
+  const block = new Set(z.nationBlockSquares('confluence').map(s => `${s.x},${s.y}`));
+  assert.equal(sha(squares.filter(s => !block.has(`${s.x},${s.y}`))), sha(z.seedWorldSquares().filter(s => !block.has(`${s.x},${s.y}`))), 'outside the block: the original grid');
 });
 
 test('plain-Node importers: the zone vocabulary lives in an import-free file, so a component test that loads app/world-zones.tsx never needs the registry (CI regression on #550)', async () => {

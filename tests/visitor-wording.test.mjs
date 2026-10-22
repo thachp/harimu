@@ -10,7 +10,7 @@ const compiled = ts.transpileModule(source, {compilerOptions:{jsx:ts.JsxEmit.Rea
 const exports = {};
 let effects = [];
 let stateCursor=0,stateOverrides={};
-new Function('exports','require',compiled)(exports,name=>name==='@/lib/market-visibility'?require('../lib/market-visibility.ts'):name==='@/lib/hud-help'?require('../lib/hud-help.ts'):name==='@/lib/nation-themes'?require('../lib/nation-themes.ts'):name==='@/lib/nation-emblem'?require('../lib/nation-emblem.ts'):name==='./nation-symbol'?{NationSymbol:()=>null}:name==='./nation-crest'?{NationCrest:()=>null}:name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-settings'?{GameSettings:()=>null}:name==='@/lib/notice-scope'?require('../lib/notice-scope.ts'):name==='./game-timer'?{GameTimer:()=>null}:name==='react'?{useEffect(fn){effects.push(fn);},useState(initial){const slot=stateCursor++;return [stateOverrides[slot]??initial,()=>{}];}}:name==='@/lib/nation-discovery'?discovery:name==='@phosphor-icons/react'?new Proxy({},{get:(_,key)=>String(key)}):name.endsWith('.css')?{}:name==='./game-viewport'?{default:()=>null}:require(name));
+new Function('exports','require',compiled)(exports,name=>name==='@/lib/market-visibility'?require('../lib/market-visibility.ts'):name==='@/lib/context-strip-copy'?require('../lib/context-strip-copy.ts'):name==='@/lib/hud-help'?require('../lib/hud-help.ts'):name==='@/lib/nation-themes'?require('../lib/nation-themes.ts'):name==='@/lib/nation-emblem'?require('../lib/nation-emblem.ts'):name==='./nation-symbol'?{NationSymbol:()=>null}:name==='./nation-crest'?{NationCrest:()=>null}:name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./game-settings'?{GameSettings:()=>null}:name==='@/lib/notice-scope'?require('../lib/notice-scope.ts'):name==='./game-timer'?{GameTimer:()=>null}:name==='react'?{useEffect(fn){effects.push(fn);},useState(initial){const slot=stateCursor++;return [stateOverrides[slot]??initial,()=>{}];}}:name==='@/lib/nation-discovery'?discovery:name==='@phosphor-icons/react'?new Proxy({},{get:(_,key)=>String(key)}):name.endsWith('.css')?{}:name==='./game-viewport'?{default:()=>null}:require(name));
 const props={view:'square',nation:{id:'kindle',name:'Kindle'},nations:[],capacity:18,localDemo:false,panel:null,onNavigate(){}};
 function nodes(node){if(!node || typeof node!=='object')return [node]; if(typeof node.type==='function' && node.type.name==='HudHelp')return nodes(node.type(node.props));return [node,...[node.props?.children].flat(Infinity).flatMap(nodes)];}
 const render=extra=>{stateCursor=0;return nodes(exports.GameShell({...props,...extra}));};
@@ -83,4 +83,31 @@ test('#379: a citizen reloading a city URL while the session loads never sees vi
   }
   const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
   assert.match(page,/<GameShell visitorSession=\{isVisitorSession\(Boolean\(citizenNation\), clerkConfigured, citizenSessionStatus\)\}/);
+});
+
+test('#379: the context strip and footer note do not call a visitor a citizen; a citizen, a loading session and the demos keep their labels',()=>{
+  const visitor=text(render({...panelProps,visitorSession:true}));
+  assert.match(visitor,/Visitor preview/);assert.match(visitor,/CITY DISTRICTS · VISITOR VIEW/);assert.doesNotMatch(visitor,/Citizen snapshot|CITIZEN VIEW/);
+  const citizen=text(render({...panelProps,visitorSession:true,citizenNation:{id:'kindle',name:'Kindle'}}));
+  assert.match(citizen,/Citizen snapshot/);assert.match(citizen,/CITY DISTRICTS · CITIZEN VIEW/);assert.doesNotMatch(citizen,/Visitor preview/);
+  const loading=text(render({...panelProps,identityHold:'loading'}));
+  assert.match(loading,/Citizen snapshot/);assert.doesNotMatch(loading,/Visitor preview/);
+  assert.match(text(render({...panelProps,visitorSession:true,guestDemo:true})),/Disposable sample/);
+  assert.match(text(render({...panelProps,visitorSession:true,localDemo:true})),/Browser-local demo/);
+  assert.match(text(render({...panelProps,visitorSession:true,view:'country'})),/Static lore · opt-in presence/);
+});
+
+test('#379: the World tab is a real GET submit before hydration (?view=world&nation=…), and onClick still navigates client-side without a reload',()=>{
+  const calls=[];let prevented=0;
+  const tree=render({visitorSession:true,onNavigate:v=>calls.push(v),nation:{id:'aurelle',name:'Aurelle'}});
+  const el=type=>tree.filter(n=>n&&typeof n==='object'&&n.type===type);
+  const form=el('form').find(f=>f.props.id==='world-tab-form');
+  assert.ok(form,'a hidden GET form carries the World tab target');assert.equal(form.props.method,'get');assert.equal(form.props.hidden,true);
+  const hidden=el('input').find(i=>i.props.name==='nation');assert.equal(hidden.props.type,'hidden');assert.equal(hidden.props.value,'aurelle','the viewed nation travels with the click');
+  const dock=el('button').filter(b=>/^Open /.test(b.props['aria-label']??''));
+  const world=dock.find(b=>b.props['aria-label']==='Open World');
+  assert.equal(world.props.type,'submit');assert.equal(world.props.form,'world-tab-form');assert.equal(world.props.name,'view');assert.equal(world.props.value,'world','submits ?view=world');
+  for(const b of dock.filter(b=>b!==world))assert.equal(b.props.type,'button',`${b.props['aria-label']} stays a plain button`);
+  world.props.onClick({preventDefault(){prevented++;}});
+  assert.equal(prevented,1,'after hydration the default submit is cancelled, so there is no page reload');assert.deepEqual(calls,['world']);
 });

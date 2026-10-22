@@ -36,6 +36,13 @@ test('happy path: founds a T1 city and claims the radius-2 block atomically; rep
 
 test('each rejection gives a clear reason and claims nothing', async t => {
   const r = await runtime(t);
+  // A claimed square inside an otherwise eligible block: whole founding rejected, no partial claim. (#487: the old (2,13) site is now Meetwater's block, so this uses (21,13) before it is founded.)
+  await r.db.prepare("UPDATE world_squares SET owner='korund' WHERE x=22 AND y=14").run();
+  const partial = await r.call('world/found-city', 'alice', cmd(21, 13));
+  assert.equal(partial.data.reason, 'block_claimed');
+  assert.equal((await block(r, 21, 13)).filter(s => s.owner).length, 1, 'only the pre-claimed square is owned');
+  assert.equal(await cities(r), 0);
+  await r.db.prepare("UPDATE world_squares SET owner=NULL WHERE x=22 AND y=14").run();
   assert.equal((await r.call('world/found-city', 'alice', cmd(21, 13))).status, 200);
   const before = await owned(r);
   const cases = [
@@ -44,7 +51,7 @@ test('each rejection gives a clear reason and claims nothing', async t => {
     [cmd(8, 4), 'centre_frontier', /Frontier/],
     [cmd(9, 10), 'too_close', /border outpost at 8, 7.*at least 6 squares/],
     [cmd(18, 15), 'too_close', /city at 21, 13/],
-    [cmd(0, 13), 'block_off_map', /off the map edge/],
+    [cmd(12, 0), 'block_off_map', /off the map edge/], // #487: (0,13) is now next to Meetwater
     [cmd(30, 1), 'out_of_bounds', /off the map/],
   ];
   for (const [c, reason, message] of cases) {
@@ -52,12 +59,7 @@ test('each rejection gives a clear reason and claims nothing', async t => {
     assert.equal(res.data.reason, reason, `${c.x},${c.y}: ${JSON.stringify(res.data)}`); assert.match(res.data.error, message);
     assert.ok(res.status === 409 || res.status === 400);
   }
-  // A claimed square inside an otherwise eligible block: whole founding rejected, no partial claim.
-  await r.db.prepare("UPDATE world_squares SET owner='korund' WHERE x=3 AND y=14").run();
-  const partial = await r.call('world/found-city', 'alice', cmd(2, 13));
-  assert.equal(partial.data.reason, 'block_claimed');
-  assert.equal((await block(r, 2, 13)).filter(s => s.owner).length, 1, 'only the pre-claimed square is owned');
-  assert.equal(await cities(r), 1); assert.equal(await owned(r), before + 1);
+  assert.equal(await cities(r), 1); assert.equal(await owned(r), before);
 });
 
 test('authority stubs: flag gate, own nation authority, validation and same-origin', async t => {
@@ -74,7 +76,7 @@ test('authority stubs: flag gate, own nation authority, validation and same-orig
   assert.equal(await cities(r), 0);
   r.setCityFounding(true);
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
-  const korund = await r.call('world/found-city', 'bob', cmd(2, 13, { action: 'korund-chairman-order', name: 'Stahlgrad' }));
+  const korund = await r.call('world/found-city', 'bob', cmd(21, 13, { action: 'korund-chairman-order', name: 'Stahlgrad' }));
   assert.equal(korund.status, 200, JSON.stringify(korund.data)); assert.equal(korund.data.city.nationId, 'korund');
 });
 

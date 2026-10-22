@@ -4,9 +4,11 @@ import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 import {localRuntime} from './helpers/local-runtime.mjs';
 // #140: with the news flag on and budget available, prepareAiNews must call the gateway. No live AI is used.
-const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace('30000','5');
+const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace("'./ai-denylist'",JSON.stringify(new URL('../lib/ai-denylist.ts',import.meta.url).href)).replace('30000','5');
 const {prepareAiNews,readAiNews,aiNewsStaleLeaseSeconds,aiNewsRetrySeconds}=await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText).toString('base64')}`);
-const now=Math.floor(Date.now()/1000),budget={dailyBudgetMicro:970000,gatewayId:'harimu-test'},day=new Date(now*1000).toISOString().slice(0,10);
+// #160 flake: a real-clock `now` near 00:00 UTC let now+i or now-60+aiNewsRetrySeconds fall on the next UTC day,
+// so prepareAiNews keyed a fresh job id and called the gateway (3 !== 0). Pin a fixed mid-day UTC instant instead.
+const now=Date.UTC(2026,9,15,12,0,0)/1000,budget={dailyBudgetMicro:970000,gatewayId:'harimu-test'},day=new Date(now*1000).toISOString().slice(0,10);
 const news={nationId:'kindle',title:'Kindle Press',style:'press',fetchedAt:now*1000,statistics:{citizens:2,completedShifts:3,food:12},items:[]};
 const draft={title:'Ledger record',summary:'The public ledger records settled work and food.',claims:['completedShifts']};
 const gateway=()=>{const calls=[];return {calls,async run(model,input,options){calls.push({model,options});return {response:[JSON.stringify(draft),JSON.stringify({supported:true}),'safe'][calls.length-1]};}};};
@@ -42,6 +44,7 @@ test('#140 GET /api/news with the flag on returns the model item first',async t=
 });
 
 test('#160 a pre-gateway failure is retried at most once per aiNewsRetrySeconds, not on every load',async t=>{
+ for(const at of [now+4,now-60+aiNewsRetrySeconds])assert.equal(new Date(at*1000).toISOString().slice(0,10),day,'fixture stays on one UTC day');
  const r=await localRuntime();t.after(()=>r.close());await job(r,'failed','budget-unavailable',now-60);const ai=gateway();
  for(let i=0;i<5;i++)await prepareAiNews(r.db,news,now+i,ai,{enabled:true,budget});
  assert.equal(ai.calls.length,0,'within the retry window: no retake');

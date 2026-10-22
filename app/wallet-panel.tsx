@@ -3,6 +3,7 @@
 import { X } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { formatMinor, quoteTessera, summarizeWallet, walletHistoryLimit, type WalletTransaction } from '@/lib/wallet';
+import { kioskClaim, kioskClaimable, kioskHistory, kioskLabels, kioskNationVoice, kioskNotes } from '@/lib/reward-kiosk-copy';
 import { kioskBuyLabel, kioskClosed, kioskComingSoon, kioskExplainer, kioskHeader, kioskRateLine, kioskReceipt, spk } from '@/lib/kiosk-text';
 
 export type WalletPanelProps = {
@@ -13,6 +14,8 @@ export type WalletPanelProps = {
   onBuyTessera?: (tesseraMinor: number) => Promise<string | null>;
   /** #631: preview-only TEST faucet; omitted unless the server says it is available. claim resolves to an error message, or null on success. */
   testFaucet?: { grantMinor: number; granted: boolean; claim: () => Promise<string | null> };
+  /** #466: earned-Tessera reward kiosk; omitted unless the server answers (HARIMU_TESSERA_REWARDS_ENABLED off is a 404, so nothing shows). claim resolves to an error message, or null on success. */
+  rewards?: WalletRewards;
   onClose: () => void;
 };
 
@@ -47,7 +50,45 @@ function WalletTestFaucet({ grantMinor, granted, claim }: NonNullable<WalletPane
   </section>;
 }
 
-export function WalletPanel({ sparkMinor, tesseraMinor = 0, transactions, onBuyTessera, testFaucet, onClose }: WalletPanelProps) {
+export type WalletRewardRow = { entryId: string; epochDay: number; amountMinor: number; claimedAt?: string };
+export type WalletNotEarnedRow = { id: string; provenance: 'starter_grant' | 'faucet'; amountMinor: number; occurredAt: string };
+export type WalletRewards = { claimable: WalletRewardRow[]; history: WalletRewardRow[]; notEarned?: WalletNotEarnedRow[]; claimableMinor: number; claimedMinor: number; claimableCount: number; claimedCount: number; claim: (entryId: string) => Promise<string | null> };
+const rewardVoice = kioskNationVoice.kindle; // the wallet is Kindle-only (page.tsx); every line below is from Content's lib/reward-kiosk-copy.ts (#535)
+const rewardsLineWork = 'Tessera earned for settled shift work by verified citizens.'; // ARC's two lines (each under 80 characters); no buy, exchange or cash-out wording, even as a negation
+const rewardsLineCaps = 'Rewards are capped and paid only for verified work.';
+const rewardDay = (epochDay: number) => new Date(epochDay * 86400000).toISOString().slice(0, 10);
+const rewardWork = 'shift work';
+const fillReward = (text: string, minor: number) => text.replace('{reward}', `${formatMinor(minor)} TSR`).replace('{work}', rewardWork);
+/** #466: starter grants and test faucet credits get their own labels (Content #535) and sit apart; they are never in the earned totals. */
+const notEarnedLabel = { starter_grant: kioskLabels.starterGrant, faucet: kioskLabels.faucet } as const;
+const notEarnedHelp = { starter_grant: kioskLabels.starterGrantHelp.text, faucet: kioskLabels.faucetHelp.text } as const;
+/** #466: every earned row here is provenance "earned" (a settled shift reward). Starter grants and the test faucet are never listed or counted here. */
+function WalletRewardKiosk({ claimable, history, notEarned = [], claimableMinor, claimedMinor, claimableCount, claimedCount, claim }: WalletRewards) {
+  const [state, setState] = useState<{ pending: string | null; message: string | null }>({ pending: null, message: null });
+  const more = (shown: number, total: number) => total > shown ? <small>Showing the newest {shown} of {total}.</small> : null;
+  const earned = `${kioskLabels.earned} · shift reward`;
+  return <section className="wallet-rewards" aria-label={rewardVoice.title}>
+    <h3>{rewardVoice.title}</h3>
+    <p><small>{rewardsLineWork}</small><br /><small>{rewardsLineCaps}</small></p>
+    <p><small>{kioskNotes.sparkStays.text}</small></p>
+    <p>{kioskClaimable.label}: {formatMinor(claimableMinor)} TSR · Claimed so far: {formatMinor(claimedMinor)} TSR</p>
+    {claimable.length === 0 && history.length === 0 ? <p><small>{kioskHistory.empty.text}</small></p> : claimable.length === 0 ? <p><small>Nothing is waiting to be claimed.</small></p> : <ul>{claimable.map((row) => <li key={row.entryId}>
+      <span>{earned} · {rewardDay(row.epochDay)} UTC</span>
+      <button type="button" aria-label={fillReward(kioskClaimable.claimAccessibleName.text, row.amountMinor)} disabled={state.pending !== null} onClick={async () => { setState({ pending: row.entryId, message: null }); const error = await claim(row.entryId); setState({ pending: null, message: error ?? fillReward(kioskClaim.claimed.text, row.amountMinor) }); }}>{kioskClaimable.claimButton}</button></li>)}</ul>}
+    {more(claimable.length, claimableCount)}
+    {state.message && <p role="status">{state.message}</p>}
+    {history.length > 0 && <table className="wallet-history"><caption>{kioskHistory.title}</caption><thead><tr><th scope="col">Day</th><th scope="col">Provenance</th><th scope="col">Amount (TSR)</th></tr></thead>
+      <tbody>{history.map((row) => <tr key={row.entryId}><td>{rewardDay(row.epochDay)} UTC</td><td>{earned}</td><td className="wallet-credit">{formatMinor(row.amountMinor, true)}</td></tr>)}</tbody></table>}
+    {more(history.length, claimedCount)}
+    {notEarned.length > 0 && <>
+      <table className="wallet-history wallet-not-earned"><caption>Other credits (not earned)</caption><thead><tr><th scope="col">Day</th><th scope="col">Provenance</th><th scope="col">Amount (TSR)</th></tr></thead>
+        <tbody>{notEarned.map((row) => <tr key={row.id}><td>{row.occurredAt.slice(0, 10)} UTC</td><td>{notEarnedLabel[row.provenance]}</td><td>{formatMinor(row.amountMinor, true)}</td></tr>)}</tbody></table>
+      {[...new Set(notEarned.map(row => row.provenance))].map(kind => <p key={kind}><small>{notEarnedHelp[kind]}</small></p>)}
+    </>}
+  </section>;
+}
+
+export function WalletPanel({ sparkMinor, tesseraMinor = 0, transactions, onBuyTessera, testFaucet, rewards, onClose }: WalletPanelProps) {
   const wallet = sparkMinor === undefined ? null : summarizeWallet(sparkMinor, transactions ?? [], tesseraMinor);
   return <div className="wallet-panel-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="wallet-panel" role="dialog" aria-modal="true" aria-labelledby="wallet-panel-title" onKeyDown={(event) => { if (event.key === 'Escape') onClose(); else if (event.key === 'Tab') { event.preventDefault(); (event.currentTarget.querySelector('button') as HTMLButtonElement | null)?.focus(); } }}>
@@ -61,6 +102,7 @@ export function WalletPanel({ sparkMinor, tesseraMinor = 0, transactions, onBuyT
           <small>Official rate, {wallet.quote.source}.</small></p>
         {onBuyTessera ? <WalletKiosk sparkMinor={wallet.sparkMinor} rate={wallet.quote.rate} onBuyTessera={onBuyTessera} /> : <p><small>{kioskClosed}</small></p>}
         {testFaucet && <WalletTestFaucet {...testFaucet} />}
+        {rewards && <WalletRewardKiosk {...rewards} />}
         <h3>Recent transactions</h3>
         {wallet.transactions.length === 0 ? <p>No wages, purchases or fees recorded yet.</p> :
           <table className="wallet-history"><thead><tr><th scope="col">Date</th><th scope="col">Reason</th><th scope="col">Amount (SPK)</th></tr></thead>

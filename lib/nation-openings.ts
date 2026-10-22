@@ -31,16 +31,59 @@ const liveMapSeeds: Readonly<Partial<Record<NationId, MapSeed>>> = {
   kindle: { capital: { x: 5, y: 4 }, outpost: { x: 8, y: 7 }, biome: ['plains', 'hills', 'volcanic badland'] },
   korund: { capital: { x: 18, y: 4 }, outpost: { x: 15, y: 7 }, biome: ['mountains', 'cliff/plateau', 'hills'] },
   aurelle: { capital: { x: 12, y: 14 }, outpost: { x: 12, y: 11 }, biome: ['cliff/plateau', 'plains', 'coast'] },
+  /** #487 slice 2: Meetwater, the Confluence capital (docs the-confluence.mdx: central delta Heartland). [ASSUMPTION] (4,13) and the outpost (7,10): the docs give no coordinates; the 7x7 block
+   *  is clear of the three live blocks, the Commons and the grid edge on the 24x18 map (tests/confluence-capital-487.test.mjs). Biome from the docs (canals, terraced hills, delta wetland). */
+  confluence: { capital: { x: 4, y: 13 }, outpost: { x: 7, y: 10 }, biome: ['river edge', 'wetland', 'hills'] },
 };
 /** One job a nation offers. `id` must start with the nation id (it is also the work-order id, so ids never collide across nations). `wageMinor` is paid once per claimed shift. */
 export type NationJob = { id: string; name: string; capacityCost: number; hours: number; wageMinor: number; output: string };
 
-export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED`, ...liveMapSeeds[id] }));
+/** #487 (Confluence PoC, slice 1): the Confluence wage ledger for the generic work commands (lib/nation-work.ts). Read only while HARIMU_CONFLUENCE_ENABLED and HARIMU_NATION_WORK_ENABLED
+ *  are "true" and the account is QA-allowlisted (nationPlayable). Currency per docs (the-confluence.mdx: Current, CUR); no band, parity or State Bank (excluded by #487).
+ *  [ASSUMPTION] job values copy the Labor Notes / Crowns pattern (capacity 4, 2 hours, 800 minor units; Stage 0 design section 3), and the fund (100000 minor units) is an [ASSUMPTION] accepted by ARC, matching Korund's seeded `korund_resources.initial_minor` (lib/db.ts).
+ *  Name and output are placeholders from the docs' city table (Lanu Terraces: "Cooperative harvest shifts") until Content supplies copy. No capital yet: that is the next slice. */
+export const confluenceWork = {
+  currency: { code: 'CUR', name: 'Current' },
+  wage: { fundMinor: 100_000 },
+  jobs: [{ id: 'confluence-cooperative-harvest', name: 'Cooperative harvest shift', capacityCost: 4, hours: 2, wageMinor: 800, output: 'Rice brought in on the Lanu Terraces' }],
+} as const satisfies Pick<NationOpening, 'currency' | 'wage' | 'jobs'>;
+const workSeeds: Readonly<Partial<Record<NationId, Pick<NationOpening, 'currency' | 'wage' | 'jobs'>>>> = { confluence: confluenceWork };
+
+export const nationOpenings: readonly NationOpening[] = nationIds.map(id => ({ id, openingFlag: isLiveNation(id) ? null : `HARIMU_${id.toUpperCase()}_ENABLED`, ...liveMapSeeds[id], ...workSeeds[id] }));
 
 export const nationOpening = (id: unknown): NationOpening | undefined => typeof id === 'string' ? nationOpenings.find(opening => opening.id === id) : undefined;
 /** Ids whose rules run: the live nations plus any whose opening flag is exactly "true" in `bindings`, in catalog order. Unknown ids never appear.  */
 export const openNationIds = (bindings: Readonly<Record<string, string | undefined>> = {}): readonly NationId[] =>
-  nationOpenings.filter(opening => opening.openingFlag === null || bindings[opening.openingFlag] === 'true').map(opening => opening.id);
+  nationOpenings.filter(opening => opening.openingFlag === null || (bindings[opening.openingFlag] === 'true' && readinessAllows(opening, bindings))).map(opening => opening.id);
+/** #486 (Stage 0 closeout, slice 1): the map-size-independent opening checklist, read from the registry entry alone. A live nation is always ready (it keeps its own modules).
+ *  `map`: a capital and biome are set (checked present, not where; placement is #486's map-fit measurement). `work`: currency, wage fund and at least one job. */
+export type NationReadiness = { map: boolean; work: boolean; ready: boolean };
+/** #486 (QA1 nit): the map check also asks whether the capital's block fits, using the same rules as the map-fit measurement on #486. Values mirror lib/map-zones.ts
+ *  (mapWidth 24, mapHeight 18, frontierRadius 3, Commons centre 12,6); that file imports this one, so they are repeated here and pinned equal by tests/nation-readiness-486.test.mjs. */
+export const mapFitRules = { width: 24, height: 18, blockRadius: 3, commonsCentre: { x: 12, y: 6 }, minCapitalDistance: 7, minCommonsDistance: 5 } as const;
+const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+/** Does a capital's 7x7 block fit: wholly on the grid, Chebyshev >= 7 from every other capital and >= 5 from the Commons centre? A check only; it places nothing. */
+export const capitalFits = (capital: { x: number; y: number }, others: readonly { x: number; y: number }[]): boolean => {
+  const { width, height, blockRadius: r, commonsCentre, minCapitalDistance, minCommonsDistance } = mapFitRules;
+  return capital.x >= r && capital.y >= r && capital.x + r < width && capital.y + r < height
+    && cheb(capital, commonsCentre) >= minCommonsDistance && others.every(other => cheb(capital, other) >= minCapitalDistance);
+};
+/** Readiness of one registry entry, checked against the other entries' capitals. Exported so a partial entry can be tested directly. */
+export const openingReadiness = (opening: NationOpening, all: readonly NationOpening[] = nationOpenings): NationReadiness => {
+  if (opening.openingFlag === null) return { map: true, work: true, ready: true };
+  const others = all.flatMap(o => o.id !== opening.id && o.capital ? [o.capital] : []);
+  const map = Boolean(opening.capital && opening.biome?.length && capitalFits(opening.capital, others));
+  const work = Boolean(opening.currency && opening.wage && opening.jobs?.length);
+  return { map, work, ready: map && work };
+};
+export const nationReadiness = (id: unknown): NationReadiness | undefined => {
+  const opening = nationOpening(id);
+  return opening ? openingReadiness(opening) : undefined;
+};
+/** Behind HARIMU_NATION_READINESS_ENABLED (preview "true", production "false"): when on, a nation whose opening flag is "true" but whose registry entry is incomplete stays closed,
+ *  so flipping a flag early opens nothing. Off: exactly the behaviour before #486 (the opening flag and the QA allowlist decide). */
+const readinessAllows = (opening: NationOpening, bindings?: Readonly<Record<string, string | undefined>>) =>
+  bindings?.HARIMU_NATION_READINESS_ENABLED !== 'true' || nationReadiness(opening.id)?.ready === true;
 type OpeningBindings = Readonly<Record<string, string | undefined>> & QaBindings;
 /** #489 (Stage 0c): may this account enroll in, switch to, or play this nation? Fails closed.
  *  A live nation: always. An unknown id, or a nation whose opening flag is not exactly "true": never. A flag-on nation: only a QA-allowlisted account (`qaTestCitizenAllowed`:
@@ -51,6 +94,7 @@ export const nationPlayable = (id: unknown, bindings?: OpeningBindings, userId?:
   if (!opening) return false;
   if (opening.openingFlag === null) return true;
   if (typeof userId !== 'string' || !userId || bindings?.[opening.openingFlag] !== 'true') return false;
+  if (!readinessAllows(opening, bindings)) return false; // #486
   return qaTestCitizenAllowed(bindings, userId);
 };
 export { liveNations };

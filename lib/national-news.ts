@@ -6,6 +6,7 @@ import { presidiumRumors, readPresidium } from './korund-presidium';
 import { readWars, warNewsItems } from './war'; // #309
 import { readTreaties, treatyNewsItems } from './diplomacy'; // #308
 import { embargoNewsItems, readEmbargoes } from './embargo'; // #363
+import { goodsSanctionNewsItems, readGoodsSanctions } from './goods-sanctions'; // #601
 import { undergroundNewsItems } from './korund-underground'; // #295
 
 export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model';kind?:NewsItemKind};
@@ -15,7 +16,7 @@ export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;foundingPeriod?:boolean}={}):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean}={}):Promise<NationalNews|null> {
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
  if(!edition)return null;
@@ -41,6 +42,7 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  if(options.war)items.push(...warNewsItems((await readWars(db,Math.floor(now/1000))).wars,nationId)); // #309 declaration, mobilization end and war end lines, derived on read
  if(options.diplomacy)items.push(...treatyNewsItems((await readTreaties(db,Math.floor(now/1000))).treaties,nationId)); // #308 ratification and broken-pact lines, derived on read
  if(options.foundingPeriod)items.push(...foundingNewsItems(await readFoundingEvents(db),nationId)); // #612 day-30 event line, derived on read
+ if(options.targetedSanctions)items.push(...goodsSanctionNewsItems((await readGoodsSanctions(db)).sanctions,nationId)); // #601 impose and lift lines, derived on read
  if(options.embargo)items.push(...embargoNewsItems((await readEmbargoes(db)).embargoes,nationId)); // #363 impose and lift lines, derived on read
  if(tick){
   const proposals=JSON.parse(tick.proposals_json) as (GovernmentSnapshot|null)[];

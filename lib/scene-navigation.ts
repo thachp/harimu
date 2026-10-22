@@ -80,6 +80,10 @@ export function viewedNationHeld(hold: IdentityHold, search: string, validNation
 export function isVisitorSession(hasCitizenNation: boolean, clerkConfigured: boolean, status: 'loading' | 'anonymous' | 'ready' | 'error'): boolean {
   return !hasCitizenNation && (!clerkConfigured || status === 'anonymous' || status === 'ready');
 }
+/** #379: who may use the first-visit guide, its "Try a day in the life" sample and the guest sandbox: everyone who is a visitor (isVisitorSession), which is a signed-out guest and also a signed-in account that has no citizen yet ("ready", no citizen row), plus the browser-local demo. Never a citizen, never while the session is loading or errored. */
+export function guestDemoAllowed(hasCitizenNation: boolean, clerkConfigured: boolean, status: 'loading' | 'anonymous' | 'ready' | 'error'): boolean {
+  return !clerkConfigured || isVisitorSession(hasCitizenNation, clerkConfigured, status);
+}
 /** `visitor` (#376): a guest or signed-out visitor has no citizen nation, so the nation they are previewing is the only one every scene shows; keep it in every scene's URL so a reload or shared link stays on it.
  *  A citizen's personal scenes always show their own nation, so for a citizen it stays out of the URL (`visitor` false). */
 export function sceneUrl(href: string, scene: SceneView, nationId?: string, cityId?: string, keepNation = false, visitor = false): string {

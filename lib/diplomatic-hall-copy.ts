@@ -7,7 +7,8 @@
  * Voice: one neutral system voice for every line, the same in every nation. There is no byline, no nation voice, no State Media or court
  * framing and no AI character speaking, so nothing here carries the AI badge (#381 / ui-ux §23.2). The Korund refusal says only that the hall is
  * closed to the player's nation: it names no other nation, says nothing about what is said in the hall, and does not hint at how a closed
- * nation could see it. No line says posts are private, and none promises what happens to a post.
+ * nation could see it. A second, separate refusal covers a nation that loses the channel at a Red Alert (the docs list Varkand), so the
+ * closed-nation line is not stretched to cover it. No line says posts are private, and none promises what happens to a post.
  *
  * Rules: no figure is written. The two placeholders are pre-formatted strings filled at runtime: {nation}, a nation name, capped at a local
  * 24 characters, and {max}, the post length limit from the build work (a number, capped at six characters). The refusal keys below are
@@ -21,8 +22,8 @@ export const HALL_LINE_MAX=100;
 export const HALL_PLACEHOLDERS=['{nation}','{max}'] as const;
 
 export type Line={text:string;proposal:true};
-export type HallRefusalKey='nation_closed'|'signed_out'|'rate_limit'|'too_long';
-export const HALL_REFUSAL_KEYS:readonly HallRefusalKey[]=['nation_closed','signed_out','rate_limit','too_long'];
+export type HallRefusalKey='nation_closed'|'alert_closed'|'signed_out'|'rate_limit'|'too_long';
+export const HALL_REFUSAL_KEYS:readonly HallRefusalKey[]=['nation_closed','alert_closed','signed_out','rate_limit','too_long'];
 export type HallRefusal={key:HallRefusalKey;line:Line;proposal:true};
 
 const L=(text:string):Line=>({text,proposal:true});
@@ -35,10 +36,9 @@ export const hallChrome={
  proposal:true,
 } as const;
 
-/** The one-line explainer under the header, and two short helpers. */
+/** The one-line explainer under the header, and the note that each post shows its nation (the shipped Diplomatic Hall panel does this). The docs give no rule about posting in character, so no line claims one (QA3 note on #606). */
 export const hallExplainer={
  line:L('Citizens of the nations in this hall can read and post here.'),
- inCharacter:L('Post as your citizen, in character.'),
  nationNote:L('Your nation is shown next to your name.'),
  proposal:true,
 } as const;
@@ -54,6 +54,7 @@ export const hallComposer={
 /** Refusals, one neutral line each, in the order the checks would run. */
 export const hallRefusals:readonly HallRefusal[]=[
  {key:'nation_closed',line:L('The Diplomatic Hall is closed to your nation.'),proposal:true},
+ {key:'alert_closed',line:L('The Diplomatic Hall is closed to your nation during a Red Alert.'),proposal:true},
  {key:'signed_out',line:L('Sign in as a citizen to use the Diplomatic Hall.'),proposal:true},
  {key:'rate_limit',line:L('You are posting too quickly. Please wait a moment and try again.'),proposal:true},
  {key:'too_long',line:L('That post is too long. Posts can be up to {max} characters.'),proposal:true},
