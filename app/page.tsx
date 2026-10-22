@@ -18,6 +18,7 @@ import { NationComparison } from './nation-comparison';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
+import { CitySummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
@@ -1762,21 +1763,23 @@ export default function Home() {
     </>}
   </section>;
 
+  const populationFact = selected.populationBand ? <dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd> : null;
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
     {guestAllowed && (firstVisitGuideOpen
       ? tourOpen ? <GlobeTour onFocus={setTourFocusNation} onClose={finishTour} /> : <FirstVisitGuide stage={firstVisitStage} onStageChange={setFirstVisitStage} onShortlist={setShortlistIds} onStartTour={() => setTourOpen(true)} onTryGuest={startGuestDemo} onDismiss={() => { stopTour(); setFirstVisitGuideOpen(false); }} />
       : <button type="button" className="secondary-action" onClick={() => { setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); }}>Restart first-visit guide</button>)}
+    <WorldSummary nation={selected} population={populationFact} onView={changeView} />
     <p className="eyebrow">Exploring · {selected.shortName}</p>
     {guestEntry}
     <NationComparison nations={worldNations} />
-    <dl>{selected.populationBand && <><dt>Population</dt><dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd></>}<dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
+    <WorldFacts nation={selected} population={populationFact} />
     {selected.populationBand === 'needs-citizens' && <details className="pioneer-note"><summary>Pioneer nation · bonuses planned</summary><p>{pioneerNote}</p></details>}
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>
     <details><summary>Rules and limits</summary><p>Each nation keeps its own rules. Computer-controlled leaders (AI/SI) follow fixed game rules: the same situation produces the same decision. No live AI model is connected. Petitions require a verified phone number to count, but phone verification has not been set up yet, so petition submission is unavailable. Territory ownership and foreign trade are not built yet.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus,formatTime)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <ActionButton type="button" reason={firstActionReason([clerkConfigured && citizenSessionStatus === 'loading', 'Your citizen account is loading. Please wait before choosing citizenship.'], [clerkConfigured && citizenSessionStatus === 'error', 'Your citizen account could not load. Retry loading it before choosing citizenship.'])} onClick={()=>{if (!clerkConfigured || !['loading','error'].includes(citizenSessionStatus)) beginEnrollment(selected.id);}}>Choose citizenship · {selected.shortName}</ActionButton>}
-    <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
+    <WorldInstitutionsButton onView={changeView} />
   </section>;
   const viewedNationParam = new URLSearchParams(locationSearch).get('nation');
   const foreignCivic = isForeignCivic(viewMode, viewedNationParam, selected.id, citizenNation?.id);
@@ -1799,6 +1802,7 @@ export default function Home() {
   const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} /></>;
   const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
+    <CitySummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} nation={citizenNation ?? selected} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} onView={changeView} />
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {firstLoopHint}{weekTracker}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
