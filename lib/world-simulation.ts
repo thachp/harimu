@@ -110,9 +110,13 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
   await db.prepare("INSERT OR IGNORE INTO world_clock (id,epoch_seconds) VALUES ('main',?)")
     .bind(Math.floor(now/tickSeconds)*tickSeconds).run();
-  const epoch = (await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>())!.epoch_seconds;
+  // #679: the two clock reads are independent, so they share one round trip.
+  const [clock, last] = await Promise.all([
+    db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>(),
+    db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
+  ]);
+  const epoch = clock!.epoch_seconds;
   const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
-  const last = await db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>();
   for (let tick=(last?.tick ?? 0)+1; tick<=Math.min(due,(last?.tick ?? 0)+maximumCatchupTicks); tick++) {
     const scheduledAt = epoch+tick*tickSeconds;
     // Catch-up evaluates current authoritative needs, not reconstructed historical households.
@@ -130,11 +134,14 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
     const missing = await db.prepare(`SELECT t.tick,t.scheduled_at FROM world_ticks t WHERE t.tick>(SELECT COALESCE(MAX(tick),0) FROM world_ticks)-?
       AND (SELECT COUNT(*) FROM nation_stability_scores s WHERE s.tick=t.tick)<${stabilityNations.length} ORDER BY t.tick`)
       .bind(maximumCatchupTicks+scoreRepairTicks).all<{tick:number;scheduled_at:number}>();
-    for (const row of missing.results) {
+    // #679: the score inputs only read source tables (never nation_stability_scores), so every missing tick's inputs are read concurrently and all
+    // scores are written in one batch, oldest tick first, instead of a read and a batch per tick in a row.
+    const statements = await Promise.all(missing.results.map(async row => {
       // #423: war weariness reads the wars table as of the tick's own time (only while both war flags are on), so a catch-up or repaired tick scores the same as a live one.
       const weariness = options.warWeariness ? await readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined;
-      await db.batch(await stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})}));
-    }
+      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
+    }));
+    if (statements.length) await db.batch(statements.flat());
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
   // #679: the flag-gated runners each cost several sequential database round trips, and over Hyperdrive every round trip is slow, so one GET /api/world with the
   // preview flags on waited for all of them in a row (about 80 round trips, ~30 s on preview). Runners that touch separate state run as concurrent chains (see

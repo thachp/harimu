@@ -31,15 +31,15 @@ async function roundTrips(t, hoursLater) {
   } finally { r.db.prepare = prepare; r.db.batch = batch; }
 }
 
-test('with the preview flags on, a GET with no tick due waits for at most 20 sequential round trips (measured ~17.7; it was ~38)', async t => {
+test('with the preview flags on, a GET with no tick due waits for at most 14 sequential round trips (measured ~12.6; ~17.7 after #680, ~38 before)', async t => {
   assert.ok(previewFlags.length >= 20, 'the preview flag set is on');
   const { trips, clock } = await roundTrips(t, 0);
   assert.equal(clock.pendingTicks, 0);
-  assert.ok(trips <= 20, `critical path ~${trips.toFixed(1)} round trips`);
+  assert.ok(trips <= 14, `critical path ~${trips.toFixed(1)} round trips`);
 });
 
-test('with three ticks to catch up, the GET waits for at most 50 sequential round trips (measured ~48.4; it was ~95)', async t => {
+test('with three ticks to catch up, the GET waits for at most 40 sequential round trips (measured ~38.4; ~48.5 after #680, ~95 before)', async t => {
   const { trips, clock } = await roundTrips(t, 30);
   assert.equal(clock.latestTick, 3, 'the catch-up still processes three ticks');
-  assert.ok(trips <= 50, `critical path ~${trips.toFixed(1)} round trips`);
+  assert.ok(trips <= 40, `critical path ~${trips.toFixed(1)} round trips`);
 });
