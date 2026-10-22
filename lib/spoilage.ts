@@ -10,16 +10,25 @@ export * from './spoilage-rules';
  * - Idempotent per citizen, good and tick: a run only writes if no other run has spoiled that citizen's good on that tick.
  *   Every insert is guarded against the live view (free quantity / order remaining), so nothing goes negative.
  * - Only the latest tick is applied; days skipped by bounded catch-up are not back-charged.
+ * - #721: only goods held when the tick began spoil. This runs on every market write in the tick, so goods bought during the tick
+ *   (market buys filled, or ledger gains, at or after `tickStartedAt`) are fresh and are charged from the next tick. Without this a
+ *   citizen who held none at the tick's first run lost a just-bought basket on their very next order (the sell was then refused).
  */
-export async function runSpoilage(db: GameDatabase, tick: number, now: number) {
+export async function runSpoilage(db: GameDatabase, tick: number, now: number, tickStartedAt = now) {
   if (!(tick > 0)) return;
   const run = `spoil:${tick}:${crypto.randomUUID()}:`;
   for (const good of Object.keys(shelfLifeDays) as PerishableGood[]) {
-    const [held, escrow] = await Promise.all([
+    const [held, escrow, fresh] = await Promise.all([
       db.prepare('SELECT clerk_user_id, quantity FROM citizen_inventory_balances WHERE item = ? AND quantity > 0').bind(good).all<{ clerk_user_id: string; quantity: number }>(),
       db.prepare(`SELECT id, citizen_id, remaining FROM market_open_orders WHERE side = 'sell' AND good = ? AND citizen_id IS NOT NULL
         ORDER BY created_at DESC, id DESC`).bind(good).all<{ id: string; citizen_id: string; remaining: number }>(),
+      db.prepare(`SELECT clerk_user_id, SUM(qty) AS qty FROM (
+          SELECT o.citizen_id AS clerk_user_id, t.qty FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id
+            WHERE t.good = ? AND o.citizen_id IS NOT NULL AND t.filled_at >= ?
+          UNION ALL SELECT clerk_user_id, quantity_delta AS qty FROM citizen_economy_events WHERE item = ? AND quantity_delta > 0 AND occurred_at >= ?
+        ) GROUP BY clerk_user_id`).bind(good, tickStartedAt, good, tickStartedAt).all<{ clerk_user_id: string; qty: number }>(),
     ]);
+    const freshBy = new Map(fresh.results.map(r => [r.clerk_user_id, Number(r.qty)]));
     const citizens = new Map<string, { free: number; orders: { id: string; remaining: number }[] }>();
     for (const r of held.results) citizens.set(r.clerk_user_id, { free: Number(r.quantity), orders: [] });
     for (const o of escrow.results) {
@@ -27,7 +36,7 @@ export async function runSpoilage(db: GameDatabase, tick: number, now: number) {
       c.orders.push({ id: o.id, remaining: Number(o.remaining) }); citizens.set(o.citizen_id, c);
     }
     for (const [citizen, c] of citizens) {
-      const total = spoilQuantity(good, c.free + c.orders.reduce((s, o) => s + o.remaining, 0));
+      const total = spoilQuantity(good, Math.max(0, c.free + c.orders.reduce((s, o) => s + o.remaining, 0) - (freshBy.get(citizen) ?? 0)));
       if (!total) continue;
       const plan = allocateSpoilage(total, c.free, c.orders);
       const prefix = `${run}${citizen}:${good}:`;
