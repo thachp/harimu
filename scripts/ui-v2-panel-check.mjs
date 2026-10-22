@@ -18,8 +18,8 @@ const panels = {
   world: { view: 'world', panel: { nationId: 'aurelle', title: 'Aurelle', subtitle: 'Chartered monarchy', rowsLabel: 'Game locations', stats: [{ label: 'Population', value: 'Needs citizens' }, { label: 'Capital', value: 'Highspire' }, { label: 'Currency', value: 'Crown' }],
     rows: [{ id: 'country', label: 'Country travel' }, { id: 'square', label: 'Open City' }], primary: { label: 'Inspect national institutions' } } },
   city: { view: 'square', panel: { nationId: 'kindle', title: 'Forgehaven', subtitle: 'Kindle Republic', rowsLabel: 'City destinations', stats: [{ label: 'Capital', value: 'Forgehaven' }, { label: 'Currency', value: 'Spark' }],
-    rows: [{ id: 'household', label: 'Household', detail: 'Belongings and recovery' }, { id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings' }, { id: 'market', label: 'Market', detail: 'Goods and citizen listings' }, { id: 'government', label: 'Government', detail: 'Policy and petitions' }],
-    primary: { label: 'Open Household' } } },
+    rows: [{ id: 'workplace', label: 'Workplace', detail: 'Contributions and earnings' }, { id: 'market', label: 'Market', detail: 'Goods and citizen listings' }, { id: 'government', label: 'Government', detail: 'Policy and petitions' }],
+    primary: { label: 'Household' } } }, // QA3 #734: the Household destination is promoted to the primary action, not repeated as a row
 };
 
 const probe = () => {
