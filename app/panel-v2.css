@@ -1,0 +1,20 @@
+/* #392 S3 panel shape (flag NEXT_PUBLIC_HARIMU_UI_V2_PANEL). Font-independent: wrapping and min-content, no pixel-tuned widths. */
+.panel-v2{display:grid;gap:14px;margin-bottom:18px;min-width:0}
+.panel-v2-summary{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.panel-v2-summary>div{flex:1 1 0;min-width:min-content}
+.panel-v2-summary h2{font-family:var(--font-serif,Georgia,serif);font-size:1.5rem;line-height:1.15;overflow-wrap:break-word;margin:0}
+.panel-v2 .panel-v2-summary p{margin:2px 0 0;opacity:.8;overflow-wrap:break-word}
+.panel-v2 dl.panel-v2-stats{display:flex;flex-wrap:wrap;gap:8px 18px;margin:0;padding:10px 0;border-block:1px solid rgba(214,180,92,.25)}
+.panel-v2-stats>div{flex:1 1 auto;min-width:min-content}
+.panel-v2 .panel-v2-stats dt{font-size:calc(11px * var(--text-scale, 1));margin:0}
+.panel-v2 .panel-v2-stats dd{margin:0;font-size:calc(13px * var(--text-scale, 1));font-weight:600;text-align:left;overflow-wrap:break-word}
+.panel-v2 ul.panel-v2-rows{list-style:none;margin:0;padding:0;display:grid}.panel-v2 .panel-v2-rows li{margin:0;padding:0}
+.panel-v2-rows li+li{border-top:1px solid rgba(255,255,255,.08)}
+/* :not(.market-item) lifts these above .game-inspector-body button:not(.market-item), the panel's generic button rule */
+.panel-v2 .panel-v2-rows button:not(.market-item),.panel-v2 button.panel-v2-primary:not(.market-item){display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:10px 4px;text-align:left;background:none;border:0;border-radius:0;color:inherit;cursor:pointer;font-size:calc(13px * var(--text-scale, 1));line-height:1.35}
+.panel-v2 .panel-v2-rows button:not(.market-item):hover{background:rgba(255,255,255,.05)}
+.panel-v2-rows button>span{display:grid;min-width:0}
+.panel-v2-rows strong,.panel-v2-rows small{overflow-wrap:break-word}
+.panel-v2-rows small{opacity:.7}
+.panel-v2-rows button:focus-visible,.panel-v2-primary:focus-visible{outline:2px solid #d6b45c;outline-offset:2px}
+.panel-v2 button.panel-v2-primary:not(.market-item){padding:10px 14px;border:1px solid #d6b45c;border-radius:6px;background:transparent;color:#f1d58a;font-weight:600}
