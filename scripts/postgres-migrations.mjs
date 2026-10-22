@@ -139,6 +139,8 @@ export async function assertDatabaseNotAhead(db, migrations = postgresMigrations
   const ahead = unknownAppliedMigrations(migrations, done);
   if (ahead.length) throw new Error(`Production deploy refused: the database has migrations this commit does not have (${ahead.join(', ')}). This commit is older than the database; deploy a release that includes them.`);
 }
+/** #486: the preview deploy's database checks, in order: every migration applied (#119), then the database is not ahead of this commit. */
+export async function assertDeployDatabase(db, migrations = postgresMigrations()) { await assertPostgresMigrationsApplied(db, migrations); await assertDatabaseNotAhead(db, migrations); }
 /** #119 deploy guard: throws, listing every problem, unless all migrations are applied. */
 export async function assertPostgresMigrationsApplied(db, migrations = postgresMigrations()) {
   const problems = migrationProblems(migrations, await recorded(db), await liveSchema(db));
