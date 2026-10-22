@@ -94,6 +94,38 @@ for (const backend of [undefined, 'postgres']) {
     assert.equal(await c.owner(a), 'aurelle', 'the guarded UPDATE moved nothing');
   });
 
+  test(`QA3: a change between the read and the batch (square re-owned, or war ended) leaves no partial cession, no war end and no enacted record${label}`, async t => {
+    const c = await setup(t, backend);
+    // Runs `change` just before the decision batch, after every read and JS re-check has already passed.
+    const racing = async change => { const batch = c.r.db.batch.bind(c.r.db), original = c.r.db.batch; c.r.db.batch = async s => { c.r.db.batch = original; await change(); return batch(s); }; try { return await c.decide(); } finally { c.r.db.batch = original; } };
+    const endWar = () => c.r.db.prepare('UPDATE wars SET ended_at=?,end_kind=? WHERE id=?').bind(c.nowS(), 'other', c.war.id).run();
+    const [a, b] = c.frontier; await c.own('korund', [a, b]);
+    const cede = await c.command({ action: 'concede', nation: 'korund', role: 'Chairman', warId: c.war.id, squares: [a, b] });
+    assert.equal(await racing(() => c.r.db.prepare('UPDATE world_squares SET owner=? WHERE x=? AND y=?').bind('aurelle', b.x, b.y).run()), 1);
+    assert.deepEqual([(await c.terms(cede.terms.id)).status, (await c.terms(cede.terms.id)).reject_reason, await c.owner(a), await c.owner(b), (await c.ended()).ended_at], ['rejected', 'square_not_cedable', 'korund', 'aurelle', null], 'concession: no partial cession, no war end');
+    await c.r.db.prepare('UPDATE world_squares SET owner=? WHERE x=? AND y=?').bind('korund', b.x, b.y).run();
+    const cede2 = await c.command({ action: 'concede', nation: 'korund', role: 'Chairman', warId: c.war.id, squares: [a, b] });
+    await racing(endWar);
+    assert.deepEqual([(await c.terms(cede2.terms.id)).reject_reason, await c.owner(a), await c.owner(b), (await c.ended()).end_kind], ['war_ended', 'korund', 'korund', 'other'], 'concession: war ended mid-decision');
+    const c2 = await setup(t, backend);
+    const s2 = await c2.command({ action: 'surrender', nation: 'korund', role: 'Chairman', warId: c2.war.id });
+    const batch = c2.r.db.batch.bind(c2.r.db), original = c2.r.db.batch; c2.r.db.batch = async s => { c2.r.db.batch = original; await c2.r.db.prepare('UPDATE wars SET ended_at=?,end_kind=? WHERE id=?').bind(c2.nowS(), 'other', c2.war.id).run(); return batch(s); };
+    try { await c2.decide(); } finally { c2.r.db.batch = original; }
+    assert.deepEqual([(await c2.terms(s2.terms.id)).status, (await c2.terms(s2.terms.id)).reject_reason, (await c2.ended()).end_kind], ['rejected', 'war_ended', 'other'], 'surrender: no enacted record, the earlier end kept');
+  });
+
+  test(`a stale pending-row replay after the decision changes nothing: the enacting UPDATE is guarded by status${label}`, async t => {
+    const c = await setup(t, backend);
+    const s1 = await c.command({ action: 'surrender', nation: 'korund', role: 'Chairman', warId: c.war.id });
+    const pending = (await c.r.db.prepare("SELECT * FROM war_end_terms WHERE status='proposed'").all()).results.map(x => ({ ...x }));
+    assert.equal(await c.decide(), 1);
+    await c.r.db.prepare('UPDATE wars SET ended_at=NULL,end_kind=NULL WHERE id=?').bind(c.war.id).run(); // an open war again, so only the status guard can stop a re-enactment
+    const prepare = c.r.db.prepare.bind(c.r.db), original = c.r.db.prepare;
+    c.r.db.prepare = sql => { if (!/FROM war_end_terms WHERE status='proposed'/.test(sql)) return prepare(sql); const st = { bind: () => st, all: async () => ({ results: pending }) }; return st; };
+    try { assert.equal(await c.decide(c.nowS() + 999), 0, 'no second decision'); } finally { c.r.db.prepare = original; }
+    assert.equal(Number((await c.r.db.prepare('SELECT decided_at FROM war_end_terms WHERE id=?').bind(s1.terms.id).first()).decided_at), c.nowS() + 60); assert.equal((await c.ended()).ended_at, null, 'the replay ended nothing');
+  });
+
   test(`decided once under concurrent ticks (enact and reject paths): counts (1,0), squares move once; a missing rowcount is never a decision${label}`, async t => {
     const c = await setup(t, backend); const [a] = c.frontier; await c.own('korund', [a]);
     const p = await c.command({ action: 'concede', nation: 'korund', role: 'Chairman', warId: c.war.id, squares: [a] });

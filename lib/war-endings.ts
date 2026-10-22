@@ -100,9 +100,10 @@ export async function proposeWarEnding(db: GameDatabase, command: ProposeEndingC
 }
 
 const changes = (result: unknown) => Number((result as { meta?: { changes?: number } })?.meta?.changes ?? 0);
-/** World tick only (after diplomacy; never a route or a GET): decides each pending ending once. Re-checks at decision time that the war is open and every square is still cedable.
- *  The status change and the square moves go in one batch; the decision counts only when the guarded status update changed exactly one row, and the square moves are guarded
- *  by owner, zone and no purchase, so a concurrent tick moves nothing twice. Enacted: the war ends as a treaty in the same batch (peace lock). */
+/** World tick only (after diplomacy; never a route or a GET): decides each pending ending once, atomically with its re-checks (QA3). The enacting UPDATE carries the
+ *  re-checks in its own WHERE (war still open; every square still Frontier, governed by the ceding nation and never privately bought), and the square moves and the war's
+ *  end in the same batch are gated on that row now being enacted at this tick, so a failed re-check moves nothing and ends nothing. A decision counts only on a strict
+ *  rowcount of 1; when the enacting UPDATE changes nothing, a guarded reject records why. Enacted: the war ends as a treaty (peace lock). */
 export async function decideWarEndings(db: GameDatabase, now: number) {
   const rows = (await db.prepare(`SELECT ${columns} FROM war_end_terms WHERE status='proposed' ORDER BY proposed_at,id LIMIT 20`).all<Row>()).results;
   if (!rows.length) return 0;
@@ -111,14 +112,21 @@ export async function decideWarEndings(db: GameDatabase, now: number) {
   for (const row of rows) {
     const vote = decideEnding(row.kind, row.proposer_nation, row.other_nation, seats), json = JSON.stringify(vote.ratifications);
     const squares: Square[] = row.squares_json ? JSON.parse(row.squares_json) : [];
+    const reject = (reason: string) => db.prepare("UPDATE war_end_terms SET status='rejected',decided_at=?,ratification_json=?,reject_reason=? WHERE id=? AND status='proposed'").bind(now, json, reason, row.id).run();
+    if (!vote.passed) { if (changes(await reject('not_ratified')) === 1) decided++; continue; }
+    const cedable = "EXISTS (SELECT 1 FROM world_squares s WHERE s.x=? AND s.y=? AND s.zone='frontier' AND s.owner=?) AND NOT EXISTS (SELECT 1 FROM world_square_purchases p WHERE p.x=? AND p.y=?)";
+    const enact = db.prepare(`UPDATE war_end_terms SET status='enacted',decided_at=?,ratification_json=? WHERE id=? AND status='proposed' AND NOT EXISTS (SELECT 1 FROM wars w WHERE w.id=? AND w.ended_at IS NOT NULL) AND EXISTS (SELECT 1 FROM wars w WHERE w.id=?)${squares.map(() => ` AND ${cedable}`).join('')}`)
+      .bind(now, json, row.id, row.war_id, row.war_id, ...squares.flatMap(sq => [sq.x, sq.y, row.proposer_nation, sq.x, sq.y]));
+    const enacted = "EXISTS (SELECT 1 FROM war_end_terms t WHERE t.id=? AND t.status='enacted' AND t.decided_at=?)";
+    const moves = squares.map(sq => db.prepare(`UPDATE world_squares SET owner=? WHERE x=? AND y=? AND owner=? AND zone='frontier' AND NOT EXISTS (SELECT 1 FROM world_square_purchases p WHERE p.x=? AND p.y=?) AND ${enacted}`)
+      .bind(row.other_nation, sq.x, sq.y, row.proposer_nation, sq.x, sq.y, row.id, now));
+    const end = db.prepare(`UPDATE wars SET ended_at=?,end_kind='treaty' WHERE id=? AND ended_at IS NULL AND ${enacted}`).bind(now, row.war_id, row.id, now);
+    const results = await db.batch([enact, ...moves, end]);
+    if (changes(results[0]) === 1) { decided++; continue; }
+    // Not enacted: either another tick decided it, or a re-check failed. Record the reason (guarded, so a decided row is left alone).
     const war = await db.prepare('SELECT ended_at FROM wars WHERE id=?').bind(row.war_id).first<{ ended_at: number | null }>();
-    const reason = !vote.passed ? 'not_ratified' : !war || war.ended_at !== null ? 'war_ended' : await ineligibleSquare(db, row.proposer_nation, squares) ? 'square_not_cedable' : null;
-    const status = db.prepare(`UPDATE war_end_terms SET status=?,decided_at=?,ratification_json=?,reject_reason=? WHERE id=? AND status='proposed'`).bind(reason ? 'rejected' : 'enacted', now, json, reason, row.id);
-    const moves = reason ? [] : squares.map(s => db.prepare("UPDATE world_squares SET owner=? WHERE x=? AND y=? AND owner=? AND zone='frontier' AND NOT EXISTS (SELECT 1 FROM world_square_purchases p WHERE p.x=? AND p.y=?)")
-      .bind(row.other_nation, s.x, s.y, row.proposer_nation, s.x, s.y));
-    const end = reason ? [] : [db.prepare("UPDATE wars SET ended_at=?,end_kind='treaty' WHERE id=? AND ended_at IS NULL").bind(now, row.war_id)];
-    const results = await db.batch([status, ...moves, ...end]);
-    if (changes(results[0]) === 1) decided++;
+    const reason = !war || war.ended_at !== null ? 'war_ended' : await ineligibleSquare(db, row.proposer_nation, squares) ? 'square_not_cedable' : 'stale';
+    if (changes(await reject(reason)) === 1) decided++;
   }
   return decided;
 }
