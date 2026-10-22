@@ -71,11 +71,11 @@ test('first-week tracker: market goals are hidden (not "Not tracked yet") and th
 
 test('the citizen API reports the market flag, off by default, on when HARIMU_ORDER_BOOK_ENABLED is true', async t => {
   const r = await localRuntime(); t.after(() => r.close());
-  assert.deepEqual((await r.call('citizen', 'alice')).data.flags, { market: false, diplomaticHall: false });
+  assert.deepEqual((await r.call('citizen', 'alice')).data.flags, { market: false, diplomaticHall: false, mapOverlays: false });
   r.setOrderBook(true);
-  assert.deepEqual((await r.call('citizen', 'alice')).data.flags, { market: true, diplomaticHall: false });
+  assert.deepEqual((await r.call('citizen', 'alice')).data.flags, { market: true, diplomaticHall: false, mapOverlays: false });
   r.setOrderBook(false);
-  assert.deepEqual((await r.call('citizen', 'alice')).data.flags, { market: false, diplomaticHall: false });
+  assert.deepEqual((await r.call('citizen', 'alice')).data.flags, { market: false, diplomaticHall: false, mapOverlays: false });
 });
 
 test('the page, shell and daily loop use the flag: tab, link, prompts and navigation', async () => {
@@ -147,7 +147,7 @@ test('flag off: the daily-loop food step is "Buy {n} food" and buys in place fro
 
 test('flag off: a Kindle citizen works a shift, buys food (the daily-loop trade), prepares a meal, and capacity goes up', async t => {
   const r = await localRuntime(); t.after(() => r.close());
-  assert.deepEqual((await r.call('citizen', 'alice')).data.flags, { market: false, diplomaticHall: false });
+  assert.deepEqual((await r.call('citizen', 'alice')).data.flags, { market: false, diplomaticHall: false, mapOverlays: false });
   const started = await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'harvest' });
   assert.equal(started.status, 200, JSON.stringify(started.data));
   const shift = started.data.shifts.find(s => !s.claimedAt);
@@ -157,7 +157,7 @@ test('flag off: a Kindle citizen works a shift, buys food (the daily-loop trade)
   const state = async () => (await r.call('citizen', 'alice')).data;
   const food = d => d.economy.inventory.find(i => i.item === 'food')?.quantity ?? 0;
   const afterShift = await state();
-  assert.deepEqual(afterShift.flags, { market: false, diplomaticHall: false });
+  assert.deepEqual(afterShift.flags, { market: false, diplomaticHall: false, mapOverlays: false });
   const quote = afterShift.market.quotes.find(q => q.item === 'food');
   const quantity = Math.max(1, afterShift.market.mealFood - food(afterShift));
   const wallet = afterShift.economy.walletMinor;

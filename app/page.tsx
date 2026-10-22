@@ -460,7 +460,7 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
-  flags?: { market?: boolean; diplomaticHall?: boolean };
+  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean };
   firstWeek?: { completed: string[] } | null;
   profile: {
     nationId: string | null;
@@ -638,6 +638,7 @@ export default function Home() {
   // #344: the server's market flag (HARIMU_ORDER_BOOK_ENABLED). Fails closed until the citizen snapshot says otherwise.
   const [marketFlag, setMarketFlag] = useState(false);
   const [hallFlag, setHallFlag] = useState(false); // #599
+  const [overlaysFlag, setOverlaysFlag] = useState(false); // #82
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -1323,7 +1324,7 @@ export default function Home() {
     if ('election' in snapshot)setElection(snapshot.election??null);
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
-    if (snapshot.flags) { setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); }
+    if (snapshot.flags) { setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); }
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
@@ -1881,7 +1882,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? 'Country travel' : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}

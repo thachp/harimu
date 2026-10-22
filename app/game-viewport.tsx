@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 import { nationSymbolElement } from './nation-symbol';
+import { MapOverlaysControl } from './map-overlays';
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
@@ -23,10 +24,12 @@ export type GameViewportProps = {
   selectedLocation?: LocationId | null;
   onSelect: (selection: ViewportSelection) => void;
   className?: string;
+  /** #82: GET /api/citizen flags.mapOverlays. False renders no Overlays group. */
+  overlays?: boolean;
 };
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
 
-export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '' }: GameViewportProps) {
+export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '', overlays = false }: GameViewportProps) {
   const {preferences:{graphics}}=useDisplayPreferences();
   const host = useRef<HTMLDivElement>(null);
   const callback = useRef(onSelect);
@@ -240,6 +243,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       }} />
     {fallback && <p className="viewport-fallback">3D unavailable. Use the bottom strip to continue.</p>}
     <div className="viewport-controls" aria-label="Camera controls">
+      <MapOverlaysControl enabled={overlays} />
       <button type="button" onClick={() => controls.current?.zoom(.15)} aria-label="Zoom in">+</button>
       <span aria-live="polite">{cameraLabel}</span>
       <button type="button" onClick={() => controls.current?.zoom(-.15)} aria-label="Zoom out">−</button>
