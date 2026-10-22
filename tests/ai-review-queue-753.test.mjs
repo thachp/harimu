@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { aiReviewSampled, aiReviewSampleBasisPoints } from '../lib/ai-review-queue.ts';
 
@@ -39,13 +39,31 @@ test('flag on: a filter-rejected reply always lands as flagged, with the gate an
   assert.equal(row.source, 'notables'); assert.equal(row.nation_id, 'kindle'); assert.equal(row.persona, 'kindle-journalist'); assert.equal(JSON.parse(row.output_text).title, good.title);
 }));
 
-test('flag on: a passing reply lands only when its id is sampled', quiet(async t => {
+// Same id as lib/notables.ts builds: 'notable:' + sha256(userId) + ':' + requestId. Seed request ids whose stored id is (or is not) sampled.
+const storedId = (user, requestId) => `notable:${createHash('sha256').update(user).digest('hex')}:${requestId}`;
+const seededRequestId = (user, sampled) => { for (let i = 0; ; i++) { const rid = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`; if (aiReviewSampled(storedId(user, rid)) === sampled) return rid; } };
+
+for (const sampled of [true, false]) test(`flag on: a passing reply with a ${sampled ? 'sampled' : 'non-sampled'} id writes ${sampled ? '1 row' : '0 rows'}`, quiet(async t => {
   const r = await localRuntime(); t.after(() => r.close());
-  const ok = await r.answerNotable('alice', command(), stub('{"supported":true}'), { enabled: true, budget, reviewQueue: true });
+  const requestId = seededRequestId('alice', sampled);
+  const ok = await r.answerNotable('alice', { ...command(), requestId }, stub('{"supported":true}'), { enabled: true, budget, reviewQueue: true });
   assert.equal(ok.source, 'model');
-  const written = await rows(r.db), id = (await r.db.prepare("SELECT request_id FROM harimu_ai_reservations").first()).request_id;
-  assert.equal(written.length, aiReviewSampled(id) ? 1 : 0, 'the deterministic sample decides');
+  assert.equal((await r.db.prepare('SELECT request_id FROM harimu_ai_reservations').first()).request_id, storedId('alice', requestId), 'seed matches the stored id');
+  const written = await rows(r.db);
+  assert.equal(written.length, sampled ? 1 : 0);
   for (const row of written) { assert.equal(row.reason, 'sample'); assert.equal(row.filter_result, 'passed'); assert.equal(row.output_text, ok.reply); }
+}));
+
+test('POST /api/notables wires the flag: off writes 0 rows, on writes 1 flagged row for a rejected reply', quiet(async t => {
+  const r = await localRuntime(); t.after(() => r.close()); r.setFixtureAiFlags({ notables: true });
+  r.setFixtureAiBinding(stub('{"supported":false}')); r.setFixtureEnv('HARIMU_AI_REVIEW_QUEUE_ENABLED', 'false');
+  const off = await r.call('notables', 'alice', command());
+  assert.equal(off.status, 200); assert.equal(off.data.source, 'authored'); assert.deepEqual(await rows(r.db), []);
+  r.setFixtureAiBinding(stub('{"supported":false}')); r.setFixtureEnv('HARIMU_AI_REVIEW_QUEUE_ENABLED', 'true');
+  const on = await r.call('notables', 'alice', command());
+  assert.equal(on.status, 200); assert.equal(on.data.source, 'authored');
+  const written = await rows(r.db); assert.equal(written.length, 1);
+  assert.equal(written[0].reason, 'flagged'); assert.equal(written[0].filter_result, 'replaced'); assert.equal(written[0].filter_detail, 'draft-unsupported');
 }));
 
 async function admin(t, { flag = 'true', token = TOKEN } = {}) {
