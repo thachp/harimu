@@ -114,6 +114,26 @@ for (const backend of [undefined, 'postgres']) {
     assert.deepEqual([(await c2.terms(s2.terms.id)).status, (await c2.terms(s2.terms.id)).reject_reason, (await c2.ended()).end_kind], ['rejected', 'war_ended', 'other'], 'surrender: no enacted record, the earlier end kept');
   });
 
+  test(`QA3: a square bought, or moved off Frontier, or the war row deleted mid-decision: rejected, nothing moved, the war still open where it exists${label}`, async t => {
+    const c = await setup(t, backend); const [a, b] = c.frontier; await c.own('korund', [a, b]);
+    const racing = async change => { const batch = c.r.db.batch.bind(c.r.db), original = c.r.db.batch; c.r.db.batch = async s => { c.r.db.batch = original; await change(); return batch(s); }; try { return await c.decide(); } finally { c.r.db.batch = original; } };
+    const concede = () => c.command({ action: 'concede', nation: 'korund', role: 'Chairman', warId: c.war.id, squares: [a, b] });
+    for (const [why, change, undo] of [
+      ['privately bought', () => c.r.db.prepare("INSERT INTO world_square_purchases (request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at) VALUES ('sq-race',?,'korund',?,?,2500,1)").bind('alice', b.x, b.y).run(), () => c.r.db.prepare("DELETE FROM world_square_purchases WHERE request_id='sq-race'").run()],
+      ['moved off Frontier', () => c.r.db.prepare("UPDATE world_squares SET zone='wildlands' WHERE x=? AND y=?").bind(b.x, b.y).run(), () => c.r.db.prepare("UPDATE world_squares SET zone='frontier' WHERE x=? AND y=?").bind(b.x, b.y).run()],
+    ]) {
+      const p = await concede(); assert.equal(await racing(change), 1, why);
+      assert.deepEqual([(await c.terms(p.terms.id)).status, (await c.terms(p.terms.id)).reject_reason, await c.owner(a), await c.owner(b), (await c.ended()).ended_at], ['rejected', 'square_not_cedable', 'korund', 'korund', null], why);
+      await undo();
+    }
+    const p = await concede();
+    await racing(async () => { await c.r.db.prepare('DELETE FROM war_end_terms WHERE war_id=? AND id<>?').bind(c.war.id, p.terms.id).run(); await c.r.db.prepare('DELETE FROM wars WHERE id=?').bind(c.war.id).run(); });
+    const left = await c.r.db.prepare('SELECT status,reject_reason FROM war_end_terms WHERE id=?').bind(p.terms.id).first();
+    // The terms row cascades away with its war where foreign keys are enforced; where it survives it must be rejected as war_ended. Never enacted, nothing moved.
+    if (left) assert.deepEqual([left.status, left.reject_reason], ['rejected', 'war_ended']);
+    assert.deepEqual([await c.owner(a), await c.owner(b)], ['korund', 'korund'], 'war deleted: nothing moved');
+  });
+
   test(`a stale pending-row replay after the decision changes nothing: the enacting UPDATE is guarded by status${label}`, async t => {
     const c = await setup(t, backend);
     const s1 = await c.command({ action: 'surrender', nation: 'korund', role: 'Chairman', warId: c.war.id });

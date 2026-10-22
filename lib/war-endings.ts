@@ -117,6 +117,9 @@ export async function decideWarEndings(db: GameDatabase, now: number) {
     const cedable = "EXISTS (SELECT 1 FROM world_squares s WHERE s.x=? AND s.y=? AND s.zone='frontier' AND s.owner=?) AND NOT EXISTS (SELECT 1 FROM world_square_purchases p WHERE p.x=? AND p.y=?)";
     const enact = db.prepare(`UPDATE war_end_terms SET status='enacted',decided_at=?,ratification_json=? WHERE id=? AND status='proposed' AND NOT EXISTS (SELECT 1 FROM wars w WHERE w.id=? AND w.ended_at IS NOT NULL) AND EXISTS (SELECT 1 FROM wars w WHERE w.id=?)${squares.map(() => ` AND ${cedable}`).join('')}`)
       .bind(now, json, row.id, row.war_id, row.war_id, ...squares.flatMap(sq => [sq.x, sq.y, row.proposer_nation, sq.x, sq.y]));
+    // Two ticks at the same `now` (QA3): both may read this row and both may send this batch, and the gate below (enacted at this decided_at) is then true for both.
+    // Only one enacting UPDATE can change the row (status='proposed' is in its WHERE, and the database serializes the two batches), so only that tick counts a decision.
+    // The other tick's moves change nothing because each still requires owner = the ceding nation (already moved), and its war end requires ended_at IS NULL (already set).
     const enacted = "EXISTS (SELECT 1 FROM war_end_terms t WHERE t.id=? AND t.status='enacted' AND t.decided_at=?)";
     const moves = squares.map(sq => db.prepare(`UPDATE world_squares SET owner=? WHERE x=? AND y=? AND owner=? AND zone='frontier' AND NOT EXISTS (SELECT 1 FROM world_square_purchases p WHERE p.x=? AND p.y=?) AND ${enacted}`)
       .bind(row.other_nation, sq.x, sq.y, row.proposer_nation, sq.x, sq.y, row.id, now));
