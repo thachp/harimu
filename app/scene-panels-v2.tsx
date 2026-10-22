@@ -1,7 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import { PanelV2 } from './panel-v2';
-import { uiV2PanelEnabled } from '@/lib/ui-v2-panel';
+import { cityStatusStat, uiV2PanelEnabled } from '@/lib/ui-v2-panel';
 import type { CityDestination } from '@/lib/city-destinations';
 
 /** #392 S3: the World and City side-panel pieces that change with NEXT_PUBLIC_HARIMU_UI_V2_PANEL. Each piece reads the build-time flag itself, so
@@ -29,11 +29,11 @@ export function WorldInstitutionsButton({ onView, enabled = uiV2PanelEnabled() }
   return enabled ? null : <button type="button" onClick={() => onView('nation')}>Inspect national institutions</button>;
 }
 
-/** City, top of the panel (flag on): the Household destination is promoted to the primary action (as in the concept), the other destinations are the rows. */
-export function CitySummary({ cityName, nation, destinations, onView, enabled = uiV2PanelEnabled() }: { cityName: string; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; enabled?: boolean }) {
+/** City, top of the panel (flag on): "Status: Capital" first on a capital only (from the city catalog), the Household destination is promoted to the primary action (as in the concept), the other destinations are the rows. */
+export function CitySummary({ cityName, city, nation, destinations, onView, enabled = uiV2PanelEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; enabled?: boolean }) {
   if (!enabled) return null;
   const home = destinations.find(card => card.id === 'household');
-  return <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[{ label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
+  return <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
     rows={destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, onSelect: () => onView(card.id) }))}
     primary={home ? { label: home.label, onSelect: () => onView(home.id) } : undefined} />;
 }

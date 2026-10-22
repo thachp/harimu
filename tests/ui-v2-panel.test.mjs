@@ -24,11 +24,12 @@ const render = async flag => {
   const nation = { id: 'aurelle', name: 'Aurelle', government: 'GOV', capital: 'CAP', currency: 'CUR', economy: 'ECO', religion: 'REL' }, noop = () => {};
   const population = React.createElement('dd', { className: 'population-band' }, 'POP'), h = React.createElement;
   const world = renderToStaticMarkup(h(React.Fragment, null, h(mod.WorldSummary, { nation, population, onView: noop }), h(mod.WorldFacts, { nation, population }), h(mod.WorldInstitutionsButton, { onView: noop })));
-  const city = renderToStaticMarkup(h(mod.CitySummary, { cityName: 'Highspire', nation, destinations: cityDestinations('aurelle', true), onView: noop }));
-  return { world, city };
+  const city = renderToStaticMarkup(h(mod.CitySummary, { cityName: 'Highspire', city: { capital: true }, nation, destinations: cityDestinations('aurelle', true), onView: noop }));
+  const town = renderToStaticMarkup(h(mod.CitySummary, { cityName: 'Town', city: { capital: false }, nation, destinations: cityDestinations('aurelle', true), onView: noop }));
+  return { world, city, town };
 };
 const count = (html, text) => html.split(text).length - 1;
-const expectFor = (flag, { world, city }) => {
+const expectFor = (flag, { world, city, town = '' }) => {
   const on = flag === 'true';
   assert.equal(world.includes('class="panel-v2"'), on, `World .panel-v2 with the flag ${flag}`);
   assert.equal(city.includes('class="panel-v2"'), on, `City .panel-v2 with the flag ${flag}`);
@@ -42,8 +43,9 @@ const expectFor = (flag, { world, city }) => {
     assert.equal(count(city, '>Household<'), 1, 'Household shows once (promoted to the primary action)');
     assert.match(city, /class="panel-v2-primary"><span>Household<\/span>/);
     assert.doesNotMatch(city, /Open Household/);
+    assert.match(city, /<dt>Status<\/dt><dd>Capital<\/dd>/, 'Status: Capital on a capital'); assert.doesNotMatch(town, /<dt>Status<\/dt>/, 'no Status elsewhere');
     for (const label of ['Workplace', 'Chartered food', 'Government']) assert.ok(city.includes(`<strong>${label}</strong>`), label);
-  } else assert.equal(city, '');
+  } else { assert.equal(city, ''); assert.equal(town, ''); }
 };
 
 test('render: World and City panels with the flag off and on, same assertions', async () => {
@@ -77,4 +79,21 @@ test('every esbuild harness that defines UI_V2_TOPBAR also defines UI_V2_PANEL',
     const src = await read(`scripts/${f}`);
     if (/['"]process\.env\.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR['"]\s*:/.test(src)) assert.match(src, /['"]process\.env\.NEXT_PUBLIC_HARIMU_UI_V2_PANEL['"]\s*:/, `${f} must define UI_V2_PANEL`);
   }
+});
+
+test('Status: Capital comes from the city catalog: shown on every capital, hidden on every other city', async () => {
+  const { cityStatusStat } = await import('../lib/ui-v2-panel.ts');
+  const { citiesForNation, outpostCityForNation } = await import('../lib/cities.ts');
+  assert.match(await read('app/page.tsx'), /<CitySummary [^>]*city=\{activeCity\}/);
+  assert.match(await read('app/scene-panels-v2.tsx'), /stats=\{\[\.\.\.\[cityStatusStat\(city\)\]\.filter\(stat => stat !== null\)/);
+  let capitals = 0, others = 0;
+  for (const nation of ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']) {
+    const outpost = outpostCityForNation(nation);
+    for (const city of [...citiesForNation(nation), ...(outpost ? [outpost] : [])]) {
+      if (city.capital) { assert.deepEqual(cityStatusStat(city), { label: 'Status', value: 'Capital' }, city.id); capitals++; }
+      else { assert.equal(cityStatusStat(city), null, city.id); others++; }
+    }
+  }
+  assert.equal(capitals, 10); assert.ok(others >= 20);
+  assert.equal(cityStatusStat(null), null); assert.equal(cityStatusStat(undefined), null);
 });
