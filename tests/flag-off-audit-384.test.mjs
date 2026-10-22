@@ -74,6 +74,7 @@ const flagOffPins = {
   HARIMU_SPARK_SUPPLY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_LEDGER_RECONCILIATION_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_AI_COST_DASHBOARD_ENABLED: 'ai-costs-614.test.mjs',
+  HARIMU_AI_REVIEW_QUEUE_ENABLED: 'ai-review-queue-753.test.mjs',
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.
