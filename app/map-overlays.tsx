@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { createPortal } from 'react-dom';
 import { nationMark } from '../lib/nation-themes';
 import type { OwnershipMap } from '../lib/map-ownership';
-import { bandMark, type UnrestMap } from '../lib/map-unrest';
+import { bandMark, NO_DATA, unpublishedLabel, type UnrestMap } from '../lib/map-unrest';
 import { resourceIcon, resourceName, type ResourceMap } from '../lib/map-resources';
 import { MAP_OVERLAYS, UNAVAILABLE_OVERLAYS, UNREST_SCALE, LEGEND_TEXT, toggleOverlay, overlayLabel, phonePopoverPlacement, readSessionOverlays, writeSessionOverlays, type OverlayId } from '../lib/map-overlays';
 
@@ -73,7 +73,8 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
         {active.map(id => <section key={id}>
           <strong>{overlayLabel(id)}</strong>
           {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}><span aria-hidden="true">{bandMark(step).symbol}</span> {step}</li>)}</ol> : null}
-          {id === 'unrest' && unrest ? <ul className="map-ownership-key">{unrest.nations.map(({ nationId, unrest: score, band }) => <li key={nationId}><span aria-hidden="true">{bandMark(band).symbol}</span> {nationMark(nationId)?.name ?? nationId}: {band} ({score})</li>)}</ul> : null}
+          {id === 'unrest' && unrest ? <ul className="map-ownership-key">{unrest.nations.map(({ nationId, unrest: score, band }) => <li key={nationId}><span aria-hidden="true">{bandMark(band).symbol}</span> {nationMark(nationId)?.name ?? nationId}: {band} ({score})</li>)}
+            {unrest.unpublished.map(id => <li key={id}>{unpublishedLabel(nationMark(id)?.name ?? id)}</li>)}<li>{NO_DATA}</li></ul> : null}
           {id === 'resources' && resources ? <ul className="map-ownership-key">{resources.totals.map(({ resource, squares }) => <li key={resource}><span aria-hidden="true">{resourceIcon(resource).symbol}</span> {resourceName(resource)}{resourceIcon(resource).rare ? ' (rare)' : ''}: {squares} {squares === 1 ? 'square' : 'squares'}</li>)}</ul>
             : id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} {squares === 1 ? 'square' : 'squares'}</li>; })}</ul>
             : <span>{id === 'ownership' ? 'Loading owners.' : id === 'resources' ? 'Loading resources.' : id === 'unrest' && !unrest ? 'Loading unrest.' : LEGEND_TEXT[id]}</span>}

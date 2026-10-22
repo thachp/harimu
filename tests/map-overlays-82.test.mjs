@@ -128,7 +128,7 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/citizen flags.mapOv
 // #82 slice 2 (ARC): toggles are remembered for the browser session; the Ownership overlay reads owners only while it is on.
 const fixture = { width: 24, height: 18, cells: [[3, 2, 'kindle'], [4, 2, 'kindle'], [16, 2, 'korund']], totals: [{ nationId: 'kindle', squares: 2 }, { nationId: 'korund', squares: 1 }] };
 const resourceFixture = { width: 24, height: 18, cells: [[2, 5, 'food'], [9, 9, 'ore'], [12, 6, 'Emberstone']], totals: [{ resource: 'Emberstone', squares: 1 }, { resource: 'food', squares: 1 }, { resource: 'ore', squares: 1 }] };
-const unrestFixture = { width: 24, height: 18, nations: [{ nationId: 'aurelle', unrest: 64, band: 'Riot' }, { nationId: 'kindle', unrest: 30, band: 'Tense' }, { nationId: 'korund', unrest: 12, band: 'Calm' }], cells: [[5, 4, 'Tense'], [18, 4, 'Calm'], [12, 14, 'Riot']] };
+const unrestFixture = { width: 24, height: 18, nations: [{ nationId: 'aurelle', unrest: 64, band: 'Riot' }, { nationId: 'kindle', unrest: 30, band: 'Tense' }], cells: [[5, 4, 'Tense'], [12, 14, 'Riot']], unpublished: ['korund'] };
 function spyFetch() { const calls = []; globalThis.fetch = async url => { calls.push(String(url)); return new Response(JSON.stringify(String(url).endsWith('/resources') ? resourceFixture : String(url).endsWith('/unrest') ? unrestFixture : fixture), { status: 200 }); }; return calls; }
 
 test('ARC: the toggles survive leaving for the country view and coming back, but not a new session or a tampered value', async () => {
@@ -313,8 +313,14 @@ const { unrestBand, unrestMap, UNREST_BANDS } = require('../lib/map-unrest.ts');
 test('Unrest: bands Calm < 30 <= Tense < 60 <= Riot, distinct symbols; unrestMap shows only scored nations\' squares', () => {
   assert.deepEqual([0, 29, 30, 59, 60, 100].map(unrestBand), ['Calm', 'Calm', 'Tense', 'Tense', 'Riot', 'Riot']);
   assert.deepEqual(UNREST_BANDS.map(b => b.band), [...UNREST_SCALE]); assert.equal(new Set(UNREST_BANDS.map(b => b.symbol)).size, 3);
-  const map = unrestMap(24, 18, [{ x: 1, y: 1, owner: 'kindle' }, { x: 2, y: 2, owner: 'korund' }, { x: 3, y: 3, owner: null }, { x: 4, y: 4, owner: 'aurelle' }], { kindle: 61, korund: 10 });
-  assert.deepEqual(map, { width: 24, height: 18, nations: [{ nationId: 'kindle', unrest: 61, band: 'Riot' }, { nationId: 'korund', unrest: 10, band: 'Calm' }], cells: [[1, 1, 'Riot'], [2, 2, 'Calm']] }, 'no band invented for an unscored nation');
+  const map = unrestMap(24, 18, [{ x: 1, y: 1, owner: 'kindle' }, { x: 2, y: 2, owner: 'aurelle' }, { x: 3, y: 3, owner: null }, { x: 4, y: 4, owner: 'veldwood' }, { x: 5, y: 5, owner: 'korund' }], { kindle: 61, aurelle: 10, korund: 77 }, ['korund']);
+  assert.deepEqual(map, { width: 24, height: 18, nations: [{ nationId: 'kindle', unrest: 61, band: 'Riot' }, { nationId: 'aurelle', unrest: 10, band: 'Calm' }], cells: [[1, 1, 'Riot'], [2, 2, 'Calm']], unpublished: ['korund'] }, 'no band invented for an unscored nation; Korund unshaded, id only');
+});
+test('#747 [ASSUMPTION] cut-offs live in one config and every boundary follows it', () => {
+  const { UNREST_CUTOFFS } = require('../lib/map-unrest.ts');
+  assert.deepEqual(UNREST_CUTOFFS, { tense: 30, riot: 60 });
+  assert.deepEqual([UNREST_CUTOFFS.tense - 1, UNREST_CUTOFFS.tense, UNREST_CUTOFFS.riot - 1, UNREST_CUTOFFS.riot].map(unrestBand), ['Calm', 'Tense', 'Tense', 'Riot']);
+  assert.deepEqual(UNREST_BANDS.map(b => b.from), [0, UNREST_CUTOFFS.tense, UNREST_CUTOFFS.riot]);
 });
 
 test('Unrest: flag off reads nothing; off reads nothing; on, one read draws band symbols with heat tint (none in low graphics), legend per nation; exclusive with Ownership; hidden in the city view', async () => {
@@ -328,8 +334,9 @@ test('Unrest: flag off reads nothing; off reads nothing; on, one read draws band
   const on = await mount(true); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
   assert.deepEqual(calls, ['/api/world/unrest'], 'baseline: the same spy sees the one read');
   const layer = on.el.querySelector('.map-unrest'); assert.equal(layer.getAttribute('aria-hidden'), 'true'); assert.ok(layer.classList.contains('map-ownership'), 'placed by the viewport like Ownership');
-  assert.deepEqual([...layer.children].map(c => [c.dataset.band, c.textContent, c.dataset.x, c.dataset.y, c.hidden, Boolean(c.style.backgroundColor)]), [['Tense', '◐', '5', '4', true, true], ['Calm', '○', '18', '4', true, true], ['Riot', '●', '12', '14', true, true]]);
-  assert.deepEqual([...on.el.querySelectorAll('.map-ownership-key li')].map(li => li.textContent), ['● Aurelle: Riot (64)', '◐ Kindle Republic: Tense (30)', '○ Korund: Calm (12)']);
+  assert.deepEqual([...layer.children].map(c => [c.dataset.band, c.textContent, c.dataset.x, c.dataset.y, c.hidden, Boolean(c.style.backgroundColor)]), [['Tense', '◐', '5', '4', true, true], ['Riot', '●', '12', '14', true, true]]);
+  assert.deepEqual([...on.el.querySelectorAll('.map-ownership-key li')].map(li => li.textContent), ['● Aurelle: Riot (64)', '◐ Kindle Republic: Tense (30)', 'Korund: State-approved, not published', 'No data']);
+  assert.doesNotMatch(on.el.querySelector('.map-overlays-legend, [role="dialog"]')?.textContent ?? on.el.textContent, /Korund: (Calm|Tense|Riot)|Korund.*\(\d+\)/, '#747: no Korund band or score in the client');
   await click(on.button('Ownership')); assert.equal(document.querySelector('.map-unrest'), null, 'Ownership turns Unrest off'); assert.deepEqual(pressed(on), ['Ownership']);
   await on.close();
   window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['unrest'])); spyFetch();
@@ -363,4 +370,19 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/world/unrest: 404 w
   assert.deepEqual(on.data.nations, [{ nationId: 'kindle', unrest: 45, band: 'Tense' }], 'only scored nations');
   assert.ok(on.data.cells.length > 0 && on.data.cells.some(([x, y]) => x === 5 && y === 4), 'Kindle\'s squares, capital included');
   assert.ok(on.data.cells.every(([, , band]) => on.data.nations.some(n => n.band === band)));
+});
+
+for (const backend of ['sqlite', 'postgres']) test(`#747 GET /api/world/unrest: a seeded Korund score leaks neither number nor band; a missing stability table is no 500 (${backend})`, async t => {
+  const r = await localRuntime({ backend }); t.after(() => r.close()); r.setMapOverlays(true);
+  const ins = 'INSERT INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)';
+  await r.db.prepare(ins).bind('kindle', 1, 1, 1, 50, 45, '{}', '{}').run();
+  await r.db.prepare(ins).bind('korund', 1, 1, 1, 23, 77, '{}', '{}').run();
+  const on = await r.call('world/unrest'), body = JSON.stringify(on.data);
+  assert.equal(on.status, 200);
+  assert.deepEqual(on.data.nations.map(n => n.nationId), ['kindle']); assert.deepEqual(on.data.unpublished, ['korund']);
+  assert.ok(!body.includes('77') && !body.includes('Riot') && !body.includes('"23'), `no Korund score or band: ${body.slice(0, 200)}`);
+  assert.ok(on.data.cells.every(([, , band]) => band === 'Tense'), 'Korund squares unshaded');
+  const prepare = r.db.prepare.bind(r.db); r.db.prepare = q => (/nation_stability_scores/.test(q) ? { bind: () => ({ first: async () => { throw new Error('no such table: nation_stability_scores'); } }), first: async () => { throw new Error('no such table: nation_stability_scores'); } } : prepare(q)); // a database that predates the stability table
+  const gone = await r.call('world/unrest');
+  assert.equal(gone.status, 200); assert.deepEqual([gone.data.nations, gone.data.cells, gone.data.unpublished], [[], [], []]);
 });
