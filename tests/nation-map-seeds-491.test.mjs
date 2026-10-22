@@ -111,9 +111,9 @@ test('the same upsert runs on Postgres (PGlite) and is idempotent there', async 
 test('the shipped local runtime seeds the original grid plus, via the boot step, only Confluence\'s block (#487)', async t => {
   const { r, z } = await load(t);
   const { squares, source } = await z.readWorldSquares(r.db);
-  assert.equal(source, 'table'); assert.equal(sha(squares), sha(z.seedWorldSquares(z.mappedNations)));
+  assert.equal(source, 'table'); assert.equal(sha(squares), sha(z.withRareNodes(z.seedWorldSquares(z.mappedNations)))); // #745: plus the rare node placements
   const block = new Set(z.nationBlockSquares('confluence').map(s => `${s.x},${s.y}`));
-  assert.equal(sha(squares.filter(s => !block.has(`${s.x},${s.y}`))), sha(z.seedWorldSquares().filter(s => !block.has(`${s.x},${s.y}`))), 'outside the block: the original grid');
+  assert.equal(sha(squares.filter(s => !block.has(`${s.x},${s.y}`))), sha(z.withRareNodes(z.seedWorldSquares()).filter(s => !block.has(`${s.x},${s.y}`))), 'outside the block: the original grid (with #745 rare nodes)');
 });
 
 test('plain-Node importers: the zone vocabulary lives in an import-free file, so a component test that loads app/world-zones.tsx never needs the registry (CI regression on #550)', async () => {
