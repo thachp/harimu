@@ -24,6 +24,7 @@ import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/pop
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
 import { marketVisible } from '@/lib/market-visibility';
+import { WelcomeBack, type WelcomeBackData } from './welcome-back'; // #739
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
@@ -464,6 +465,7 @@ function ClerkAccountControl() {
 type CitizenSnapshot = {
   flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean };
   firstWeek?: { completed: string[] } | null;
+  welcomeBack?: WelcomeBackData; // #739
   profile: {
     nationId: string | null;
     displayName: string | null;
@@ -637,6 +639,7 @@ export default function Home() {
   // First-week progress (#134): STUB store in this browser until server-side tracking (#135).
   const [weekDone, setWeekDone] = useState<{key:string;ids:string[]}>({key:'',ids:[]});
   const [serverWeekIds, setServerWeekIds] = useState<string[] | null>(null);
+  const [welcomeBack, setWelcomeBack] = useState<WelcomeBackData | null>(null); // #739
   // #344: the server's market flag (HARIMU_ORDER_BOOK_ENABLED). Fails closed until the citizen snapshot says otherwise.
   const [marketFlag, setMarketFlag] = useState(false);
   const [hallFlag, setHallFlag] = useState(false); // #599
@@ -1328,6 +1331,7 @@ export default function Home() {
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
     if (snapshot.flags) { setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); }
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
+    if (snapshot.welcomeBack) setWelcomeBack(snapshot.welcomeBack); // #739: sent once; kept until dismissed
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
     setDemoStarterGranted(snapshot.demoStarterGranted ?? false);
@@ -1805,7 +1809,7 @@ export default function Home() {
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
     <CitySummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} city={activeCity} nation={citizenNation ?? selected} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} onView={changeView} />
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
-    {firstLoopHint}{weekTracker}{dailyLoop}
+    {welcomeBack && <WelcomeBack nationId={citizenNation?.id} data={welcomeBack} now={Date.now()} onClose={() => setWelcomeBack(null)} />}{firstLoopHint}{weekTracker}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}

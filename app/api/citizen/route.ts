@@ -1,4 +1,5 @@
 import { confluencePriceBoard } from '@/lib/confluence-price-band'; // #487
+import { bumpLastActive, dormancyEnabled, dormancyOnLoad, readLastActive } from '../../../lib/dormancy-rules';
 import { isFoundingNation, readFoundingState } from '@/lib/founding-period'; // #612
 import { publicSuccession, readSuccession } from '@/lib/aurelle-succession'; // #613
 import {accountElectionEnabled,accountElectionDatabase,accountElectionId} from '@/lib/preview-election';
@@ -154,12 +155,13 @@ export async function GET(request: Request) {
   const readNow = Math.floor(Date.now() / 1000);
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   const successionOn = (env as unknown as { HARIMU_AURELLE_SUCCESSION_ENABLED?: string }).HARIMU_AURELLE_SUCCESSION_ENABLED === 'true'; // #613
+  const dormancyOn = dormancyEnabled(env as never); // #739
   const foundingOn = (env as unknown as { HARIMU_FOUNDING_PERIOD_ENABLED?: string }).HARIMU_FOUNDING_PERIOD_ENABLED === 'true';
   const accountLevel=accountElectionEnabled(env as unknown as {NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string});
   const electionDatabase=accountLevel?accountElectionDatabase(database):database;
   // #596: every read below is read-only and independent of the others, so they run together: one wave of round trips instead of about twenty in a row (each is a network hop on preview).
   // Only the reads that need the profile or the verification (election, collective petitions, first week, government) wait for them, in the second wave.
-  const [simulation, capacity, starterFood, [profile, plan, itemResult, decision, politicalAction], verification, market, aurellePlan, korundPlan, nationWork, economy, playerMarket, shifts, founding, succession] = await Promise.all([
+  const [simulation, capacity, starterFood, [profile, plan, itemResult, decision, politicalAction], verification, market, aurellePlan, korundPlan, nationWork, economy, playerMarket, shifts, founding, succession, lastActive] = await Promise.all([
     readWorldSimulation(database, readNow, { reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warAssembly: (env as unknown as { HARIMU_WAR_ASSEMBLY_ENABLED?: string }).HARIMU_WAR_ASSEMBLY_ENABLED === 'true', warEndings: (env as unknown as { HARIMU_WAR_ENDINGS_ENABLED?: string }).HARIMU_WAR_ENDINGS_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true' }),
     readCapacityProjection(database, userId, readNow, interval),
     pendingStarterFood(database, userId),
@@ -195,13 +197,16 @@ export async function GET(request: Request) {
     readShifts(database, userId),
     foundingOn ? readFoundingState(database, readNow) : null, // #612: read-only, flag off: not read
     successionOn ? readSuccession(database) : null, // #613: read-only, flag off: not read
+    dormancyOn ? readLastActive(database, userId) : null, // #739: in this wave, so no extra serial round trip; flag off: not read
   ]);
+  const dormancy = dormancyOn ? dormancyOnLoad(lastActive, readNow) : null; // computed from the value before the bump
   const civicNow=Math.floor(Date.now()/1000);
   const [election, collectivePetitions, firstWeek, governmentRead] = await Promise.all([
     profile?.nation_id==='kindle'?readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true):null,
     profile?.nation_id==='kindle'?readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
     profile ? readFirstWeekProgress(database,userId) : null,
     profile?.nation_id ? readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId, { readOnly: true, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' }) : null,
+    dormancy?.bump ? bumpLastActive(database, userId, readNow) : null, // #739: the one GET write (hourly activity bump, flag on only), in the existing second wave
   ]);
   if (profile && capacity) profile.capacity = capacity.capacity;
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
@@ -213,6 +218,7 @@ export async function GET(request: Request) {
     ...nationWork,
     ...(() => { const board = confluencePriceBoard(profile?.nation_id, userId, env as never); return board ? { confluencePriceBoard: board } : {}; })(), // #487: pure, no query
     firstWeek,
+    ...(dormancy?.welcomeBack ? { welcomeBack: dormancy.welcomeBack } : {}), // #739: once, on the first load after Away or longer
     flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true', mapOverlays: (env as unknown as { HARIMU_MAP_OVERLAYS_ENABLED?: string }).HARIMU_MAP_OVERLAYS_ENABLED === 'true' }, // #82: the Overlays group renders only while this is true; // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
     simulation,
     verification,

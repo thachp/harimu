@@ -177,7 +177,8 @@ async function initialize(database: GameDatabase) {
       influence INTEGER DEFAULT 1240 NOT NULL,
       standing TEXT DEFAULT 'Good standing' NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      last_active_at TEXT
     )`),
     database.prepare(`CREATE TABLE IF NOT EXISTS citizen_plans (
       clerk_user_id TEXT PRIMARY KEY NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
@@ -348,6 +349,9 @@ async function initialize(database: GameDatabase) {
   const citizenColumnNames = new Set(citizenColumns.results.map((column) => column.name));
   if (!citizenColumnNames.has('nation_changes')) {
     await database.prepare('ALTER TABLE citizens ADD COLUMN nation_changes INTEGER NOT NULL DEFAULT 0').run();
+  }
+  if (!citizenColumnNames.has('last_active_at')) { // #739 (migration 0069): general activity for dormancy, backfilled from updated_at
+    await database.batch([database.prepare('ALTER TABLE citizens ADD COLUMN last_active_at TEXT'), database.prepare('UPDATE citizens SET last_active_at = updated_at WHERE last_active_at IS NULL')]);
   }
 
   // #400: treaties gained broken_by (migration 0040); a local database created before it gets the column once.
