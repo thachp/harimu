@@ -120,6 +120,19 @@ export function nationSquaresUpsertSql(nationId: string, nations: readonly MapNa
       + `WHERE world_squares.zone='wildlands' AND world_squares.owner IS NULL AND world_squares.feature IS NULL`);
   return out;
 }
+/** #486 (ARC on #486: 30x24 additive): the one growth of the world grid, from the old size to the new. Kept as literals, not WORLD_GRID, so migration 0066 stays reproducible after the switch. */
+export const gridGrowth486 = { from: { width: 24, height: 18 }, to: { width: 30, height: 24 } } as const;
+/** Insert-only statements for the squares a grid growth adds (x >= from.width or y >= from.height), seeded exactly as `seedWorldSquares` would seed them on the larger grid.
+ *  `ON CONFLICT (x,y) DO NOTHING` on both SQLite and Postgres: an existing row is never updated or deleted, and a second run changes nothing. Literal values from the fixed seed only. */
+export function gridGrowthSql(growth: { from: { width: number; height: number }; to: { width: number; height: number } } = gridGrowth486, nations: readonly MapNation[] = mappedNations, chunk = 100): string[] {
+  const rows: string[] = [];
+  for (let y = 0; y < growth.to.height; y++) for (let x = 0; x < growth.to.width; x++) if (x >= growth.from.width || y >= growth.from.height) {
+    const s = squareAt(x, y, nations); rows.push(`(${[s.x, s.y, s.zone, s.owner, s.terrain, s.resource, s.feature].map(lit).join(',')})`);
+  }
+  const out: string[] = [];
+  for (let i = 0; i < rows.length; i += chunk) out.push(`INSERT INTO world_squares (x,y,zone,owner,terrain,resource,feature) VALUES ${rows.slice(i, i + chunk).join(',')} ON CONFLICT (x,y) DO NOTHING`);
+  return out;
+}
 /** Boot step (lib/db.ts, SQLite/D1): the upsert for every mapped nation the original seed did not write. #487: today that is Confluence's block. A Postgres
  *  database has no boot DDL path: the PR that gives the first new nation its capital runs `nationSquaresUpsertSql(id)` as its (additive) migration. */
 export function bootNationSquaresSql(nations: readonly MapNation[] = mappedNations): string[] {
