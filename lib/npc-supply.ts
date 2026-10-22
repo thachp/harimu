@@ -15,15 +15,20 @@ export * from './npc-supply-rules';
 export async function runNpcSupply(db: GameDatabase, tick: number, scheduledAt: number, now: number, tickSeconds: number) {
   if (!(tick > 0)) return;
   const since = scheduledAt - npcWindowDays * tickSeconds;
-  for (const good of Object.keys(npcSupply) as NpcGood[]) {
+  const goods = Object.keys(npcSupply) as NpcGood[];
+  // #679: each good's reads touch only that good's orders and trades, which no other good's writes below change, so every good's
+  // existence check and pricing reads share one round trip up front. The writes and matching still run one good at a time, in order.
+  const reads = await Promise.all(goods.map(good => Promise.all([
+    db.prepare('SELECT id FROM market_orders WHERE id = ?').bind(npcOrderId(good, tick)).first(),
+    db.prepare(`SELECT COALESCE(SUM(t.qty), 0) AS n FROM market_trades t JOIN market_orders s ON s.id = t.sell_order_id
+      WHERE t.good = ? AND s.citizen_id IS NOT NULL AND t.filled_at >= ?`).bind(good, since).first<{ n: number }>(),
+    db.prepare(`SELECT MIN(limit_unit_minor) AS p FROM market_open_orders WHERE city_id = ? AND good = ? AND side = 'sell' AND citizen_id IS NOT NULL`)
+      .bind(orderBookCityId, good).first<{ p: number | null }>(),
+  ])));
+  for (const [index, good] of goods.entries()) {
     const id = npcOrderId(good, tick);
-    if (await db.prepare('SELECT id FROM market_orders WHERE id = ?').bind(id).first()) continue;
-    const [sold, best] = await Promise.all([
-      db.prepare(`SELECT COALESCE(SUM(t.qty), 0) AS n FROM market_trades t JOIN market_orders s ON s.id = t.sell_order_id
-        WHERE t.good = ? AND s.citizen_id IS NOT NULL AND t.filled_at >= ?`).bind(good, since).first<{ n: number }>(),
-      db.prepare(`SELECT MIN(limit_unit_minor) AS p FROM market_open_orders WHERE city_id = ? AND good = ? AND side = 'sell' AND citizen_id IS NOT NULL`)
-        .bind(orderBookCityId, good).first<{ p: number | null }>(),
-    ]);
+    const [existing, sold, best] = reads[index];
+    if (existing) continue;
     const qty = npcQuantity(good, Number(sold?.n ?? 0));
     const price = npcAskMinor(good, best?.p == null ? null : Number(best.p));
     const cancelOlder = db.prepare(`INSERT OR IGNORE INTO market_order_cancellations (request_id, order_id, cancelled_at)
@@ -37,6 +42,6 @@ export async function runNpcSupply(db: GameDatabase, tick: number, scheduledAt: 
     ]);
     // If matchOpen throws after the insert, the ask simply rests unmatched: fills are guarded and idempotent (#197),
     // and the next player order that crosses it matches normally. No retry needed.
-    await matchOpen(db, id, now);
+    await matchOpen(db, id, now, { cityId: orderBookCityId, good, side: 'sell' }); // #679: book read alongside the order read
   }
 }
