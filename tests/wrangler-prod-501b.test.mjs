@@ -13,6 +13,8 @@ const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
 // Vars present in preview and deliberately absent in production.
 const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']; // #501c: no journal in production
+// Top-level keys present in preview and deliberately absent in production (preview-only observability, Patrick approved via PM).
+const previewOnlyTopLevelKeys = ['d1_databases', 'observability'];
 // Vars production adds, with their required values.
 const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
@@ -82,7 +84,13 @@ test('identity and bindings: own Worker, same account and runtime shape, no D1, 
   for (const key of ['main', 'compatibility_date', 'compatibility_flags', 'placement', 'triggers', 'ai', 'durable_objects', 'migrations']) assert.deepEqual(prod[key], preview[key], key);
   for (const key of ['d1_databases', 'routes', 'route', 'kv_namespaces', 'r2_buckets', 'services', 'queues', 'tail_consumers', 'env']) assert.equal(prod[key], undefined, `${key} must not exist on production yet`);
   assert.equal(prod.workers_dev, false); assert.equal(prod.preview_urls, false);
-  assert.deepEqual(Object.keys(prod).sort(), [...Object.keys(preview).filter(key => key !== 'd1_databases'), ].sort(), 'no top-level key beyond the preview set (minus D1)');
+  assert.deepEqual(Object.keys(prod).sort(), Object.keys(preview).filter(key => !previewOnlyTopLevelKeys.includes(key)).sort(), 'no top-level key beyond the preview set (minus the preview-only keys)');
+});
+
+test('observability: on in preview only; production carries no observability block', () => {
+  assert.deepEqual(preview.observability, { enabled: true });
+  assert.equal(prod.observability, undefined, 'production stays unchanged');
+  assert.equal(previewOnlyTopLevelKeys.every(key => key in preview), true, 'every listed preview-only key exists in preview');
 });
 
 test('vars: same names as preview except the listed differences; every flag false; no preview-only or secret-looking var', () => {

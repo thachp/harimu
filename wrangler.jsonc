@@ -16,6 +16,8 @@
     "id": "a1f662c88f3b485190c402d9548ae360"
   }],
   "ai": { "binding": "AI" },
+  // Preview only: Workers observability keeps Worker console logs (for example the [notables] rejection lines) searchable in the dashboard; wrangler.prod.jsonc stays unchanged.
+  "observability": { "enabled": true },
   "workers_dev": true,
   "preview_urls": true,
   // Preview turns on every feature flag that is safe without an unset Worker secret (the Workers AI flags are on too, capped by HARIMU_AI_DAILY_BUDGET_MICRO; the QA2 smoke list is in the PR that did it). The "Off" in a flag comment below describes that flag's off behavior. wrangler.prod.jsonc keeps every flag "false".
