@@ -11,7 +11,7 @@ const entry = `import React from 'react'; import { createRoot } from 'react-dom/
   const nation = { id: 'kindle', name: 'Kindle Republic', capital: 'Forgehaven' };
   // #82 slice 2: a fixed owner read so the Ownership layer and legend render offline.
   const owned = [[4, 3, 'kindle'], [5, 3, 'kindle'], [5, 4, 'kindle'], [6, 4, 'kindle'], [5, 5, 'kindle'], [17, 4, 'korund'], [18, 4, 'korund'], [12, 14, 'aurelle']]; // around the capitals (lib/nation-openings.ts)
-  window.fetch = async () => new Response(JSON.stringify({ width: 24, height: 18, cells: owned, totals: [{ nationId: 'kindle', squares: 5 }, { nationId: 'korund', squares: 2 }, { nationId: 'aurelle', squares: 1 }] }));
+  window.fetch = async url => new Response(JSON.stringify(String(url).endsWith('/resources') ? { width: 24, height: 18, cells: [[5, 5, 'food'], [7, 3, 'timber'], [4, 6, 'ore'], [17, 6, 'stone'], [12, 14, 'Riverpearl']], totals: [{ resource: 'food', squares: 1 }, { resource: 'ore', squares: 1 }, { resource: 'Riverpearl', squares: 1 }, { resource: 'stone', squares: 1 }, { resource: 'timber', squares: 1 }] } : { width: 24, height: 18, cells: owned, totals: [{ nationId: 'kindle', squares: 5 }, { nationId: 'korund', squares: 2 }, { nationId: 'aurelle', squares: 1 }] }));
   window.mountOverlays = () => createRoot(document.getElementById('root')).render(<GameShell mapOverlays view="world" nation={nation} nations={[nation]} capacity={18} localDemo={false} inventory={{ food: 6, materials: 2, knowledge: 2 }} walletMinor={4000} citizenNation={null} contextTitle="Nations" onNavigate={() => {}} panel={<p>Kindle Republic</p>} />);`;
 
 async function bundle() {
@@ -73,7 +73,7 @@ export async function checkMapOverlays({ browser, css, preflight, failures, rows
     await page.waitForSelector('.map-overlays', { state: 'attached' });
     if (w <= 390) await page.click('.map-overlays-trigger');
     for (const name of ['Resources', 'Ownership']) await page.click(`.map-overlays-group button:text-is("${name}")`);
-    await page.mouse.move(1, h - 1); await page.evaluate(() => document.activeElement?.blur()); await page.waitForSelector('.map-ownership > span'); await page.waitForTimeout(100);
+    await page.mouse.move(1, h - 1); await page.evaluate(() => document.activeElement?.blur()); await page.waitForSelector('.map-ownership > span'); await page.waitForSelector('.map-resources > span'); await page.waitForTimeout(100);
     const r = await page.evaluate(probe);
     rows.push(`${id}: ${r.controls} controls, ${r.mode}${r.issues.length ? ' ✗ ' + r.issues.join('; ') : ''}`);
     for (const i of r.issues) failures.push(`${id}: ${i}`);

@@ -140,8 +140,8 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
         labels.forEach(({ button }) => { if (button.hidden || !button.offsetWidth) return; const bw = button.offsetWidth, bh = button.offsetHeight; // translate(-50%,-100%): left is the centre, top is the bottom edge
           button.style.left = `${Math.min(Math.max(parseFloat(button.style.left), bw / 2), Math.max(bw / 2, w - bw / 2))}px`; button.style.top = `${Math.min(Math.max(parseFloat(button.style.top), bh), h)}px`; });
       }
-      const owned = mode === 'world' ? container.closest('.game-viewport')?.querySelector<HTMLElement>('.map-ownership') : null; // #82: Ownership cells ride the globe squares
-      if (owned) { const spans = [...owned.querySelectorAll<HTMLElement>('span[data-x]')];
+      const layers = mode === 'world' ? container.closest('.game-viewport')?.querySelectorAll<HTMLElement>('.map-ownership, .map-resources') ?? [] : []; // #82: Ownership and Resources cells ride the globe squares
+      for (const owned of layers) { const spans = [...owned.querySelectorAll<HTMLElement>('span[data-x]')];
         projectOwnershipCells({ width: Number(owned.dataset.width), height: Number(owned.dataset.height) }, spans.map(s => [Number(s.dataset.x), Number(s.dataset.y)]), world.group, camera, { w, h }, new THREE.Vector3())
           .forEach((spot, i) => { spans[i].hidden = spot.hidden; spans[i].style.left = `${spot.left}px`; spans[i].style.top = `${spot.top}px`; }); }
       if (highlight.visible) highlight.update();

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { createPortal } from 'react-dom';
 import { nationMark } from '../lib/nation-themes';
 import type { OwnershipMap } from '../lib/map-ownership';
+import { resourceIcon, resourceName, type ResourceMap } from '../lib/map-resources';
 import { MAP_OVERLAYS, UNAVAILABLE_OVERLAYS, UNREST_SCALE, LEGEND_TEXT, toggleOverlay, overlayLabel, phonePopoverPlacement, readSessionOverlays, writeSessionOverlays, type OverlayId } from '../lib/map-overlays';
 
 /** Renders nothing unless the server sent flags.mapOverlays === true. */
@@ -16,6 +17,7 @@ const session = () => { try { return window.sessionStorage; } catch { return und
 export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraphics?: boolean; mapLayer?: boolean }) {
   const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session())); // ARC: remembered for the browser session, off in a new one
   const [ownership, setOwnership] = useState<OwnershipMap | null>(null);
+  const [resources, setResources] = useState<ResourceMap | null>(null);
   const [open, setOpen] = useState(false); // the phone popover (390px and below)
   const [placement, setPlacement] = useState<CSSProperties>({});
   const [announcement, setAnnouncement] = useState('');
@@ -40,6 +42,13 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
     fetch('/api/world/ownership').then(r => (r.ok ? r.json() : null) as Promise<OwnershipMap | null>).then(data => { if (live && data?.cells) setOwnership(data); }).catch(() => {});
     return () => { live = false; };
   }, [ownershipOn, ownership]);
+  const resourcesOn = active.includes('resources');
+  useEffect(() => { // #82 slice 3: same rule for resource nodes: read only while Resources is on, once per mount
+    if (!resourcesOn || resources) return;
+    let live = true;
+    fetch('/api/world/resources').then(r => (r.ok ? r.json() : null) as Promise<ResourceMap | null>).then(data => { if (live && data?.cells) setResources(data); }).catch(() => {});
+    return () => { live = false; };
+  }, [resourcesOn, resources]);
   const [viewport, setViewport] = useState<Element | null>(null); // the layer's portal target, found after mount
   useEffect(() => { setViewport(rootRef.current?.closest('.game-viewport') ?? null); }, []);
   useEffect(() => {
@@ -55,8 +64,9 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
         {active.map(id => <section key={id}>
           <strong>{overlayLabel(id)}</strong>
           {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}>{step}</li>)}</ol> : null}
-          {id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} {squares === 1 ? 'square' : 'squares'}</li>; })}</ul>
-            : <span>{id === 'ownership' ? 'Loading owners.' : LEGEND_TEXT[id]}</span>}
+          {id === 'resources' && resources ? <ul className="map-ownership-key">{resources.totals.map(({ resource, squares }) => <li key={resource}><span aria-hidden="true">{resourceIcon(resource).symbol}</span> {resourceName(resource)}{resourceIcon(resource).rare ? ' (rare)' : ''}: {squares} {squares === 1 ? 'square' : 'squares'}</li>)}</ul>
+            : id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} {squares === 1 ? 'square' : 'squares'}</li>; })}</ul>
+            : <span>{id === 'ownership' ? 'Loading owners.' : id === 'resources' ? 'Loading resources.' : LEGEND_TEXT[id]}</span>}
         </section>)}
       </div>}
       <div role="group" aria-label="Overlays" className="map-overlays-group">
@@ -70,6 +80,7 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
     </div>
     <span className="map-overlays-status" aria-live="polite">{announcement}</span>
     {ownershipOn && mapLayer && ownership && viewport ? createPortal(<OwnershipLayer map={ownership} lowGraphics={lowGraphics} />, viewport) : null}
+    {resourcesOn && mapLayer && resources && viewport ? createPortal(<ResourcesLayer map={resources} />, viewport) : null}
   </div>;
 }
 
@@ -78,5 +89,12 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
 function OwnershipLayer({ map, lowGraphics }: { map: OwnershipMap; lowGraphics: boolean }) {
   return <div className="map-ownership" data-low-graphics={lowGraphics ? 'true' : undefined} data-width={map.width} data-height={map.height} aria-hidden="true">
     {map.cells.map(([x, y, nationId]) => { const mark = nationMark(nationId); return <span key={`${x},${y}`} hidden data-nation={nationId} data-x={x} data-y={y} style={{ color: mark?.accent, ...(lowGraphics ? {} : { backgroundColor: `${mark?.accent ?? '#888888'}55` }) }}>{mark?.symbol ?? '■'}</span>; })}
+  </div>;
+}
+
+/** #82 slice 3: resource node icons on their globe squares (GameViewport places them, like Ownership). Static: no animation or transition, so reduced motion needs nothing. */
+function ResourcesLayer({ map }: { map: ResourceMap }) {
+  return <div className="map-resources" data-width={map.width} data-height={map.height} aria-hidden="true">
+    {map.cells.map(([x, y, resource]) => { const icon = resourceIcon(resource); return <span key={`${x},${y}`} hidden data-resource={resource} data-rare={icon.rare ? 'true' : undefined} data-x={x} data-y={y}>{icon.symbol}</span>; })}
   </div>;
 }

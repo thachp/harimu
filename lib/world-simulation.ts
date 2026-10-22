@@ -76,7 +76,7 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
   const marketTick = () => (market ??= current!.first<{tick:number;scheduled_at:number}>());
   return [
     // Market day, only while the order book is on (write paths only). Idempotent per tick: #199 fruit and meat spoil first, then #198 NPC farm asks are posted for the current game day.
-    [{ name: 'spoilage', on: options.npcSupply === true, run: async () => { const tick = await marketTick(); if (tick) await runSpoilage(db, Number(tick.tick), now); } },
+    [{ name: 'spoilage', on: options.npcSupply === true, run: async () => { const tick = await marketTick(); if (tick) await runSpoilage(db, Number(tick.tick), now, Number(tick.scheduled_at)); } },
      { name: 'npcSupply', on: options.npcSupply === true, run: async () => { const tick = await marketTick(); if (tick) await runNpcSupply(db, Number(tick.tick), Number(tick.scheduled_at), now, tickSeconds); } }],
     // #71 Aurelle Rising thresholds and Crisis Window resolution, then #281 the AI palace coup (each only while its flag is on).
     [{ name: 'aurelleRising', on: options.aurelleRising === true, run: () => runAurelleRising(db, now) },
