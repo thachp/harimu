@@ -133,14 +133,14 @@ export function migrationProblems(migrations, recordedMap, live) {
 /** #486 (ARC): applied migrations this commit does not have. Non-empty means the commit is older than the database (e.g. pre-#724 code against a database that already has 0066). */
 export function unknownAppliedMigrations(migrations, recordedMap) { const known = new Set(migrations.map(m => m.id)); return [...(recordedMap?.keys() ?? [])].filter(id => !known.has(id)).sort(); }
 /** #486 (ARC) deploy guard for the #501 production path: refuses, fail closed, to ship a commit older than the shared database. No schema_migrations table also refuses. */
-export async function assertDatabaseNotAhead(db, migrations = postgresMigrations()) {
+export async function assertDatabaseNotAhead(db, migrations = postgresMigrations(), deploy = 'Production deploy') {
   const done = await recorded(db);
-  if (done === null) throw new Error('Production deploy refused: schema_migrations is missing, so this commit cannot be checked against the database.');
+  if (done === null) throw new Error(`${deploy} refused: schema_migrations is missing, so this commit cannot be checked against the database.`);
   const ahead = unknownAppliedMigrations(migrations, done);
-  if (ahead.length) throw new Error(`Production deploy refused: the database has migrations this commit does not have (${ahead.join(', ')}). This commit is older than the database; deploy a release that includes them.`);
+  if (ahead.length) throw new Error(`${deploy} refused: the database has migrations this commit does not have (${ahead.join(', ')}). This commit is older than the database; deploy a release that includes them.`);
 }
 /** #486: the preview deploy's database checks, in order: every migration applied (#119), then the database is not ahead of this commit. */
-export async function assertDeployDatabase(db, migrations = postgresMigrations()) { await assertPostgresMigrationsApplied(db, migrations); await assertDatabaseNotAhead(db, migrations); }
+export async function assertDeployDatabase(db, migrations = postgresMigrations()) { await assertPostgresMigrationsApplied(db, migrations); await assertDatabaseNotAhead(db, migrations, 'Preview deploy'); }
 /** #119 deploy guard: throws, listing every problem, unless all migrations are applied. */
 export async function assertPostgresMigrationsApplied(db, migrations = postgresMigrations()) {
   const problems = migrationProblems(migrations, await recorded(db), await liveSchema(db));

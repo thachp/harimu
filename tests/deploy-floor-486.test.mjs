@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { rollbackFloorCommit, rollbackFloorProblem, main as deployMain } from '../scripts/deploy-production.mjs';
 import { readProductionConfigRaw } from '../scripts/production-config.mjs';
 import { PGlite } from '@electric-sql/pglite';
-import { assertDeployDatabase, bootstrapEmptyPostgres, postgresMigrations } from '../scripts/postgres-migrations.mjs';
+import { assertDatabaseNotAhead, assertDeployDatabase, bootstrapEmptyPostgres, postgresMigrations } from '../scripts/postgres-migrations.mjs';
 
 const version = '0123abcd-0123-4abc-8def-0123456789ab';
 const fake = (tag, { view = 0, ancestor = 0, stdout } = {}) => { const calls = []; return { calls, spawn: (cmd, args) => { calls.push([cmd, ...args]);
@@ -55,7 +55,9 @@ test('the preview deploy refuses a database ahead of this commit (behavioural, P
   await assertDeployDatabase(pg, migrations);
   await assert.rejects(assertDeployDatabase(pg, migrations.slice(0, -1)), new RegExp(`${migrations.at(-1).id}.*older than the database`, 's'));
   await pg.query('INSERT INTO schema_migrations (id, checksum) VALUES ($1, $2)', ['9999_newer_release', 'x']);
-  await assert.rejects(assertDeployDatabase(pg, migrations), /9999_newer_release/);
+  await assert.rejects(assertDeployDatabase(pg, migrations), /^Error: Preview deploy refused: .*9999_newer_release/);
+  const bare = new PGlite(); t.after(() => bare.close());
+  await assert.rejects(assertDatabaseNotAhead(bare, migrations, 'Preview deploy'), /^Error: Preview deploy refused: schema_migrations is missing/, 'no schema_migrations table: refused (fail closed)');
   const src = readFileSync('scripts/deploy-cloudflare.mjs', 'utf8');
   assert.ok(src.indexOf('await assertDeployDatabase(db)') > 0 && src.indexOf('await assertDeployDatabase(db)') < src.indexOf('deployArgs(false)'), 'deploy-cloudflare runs it before deploying');
 });

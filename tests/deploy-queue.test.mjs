@@ -33,7 +33,7 @@ test('#172 Postgres backend skips the D1 check with a warning; D1 backend still 
   const skip = deploy.indexOf("if (storageBackend === 'postgres') {"), d1 = deploy.indexOf("'d1', 'execute'");
   assert.ok(skip > 0 && d1 > skip, 'D1 check sits in the non-Postgres branch');
   assert.match(deploy.slice(skip, d1), /console\.warn\([^)]*skipping the legacy preview D1 schema check[\s\S]*\} else \{/);
-  assert.match(deploy, /assertPostgresMigrationsApplied\(db\)/);
+  assert.match(deploy, /assertDeployDatabase\(db\)/); // #486: runs #119's assertPostgresMigrationsApplied first
 });
 
 test('#177 CLOUDFLARE_API_KEY values are redacted', () => {
