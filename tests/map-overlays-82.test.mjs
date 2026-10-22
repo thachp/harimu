@@ -106,7 +106,7 @@ test('wiring: the group sits first in viewport-controls (left of the zoom cluste
   assert.match(vp, /<div className="viewport-controls" aria-label="Camera controls">\s*<MapOverlaysControl enabled=\{overlays\} \/>\s*<button type="button".*aria-label="Zoom in"/);
   assert.match(vp, /overlays = false \}: GameViewportProps/);
   const shell = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
-  assert.match(shell, /mapOverlays = false,/); assert.match(shell, /<GameViewport marketOpen=\{marketVisible\([^)]*\)\} overlays=\{mapOverlays\}/);
+  assert.match(shell, /mapOverlays = false,/); assert.match(shell, /<GameViewport marketOpen=\{marketVisible\([^)]*\)\} visitor=\{visitor\} overlays=\{mapOverlays\}/);
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
   assert.match(page, /const \[overlaysFlag, setOverlaysFlag\] = useState\(false\)/); assert.match(page, /setOverlaysFlag\(snapshot\.flags\.mapOverlays === true\)/); assert.match(page, /<GameShell .*marketOpen=\{marketShown\} mapOverlays=\{overlaysFlag\}/);
   const css = await readFile(new URL('../app/game-shell.css', import.meta.url), 'utf8');
