@@ -39,7 +39,8 @@ export function MapOverlays({ lowGraphics = false }: { lowGraphics?: boolean }) 
     fetch('/api/world/ownership').then(r => (r.ok ? r.json() : null) as Promise<OwnershipMap | null>).then(data => { if (live && data?.cells) setOwnership(data); }).catch(() => {});
     return () => { live = false; };
   }, [ownershipOn, ownership]);
-  const viewport = rootRef.current?.closest('.game-viewport');
+  const [viewport, setViewport] = useState<Element | null>(null); // the layer's portal target, found after mount
+  useEffect(() => { setViewport(rootRef.current?.closest('.game-viewport') ?? null); }, []);
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) close(); };
