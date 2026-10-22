@@ -148,10 +148,10 @@ test('marketTickerOn is on only for the exact string "true"', async () => {
 });
 
 // QA1 on #712: an in-flight poll that resolves after the tab hid must not queue an announcement.
-test('accept() skips queuing an announcement while document.hidden, and stop() documents that hiding drops pending moves', () => {
+test('the only announcement offer is guarded by document.hidden (QA1 on #716: no pinned names, lines or doc text)', () => {
   const board = readFileSync(new URL('../app/market-board.tsx', import.meta.url), 'utf8');
-  assert.match(board, /if \(live && !document\.hidden\) announcer\.offer\(found, next\.goods, now\);/);
-  assert.equal(board.match(/announcer\.offer\(/g).length, 1, 'the only offer is behind the hidden check');
-  const lib = readFileSync(new URL('../lib/market-ticker.ts', import.meta.url), 'utf8');
-  assert.match(lib, /Hiding the tab intentionally drops pending moves/);
+  const offers = [...board.matchAll(/\.offer\(/g)];
+  assert.equal(offers.length, 1, 'one offer call');
+  const before = board.slice(Math.max(0, offers[0].index - 200), offers[0].index);
+  assert.match(before, /if \([^)]*!document\.hidden[^)]*\)\s*\w+$/, 'the offer runs only when the tab is visible');
 });

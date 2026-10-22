@@ -67,7 +67,8 @@ export function tickAnnouncer(say: (text: string) => void, clock: Clock, windowM
       else { const at = lastAt + windowMs; timer = clock.setTimeout(() => flush(at), at - now); }
     },
     /** QA1 on #706: drops the deferred announcement and anything pending, so nothing is said after the tab hides, the flag turns off or the board unmounts.
-     *  Hiding the tab intentionally drops pending moves: on return the board reloads at once and shows fresh markers, and only moves seen while visible are announced. */
+     *  Hiding the tab drops moves already queued before the hide (they are not said later). A Last trade move made while the tab was hidden is still announced on return,
+     *  as one net change against the book seen before the hide, because the board reloads at once and compares against that book. */
     stop() { if (timer !== null) clock.clearTimeout(timer); timer = null; pending.clear(); },
   };
 }
