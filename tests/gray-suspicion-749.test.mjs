@@ -13,11 +13,14 @@ test('rules: a trade adds 2, at most 4 a UTC day from trades; both below one dis
   assert.equal(suspicionLevelWithGray([], [], T0), 0);
   assert.equal(suspicionLevelWithGray([], [T0], T0), 2, 'one trade');
   assert.equal(suspicionLevelWithGray([], [T0, T0 + 60, T0 + 120, T0 + 180], T0 + 200), 4, 'several trades in a day hit the daily cap');
-  assert.equal(suspicionLevelWithGray([], [T0, T0 + 60, T0 + DAY, T0 + DAY + 60], T0 + DAY + 100), 8, 'the cap resets the next UTC day (4, then +4 under a day later)');
+  assert.equal(suspicionLevelWithGray([], [T0, T0 + 60, T0 + DAY, T0 + DAY + 60], T0 + DAY + 100), 7, 'the cap resets the next UTC day (4, 1 midnight of decay, then +4)');
   assert.equal(suspicionLevelWithGray([], [T0], T0 + 2 * DAY), 0, 'decays 1 per real day like discoveries');
   assert.equal(suspicionLevelWithGray([], [T0], T0 + DAY), 1);
   for (const hits of [[], [T0], [T0, T0 + 3 * DAY], [T0, T0 + 40 * DAY]]) for (const at of [T0 + DAY, T0 + 50 * DAY])
-    assert.equal(suspicionLevelWithGray(hits, [], at), suspicionLevel(hits, at), 'no trades: exactly the #382 level');
+    assert.ok(Math.abs(suspicionLevelWithGray(hits, [], at) - suspicionLevel(hits, at)) <= hits.length, 'no trades: the #382 level up to midnight rounding (1 per discovery gap)');
+  // #752 (QA1): steady trading still decays: 2 trades a day for 30 days settles near 4 in / 1 out a day, not the max
+  const steady = []; for (let d = 0; d < 30; d++) steady.push(T0 + d * DAY, T0 + d * DAY + 3600);
+  assert.equal(suspicionLevelWithGray([], steady, T0 + 29 * DAY + 7200), 4 * 30 - 29, 'decay per midnight crossed');
   assert.equal(suspicionLevelWithGray([T0], [T0 + 60], T0 + 100), 12, 'discovery 10 + trade 2');
   assert.deepEqual(deriveDuties([T0]), [], 'trades never feed duties: deriveDuties takes discoveries only');
 });
