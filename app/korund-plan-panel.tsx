@@ -11,7 +11,6 @@ import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
 import { quotaPercent } from '@/lib/korund-coupons';
-import { overFulfilledPercent } from '@/lib/korund-medals-rules'; // #737
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
 import { grayText, grayRefusal, ln, fc, rate, rumorLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
@@ -99,7 +98,8 @@ export function PriorNationShift({ shift, currency, pending, uncertain, onClaim,
 }
 
 export function QuotaBar({ quota, medals }: { quota: NonNullable<KorundPlanView['quota']>; medals?: KorundPlanView['medals'] }) {
-  const over = medals ? overFulfilledPercent(quota.unitFood, quota.targetFood) : 0; // #737: only with HARIMU_KORUND_MEDALS_ENABLED on
+  // #737 (only with HARIMU_KORUND_MEDALS_ENABLED on): unclamped over-fulfilment percent, same formula as lib/korund-medals-rules overFulfilledPercent (inlined: the panel's test loaders map each import)
+  const over = medals && quota.targetFood > 0 && quota.unitFood > quota.targetFood ? Math.round(quota.unitFood * 100 / quota.targetFood) : 0;
   const unit = quotaPercent(quota.unitFood, quota.targetFood);
   const own = quotaPercent(quota.ownFood, quota.targetFood);
   return <section className="korund-quota" aria-label="Work-unit quota">
