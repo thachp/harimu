@@ -1,3 +1,4 @@
+import { mapLimited } from './parked'; // #679
 import { runFoundingDay30 } from './founding-period'; // #612
 import { finalizeDueElection } from './elections';
 import { runKindleAssembly, type AssemblyTickConfig } from './assembly';
@@ -26,6 +27,8 @@ export const tickSeconds = 7200;
 export const maximumCatchupTicks = 3;
 /** #159: how many ticks before the catch-up window are re-checked for missing scores (12 = one real day). */
 const scoreRepairTicks=12;
+/** #679: at most this many missing ticks have their score inputs read at once, so a long repair can't flood the connection pool. */
+export const scoreRepairConcurrency=4;
 // These schema exports are for local SQL fixtures; production uses additive Drizzle migrations.
 export const worldClockSchema = `CREATE TABLE world_clock (id TEXT PRIMARY KEY CHECK(id='main'), epoch_seconds INTEGER NOT NULL)`;
 export const worldTickSchema = `CREATE TABLE world_ticks (tick INTEGER PRIMARY KEY CHECK(tick>0), scheduled_at INTEGER NOT NULL, processed_at INTEGER NOT NULL, proposals_json TEXT NOT NULL)`;
@@ -134,9 +137,9 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
     const missing = await db.prepare(`SELECT t.tick,t.scheduled_at FROM world_ticks t WHERE t.tick>(SELECT COALESCE(MAX(tick),0) FROM world_ticks)-?
       AND (SELECT COUNT(*) FROM nation_stability_scores s WHERE s.tick=t.tick)<${stabilityNations.length} ORDER BY t.tick`)
       .bind(maximumCatchupTicks+scoreRepairTicks).all<{tick:number;scheduled_at:number}>();
-    // #679: the score inputs only read source tables (never nation_stability_scores), so every missing tick's inputs are read concurrently and all
+    // #679: the score inputs only read source tables (never nation_stability_scores), so missing ticks' inputs are read concurrently (scoreRepairConcurrency at a time) and all
     // scores are written in one batch, oldest tick first, instead of a read and a batch per tick in a row.
-    const statements = await Promise.all(missing.results.map(async row => {
+    const statements = await mapLimited(missing.results, scoreRepairConcurrency, async row => {
       // #423: war weariness reads the wars table as of the tick's own time (only while both war flags are on), so a catch-up or repaired tick scores the same as a live one.
       const weariness = options.warWeariness ? await readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined;
       return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
