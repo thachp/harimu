@@ -1,6 +1,6 @@
 /**
  * #501c: production deploy (inactive). Nothing runs this automatically: no npm script, no workflow before slice d, and slice d's workflow is manual-dispatch behind the
- * `production` environment approval. It refuses unless every input below is present and consistent, and it never calls Cloudflare, PlanetScale or Clerk in --dry-run
+ * `production` environment approval. It refuses unless every input below is present and consistent, and it never calls Cloudflare (except the read-only rollback-floor `wrangler versions view`, #486), PlanetScale or Clerk in --dry-run
  * (it validates and prints the plan only). Inputs (names only): HARIMU_DEPLOY_ENVIRONMENT=production, --qa2-go-sha=<40 hex> equal to the checked-out HEAD (and GITHUB_SHA when set),
  * and for a real run also GITHUB_REF=refs/heads/main, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, the admin-URL secret named by --database-url-env (default PRODUCTION_DATABASE_ADMIN_URL; PREVIEW_DATABASE_ADMIN_URL while production shares preview's database). Migrations and the pre-deploy PlanetScale backup are
  * separate workflow steps that run before this script; this script only verifies the migrations are applied, then uploads the built bundle.
@@ -23,7 +23,7 @@ export function rollbackFloorProblem(version, spawn = spawnSync) {
   let tag; try { tag = JSON.parse(view.stdout ?? '')?.annotations?.['workers/tag']; } catch { return 'the target version could not be parsed'; }
   if (!/^[a-f0-9]{40}$/.test(tag ?? '')) return 'the target version carries no commit tag (built before the rollback floor)';
   const ancestor = spawn('git', ['merge-base', '--is-ancestor', rollbackFloorCommit, tag], { encoding: 'utf8' });
-  if (ancestor.status !== 0) return `the target version's commit ${tag} does not contain ${rollbackFloorCommit} (#724)`;
+  if (ancestor.status !== 0) return `target version ${version} was built from commit ${tag}, which does not contain the required floor commit ${rollbackFloorCommit} (#724's merge); roll back only to a version built from a descendant of it`;
   return null;
 }
 export function productionDeployProblems({ argv, env, head }) {
@@ -52,8 +52,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
   if (problems.length) throw new Error(`Production deploy refused:\n- ${problems.join('\n- ')}`);
   const rollback = rollbackVersion(argv);
   if (rollback !== undefined) {
-    if (argv.includes('--dry-run')) { console.log(`Dry run: would run: wrangler ${productionRollbackArgs(rollback).join(' ')}`); return 0; }
-    const floor = rollbackFloorProblem(rollback, spawn); if (floor) throw new Error(`Production rollback refused (#486 floor): ${floor}.`);
+    const floor = rollbackFloorProblem(rollback, spawn); if (floor) throw new Error(`Production rollback refused (#486 floor): ${floor}.`); // also on --dry-run (read-only: versions view + git), so a rehearsal finds a bad target
+    if (argv.includes('--dry-run')) { console.log(`Dry run: rollback floor passed; would run: wrangler ${productionRollbackArgs(rollback).join(' ')}`); return 0; }
     return spawn('node_modules/.bin/wrangler', productionRollbackArgs(rollback), { stdio: 'inherit', env: { ...env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_PATH: '.wrangler/logs' } }).status ?? 1;
   }
   const journal = journalProblems(); if (journal.length) throw new Error(`Production deploy refused:\n- ${journal.join('\n- ')}`);
