@@ -66,7 +66,8 @@ export function tickAnnouncer(say: (text: string) => void, clock: Clock, windowM
       if (lastAt === null || now - lastAt >= windowMs) flush(now);
       else { const at = lastAt + windowMs; timer = clock.setTimeout(() => flush(at), at - now); }
     },
-    /** QA1 on #706: drops the deferred announcement and anything pending, so nothing is said after the tab hides, the flag turns off or the board unmounts. */
+    /** QA1 on #706: drops the deferred announcement and anything pending, so nothing is said after the tab hides, the flag turns off or the board unmounts.
+     *  Hiding the tab intentionally drops pending moves: on return the board reloads at once and shows fresh markers, and only moves seen while visible are announced. */
     stop() { if (timer !== null) clock.clearTimeout(timer); timer = null; pending.clear(); },
   };
 }

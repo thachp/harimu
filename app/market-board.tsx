@@ -67,7 +67,7 @@ export function useOrderBook(active: boolean) {
   const accept = useCallback((next: OrderBookState, live: boolean) => {
     const found = priceMoves(latest.current?.goods ?? null, next.goods), now = Date.now();
     setMoves(found); setUpdatedAt(now);
-    if (live) announcer.offer(found, next.goods, now);
+    if (live && !document.hidden) announcer.offer(found, next.goods, now); // QA1 on #712: a poll that lands after the tab hid never queues an announcement
     setBook(next);
   }, [announcer]);
   useEffect(() => { latest.current = book; }, [book]);

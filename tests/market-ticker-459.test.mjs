@@ -146,3 +146,12 @@ test('marketTickerOn is on only for the exact string "true"', async () => {
   assert.equal(marketTickerOn({ HARIMU_MARKET_TICKER_ENABLED: 'true' }), true);
   for (const v of [undefined, 'false', 'TRUE', true, '1']) assert.equal(marketTickerOn({ HARIMU_MARKET_TICKER_ENABLED: v }), false);
 });
+
+// QA1 on #712: an in-flight poll that resolves after the tab hid must not queue an announcement.
+test('accept() skips queuing an announcement while document.hidden, and stop() documents that hiding drops pending moves', () => {
+  const board = readFileSync(new URL('../app/market-board.tsx', import.meta.url), 'utf8');
+  assert.match(board, /if \(live && !document\.hidden\) announcer\.offer\(found, next\.goods, now\);/);
+  assert.equal(board.match(/announcer\.offer\(/g).length, 1, 'the only offer is behind the hidden check');
+  const lib = readFileSync(new URL('../lib/market-ticker.ts', import.meta.url), 'utf8');
+  assert.match(lib, /Hiding the tab intentionally drops pending moves/);
+});
