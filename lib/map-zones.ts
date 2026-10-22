@@ -120,6 +120,19 @@ export function nationSquaresUpsertSql(nationId: string, nations: readonly MapNa
       + `WHERE world_squares.zone='wildlands' AND world_squares.owner IS NULL AND world_squares.feature IS NULL`);
   return out;
 }
+/** #486 (ARC on #486: 30x24 additive): the one growth of the world grid, from the old size to the new. Kept as literals, not WORLD_GRID, so migration 0066 stays reproducible after the switch. */
+export const gridGrowth486 = { from: { width: 24, height: 18 }, to: { width: 30, height: 24 } } as const;
+/** Insert-only statements for the squares a grid growth adds (x >= from.width or y >= from.height), seeded exactly as `seedWorldSquares` would seed them on the larger grid.
+ *  `ON CONFLICT (x,y) DO NOTHING` on both SQLite and Postgres: an existing row is never updated or deleted, and a second run changes nothing. Literal values from the fixed seed only. */
+export function gridGrowthSql(growth: { from: { width: number; height: number }; to: { width: number; height: number } } = gridGrowth486, nations: readonly MapNation[] = mappedNations, chunk = 100): string[] {
+  const rows: string[] = [];
+  for (let y = 0; y < growth.to.height; y++) for (let x = 0; x < growth.to.width; x++) if (x >= growth.from.width || y >= growth.from.height) {
+    const s = squareAt(x, y, nations); rows.push(`(${[s.x, s.y, s.zone, s.owner, s.terrain, s.resource, s.feature].map(lit).join(',')})`);
+  }
+  const out: string[] = [];
+  for (let i = 0; i < rows.length; i += chunk) out.push(`INSERT INTO world_squares (x,y,zone,owner,terrain,resource,feature) VALUES ${rows.slice(i, i + chunk).join(',')} ON CONFLICT (x,y) DO NOTHING`);
+  return out;
+}
 /** Boot step (lib/db.ts, SQLite/D1): the upsert for every mapped nation the original seed did not write. #487: today that is Confluence's block. A Postgres
  *  database has no boot DDL path: the PR that gives the first new nation its capital runs `nationSquaresUpsertSql(id)` as its (additive) migration. */
 export function bootNationSquaresSql(nations: readonly MapNation[] = mappedNations): string[] {
@@ -139,7 +152,12 @@ export function sqliteWorldSquaresMigration(): string {
 
 /** #486 (30x24 additive grid, slice 1): the rows of `world_squares` that lie on this build's grid. A table may hold more rows than the grid (the additive migration that grows
  *  the map runs before the build that reads the larger grid), so readers count and use only on-grid rows; a table missing any on-grid row is still incomplete. */
-export const onGrid = <T extends { x: number | string; y: number | string }>(rows: readonly T[]): T[] => rows.filter(r => Number(r.x) >= 0 && Number(r.y) >= 0 && Number(r.x) < mapWidth && Number(r.y) < mapHeight);
+// QA1 on #724: a non-integer coordinate is never on the grid. Travel and sieges read single squares and keep their own bounds checks (lib/travel.ts, lib/siege-actions.ts),
+// so they never see rows beyond the grid either.
+export const onGrid = <T extends { x: number | string; y: number | string }>(rows: readonly T[]): T[] => rows.filter(r => {
+  const x = Number(r.x), y = Number(r.y);
+  return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < mapWidth && y < mapHeight;
+});
 type Row = { x: number; y: number; zone: Zone; owner: string | null; terrain: string; resource: string | null; feature: string | null };
 export async function readWorldSquares(db: GameDatabase): Promise<{ squares: WorldSquare[]; source: 'table' | 'seed' }> {
   try {
