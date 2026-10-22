@@ -86,6 +86,7 @@ async function world(backend, t) {
   const { PGlite } = await import('@electric-sql/pglite'); const pg = new PGlite(); t.after(() => pg.close()); await pg.exec(zones.postgresWorldSquaresMigration());
   return { exec: s => pg.exec(s), all: async () => (await pg.query('SELECT x,y,zone,owner,terrain,resource,feature FROM world_squares ORDER BY y,x')).rows, sql: await read('db/postgres/0067_rare_nodes.sql') };
 }
+const registry = await (async () => { const r = await localRuntime(); try { return await r.importModule('lib/world-registry.ts'); } finally { await r.close(); } })();
 const placed = rows => Object.fromEntries(rows.filter(r => zones.rareNodePlacements.some(p => p.resource === r.resource)).map(r => [r.resource, `${r.x},${r.y}`]));
 for (const backend of ['sqlite', 'pglite']) {
   test(`0067 guards (${backend}): owned, resourced and city target squares are untouched across two runs; the second run is a no-op`, async t => {
@@ -99,16 +100,28 @@ for (const backend of ['sqlite', 'pglite']) {
     assert.deepEqual(placed(once), placed(zones.withRareNodes(before)), 'SQL and the in-code fallback agree');
     await w.exec(w.sql); assert.deepEqual(await w.all(), once, 'second run is a no-op');
   });
-  test(`0067 fallback (${backend}): an occupied target moves its type to the nearest eligible square (fixed tie-break)`, async t => {
-    const w = await world(backend, t); await w.exec("UPDATE world_squares SET owner='kindle' WHERE x=12 AND y=5");
-    await w.exec(w.sql);
-    assert.deepEqual(placed(await w.all()), { Ironroot: '12,4', Frostcore: '13,4', Hazequartz: '10,6', Sunglass: '13,6', 'Geotherm core': '12,7', Heartwood: '14,7', Stormcells: '12,8' },
-      'Ironroot: (12,4) wins the distance-1 tie on y; Frostcore, displaced, takes (13,4)');
-    const v = await world(backend, t); await v.exec("UPDATE world_squares SET owner='kindle' WHERE x=13 AND y=6"); await v.exec(v.sql);
-    assert.equal(placed(await v.all()).Sunglass, '14,5', 'Sunglass: of the diagonal ties, lowest y first (x-first would pick another)');
+  test(`0067 (${backend}): every rare-node square is Commons, so checkPurchaseSite refuses it (map-design §6.1)`, async t => {
+    const w = await world(backend, t); await w.exec("UPDATE world_squares SET owner='kindle' WHERE x=12 AND y=5"); await w.exec(w.sql); // includes a fallback square
+    const rows = (await w.all()).map(r => ({ ...r, x: Number(r.x), y: Number(r.y) })), nodes = rows.filter(r => zones.rareNodePlacements.some(p => p.resource === r.resource));
+    assert.equal(nodes.length, 7);
+    for (const n of nodes) {
+      assert.equal(n.zone, 'commons', `${n.resource} at ${n.x},${n.y}`);
+      const owned = rows.map(r => (Math.max(Math.abs(r.x - n.x), Math.abs(r.y - n.y)) === 1 ? { ...r, owner: 'kindle' } : r)); // even next to the buyer's land
+      assert.equal(registry.checkPurchaseSite(owned, 'kindle', n.x, n.y)?.reason, 'commons', `${n.resource} is not for sale`);
+    }
+  });
+  test(`0067 fallback (${backend}): an occupied target moves its type to the nearest eligible square, Commons first (fixed order)`, async t => {
+    const w = await world(backend, t); await w.exec("UPDATE world_squares SET owner='kindle' WHERE x=12 AND y=5"); await w.exec(w.sql);
+    assert.deepEqual(placed(await w.all()), { Frostcore: '12,4', Hazequartz: '10,6', Ironroot: '13,6', Sunglass: '12,7', Heartwood: '14,7', 'Geotherm core': '12,8', Stormcells: '11,8' },
+      'Ironroot takes the nearest empty Commons square (13,6); the displaced Sunglass and Geotherm core cascade the same way');
+    const v = await world(backend, t); await v.exec("UPDATE world_squares SET owner='kindle' WHERE (x,y) IN ((12,5),(12,7),(13,8),(14,5))"); await v.exec(v.sql);
+    const p = placed(await v.all()); assert.deepEqual([p.Heartwood, p.Stormcells], ['13,4', '11,8'], 'equal-distance ties go to the lower y, then the lower x');
   });
   test(`0067 check (${backend}): with no eligible square left, the migration errors`, async t => {
     const w = await world(backend, t); await w.exec("UPDATE world_squares SET owner='kindle' WHERE x BETWEEN 10 AND 14 AND y BETWEEN 4 AND 8");
-    await assert.rejects(w.exec(w.sql), /NOT NULL|null value/i);
+    await assert.rejects(w.exec(w.sql), /NOT NULL|null value/i);    const v = await world(backend, t); // a type already on a buyable Wildlands square is skipped, so the check must refuse it (all seven must be Commons)
+    await v.exec("UPDATE world_squares SET resource='Frostcore' WHERE x=20 AND y=10 AND zone='wildlands' AND owner IS NULL");
+    assert.equal((await v.all()).find(r => r.resource === 'Frostcore')?.zone, 'wildlands', 'setup: Frostcore sits on Wildlands');
+    await assert.rejects(v.exec(v.sql), /NOT NULL|null value/i);
   });
 }
