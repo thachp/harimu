@@ -1,7 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { laborNoteSql, laborNoteBinds } from './korund-wallet';
 import { GRAY_AMOUNT_CAP_MINOR, GRAY_OFFER_LIFETIME_SECONDS, GRAY_STARTING_GRANT_MINOR, GRAY_RATE_MIN, GRAY_RATE_MAX, GRAY_RUMOR_TRADES, GRAY_RUMOR_WINDOW_SECONDS,
-  grayCashFor, rumoredRate, validGrayOffer, type GrayOfferInput } from './gray-market-rules';
+  GRAY_DAILY_VOLUME_CAP_MINOR, grayDayStart, grayDailyRemaining, grayCashFor, rumoredRate, validGrayOffer, type GrayOfferInput } from './gray-market-rules';
 
 /** Korund gray market PoC (#43), behind HARIMU_GRAY_MARKET_ENABLED (off). Korund citizens only.
  * FC is smuggled foreign cash: an off-book unit that exists only in gray_cash_grants (one small grant per citizen) and gray_trades. It is
@@ -44,6 +44,13 @@ export const grayMarketSchemas = [
 export const grayCashSql = (user: string): string => `(COALESCE((SELECT amount_minor FROM gray_cash_grants WHERE clerk_user_id=${user}),0)`
   + `+COALESCE((SELECT SUM(cash_minor) FROM gray_trades WHERE seller_id=${user}),0)-COALESCE((SELECT SUM(cash_minor) FROM gray_trades WHERE buyer_id=${user}),0))`;
 const grayCashBinds = (userId: string): string[] => [userId, userId, userId];
+/** #736: today's volume for a citizen (LN posted + LN accepted since the UTC day start). `user` is `?`; binds: user, dayStart, user, dayStart. */
+const grayVolumeSql = (user: string): string => `(COALESCE((SELECT SUM(amount_minor) FROM gray_offers WHERE clerk_user_id=${user} AND created_at>=?),0)`
+  + `+COALESCE((SELECT SUM(amount_minor) FROM gray_trades WHERE buyer_id=${user} AND traded_at>=?),0))`;
+const grayVolumeBinds = (userId: string, now: number): (string | number)[] => [userId, grayDayStart(now), userId, grayDayStart(now)];
+const volume = async (db: GameDatabase, userId: string, now: number) => Number((await db.prepare(`SELECT ${grayVolumeSql('?')} AS n`).bind(...grayVolumeBinds(userId, now)).first<{ n: number }>())?.n ?? 0);
+const capError = (remaining: number): GrayResult => ({ status: 409, reason: 'daily_cap', error: `Today's limit: ${(remaining / 100).toFixed(2)} LN left.` });
+export type GrayOptions = { dailyCap?: boolean };
 
 export type GrayOfferView = { id: string; amountMinor: number; askRate: number; cashMinor: number; createdAt: string; expiresAt: string };
 export type GrayView = {
@@ -55,6 +62,8 @@ export type GrayView = {
   myOffer: (GrayOfferView & { status: 'open' | 'accepted' | 'expired' }) | null;
   offers: GrayOfferView[];
   limits: { amountCapMinor: number; rateMin: number; rateMax: number; lifetimeSeconds: number };
+  /** #736: present only with HARIMU_GRAY_DAILY_CAP_ENABLED on. */
+  dailyRemainingMinor?: number; dailyCapMinor?: number;
 };
 export type GrayResult = { status: number; error?: string; reason?: string; replayed?: boolean };
 
@@ -64,13 +73,14 @@ type OfferRow = { id: string; amount_minor: number; ask_rate: number; cash_minor
 const offerView = (r: OfferRow): GrayOfferView => ({ id: r.id, amountMinor: Number(r.amount_minor), askRate: Number(r.ask_rate), cashMinor: Number(r.cash_minor), createdAt: iso(Number(r.created_at)), expiresAt: iso(Number(r.expires_at)) });
 
 /** The read model. Never writes: expired offers are simply not listed, and the starting grant is shown but not recorded until the first action. */
-export async function readGray(db: GameDatabase, userId: string, now: number): Promise<GrayView> {
-  const [grant, flows, mine, others, trades] = await Promise.all([
+export async function readGray(db: GameDatabase, userId: string, now: number, options: GrayOptions = {}): Promise<GrayView> {
+  const [grant, flows, mine, others, trades, used] = await Promise.all([
     db.prepare('SELECT amount_minor FROM gray_cash_grants WHERE clerk_user_id=?').bind(userId).first<{ amount_minor: number }>(),
     db.prepare(`SELECT COALESCE((SELECT SUM(cash_minor) FROM gray_trades WHERE seller_id=?),0)-COALESCE((SELECT SUM(cash_minor) FROM gray_trades WHERE buyer_id=?),0) AS net`).bind(userId, userId).first<{ net: number }>(),
     db.prepare(`SELECT o.*, EXISTS(SELECT 1 FROM gray_trades t WHERE t.offer_id=o.id) AS traded FROM gray_offers o WHERE o.clerk_user_id=? ORDER BY o.created_at DESC, o.id DESC LIMIT 1`).bind(userId).first<OfferRow & { traded: number }>(),
     db.prepare(`SELECT o.* FROM gray_offers o WHERE o.clerk_user_id<>? AND ${openOffer('o')} ORDER BY o.created_at DESC, o.id DESC LIMIT 20`).bind(userId, now).all<OfferRow>(),
     db.prepare('SELECT offer_id, ask_rate, traded_at FROM gray_trades WHERE traded_at>=? ORDER BY traded_at DESC, offer_id DESC LIMIT ?').bind(now - GRAY_RUMOR_WINDOW_SECONDS, GRAY_RUMOR_TRADES).all<{ offer_id: string; ask_rate: number; traded_at: number }>(),
+    options.dailyCap ? volume(db, userId, now) : Promise.resolve(0),
   ]);
   const myStatus = mine ? (Number(mine.traded) ? 'accepted' : Number(mine.expires_at) > now ? 'open' : 'expired') as 'open' | 'accepted' | 'expired' : null;
   return {
@@ -80,6 +90,7 @@ export async function readGray(db: GameDatabase, userId: string, now: number): P
     myOffer: mine && myStatus ? { ...offerView(mine), status: myStatus } : null,
     offers: (others.results ?? []).map(offerView),
     limits: { amountCapMinor: GRAY_AMOUNT_CAP_MINOR, rateMin: GRAY_RATE_MIN, rateMax: GRAY_RATE_MAX, lifetimeSeconds: GRAY_OFFER_LIFETIME_SECONDS },
+    ...(options.dailyCap ? { dailyRemainingMinor: grayDailyRemaining(used), dailyCapMinor: GRAY_DAILY_VOLUME_CAP_MINOR } : {}),
   };
 }
 
@@ -94,7 +105,7 @@ const openCount = async (db: GameDatabase, userId: string, now: number) => Numbe
 
 /** Posts one cash-bundle offer: sell `amountMinor` LN for FC at the asking rate. One open offer per citizen; the LN stays in the poster's
  * wallet until a buyer accepts (the accept re-checks it). The request id is the offer id, so a retry replays and a foreign id is request_reused. */
-export async function postOffer(db: GameDatabase, userId: string, input: { amountMinor?: unknown; askRate?: unknown }, requestId: string, now: number): Promise<GrayResult> {
+export async function postOffer(db: GameDatabase, userId: string, input: { amountMinor?: unknown; askRate?: unknown }, requestId: string, now: number, options: GrayOptions = {}): Promise<GrayResult> {
   const terms: GrayOfferInput | null = validGrayOffer(input);
   if (!terms) return { status: 400, reason: 'out_of_range', error: `Offer between 0.01 and ${(GRAY_AMOUNT_CAP_MINOR / 100).toFixed(2)} LN at a whole-hundredths rate.` };
   const priorOffer = await db.prepare('SELECT clerk_user_id FROM gray_offers WHERE id=?').bind(requestId).first<{ clerk_user_id: string }>();
@@ -105,10 +116,12 @@ export async function postOffer(db: GameDatabase, userId: string, input: { amoun
   await db.prepare(`INSERT INTO gray_offers(id, clerk_user_id, amount_minor, ask_rate, cash_minor, created_at, expires_at)
     SELECT ?,clerk_user_id,?,?,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id='korund'
     AND NOT EXISTS(SELECT 1 FROM gray_offers o WHERE o.clerk_user_id=? AND ${openOffer('o')})
-    AND ?<=${laborNoteSql('?')} ON CONFLICT DO NOTHING`)
-    .bind(requestId, terms.amountMinor, terms.askRate, cashMinor, now, now + GRAY_OFFER_LIFETIME_SECONDS, userId, userId, now, terms.amountMinor, ...laborNoteBinds(userId)).run();
+    AND ?<=${laborNoteSql('?')}${options.dailyCap ? ` AND ${grayVolumeSql('?')}+?<=?` : ''} ON CONFLICT DO NOTHING`)
+    .bind(requestId, terms.amountMinor, terms.askRate, cashMinor, now, now + GRAY_OFFER_LIFETIME_SECONDS, userId, userId, now, terms.amountMinor, ...laborNoteBinds(userId),
+      ...(options.dailyCap ? [...grayVolumeBinds(userId, now), terms.amountMinor, GRAY_DAILY_VOLUME_CAP_MINOR] : [])).run();
   const created = await db.prepare('SELECT clerk_user_id FROM gray_offers WHERE id=?').bind(requestId).first<{ clerk_user_id: string }>();
   if (created?.clerk_user_id !== userId) {
+    if (options.dailyCap) { const left = grayDailyRemaining(await volume(db, userId, now)); if (terms.amountMinor > left) return capError(left); }
     if (await openCount(db, userId, now)) return { status: 409, reason: 'offer_open', error: 'You already have an open offer. It expires on its own.' };
     if ((await laborNotes(db, userId)) < terms.amountMinor) return { status: 409, reason: 'insufficient_ln', error: 'You do not hold that many Labor Notes.' };
     return { status: 409, reason: 'unavailable', error: 'The offer could not be posted.' };
@@ -119,12 +132,17 @@ export async function postOffer(db: GameDatabase, userId: string, input: { amoun
     await db.prepare('DELETE FROM gray_offers WHERE id=? AND clerk_user_id=? AND NOT EXISTS(SELECT 1 FROM gray_trades WHERE offer_id=gray_offers.id)').bind(requestId, userId).run();
     return { status: 409, reason: 'offer_open', error: 'You already have an open offer. It expires on its own.' };
   }
+  // #736 committed re-check (same pattern): a racing accept by this citizen may have passed its own guard; over the cap, withdraw this offer.
+  if (options.dailyCap && await volume(db, userId, now) > GRAY_DAILY_VOLUME_CAP_MINOR) {
+    await db.prepare('DELETE FROM gray_offers WHERE id=? AND clerk_user_id=? AND NOT EXISTS(SELECT 1 FROM gray_trades WHERE offer_id=gray_offers.id)').bind(requestId, userId).run();
+    return capError(grayDailyRemaining(await volume(db, userId, now)));
+  }
   return { status: 200 };
 }
 
 /** Accepts someone else's open offer: the buyer pays the offer's FC price and receives its LN. One trade per offer (primary key), so of two
  * simultaneous accepts exactly one wins. The accept request id is stored in the trade, so a retry replays and a foreign id is request_reused. */
-export async function acceptOffer(db: GameDatabase, userId: string, offerId: string, requestId: string, now: number): Promise<GrayResult> {
+export async function acceptOffer(db: GameDatabase, userId: string, offerId: string, requestId: string, now: number, options: GrayOptions = {}): Promise<GrayResult> {
   const usedAsOffer = await db.prepare('SELECT 1 AS y FROM gray_offers WHERE id=?').bind(requestId).first();
   if (usedAsOffer) return { status: 409, reason: 'request_reused', error: 'Request identifier already used.' };
   const byRequest = await db.prepare('SELECT buyer_id, offer_id FROM gray_trades WHERE request_id=?').bind(requestId).first<{ buyer_id: string; offer_id: string }>();
@@ -140,17 +158,22 @@ export async function acceptOffer(db: GameDatabase, userId: string, offerId: str
     SELECT o.id,?,o.clerk_user_id,?,o.amount_minor,o.cash_minor,o.ask_rate,? FROM gray_offers o
     JOIN citizens b ON b.clerk_user_id=? AND b.nation_id='korund' JOIN citizens s ON s.clerk_user_id=o.clerk_user_id AND s.nation_id='korund'
     WHERE o.id=? AND o.clerk_user_id<>? AND o.expires_at>?
-    AND o.cash_minor<=${grayCashSql('?')} AND o.amount_minor<=${laborNoteSql('o.clerk_user_id')}
+    AND o.cash_minor<=${grayCashSql('?')} AND o.amount_minor<=${laborNoteSql('o.clerk_user_id')}${options.dailyCap ? ` AND ${grayVolumeSql('?')}+o.amount_minor<=?` : ''}
     ON CONFLICT DO NOTHING`)
-    .bind(requestId, userId, now, userId, offerId, userId, now, ...grayCashBinds(userId)).run();
+    .bind(requestId, userId, now, userId, offerId, userId, now, ...grayCashBinds(userId), ...(options.dailyCap ? [...grayVolumeBinds(userId, now), GRAY_DAILY_VOLUME_CAP_MINOR] : [])).run();
   const trade = await db.prepare('SELECT buyer_id, request_id FROM gray_trades WHERE offer_id=?').bind(offerId).first<{ buyer_id: string; request_id: string }>();
   if (!trade) {
+    if (options.dailyCap) { const left = grayDailyRemaining(await volume(db, userId, now)); if (Number(offer.amount_minor) > left) return capError(left); }
     if ((await cash(db, userId)) < Number(offer.cash_minor)) return { status: 409, reason: 'insufficient_cash', error: 'You do not hold enough FC for that offer.' };
     return { status: 409, reason: 'seller_short', error: 'The poster no longer holds that many Labor Notes.' };
   }
   if (trade.request_id !== requestId) return trade.buyer_id === userId ? { status: 200, replayed: true } : { status: 409, reason: 'taken', error: 'Another player took that offer first.' };
   // Committed re-check: the guards above read pre-commit balances. If a racing trade or coupon redemption overdrew the buyer's FC or the seller's
   // LN, this trade is withdrawn (fail closed) and nothing has changed hands.
+  if (options.dailyCap && await volume(db, userId, now) > GRAY_DAILY_VOLUME_CAP_MINOR) { // #736: a racing post or accept by this buyer; withdraw (fail closed)
+    await db.prepare('DELETE FROM gray_trades WHERE offer_id=? AND request_id=?').bind(offerId, requestId).run();
+    return capError(grayDailyRemaining(await volume(db, userId, now)));
+  }
   if ((await cash(db, userId)) < 0 || (await laborNotes(db, offer.clerk_user_id)) < 0) {
     await db.prepare('DELETE FROM gray_trades WHERE offer_id=? AND request_id=?').bind(offerId, requestId).run();
     return { status: 409, reason: 'seller_short', error: 'The trade could not settle and was withdrawn.' };

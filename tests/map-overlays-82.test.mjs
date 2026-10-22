@@ -127,7 +127,8 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/citizen flags.mapOv
 
 // #82 slice 2 (ARC): toggles are remembered for the browser session; the Ownership overlay reads owners only while it is on.
 const fixture = { width: 24, height: 18, cells: [[3, 2, 'kindle'], [4, 2, 'kindle'], [16, 2, 'korund']], totals: [{ nationId: 'kindle', squares: 2 }, { nationId: 'korund', squares: 1 }] };
-function spyFetch() { const calls = []; globalThis.fetch = async url => { calls.push(String(url)); return new Response(JSON.stringify(fixture), { status: 200 }); }; return calls; }
+const resourceFixture = { width: 24, height: 18, cells: [[2, 5, 'food'], [9, 9, 'ore'], [12, 6, 'Emberstone']], totals: [{ resource: 'Emberstone', squares: 1 }, { resource: 'food', squares: 1 }, { resource: 'ore', squares: 1 }] };
+function spyFetch() { const calls = []; globalThis.fetch = async url => { calls.push(String(url)); return new Response(JSON.stringify(String(url).endsWith('/resources') ? resourceFixture : fixture), { status: 200 }); }; return calls; }
 
 test('ARC: the toggles survive leaving for the country view and coming back, but not a new session or a tampered value', async () => {
   window.sessionStorage.clear(); spyFetch();
@@ -210,7 +211,7 @@ test('anchoring rule: square (x, y) maps to latitude/longitude equirectangularly
 test('GameViewport places the cells from its draw loop in world mode only, and the city view hides the layer', async () => {
   const vp = await readFile(new URL('../app/game-viewport.tsx', import.meta.url), 'utf8');
   const draw = vp.slice(vp.indexOf('const draw = () => {'), vp.indexOf('renderer.render(scene, camera);'));
-  assert.match(draw, /const owned = mode === 'world' \? container\.closest\('\.game-viewport'\)\?\.querySelector<HTMLElement>\('\.map-ownership'\) : null;/);
+  assert.match(draw, /const layers = mode === 'world' \? container\.closest\('\.game-viewport'\)\?\.querySelectorAll<HTMLElement>\('\.map-ownership, \.map-resources'\) \?\? \[\] : \[\];/);
   assert.match(draw, /projectOwnershipCells\([^;]*world\.group, camera, \{ w, h \}/);
   assert.match(vp, /new MutationObserver\(render\)/, 'a layer that mounts later is placed');
   window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['ownership'])); const calls = spyFetch();
@@ -223,7 +224,7 @@ test('flag on, Ownership off: no read', async () => {
   window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['resources'])); const calls = spyFetch();
   const m = await mount(true); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
   await click(m.button('Unrest')); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
-  assert.equal(calls.length, 0); await m.close(); window.sessionStorage.clear();
+  assert.deepEqual(calls.filter(u => u.includes('ownership')), [], 'no owner read'); await m.close(); window.sessionStorage.clear();
 });
 
 test('ARC: blocked or missing sessionStorage is safe and starts all off', async t => {
@@ -248,4 +249,59 @@ test('ARC: blocked or missing sessionStorage is safe and starts all off', async 
   const { readSessionOverlays, writeSessionOverlays } = require('../lib/map-overlays.ts');
   assert.doesNotThrow(() => writeSessionOverlays({ setItem: boom }, ['unrest']), 'a blocked write never throws out of the click');
   assert.deepEqual(readSessionOverlays({ getItem: boom }), []); assert.deepEqual(readSessionOverlays(undefined), []);
+});
+
+// #82 slice 3: the Resources overlay (map-design §6.2 resource nodes), same flag, toggle, session and anchoring as Ownership.
+const { RESOURCE_ICONS, resourceMap } = require('../lib/map-resources.ts');
+
+test('Resources: one distinct icon for every §6.2 node, rare ones marked; resourceMap keeps only nodes', async () => {
+  const spec = ['food', 'timber', 'stone', 'ore', 'fuel', 'cloth fiber', 'Emberstone', 'Riverpearl', 'Ironroot', 'Skysilk', 'Geotherm core', 'Sunglass', 'Frostcore', 'Hazequartz', 'Heartwood', 'Stormcells'];
+  assert.deepEqual(Object.keys(RESOURCE_ICONS), spec);
+  assert.equal(new Set(Object.values(RESOURCE_ICONS).map(i => i.symbol)).size, 16, 'shape, not color, tells them apart');
+  assert.deepEqual(spec.filter(r => RESOURCE_ICONS[r].rare), spec.slice(6));
+  const zones = await (async () => { const r = await localRuntime(); try { return await r.importModule('lib/map-zones.ts'); } finally { await r.close(); } })();
+  const seeded = zones.seedWorldSquares(), used = new Set(seeded.map(s => s.resource).filter(Boolean));
+  assert.ok([...used].every(r => RESOURCE_ICONS[r]), `every seeded node has an icon: ${[...used]}`);
+  const map = resourceMap(24, 18, [{ x: 1, y: 2, resource: 'ore' }, { x: 3, y: 4, resource: null }, { x: 5, y: 6, resource: 'ore' }, { x: 7, y: 8, resource: 'food' }]);
+  assert.deepEqual(map, { width: 24, height: 18, cells: [[1, 2, 'ore'], [5, 6, 'ore'], [7, 8, 'food']], totals: [{ resource: 'ore', squares: 2 }, { resource: 'food', squares: 1 }] });
+});
+
+test('Resources: flag off reads nothing; Resources off reads nothing; on, one read places node icons and the legend counts them; hidden in the city view', async () => {
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['resources']));
+  let calls = spyFetch();
+  const off = await mount(false); await act(async () => {}); assert.equal(calls.length, 0, 'flag off'); assert.equal(document.querySelector('.map-resources'), null); await off.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['ownership'])); calls = spyFetch();
+  const own = await mount(true); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.deepEqual(calls, ['/api/world/ownership'], 'flag on, Resources off: no resource read'); await own.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['resources'])); calls = spyFetch();
+  const on = await mount(true); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.deepEqual(calls, ['/api/world/resources'], 'baseline: the same spy sees the one read');
+  const layer = on.el.querySelector('.map-resources'); assert.equal(layer.getAttribute('aria-hidden'), 'true');
+  assert.deepEqual([...layer.children].map(c => [c.dataset.resource, c.textContent, c.dataset.x, c.dataset.y, c.hidden, c.dataset.rare ?? null]), [['food', '✿', '2', '5', true, null], ['ore', '◆', '9', '9', true, null], ['Emberstone', '✹', '12', '6', true, 'true']], 'hidden until GameViewport places them on the globe');
+  assert.deepEqual([...on.el.querySelectorAll('.map-ownership-key li')].map(li => li.textContent), ['✹ Emberstone (rare): 1 square', '✿ Food: 1 square', '◆ Ore: 1 square']);
+  await click(on.button('Resources')); assert.equal(document.querySelector('.map-resources'), null);
+  await click(on.button('Resources')); assert.equal(calls.length, 1, 'turning it back on reuses the read'); await on.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['resources'])); spyFetch();
+  const city = await mount(true, { mapLayer: false }); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.equal(document.querySelector('.map-resources'), null, 'no world nodes over the city'); await city.close(); window.sessionStorage.clear();
+});
+
+test('Resources: safe under reduced motion (static icons: no animation or transition in their CSS)', async () => {
+  const css = await readFile(new URL('../app/game-shell.css', import.meta.url), 'utf8');
+  const rules = css.split('\n').filter(l => l.startsWith('.map-resources'));
+  assert.ok(rules.length >= 3); assert.ok(rules.every(l => !/animation|transition/.test(l)), rules.join('\n'));
+});
+
+for (const backend of ['sqlite', 'postgres']) test(`GET /api/world/resources: 404 with no database read while off; read-only nodes while on (${backend})`, async t => {
+  const r = await localRuntime({ backend }); t.after(() => r.close());
+  const sql = []; const prepare = r.db.prepare.bind(r.db); r.db.prepare = q => { sql.push(q); return prepare(q); };
+  const off = await r.call('world/resources');
+  assert.equal(off.status, 404); assert.equal(sql.length, 0, 'flag off opens no database');
+  r.setMapOverlays(true);
+  const on = await r.call('world/resources');
+  assert.equal(on.status, 200); assert.ok(sql.length > 0, 'baseline: the same spy sees the read');
+  assert.ok(sql.every(q => /^\s*SELECT/i.test(q)), `GET is read-only: ${sql.join(' | ')}`);
+  assert.deepEqual([on.data.width, on.data.height], [24, 18]);
+  assert.ok(on.data.cells.length > 0 && on.data.cells.every(([, , res]) => RESOURCE_ICONS[res]));
+  assert.equal(on.data.totals.reduce((n, t) => n + t.squares, 0), on.data.cells.length);
 });
