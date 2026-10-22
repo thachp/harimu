@@ -143,7 +143,7 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       // #423: war weariness reads the wars table as of the tick's own time (only while both war flags are on), so a catch-up or repaired tick scores the same as a live one.
       const weariness = options.warWeariness ? await readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined;
       return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
-    }));
+    });
     if (statements.length) await db.batch(statements.flat());
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
   // #679: the flag-gated runners each cost several sequential database round trips, and over Hyperdrive every round trip is slow, so one GET /api/world with the
