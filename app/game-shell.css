@@ -411,6 +411,7 @@ body:has(.harimu-game){overflow:auto}
 .map-resources{position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none}
 .map-resources>span[hidden]{display:none}
 .map-resources>span{position:absolute;transform:translate(15%,-115%);font-size:calc(11px * var(--text-scale, 1));line-height:1;color:#f3ecd6;text-shadow:0 0 2px #0b2631,0 0 2px #0b2631}
+.map-resources[data-low-graphics]>span{text-shadow:none}
 .map-resources>span[data-rare]{border:1px solid #d0ad54;border-radius:50%;padding:1px}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);

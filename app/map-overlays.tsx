@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { createPortal } from 'react-dom';
 import { nationMark } from '../lib/nation-themes';
 import type { OwnershipMap } from '../lib/map-ownership';
+import { bandMark, type UnrestMap } from '../lib/map-unrest';
 import { resourceIcon, resourceName, type ResourceMap } from '../lib/map-resources';
 import { MAP_OVERLAYS, UNAVAILABLE_OVERLAYS, UNREST_SCALE, LEGEND_TEXT, toggleOverlay, overlayLabel, phonePopoverPlacement, readSessionOverlays, writeSessionOverlays, type OverlayId } from '../lib/map-overlays';
 
@@ -17,6 +18,7 @@ const session = () => { try { return window.sessionStorage; } catch { return und
 export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraphics?: boolean; mapLayer?: boolean }) {
   const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session())); // ARC: remembered for the browser session, off in a new one
   const [ownership, setOwnership] = useState<OwnershipMap | null>(null);
+  const [unrest, setUnrest] = useState<UnrestMap | null>(null);
   const [resources, setResources] = useState<ResourceMap | null>(null);
   const [open, setOpen] = useState(false); // the phone popover (390px and below)
   const [placement, setPlacement] = useState<CSSProperties>({});
@@ -42,6 +44,13 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
     fetch('/api/world/ownership').then(r => (r.ok ? r.json() : null) as Promise<OwnershipMap | null>).then(data => { if (live && data?.cells) setOwnership(data); }).catch(() => {});
     return () => { live = false; };
   }, [ownershipOn, ownership]);
+  const unrestOn = active.includes('unrest');
+  useEffect(() => { // #82 slice 4: same rule for Unrest bands: read only while Unrest is on, once per mount
+    if (!unrestOn || unrest) return;
+    let live = true;
+    fetch('/api/world/unrest').then(r => (r.ok ? r.json() : null) as Promise<UnrestMap | null>).then(data => { if (live && data?.cells) setUnrest(data); }).catch(() => {});
+    return () => { live = false; };
+  }, [unrestOn, unrest]);
   const resourcesOn = active.includes('resources');
   useEffect(() => { // #82 slice 3: same rule for resource nodes: read only while Resources is on, once per mount
     if (!resourcesOn || resources) return;
@@ -63,10 +72,11 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
       {active.length > 0 && <div className="map-overlays-legend" role="region" tabIndex={0} aria-label="Overlay legend">
         {active.map(id => <section key={id}>
           <strong>{overlayLabel(id)}</strong>
-          {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}>{step}</li>)}</ol> : null}
+          {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}><span aria-hidden="true">{bandMark(step).symbol}</span> {step}</li>)}</ol> : null}
+          {id === 'unrest' && unrest ? <ul className="map-ownership-key">{unrest.nations.map(({ nationId, unrest: score, band }) => <li key={nationId}><span aria-hidden="true">{bandMark(band).symbol}</span> {nationMark(nationId)?.name ?? nationId}: {band} ({score})</li>)}</ul> : null}
           {id === 'resources' && resources ? <ul className="map-ownership-key">{resources.totals.map(({ resource, squares }) => <li key={resource}><span aria-hidden="true">{resourceIcon(resource).symbol}</span> {resourceName(resource)}{resourceIcon(resource).rare ? ' (rare)' : ''}: {squares} {squares === 1 ? 'square' : 'squares'}</li>)}</ul>
             : id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} {squares === 1 ? 'square' : 'squares'}</li>; })}</ul>
-            : <span>{id === 'ownership' ? 'Loading owners.' : id === 'resources' ? 'Loading resources.' : LEGEND_TEXT[id]}</span>}
+            : <span>{id === 'ownership' ? 'Loading owners.' : id === 'resources' ? 'Loading resources.' : id === 'unrest' && !unrest ? 'Loading unrest.' : LEGEND_TEXT[id]}</span>}
         </section>)}
       </div>}
       <div role="group" aria-label="Overlays" className="map-overlays-group">
@@ -80,7 +90,8 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
     </div>
     <span className="map-overlays-status" aria-live="polite">{announcement}</span>
     {ownershipOn && mapLayer && ownership && viewport ? createPortal(<OwnershipLayer map={ownership} lowGraphics={lowGraphics} />, viewport) : null}
-    {resourcesOn && mapLayer && resources && viewport ? createPortal(<ResourcesLayer map={resources} />, viewport) : null}
+    {resourcesOn && mapLayer && resources && viewport ? createPortal(<ResourcesLayer map={resources} lowGraphics={lowGraphics} />, viewport) : null}
+    {unrestOn && mapLayer && unrest && viewport ? createPortal(<UnrestLayer map={unrest} lowGraphics={lowGraphics} />, viewport) : null}
   </div>;
 }
 
@@ -93,8 +104,16 @@ function OwnershipLayer({ map, lowGraphics }: { map: OwnershipMap; lowGraphics: 
 }
 
 /** #82 slice 3: resource node icons on their globe squares (GameViewport places them, like Ownership). Static: no animation or transition, so reduced motion needs nothing. */
-function ResourcesLayer({ map }: { map: ResourceMap }) {
-  return <div className="map-resources" data-width={map.width} data-height={map.height} aria-hidden="true">
+function ResourcesLayer({ map, lowGraphics }: { map: ResourceMap; lowGraphics: boolean }) {
+  return <div className="map-resources" data-low-graphics={lowGraphics ? 'true' : undefined} data-width={map.width} data-height={map.height} aria-hidden="true">
     {map.cells.map(([x, y, resource]) => { const icon = resourceIcon(resource); return <span key={`${x},${y}`} hidden data-resource={resource} data-rare={icon.rare ? 'true' : undefined} data-x={x} data-y={y}>{icon.symbol}</span>; })}
+  </div>;
+}
+
+/** #82 slice 4: each scored nation's squares in its Unrest band: a band symbol (not color alone) on the band's heat tint; low graphics: symbols only, no tint.
+ *  GameViewport places them on the globe squares, like Ownership (the two are exclusive). Decorative; the legend carries the text. */
+function UnrestLayer({ map, lowGraphics }: { map: UnrestMap; lowGraphics: boolean }) {
+  return <div className="map-ownership map-unrest" data-low-graphics={lowGraphics ? 'true' : undefined} data-width={map.width} data-height={map.height} aria-hidden="true">
+    {map.cells.map(([x, y, band]) => { const mark = bandMark(band); return <span key={`${x},${y}`} hidden data-band={band} data-x={x} data-y={y} style={{ color: '#f3ecd6', ...(lowGraphics ? {} : { backgroundColor: `${mark.color}cc` }) }}>{mark.symbol}</span>; })}
   </div>;
 }

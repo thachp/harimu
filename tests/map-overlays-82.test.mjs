@@ -53,7 +53,7 @@ test('aria-pressed toggles, all start off, mutual exclusion and the legend follo
   await click(m.button('Unrest')); assert.deepEqual(pressed(m), ['Resources', 'Unrest'], 'Unrest turns Ownership off');
   const legend = m.el.querySelector('.map-overlays-legend');
   assert.deepEqual([...legend.querySelectorAll('section strong')].map(s => s.textContent), ['Resources', 'Unrest'], 'one legend section per active overlay');
-  assert.deepEqual([...legend.querySelectorAll('.map-overlays-scale li')].map(li => li.textContent), ['Calm', 'Tense', 'Riot']);
+  assert.deepEqual([...legend.querySelectorAll('.map-overlays-scale li')].map(li => li.textContent), ['○ Calm', '◐ Tense', '● Riot'], 'band symbols, not color alone');
   assert.match(m.el.querySelector('[aria-live="polite"]').textContent, /Resources, Unrest/);
   await click(m.button('Ownership')); assert.deepEqual(pressed(m), ['Ownership', 'Resources'], 'Ownership turns Unrest off');
   await click(m.button('Ownership')); await click(m.button('Resources')); assert.deepEqual(pressed(m), []);
@@ -128,7 +128,8 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/citizen flags.mapOv
 // #82 slice 2 (ARC): toggles are remembered for the browser session; the Ownership overlay reads owners only while it is on.
 const fixture = { width: 24, height: 18, cells: [[3, 2, 'kindle'], [4, 2, 'kindle'], [16, 2, 'korund']], totals: [{ nationId: 'kindle', squares: 2 }, { nationId: 'korund', squares: 1 }] };
 const resourceFixture = { width: 24, height: 18, cells: [[2, 5, 'food'], [9, 9, 'ore'], [12, 6, 'Emberstone']], totals: [{ resource: 'Emberstone', squares: 1 }, { resource: 'food', squares: 1 }, { resource: 'ore', squares: 1 }] };
-function spyFetch() { const calls = []; globalThis.fetch = async url => { calls.push(String(url)); return new Response(JSON.stringify(String(url).endsWith('/resources') ? resourceFixture : fixture), { status: 200 }); }; return calls; }
+const unrestFixture = { width: 24, height: 18, nations: [{ nationId: 'aurelle', unrest: 64, band: 'Riot' }, { nationId: 'kindle', unrest: 30, band: 'Tense' }, { nationId: 'korund', unrest: 12, band: 'Calm' }], cells: [[5, 4, 'Tense'], [18, 4, 'Calm'], [12, 14, 'Riot']] };
+function spyFetch() { const calls = []; globalThis.fetch = async url => { calls.push(String(url)); return new Response(JSON.stringify(String(url).endsWith('/resources') ? resourceFixture : String(url).endsWith('/unrest') ? unrestFixture : fixture), { status: 200 }); }; return calls; }
 
 test('ARC: the toggles survive leaving for the country view and coming back, but not a new session or a tampered value', async () => {
   window.sessionStorage.clear(); spyFetch();
@@ -304,4 +305,62 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/world/resources: 40
   assert.deepEqual([on.data.width, on.data.height], [24, 18]);
   assert.ok(on.data.cells.length > 0 && on.data.cells.every(([, , res]) => RESOURCE_ICONS[res]));
   assert.equal(on.data.totals.reduce((n, t) => n + t.squares, 0), on.data.cells.length);
+});
+
+// #82 slice 4: the Unrest overlay: each scored nation's latest Unrest band (Calm/Tense/Riot) on its squares; exclusive with Ownership.
+const { unrestBand, unrestMap, UNREST_BANDS } = require('../lib/map-unrest.ts');
+
+test('Unrest: bands Calm < 30 <= Tense < 60 <= Riot, distinct symbols; unrestMap shows only scored nations\' squares', () => {
+  assert.deepEqual([0, 29, 30, 59, 60, 100].map(unrestBand), ['Calm', 'Calm', 'Tense', 'Tense', 'Riot', 'Riot']);
+  assert.deepEqual(UNREST_BANDS.map(b => b.band), [...UNREST_SCALE]); assert.equal(new Set(UNREST_BANDS.map(b => b.symbol)).size, 3);
+  const map = unrestMap(24, 18, [{ x: 1, y: 1, owner: 'kindle' }, { x: 2, y: 2, owner: 'korund' }, { x: 3, y: 3, owner: null }, { x: 4, y: 4, owner: 'aurelle' }], { kindle: 61, korund: 10 });
+  assert.deepEqual(map, { width: 24, height: 18, nations: [{ nationId: 'kindle', unrest: 61, band: 'Riot' }, { nationId: 'korund', unrest: 10, band: 'Calm' }], cells: [[1, 1, 'Riot'], [2, 2, 'Calm']] }, 'no band invented for an unscored nation');
+});
+
+test('Unrest: flag off reads nothing; off reads nothing; on, one read draws band symbols with heat tint (none in low graphics), legend per nation; exclusive with Ownership; hidden in the city view', async () => {
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['unrest']));
+  let calls = spyFetch();
+  const off = await mount(false); await act(async () => {}); assert.equal(calls.length, 0, 'flag off'); assert.equal(document.querySelector('.map-unrest'), null); await off.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['resources'])); calls = spyFetch();
+  const res = await mount(true); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.deepEqual(calls.filter(u => u.endsWith('/unrest')), [], 'flag on, Unrest off: no unrest read'); await res.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['unrest'])); calls = spyFetch();
+  const on = await mount(true); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.deepEqual(calls, ['/api/world/unrest'], 'baseline: the same spy sees the one read');
+  const layer = on.el.querySelector('.map-unrest'); assert.equal(layer.getAttribute('aria-hidden'), 'true'); assert.ok(layer.classList.contains('map-ownership'), 'placed by the viewport like Ownership');
+  assert.deepEqual([...layer.children].map(c => [c.dataset.band, c.textContent, c.dataset.x, c.dataset.y, c.hidden, Boolean(c.style.backgroundColor)]), [['Tense', '◐', '5', '4', true, true], ['Calm', '○', '18', '4', true, true], ['Riot', '●', '12', '14', true, true]]);
+  assert.deepEqual([...on.el.querySelectorAll('.map-ownership-key li')].map(li => li.textContent), ['● Aurelle: Riot (64)', '◐ Kindle Republic: Tense (30)', '○ Korund: Calm (12)']);
+  await click(on.button('Ownership')); assert.equal(document.querySelector('.map-unrest'), null, 'Ownership turns Unrest off'); assert.deepEqual(pressed(on), ['Ownership']);
+  await on.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['unrest'])); spyFetch();
+  const low = await mount(true, { lowGraphics: true }); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.ok([...low.el.querySelector('.map-unrest').children].every(c => !c.style.backgroundColor && c.textContent), 'low graphics: symbols only'); await low.close();
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['unrest'])); spyFetch();
+  const city = await mount(true, { mapLayer: false }); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.equal(document.querySelector('.map-unrest'), null, 'no world squares over the city'); await city.close(); window.sessionStorage.clear();
+});
+
+test('low graphics: Resources icons drop the text shadow, Unrest/Ownership cells never had one', async () => {
+  const css = await readFile(new URL('../app/game-shell.css', import.meta.url), 'utf8');
+  assert.match(css, /^\.map-resources\[data-low-graphics\]>span\{text-shadow:none\}$/m);
+  assert.ok(css.split('\n').filter(l => l.startsWith('.map-ownership')).every(l => !/text-shadow/.test(l)));
+  window.sessionStorage.setItem('harimu.mapOverlays', JSON.stringify(['resources'])); spyFetch();
+  const low = await mount(true, { lowGraphics: true }); await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+  assert.equal(low.el.querySelector('.map-resources').dataset.lowGraphics, 'true'); await low.close(); window.sessionStorage.clear();
+});
+
+for (const backend of ['sqlite', 'postgres']) test(`GET /api/world/unrest: 404 with no database read while off; read-only bands while on (${backend})`, async t => {
+  const r = await localRuntime({ backend }); t.after(() => r.close());
+  await r.db.prepare('INSERT INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)').bind('kindle', 1, 1, 1, 50, 45, '{}', '{}').run(); // a fixture score in the test database
+  const sql = []; const prepare = r.db.prepare.bind(r.db); r.db.prepare = q => { sql.push(q); return prepare(q); };
+  const off = await r.call('world/unrest');
+  assert.equal(off.status, 404); assert.equal(sql.length, 0, 'flag off opens no database');
+  r.setMapOverlays(true);
+  const on = await r.call('world/unrest');
+  assert.equal(on.status, 200); assert.ok(sql.length > 0, 'baseline: the same spy sees the read');
+  assert.ok(sql.every(q => /^\s*SELECT/i.test(q)), `GET is read-only: ${sql.join(' | ')}`);
+  assert.deepEqual([on.data.width, on.data.height], [24, 18]);
+  assert.deepEqual(on.data.nations, [{ nationId: 'kindle', unrest: 45, band: 'Tense' }], 'only scored nations');
+  assert.ok(on.data.cells.length > 0 && on.data.cells.some(([x, y]) => x === 5 && y === 4), 'Kindle\'s squares, capital included');
+  assert.ok(on.data.cells.every(([, , band]) => on.data.nations.some(n => n.band === band)));
 });
