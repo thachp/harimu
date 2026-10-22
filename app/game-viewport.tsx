@@ -8,7 +8,7 @@ import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisi
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 import { nationSymbolElement } from './nation-symbol';
 import { MapOverlaysControl } from './map-overlays';
-import { nationPlaces, WORLD_GRID } from '../lib/globe-mapping';
+import { nationPlaces, projectOwnershipCells, WORLD_GRID } from '../lib/globe-mapping';
 import { mapFitRules, nationOpenings } from '../lib/nation-openings';
 
 export type GameViewportProps = {
@@ -136,6 +136,10 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
         const spots = placeLabels(shown.map(({ button }) => ({ x: parseFloat(button.style.left), y: parseFloat(button.style.top), w: button.offsetWidth, h: button.offsetHeight })), { w, h }, 4, blocked);
         shown.forEach(({ button }, index) => { button.style.left = `${spots[index].x}px`; button.style.top = `${spots[index].y}px`; });
       }
+      const owned = mode === 'world' ? container.closest('.game-viewport')?.querySelector<HTMLElement>('.map-ownership') : null; // #82: Ownership cells ride the globe squares
+      if (owned) { const spans = [...owned.querySelectorAll<HTMLElement>('span[data-x]')];
+        projectOwnershipCells({ width: Number(owned.dataset.width), height: Number(owned.dataset.height) }, spans.map(s => [Number(s.dataset.x), Number(s.dataset.y)]), world.group, camera, { w, h }, new THREE.Vector3())
+          .forEach((spot, i) => { spans[i].hidden = spot.hidden; spans[i].style.left = `${spot.left}px`; spans[i].style.top = `${spot.top}px`; }); }
       if (highlight.visible) highlight.update();
       renderer.render(scene, camera);
     };
@@ -167,6 +171,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
     controls.current = { zoom: changeZoom, pan, reset: () => { userCamera.current?.(); target.set(0, 0, 0); zoom = 1; setCameraLabel('100%'); highlight.visible = false; render(); }, focus, focusNation };
     const resize = () => { renderer.setSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight), false); render(); };
     const observer = new ResizeObserver(resize); observer.observe(container); resize();
+    const layerWatch = new MutationObserver(render); const viewportEl = container.closest('.game-viewport'); if (viewportEl) layerWatch.observe(viewportEl, { childList: true }); // #82: place the Ownership layer when it mounts
     container.closest('.harimu-game')?.querySelectorAll('.game-stage-overlay > *').forEach(el => observer.observe(el)); // #377: re-place labels when the breadcrumb or shift chip changes size
     const raycaster = new THREE.Raycaster();
     let dragging: { x: number; y: number; total: number } | null = null;
@@ -208,7 +213,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
     canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', cancel);
     canvas.addEventListener('wheel', wheel, { passive: false });
     return () => {
-      cancelled = true; controls.current = null; observer.disconnect(); if (frame) cancelAnimationFrame(frame);
+      cancelled = true; controls.current = null; observer.disconnect(); layerWatch.disconnect(); if (frame) cancelAnimationFrame(frame);
       canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', up); canvas.removeEventListener('pointercancel', cancel); canvas.removeEventListener('wheel', wheel);
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
@@ -246,7 +251,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       }} />
     {fallback && <p className="viewport-fallback">3D unavailable. Use the bottom strip to continue.</p>}
     <div className="viewport-controls" aria-label="Camera controls">
-      <MapOverlaysControl enabled={overlays} />
+      <MapOverlaysControl enabled={overlays} lowGraphics={graphics === 'low'} mapLayer={mode === 'world'} />
       <button type="button" onClick={() => controls.current?.zoom(.15)} aria-label="Zoom in">+</button>
       <span aria-live="polite">{cameraLabel}</span>
       <button type="button" onClick={() => controls.current?.zoom(-.15)} aria-label="Zoom out">−</button>

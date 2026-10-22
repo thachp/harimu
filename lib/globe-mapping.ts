@@ -53,3 +53,15 @@ export function nationPlaces(catalog: readonly { id: string; capital?: Square }[
   return ids.map(id => coordinates[list.findIndex(n => n.id === id)]);
 }
 
+/** #82 Ownership overlay: squares through the same mapping, then the globe's rotation and the camera. */
+type Vec = { x: number; y: number; z: number; set(x: number, y: number, z: number): Vec; applyMatrix4(m: unknown): Vec; project(camera: unknown): Vec };
+/** Screen spots for each owned cell under the current globe rotation and camera; called by GameViewport on every frame it draws. */
+export function projectOwnershipCells(map: Grid, cells: readonly [number, number][], globe: { matrixWorld: unknown }, camera: unknown, size: { w: number; h: number }, vec: Vec) {
+  return cells.map(([x, y]) => {
+    const { latitude, longitude } = squareLatLon({ x, y }, map), lat = latitude * Math.PI / 180, lon = longitude * Math.PI / 180;
+    const p = vec.set(7.05 * Math.cos(lat) * Math.sin(lon), 7.05 * Math.sin(lat), 7.05 * Math.cos(lat) * Math.cos(lon)).applyMatrix4(globe.matrixWorld);
+    const front = p.z / Math.hypot(p.x, p.y, p.z) > .16;
+    p.project(camera);
+    return { left: (p.x + 1) * size.w / 2, top: (1 - p.y) * size.h / 2, hidden: !front || Math.abs(p.x) > 1 || Math.abs(p.y) > 1 };
+  });
+}

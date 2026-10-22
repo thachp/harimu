@@ -1,15 +1,21 @@
 'use client';
-// #82 slice 1: the Overlays toggle group next to the zoom cluster. Rendering on the map is a no-op in this slice.
+// #82: the Overlays toggle group next to the zoom cluster. Slice 2 draws Ownership; Resources and Unrest are still placeholders.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { MAP_OVERLAYS, UNAVAILABLE_OVERLAYS, UNREST_SCALE, LEGEND_TEXT, toggleOverlay, overlayLabel, phonePopoverPlacement, type OverlayId } from '../lib/map-overlays';
+import { createPortal } from 'react-dom';
+import { nationMark } from '../lib/nation-themes';
+import type { OwnershipMap } from '../lib/map-ownership';
+import { MAP_OVERLAYS, UNAVAILABLE_OVERLAYS, UNREST_SCALE, LEGEND_TEXT, toggleOverlay, overlayLabel, phonePopoverPlacement, readSessionOverlays, writeSessionOverlays, type OverlayId } from '../lib/map-overlays';
 
 /** Renders nothing unless the server sent flags.mapOverlays === true. */
-export function MapOverlaysControl({ enabled }: { enabled: boolean }) {
-  return enabled ? <MapOverlays /> : null;
+/** mapLayer: the view draws world squares (the globe); false in the city view, where the Ownership layer is hidden. */
+export function MapOverlaysControl({ enabled, lowGraphics = false, mapLayer = true }: { enabled: boolean; lowGraphics?: boolean; mapLayer?: boolean }) {
+  return enabled ? <MapOverlays lowGraphics={lowGraphics} mapLayer={mapLayer} /> : null;
 }
+const session = () => { try { return window.sessionStorage; } catch { return undefined; } };
 
-export function MapOverlays() {
-  const [active, setActive] = useState<OverlayId[]>([]); // all off at start; not persisted (UX)
+export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraphics?: boolean; mapLayer?: boolean }) {
+  const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session())); // ARC: remembered for the browser session, off in a new one
+  const [ownership, setOwnership] = useState<OwnershipMap | null>(null);
   const [open, setOpen] = useState(false); // the phone popover (390px and below)
   const [placement, setPlacement] = useState<CSSProperties>({});
   const [announcement, setAnnouncement] = useState('');
@@ -17,7 +23,7 @@ export function MapOverlays() {
   const close = () => { setOpen(false); triggerRef.current?.focus(); };
   const toggle = (id: OverlayId) => {
     const next = toggleOverlay(active, id);
-    setActive(next);
+    setActive(next); writeSessionOverlays(session(), next);
     setAnnouncement(next.length ? `Overlays on: ${next.map(overlayLabel).join(', ')}` : 'All overlays off');
   };
   // UX: the phone popover never overlaps the top-left "World" chip. Right-anchored beside it when it fits, else a bottom sheet below it.
@@ -27,6 +33,15 @@ export function MapOverlays() {
     const chip = (root.closest('.harimu-game') ?? document).querySelector('.game-breadcrumbs')?.getBoundingClientRect();
     setPlacement(phonePopoverPlacement({ width: document.documentElement.clientWidth, height: window.innerHeight }, bar.getBoundingClientRect(), chip ? { right: chip.right, bottom: chip.bottom } : null));
   }, [open, active.length]);
+  const ownershipOn = active.includes('ownership');
+  useEffect(() => { // the only ownership read: while the overlay is on, once per mount; nothing is fetched while it is off (or the flag is off)
+    if (!ownershipOn || ownership) return;
+    let live = true;
+    fetch('/api/world/ownership').then(r => (r.ok ? r.json() : null) as Promise<OwnershipMap | null>).then(data => { if (live && data?.cells) setOwnership(data); }).catch(() => {});
+    return () => { live = false; };
+  }, [ownershipOn, ownership]);
+  const [viewport, setViewport] = useState<Element | null>(null); // the layer's portal target, found after mount
+  useEffect(() => { setViewport(rootRef.current?.closest('.game-viewport') ?? null); }, []);
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) close(); };
@@ -40,7 +55,8 @@ export function MapOverlays() {
         {active.map(id => <section key={id}>
           <strong>{overlayLabel(id)}</strong>
           {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}>{step}</li>)}</ol> : null}
-          <span>{LEGEND_TEXT[id]}</span>
+          {id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} {squares === 1 ? 'square' : 'squares'}</li>; })}</ul>
+            : <span>{id === 'ownership' ? 'Loading owners.' : LEGEND_TEXT[id]}</span>}
         </section>)}
       </div>}
       <div role="group" aria-label="Overlays" className="map-overlays-group">
@@ -53,5 +69,14 @@ export function MapOverlays() {
       </div>
     </div>
     <span className="map-overlays-status" aria-live="polite">{announcement}</span>
+    {ownershipOn && mapLayer && ownership && viewport ? createPortal(<OwnershipLayer map={ownership} lowGraphics={lowGraphics} />, viewport) : null}
+  </div>;
+}
+
+/** Owned squares, each its nation's symbol (not color alone), tinted unless graphics are low. GameViewport places every cell on its globe square each frame
+ *  (projectOwnershipCells); until then they stay hidden. Decorative; the legend carries the text. */
+function OwnershipLayer({ map, lowGraphics }: { map: OwnershipMap; lowGraphics: boolean }) {
+  return <div className="map-ownership" data-low-graphics={lowGraphics ? 'true' : undefined} data-width={map.width} data-height={map.height} aria-hidden="true">
+    {map.cells.map(([x, y, nationId]) => { const mark = nationMark(nationId); return <span key={`${x},${y}`} hidden data-nation={nationId} data-x={x} data-y={y} style={{ color: mark?.accent, ...(lowGraphics ? {} : { backgroundColor: `${mark?.accent ?? '#888888'}55` }) }}>{mark?.symbol ?? '■'}</span>; })}
   </div>;
 }
