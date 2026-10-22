@@ -16,10 +16,12 @@ export function publicNewsFacts(news:NationalNews):Facts{
  const {citizens,completedShifts,food}=news.statistics;if([citizens,completedShifts,food].some(n=>!Number.isSafeInteger(n)||n<0))throw Error('Invalid public facts.');
  return {nationId:news.nationId,citizens,completedShifts,food};
 }
+// #658 follow-up: with digits banned, the model wrote placeholder phrases such as 'a total of citizens'. Reject them.
+const danglingQuantity=/\b(?:a|the)\s+total\s+of\b|\btotal(?:s|ing)?\s+(?:of\s+)?(?:registered\s+)?(?:citizens|shifts|food)\b|\ba\s+(?:number|count|sum|amount)\s+of\b/iu;
 const quantitative=/\p{Number}|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|dozen|half|double|triple|twice|percent|majority|minority|everyone|all|many|most|more|less|fewer|higher|lower)\b/iu;
 export function validatedNewsDraft(value:unknown):Draft|null{
  if(!value||typeof value!=='object')return null;const d=value as Record<string,unknown>;
- if(typeof d.title!=='string'||typeof d.summary!=='string'||!d.title.trim()||!d.summary.trim()||d.title.length>100||d.summary.length>500||quantitative.test(d.title+' '+d.summary)||/[<>\[\]{}]/.test(d.title+d.summary)||deniedAiText(d.title+'\n'+d.summary)!==null||!Array.isArray(d.claims)||d.claims.length<1||d.claims.length>3||new Set(d.claims).size!==d.claims.length||d.claims.some(v=>typeof v!=='string'||!['citizens','completedShifts','food'].includes(v)))return null;
+ if(typeof d.title!=='string'||typeof d.summary!=='string'||!d.title.trim()||!d.summary.trim()||d.title.length>100||d.summary.length>500||quantitative.test(d.title+' '+d.summary)||danglingQuantity.test(d.title+' '+d.summary)||/[<>\[\]{}]/.test(d.title+d.summary)||deniedAiText(d.title+'\n'+d.summary)!==null||!Array.isArray(d.claims)||d.claims.length<1||d.claims.length>3||new Set(d.claims).size!==d.claims.length||d.claims.some(v=>typeof v!=='string'||!['citizens','completedShifts','food'].includes(v)))return null;
  return {title:d.title.trim(),summary:d.summary.trim(),claims:d.claims as Draft['claims']};
 }
 export function validatedNewsIntroduction(value:unknown){const draft=validatedNewsDraft(value);return draft&&/[.!?]$/.test(draft.summary)?draft:null;}
