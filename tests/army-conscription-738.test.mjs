@@ -17,6 +17,8 @@ test('rules: lottery size, one levy per home city, deterministic, Kindle never c
   assert.equal(lev.length, 3, 'one per city, homeless citizens share one bucket'); assert.equal(new Set(lev).size, 3);
   assert.deepEqual(pickConscripts('kindle', 5, E(10)), []); assert.deepEqual([...volunteerNations], ['kindle'], 'volunteering stays Kindle-only');
   assert.equal(NEWCOMER_SHIELD_SECONDS, NEWCOMER_SHIELD_DAYS * 86400); assert.equal(SERVICE_TERM_SECONDS, 2 * DRAFT_WEEK_SECONDS);
+  assert.deepEqual(pickConscripts('aurelle', 9, E(6, i => `c${i % 3}`)), pickConscripts('aurelle', 9, E(6, i => `c${i % 3}`)), 'a retry of the same nation and week picks the same people');
+  const copy = readFileSync('lib/army-copy.ts', 'utf8'); assert.match(copy, /PLACEHOLDER copy, marked for Content[^\n]*\n calledUp:L\(/, 'call-up line is placeholder copy marked for Content');
   const card = readFileSync('app/army-card.tsx', 'utf8'); assert.match(card, /army\.serveUntil \? <p>\{fill\(unitMembership\.calledUp\.text/);
   assert.match(readFileSync('app/page.tsx', 'utf8'), /<GovernmentPanel [^\n]*\/>\s*<ArmyCard \/>/, 'pin: ArmyCard after GovernmentPanel');
 });
