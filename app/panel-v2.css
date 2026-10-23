@@ -21,3 +21,6 @@
 /* #392 S6: a long primary label wraps to more lines; it is never truncated */
 .panel-v2 button.panel-v2-primary>span{min-width:0;white-space:normal;overflow-wrap:break-word;text-overflow:clip}
 .panel-v2 .panel-v2-rows button[aria-pressed=true]{background:rgba(214,180,92,.12);box-shadow:inset 3px 0 #d6b45c}
+
+/* #392 S7 follow-up: City rows and the Household primary carry the same decorative icon as the City pills (UI_V2_CITY), in the pills' gold. */
+.panel-v2 .panel-v2-icon{display:inline-flex;flex:none;color:#e2c36b}.panel-v2 .panel-v2-rows button>span:nth-child(2){flex:1}.panel-v2 button.panel-v2-primary>span:nth-child(2){flex:1}

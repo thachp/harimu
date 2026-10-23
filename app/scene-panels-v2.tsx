@@ -4,6 +4,8 @@ import { PanelV2 } from './panel-v2';
 import { cityStatusStat, uiV2PanelEnabled } from '@/lib/ui-v2-panel';
 import { countryWord } from '@/lib/ui-v2-rail';
 import type { CityDestination } from '@/lib/city-destinations';
+import { uiV2CityEnabled } from '@/lib/ui-v2-city';
+import { cityPlaceIcon } from './city-pill';
 
 /** #392 S3: the World and City side-panel pieces that change with NEXT_PUBLIC_HARIMU_UI_V2_PANEL. Each piece reads the build-time flag itself, so
  *  page.tsx never decides it (tests/ui-v2-panel.test.mjs renders these flag off and on, and pins that page.tsx passes no `enabled`). Existing copy only. */
@@ -31,10 +33,10 @@ export function WorldInstitutionsButton({ onView, enabled = uiV2PanelEnabled() }
 }
 
 /** City, top of the panel (flag on): "Status: Capital" first on a capital only (from the city catalog), the Household destination is promoted to the primary action (as in the concept), the other destinations are the rows. */
-export function CitySummary({ cityName, city, nation, destinations, onView, enabled = uiV2PanelEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; enabled?: boolean }) {
+export function CitySummary({ cityName, city, nation, destinations, onView, enabled = uiV2PanelEnabled(), icons = uiV2CityEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; enabled?: boolean; icons?: boolean }) {
   if (!enabled) return null;
   const home = destinations.find(card => card.id === 'household');
   return <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
-    rows={destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, onSelect: () => onView(card.id) }))}
-    primary={home ? { label: home.label, onSelect: () => onView(home.id) } : undefined} />;
+    rows={destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? cityPlaceIcon(card.id) : undefined, onSelect: () => onView(card.id) }))}
+    primary={home ? { label: home.label, icon: icons ? cityPlaceIcon(home.id) : undefined, onSelect: () => onView(home.id) } : undefined} />; // S7 follow-up: with the City pills on, rows carry the pill's icon
 }
