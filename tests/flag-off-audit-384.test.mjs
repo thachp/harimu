@@ -90,6 +90,7 @@ const flagOffPins = {
   HARIMU_AI_REVIEW_QUEUE_ENABLED: 'ai-review-queue-753.test.mjs',
   HARIMU_REPORTS_ENABLED: 'reports-743.test.mjs',
   HARIMU_DORMANCY_ENABLED: 'dormancy-739.test.mjs',
+  HARIMU_VOTE_BUYING_WATCH_ENABLED: 'vote-buying-watch-825.test.mjs',
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
 };
 

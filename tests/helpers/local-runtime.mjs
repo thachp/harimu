@@ -57,6 +57,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/ledger-reconciliation.ts','lib/ledger-reconciliation-rules.ts','app/api/admin/ledger-reconciliation/route.ts', // #432
     'lib/ai-costs.ts','lib/ai-denylist.ts','lib/ai-kill-switch.ts','lib/kill-switch-copy.ts','app/api/admin/ai-costs/route.ts', // #614
     'lib/ai-review-queue.ts','app/api/admin/ai-review-queue/route.ts', // #753
+    'lib/vote-buying-watch.ts','app/api/admin/vote-buying/route.ts', // #825
     'lib/polling-rules.ts','lib/polling.ts','app/api/polling/route.ts', // #740
     'lib/reports.ts','lib/report-copy.ts','app/api/reports/route.ts', // #743
     'lib/dormancy-rules.ts','lib/dormancy-copy.ts','lib/savings-shield.ts', 'app/api/citizen/heartbeat/route.ts', // #739

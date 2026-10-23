@@ -168,6 +168,8 @@
     "HARIMU_DORMANCY_ENABLED": "false",
     // #789: read-only Kindle national budget card (docs §12.12): treasury balance and income-tax inflow from the ledger.
     "HARIMU_KINDLE_BUDGET_VIEW_ENABLED": "false",
+    // #825: Kindle vote-buying watch (docs §9.5): a player-market transfer within 48h of a Kindle vote, from a party member, campaign actor or 3+-voter payer, records an investigation event.
+    "HARIMU_VOTE_BUYING_WATCH_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

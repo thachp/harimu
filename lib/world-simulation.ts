@@ -1,4 +1,5 @@
 import { mapLimited } from './async-limits'; // #679
+import { runVoteBuyingWatch } from './vote-buying-watch'; // #825
 import { dormantAt } from './dormancy-rules'; // #739
 import { runFoundingDay30 } from './founding-period'; // #612
 import { finalizeDueElection } from './elections';
@@ -99,6 +100,8 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
      { name: 'warEndings', on: options.war === true && options.warEndings === true, run: () => decideWarEndings(db, now, { enabled: options.warWeariness === true, losses: options.warWearinessLosses === true }).catch(warnOnly('war endings')) }],
     // #612: the Founding Period's one day-30 event per MVP nation (idempotent).
     [{ name: 'foundingDay30', on: options.foundingPeriod === true, run: () => runFoundingDay30(db, now).catch(warnOnly('founding day-30')) }],
+    // #825 Kindle vote-buying watch: one idempotent sweep statement over direct transfers/gifts only (none exist yet, so no query) (HARIMU_VOTE_BUYING_WATCH_ENABLED; citizen POST path only, never a GET).
+    [{ name: 'voteBuyingWatch', on: options.voteBuyingWatch === true, run: () => runVoteBuyingWatch(db, now).catch(warnOnly('vote-buying watch')) }],
   ];
 }
 /** #679: run the chains concurrently, each in order. A runner that throws ends its own chain and still fails the request, but only after every other chain has
@@ -111,7 +114,7 @@ export async function runWorldChains(chains: WorldRunner[][]): Promise<void> {
 }
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
