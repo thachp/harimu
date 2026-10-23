@@ -63,7 +63,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/polling-rules.ts','lib/polling.ts','app/api/polling/route.ts', // #740
     'lib/plank-votes-rules.ts','lib/plank-votes.ts','app/api/planks/route.ts', // #831
     'lib/party-donations-rules.ts','lib/party-donations.ts','app/api/party-donations/route.ts', // #863
-    'lib/rallies-rules.ts','lib/rallies.ts','app/api/rallies/route.ts', // #867
+    'lib/rallies-rules.ts','lib/rallies.ts','lib/rally-speech-ai.ts','app/api/rallies/route.ts', // #867, #876
     'lib/reports.ts','lib/report-copy.ts','app/api/reports/route.ts', // #743
     'lib/dormancy-rules.ts','lib/dormancy-copy.ts','lib/savings-shield.ts','lib/kindle-sales-tax.ts', 'app/api/citizen/heartbeat/route.ts', // #739
     'lib/army-copy.ts','lib/army-rules.ts','lib/army-conscription.ts','lib/army.ts','app/api/army/route.ts','app/api/army/drill/route.ts','app/api/army/draft/route.ts','lib/army-map.ts','lib/army-supply.ts','app/api/army/positions/route.ts', // #738

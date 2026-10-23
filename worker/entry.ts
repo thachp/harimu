@@ -6,6 +6,7 @@ import { readCityLocation } from '../lib/city-location';
 import { runCabinetCron } from '../lib/cabinet-cron';
 import { cronJobsOn, type CronFlagBindings } from '../lib/cron-gates';
 import { runRallyCron } from '../lib/rallies'; // #867
+import { runRallySpeechCron, type RallySpeechBindings } from '../lib/rally-speech-ai'; // #876
 import { runDiplomacyCron } from '../lib/diplomacy';
 import { runCrownCron } from '../lib/crown-debasement';
 import { runTownHallCron } from '../lib/town-hall-ai';
@@ -49,7 +50,7 @@ const worker = {
       .then(() => undefined, error => { console.warn('[cron] Ledger reconciliation failed', error instanceof Error ? error.name : 'unknown'); }));
     // #465: earned-Tessera epoch close (one entry per verified settled shift, pro-rata from a fixed daily pool); a no-op unless HARIMU_TESSERA_REWARDS_ENABLED="true" (default "false"). Idempotent; never runs on a read.
     // #867: publish one AI-labeled news clip per Kindle rally whose time has passed; a no-op unless HARIMU_KINDLE_RALLIES_ENABLED is "true". Never runs on a read.
-    if (on.rallies) ctx.waitUntil((async () => runRallyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000)))()
+    if (on.rallies) ctx.waitUntil((async () => { const db = await getDatabase(), t = Math.floor(controller.scheduledTime / 1000); await runRallyCron(db, t); await runRallySpeechCron(db, t, env as unknown as RallySpeechBindings); /* #876: a no-op unless HARIMU_AI_RALLY_SPEECHES_ENABLED, AI binding and budget */ })()
       .then(() => undefined, error => { console.warn('[cron] Rally clips failed', error instanceof Error ? error.name : 'unknown'); }));
     if (on.tesseraRewards) ctx.waitUntil((async () => runTesseraRewardCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_TESSERA_REWARDS_ENABLED?: string }, async userId => (await readVerification(userId)).countedActionsEligible))()
       .then(() => undefined, error => { console.warn('[cron] Tessera reward epoch close failed', error instanceof Error ? error.name : 'unknown'); }));
