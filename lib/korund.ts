@@ -17,7 +17,7 @@ export const korundSchemas = [
  `CREATE TABLE korund_rations (id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), game_week INTEGER NOT NULL CHECK(game_week>=1), quantity INTEGER NOT NULL CHECK(quantity=2), occurred_at INTEGER NOT NULL, UNIQUE(clerk_user_id,game_week))`,
  `CREATE TABLE korund_meals (id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), quantity INTEGER NOT NULL CHECK(quantity=2), occurred_at INTEGER NOT NULL, capacity_applied INTEGER NOT NULL DEFAULT 0 CHECK(capacity_applied IN (0,1)))`,
 ] as const;
-export const korundPublicFoodSql = `SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) AS food, ${korundPoolSql} AS funds FROM korund_resources WHERE id='state'`;
+export const korundPublicFoodSql = `SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) AS food, initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0)-COALESCE((SELECT SUM(wage_minor) FROM korund_post_settlements),0) AS funds FROM korund_resources WHERE id='state'`; // #886 (b): literal = korund-posts korundPoolSql (tests/korund.test.py reads this text)
 export const korundStartSql = `INSERT OR IGNORE INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at)
  SELECT ?,clerk_user_id,'korund-food-production','State food-production brigade','4 food contributed to state ration supply',4,?,? FROM citizens
  WHERE clerk_user_id=? AND nation_id='korund' AND capacity>=4 AND NOT EXISTS(SELECT 1 FROM work_shifts WHERE clerk_user_id=? AND claimed_at IS NULL)
@@ -28,7 +28,7 @@ export const korundDebitSql = `UPDATE citizens SET capacity=capacity-4,updated_a
 export const korundSettleSql = `INSERT OR IGNORE INTO korund_settlements(shift_id,clerk_user_id,wage_minor,food_output,settled_at)
  SELECT s.id,s.clerk_user_id,800,4,? FROM work_shifts s JOIN korund_work_starts k ON k.id=s.id JOIN citizens c ON c.clerk_user_id=s.clerk_user_id
  WHERE s.id=? AND s.clerk_user_id=? AND k.capacity_applied=1 AND s.claimed_at IS NULL AND s.completes_at<=?
- AND 800<=(SELECT ${korundPoolSql} FROM korund_resources WHERE id='state')`;
+ AND 800<=(SELECT initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0)-COALESCE((SELECT SUM(wage_minor) FROM korund_post_settlements),0) FROM korund_resources WHERE id='state')`;
 export const korundRationSql = `INSERT OR IGNORE INTO korund_rations(id,clerk_user_id,game_week,quantity,occurred_at)
  SELECT ?,clerk_user_id,?,2,? FROM citizens WHERE clerk_user_id=? AND nation_id='korund'
  AND 2<=(SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) FROM korund_resources WHERE id='state')
