@@ -50,10 +50,10 @@ export function skipForTemplates(path: AiNarrativePath, env: AiTemplatesOnlyEnv 
  *  "" (off), "all", or a comma list of persona ids. Notables use their profile id; the other AI paths speak as one fixed persona each (below). A muted
  *  persona's path makes no model call and no reservation; Notables answer with the shared "persona muted" notice copy. An unknown id or
  *  a non-string fails closed to "all". It is an operator control, not a feature flag: "" in both wrangler files. The logged switch record is a later slice. */
-export const aiPathPersonas = { 'ai-news': (nationId: string) => `${nationId}-news-desk`, 'cabinet-response': () => 'kindle-cabinet', 'town-hall': () => 'kindle-candidates', debate: () => 'kindle-candidates' } as const;
-// Every Notable profile id (lib/notable-profiles.ts, lib/notable-roster.ts, lib/wave2-notable-roster.ts; kept in step by tests/ai-persona-mute-764) plus the path personas.
+export const aiPathPersonas = { 'ai-news': (nationId: string) => `${nationId}-news-desk`, 'cabinet-response': () => 'kindle-cabinet', 'town-hall': () => 'kindle-town-hall', debate: () => 'kindle-debate' } as const;
+// Every Notable profile id (the live and wave-2 Notable rosters; kept in step by tests/ai-persona-mute-764) plus the path personas.
 export const aiNotablePersonas = ['kindle-journalist', 'korund-chronicler', 'aurelle-courtier', 'kindle-union-organizer', 'kindle-emberball-owner', 'kindle-cartoonist', 'korund-brigade-leader', 'korund-canteen-cook', 'korund-veteran-builder', 'aurelle-guild-master', 'aurelle-hearth-keeper', 'aurelle-landless-knight', 'confluence-cooperative-manager', 'confluence-almoner', 'confluence-faith-registrar', 'confluence-canal-captain', 'confluence-local-editor', 'confluence-party-cadre', 'hoarvale-coalition-whip', 'hoarvale-board-observer', 'hoarvale-mint-economist', 'hoarvale-bathhouse-keeper', 'hoarvale-sketch-comedian', 'hoarvale-crown-herald'] as const;
-export const aiMutablePersonas: readonly string[] = [...aiNotablePersonas, ...aiTemplatesOnlyNations.map(n => aiPathPersonas['ai-news'](n)), 'kindle-cabinet', 'kindle-candidates'];
+export const aiMutablePersonas: readonly string[] = [...aiNotablePersonas, ...aiTemplatesOnlyNations.map(n => aiPathPersonas['ai-news'](n)), 'kindle-cabinet', 'kindle-town-hall', 'kindle-debate'];
 export type AiMutedPersonasEnv = { HARIMU_AI_MUTED_PERSONAS?: unknown };
 export function aiMutedPersonasMode(raw: unknown): AiTemplatesOnlyMode {
   if (raw === undefined || raw === null) return 'off';
