@@ -28,3 +28,5 @@
 .household-v2-family img{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #d6b45c}
 .household-v2-family strong{font-size:calc(13px * var(--text-scale, 1));overflow-wrap:normal;word-break:normal}
 .household-v2-family small{font-size:calc(11px * var(--text-scale, 1));color:#b9cfd3}
+/* #392 S7 follow-up: City rows and the Household primary carry the same decorative icon as the City pills (UI_V2_CITY), in the pills' gold. */
+.panel-v2 .panel-v2-icon{display:inline-flex;flex:none;color:#e2c36b}.panel-v2 .panel-v2-rows button>span:nth-child(2){flex:1}.panel-v2 button.panel-v2-primary>span:nth-child(2){flex:1}

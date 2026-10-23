@@ -13,7 +13,9 @@ export const voteBuyingWatch = Object.freeze({ windowSeconds: 48 * 3600 });
 /** Declared candidates (every primary hopeful; the general slate's candidates are the incumbent hopefuls). A candidate counts as a sender on their own,
  *  recorded under the existing 'campaign' reason (no schema change). Code constants, safe to inline. */
 export const voteBuyingCandidateIds: readonly string[] = hopefuls.map(h => h.id);
-const candidateList = voteBuyingCandidateIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
+/** The candidate half of the 'campaign' test. An empty list yields '' (skip the clause) rather than `IN ()`, which is invalid SQL. Code constants only, quotes escaped. */
+export const candidateSenderSql = (ids: readonly string[]) => ids.length ? `h.sender IN (${ids.map(id => `'${id.replace(/'/g, "''")}'`).join(',')}) OR ` : '';
+const candidateClause = candidateSenderSql(voteBuyingCandidateIds);
 export const voteBuyingReasons = ['party-member', 'campaign'] as const;
 export type VoteBuyingReason = (typeof voteBuyingReasons)[number];
 
@@ -45,7 +47,7 @@ WITH r AS (${receipts}), t AS (${sources.map(x => `SELECT '${x.name}:'||id AS id
 SELECT h.ekey, h.uid, h.sender, h.id, x.reason, ? FROM hits h
  JOIN (SELECT 'party-member' AS reason UNION ALL SELECT 'campaign') x ON
   (x.reason='party-member' AND EXISTS(SELECT 1 FROM party_members p WHERE p.clerk_user_id=h.sender))
-  OR (x.reason='campaign' AND (h.sender IN (${candidateList}) OR EXISTS(SELECT 1 FROM canvass_quests q WHERE q.clerk_user_id=h.sender)))
+  OR (x.reason='campaign' AND (${candidateClause}EXISTS(SELECT 1 FROM canvass_quests q WHERE q.clerk_user_id=h.sender)))
 ON CONFLICT DO NOTHING`;
 
 /** Sweeps votes cast in the last 2 windows (so a transfer up to 48h after a vote is still caught). Call only with the flag on. No sources: no query at all. */

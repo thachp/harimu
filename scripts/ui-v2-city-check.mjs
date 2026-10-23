@@ -68,6 +68,8 @@ const probe = ({ on, phone }) => {
   const primary = panel?.querySelector('.panel-v2-primary')?.textContent ?? '';
   for (const d of ['Workplace', 'Market', 'Government']) if (!rows.some(t => t.startsWith(d))) issues.push(`panel has no "${d}" row`);
   if (!primary.includes('Household')) issues.push('panel has no Household primary');
+  const iconless = [...(panel?.querySelectorAll('.panel-v2-rows button, .panel-v2-primary') ?? [])].filter(b => !b.querySelector('.panel-v2-icon[aria-hidden="true"] svg')).length; // rows match the pills' icons
+  if (on ? iconless : panel?.querySelector('.panel-v2-icon')) issues.push(on ? `${iconless} panel rows without the pill icon` : 'panel row icons with the flag off');
   const covered = labels.filter(b => !b.hidden).filter(b => { const r = b.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return t && !b.contains(t); }).map(b => b.textContent.trim());
   return { issues, names, minText, minRim, pills: pills.length, covered };
 };

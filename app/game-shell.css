@@ -440,6 +440,10 @@ body:has(.harimu-game){overflow:auto}
   .game-mobile-v2.game-rail-on .game-nav-row{grid-row:8;position:sticky;bottom:0;z-index:8;border-top:1px solid #49616a;border-bottom:0;box-shadow:0 -4px 12px #0007}
   .game-mobile-v2.game-rail-on:has(.citizen-dock) .game-nav-row{bottom:45px}
   .game-mobile-v2 .game-inspector{border-top:1px solid #49616a;border-radius:14px 14px 0 0;box-shadow:0 -6px 16px #0006;padding-top:14px}
+  /* S8 follow-up (#377, ARC): the City scene is the screen minus the bars (heights from app/game-shell.tsx); 44dvh / 260px stay as the fallback */
+  .harimu-game.game-mobile-v2.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) auto 0 minmax(0,auto)}
+  .game-mobile-v2.game-city-v2 .game-stage{min-height:0;height:max(200px,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px)))}
+  .game-mobile-v2.game-city-v2:not([style*="--s8-top"]) .game-stage{height:44dvh}
   .game-mobile-v2 .game-inspector::before{content:"";display:block;width:36px;height:4px;margin:0 auto 6px;border-radius:2px;background:#6f8a92}
 }
 /* #85: nation skin PoC on the top bar (NEXT_PUBLIC_HARIMU_NATION_SKIN; app/game-shell.tsx sets data-nation-skin only for a signed-in Kindle, Korund or Aurelle citizen).
