@@ -3,7 +3,7 @@ import {getDatabase} from '@/lib/db';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {readCityLocation} from '@/lib/city-location';
-import {homeMoveCooldownSeconds,homeMoveFeeMinor,moveHomeCity,nextHomeMoveAt} from '@/lib/home-move';
+import {homeMoveCooldownSeconds,homeMoveCurrency,homeMoveFeeMinor,moveHomeCity,nextHomeMoveAt} from '@/lib/home-move';
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 // #781: flag off is a 404 before auth and before any database read.
@@ -18,7 +18,7 @@ export async function GET(request:Request){
  if(!enabled())return notFound();
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json({...location,feeMinor:homeMoveFeeMinor,cooldownSeconds:homeMoveCooldownSeconds,nextMoveAt:await nextHomeMoveAt(ctx.db,ctx.userId)});
+ return json({...location,feeMinor:homeMoveFeeMinor,currency:homeMoveCurrency(ctx.nationId),cooldownSeconds:homeMoveCooldownSeconds,nextMoveAt:await nextHomeMoveAt(ctx.db,ctx.userId)});
 }
 export async function POST(request:Request){
  if(!enabled())return notFound();

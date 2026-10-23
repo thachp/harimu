@@ -108,3 +108,42 @@ test('funds boundary: a wallet of exactly the fee can move and ends at zero', as
   const w0 = await wallet(); assert.equal(w0, 1000);
   const res = await move(tarrek); assert.equal(res.status, 200, JSON.stringify(res.data)); assert.equal(await wallet(), 0);
 });
+
+// ARC ruling on #781: 10 units of the nation's own wallet currency; no wallet currency (Aurelle: Royal Favor is not money) is 403 not_open_yet.
+for (const backend of ['sqlite', 'postgres']) {
+  test(`${backend}: Korund pays 10 LN from the labor-note wallet; Spark is untouched; LN shortfall is refused`, async t => {
+    const { r } = await world(t, { backend, cash: 0 });
+    const at = new Date(r.now).toISOString();
+    for (const id of ['kim', 'kip']) await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'korund',?,18,0,'Good standing',?,?)").bind(id, id, at, at).run();
+    const settle = async (user, i) => { const id = randomUUID(), iso = new Date((1 + i) * 1000).toISOString();
+      await r.db.prepare('INSERT INTO work_shifts VALUES (?,?,?,?,?,?,?,?,?)').bind(id, user, 'aurelle-food-estate', 'Korund fixture', '4 state food', 4, iso, iso, iso).run();
+      await r.db.prepare('INSERT INTO korund_settlements(shift_id,clerk_user_id,wage_minor,food_output,settled_at) VALUES (?,?,800,4,?)').bind(id, user, 1 + i).run(); };
+    await settle('kim', 0); await settle('kim', 1); await settle('kip', 2);
+    const { laborNoteSql, laborNoteBinds } = await r.importModule('lib/korund-wallet.ts');
+    const ln = async u => Number((await r.db.prepare(`SELECT ${laborNoteSql('?')} AS n`).bind(...laborNoteBinds(u)).first()).n);
+    const spk = async u => Number((await r.db.prepare('SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id=?').bind(u).first()).balance);
+    const krel = citiesForNation('korund').find(c => !c.capital).id;
+    const g = await r.call('city-home', 'kim'); assert.equal(g.data.currency, 'LN');
+    const spk0 = await spk('kim');
+    const ok = await r.call('city-home', 'kim', { cityId: krel, requestId: randomUUID() });
+    assert.equal(ok.status, 200, JSON.stringify(ok.data)); assert.equal(ok.data.currency, 'LN');
+    assert.equal(await ln('kim'), 1600 - 1000); assert.equal(await spk('kim'), spk0, 'no Spark charged');
+    const poor = await r.call('city-home', 'kip', { cityId: krel, requestId: randomUUID() });
+    assert.equal(poor.status, 402); assert.equal(poor.data.reason, 'funds'); assert.equal(await ln('kip'), 800);
+    const row = await r.db.prepare("SELECT currency FROM home_city_moves WHERE clerk_user_id='kim'").first(); assert.equal(row.currency, 'LN');
+  });
+
+  test(`${backend}: Kindle pays in SPK; Aurelle has no wallet currency and is refused not_open_yet with nothing charged`, async t => {
+    const { r, move } = await world(t, { backend });
+    const ok = await move(tarrek); assert.equal(ok.data.currency, 'SPK');
+    assert.equal((await r.db.prepare("SELECT currency FROM home_city_moves WHERE clerk_user_id='alice'").first()).currency, 'SPK');
+    const at = new Date(r.now).toISOString();
+    await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES ('ava','aurelle','ava',18,0,'Good standing',?,?)").bind(at, at).run();
+    await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','fixture-cash',-1,5000,1)").bind(randomUUID(), 'ava').run();
+    const vale = citiesForNation('aurelle').find(c => !c.capital).id;
+    const res = await r.call('city-home', 'ava', { cityId: vale, requestId: randomUUID() });
+    assert.equal(res.status, 403); assert.equal(res.data.reason, 'not_open_yet');
+    assert.equal(Number((await r.db.prepare("SELECT COUNT(*) AS n FROM home_city_moves WHERE clerk_user_id='ava'").first()).n), 0);
+    assert.equal((await r.call('city-home', 'ava')).data.currency, null);
+  });
+}
