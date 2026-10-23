@@ -1,7 +1,7 @@
 /** #740 slice 1: voluntary Kindle voter-intent answers and one published poll per election per real day (migration 0073 mirrors pollingSchemas).
  *  Reads return only the caller's own answer and published aggregates, never another citizen's answer or who answered. */
 import type { GameDatabase } from './database-contract';
-import { drawSample, maximumSample, pollDay, tallyPoll, type PollResult } from './polling-rules';
+import { drawSample, maximumSample, pollDay, pollSeed, tallyPoll, type PollResult } from './polling-rules';
 import { electionId } from './elections';
 export const pollingSchemas = [
   `CREATE TABLE IF NOT EXISTS kindle_poll_answers (election_id TEXT NOT NULL, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, candidate_id TEXT NOT NULL, answered_at INTEGER NOT NULL, request_id TEXT NOT NULL UNIQUE, PRIMARY KEY (election_id, clerk_user_id))`,
@@ -19,7 +19,7 @@ export async function publishDailyPoll(db: GameDatabase, election: Election, now
   const day = pollDay(now), dayStart = day * 86400;
   if (await db.prepare('SELECT 1 AS x FROM kindle_poll_snapshots WHERE election_id=? AND poll_day=?').bind(election.id, day).first()) return;
   const { results } = await db.prepare('SELECT candidate_id FROM kindle_poll_answers WHERE election_id=? AND answered_at<? ORDER BY clerk_user_id').bind(election.id, dayStart).all<{ candidate_id: string }>();
-  const poll = tallyPoll(drawSample((results ?? []).map(r => r.candidate_id), maximumSample, `${election.id}:${day}`), election.slate);
+  const poll = tallyPoll(drawSample((results ?? []).map(r => r.candidate_id), maximumSample, pollSeed(election.id, day)), election.slate);
   if (poll) await db.prepare('INSERT INTO kindle_poll_snapshots (election_id, poll_day, n, margin_tenths, shares_json, published_at) VALUES (?,?,?,?,?,?) ON CONFLICT (election_id, poll_day) DO NOTHING').bind(election.id, day, poll.n, Math.round(poll.margin * 10), JSON.stringify(poll.shares), now).run();
 }
 export type PollView = { open: boolean; candidates: { id: string; name: string }[]; myAnswer: string | null; poll: (Omit<PollResult, 'shares'> & { day: number; publishedAt: number; shares: { candidateId: string; name: string; share: number }[] }) | null };

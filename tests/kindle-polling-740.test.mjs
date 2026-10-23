@@ -1,7 +1,7 @@
 /** #740 slice 1: Kindle polling (docs §9.4/§9.5). Pure rules, flag-off 404 with no DB (spy), answer/change/decline/replay, eligibility, minimum sample, once-a-day snapshot, no individual answers. SQLite + PGlite. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { seededRandom, drawSample, marginPoints, tallyPoll, minimumPublishedSample, maximumSample, pollingFlagOn, pollDay } from '../lib/polling-rules.ts';
+import { seededRandom, drawSample, marginPoints, tallyPoll, minimumPublishedSample, maximumSample, pollingFlagOn, pollDay, pollSeed } from '../lib/polling-rules.ts';
 
 test('rules: seeded sample, 95% margin ≈ 0.98/√n, minimum sample 10, shares in slate order', () => {
   assert.equal(seededRandom('s')(), seededRandom('s')()); assert.notEqual(seededRandom('s')(), seededRandom('t')());
@@ -19,6 +19,8 @@ test('rules: seeded sample, 95% margin ≈ 0.98/√n, minimum sample 10, shares 
   assert.deepEqual(tallyPoll([...Array(1).fill('a'), ...Array(2).fill('b'), ...Array(8).fill('c')], slate).shares.map(x => x.share), [9.1, 18.2, 72.7], 'one decimal');
   for (const e of [{}, { HARIMU_KINDLE_POLLING_ENABLED: 'TRUE' }, { HARIMU_KINDLE_POLLING_ENABLED: 'false' }, null]) assert.equal(pollingFlagOn(e), false); assert.equal(pollingFlagOn({ HARIMU_KINDLE_POLLING_ENABLED: 'true' }), true);
   assert.deepEqual([pollDay(86399), pollDay(86400)], [0, 1]);
+  assert.equal(pollSeed('e', 3), 'e:3'); const many = Array.from({ length: 500 }, (_, i) => i % 3);
+  assert.notDeepEqual(drawSample(many, 400, pollSeed('e', 3)), drawSample(many, 400, pollSeed('e', 4)), 'a new day draws a new sample');
 });
 
 async function spy(r, fn) { const prepare = r.db.prepare.bind(r.db), seen = { sql: [] }; r.db.prepare = q => { seen.sql.push(q); return prepare(q); }; try { seen.result = await fn(); } finally { r.db.prepare = prepare; } return seen; }
@@ -43,8 +45,8 @@ for (const backend of ['sqlite', 'postgres']) {
     const { r } = await setup(t, backend);
     for (const flag of [undefined, 'false', 'TRUE']) {
       r.setFixtureEnv('HARIMU_KINDLE_POLLING_ENABLED', flag);
-      const off = await spy(r, async () => [await r.call('polling', 'alice'), await r.call('polling', null), await r.call('polling', 'alice', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-off1' }), await r.call('polling', null, { action: 'decline' })]);
-      assert.deepEqual(off.result.map(x => x.status), [404, 404, 404, 404]); assert.deepEqual(off.sql, [], `flag ${flag}: no database access`);
+      const off = await spy(r, async () => [await r.call('polling', 'alice'), await r.call('polling', null), await r.call('polling', 'alice', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-off1' }), await r.call('polling', null, { action: 'decline' }), await r.call('polling', 'alice', { action: 'decline' }, 'https://evil.invalid')]);
+      assert.deepEqual(off.result.map(x => x.status), [404, 404, 404, 404, 404], 'cross-origin too: the flag is checked first'); assert.deepEqual(off.sql, [], `flag ${flag}: no database access`);
     }
     assert.equal(await rows(r, 'kindle_poll_answers') + await rows(r, 'kindle_poll_snapshots'), 0);
     r.setFixtureEnv('HARIMU_KINDLE_POLLING_ENABLED', 'true');
@@ -65,7 +67,10 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(await rows(r, 'kindle_poll_answers'), 1);
     for (const body of [{ action: 'answer', candidateId: 'nobody', requestId: 'req-740-x3' }, { action: 'answer', candidateId: 'mara-quell', requestId: 'short' }, { action: 'vote' }]) assert.equal((await post('alice', body)).status, 400, JSON.stringify(body));
     assert.equal((await r.call('polling', 'alice', { action: 'decline' }, 'https://evil.invalid')).status, 403, 'same origin');
-    assert.equal((await post('alice', { action: 'decline' })).data.polling.myAnswer, null); assert.equal(await rows(r, 'kindle_poll_answers'), 0, 'decline removes my answer');
+    assert.equal((await post('bob', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-b1' })).status, 200);
+    assert.equal((await post('alice', { action: 'decline' })).data.polling.myAnswer, null); assert.equal(await rows(r, 'kindle_poll_answers'), 1, 'decline removes only my answer');
+    assert.equal((await r.call('polling', 'bob')).data.polling.myAnswer, 'mara-quell');
+    assert.equal((await post('bob', { action: 'decline' })).status, 200); assert.equal(await rows(r, 'kindle_poll_answers'), 0);
     await citizen('kim', 'korund');
     assert.equal((await r.call('polling', 'kim')).data.reason, 'not_kindle'); assert.equal((await post('kim', { action: 'decline' })).status, 403);
     r.setFixtureEnv('HARIMU_ACCOUNT_ELECTION_POC_ENABLED', 'false');

@@ -25,4 +25,6 @@ export function tallyPoll(sample: readonly string[], slate: readonly string[]): 
   if (n < minimumPublishedSample) return null;
   return { n, margin: marginPoints(n)!, shares: slate.map(candidateId => ({ candidateId, share: Math.round(sample.filter(c => c === candidateId).length * 1000 / n) / 10 })) };
 }
+/** One seed per election per real day, so each day's poll draws a fresh sample once the answers exceed the maximum sample. */
+export const pollSeed = (electionId: string, day: number) => `${electionId}:${day}`;
 export const pollDay = (nowSec: number) => Math.floor(nowSec / 86400);
