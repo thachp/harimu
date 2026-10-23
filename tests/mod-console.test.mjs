@@ -44,3 +44,12 @@ test('the console renders a labelled form and, after a load, a captioned table w
   assert.match(html, /<h1>Mod console<\/h1>/); assert.match(html, /<label>Admin token<input type="password" autoComplete="off" required=""/);
   assert.match(html, /role="status"/); assert.equal((html.match(/<button/g) ?? []).length, 1, 'one button: Load');
 });
+
+test('ARC: no data before the server accepts the token; the older-entries cue uses the route\'s 50-entry page', async () => {
+  const ui = await read('app/admin/mod/mod-console.tsx');
+  assert.match(ui, /\{result\?\.ok && <div className=\{styles\.scroll\}/, 'the table renders only from an accepted response');
+  assert.equal((ui.match(/<table/g) ?? []).length, 1); assert.doesNotMatch(ui, /useEffect/, 'nothing loads before Load');
+  assert.match(ui, /setResult\(null\); setResult\(await load\(/, 'a new load clears the previous data first');
+  assert.match(ui, /const PAGE = 50;/); assert.match(ui, /older entries not shown/);
+  assert.match(await read('lib/ai-review-queue.ts'), /limit=50/);
+});
