@@ -1,7 +1,7 @@
 /** #867: Kindle rallies PoC behind HARIMU_KINDLE_RALLIES_ENABLED. Each AI candidate holds one scheduled rally per real week in a Kindle city square.
  *  Citizens mark "attend" once per rally (one row per citizen and rally). When the rally time passes, the scheduled Worker publishes one news clip per rally
  *  (rally_clips, PRIMARY KEY rally_id), labeled AI. The speech is the template path (the AI-labeled template line used when the AI kill switch is in templates-only
- *  mode); a model-written speech is a follow-up. Rallies add NO votes or ballot weight: nothing in lib/elections.ts or lib/primaries.ts reads these tables. */
+ *  mode). #876: a model-written speech stored in rally_speeches (lib/rally-speech-ai.ts) replaces the template once it exists. Rallies add NO votes or ballot weight: nothing in lib/elections.ts or lib/primaries.ts reads these tables. */
 import type { GameDatabase } from './database-contract';
 import { electionCandidates } from './elections';
 import { citiesForNation } from './cities';
@@ -14,11 +14,15 @@ export const rallySchemas = [
 ];
 export type Rally = { id: string; candidateId: string; candidateName: string; cityId: string; cityName: string; startsAt: number; speech: { text: string; ai: true }; humans: number; aiCrowd: number; crowd: number; attending: boolean };
 
-function rallyFor(index: number, week: number) {
+export function rallyFor(index: number, week: number) {
   const c = electionCandidates[index], cities = citiesForNation('kindle'), city = cities[(week + index) % cities.length];
   return { id: rallyIdFor(c.id, week), candidate: c, city, startsAt: rallyStartsAt(week, index),
     speech: `${c.name} to the crowd in ${city.name}: ${c.platform} Kindle works when Kindle works together.` };
 }
+/** #876: the stored model-written speech for this rally, or the #867 template. */
+const speechOf = async (db: GameDatabase, r: { id: string; speech: string }) => {
+  try { return (await db.prepare('SELECT speech FROM rally_speeches WHERE rally_id=?').bind(r.id).first<{ speech: string }>())?.speech ?? r.speech; } catch { return r.speech; }
+};
 const humans = async (db: GameDatabase, rallyId: string) => Number((await db.prepare('SELECT COUNT(*) AS n FROM rally_attendance WHERE rally_id=?').bind(rallyId).first<{ n: number }>())?.n ?? 0);
 
 /** Read-only: each candidate's upcoming rally. */
@@ -28,7 +32,7 @@ export async function readRallies(db: GameDatabase, userId: string, now: number)
     const r = rallyFor(i, upcomingRallyWeek(now, i)), n = await humans(db, r.id);
     const mine = await db.prepare('SELECT 1 AS x FROM rally_attendance WHERE rally_id=? AND clerk_user_id=?').bind(r.id, userId).first();
     out.push({ id: r.id, candidateId: r.candidate.id, candidateName: r.candidate.name, cityId: r.city.id, cityName: r.city.name, startsAt: r.startsAt,
-      speech: { text: r.speech, ai: true }, humans: n, aiCrowd: rallyAiCrowd, crowd: n + rallyAiCrowd, attending: Boolean(mine) });
+      speech: { text: await speechOf(db, r), ai: true }, humans: n, aiCrowd: rallyAiCrowd, crowd: n + rallyAiCrowd, attending: Boolean(mine) });
   }
   return out;
 }
@@ -46,7 +50,7 @@ export async function runRallyCron(db: GameDatabase, now: number) {
   for (let i = 0; i < electionCandidates.length; i++) {
     const r = rallyFor(i, lastRallyWeek(now, i));
     const res = await db.prepare('INSERT INTO rally_clips (rally_id, candidate_id, city_id, humans, ai_crowd, speech, published_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING')
-      .bind(r.id, r.candidate.id, r.city.id, await humans(db, r.id), rallyAiCrowd, r.speech, now).run();
+      .bind(r.id, r.candidate.id, r.city.id, await humans(db, r.id), rallyAiCrowd, await speechOf(db, r), now).run();
     published += Number(res.meta?.changes ?? 0);
   }
   return { status: 'ran' as const, published };
