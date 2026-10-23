@@ -110,6 +110,16 @@ test('concurrent seizures and coupon redemptions never take the balance below 0'
   assert.equal(balance, 150 - seized - (results[6].status === 200 ? 200 : 0), 'ledger adds up');
 });
 
+test('trade key (QA3): rolling an already-seized offer again on a later game day returns 0, keeps one row, leaves the balance alone', async t => {
+  const { r, m, now } = await setup(t);
+  const id = await seedTrade(r, 100, now);
+  assert.equal(await m.rollSeizure(r.db, 'bob', id, now, hit), 50);
+  const balance = await ln(r, 'bob');
+  assert.equal(await m.rollSeizure(r.db, 'bob', id, now + 3 * GAME_DAY, hit), 0, 'same offer, later game day: no second seizure, no error');
+  assert.deepEqual((await r.db.prepare('SELECT offer_id, amount_minor FROM gray_seizures').all()).results.map(x => [x.offer_id, Number(x.amount_minor)]), [[id, 50]]);
+  assert.equal(await ln(r, 'bob'), balance);
+});
+
 test('offer filter (QA3): an earlier 5000 trade for the same courier never sizes a later 100 bundle', async t => {
   const { r, m, now } = await setup(t);
   await seedTrade(r, 5000, now - 60);
