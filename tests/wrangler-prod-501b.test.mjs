@@ -40,6 +40,7 @@ const previewOnFlags = [
   'HARIMU_FAITH_ENABLED',
   'HARIMU_DIPLOMATIC_HALL_ENABLED',
   'HARIMU_MAP_OVERLAYS_ENABLED', // #82
+  'HARIMU_CIVIC_RANK_ENABLED', // #741
   'HARIMU_FOUNDING_PERIOD_ENABLED',
   'HARIMU_AURELLE_SUCCESSION_ENABLED',
   'HARIMU_WAR_ENABLED',
@@ -72,7 +73,7 @@ const previewOnFlags = [
 const previewOffFlags = ['HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_REWARDS_ENABLED', 'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_MERIDIAN_ENABLED', 'HARIMU_ILMAR_ENABLED', 'HARIMU_HOARVALE_ENABLED', 'HARIMU_VARKAND_ENABLED', 'HARIMU_VELDWOOD_ENABLED', 'HARIMU_FULMARA_ENABLED', 'HARIMU_AI_COST_DASHBOARD_ENABLED'];
 const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'], ...Object.fromEntries(previewOnFlags.map(name => [name, ['true', 'false']])) };
 // The only non-"false" values production may carry.
-const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, HARIMU_AI_TEMPLATES_ONLY: '', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
+const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, HARIMU_AI_TEMPLATES_ONLY: '', HARIMU_AI_MUTED_PERSONAS: '', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
 
 test('wrangler.prod.jsonc has only full-line // comments (the #633 rule) and parses', () => {
   const offenders = readFileSync('wrangler.prod.jsonc', 'utf8').split('\n').map((line, index) => ({ line, number: index + 1 }))
@@ -179,4 +180,9 @@ test('QA3 on #641: the runtime role grants, applied on a real Postgres (PGlite) 
 test('#742: the AI kill switch HARIMU_AI_TEMPLATES_ONLY is present and "" (off) in both files', () => {
   assert.equal(preview.vars.HARIMU_AI_TEMPLATES_ONLY, '');
   assert.equal(prod.vars.HARIMU_AI_TEMPLATES_ONLY, '');
+});
+
+test('#764: the per-persona mute HARIMU_AI_MUTED_PERSONAS is present and "" (off) in both files', () => {
+  assert.equal(preview.vars.HARIMU_AI_MUTED_PERSONAS, '');
+  assert.equal(prod.vars.HARIMU_AI_MUTED_PERSONAS, '');
 });

@@ -34,8 +34,11 @@ export async function heartbeat(db: GameDatabase, userId: string, now: number): 
   if (last !== null && now - last < ACTIVITY_BUMP_SECONDS) return { bumped: false, welcomeBack: null };
   const at = new Date(now * 1000).toISOString(), floor = new Date((now - ACTIVITY_BUMP_SECONDS) * 1000).toISOString();
   // Compare-and-set on the prior value: of several parallel first loads only one changes the row, and only it returns the briefing.
+  // An unparseable value is treated like NULL (QA1): no briefing, and it is overwritten (compare-and-set on the raw value, no hourly floor).
   const saved = row.last_active_at === null
     ? await db.prepare('UPDATE citizens SET last_active_at = ? WHERE clerk_user_id = ? AND last_active_at IS NULL').bind(at, userId).run()
+    : last === null
+    ? await db.prepare('UPDATE citizens SET last_active_at = ? WHERE clerk_user_id = ? AND last_active_at = ?').bind(at, userId, row.last_active_at).run()
     : await db.prepare('UPDATE citizens SET last_active_at = ? WHERE clerk_user_id = ? AND last_active_at = ? AND last_active_at <= ?').bind(at, userId, row.last_active_at, floor).run();
   if (!saved.meta.changes) return { bumped: false, welcomeBack: null };
   const status = dormancyStatus(last, now);

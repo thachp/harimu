@@ -51,6 +51,8 @@ export function aiGatewayOptions(config:AiBudgetConfig){return {gateway:{id:conf
  * charge is never refunded and still counts against the day(s) it reserved.
  */
 export const aiUncertainBlockTtlSeconds=3600;
+/** #769: a reservation started this close to 00:00Z also counts against the next UTC day. */
+export const aiMidnightSpillSeconds=600;
 /** #92: a 'pending' row was never marked sent (see markAiReservationSent), so its inference never reached the gateway (each call times out
  * after 30s, a sequence has at most four). It stops counting and is deleted on the next reservation. */
 export const aiPendingExpirySeconds=aiUncertainBlockTtlSeconds;
@@ -108,8 +110,11 @@ async function reserveBudget(db:GameDatabase,id:string,model:string,cost:number,
  if(!Number.isSafeInteger(now)||!validConfig(config)||!id)return false;
  const budget=config.dailyBudgetMicro;
  await expireStaleAiReservations(db,now);
- const day=new Date(now*1000).toISOString().slice(0,10),next=new Date((now+86400)*1000).toISOString().slice(0,10);
- // Pre-book the next UTC day too, to cover requests spanning midnight. Earlier-day
+ // #769: a reservation counts against the UTC day it starts on, and also against the next day only when it starts
+ // within aiMidnightSpillSeconds of 00:00Z (a sequence can then span midnight). Otherwise next=day, so a busy day no
+ // longer pre-books (and can exhaust) the following day's caps. Existing rows keep whatever next_utc_day they stored.
+ const day=new Date(now*1000).toISOString().slice(0,10),next=86400-now%86400<=aiMidnightSpillSeconds?new Date((now+86400)*1000).toISOString().slice(0,10):day;
+ // Pre-book the next UTC day only inside that window. Earlier-day
  // uncertain/pending calls block further inference for aiUncertainBlockTtlSeconds; they are never refunded.
  // Step 1: one atomic conditional INSERT ... SELECT (a single statement in its own write transaction).
  const limits=`COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(reserved_micro) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=?-? AND COALESCE((SELECT SUM(CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND COALESCE((SELECT SUM(CASE WHEN model=? OR model='cabinet-response-3b-guard-2026-10-14' THEN 3 WHEN model=? THEN 4 ELSE 1 END) FROM harimu_ai_reservations WHERE utc_day=? OR next_utc_day=?),0)<=200-? AND (?=0 OR (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id LIKE ? AND utc_day=?)<?)`;

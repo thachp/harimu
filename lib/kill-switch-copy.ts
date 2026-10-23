@@ -1,5 +1,5 @@
 /** Player notices for the AI kill switches (issue #579). Content only: the switches, the mod console and every panel that would show these
- * notices are other work, and nothing imports this module. Canon: harimu-docs systems/moderation-safety §21.3 (tools include per-persona and
+ * notices are wired per path (#742 template footer, #764 muted Notable). Canon: harimu-docs systems/moderation-safety §21.3 (tools include per-persona and
  * global AI kill switches) and §21.4 (Kill switches: "Staff can mute a persona's narrative output, freeze a nation's major decisions (the
  * utility model continues) or switch all narrative to templates, instantly and logged"), and the MVP Scope Integrity row (AI kill switches).
  *

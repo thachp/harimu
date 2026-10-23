@@ -41,6 +41,11 @@ for (const backend of ['sqlite', 'postgres']) test(`POST /api/citizen/heartbeat:
   await setLast(r, 'alice', r.now - 9 * D * 1000);
   const racing = await Promise.all([beat(r, 'alice'), beat(r, 'alice'), beat(r, 'alice')]);
   assert.equal(racing.filter(x => x.data.welcomeBack).length, 1, 'parallel first loads: only the compare-and-set winner returns the briefing (QA1)');
+  await r.db.prepare("UPDATE citizens SET last_active_at = 'not-a-date' WHERE clerk_user_id = 'alice'").run(); // QA1: unparseable is treated like NULL
+  assert.deepEqual((await beat(r, 'alice')).data, { bumped: true, welcomeBack: null }, 'unparseable: no briefing, bumped');
+  assert.equal(await last(r, 'alice'), new Date(Math.floor(r.now / 1000) * 1000).toISOString(), 'unparseable value is overwritten');
+  await r.db.prepare("UPDATE citizens SET last_active_at = NULL WHERE clerk_user_id = 'alice'").run();
+  assert.deepEqual((await beat(r, 'alice')).data, { bumped: true, welcomeBack: null }, 'NULL: same as unparseable');
   assert.deepEqual((await beat(r, 'nobody')).data, { bumped: false, welcomeBack: null }, 'no citizen row: nothing written');
 });
 

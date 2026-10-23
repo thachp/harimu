@@ -1,5 +1,5 @@
 import type { GameDatabase } from './database-contract';
-import { skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
+import { skipForMutedPersona, aiPathPersonas, skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
 import { electionCandidates } from './elections';
 import { aiBudgetConfig, type AiBudgetConfig } from './ai-budget';
 import type { NewsAiBinding } from './ai-news';
@@ -37,6 +37,8 @@ export async function prepareDebateAnswer(db: GameDatabase, now: number, binding
   if (!options.enabled || !binding || !options.budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
   // #742: templates-only mode (the candidates are Kindle's) makes no model call and no reservation; the question stays unanswered.
   if (skipForTemplates('debate', options.killSwitch, 'kindle', now)) return { status: 'templates-only' as const };
+  // #764: a muted persona makes no model call and no reservation either.
+  if (skipForMutedPersona('debate', options.killSwitch, aiPathPersonas.debate(), now)) return { status: 'persona-muted' as const };
   const day = new Date(now * 1000).toISOString().slice(0, 10);
   const p = await nextPending(db, now, day);
   if (!p) return { status: 'idle' as const };
