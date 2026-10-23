@@ -72,6 +72,8 @@
     "HARIMU_KORUND_SHORTFALL_ENABLED": "false",
     // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
     "HARIMU_SAVINGS_SHIELD_ENABLED": "false",
+    // #844: Kindle sales tax: each fill on Kindle's goods market (any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migration 0081). Off: no row written, no tax query.
+    "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
     // #781: move your home city within your own nation for a fee of 10 units of the nation's wallet currency (SPK Kindle, LN Korund; no wallet currency: not_open_yet), once per 7 real days (POST /api/city/home). Off: 404 before auth, no read or write; home stays the capital.
     "HARIMU_HOME_CITY_MOVE_ENABLED": "false",
     // #777: goods-market seller fee (0.5%, rounded down) written as a sink row with each fill and netted from the wallet. Off: no fee written or read.
@@ -123,6 +125,8 @@
     "HARIMU_KINDLE_POLLING_ENABLED": "false",
     // #831: Kindle platform plank up-votes (docs 9.4): party members up-vote up to 3 of their party's pledges for the party AI to consider; visibility only, never votes or currency. Off: /api/planks is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_PLANK_VOTES_ENABLED": "false",
+    // #863: Kindle campaign donations PoC (docs 9.4): Tier-1 citizens donate Spark to an AI party, capped per party per week and publicly listed; never votes, ballot or primary weight. Off: /api/party-donations is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_PARTY_DONATIONS_ENABLED": "false",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
@@ -189,6 +193,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "false",
     // #392 S8: phone layout for UI v2 (rail and tabs as a bottom tab bar, panel as a bottom sheet); needs UI_V2_RAIL.
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "false",
+    // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
+    "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "false",
     // #243: filler wire stories (lib/press-templates.ts packs) in the National news edition under their in-world byline; they give way once a player paper publishes.
     "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "false",
     // #85: nation skin PoC on the top bar (Kindle / Korund / Aurelle colors + one CSS motif each); guests and pre-citizens keep the neutral bar.

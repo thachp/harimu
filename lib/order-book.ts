@@ -16,6 +16,7 @@ import { marketGoods, type MarketGood } from './market-orders';
  * HARIMU_ORDER_BOOK_ENABLED (default off); #200's board replaces them, and they are retired then.
  */
 import { marketFeeSql } from './market-fee'; // #777
+import { kindleSalesTaxSql } from './kindle-sales-tax'; // #844
 import { orderBookCityId, orderBookLimits, matchOrder, tradeSql, type OrderCommand, type OrderBookState, type RestingOrder } from './order-book-rules';
 export * from './order-book-rules';
 export type BookLevel = { unitMinor: number; qty: number; npc: boolean };
@@ -43,7 +44,7 @@ const sameIntent = (r: Receipt | null, userId: string, c: OrderCommand) => !!r &
 /** Match an open order against the book. Re-reads after each guarded batch so a concurrent change only shortens the fill.
  *  #679: `known` is the order's own city, good and side when the caller already has them (the NPC farm just posted it), so each round reads the
  *  order and its opposite book together instead of one after the other. A mismatch with the stored order falls back to reading the book again. */
-export async function matchOpen(db: GameDatabase, orderId: string, now: number, known?: { cityId: string; good: string; side: 'buy' | 'sell' }, options: { fee?: boolean } = {}) {
+export async function matchOpen(db: GameDatabase, orderId: string, now: number, known?: { cityId: string; good: string; side: 'buy' | 'sell' }, options: { fee?: boolean; salesTax?: boolean } = {}) {
   const readBook = (cityId: string, good: string, side: string) => db.prepare(`SELECT id, citizen_id, side, limit_unit_minor, remaining, created_at FROM market_open_orders
       WHERE city_id = ? AND good = ? AND side != ? AND id != ?`).bind(cityId, good, side, orderId).all<RestingOrder>();
   for (let round = 0; round < orderBookLimits.matchRounds; round++) {
@@ -60,12 +61,14 @@ export async function matchOpen(db: GameDatabase, orderId: string, now: number, 
     if (!fills.length) return;
     // Trade ids are deterministic (order, round, index): a retried batch can't insert a second copy, and ids sort in fill order.
     // #777: with the fee on, each trade INSERT is followed by its guarded fee INSERT in the same batch (no fee row unless the trade row landed).
+    // #844: with the sales tax on, its guarded INSERT follows too (after the fee); `per` is the statements per fill, the trade first.
+    const per = 1 + (options.fee ? 1 : 0) + (options.salesTax ? 1 : 0);
     const results = await db.batch(fills.flatMap((f, i) => {
       const [buy, sell] = me.side === 'buy' ? [orderId, f.restingId] : [f.restingId, orderId], id = `t:${orderId}:${round}:${String(i).padStart(3, '0')}`;
       const trade = db.prepare(tradeSql).bind(id, f.qty, f.unitMinor, now, buy, sell, f.qty, f.qty, f.unitMinor, f.unitMinor);
-      return options.fee ? [trade, db.prepare(marketFeeSql).bind(id)] : [trade];
+      return [trade, ...(options.fee ? [db.prepare(marketFeeSql).bind(id)] : []), ...(options.salesTax ? [db.prepare(kindleSalesTaxSql).bind(id)] : [])];
     }));
-    if (results.filter((_, i) => !options.fee || i % 2 === 0).every(r => (r.meta?.changes ?? 0) > 0)) return;
+    if (results.filter((_, i) => i % per === 0).every(r => (r.meta?.changes ?? 0) > 0)) return;
   }
 }
 
@@ -86,7 +89,7 @@ export async function refusedCheck(db: GameDatabase, userId: string, command: Ex
   return undefined;
 }
 
-export async function executeOrderCommand(db: GameDatabase, userId: string, command: OrderCommand, now: number, options: { fee?: boolean } = {}): Promise<{ status: number; replayed?: boolean; error?: string; refusedCheck?: RefusedCheck }> {
+export async function executeOrderCommand(db: GameDatabase, userId: string, command: OrderCommand, now: number, options: { fee?: boolean; salesTax?: boolean } = {}): Promise<{ status: number; replayed?: boolean; error?: string; refusedCheck?: RefusedCheck }> {
   const find = () => db.prepare(receiptSql).bind(command.requestId, command.requestId).first<Receipt>();
   const existing = await find();
   if (existing) return sameIntent(existing, userId, command) ? { status: 200, replayed: true } : { status: 409, error: 'Request identifier already used for another intent.' };
@@ -115,7 +118,7 @@ export async function executeOrderCommand(db: GameDatabase, userId: string, comm
   return { status: 200 };
 }
 
-export async function readOrderBook(db: GameDatabase, userId: string, options: { fee?: boolean } = {}): Promise<OrderBookState> {
+export async function readOrderBook(db: GameDatabase, userId: string, options: { fee?: boolean; salesTax?: boolean } = {}): Promise<OrderBookState> {
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>();
   type Row = { good: string; side: string; limit_unit_minor: number; qty: number; npc: number };
   const levels = (await db.prepare(`SELECT good, side, limit_unit_minor, SUM(remaining) AS qty, MAX(CASE WHEN npc_id IS NULL THEN 0 ELSE 1 END) AS npc

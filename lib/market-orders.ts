@@ -95,6 +95,13 @@ export const marketTradeFeesSchema = `CREATE TABLE IF NOT EXISTS market_trade_fe
   charged_at INTEGER NOT NULL
 )`;
 export const marketTradeFeesIndex = `CREATE INDEX IF NOT EXISTS idx_market_trade_fees_seller ON market_trade_fees(seller_id, charged_at)`;
+/** #844 Kindle sales tax: one row per taxed fill; the seller's debit leg and the kindle-treasury credit (see lib/kindle-sales-tax.ts). */
+export const marketSalesTaxSchema = `CREATE TABLE IF NOT EXISTS market_sales_tax (
+  trade_id TEXT PRIMARY KEY REFERENCES market_trades(id) ON DELETE CASCADE,
+  seller_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+  tax_minor INTEGER NOT NULL CHECK(typeof(tax_minor) = 'integer' AND tax_minor > 0),
+  charged_at INTEGER NOT NULL
+)`;
 /** #781 home-move fee sink (one row per move; currency SPK or LN). Netted by walletViewSql (SPK) and lib/korund-wallet (LN). */
 export const homeCityMovesSchema = `CREATE TABLE IF NOT EXISTS home_city_moves (
  request_id TEXT PRIMARY KEY,
@@ -115,6 +122,16 @@ export const savingsShieldCreditsSchema = `CREATE TABLE IF NOT EXISTS savings_sh
  status TEXT NOT NULL CHECK(status IN ('paid', 'skipped')), reason TEXT NOT NULL,
  CHECK((status = 'paid') = (credit_minor > 0))
 )`;
+/** #863 Kindle campaign donations: one row per donation; netted by walletViewSql (citizen debit) and summed per party (party-account credit, lib/party-donations.ts). */
+export const partyDonationsSchema = `CREATE TABLE IF NOT EXISTS party_donations (
+ request_id TEXT PRIMARY KEY,
+ clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+ party_id TEXT NOT NULL,
+ amount_minor INTEGER NOT NULL CHECK(typeof(amount_minor) = 'integer' AND amount_minor > 0),
+ week INTEGER NOT NULL, donated_at INTEGER NOT NULL
+)`;
+export const partyDonationsIndex = `CREATE INDEX IF NOT EXISTS idx_party_donations_user ON party_donations(clerk_user_id, party_id, week)`;
+export const partyDonationsPartyIndex = `CREATE INDEX IF NOT EXISTS idx_party_donations_party ON party_donations(party_id, donated_at)`;
 export const marketSchemas = [marketGoodsSchema, marketOrdersSchema, marketCancellationsSchema, marketTradesSchema, ...marketIndexes, marketSpoilageSchema, ...marketSpoilageIndexes, marketOpenOrdersView];
 export const marketGoodsSeedSql = marketGoods.map(g =>
   `INSERT OR IGNORE INTO market_goods (good, label, unit, perishable, shelf_life_days) VALUES ('${g.good}', '${g.label}', '${g.unit}', ${g.perishable ? 1 : 0}, ${g.shelfLifeDays ?? 'NULL'})`);

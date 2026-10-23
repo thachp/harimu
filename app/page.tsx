@@ -21,7 +21,7 @@ import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { countryWord } from '@/lib/ui-v2-rail';
 import { NationPanel } from './nation-panel-v2';
-import { CitySummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
+import { CitySummary, HouseholdSummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
@@ -46,6 +46,7 @@ import type {ElectionSnapshot} from '../lib/elections';
 import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
+import { householdStock, householdWalletMinor } from '@/lib/ui-v2-household';
 import { SceneNews } from './world-scene';
 import { noticeboardEvents } from '@/lib/noticeboard'; // #375
 import { firstLoopStep } from '@/lib/first-loop';
@@ -93,6 +94,7 @@ import { CityCoResidents } from './city-coresidents';
 import { CivicRankCard } from './civic-rank-card';
 import { PollCard } from './poll-card'; // #740
 import { PlankVotes } from './plank-votes'; // #831
+import { PartyDonations } from './party-donations'; // #863
 import { KindleBudgetCard, useKindleBudget } from './kindle-budget-card';
 import { ArmyCard } from './army-card'; // #738
 import { IVotedBadge } from './i-voted-badge'; // #782
@@ -1703,6 +1705,7 @@ export default function Home() {
       {nationPlanPanelNation(citizenNation.id, viewMode) && dailyLoop}
       {(viewMode === 'household' || viewMode === 'workplace') && <HolidayBanner faith={faithApi.faith} busy={faithApi.busy} onJoin={faithApi.joinFestival} />}
       {viewMode === 'household' && <>
+        <HouseholdSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor, aurellePlan?.walletMinor, korundPlan?.walletMinor)} {...householdStock(citizenNation.id, economy?.inventory, aurellePlan?.foodQuantity, korundPlan?.foodQuantity)} residence={(currentCityAccount?.homeCityId ? cityForNation(citizenNation.id, currentCityAccount.homeCityId) : capitalCityForNation(citizenNation.id))?.name} />
         <FaithPanel api={faithApi} />
         {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
@@ -1775,6 +1778,7 @@ export default function Home() {
         {citizenNation.id==='kindle'&&clerkConfigured&&<TownHalls key={`town-hall:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<PollCard key={`poll:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<PlankVotes key={`planks:${citizenSessionKey}`}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<PartyDonations key={`donations:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<Debate key={`debate:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&simulation?.reserve&&<ReserveBoardLine reserve={simulation.reserve}/>}
         {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={`aurelle-rising:${citizenSessionKey}`}/>}
