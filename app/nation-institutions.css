@@ -4,11 +4,11 @@
 .nation-inspector p,.nation-inspector dd{overflow-wrap:anywhere;line-height:1.5}
 .nation-inspector dl{display:grid;grid-template-columns:minmax(max(70px,min-content),.8fr) minmax(0,1.6fr);gap:8px 12px;margin:0;font-size:calc(13px * var(--text-scale, 1))}
 .nation-inspector dt{color:#94b0ba;overflow-wrap:normal;word-break:normal}
-/* #779: labels never split mid-word: the label column grows to its longest word, and narrow panels stack label over value */
+/* #779: labels and system picker buttons never split mid-word: the label column and each picker button grow to their longest word, and narrow panels stack label over value */
 @media (max-width:420px){.nation-inspector dl{grid-template-columns:minmax(0,1fr);gap:2px 0}.nation-inspector dd{margin-bottom:6px}}
 .nation-inspector dd{margin:0}
 .nation-inspector details{padding:10px;border:1px solid #34535d;border-radius:3px;font-size:calc(12px * var(--text-scale, 1))}.nation-inspector summary{cursor:pointer}.nation-inspector details[open] summary{margin-bottom:8px}.nation-inspector details p{margin-bottom:8px}
 .nation-inspector-systems,.nation-inspector-links{display:flex;flex-wrap:wrap;gap:7px}
-.nation-inspector-systems button{flex:1 1 85px}.nation-inspector button{min-height:44px;white-space:normal;text-align:left;padding:9px 12px;border:1px solid #3b6670;border-radius:3px;background:#1a4650;color:#e1f2ef;font:inherit;font-size:calc(12px * var(--text-scale, 1));cursor:pointer}
+.nation-inspector-systems button{flex:1 1 85px}.nation-inspector .nation-inspector-systems button{min-width:min-content;overflow-wrap:normal;word-break:normal}.nation-inspector button{min-height:44px;white-space:normal;text-align:left;padding:9px 12px;border:1px solid #3b6670;border-radius:3px;background:#1a4650;color:#e1f2ef;font:inherit;font-size:calc(12px * var(--text-scale, 1));cursor:pointer}
 .nation-inspector button[aria-pressed=true]{border-color:#8bd2c5;background:#245b61}.nation-inspector button:disabled{opacity:.45;cursor:default}.nation-inspector button:focus-visible,.nation-inspector summary:focus-visible{outline:2px solid #80d8ce;outline-offset:3px}
 .nation-inspector article{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid #34535d;border-radius:3px;background:#15303b}.nation-inspector-jobs[open]{display:flex;flex-direction:column;gap:10px}

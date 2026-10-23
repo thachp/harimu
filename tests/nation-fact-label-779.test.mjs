@@ -23,3 +23,10 @@ test('#779: the layout check runs in hud-layout-check at 1280/390/320, 100/125/1
   assert.match(check, /\['false', 'true'\]/);
   assert.match(check, /splits "\$\{m\[0\]\}" mid-word/);
 });
+
+test('#786: system picker buttons grow to their longest word and never break inside it (beats .game-inspector-body overflow-wrap:anywhere)', async () => {
+  assert.match(css, /\.nation-inspector \.nation-inspector-systems button\{min-width:min-content;overflow-wrap:normal;word-break:normal\}/);
+  const check = await readFile(new URL('../scripts/nation-fact-label-check.mjs', import.meta.url), 'utf8');
+  assert.match(check, /picker "\$\{b\.textContent\}" splits "\$\{m\[0\]\}" mid-word/);
+  assert.match(check, /probe, flag === 'false'/);
+});
