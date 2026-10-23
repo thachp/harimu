@@ -23,7 +23,7 @@ async function world(t, { backend = 'sqlite', shield = true, verified = true, ri
   await r.call('citizen', 'alice');
   if (nation !== 'kindle') await r.db.prepare('UPDATE citizens SET nation_id = ? WHERE clerk_user_id = ?').bind(nation, 'alice').run();
   const now = Math.floor(r.now / 1000), last = now - idleDays * D;
-  await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','fixture-cash',-1,?,1)").bind(randomUUID(), 'alice', cash).run();
+  if (cash) await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','fixture-cash',-1,?,1)").bind(randomUUID(), 'alice', cash).run();
   await r.db.prepare("UPDATE economy_funds SET initial_minor = ? WHERE id = 'kindle-treasury'").bind(treasury).run();
   // The money supply is seeded before the absence; a 10% emergency issuance just after it starts makes the Price Index rise during the absence.
   await r.db.prepare("INSERT INTO spark_issuances VALUES ('spark-seed','spark-seed',1,'seed',0,100000,0,100000,'Reserve Board',?,NULL)").bind(last - 3600).run();
@@ -64,9 +64,50 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await flat.rows(), [{ status: 'skipped', credit_minor: 0, reason: 'no_index_rise' }]);
     const unverified = await world(t, { backend, verified: false });
     assert.equal((await unverified.beat()).data.welcomeBack.shield, undefined); assert.deepEqual(await unverified.rows(), [], 'unverified: no row');
-    const poor = await world(t, { backend, treasury: 0 }); const p0 = await poor.wallet();
+    const poor = await world(t, { backend, treasury: 0 }); const p0 = await poor.wallet(); // kills the mutant that drops the WHERE treasury guard
     assert.equal((await poor.beat()).data.welcomeBack.shield, undefined);
     assert.deepEqual(await poor.rows(), [{ status: 'skipped', credit_minor: 0, reason: 'treasury_short' }]); assert.equal(await poor.wallet(), p0);
+  });
+}
+
+for (const backend of ['sqlite', 'postgres']) {
+  test(`${backend}: two concurrent returns for the same absence: exactly one pays and shows the shield; wallet and treasury change once`, async t => {
+    const w = await world(t, { backend });
+    const credit = await w.expected(10000); assert.ok(credit > 0);
+    const w0 = await w.wallet(), t0 = await w.treasuryNow();
+    const { applySavingsShield } = await w.r.importModule('lib/savings-shield.ts');
+    const both = await Promise.all([0, 1].map(() => applySavingsShield(w.r.db, 'alice', w.last, w.now, true)));
+    assert.deepEqual(both.map(x => x.replayed).sort(), [false, true], JSON.stringify(both));
+    const shown = both.filter(x => x.status === 'paid' && !x.replayed); // the route shows the line only for this case
+    assert.equal(shown.length, 1); assert.equal(shown[0].creditMinor, credit);
+    assert.equal(await w.wallet(), w0 + credit); assert.equal(await w.treasuryNow(), t0 - credit);
+    assert.deepEqual(await w.rows(), [{ status: 'paid', credit_minor: credit, reason: 'paid' }]);
+    // Through the route: two concurrent heartbeats for the same absence show the line at most once.
+    const r2 = await world(t, { backend }); const a0 = await r2.wallet();
+    const res = await Promise.all([r2.beat(), r2.beat()]);
+    assert.equal(res.filter(x => x.data.welcomeBack?.shield).length, 1, JSON.stringify(res.map(x => x.data)));
+    assert.equal(await r2.wallet(), a0 + credit); assert.equal((await r2.rows()).length, 1);
+  });
+}
+
+test('a top-up during dormancy does not raise the credit (inflows since the absence began are excluded)', async t => {
+  const w = await world(t, {}); const credit = await w.expected(10000); assert.ok(credit > 0);
+  await w.r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','top-up',-1,?,?)").bind(randomUUID(), 'alice', 14000, w.last + 2 * D).run();
+  assert.deepEqual((await w.beat()).data.welcomeBack.shield, { creditMinor: credit }, 'paid on the 100 SPK held at dormancy, not the 240 after the top-up');
+  const only = await world(t, { cash: 0 });
+  await only.r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','top-up',-1,?,?)").bind(randomUUID(), 'alice', 14000, only.last + 2 * D).run();
+  assert.equal((await only.beat()).data.welcomeBack.shield, undefined);
+  assert.deepEqual(await only.rows(), [{ status: 'skipped', credit_minor: 0, reason: 'no_balance' }]);
+});
+
+for (const backend of ['sqlite', 'postgres']) {
+  test(`${backend}: the conditional insert guard: a treasury of exactly the credit pays and ends at 0; one minor short records treasury_short`, async t => {
+    const probe = await world(t, { backend }); const credit = await probe.expected(10000);
+    const exact = await world(t, { backend, treasury: credit });
+    assert.deepEqual((await exact.beat()).data.welcomeBack.shield, { creditMinor: credit }); assert.equal(await exact.treasuryNow(), 0);
+    const short = await world(t, { backend, treasury: credit - 1 }); const s0 = await short.wallet();
+    assert.equal((await short.beat()).data.welcomeBack.shield, undefined); assert.equal(await short.treasuryNow(), credit - 1, 'never commits negative');
+    assert.equal(await short.wallet(), s0); assert.deepEqual(await short.rows(), [{ status: 'skipped', credit_minor: 0, reason: 'treasury_short' }]);
   });
 }
 
