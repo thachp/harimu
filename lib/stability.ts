@@ -60,7 +60,9 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
  // term, so on a holiday it cannot count against the nation: a turnout shortfall adds no Unrest and no negative Stability.
  const rawWork = workTerms(i.worked, i.citizens);
  const food = foodTerms(i.fed, i.citizens), work = holiday ? {...rawWork, stability: Math.max(0, rawWork.stability), unrest: 0} : rawWork, promise = promiseTerms(i.promisesKept, i.promisesBroken), petitions = petitionTerms(i.petitionBacklog, i.citizens);
- const foodDetail = `${food.coverage}% of citizens ate in the last 24 real hours`, workDetail = `${work.share}% worked a shift in the last 24 real hours`+(holiday?' (public holiday: one fewer shift expected, a shortfall is not counted)':'');
+ // #815 (QA1 nit): with no counted citizens (none at all, or every one Dormant, #739) the shares are the neutral 50, so the copy says so instead of a made-up 50%.
+ const none = i.citizens === 0, noneDetail = 'No active citizens: neutral score';
+ const foodDetail = none ? noneDetail : `${food.coverage}% of citizens ate in the last 24 real hours`, workDetail = (none ? noneDetail : `${work.share}% worked a shift in the last 24 real hours`)+(holiday?' (public holiday: one fewer shift expected, a shortfall is not counted)':'');
  const promiseDetail = promise.rate === null ? 'No petition reviews in the last 7 real days' : `${promise.rate}% of reviewed petitions were accepted in the last 7 real days`;
  const petitionDetail = `${i.petitionBacklog} petitions awaiting review (${petitions.share} per 100 citizens)`;
  const stability: ScoreTerm[] = [
@@ -82,14 +84,13 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
 const iso = (seconds: number) => new Date(seconds*1000).toISOString();
 /** Reads the inputs for one nation as of `at` (unix seconds). Every input is windowed on `at`, so a catch-up tick
  * reads that game day's records: a petition resolved after `at` still counts as backlog for that tick (#142). */
-/** #739 slice 2 (ARC): Dormant = no activity for DORMANCY_DAYS.dormant (30) real days. Only a well-formed ISO last_active_at (24 chars, as written by the heartbeat and 0069)
- *  can make a citizen Dormant; NULL or malformed counts as active (never excluded on bad data). */
-export const dormantAt = (at: number) => new Date((at - 30*86400)*1000).toISOString();
+/** #739 slice 2 (ARC): `dormantBefore` is the ISO cutoff from lib/dormancy-rules.ts dormantAt (DORMANCY_DAYS.dormant). Only a well-formed ISO last_active_at (24 chars, as written
+ *  by the heartbeat and 0069) at or before it makes a citizen Dormant; NULL or malformed counts as active. This file keeps no runtime imports (tests load it directly). */
 const notDormant = " AND NOT (c.last_active_at IS NOT NULL AND length(c.last_active_at)=24 AND c.last_active_at<=?)";
-export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; excludeDormant?: boolean} = {}): Promise<StabilityInputs> {
+export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string} = {}): Promise<StabilityInputs> {
  const since = at-signalWindowSeconds;
- // #739 slice 2 (ARC): with excludeDormant (flag on, live tick only), the citizens/fed/worked counts leave out citizens Dormant at `at`, so food and work shares exclude them. Flag off: the SQL text is unchanged (tests/world-repair-cap-679 matches it).
- const nd = options.excludeDormant ? notDormant : '', cut = options.excludeDormant ? [dormantAt(at)] : [];
+ // #739 slice 2 (ARC): with dormantBefore (flag on, live tick only), the citizens/fed/worked counts leave out citizens Dormant at `at`, so food and work shares exclude them. Flag off: the SQL text is unchanged (tests/world-repair-cap-679 matches it).
+ const nd = options.dormantBefore ? notDormant : '', cut = options.dormantBefore ? [options.dormantBefore] : [];
  const meals = nationId === 'kindle' ? "SELECT clerk_user_id FROM citizen_economy_events WHERE kind='meal' AND occurred_at>? AND occurred_at<=?"
   : nationId === 'korund' ? 'SELECT clerk_user_id FROM korund_meals WHERE occurred_at>? AND occurred_at<=?'
   : 'SELECT clerk_user_id FROM aurelle_meals WHERE occurred_at>? AND occurred_at<=?';
@@ -109,7 +110,7 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
 }
 
 /** Statements that record one game day's scores. INSERT OR IGNORE makes retries no-ops. */
-export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; excludeDormant?: boolean} = {}) {
+export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string} = {}) {
  return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); const score = computeStability(inputs);
   return db.prepare('INSERT OR IGNORE INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)')
    .bind(nationId, tick, scheduledAt, now, score.stability, score.unrest, JSON.stringify(inputs), JSON.stringify(score.breakdown)); }));

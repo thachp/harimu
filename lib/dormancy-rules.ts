@@ -11,6 +11,9 @@ export const DORMANCY_DAYS = Object.freeze({ away: 7, dormant: 30, archived: 180
 /** last_active_at is bumped at most once per real hour per citizen. */
 export const ACTIVITY_BUMP_SECONDS = 3_600;
 
+/** #739 slice 2 / #815 (QA1 nit): the Dormant cutoff for a tick at `at` (unix seconds), as ISO text comparable with last_active_at. */
+export const dormantAt = (at: number) => new Date((at - DORMANCY_DAYS.dormant * DAY) * 1000).toISOString();
+
 export const dormancyEnabled = (env: { HARIMU_DORMANCY_ENABLED?: string } | null | undefined) => env?.HARIMU_DORMANCY_ENABLED === 'true';
 
 /** Status after `seconds` of inactivity (both in seconds). Unknown or future activity counts as active. */

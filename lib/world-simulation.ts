@@ -1,4 +1,5 @@
 import { mapLimited } from './async-limits'; // #679
+import { dormantAt } from './dormancy-rules'; // #739
 import { runFoundingDay30 } from './founding-period'; // #612
 import { finalizeDueElection } from './elections';
 import { runKindleAssembly, type AssemblyTickConfig } from './assembly';
@@ -149,7 +150,7 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       // (due while no request arrived) and #679-repaired past ticks keep the old full count, even after deploy: no flag-on time is recorded, and dormancy history
       // is not reconstructed (last_active_at is only the current value). Pinned by tests/dormancy-stability-739.test.mjs.
       const live = options.dormancy === true && Number(row.scheduled_at)+tickSeconds>now;
-      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(live?{excludeDormant:true}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
+      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
     });
     if (statements.length) await db.batch(statements.flat());
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
