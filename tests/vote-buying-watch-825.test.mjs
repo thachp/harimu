@@ -67,6 +67,13 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await events(r), [], '(c) self-gift: sender = voter never flags');
   });
 
+  test(`(${backend}) QA3: with an empty candidate list, a canvasser's gift is still flagged as 'campaign'`, async t => {
+    const { r, now, vote, gifts, w } = await setup(backend); t.after(() => r.close());
+    const sql = w.voteBuyingSweepSql(gifts([['cv', 'canvasser', 'v4', vote + H]])).replace(w.candidateSenderSql(w.voteBuyingCandidateIds), w.candidateSenderSql([]));
+    await r.db.prepare(sql).bind(now - 96 * H, now - 96 * H, now - 96 * H, 48 * H, 48 * H, now).run();
+    assert.deepEqual(await events(r), [{ election_key: 'civic:e825', voter_id: 'v4', sender_id: 'canvasser', transfer_id: 'gift:cv', reason: 'campaign' }]);
+  });
+
   test(`sweep (${backend}): an ordinary market purchase at the listed price by a party member records no event (and with no direct sources there is no query)`, async t => {
     const { r, now, vote, fill, w } = await setup(backend); t.after(() => r.close());
     await fill('boss', 'v1', vote + H); await fill('canvasser', 'v2', vote - H);
