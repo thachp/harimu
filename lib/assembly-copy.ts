@@ -1,10 +1,10 @@
-/** Kindle mid-term Assembly copy: ballot explainer, Republic Wire Service press items and results caption (issue #299,
+/** Kindle mid-term Assembly copy: ballot explainer, Kindle Press press items and results caption (issue #299,
  * companion to SDE #283). Content only: #283 owns district seats, party lists, the count and the day-60 trigger; no UI
  * imports this. Canon: harimu-docs politics/elections §9.1 ("Mid-term Assembly election ... half the seats"; ballots
  * secret, results hidden until close), §9.3 (party-list PR within the district; only human votes are counted, Decision 65: the
  * simulated AI ballot bloc is superseded, #449), §9.5 and the Kindle Republic page (Forgehaven Assembly dome; per-district counts fully published), plus
  * the #237 Kindle press voice (plain, argumentative, officials questioned). The byline is the Kindle pack's
- * "Republic Wire Service" (lib/press-templates.ts, #242).
+ * "Kindle Press" (lib/press-templates.ts, #242).
  *
  * Rules: no figures. "Half the seats" and "one party list" are the docs' own words; seat counts appear only through
  * {seats}, and no totals, turnout or quorum are written in. Seat allocation is described only as "in proportion to
@@ -27,7 +27,7 @@ export type AssemblyPressStage={stage:AssemblyStage;items:readonly AssemblyPress
 
 export const ASSEMBLY_STAGES:readonly AssemblyStage[]=['midterm-announced','voting-open','results-gain','results-hold','results-loss'];
 /** Same wire service as lib/press-templates.ts kindlePress.byline (a new neutral name, so proposal). */
-export const ASSEMBLY_BYLINE={name:'Republic Wire Service',proposal:true} as const;
+export const ASSEMBLY_BYLINE={name:'Kindle Press',proposal:false} as const;
 
 const L=(text:string):Line=>({text,proposal:true});
 const it=(id:string,headline:string,body:string):AssemblyPressItem=>({id,headline,body,proposal:true});

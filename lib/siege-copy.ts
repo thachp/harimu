@@ -3,7 +3,7 @@
  * Canon: harimu-docs territory-cities-warfare §15.3 (capturing a city takes at least two successful assaults on two different days inside
  * the defender's defense window; Heartland squares cannot be captured), cities §capture rules (capitals and other Heartland cities can
  * never be captured; Frontier outposts and cities founded on Frontier squares can be), §15.4 (citizens are never killed; evacuation is
- * covered by the separate war-protections copy, #421) and the three press voices: Kindle (#237, Republic Wire Service, plain and argumentative),
+ * covered by the separate war-protections copy, #421) and the three press voices: Kindle (#237, Kindle Press, plain and argumentative),
  * Korund State Media (#238/#244) and the Aurelle Court Gazette (#239, "Be it known"). Bylines are checked against lib/press-templates.ts.
  *
  * Each nation has two variants of every siege event: a `report` (a bylined report about a siege between other nations, or about one in
@@ -40,22 +40,22 @@ const L=(text:string):Line=>({text,proposal:true});
 const s=(id:string,headline:string,body:string,aiBadge=false):SiegeNotice=>({id,headline,body,aiBadge,proposal:true});
 
 export const siegeNotices:readonly SiegeNationNotices[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,notices:{
   opened:{
-   report:s('kindle-opened-report','Siege opens at {city}','Republic Wire Service: {attacker} lays siege to {city}. Taking it needs two successful assaults on two days.'),
-   own:s('kindle-opened-own','Siege begins at {city}','Republic Wire Service: the siege of {city} is on. Officials must tell citizens what it means.')},
+   report:s('kindle-opened-report','Siege opens at {city}','Kindle Press: {attacker} lays siege to {city}. Taking it needs two successful assaults on two days.'),
+   own:s('kindle-opened-own','Siege begins at {city}','Kindle Press: the siege of {city} is on. Officials must tell citizens what it means.')},
   'first-assault':{
-   report:s('kindle-first-report','First assault succeeds','Republic Wire Service: {attacker}\'s assault on {city} succeeded. A second, on another day, is needed.'),
-   own:s('kindle-first-own','A first assault lands','Republic Wire Service: the first assault on {city} has succeeded. A second is needed, on another day.')},
+   report:s('kindle-first-report','First assault succeeds','Kindle Press: {attacker}\'s assault on {city} succeeded. A second, on another day, is needed.'),
+   own:s('kindle-first-own','A first assault lands','Kindle Press: the first assault on {city} has succeeded. A second is needed, on another day.')},
   'city-falls':{
-   report:s('kindle-falls-report','{city} has fallen','Republic Wire Service: {city} has fallen to {attacker}. Its citizens are evacuated.'),
-   own:s('kindle-falls-own','The siege is over','Republic Wire Service: {city} is captured after a second assault. Ask your officials what comes next.')},
+   report:s('kindle-falls-report','{city} has fallen','Kindle Press: {city} has fallen to {attacker}. Its citizens are evacuated.'),
+   own:s('kindle-falls-own','The siege is over','Kindle Press: {city} is captured after a second assault. Ask your officials what comes next.')},
   'assault-held':{
-   report:s('kindle-held-report','Assault held at {city}','Republic Wire Service: {defender} held {city}. The assault did not succeed.'),
-   own:s('kindle-held-own','{city} holds','Republic Wire Service: the assault on {city} was turned back. The siege goes on.')},
+   report:s('kindle-held-report','Assault held at {city}','Kindle Press: {defender} held {city}. The assault did not succeed.'),
+   own:s('kindle-held-own','{city} holds','Kindle Press: the assault on {city} was turned back. The siege goes on.')},
   lifted:{
-   report:s('kindle-lifted-report','Siege lifted at {city}','Republic Wire Service: {attacker} lifts the siege of {city}. The city was not captured.'),
-   own:s('kindle-lifted-own','No capture at {city}','Republic Wire Service: the siege of {city} is over, and the city stands. Officials must say why.')}}},
+   report:s('kindle-lifted-report','Siege lifted at {city}','Kindle Press: {attacker} lifts the siege of {city}. The city was not captured.'),
+   own:s('kindle-lifted-own','No capture at {city}','Kindle Press: the siege of {city} is over, and the city stands. Officials must say why.')}}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
   opened:{
    report:s('korund-opened-report','Siege abroad','Korund State Media reports: {attacker} has laid siege to {city}.'),

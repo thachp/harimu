@@ -57,7 +57,7 @@ test('the reassurance stays inside the wellbeing page: identity kept, absence no
 });
 test('one neutral system voice: no byline, no AI badge, no nation, leader or outlet voice, no real-world references', () => {
   for (const o of [S,R,N,A]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
-  for (const t of all()) { assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|Chairman|Crown|President|Kindle|Korund|Aurelle|AI-generated|AI character|Notable|@/,t); assert.doesNotMatch(t,/\b(Earth|America\w*|Europe\w*|England|France|Japan|China|Russia|Tessera|NFT|on-chain)\b/,t); }
+  for (const t of all()) { assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|Chairman|Crown|President|Kindle|Korund|Aurelle|AI-generated|AI character|Notable|@/,t); assert.doesNotMatch(t,/\b(Earth|America\w*|Europe\w*|England|France|Japan|China|Russia|Tessera|NFT|on-chain)\b/,t); }
 });
 test('unwired: nothing in app/, components/ or lib/ imports wellbeing-break-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };

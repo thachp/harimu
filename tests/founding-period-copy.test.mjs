@@ -61,8 +61,8 @@ test('day-30 previews match the 10.6 events: Kindle first election (citizens vot
 test('voices and bylines: each preview opens with its own outlet and the byline matches lib/press-templates.ts', () => {
   const by=Object.fromEntries(DP.map(x=>[x.nationId,x.byline]));
   assert.deepEqual(by.kindle,kindlePress.byline); assert.deepEqual(by.korund,korundStateMedia.byline); assert.deepEqual(by.aurelle,aurelleGazette.byline);
-  assert.match(dayThirtyPreviewFor('kindle').body,/^Republic Wire Service: /); assert.match(dayThirtyPreviewFor('korund').body,/^Korund State Media reports: /); assert.match(dayThirtyPreviewFor('aurelle').body,/^The Court Gazette reports that /);
-  for (const t of [BN.caption.text,BN.explainer.text,PG.line.text,TN.line.text,EN.text]) assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|Chairman|Crown|Assembly/,t);
+  assert.match(dayThirtyPreviewFor('kindle').body,/^Kindle Press: /); assert.match(dayThirtyPreviewFor('korund').body,/^Korund State Media reports: /); assert.match(dayThirtyPreviewFor('aurelle').body,/^The Court Gazette reports that /);
+  for (const t of [BN.caption.text,BN.explainer.text,PG.line.text,TN.line.text,EN.text]) assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|Chairman|Crown|Assembly/,t);
 });
 test('AI badge (#381, ui-ux 23.2): only the Korund State Media line for the state\'s own act is badged; the Kindle and Gazette reports and every system line are not', () => {
   assert.deepEqual(DP.filter(x=>x.aiBadge).map(x=>x.nationId),['korund']);

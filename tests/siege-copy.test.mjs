@@ -61,7 +61,7 @@ test('badge rule (#381, ui-ux 23.2): Aurelle "Be it known" and Korund own-siege 
 test('bylines match lib/press-templates.ts and lead the body', () => {
   const by=Object.fromEntries(SN.map(n=>[n.nationId,n.byline]));
   assert.deepEqual(by.kindle,kindlePress.byline); assert.deepEqual(by.korund,korundStateMedia.byline); assert.deepEqual(by.aurelle,aurelleGazette.byline);
-  for (const x of notices()) { if (x.nation==='kindle') assert.match(x.n.body,/^Republic Wire Service: /); if (x.nation==='korund') assert.match(x.n.body,/^Korund State Media reports: /); }
+  for (const x of notices()) { if (x.nation==='kindle') assert.match(x.n.body,/^Kindle Press: /); if (x.nation==='korund') assert.match(x.n.body,/^Korund State Media reports: /); }
 });
 test('the two-day rule is only the docs\' rule: second assault on another day; first assault never captures', () => {
   for (const e of ['first-assault']) for (const x of notices().filter(y=>y.event===e)) assert.match(x.n.body,/second|another day/,x.n.id);
@@ -78,11 +78,11 @@ test('tone (docs 15.4): citizens are never killed; no violence, loot or glory; n
   assert.doesNotMatch(t,/\b(kill|killed|dead|death|die[sd]?|casualt\w*|massacre|slain|blood|burn|loot|slaughter|glor\w*|victory|conquer\w*|crush\w*)\b/i);
   assert.doesNotMatch(t,/Notable|@|\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia|Versailles|Napoleon)\b/);
-  for (const x of notices()) { if (x.nation!=='kindle') assert.doesNotMatch(x.n.body,/Republic Wire Service/); if (x.nation!=='korund') assert.doesNotMatch(x.n.body,/State Media/); if (x.nation!=='aurelle') assert.doesNotMatch(x.n.body,/Be it known|Court Gazette/); }
+  for (const x of notices()) { if (x.nation!=='kindle') assert.doesNotMatch(x.n.body,/Kindle Press/); if (x.nation!=='korund') assert.doesNotMatch(x.n.body,/State Media/); if (x.nation!=='aurelle') assert.doesNotMatch(x.n.body,/Be it known|Court Gazette/); }
 });
 test('system lines carry no byline or AI badge: strip, rules and private notices', () => {
   for (const o of [ST,SR,CP]) assert.equal('aiBadge' in o,false);
-  for (const l of [ST.caption,...SR.lines,CP.defender,CP.attacker]) { assert.equal('aiBadge' in l,false); assert.doesNotMatch(l.text,/Republic Wire|State Media|Court Gazette|Be it known/); }
+  for (const l of [ST.caption,...SR.lines,CP.defender,CP.attacker]) { assert.equal('aiBadge' in l,false); assert.doesNotMatch(l.text,/Kindle Press|State Media|Court Gazette|Be it known/); }
 });
 test('wired only through app/siege-panel.tsx (#620): nothing else in app/, components/ or lib/ imports siege-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };

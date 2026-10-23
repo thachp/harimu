@@ -59,7 +59,7 @@ test('Korund never says the population is tired of the war: no weariness, tired,
   assert.match(wearinessNewsFor('korund').notices.rising.headline,/Resolve is being tested/);
 });
 test('Kindle is frank; Aurelle speaks of the Crown\'s patience and the realm\'s burden', () => {
-  assert.equal(BN.kindle.rising,'War weariness is rising'); for (const l of WEARINESS_LEVELS) assert.match(wearinessNewsFor('kindle').notices[l].body,/^Republic Wire Service: /);
+  assert.equal(BN.kindle.rising,'War weariness is rising'); for (const l of WEARINESS_LEVELS) assert.match(wearinessNewsFor('kindle').notices[l].body,/^Kindle Press: /);
   assert.match(wearinessNewsFor('kindle').notices.high.body,/polls/);
   assert.match(BN.aurelle.rising,/patience/); assert.match(BN.aurelle.high,/burden/); assert.match(BN.aurelle.severe,/burden/);
   for (const l of WEARINESS_LEVELS) assert.match(wearinessNewsFor('aurelle').notices[l].body,/patience|burden/);
@@ -83,7 +83,7 @@ test('weekly notice and relief: Unrest only via {amount}; relief never promises 
   for (const l of ST.weekly) assert.match(l.text,/Unrest/); for (const l of ST.tooltip) assert.match(l.text,/Unrest/);
   assert.match(ST.tooltip[0].text,/Losses and lost squares speed it up/);
   for (const l of RL) { assert.match(l.text,/war (is over|has ended)|The war/i); assert.doesNotMatch(l.text,/fall|drop|eas|relief|reduc|less|\{/i,l.text); }
-  for (const t of [...ST.tooltip.map(l=>l.text),...ST.weekly.map(l=>l.text),...RL.map(l=>l.text)]) assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known/);
+  for (const t of [...ST.tooltip.map(l=>l.text),...ST.weekly.map(l=>l.text),...RL.map(l=>l.text)]) assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known/);
 });
 test('tone: no violence, no casualties named, no Notable, no other nations, no real-world reference', () => {
   const t=all().join(' ');

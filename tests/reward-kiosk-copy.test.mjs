@@ -59,7 +59,7 @@ test('earned versus not earned: starter grants and faucets are never called earn
 test('nation voice differs for Kindle, Korund and Aurelle, in word choice only', () => {
   assert.equal(new Set(KIOSK_NATIONS.map(n=>NV[n].title)).size,3); assert.equal(new Set(KIOSK_NATIONS.map(n=>NV[n].intro.text)).size,3);
   assert.match(NV.kindle.intro.text,/^Claim what you earned/); assert.match(NV.korund.intro.text,/for all\./); assert.match(NV.aurelle.intro.text,/may be claimed here/);
-  for (const t of all()) assert.doesNotMatch(t,/Chairman|Crown|Monarch|President|Plan Commission|Assembly|Privy|Be it known|State Media|Republic Wire|Court Gazette|Notable|@|!/,t);
+  for (const t of all()) assert.doesNotMatch(t,/Chairman|Crown|Monarch|President|Plan Commission|Assembly|Privy|Be it known|State Media|Kindle Press|Court Gazette|Notable|@|!/,t);
 });
 test('system chrome: no byline, no AI badge, no pressure', () => {
   for (const o of [CL,LB,CM,HS,NT,...KIOSK_NATIONS.map(n=>NV[n])]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
