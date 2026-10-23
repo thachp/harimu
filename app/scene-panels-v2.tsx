@@ -45,6 +45,7 @@ export function CitySummary({ cityName, city, nation, destinations, onView, enab
 /** #392 S9 (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): the Household panel head, existing data only. Wallet, Food, Residence, and Pantry (food and materials from the
  *  inventory); family cards with the four existing Vale portraits. Names and relations are the household's own from the original planning view (137d9d4);
  *  no needs or mood are shown because no per-member data exists. The portraits are decorative (alt=""): each card's name is its text. */
+// TODO(#392): the Vale family is shared across every nation; per-nation households need their own data.
 export const valeFamily = [
   { id: 'citizen', name: 'You', relation: 'Citizen', image: '/assets/household/leora-vale.webp' },
   { id: 'partner', name: 'Toma Vale', relation: 'Partner', image: '/assets/household/toma-vale.webp' },
@@ -56,7 +57,7 @@ export function HouseholdSummary({ nation, walletMinor, inventory, residence, en
   const food = itemCount(inventory, 'food'), materials = itemCount(inventory, 'materials');
   return <div className="household-v2">
     <PanelV2 title="Household" subtitle={nation.name} rowsLabel="Household" rows={[]}
-      stats={[{ label: 'Wallet', value: `${((walletMinor ?? 0) / 100).toFixed(2)} ${nation.currency}` }, { label: 'Food', value: String(food) }, ...(residence ? [{ label: 'Residence', value: residence }] : []), { label: 'Pantry', value: `${food} food · ${materials} materials` }]} />
-    <ul className="household-v2-family" aria-label="Household members">{valeFamily.map(member => <li key={member.id}><img src={member.image} alt="" width={48} height={48} loading="lazy" /><strong>{member.name}</strong><small>{member.relation}</small></li>)}</ul>
+      stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), { label: 'Food', value: String(food) }, ...(residence ? [{ label: 'Residence', value: residence }] : []), { label: 'Pantry', value: `${food} food · ${materials} materials` }]} />
+    <ul className="household-v2-family" aria-label="Household members">{valeFamily.map(member => <li key={member.id}>{/* eslint-disable-line @next/next/no-img-element -- 48px decorative static portraits; no Next image loader on this deploy */}<img src={member.image} alt="" width={48} height={48} loading="lazy" /><strong>{member.name}</strong><small>{member.relation}</small></li>)}</ul>
   </div>;
 }
