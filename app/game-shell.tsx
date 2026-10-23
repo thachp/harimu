@@ -124,9 +124,10 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   useEffect(() => {
     if (!mobileV2 || typeof ResizeObserver === 'undefined') return;
     const root = document.querySelector<HTMLElement>('.harimu-game.game-mobile-v2'); if (!root) return;
-    const sync = () => { for (const [name, sel] of [['--s8-top', '.game-hud'], ['--s8-tabs', '.game-nav-row'], ['--s8-dock', '.citizen-dock']] as const) root.style.setProperty(name, `${root.querySelector(sel)?.getBoundingClientRect().height ?? 0}px`); };
+    const sync = () => { for (const [name, sel] of [['--s8-top', '.game-hud'], ['--s8-tabs', '.game-nav-row'], ['--s8-dock', '.citizen-dock'], ['--s8-sheet', ':is(#game-details, #game-reopen)']] as const) root.style.setProperty(name, `${root.querySelector(sel)?.getBoundingClientRect().height ?? 0}px`); };
     const observer = new ResizeObserver(sync), watched = new Set<Element>();
-    const attach = () => { for (const el of root.querySelectorAll('.game-hud, .game-nav-row, .citizen-dock')) if (!watched.has(el)) { watched.add(el); observer.observe(el); } sync(); };
+    const attach = () => { for (const el of root.querySelectorAll('.game-hud, .game-nav-row, .citizen-dock, #game-details, #game-reopen')) if (!watched.has(el)) { watched.add(el); observer.observe(el); } sync(); };
+    // #847: the fixed phone sheet (open) or its Show-details bar (collapsed) is measured too, so the scene ends at its top.
     // Bars that mount later (the citizen dock after signing in on City) or unmount are picked up: a child-list change re-attaches and re-measures.
     const mutations = new MutationObserver(attach); mutations.observe(root, { childList: true }); attach();
     return () => { observer.disconnect(); mutations.disconnect(); };

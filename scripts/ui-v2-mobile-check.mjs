@@ -37,13 +37,18 @@ const probe = ({ on, phone, view, scale }) => {
     if (rects.stage && Math.abs(rects.stage.t - rects.hud.b) > 1.5) issues.push(`${Math.round(rects.stage.t - rects.hud.b)}px gap between the top bar and the scene`);
     // A pinned bar overlays whatever scrolls under it; the page end is checked below (atEnd). At 100% text the City scene fits above the bar unscrolled (#377).
     if (view === 'square' && overlaps(rects.nav, rects.stage)) issues.push('tab bar covers the City scene');
-    if (view === 'square') { const c = box('.game-stage .viewport-canvas'), d = box('.citizen-dock'), floor = Math.min(rects.nav.t, d ? d.t : vh); // #377: the canvas fits between the bars
+    if (view === 'square') { const c = box('.game-stage .viewport-canvas'), d = box('.citizen-dock'), sh = box(':is(#game-details, #game-reopen)'), floor = Math.min(rects.nav.t, d ? d.t : vh, sh ? sh.t : vh); // #377: the canvas fits between the bars
       if (!c || c.t < rects.hud.b - 1 || c.b > floor + 1) issues.push(`City canvas ${c ? `${Math.round(c.t)}-${Math.round(c.b)}` : 'missing'} does not fit between the bars (${Math.round(rects.hud.b)}-${Math.round(floor)})`);
+      else if (on && sh && scale === 1 && rects.stage.b > sh.t + 1.5) issues.push(`scene runs ${Math.round(rects.stage.b - sh.t)}px under the sheet`); // #847: at 100% the map controls stay above the open sheet; at larger text the sheet may overlay them until collapsed (checked in sheetToggle)
       else if (Math.abs(rects.stage.b - floor) > 1.5 && rects.stage.b - rects.stage.t > 261) issues.push(`scene ends ${Math.round(floor - rects.stage.b)}px above the tab bar`); }
     for (const b of controls) { const t = b.querySelector('span') ?? b; if (t.scrollWidth > t.clientWidth + 1 || b.scrollWidth > b.clientWidth + 1) issues.push(`"${b.textContent.trim()}" is truncated`); } // ARC: the bar may wrap to two rows at 320/150%, never truncate
     if (row.scrollWidth > row.clientWidth + 1) issues.push('tab bar scrolls sideways');
     for (const b of controls) { const r = b.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       if (r.height < 43.5) issues.push(`"${b.textContent.trim()}" is ${Math.round(r.height)}px tall`); if (t && !b.contains(t)) issues.push(`"${b.textContent.trim()}" is covered`); }
+    const sh = q(':is(#game-details, #game-reopen)'), shr = sh?.getBoundingClientRect(); // #847: the sheet is fixed on the tab bar, with one 44px+ toggle
+    if (!sh || getComputedStyle(sh).position !== 'fixed' || Math.abs(shr.bottom - rects.nav.t) > 1) issues.push(`sheet is not fixed on the tab bar (${sh ? `${getComputedStyle(sh).position} ${Math.round(shr.bottom)}` : 'missing'})`);
+    const tg = q('#game-details .game-inspector-title button[aria-controls=game-details], #game-reopen'), tr = tg?.getBoundingClientRect();
+    if (!tg || !tg.hasAttribute('aria-expanded') || tr.height < 43.5 || tr.width < 43.5) issues.push(`sheet toggle missing, without aria-expanded or under 44px`);
     const p = q('.game-inspector'); if (p && parseFloat(getComputedStyle(p).borderTopLeftRadius) < 8) issues.push('panel is not a sheet');
   } else if (phone && rects.stage && rects.nav.t > rects.stage.t) issues.push('flag off: nav row is not above the scene');
   return { issues, names, rects };
@@ -52,6 +57,22 @@ const atEnd = () => { if (!document.querySelector('.game-nav-row')) return []; w
   const last = [...document.querySelectorAll('.harimu-game > :is(.game-inspector,.game-context-strip,.game-stage,.game-notice)')].reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0);
   const issues = []; if (n.top < last - 1) issues.push(`scrolled to the end, the tab bar still covers ${Math.round(last - n.top)}px of content`); if (d && n.bottom > d.top + 1) issues.push('tab bar under the dock');
   window.scrollTo(0, 0); return issues; };
+
+// #847: keyboard collapse then expand. The toggle reports aria-expanded, focus moves to the other end, and the scene resizes to the sheet each time.
+const sheetToggle = async page => {
+  const state = () => page.evaluate(() => { const g = document.querySelector('.harimu-game'), o = document.querySelector('#game-reopen'), sh = document.querySelector(':is(#game-details, #game-reopen)'), st = document.querySelector('.game-stage');
+    return { open: !!document.querySelector('#game-details'), exp: (o ?? document.querySelector('#game-details .game-inspector-title button'))?.getAttribute('aria-expanded'), focus: document.activeElement?.id || document.activeElement?.closest('#game-details') ? (document.activeElement.id || 'in-sheet') : '', h: o?.getBoundingClientRect().height ?? 0,
+      gap: Math.round(sh.getBoundingClientRect().top - st.getBoundingClientRect().bottom), sheetVar: g.style.getPropertyValue('--s8-sheet'), sh: Math.round(sh.getBoundingClientRect().height) }; });
+  const issues = [];
+  await page.focus('#game-details .game-inspector-title button'); await page.keyboard.press('Enter'); await page.waitForTimeout(250);
+  let s = await state();
+  if (s.open || s.exp !== 'false' || s.focus !== 'game-reopen' || s.h < 43.5) issues.push(`collapse by keyboard: ${JSON.stringify(s)}`);
+  if (s.gap < -1.5) issues.push(`collapsed, the scene still runs ${-s.gap}px under the Show details bar`);
+  if (`${s.sh}px` !== s.sheetVar && Math.abs(parseFloat(s.sheetVar) - s.sh) > 1) issues.push(`collapsed sheet not measured (${s.sheetVar} vs ${s.sh})`);
+  await page.keyboard.press('Enter'); await page.waitForTimeout(250); s = await state();
+  if (!s.open || s.exp !== 'true' || !s.focus) issues.push(`expand by keyboard: ${JSON.stringify(s)}`);
+  return issues;
+};
 
 export async function checkUiV2Mobile({ browser, css, preflight, failures, rows }) {
   const shots = process.env.LAYOUT_SHOTS_DIR, base = {}, extra = await readFile(new URL('../app/panel-v2.css', import.meta.url), 'utf8');
@@ -69,14 +90,15 @@ export async function checkUiV2Mobile({ browser, css, preflight, failures, rows 
           const main = document.querySelector('.harimu-game'), d = document.createElement('nav'); d.className = 'citizen-dock'; d.style.height = '45px'; main.appendChild(d);
           await new Promise(r => setTimeout(r, 120)); const v = main.style.getPropertyValue('--s8-dock'); d.remove(); await new Promise(r => setTimeout(r, 120));
           return v === '45px' && main.style.getPropertyValue('--s8-dock') === '0px' ? '' : `late dock not measured (--s8-dock ${v})`; }) : '';
-        const r = await page.evaluate(probe, { on, phone, view, scale }), issues = [...(late ? [late] : []), ...r.issues, ...(on && phone ? await page.evaluate(atEnd) : [])];
+        const toggle = on && phone && view === 'square' ? await sheetToggle(page) : [];
+        const r = await page.evaluate(probe, { on, phone, view, scale }), issues = [...toggle, ...(late ? [late] : []), ...r.issues, ...(on && phone ? await page.evaluate(atEnd) : [])];
         if (!on) base[key] = r; else if (base[key]) {
           if (base[key].names && r.names && base[key].names.join() !== r.names.join()) issues.push(`controls changed: ${r.names.join()} vs ${base[key].names.join()}`);
           if (!phone && JSON.stringify(base[key].rects) !== JSON.stringify(r.rects)) issues.push('desktop layout changed with the flag on');
         }
         for (const i of issues) failures.push(`${id}: ${i}`);
         rows.push(`${id}: ${r.names?.length ?? 0} nav controls${issues.length ? ' ✗' : ''}`);
-        if (shots && h !== 640 && scale !== 1.25 && !dock && (view === 'square' || (phone && on))) await page.screenshot({ path: `${shots}/s8-${view}-${on ? 'on' : 'off'}-${w}-${scale * 100}.png` });
+        if (shots) await page.evaluate(() => document.fonts.ready); if (shots && h !== 640 && scale !== 1.25 && !dock && (view === 'square' || (phone && on))) await page.screenshot({ path: `${shots}/s8-${view}-${on ? 'on' : 'off'}-${w}-${scale * 100}.png` });
       }
       await context.close();
     }
