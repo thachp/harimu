@@ -13,7 +13,7 @@ jobs:
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event.repository.full_name == github.repository
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -21,7 +21,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
-          cache: npm
       - run: npm ci
       - name: Create the role and run the role check
         env:
