@@ -80,3 +80,46 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(await count('rally_speeches'), 0); assert.deepEqual(await speeches(), template);
   });
 }
+
+test('#876: the rallies cron job runs runRallyCron and then runRallySpeechCron on the same database and time', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../worker/entry.ts', import.meta.url), 'utf8'), line = source.split('\n').find(l => /if \(on\.rallies\)/.test(l)) ?? '';
+  assert.match(line, /await runRallyCron\(db, t\);\s*await runRallySpeechCron\(db, t, env as unknown as RallySpeechBindings\)/);
+  assert.match(source, /import \{ runRallySpeechCron, type RallySpeechBindings \} from '\.\.\/lib\/rally-speech-ai'|import \{ runRallySpeechCron[^}]*\} from '\.\.\/lib\/rally-speech-ai'/);
+});
+const perCandidate = () => ({ seen: [], async run(model, input) {
+  this.seen.push(model);
+  if (model.includes('guard')) return { response: 'safe' };
+  const required = input.response_format?.json_schema?.required ?? [];
+  if (required.includes('supported')) return { response: JSON.stringify({ supported: true }) };
+  const who = JSON.parse(input.messages[1].content).candidate;
+  return { response: JSON.stringify({ response: `I am ${who}, and I will keep Kindle working for every Resident.` }) };
+} });
+for (const backend of ['sqlite', 'postgres']) {
+  test(`#876 ${backend}: each rally and its published clip carry their own candidate's speech`, async t => {
+    const { r, ai, rallies, now } = await setup(t, backend);
+    assert.deepEqual((await ai.runRallySpeechCron(r.db, now, env(perCandidate()))).results, ['recorded', 'recorded', 'recorded']);
+    const list = (await r.call('rallies', 'alice')).data.rallies;
+    assert.equal(new Set(list.map(x => x.speech.text)).size, 3);
+    for (const x of list) assert.equal(x.speech.text, `I am ${x.candidateName}, and I will keep Kindle working for every Resident.`, x.id);
+    await rallies.runRallyCron(r.db, Math.max(...list.map(x => x.startsAt)) + 60);
+    for (const x of list) assert.equal((await r.db.prepare('SELECT speech FROM rally_clips WHERE rally_id=?').bind(x.id).first())?.speech, x.speech.text, `clip ${x.id}`);
+  });
+
+  test(`#876 ${backend}: the retry key is once per rally per UTC day, and a run that loses the reservation race says so`, async t => {
+    const { r, ai, now, count } = await setup(t, backend);
+    const down = { async run() { throw new Error('down'); } };
+    await ai.runRallySpeechCron(r.db, now, env(down));
+    const day = new Date(now * 1000).toISOString().slice(0, 10), ids = (await r.db.prepare("SELECT request_id FROM harimu_ai_reservations WHERE request_id LIKE 'rally:%' ORDER BY request_id").all()).results.map(x => x.request_id);
+    assert.equal(ids.length, 3); assert.ok(ids.every(id => id.endsWith(`:${day}`)), ids.join());
+    // Lost race: the pre-check saw nothing, but another run already holds today's reservation.
+    const seen = new Set(), blind = new Proxy(r.db, { get(target, key) {
+      if (key !== 'prepare') { const v = target[key]; return typeof v === 'function' ? v.bind(target) : v; }
+      return sql => { const st = target.prepare(sql); if (!sql.startsWith('SELECT (SELECT COUNT(*) FROM rally_speeches')) return st; return { bind(...a) { const b = st.bind(...a), k = a.join(); return { first: async () => (seen.has(k) ? b.first() : (seen.add(k), { saved: 0, tried: 0 })) }; } }; };
+    } });
+    assert.deepEqual((await ai.runRallySpeechCron(blind, now, env(gateway()))).results, ['raced', 'raced', 'raced']);
+    const tomorrow = now - now % 86400 + 86400 + 3600;
+    const next = await ai.runRallySpeechCron(r.db, tomorrow, env(gateway()));
+    assert.ok(next.results.includes('recorded'), 'a new UTC day is a new attempt'); assert.ok(await count('rally_speeches') > 0);
+  });
+}

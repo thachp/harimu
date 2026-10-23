@@ -35,7 +35,13 @@ export async function runRallySpeechCron(db: GameDatabase, now: number, b: Rally
       draft: `You are ${card.name}, an AI candidate in the Kindle presidential campaign, giving a short speech at a rally in a city square. Speak in the first person, in two to four plain sentences, using only the candidate's platform and platform cards given below. Do not announce any new promise, policy, spending or appointment, and never ask anyone how to vote or offer anything for a vote. Use no numbers or links. Return JSON with a response string.`,
       check: 'Check this rally speech. Return JSON with supported true only when every claim in it is on the candidate platform or platform cards given, and it announces no new promise, policy, spending, appointment or quantity.',
     });
-    if (made.status === 'budget-unavailable') { results.push(made.status); break; }
+    if (made.status === 'budget-unavailable') {
+      // A run that lost the race for this rally's reservation (or found its speech already stored) is not a budget stop.
+      const now2 = await db.prepare(`SELECT (SELECT COUNT(*) FROM rally_speeches WHERE rally_id=?) AS saved, (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id=?) AS tried`).bind(r.id, reservation).first<{ saved: number; tried: number }>();
+      if (Number(now2?.saved) > 0) { results.push('already-recorded'); continue; }
+      if (Number(now2?.tried) > 0) { results.push('raced'); continue; }
+      results.push(made.status); break;
+    }
     if (made.status !== 'text') { results.push(made.status); continue; }
     const [saved] = await db.batch([
       db.prepare('INSERT INTO rally_speeches (rally_id, speech, created_at) VALUES (?,?,?) ON CONFLICT DO NOTHING').bind(r.id, made.text, now),
