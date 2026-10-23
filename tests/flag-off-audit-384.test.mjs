@@ -43,6 +43,7 @@ const flagOffPins = {
   HARIMU_HOME_CITY_MOVE_ENABLED: 'home-city-move-781.test.mjs',
   HARIMU_SAVINGS_SHIELD_ENABLED: 'savings-shield-824.test.mjs',
   HARIMU_KINDLE_SALES_TAX_ENABLED: 'kindle-sales-tax-844.test.mjs',
+  HARIMU_MVP_JOB_TYPES_ENABLED: 'mvp-job-types-886.test.mjs',
   HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
   HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',
