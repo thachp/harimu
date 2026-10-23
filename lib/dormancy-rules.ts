@@ -33,7 +33,10 @@ export async function heartbeat(db: GameDatabase, userId: string, now: number): 
   const last = seconds(row.last_active_at);
   if (last !== null && now - last < ACTIVITY_BUMP_SECONDS) return { bumped: false, welcomeBack: null };
   const at = new Date(now * 1000).toISOString(), floor = new Date((now - ACTIVITY_BUMP_SECONDS) * 1000).toISOString();
-  const saved = await db.prepare('UPDATE citizens SET last_active_at = ? WHERE clerk_user_id = ? AND (last_active_at IS NULL OR last_active_at <= ?)').bind(at, userId, floor).run();
+  // Compare-and-set on the prior value: of several parallel first loads only one changes the row, and only it returns the briefing.
+  const saved = row.last_active_at === null
+    ? await db.prepare('UPDATE citizens SET last_active_at = ? WHERE clerk_user_id = ? AND last_active_at IS NULL').bind(at, userId).run()
+    : await db.prepare('UPDATE citizens SET last_active_at = ? WHERE clerk_user_id = ? AND last_active_at = ? AND last_active_at <= ?').bind(at, userId, row.last_active_at, floor).run();
   if (!saved.meta.changes) return { bumped: false, welcomeBack: null };
   const status = dormancyStatus(last, now);
   return { bumped: true, welcomeBack: status === 'active' || last === null ? null : { status, since: new Date(last * 1000).toISOString() } };

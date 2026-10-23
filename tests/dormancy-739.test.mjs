@@ -38,6 +38,9 @@ for (const backend of ['sqlite', 'postgres']) test(`POST /api/citizen/heartbeat:
   const later = spy(r); const third = await beat(r, 'alice'); later.restore();
   assert.equal(third.data.welcomeBack, null, 'two hours away is still active'); assert.equal(bumps(later.sql), 1, 'hourly bump');
   for (const [days, status] of [[31, 'dormant'], [181, 'archived']]) { await setLast(r, 'alice', r.now - days * D * 1000); assert.equal((await beat(r, 'alice')).data.welcomeBack.status, status); }
+  await setLast(r, 'alice', r.now - 9 * D * 1000);
+  const racing = await Promise.all([beat(r, 'alice'), beat(r, 'alice'), beat(r, 'alice')]);
+  assert.equal(racing.filter(x => x.data.welcomeBack).length, 1, 'parallel first loads: only the compare-and-set winner returns the briefing (QA1)');
   assert.deepEqual((await beat(r, 'nobody')).data, { bumped: false, welcomeBack: null }, 'no citizen row: nothing written');
 });
 
@@ -54,10 +57,14 @@ test('nations without their own frame get the neutral generic frame (no byline, 
   assert.match(src, /welcomeBackFor\(nationId as DormancyNation\) \?\? welcomeBackGeneric/); assert.doesNotMatch(src, /\.news\b/, "the news line is never rendered");
 });
 
-test('migration 0069 is additive and backfills last_active_at from updated_at (Postgres); SQLite gets the same column and backfill', async t => {
+test('migration 0069 is additive and backfills last_active_at with now on Postgres and SQLite (an active player gets no false Welcome back)', async t => {
   const sql = readFileSync('db/postgres/0069_citizen_last_active.sql', 'utf8'), pg = new PGlite(); t.after(() => pg.close());
   await pg.exec("CREATE TABLE citizens (clerk_user_id TEXT PRIMARY KEY, updated_at TEXT NOT NULL); INSERT INTO citizens VALUES ('a','2026-01-01T00:00:00.000Z')");
   await pg.exec(sql); await pg.exec(sql);
-  assert.deepEqual((await pg.query('SELECT clerk_user_id, last_active_at FROM citizens')).rows, [{ clerk_user_id: 'a', last_active_at: '2026-01-01T00:00:00.000Z' }]);
-  assert.match(readFileSync('lib/db.ts', 'utf8'), /ALTER TABLE citizens ADD COLUMN last_active_at TEXT'\), database\.prepare\('UPDATE citizens SET last_active_at = updated_at WHERE last_active_at IS NULL'\)/);
+  const [{ last_active_at: v }] = (await pg.query('SELECT last_active_at FROM citizens')).rows;
+  assert.match(v, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/); assert.ok(Math.abs(Date.parse(v) - Date.now()) < 60_000, 'backfilled with now, not updated_at: no false Welcome back');
+  assert.match(readFileSync('lib/db.ts', 'utf8'), /ADD COLUMN last_active_at TEXT'\), database\.prepare\("UPDATE citizens SET last_active_at = strftime\('%Y-%m-%dT%H:%M:%fZ','now'\) WHERE last_active_at IS NULL"\)/);
+  const { DatabaseSync } = await import('node:sqlite'), lite = new DatabaseSync(':memory:'); lite.exec("CREATE TABLE citizens (clerk_user_id TEXT PRIMARY KEY, updated_at TEXT NOT NULL); INSERT INTO citizens VALUES ('a','2026-01-01T00:00:00.000Z')");
+  lite.exec(readFileSync('drizzle/0069_citizen_last_active.sql', 'utf8')); const w = lite.prepare('SELECT last_active_at FROM citizens').get().last_active_at; lite.close();
+  assert.match(w, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/); assert.ok(Math.abs(Date.parse(w) - Date.now()) < 60_000, 'SQLite backfill is now too');
 });
