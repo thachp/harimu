@@ -36,7 +36,7 @@ async function setup(t, backend) {
   await r.db.prepare("INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) VALUES ('kindle-presidential-poc-1','kindle',?,?,?)").bind(JSON.stringify(slate), day0, day0 + 259200).run();
   const at = new Date(r.now).toISOString();
   const citizen = (id, nation = 'kindle') => r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,?,?,18,0,'Good standing',?,?)").bind(id, nation, id, at, at).run();
-  const answer = (id, cand, when) => r.db.prepare('INSERT INTO kindle_poll_answers (election_id,clerk_user_id,candidate_id,answered_at,request_id) VALUES (?,?,?,?,?)').bind('kindle-presidential-poc-1', id, cand, when, `seed-${id}`).run();
+  const answer = (id, cand, when) => r.db.prepare('INSERT INTO kindle_poll_answers (election_id,clerk_user_id,candidate_id,answered_at,first_answered_at,request_id) VALUES (?,?,?,?,?,?)').bind('kindle-presidential-poc-1', id, cand, when, when, `seed-${id}`).run();
   r.setFixtureEnv('HARIMU_KINDLE_POLLING_ENABLED', 'true');
   return { r, day0, citizen, answer };
 }
@@ -117,6 +117,34 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual([three.day, await rows(r, 'kindle_poll_snapshots')], [d1 / 86400 + 2, 2], '10 new answers publish');
     assert.deepEqual(three.shares.map(s => s.share), [5, 0, 95], 'the day-start answer is in the next poll (1 of 20)');
     assertPrivate((await r.call('polling', 'alice')).data);
+  });
+
+  test(`/api/polling (${backend}): ARC: 10 changed answers from earlier respondents keep the old snapshot; 10 new distinct respondents publish`, async t => {
+    const { r, day0, citizen, answer } = await setup(t, backend);
+    for (let i = 0; i < 20; i++) await citizen(`c${i}`);
+    for (let i = 0; i < 10; i++) await answer(`c${i}`, 'mara-quell', day0 + i);
+    assert.equal((await r.call('polling', 'bob', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-b0' })).status, 200); // bob answers before the first cut-off
+    const d1 = day0 + 86400; r.setNow((d1 + 60) * 1000);
+    const one = (await r.call('polling', 'alice')).data.polling.poll; assert.deepEqual(one.shares.map(s => s.share), [0, 0, 100]);
+    const change = (id, cand, when) => r.db.prepare('UPDATE kindle_poll_answers SET candidate_id=?, answered_at=? WHERE clerk_user_id=?').bind(cand, when, id).run();
+    for (let i = 0; i < 10; i++) await change(`c${i}`, 'ines-varro', d1 + 100 + i);
+    // A decline-and-re-answer through the API is not a new respondent either.
+    assert.equal((await r.call('polling', 'alice', { action: 'answer', candidateId: 'ines-varro', requestId: 'req-740-a1' })).status, 200);
+    r.setNow((d1 + 86400 + 60) * 1000);
+    const two = (await r.call('polling', 'alice')).data.polling.poll;
+    assert.equal(two.day, one.day, '10 changed answers + 1 new: the previous snapshot is still served');
+    r.setNow((d1 + 86400 + 120) * 1000);
+    assert.equal((await r.call('polling', 'alice', { action: 'decline' })).status, 200);
+    assert.equal((await r.call('polling', 'alice', { action: 'answer', candidateId: 'ines-varro', requestId: 'req-740-a2' })).status, 200);
+    assert.equal((await r.call('polling', 'bob', { action: 'decline' })).status, 200); // bob declines and answers again: he answered before the cut-off, so not new
+    assert.equal((await r.call('polling', 'bob', { action: 'answer', candidateId: 'tobin-achterberg', requestId: 'req-740-b1' })).status, 200);
+    for (let i = 10; i < 18; i++) await answer(`c${i}`, 'tobin-achterberg', d1 + 86400 + 200 + i); // alice (day 1) + 8 = 9 new so far
+    r.setNow((d1 + 2 * 86400 + 60) * 1000);
+    assert.equal((await r.call('polling', 'bob')).data.polling.poll.day, one.day, '9 new respondents (alice once; bob answered before the cut-off): still the old snapshot');
+    await answer('c18', 'tobin-achterberg', d1 + 2 * 86400 + 100);
+    r.setNow((d1 + 3 * 86400 + 60) * 1000);
+    const three = (await r.call('polling', 'bob')).data.polling.poll;
+    assert.equal(three.day, d1 / 86400 + 3, '10 new distinct respondents publish');
   });
 
   test(`/api/polling (${backend}): two first reads of a day racing keep exactly one snapshot`, async t => {
