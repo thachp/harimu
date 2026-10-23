@@ -183,6 +183,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "false",
+    // #392 S8: phone layout for UI v2 (rail and tabs as a bottom tab bar, panel as a bottom sheet); needs UI_V2_RAIL.
+    "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "false",
     // #243: filler wire stories (lib/press-templates.ts packs) in the National news edition under their in-world byline; they give way once a player paper publishes.
     "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "false",
     // #85: nation skin PoC on the top bar (Kindle / Korund / Aurelle colors + one CSS motif each); guests and pre-citizens keep the neutral bar.
