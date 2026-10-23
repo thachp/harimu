@@ -1,0 +1,28 @@
+-- Issue #824: Kindle Dormant Savings Shield (docs 12.8), flag HARIMU_SAVINGS_SHIELD_ENABLED (off in production). Additive table; one row per returning absence.
+-- 'paid' rows are the Kindle treasury welfare-line debit (lib/economy kindleTreasuryBalanceSql) and the wallet credit (the balance view below).
+CREATE TABLE IF NOT EXISTS savings_shield_credits (
+ absence_key TEXT PRIMARY KEY,
+ clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+ absence_started_at INTEGER NOT NULL, returned_at INTEGER NOT NULL, balance_minor INTEGER NOT NULL,
+ index_start_tenths INTEGER NOT NULL, index_end_tenths INTEGER NOT NULL,
+ credit_minor INTEGER NOT NULL CHECK(typeof(credit_minor) = 'integer' AND credit_minor >= 0),
+ status TEXT NOT NULL CHECK(status IN ('paid', 'skipped')), reason TEXT NOT NULL,
+ CHECK((status = 'paid') = (credit_minor > 0))
+);
+DROP VIEW IF EXISTS citizen_wallet_balances;
+CREATE VIEW citizen_wallet_balances AS
+  SELECT c.clerk_user_id,
+    COALESCE((SELECT SUM(wage_minor) FROM shift_settlements WHERE clerk_user_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(tax_minor) FROM shift_income_tax WHERE clerk_user_id = c.clerk_user_id), 0)
+    + COALESCE((SELECT SUM(wallet_delta) FROM citizen_economy_events WHERE clerk_user_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(spark_minor) FROM citizen_tessera_exchanges WHERE clerk_user_id = c.clerk_user_id), 0)
+    + COALESCE((SELECT SUM(amount_minor) FROM player_fills WHERE seller_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(amount_minor) FROM player_fills WHERE buyer_id = c.clerk_user_id), 0)
+    + COALESCE((SELECT SUM(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.sell_order_id WHERE o.citizen_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(fee_minor) FROM market_trade_fees WHERE seller_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(fee_minor) FROM home_city_moves WHERE clerk_user_id = c.clerk_user_id AND currency = 'SPK'), 0)
+    + COALESCE((SELECT SUM(credit_minor) FROM savings_shield_credits WHERE clerk_user_id = c.clerk_user_id AND status = 'paid'), 0)
+    - COALESCE((SELECT SUM(remaining * limit_unit_minor) FROM market_open_orders WHERE citizen_id = c.clerk_user_id AND side = 'buy'), 0) AS balance
+  FROM citizens c;
+INSERT OR IGNORE INTO economy_migrations (id) VALUES ('savings-shield-v1');
