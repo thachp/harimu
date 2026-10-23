@@ -151,10 +151,14 @@
     "HARIMU_LEDGER_RECONCILIATION_ENABLED": "false",
     // #614: read-only admin AI cost dashboard (GET /api/admin/ai-costs, JSON only). "false" in preview too (ARC exception): it needs the HARIMU_ADMIN_TOKEN Worker secret, set in the dashboard, never in this file.
     "HARIMU_AI_COST_DASHBOARD_ENABLED": "false",
+    // #743: out-of-character Report intake for city chat messages and Notable replies (POST /api/reports, write-only; no mod console yet).
+    "HARIMU_REPORTS_ENABLED": "false",
     // #753: staff AI review queue (docs §21.4): filter-failed Notable replies plus a ~1% sample of passing ones; admin list at /api/admin/ai-review-queue behind HARIMU_ADMIN_TOKEN.
     "HARIMU_AI_REVIEW_QUEUE_ENABLED": "false",
     // #739: citizen dormancy slice 1 (docs §17.4): Away/Dormant/Archived status and the Welcome back briefing; flag off = no last_active_at read or write.
     "HARIMU_DORMANCY_ENABLED": "false",
+    // #789: read-only Kindle national budget card (docs §12.12): treasury balance and income-tax inflow from the ledger.
+    "HARIMU_KINDLE_BUDGET_VIEW_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

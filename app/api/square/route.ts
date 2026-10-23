@@ -9,6 +9,8 @@ import { parseShadowMute, logShadowMuted } from '@/lib/chat-shadow-mute';
 // #790: operator shadow-mute list (comma-separated citizen ids, not a secret). Empty: no change.
 const shadowMuted=()=>parseShadowMute((env as unknown as {HARIMU_CHAT_SHADOW_MUTE?:string}).HARIMU_CHAT_SHADOW_MUTE);
 export const dynamic='force-dynamic';
+// #743: the client shows the Report control only when intake is on.
+const reportsEnabled=()=>(env as unknown as {HARIMU_REPORTS_ENABLED?:string}).HARIMU_REPORTS_ENABLED==='true';
 async function context(request:Request) {
   const userId=await authenticatedUserId(request);
   if(!userId)return null;
@@ -21,7 +23,7 @@ export async function GET(request:Request) {
   const ctx=await context(request);
   if(!ctx)return privateResponse({error:'Sign in required.'},401);
   if(!ctx.nationId)return privateResponse({error:'Enroll in a nation first.'},403);
-  return privateResponse(await readSquare(ctx.db,ctx.userId,ctx.nationId,ctx.now,shadowMuted()));
+  return privateResponse({...await readSquare(ctx.db,ctx.userId,ctx.nationId,ctx.now,shadowMuted()),reportsEnabled:reportsEnabled()});
 }
 // #194: a square post can complete a first-week goal; latch after a successful write.
 export async function POST(request:Request) {
@@ -72,5 +74,5 @@ async function handleSquarePost(request:Request) {
       }
     }
   } else return privateResponse({error:'Unknown action.'},400);
-  return privateResponse(await readSquare(db,userId,nationId,now,muted));
+  return privateResponse({...await readSquare(db,userId,nationId,now,muted),reportsEnabled:reportsEnabled()});
 }
