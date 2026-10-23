@@ -61,3 +61,22 @@ export const korundMedalCopy={
 /** #737 (ARC): the quota bar's screen-reader text; says "over-fulfilled" when the unit is over target (only with medals on, `over` > 0). */
 export const korundQuotaValueText=(unitFood:number,targetFood:number,ownFood:number,over=0)=>
  `${unitFood} of ${targetFood} food${over>0?`, over-fulfilled at ${Math.round(over)}%`:''}; your contribution ${ownFood}`;
+
+/** #759 weekly quota shortfall (docs 12.11 step 3: "under-fulfilment triggers inspections ... and lost bonuses for work units"), HARIMU_KORUND_SHORTFALL_ENABLED only.
+ *  Derived on read from korund_settlements for the last CLOSED week, like #737 medals: no table, no migration, no write in GET, idempotent by construction.
+ *  [ASSUMPTION] no work-unit bonus exists today, so the "withheld bonus" is a zero-bonus ledger line (0 LN, reason quota_shortfall) shown on read, never stored.
+ *  [ASSUMPTION] every Korund citizen is a member of the single state brigade (the #41 quota bar already sums the whole unit), so each member sees one line per short week.
+ *  [ASSUMPTION] the press line is returned with the plan and shown in the panel; there is no shared city feed for Korund to publish into yet. */
+export type KorundShortfall={week:number;workUnit:string;unitFood:number;targetFood:number;percent:number;ledger:{bonusMinor:0;reason:'quota_shortfall'};press:string};
+/** Percent of the target missed (1-100); 0 at or over target. */
+export const shortfallPercent=(unitFood:number,target=korundWeeklyQuotaFood)=>target>0&&unitFood<target?Math.max(1,Math.round((target-unitFood)*100/target)):0;
+export const korundShortfallCopy={
+ notice:(unit:string,pct:number)=>`Inspection: ${unit} finished last week ${pct}% short of its quota.`,
+ ledger:(week:number)=>`Week ${week} work-unit bonus: 0.00 LN withheld (quota shortfall).`,
+ press:(unit:string)=>`Plan inspectors visit the ${unit} after a weekly shortfall.`,
+} as const;
+/** Shortfall for closed week `week` (null when the unit met its target or there is no closed week yet). */
+export function korundShortfall(week:number,unitFood:number,target=korundWeeklyQuotaFood):KorundShortfall|null{
+ const percent=shortfallPercent(unitFood,target);
+ return week<1||percent===0?null:{week,workUnit:korundWorkUnit,unitFood,targetFood:target,percent,ledger:{bonusMinor:0,reason:'quota_shortfall'},press:korundShortfallCopy.press(korundWorkUnit)};
+}
