@@ -1,5 +1,5 @@
 /** Out-of-character Report copy for citizen chat, AI leader addresses, AI-written news and Notable replies (issue #457, docs §21.3). Content
- * only: the report button, its dialog, the backend report record and the moderation queue belong to other lanes, and no UI imports this.
+ * for the report button, its dialog and the intake route (#743); the moderation queue belongs to another lane.
  * Canon: harimu-docs moderation-safety §21.3 (a report button on every message, name, poster, profile "and every AI-generated speech, article
  * or Notable reply"), §21.1 (moderation reports are "a separate, clearly labeled OOC tool; in-game 'denunciation' is a different button"; the
  * risk rows for real-world politics, hate, harassment, doxxing and threats), §21.4 (what AI content must not contain) and the wellbeing page

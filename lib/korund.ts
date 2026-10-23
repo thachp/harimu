@@ -79,7 +79,7 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -98,7 +98,7 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  const extra=await readCouponsAndQuota(db,userId,w.number,Boolean(ledger?.coupon_used),w.start,w.end);
  const bureau=options.laborBureau&&citizen?.nation_id==='korund'?{bureau:await readBureau(db,userId,now)}:{};
  // #43: the gray market is in the plan only with HARIMU_GRAY_MARKET_ENABLED on, and only for a Korund citizen.
- const gray=options.grayMarket&&citizen?.nation_id==='korund'?{gray:await readGray(db,userId,now,{dailyCap:options.grayDailyCap===true,suspicion:options.graySuspicion===true})}:{};
+ const gray=options.grayMarket&&citizen?.nation_id==='korund'?{gray:await readGray(db,userId,now,{dailyCap:options.grayDailyCap===true,suspicion:options.graySuspicion===true,seizure:options.graySeizure===true})}:{};
  const medals=options.medals&&citizen?.nation_id==='korund'?{medals:await readMedals(db,userId,w.start,w.number)}:{};
  // #759: last closed week's unit food vs the quota (read-only, Korund only, flag on only); null = met or no closed week yet.
  const korund=citizen?.nation_id==='korund',prevFood=korund&&(options.shortfall||options.rationCut)&&w.number>=2?await closedWeekFood(db,w.start):null;
@@ -114,14 +114,14 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean}={}) {
+export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean}={}) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  if(command.action==='korund-gray-post-offer'||command.action==='korund-gray-accept-offer'){
   // #43: the gray market ships off; with the flag off these actions are not found and change nothing.
   if(!options.grayMarket)return {status:404,reason:'disabled',error:'Not found.'};
   if(nation?.nation_id!=='korund')return {status:403,reason:'korund_only',error:'Korund citizenship required.'};
   const requestId=command.requestId!.toLowerCase();
-  return command.action==='korund-gray-post-offer'?postOffer(db,userId,{amountMinor:command.amountMinor,askRate:command.askRate},requestId,now,{dailyCap:options.grayDailyCap===true}):acceptOffer(db,userId,command.offerId!.toLowerCase(),requestId,now,{dailyCap:options.grayDailyCap===true});
+  return command.action==='korund-gray-post-offer'?postOffer(db,userId,{amountMinor:command.amountMinor,askRate:command.askRate},requestId,now,{dailyCap:options.grayDailyCap===true}):acceptOffer(db,userId,command.offerId!.toLowerCase(),requestId,now,{dailyCap:options.grayDailyCap===true,seizure:options.graySeizure===true});
  }
  // An already-started shift may settle into its original LN ledger after a grace-period move.
  if(nation?.nation_id!=='korund' && command.action!=='korund-claim-work') return {status:409,error:'Korund citizenship required; previous balances remain in their original currency.'};

@@ -36,6 +36,7 @@ const flagOffPins = {
   HARIMU_GRAY_MARKET_ENABLED: 'gray-market-43.test.mjs',
   HARIMU_GRAY_DAILY_CAP_ENABLED: 'gray-daily-cap-736.test.mjs',
   HARIMU_GRAY_SUSPICION_ENABLED: 'gray-suspicion-749.test.mjs',
+  HARIMU_GRAY_SEIZURE_ENABLED: 'gray-seizure-797.test.mjs',
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
   HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
@@ -83,6 +84,8 @@ const flagOffPins = {
   HARIMU_LEDGER_RECONCILIATION_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_AI_COST_DASHBOARD_ENABLED: 'ai-costs-614.test.mjs',
   HARIMU_AI_REVIEW_QUEUE_ENABLED: 'ai-review-queue-753.test.mjs',
+  HARIMU_REPORTS_ENABLED: 'reports-743.test.mjs',
+  HARIMU_DORMANCY_ENABLED: 'dormancy-739.test.mjs',
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.
@@ -93,7 +96,7 @@ const switchOffPins = {
   HARIMU_STORAGE_MAINTENANCE: 'flag-off-audit-384.test.mjs',
 };
 const notSwitches = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_PRODUCTION_STORAGE', 'HARIMU_POSTGRES_CUTOVER_READY', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED',
-  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY'];
+  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
 
 test('every boolean wrangler var that is not *_ENABLED is a registered switch (off in both configs) or a listed config value', () => {
   for (const [file, config] of Object.entries(configs)) {

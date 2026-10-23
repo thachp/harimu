@@ -74,7 +74,9 @@ test('tone: no real-world names, places, parties or symbols, no other nations', 
   assert.doesNotMatch(x,/\b(Earth|America\w*|Europe\w*|England|France|Japan|China|Russia\w*|Trump|Biden|Putin)\b/);
   assert.doesNotMatch(x,/\b(Kindle|Korund|Aurelle|Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b|@/);
 });
-test('unwired: nothing in app/, components/ or lib/ imports report-copy', () => {
+test('wired only where intended: lib/reports.ts and app/report-button.tsx (#743) import report-copy, nothing else does', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('report-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/report-copy/, f);
+  const allowed=new Set(['lib/reports.ts','app/report-button.tsx']);
+  for (const f of allowed) assert.match(readFileSync(f,'utf8'),/report-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('report-copy.ts')&&!allowed.has(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/report-copy/, f);
 });

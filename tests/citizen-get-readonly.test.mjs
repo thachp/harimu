@@ -49,6 +49,13 @@ for (const accountElection of [false, true]) test(`GET /api/citizen makes no wri
   }
 });
 
+test('#739 (ARC): GET /api/citizen still makes no writes with HARIMU_DORMANCY_ENABLED on, even for a citizen away for weeks', async t => {
+  const r = await localRuntime(); t.after(() => r.close()); r.setDormancy(true);
+  await r.db.prepare("UPDATE citizens SET last_active_at = ? WHERE clerk_user_id = 'alice'").bind(new Date(r.now - 40 * 86400 * 1000).toISOString()).run();
+  const probe = recordWrites(r); const got = await r.call('citizen', 'alice'); await r.call('citizen', 'alice'); probe.restore();
+  assert.equal(got.status, 200); assert.deepEqual(probe.writes, [], `flag on: GET wrote ${JSON.stringify(probe.writes)}`); assert.equal(got.data.welcomeBack, undefined, 'the briefing comes from the heartbeat, not GET');
+});
+
 test('write paths now record the starter grant, capacity clock, visit and election that GET no longer writes', async t => {
   const r = await localRuntime({ ballotPrivacyReady: true }); t.after(() => r.close());
   r.setVerification('alice', tierOne(r, 'alice'));

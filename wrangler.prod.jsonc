@@ -61,6 +61,8 @@
     "HARIMU_GRAY_DAILY_CAP_ENABLED": "false",
     // #749: each completed Korund gray-market trade adds private Suspicion (capped per day, never starts Correction Duty). Off: Suspicion from discoveries only.
     "HARIMU_GRAY_SUSPICION_ENABLED": "false",
+    // #797: after an accepted gray-market trade a checkpoint may seize part of the buyer's LN bundle (chance rises with Suspicion, capped; one per game day); seized LN is destroyed. Off: no roll, no write.
+    "HARIMU_GRAY_SEIZURE_ENABLED": "false",
     // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
     "HARIMU_KORUND_MEDALS_ENABLED": "false",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
@@ -147,8 +149,12 @@
     "HARIMU_LEDGER_RECONCILIATION_ENABLED": "false",
     // #614: read-only admin AI cost dashboard (GET /api/admin/ai-costs, JSON only). "false" in preview too (ARC exception): it needs the HARIMU_ADMIN_TOKEN Worker secret, set in the dashboard, never in this file.
     "HARIMU_AI_COST_DASHBOARD_ENABLED": "false",
+    // #743: out-of-character Report intake for city chat messages and Notable replies (POST /api/reports, write-only; no mod console yet).
+    "HARIMU_REPORTS_ENABLED": "false",
     // #753: staff AI review queue (docs §21.4): filter-failed Notable replies plus a ~1% sample of passing ones; admin list at /api/admin/ai-review-queue behind HARIMU_ADMIN_TOKEN.
     "HARIMU_AI_REVIEW_QUEUE_ENABLED": "false",
+    // #739: citizen dormancy slice 1 (docs §17.4): Away/Dormant/Archived status and the Welcome back briefing; flag off = no last_active_at read or write.
+    "HARIMU_DORMANCY_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",
@@ -161,7 +167,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "false",
-    "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "false"
+    "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "false",
+    "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]

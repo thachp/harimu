@@ -76,12 +76,15 @@ const LN: CurrencySpec = {
   legs: `SELECT clerk_user_id AS acct, wage_minor AS delta FROM korund_settlements
     UNION ALL SELECT clerk_user_id, -price_minor FROM korund_coupon_redemptions
     UNION ALL SELECT buyer_id, amount_minor FROM gray_trades
-    UNION ALL SELECT seller_id, -amount_minor FROM gray_trades`,
+    UNION ALL SELECT seller_id, -amount_minor FROM gray_trades
+    UNION ALL SELECT clerk_user_id, -amount_minor FROM gray_seizures`, // #797 sink leg: destroyed, credited to no account
   appBalances: `SELECT c.clerk_user_id AS acct, ${laborNoteSql('c.clerk_user_id')} AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('LN', 'korund_settlements', 'clerk_user_id', 'wage_minor', true),
     ...integerAndSign('LN', 'korund_coupon_redemptions', 'clerk_user_id', 'price_minor', true),
     ...integerAndSign('LN', 'gray_trades', 'buyer_id', 'amount_minor', true),
+    ...integerAndSign('LN', 'gray_seizures', 'offer_id', 'amount_minor', true), // #797
+    { currency: 'LN', check: 'seizure_not_buyer_or_over_bundle', sql: 'SELECT z.offer_id AS acct FROM gray_seizures z LEFT JOIN gray_trades t ON t.offer_id = z.offer_id WHERE t.offer_id IS NULL OR t.buyer_id <> z.clerk_user_id OR z.amount_minor > t.amount_minor' },
     { currency: 'LN', check: 'fund_negative:korund-state', sql: `SELECT r.id AS acct FROM korund_resources r WHERE r.id = 'state' AND r.initial_minor - COALESCE((SELECT SUM(wage_minor) FROM korund_settlements), 0) < 0` },
   ],
 };

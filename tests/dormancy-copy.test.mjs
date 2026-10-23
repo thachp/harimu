@@ -83,7 +83,7 @@ test('the header names no other lib module path', () => {
   const head=readFileSync('lib/dormancy-copy.ts','utf8').split('*/')[0];
   assert.doesNotMatch(head,/\blib\/|\.ts\b|app\/|components\//);
 });
-test('unwired: nothing in app/, components/ or lib/ imports dormancy-copy', () => {
+test('wired only by the #739 Welcome back briefing: nothing else in app/, components/ or lib/ imports dormancy-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('dormancy-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/dormancy-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('dormancy-copy.ts')&&f!=='app/welcome-back.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/dormancy-copy/, f);
 });
