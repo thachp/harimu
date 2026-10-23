@@ -8,7 +8,7 @@ const D = 86400, DAY1 = Date.UTC(2026, 9, 10, 22, 30);
 async function setup(t, backend, lossCap) {
   const r = await localRuntime(backend ? { backend } : {}); t.after(() => r.close()); r.setNow(DAY1);
   const siege = await r.importModule('lib/siege-actions.ts'), cap = await r.importModule('lib/war-loss-cap.ts'), zones = await r.importModule('lib/map-zones.ts');
-  r.db.sqlite.exec(await readFile(new URL("../drizzle/0094_war_capture_refusals.sql", import.meta.url), 'utf8')); // migration 0094, as deployed
+  // migration 0094: lib/db.ts creates war_capture_refusals with the other schemas
   const nowS = () => Math.floor(r.now / 1000), run = (sql, ...b) => r.db.prepare(sql).bind(...b).run(), one = (sql, ...b) => r.db.prepare(sql).bind(...b).first();
   const declared = nowS() - 5 * D;
   await run('INSERT INTO wars (id,request_id,pair_key,attacker_nation,defender_nation,declared_by,declared_at,mobilization_ends_at,ended_at,end_kind) VALUES (?,?,?,?,?,?,?,?,?,?)', 'w1', 'rq-w1', 'pair-w1', 'korund', 'kindle', 'test', declared, declared + 172800, null, null);
