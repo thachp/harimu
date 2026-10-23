@@ -10,22 +10,28 @@ export type InspectedNation = {
   currency: string; religion: string; population: string; treasury: string; stability: number; motto: string; tradeStatus: string;
 };
 type InstitutionWork = { id: string; name: string; detail: string; cost: number; nationId?: string | null };
-export function NationInstitutions({ incomeTaxPercent = 0, nation, citizenNation, capacity, workOrders, workPending,
-  onWorldView, onHousehold, onWorkplace, onCommitWork }: {
-  incomeTaxPercent?: number; nation: InspectedNation; nations?: InspectedNation[]; citizenNation?: InspectedNation; capacity: number;
-  workOrders: InstitutionWork[]; workPending: boolean; onSelectNation?: (id: string) => void;
-  onWorldView: () => void; onHousehold: () => void; onWorkplace: () => void;
-  onCommitWork: (order: InstitutionWork) => void | Promise<void>;
-}) {
-  const [selectedSystemId, setSelectedSystemId] = useState('capital');
-  const systems = [
+/** The institution systems shown for a nation (shared with the #392 S6 rows, so both read the same lore). */
+export function institutionSystems(nation: InspectedNation) {
+  return [
     { id: 'capital', label: 'Capital', title: nation.capital, detail: 'Computer-controlled leaders follow fixed game rules. AI/SI means artificial or simulated intelligence; no live AI model is connected.' },
     { id: 'currency', label: 'Currency', title: nation.currency.split(' · ')[0], detail: `${nation.currency}. ${nation.id === 'korund' ? 'Labor Notes stay in Korund’s separate ledger. Coupon rations replace legal private-market food purchases; LN spending is planned.' : 'This is the nation’s designed currency regime. International exchange and conversion are planned.'}` },
     { id: 'corridor', label: 'Trade', title: 'Trade corridor', detail: `${nation.tradeStatus}. Cross-border settlement, transport and corridor controls are design context; they are not simulated here yet.` },
     { id: 'commons', label: 'Civic life', title: 'Civic institutions', detail: 'Counted petitions require Tier 1 phone verification, which is not available yet. Elections, protests and public-opinion systems are planned.' },
     { id: 'works', label: 'Public works', title: 'Production and reserves', detail: `${nation.economy}. ${nation.id === 'kindle' ? 'Paid contribution shifts produce recorded output and agreed citizen rewards.' : nation.id === 'korund' ? 'Assigned food-production shifts pay Labor Notes and replenish the finite state ration pool.' : nation.id === 'aurelle' ? 'Chartered service pays Crowns and earns bounded Favor; food is sold from finite estate stock.' : 'This nation’s work and production ledger is planned.'}` },
   ];
-  const system = systems.find(item => item.id === selectedSystemId) ?? systems[0];
+}
+export function NationInstitutions({ incomeTaxPercent = 0, nation, citizenNation, capacity, workOrders, workPending,
+  onWorldView, onHousehold, onWorkplace, onCommitWork, systemId, systemPicker = true }: {
+  incomeTaxPercent?: number; nation: InspectedNation; nations?: InspectedNation[]; citizenNation?: InspectedNation; capacity: number;
+  workOrders: InstitutionWork[]; workPending: boolean; onSelectNation?: (id: string) => void;
+  onWorldView: () => void; onHousehold: () => void; onWorkplace: () => void;
+  onCommitWork: (order: InstitutionWork) => void | Promise<void>;
+  /** #392 S6: the selected system when a parent controls it (its chevron rows replace the picker), and whether to show the picker. */
+  systemId?: string; systemPicker?: boolean;
+}) {
+  const [selectedSystemId, setSelectedSystemId] = useState('capital');
+  const systems = institutionSystems(nation);
+  const system = systems.find(item => item.id === (systemId ?? selectedSystemId)) ?? systems[0];
   const ownNation = nation.id === citizenNation?.id;
   const jobs = nation.id === 'kindle' ? workOrders.filter(order => !order.nationId || order.nationId === 'kindle') : [];
   return <section className="nation-inspector" aria-label={`${nation.name} institutions`}>
@@ -33,9 +39,9 @@ export function NationInstitutions({ incomeTaxPercent = 0, nation, citizenNation
     <details><summary>Example nation profile</summary><p>Illustrative starting figures, not measured live conditions.</p>
       <dl><dt>Population</dt><dd>{nation.population}</dd><dt>Treasury</dt><dd>{nation.treasury}</dd><dt>Stability</dt><dd>{nation.stability} / 100</dd></dl>
     </details>
-    <div className="nation-inspector-systems" role="group" aria-label="Institution systems">
+    {systemPicker && <div className="nation-inspector-systems" role="group" aria-label="Institution systems">
       {systems.map(item => <button key={item.id} type="button" aria-pressed={item.id === system.id} onClick={() => setSelectedSystemId(item.id)}>{item.label}</button>)}
-    </div>
+    </div>}
     <article aria-live="polite"><h3>{system.title}</h3><p>{system.detail}</p></article>
     {jobs.length > 0 && <details className="nation-inspector-jobs"><summary>Paid contributions</summary>
       {!ownNation && <p>Kindle citizens only. Your citizenship remains {citizenNation?.shortName ?? 'unselected'}.</p>}

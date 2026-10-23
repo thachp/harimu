@@ -42,6 +42,7 @@ const SPK: CurrencySpec = {
     UNION ALL SELECT buyer_id, -amount_minor FROM player_fills
     UNION ALL SELECT o.citizen_id, t.qty * t.unit_minor FROM market_trades t JOIN market_orders o ON o.id = t.sell_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT o.citizen_id, -(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id IS NOT NULL
+    UNION ALL SELECT seller_id, -fee_minor FROM market_trade_fees
     UNION ALL SELECT citizen_id, -(remaining * limit_unit_minor) FROM market_open_orders WHERE side = 'buy' AND citizen_id IS NOT NULL`,
   appBalances: 'SELECT clerk_user_id AS acct, balance FROM citizen_wallet_balances',
   probes: [
@@ -53,6 +54,8 @@ const SPK: CurrencySpec = {
     ...integerAndSign('SPK', 'player_fills', 'buyer_id', 'amount_minor', true),
     ...integerAndSign('SPK', 'market_trades', 'id', 'unit_minor', true),
     ...integerAndSign('SPK', 'market_trades', 'id', 'qty', true),
+    ...integerAndSign('SPK', 'market_trade_fees', 'trade_id', 'fee_minor', true), // #777 sink leg
+    { currency: 'SPK', check: 'fee_not_seller_or_over_gross', sql: 'SELECT f.trade_id AS acct FROM market_trade_fees f LEFT JOIN market_trades t ON t.id = f.trade_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE t.id IS NULL OR s.citizen_id IS NULL OR s.citizen_id <> f.seller_id OR f.fee_minor > t.qty * t.unit_minor' },
     // Transfers: the debit leg and the credit leg must agree with each other and with the counterpart's record.
     { currency: 'SPK', check: 'tax_over_gross', sql: 'SELECT clerk_user_id AS acct FROM shift_income_tax WHERE tax_minor > gross_minor' },
     { currency: 'SPK', check: 'tax_gross_not_wage', sql: 'SELECT t.clerk_user_id AS acct FROM shift_income_tax t LEFT JOIN shift_settlements s ON s.shift_id = t.shift_id WHERE s.shift_id IS NULL OR t.gross_minor <> s.wage_minor' },
