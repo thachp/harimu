@@ -14,14 +14,15 @@ test('required check rejects failed, cancelled, skipped and absent prerequisite 
   assert.match(gate, /for job in node-tests postgres-tests validation ai-evals; do/);
   const command = gate.match(/        run: \|\n((?:          .*\n?)+)/)[1].replace(/^ {10}/gm, '');
   const results = ['success', 'failure', 'cancelled', 'skipped', undefined];
-  for (const node of results) for (const postgres of results) for (const validation of results) {
+  for (const node of results) for (const postgres of results) for (const validation of results) for (const evals of results) {
     const needs = {};
     if (node) needs['node-tests'] = { result: node };
     if (postgres) needs['postgres-tests'] = { result: postgres };
     if (validation) needs.validation = { result: validation };
+    if (evals) needs['ai-evals'] = { result: evals };
     const result = spawnSync('bash', ['-e', '-c', command], { env: { ...process.env, NEEDS_JSON: JSON.stringify(needs) } });
-    assert.equal(result.status === 0, node === 'success' && postgres === 'success' && validation === 'success',
-      `Node=${node}, postgres=${postgres}, validation=${validation}`);
+    assert.equal(result.status === 0, node === 'success' && postgres === 'success' && validation === 'success' && evals === 'success',
+      `Node=${node}, postgres=${postgres}, validation=${validation}, ai-evals=${evals}`);
   }
 });
 
