@@ -48,7 +48,8 @@ test('#282 rules: window, exactly the top 5 by votes then earliest then id, and 
 
 test('#282: the flags default to "false", migration 0048 only adds the answers table, and nothing can reach the AI from a route or a read', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  for (const flag of ['HARIMU_DEBATE_ENABLED', 'HARIMU_AI_DEBATE_ANSWERS_ENABLED']) assert.deepEqual([...cfg.matchAll(new RegExp(`"${flag}"\\s*:\\s*"([^"]*)"`, 'g'))].map(m => m[1]), flag === 'HARIMU_DEBATE_ENABLED' || flag === 'HARIMU_TOWN_HALLS_ENABLED' ? ['false'] : ['true'], flag);
+  for (const flag of ['HARIMU_DEBATE_ENABLED', 'HARIMU_AI_DEBATE_ANSWERS_ENABLED']) assert.deepEqual([...cfg.matchAll(new RegExp(`"${flag}"\\s*:\\s*"([^"]*)"`, 'g'))].map(m => m[1]), ['true'], flag);
+  assert.match(await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'), /"HARIMU_DEBATE_ENABLED": "false"/);
   assert.doesNotMatch(cfg, /"HARIMU_DEBATE_OPEN_AT"\s*:/, 'no open time is configured: it never opens by default');
   for (const file of ['../drizzle/0048_debate_answers.sql', '../db/postgres/0048_debate_answers.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');

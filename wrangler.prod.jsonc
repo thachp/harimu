@@ -113,6 +113,8 @@
     "HARIMU_CIVIC_RANK_ENABLED": "false",
     // #738 slice 1: army units: volunteer for your nation's home-guard unit, leave it, pick a squad stance. Needs HARIMU_WAR_ENABLED too. Off: /api/army is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMIES_ENABLED": "false",
+    // #842: Religious Harmony (docs 14.5): a per-nation 0–100 score from festival holidays, festival joins, banned-festival joins and Korund raids, feeding Stability (±5) and shown on the faith panel (Korund: band only). Off: no Stability input, no panel line, no reads. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_RELIGIOUS_HARMONY_ENABLED": "false",
     // #738 slice 2: army drills: one drill per member per game day; current members' drills and shifts raise unit strength and morale on the card. Needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED too. Off: POST /api/army/drill is 404 and /api/army has no strength or morale. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMY_DRILLS_ENABLED": "false",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
@@ -173,7 +175,7 @@
     // #825: Kindle vote-buying watch (docs §9.5): a player-market transfer within 48h of a Kindle vote, from a party member, campaign actor or 3+-voter payer, records an investigation event.
     "HARIMU_VOTE_BUYING_WATCH_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
-    // Realtime presence spike (#76): server and client flags; both off until QA enables them.
+    // Realtime presence spike (#76): server and client flags; on in preview (preview-flags-on), "false" in production.
     "HARIMU_REALTIME_PRESENCE": "false",
     "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false",
     "NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "false",
