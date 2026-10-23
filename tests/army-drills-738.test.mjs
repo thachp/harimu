@@ -25,7 +25,7 @@ test('card: strength, morale and Drill only when the read carries strength; stri
   const card = readFileSync('app/army-card.tsx', 'utf8');
   assert.match(card, /unit\.strength !== undefined && <p>\{unitCard\.strengthLabel\}/); assert.match(card, /\{unitMembership\.drillButton\}/); assert.match(card, /unitMembership\.drilledToday\.text/);
   assert.doesNotMatch(card, />\s*(Strength|Morale|Drill)\b/, 'no hard-coded labels');
-  assert.match(readFileSync('app/page.tsx', 'utf8'), /<GovernmentPanel [^\n]*\/>\s*<ArmyCard \/>/);
+  assert.match(readFileSync('app/page.tsx', 'utf8'), /<GovernmentPanel [^\n]*\/>\s*<ArmyCard key=\{`army:\$\{citizenSessionKey\}`\}\/>/);
 });
 
 async function spy(r, fn) { const prepare = r.db.prepare.bind(r.db), seen = { sql: [] }; r.db.prepare = q => { seen.sql.push(q); return prepare(q); }; try { seen.result = await fn(); } finally { r.db.prepare = prepare; } return seen; }
