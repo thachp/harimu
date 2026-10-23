@@ -108,9 +108,10 @@ for (const backend of ['sqlite', 'postgres']) {
     await Promise.all([w.open('k0'), w.open('k0')]); assert.equal(await w.n(`SELECT COUNT(*) AS n FROM army_conscripts WHERE clerk_user_id = 'k0'`), 2, 'repeat opens are idempotent');
     const late = await world(t, backend); await late.add('k5', 'korund'); await late.open('k5');
     late.r.setNow(late.r.now + SERVICE_TERM_SECONDS * 1000);
-    assert.equal((await late.r.call('army/draft', 'k5', { action: 'stay' })).status, 409, 'stay only during the term');
+    assert.deepEqual(await late.r.call('army/draft', 'k5', { action: 'stay' }).then(r => [r.status, r.data.reason]), [409, 'not_conscripted'], 'stay only during the term: refused with a reason');
     assert.equal((await late.open('k5')).data.drafted, 1, 'a late stay does not stop the release: released, so drafted again');
     const s = await world(t, backend); await s.add('k9', 'korund'); await s.open('k9');
+    await s.add('v1', 'kindle'); assert.deepEqual(await s.r.call('army/draft', 'v1', { action: 'stay' }).then(r => [r.status, r.data.reason]), [409, 'not_conscripted'], 'a non-conscript stay is refused');
     assert.deepEqual((await s.r.call('army/draft', 'k9', { action: 'stay' })).data, { stayed: true });
     assert.equal((await s.r.call('army/draft', 'k9', { action: 'stay' })).status, 200, 'stay is idempotent');
     s.r.setNow(s.r.now + SERVICE_TERM_SECONDS * 1000); await s.open('k9');
@@ -142,3 +143,11 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(await w.n('SELECT drafted AS n FROM army_drafts'), 2, 'members drafted equal the recorded count');
   });
 }
+
+test('stay-error follow-up (#738): a refused stay shows the placeholder refusal copy, marked for Content; never the generic failure note', () => {
+  const card = readFileSync('app/army-card.tsx', 'utf8'), copy = readFileSync('lib/army-copy.ts', 'utf8');
+  // QA2 on #859: stayRefused only for 409 + not_conscripted; any other non-OK (401/403/404/500) and network errors keep the generic stance failure note.
+  assert.match(card, /setNote\(r\.ok \? fill\(unitMembership\.stayed\.text, unit\.name\) : r\.status === 409 && reason === 'not_conscripted' \? fill\(unitMembership\.stayRefused\.text, unit\.name\) : armyFailureNote\('stance', unit\.name, String\(r\.status\)\)\); \}\)\.catch\(\(\) => setNote\(armyFailureNote\('stance', unit\.name, 'network'\)\)\)/);
+  assert.match(card, /const reason = r\.ok \? '' : \(\(await r\.json\(\)\.catch\(\(\) => \(\{\}\)\)\) as \{ reason\?: string \}\)\.reason;/);
+  assert.match(copy, /PLACEHOLDER copy, marked for Content[^\n]*refused stay[^\n]*\n stayRefused:L\('You cannot stay in \{unit\}: you are not serving a term right now\.'\)/);
+});
