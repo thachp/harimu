@@ -1,0 +1,3 @@
+-- Issue #738 slice 3: conscription (docs §11.3, §15.4): the Korund lottery and Aurelle levies, one draft per nation per game week, behind HARIMU_ARMIES_ENABLED (off in production). Additive only.
+CREATE TABLE IF NOT EXISTS army_drafts (nation_id TEXT COLLATE "C" NOT NULL, game_week BIGINT NOT NULL, token TEXT COLLATE "C" NOT NULL, drafted BIGINT NOT NULL CHECK(drafted >= 0), ran_at BIGINT NOT NULL, PRIMARY KEY (nation_id, game_week));
+CREATE TABLE IF NOT EXISTS army_conscripts (clerk_user_id TEXT COLLATE "C" NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, nation_id TEXT COLLATE "C" NOT NULL, game_week BIGINT NOT NULL, serve_until BIGINT NOT NULL, PRIMARY KEY (clerk_user_id, game_week));

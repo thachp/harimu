@@ -75,6 +75,8 @@ export const unitMembership={
  drillButton:'Drill with your unit',
  drilled:L('You drilled with {unit}.'),
  drilledToday:L('You already drilled this game day.'),
+ // #738 slice 3 (proposal, for Content): a conscript's call-up note; Leave is hidden until the term ends.
+ calledUp:L('You were called up to serve in {unit}. You can leave when your term ends.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),

@@ -34,7 +34,7 @@ export function ArmyCard() {
       </fieldset>
       <p>{squadStance.oneInput.text}</p>
       {unit.strength !== undefined && <><p>{unitMembership.drillsHelper.text}</p><button type="button" onClick={() => void drill()}>{unitMembership.drillButton}</button></>}
-      <button type="button" onClick={() => void send({ action: 'leave' }, fill(unitMembership.left.text, unit.name))}>{unitMembership.leaveButton}</button>
+      {army.serveUntil ? <p>{fill(unitMembership.calledUp.text, unit.name)}</p> : <button type="button" onClick={() => void send({ action: 'leave' }, fill(unitMembership.left.text, unit.name))}>{unitMembership.leaveButton}</button>}
     </> : !unit.openToVolunteers ? <p>{unitMembership.notOpenYet.text}</p> : <button type="button" onClick={() => void send({ action: 'join', unitId: unit.id }, fill(unitMembership.joined.text, unit.name))}>{unitMembership.joinButton}</button>}
     {note && <p role="status">{note}</p>}
   </section>;
