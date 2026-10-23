@@ -34,7 +34,7 @@
     "HARIMU_AI_NEWS_ENABLED": "true",
     "HARIMU_NOTABLES_ENABLED": "true",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "true",
-    "HARIMU_CITY_FOUNDING_ENABLED": "false",
+    "HARIMU_CITY_FOUNDING_ENABLED": "true",
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
     // #764: per-persona AI mute (operator control, not a feature flag). "" = off; "all" or a comma list of persona ids (Notable ids, <nation>-news-desk, kindle-cabinet, kindle-town-hall, kindle-debate) skips that persona's model calls. Unknown values fail closed to "all".
@@ -96,9 +96,9 @@
     // #465: earned-Tessera rewards (a fixed daily pool split pro-rata over verified settled Kindle shifts, claimed at a kiosk; no exchange, cash-out or conversion). Off: the rewards route is a 404 and the epoch-close cron is a no-op.
     "HARIMU_TESSERA_REWARDS_ENABLED": "false",
     // #283: Kindle mid-term Assembly election (D'Hondt per district, 5% district share). Off until QA. #351: the real calendar is driven by the world clock: set HARIMU_KINDLE_CYCLE_START_AT (epoch seconds, start of day 0 of the first 120-day cycle) and the vote opens at day 60 of every cycle for 72 hours. Without it, HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) is a manual one-off open. Neither set: it never opens.
-    "HARIMU_KINDLE_ASSEMBLY_ENABLED": "false",
+    "HARIMU_KINDLE_ASSEMBLY_ENABLED": "true",
     // #307: Kindle party membership and human primaries. Off until QA. Opening is manual: set HARIMU_PRIMARIES_OPEN_AT (epoch seconds) to open the 72-hour primary.
-    "HARIMU_PRIMARIES_ENABLED": "false",
+    "HARIMU_PRIMARIES_ENABLED": "true",
     "HARIMU_TRAVEL_ENABLED": "true",
     "HARIMU_KORUND_PRESIDIUM_ENABLED": "true",
     // #67: citizen faith, Devotion and daily worship. Off until the card UI and QA.
@@ -143,13 +143,13 @@
     // #362: Aurelle Crown debasement PoC (mint parity, Currency Confidence, Monarch decree). Off until QA; decrees are written only by the scheduled Worker.
     "HARIMU_CROWN_DEBASEMENT_ENABLED": "true",
     // #442: Kindle canvassing PoC (party members' ground-game quests; display-only district visibility, never votes). Off until QA.
-    "HARIMU_CANVASSING_ENABLED": "false",
+    "HARIMU_CANVASSING_ENABLED": "true",
     // #441: Kindle town hall PoC (citizen questions for 24 hours, top 10 answered). Off until QA. An operator sets HARIMU_TOWN_HALL_OPEN_AT (epoch seconds) to open every candidate's hall; unset it never opens.
-    "HARIMU_TOWN_HALLS_ENABLED": "false",
+    "HARIMU_TOWN_HALLS_ENABLED": "true",
     // #441: the AI candidates' town hall answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_TOWN_HALLS_ENABLED, the AI binding and a valid AI budget.
     "HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED": "true",
     // #282: Kindle presidential debate PoC (citizen questions and up-votes through the town hall path, top 5 put to every AI candidate, fact-check panel). Off until QA. An operator sets HARIMU_DEBATE_OPEN_AT (epoch seconds) to open intake for 24 hours; unset it never opens.
-    "HARIMU_DEBATE_ENABLED": "false",
+    "HARIMU_DEBATE_ENABLED": "true",
     // #282: the AI candidates' debate answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_DEBATE_ENABLED, the AI binding and a valid AI budget. Off, every answer is the candidate's fallback line.
     "HARIMU_AI_DEBATE_ANSWERS_ENABLED": "true",
     // #431: Kindle Spark money supply and Price Index PoC (Reserve Board issuance within the 3% cap and the Charter Limit). Off until QA; issuance is written only by the scheduled Worker.
@@ -169,9 +169,9 @@
     // #825: Kindle vote-buying watch (docs §9.5): a player-market transfer within 48h of a Kindle vote, from a party member, campaign actor or 3+-voter payer, records an investigation event.
     "HARIMU_VOTE_BUYING_WATCH_ENABLED": "true",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
-    // Realtime presence spike (#76): server and client flags; both off until QA enables them.
-    "HARIMU_REALTIME_PRESENCE": "false",
-    "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false",
+    // Realtime presence spike (#76): server and client flags; on in preview (preview-flags-on), "false" in production.
+    "HARIMU_REALTIME_PRESENCE": "true",
+    "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "true",
     "NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_CREST": "true",
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "true",

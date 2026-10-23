@@ -20,8 +20,9 @@ const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
 // Feature flags the preview turns on for QA (the preview-flags-on change). Production keeps every one "false". Adding a flag here is a deliberate preview-only decision.
 // Build-time UI flags (baked into the client bundle at build): on in preview, always "false" in production. Exactly these four.
-const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_NATION_SKIN', 'NEXT_PUBLIC_HARIMU_WIRE_BYLINES', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
+const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE', 'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_NATION_SKIN', 'NEXT_PUBLIC_HARIMU_WIRE_BYLINES', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
 const previewOnFlags = [
+  'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_REALTIME_PRESENCE', // preview-flags-on (politics, founding, presence)
   'HARIMU_TEST_FAUCET_ENABLED',
   'HARIMU_LABOR_BUREAU_ENABLED',
   'HARIMU_GRAY_MARKET_ENABLED',
@@ -84,7 +85,7 @@ const previewOnFlags = [
   ...previewOnUiFlags,
 ];
 // Flags that stay "false" in preview on purpose: Decision 111 exchange, QA1's square-purchase objection, the unset-secret (fail-closed) flags, and the PoCs or scaffolding listed in the PR.
-const previewOffFlags = ['HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_REWARDS_ENABLED', 'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_MERIDIAN_ENABLED', 'HARIMU_ILMAR_ENABLED', 'HARIMU_HOARVALE_ENABLED', 'HARIMU_VARKAND_ENABLED', 'HARIMU_VELDWOOD_ENABLED', 'HARIMU_FULMARA_ENABLED', 'HARIMU_AI_COST_DASHBOARD_ENABLED'];
+const previewOffFlags = ['HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_REWARDS_ENABLED', 'HARIMU_MERIDIAN_ENABLED', 'HARIMU_ILMAR_ENABLED', 'HARIMU_HOARVALE_ENABLED', 'HARIMU_VARKAND_ENABLED', 'HARIMU_VELDWOOD_ENABLED', 'HARIMU_FULMARA_ENABLED', 'HARIMU_AI_COST_DASHBOARD_ENABLED'];
 const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'], ...Object.fromEntries(previewOnFlags.map(name => [name, ['true', 'false']])) };
 // The only non-"false" values production may carry.
 const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, HARIMU_AI_TEMPLATES_ONLY: '', HARIMU_AI_MUTED_PERSONAS: '', HARIMU_CHAT_SHADOW_MUTE: '' /* #790 operator list, empty */, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
@@ -133,7 +134,7 @@ test('vars: same names as preview except the listed differences; every flag fals
 });
 
 test('preview flags: exactly the previewOnFlags are "true", the deliberate exceptions stay "false", and production is "false" for every one', () => {
-  const flags = config => Object.keys(config.vars).filter(n => /_ENABLED$/.test(n) || previewOnUiFlags.includes(n));
+  const flags = config => Object.keys(config.vars).filter(n => /_ENABLED$/.test(n) || previewOnUiFlags.includes(n) || previewOnFlags.includes(n));
   const previewTrue = flags(preview).filter(n => preview.vars[n] === 'true').sort();
   assert.deepEqual(previewTrue, [...previewOnFlags, 'HARIMU_ACCOUNT_ELECTION_POC_ENABLED'].sort(), 'a new "true" preview flag must be added to previewOnFlags on purpose');
   for (const name of previewOffFlags) assert.equal(preview.vars[name], 'false', `${name} must stay "false" in preview`);
