@@ -10,7 +10,7 @@ import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
-import { quotaPercent, korundMedalCopy, korundQuotaValueText, korundShortfallCopy } from '@/lib/korund-coupons';
+import { quotaPercent, korundMedalCopy, korundQuotaValueText, korundShortfallCopy, korundRationCutCopy } from '@/lib/korund-coupons';
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
 import { grayText, grayRefusal, ln, fc, rate, rumorLine, walletStreetRateLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
@@ -66,6 +66,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!couponsCurrent, 'Refresh for the current game week’s ration book.'], [plan.couponFoodRemaining <= 0, 'This game week’s food coupons have been used.'], [!queue,'Refresh to load the current queue.'], [Boolean(queue&&queue.waiting>0&&queue.position!==1),queue?.requestId?'Wait for earlier requests to collect or cancel. Your place is retained.':'Join the queue and wait for earlier requests to collect or cancel.'], [plan.publicFoodRemaining < plan.couponFoodRemaining, 'State food cannot cover this ration. Collected assignments replenish it.'])} onClick={() => onCommand('korund-redeem-ration')}>Redeem this week’s food coupons · {plan.couponFoodRemaining} food</ActionButton>
       <button type="button" onClick={() => onNavigate('household')}>Take rations to your household</button>
     </> : scene === 'household' ? <>
+      {plan.rationCut && <p className="korund-ration-cut" role="status" aria-label={korundRationCutCopy.label}>{korundRationCutCopy.notice}</p>}
       {plan.coupons && <CouponBook now={now} coupons={plan.coupons} walletMinor={plan.walletMinor} clothing={plan.clothingQuantity ?? 0} goods={plan.goodsQuantity ?? 0} reason={pendingActionReason(pending, uncertain)} onRedeem={(kind) => onCommand('korund-redeem-coupon', kind)} onFood={() => onNavigate('market')} />}
       <p>A household meal uses 2 food and restores up to 4 WC, capped at 24. Meals have a two-real-hour (one game day) cooldown; normal capacity recovery continues.</p>
       <p>{capacity >= 24 ? 'Capacity is full; save your rations.' : plan.foodQuantity < 2 ? 'Redeem your ration coupons for food.' : !mealReady ? `Next meal: ${plan.mealReadyAt ? formatTime(plan.mealReadyAt) : 'checking timing…'}` : 'Household meal available.'}</p>
@@ -124,9 +125,9 @@ export function CouponBook({ now, coupons, walletMinor, clothing, goods, reason,
     {expiresAt && <GameTimer endsAt={expiresAt} label="Coupons expire at the weekly reset" />}
     <p>Coupons are issued in your name, cannot be traded or sent, and unused coupons disappear at the weekly reset.</p>
     <ul>{coupons.map((coupon) => <li key={coupon.kind}>
-      <strong>{coupon.label}</strong> · {coupon.quantity} {coupon.item} · {coupon.priceMinor === 0 ? 'no LN charge' : `${(coupon.priceMinor / 100).toFixed(2)} LN fixed price`} · {coupon.used ? 'used this week' : 'available'}
+      <strong>{coupon.label}</strong> · {coupon.quantity} {coupon.item} · {coupon.priceMinor === 0 ? 'no LN charge' : `${(coupon.priceMinor / 100).toFixed(2)} LN fixed price`} · {coupon.withdrawn ? korundRationCutCopy.withdrawn : coupon.used ? 'used this week' : 'available'}
       {coupon.kind === 'food' ? (!coupon.used && <button type="button" onClick={onFood}>Redeem at the ration counter</button>)
-        : <ActionButton type="button" reason={reason ?? firstActionReason([!now, 'Checking the coupon expiry…'], [now >= Date.parse(coupon.expiresAt), 'This coupon book expired at the weekly reset. Refresh for this week’s coupons.'], [coupon.used, 'This coupon was already used this week.'], [walletMinor < coupon.priceMinor, `You need ${(coupon.priceMinor / 100).toFixed(2)} LN. Complete an assigned shift first.`])} onClick={() => onRedeem(coupon.kind as 'clothing' | 'goods')}>Redeem {coupon.label.toLowerCase()}</ActionButton>}
+        : <ActionButton type="button" reason={reason ?? firstActionReason([!now, 'Checking the coupon expiry…'], [Boolean(coupon.withdrawn), korundRationCutCopy.notice], [now >= Date.parse(coupon.expiresAt), 'This coupon book expired at the weekly reset. Refresh for this week’s coupons.'], [coupon.used, 'This coupon was already used this week.'], [walletMinor < coupon.priceMinor, `You need ${(coupon.priceMinor / 100).toFixed(2)} LN. Complete an assigned shift first.`])} onClick={() => onRedeem(coupon.kind as 'clothing' | 'goods')}>Redeem {coupon.label.toLowerCase()}</ActionButton>}
     </li>)}</ul>
     <p>Household stores: {clothing} clothing · {goods} goods bundles.</p>
   </section>;
