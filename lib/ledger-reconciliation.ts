@@ -44,6 +44,7 @@ const SPK: CurrencySpec = {
     UNION ALL SELECT o.citizen_id, t.qty * t.unit_minor FROM market_trades t JOIN market_orders o ON o.id = t.sell_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT o.citizen_id, -(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT seller_id, -fee_minor FROM market_trade_fees
+    UNION ALL SELECT seller_id, -tax_minor FROM market_sales_tax
     UNION ALL SELECT clerk_user_id, -fee_minor FROM home_city_moves WHERE currency = 'SPK'
     UNION ALL SELECT clerk_user_id, credit_minor FROM savings_shield_credits WHERE status = 'paid'
     UNION ALL SELECT clerk_user_id, -amount_minor FROM party_donations
@@ -59,6 +60,8 @@ const SPK: CurrencySpec = {
     ...integerAndSign('SPK', 'market_trades', 'id', 'unit_minor', true),
     ...integerAndSign('SPK', 'market_trades', 'id', 'qty', true),
     ...integerAndSign('SPK', 'market_trade_fees', 'trade_id', 'fee_minor', true), // #777 sink leg
+    ...integerAndSign('SPK', 'market_sales_tax', 'trade_id', 'tax_minor', true), // #844 sales-tax leg (credited to kindle-treasury)
+    { currency: 'SPK', check: 'sales_tax_not_seller_or_over_gross', sql: 'SELECT x.trade_id AS acct FROM market_sales_tax x LEFT JOIN market_trades t ON t.id = x.trade_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE t.id IS NULL OR s.citizen_id IS NULL OR s.citizen_id <> x.seller_id OR x.tax_minor > t.qty * t.unit_minor' },
     ...integerAndSign('SPK', 'home_city_moves', 'request_id', 'fee_minor', true), // #781 move-fee sink leg
     ...integerAndSign('SPK', 'savings_shield_credits', 'absence_key', 'credit_minor', true), // #824 welfare-line credit
     ...integerAndSign('SPK', 'party_donations', 'request_id', 'amount_minor', true), // #863 donation: citizen debit, party-account credit
