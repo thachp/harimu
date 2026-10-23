@@ -41,21 +41,29 @@ export const harmonyBandLabel: Readonly<Record<HarmonyBand, string>> = { straine
 /** Panel line (placeholder copy, marked for Content): the band, plus the number outside Korund. */
 export const harmonyLine = (nation: string, score: number) => `Religious Harmony: ${harmonyBandLabel[harmonyBand(score)]}${nation === 'korund' ? '' : ` (${score}/${HARMONY_MAX})`}`;
 
-/** Reads the signals for one nation as of `at` (seconds). Festival joins count by the joiner's nation; in Korund every festival is banned. */
-export async function readHarmonySignals(db: GameDatabase, nation: HarmonyNation, at: number, holiday: boolean): Promise<HarmonySignals> {
+/** Reads every nation's signals as of `at` (seconds) in one query (QA3 on #854: one round trip per scored tick, not one per nation).
+ *  Festival joins count by the joiner's nation; raids and raid hits are Korund's. */
+export async function readAllHarmonySignals(db: GameDatabase, at: number, holidays: ReadonlySet<string> = new Set()): Promise<Record<HarmonyNation, HarmonySignals>> {
   const since = at - HARMONY_WINDOW_SECONDS;
-  const row = await db.prepare(`SELECT
-      (SELECT COUNT(*) FROM citizen_festival_joins j JOIN citizens c ON c.clerk_user_id = j.user_id WHERE c.nation_id = ? AND j.joined_at > ? AND j.joined_at <= ?) AS joins,
-      (SELECT COUNT(*) FROM korund_raids WHERE ? = 'korund' AND raided_at > ? AND raided_at <= ?) AS raids,
-      (SELECT COUNT(*) FROM korund_raid_hits WHERE ? = 'korund' AND raided_at > ? AND raided_at <= ?) AS hits`)
-    .bind(nation, since, at, nation, since, at, nation, since, at).first<{ joins: number; raids: number; hits: number }>();
-  const joins = n(row?.joins);
-  // TODO(#842 follow-up, ARC on #854): read festival stances from the per-nation policy table (festivalStance in lib/festivals.ts) instead of
-  // treating every Korund join as banned and every other join as tolerated or endorsed.
-  return { festivalHoliday: holiday ? 1 : 0, festivalJoins: nation === 'korund' ? 0 : joins, bannedFestivalJoins: nation === 'korund' ? joins : 0, raids: n(row?.raids), raidHits: n(row?.hits) };
+  const joins = (nation: HarmonyNation) => `(SELECT COUNT(*) FROM citizen_festival_joins j JOIN citizens c ON c.clerk_user_id = j.user_id WHERE c.nation_id = '${nation}' AND j.joined_at > ? AND j.joined_at <= ?) AS ${nation}_joins`;
+  const row = await db.prepare(`SELECT ${harmonyNations.map(joins).join(', ')},
+      (SELECT COUNT(*) FROM korund_raids WHERE raided_at > ? AND raided_at <= ?) AS raids,
+      (SELECT COUNT(*) FROM korund_raid_hits WHERE raided_at > ? AND raided_at <= ?) AS hits`)
+    .bind(...harmonyNations.flatMap(() => [since, at]), since, at, since, at).first<Record<string, number>>();
+  const out = {} as Record<HarmonyNation, HarmonySignals>;
+  for (const nation of harmonyNations) {
+    const count = n(row?.[`${nation}_joins`]), korund = nation === 'korund';
+    // TODO(#842 follow-up, ARC on #854): read festival stances from the per-nation policy table (festivalStance in lib/festivals.ts) instead of
+    // treating every Korund join as banned and every other join as tolerated or endorsed.
+    out[nation] = { festivalHoliday: holidays.has(nation) ? 1 : 0, festivalJoins: korund ? 0 : count, bannedFestivalJoins: korund ? count : 0, raids: korund ? n(row?.raids) : 0, raidHits: korund ? n(row?.hits) : 0 };
+  }
+  return out;
+}
+export async function readHarmonySignals(db: GameDatabase, nation: HarmonyNation, at: number, holiday: boolean): Promise<HarmonySignals> {
+  return (await readAllHarmonySignals(db, at, holiday ? new Set([nation]) : new Set()))[nation];
 }
 export async function readHarmonyScores(db: GameDatabase, at: number, holidays: ReadonlySet<string> = new Set()): Promise<Record<HarmonyNation, number>> {
-  const out = {} as Record<HarmonyNation, number>;
-  for (const nation of harmonyNations) out[nation] = religiousHarmony(nation, await readHarmonySignals(db, nation, at, holidays.has(nation)));
+  const signals = await readAllHarmonySignals(db, at, holidays), out = {} as Record<HarmonyNation, number>;
+  for (const nation of harmonyNations) out[nation] = religiousHarmony(nation, signals[nation]);
   return out;
 }
