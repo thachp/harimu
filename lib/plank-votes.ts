@@ -5,7 +5,7 @@ import { pledgeCatalog, pledge, kindleParty } from './kindle-parties';
 import { plankVotesPerMember } from './plank-votes-rules';
 export * from './plank-votes-rules';
 export const plankVoteSchemas = [
-  `CREATE TABLE IF NOT EXISTS party_plank_votes (clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, party_id TEXT NOT NULL, pledge_key TEXT NOT NULL, voted_at INTEGER NOT NULL, PRIMARY KEY (clerk_user_id, party_id, pledge_key))`,
+  `CREATE TABLE IF NOT EXISTS party_plank_votes (clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, party_id TEXT NOT NULL, pledge_key TEXT NOT NULL, voted_at INTEGER NOT NULL, slot INTEGER NOT NULL CHECK (slot BETWEEN 1 AND 3), PRIMARY KEY (clerk_user_id, party_id, pledge_key), UNIQUE (clerk_user_id, party_id, slot))`,
 ];
 export type PlankCommand = { action: 'upvote' | 'withdraw'; pledgeKey: string };
 export type PlankView = { party: { id: string; name: string } | null; planks: { key: string; card: string; votes: number }[]; mine: string[]; max: number };
@@ -31,11 +31,16 @@ export async function runPlankCommand(db: GameDatabase, userId: string, cmd: Pla
     await db.prepare('DELETE FROM party_plank_votes WHERE clerk_user_id=? AND party_id=? AND pledge_key=?').bind(userId, partyId, cmd.pledgeKey).run();
     return { ok: true };
   }
-  // One statement: membership and the cap are checked in the same INSERT, so two concurrent up-votes cannot pass a stale count.
-  await db.prepare(`INSERT INTO party_plank_votes (clerk_user_id, party_id, pledge_key, voted_at)
-    SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM party_members WHERE clerk_user_id=? AND party_id=?)
-    AND (SELECT COUNT(*) FROM party_plank_votes WHERE clerk_user_id=? AND party_id=?) < ?
-    ON CONFLICT (clerk_user_id, party_id, pledge_key) DO NOTHING`).bind(userId, partyId, cmd.pledgeKey, now, userId, partyId, userId, partyId, plankVotesPerMember).run();
-  const has = await db.prepare('SELECT 1 AS x FROM party_plank_votes WHERE clerk_user_id=? AND party_id=? AND pledge_key=?').bind(userId, partyId, cmd.pledgeKey).first();
-  return has ? { ok: true } : { ok: false, status: 409, error: `You can up-vote at most ${plankVotesPerMember} planks. Withdraw one first.`, reason: 'cap_reached' };
+  // QA1 #832: a COUNT in the INSERT is not atomic on Postgres (READ COMMITTED). Each vote takes the lowest free slot 1..3 and
+  // UNIQUE (clerk_user_id, party_id, slot) serializes racers on both backends: a 4th vote has no slot to take.
+  const insert = () => db.prepare(`INSERT INTO party_plank_votes (clerk_user_id, party_id, pledge_key, voted_at, slot)
+    SELECT ?, ?, ?, ?, s.slot FROM (SELECT 1 AS slot UNION ALL SELECT 2 UNION ALL SELECT 3) s
+    WHERE EXISTS (SELECT 1 FROM party_members WHERE clerk_user_id=? AND party_id=?)
+    AND NOT EXISTS (SELECT 1 FROM party_plank_votes WHERE clerk_user_id=? AND party_id=? AND pledge_key=?)
+    AND NOT EXISTS (SELECT 1 FROM party_plank_votes WHERE clerk_user_id=? AND party_id=? AND slot=s.slot)
+    ORDER BY s.slot LIMIT 1 ON CONFLICT DO NOTHING`).bind(userId, partyId, cmd.pledgeKey, now, userId, partyId, userId, partyId, cmd.pledgeKey, userId, partyId).run();
+  const voted = () => db.prepare('SELECT 1 AS x FROM party_plank_votes WHERE clerk_user_id=? AND party_id=? AND pledge_key=?').bind(userId, partyId, cmd.pledgeKey).first();
+  // One retry: a concurrent vote may have taken the slot we picked while another slot is still free; refusing then would be wrong.
+  await insert(); if (!(await voted())) await insert();
+  return (await voted()) ? { ok: true } : { ok: false, status: 409, error: `You can up-vote at most ${plankVotesPerMember} planks. Withdraw one first.`, reason: 'cap_reached' };
 }
