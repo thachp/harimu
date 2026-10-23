@@ -110,7 +110,7 @@ export async function runWorldChains(chains: WorldRunner[][]): Promise<void> {
 }
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
@@ -145,7 +145,9 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
     const statements = await mapLimited(missing.results, scoreRepairConcurrency, async row => {
       // #423: war weariness reads the wars table as of the tick's own time (only while both war flags are on), so a catch-up or repaired tick scores the same as a live one.
       const weariness = options.warWeariness ? await readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined;
-      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
+      // #739 slice 2 (ARC (b): no retroactive repair): only the live tick (the latest due one) excludes Dormant citizens; a caught-up or repaired past tick keeps the old denominators.
+      const live = options.dormancy === true && Number(row.scheduled_at)+tickSeconds>now;
+      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(live?{excludeDormant:true}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
     });
     if (statements.length) await db.batch(statements.flat());
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }

@@ -50,7 +50,10 @@ for (const backend of ['sqlite', 'postgres']) test(`POST /api/citizen/heartbeat:
 });
 
 test('the client posts the heartbeat once per load and GET /api/citizen has no dormancy code (#205)', () => {
-  assert.doesNotMatch(readFileSync('app/api/citizen/route.ts', 'utf8'), /dormancy|last_active_at/i);
+  const route = readFileSync('app/api/citizen/route.ts', 'utf8');
+  assert.doesNotMatch(route, /last_active_at/i);
+  // #739 slice 2: the only dormancy reference is the flag passed to the world tick in the POST handler (advanceWorld), never in GET.
+  assert.deepEqual(route.split('\n').filter(l => /dormancy/i.test(l)).map(l => /advanceWorld\(/.test(l) && route.indexOf(l) > route.indexOf('async function handlePost')), [true]);
   const page = readFileSync('app/page.tsx', 'utf8'); assert.equal((page.match(/sendHeartbeat\(/g) ?? []).length, 1);
 });
 
