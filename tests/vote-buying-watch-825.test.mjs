@@ -40,6 +40,14 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(Object.keys(cols).sort(), ['created_at', 'election_key', 'reason', 'sender_id', 'transfer_id', 'voter_id'], 'no ballot choice is stored');
   });
 
+  test(`sweep (${backend}): a declared candidate's direct gift counts on its own (not a party member or canvasser) as 'campaign'`, async t => {
+    const { r, now, vote, gifts, w } = await setup(backend); t.after(() => r.close());
+    const cand = w.voteBuyingCandidateIds[0]; assert.ok(cand);
+    assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM party_members WHERE clerk_user_id=?').bind(cand).first()).n * 1, 0);
+    await w.runVoteBuyingWatch(r.db, now, gifts([['c1', cand, 'v2', vote + H], ['c2', cand, 'v3', vote + 49 * H]]));
+    assert.deepEqual(await events(r), [{ election_key: 'civic:e825', voter_id: 'v2', sender_id: cand, transfer_id: 'gift:c1', reason: 'campaign' }]);
+  });
+
   test(`sweep (${backend}): an ordinary market purchase at the listed price by a party member records no event (and with no direct sources there is no query)`, async t => {
     const { r, now, vote, fill, w } = await setup(backend); t.after(() => r.close());
     await fill('boss', 'v1', vote + H); await fill('canvasser', 'v2', vote - H);
