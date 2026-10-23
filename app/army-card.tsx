@@ -16,15 +16,24 @@ export function ArmyCard() {
     const data: { army?: ArmyView; error?: string } = await (res.json() as Promise<{ army?: ArmyView; error?: string }>).catch(() => ({}));
     if (res.ok) { setArmy(data.army ?? null); setNote(done); } else setNote(armyFailureNote(body.action as ArmyCommand['action'], unit.name, String(data.error ?? res.status)));
   };
+  // #738 slice 2: shown only when the GET carried strength (HARIMU_ARMY_DRILLS_ENABLED on).
+  const drill = async () => {
+    const res = await fetch('/api/army/drill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: crypto.randomUUID() }) });
+    const data: { army?: ArmyView; reason?: string; error?: string } = await (res.json() as Promise<{ army?: ArmyView; reason?: string; error?: string }>).catch(() => ({}));
+    if (res.ok) { setArmy(data.army ?? null); setNote(fill(unitMembership.drilled.text, unit.name)); }
+    else setNote(data.reason === 'already_drilled' ? unitMembership.drilledToday.text : armyFailureNote('stance', unit.name, String(data.error ?? res.status)));
+  };
   return <section className="army-card" aria-label="Your unit">
     <h3>{fill(unitCard.title, unit.name)}</h3>
     <p>{fill(unitCard.commanderLabel, unit.name, unit.officer)}</p>
     <p>{unitCard.memberCountLabel}: {unit.memberCount}</p>
+    {unit.strength !== undefined && <p>{unitCard.strengthLabel}: {unit.strength} · {unitCard.moraleLabel}: {unit.morale}</p>}
     {army.member ? <>
       <fieldset><legend>{squadStance.label}</legend>
         {armyStances.map(s => <label key={s}><input type="radio" name="stance" checked={army.stance === s} onChange={() => void send({ action: 'stance', stance: s }, squadStance.helpers[s].text)} />{squadStance.labels[s]}</label>)}
       </fieldset>
       <p>{squadStance.oneInput.text}</p>
+      {unit.strength !== undefined && <><p>{unitMembership.drillsHelper.text}</p><button type="button" onClick={() => void drill()}>{unitMembership.drillButton}</button></>}
       <button type="button" onClick={() => void send({ action: 'leave' }, fill(unitMembership.left.text, unit.name))}>{unitMembership.leaveButton}</button>
     </> : !unit.openToVolunteers ? <p>{unitMembership.notOpenYet.text}</p> : <button type="button" onClick={() => void send({ action: 'join', unitId: unit.id }, fill(unitMembership.joined.text, unit.name))}>{unitMembership.joinButton}</button>}
     {note && <p role="status">{note}</p>}

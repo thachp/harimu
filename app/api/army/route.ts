@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
-import { armiesEnabled, parseArmyCommand } from '@/lib/army-rules';
+import { armiesEnabled, armyDrillsEnabled, parseArmyCommand } from '@/lib/army-rules';
 import { readArmy, runArmyCommand } from '@/lib/army';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (!armiesEnabled(env)) return notFound();
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  return privateJson({ army: await readArmy(await getDatabase(), userId) });
+  return privateJson({ army: await readArmy(await getDatabase(), userId, Math.floor(Date.now() / 1000), armyDrillsEnabled(env)) });
 }
 
 /** POST {action:'join', unitId} | {action:'leave'} | {action:'stance', stance}, each with a requestId (replay returns the current state, writes nothing). */
