@@ -52,12 +52,13 @@ export const valeFamily = [
   { id: 'apprentice', name: 'Mika Vale', relation: 'Daughter', image: '/assets/household/mika-vale.webp' },
   { id: 'child', name: 'Niko Vale', relation: 'Son', image: '/assets/household/niko-vale.webp' },
 ] as const;
-export function HouseholdSummary({ nation, walletMinor, inventory, residence, enabled = uiV2HouseholdEnabled() }: { nation: Pick<Nation, 'name' | 'currency'>; walletMinor?: number | null; inventory?: readonly { item: string; quantity: number }[] | null; residence?: string | null; enabled?: boolean }) {
+export function HouseholdSummary({ nation, walletMinor, inventory, pantry = true, residence, enabled = uiV2HouseholdEnabled() }: { nation: Pick<Nation, 'name' | 'currency'>; walletMinor?: number | null; inventory?: readonly { item: string; quantity: number }[] | null; pantry?: boolean; residence?: string | null; enabled?: boolean }) {
   if (!enabled) return null;
+  // #861: Food and Pantry show only the nation's own stock (inventory missing: both hide; pantry false: no materials count, Pantry hides).
   const food = itemCount(inventory, 'food'), materials = itemCount(inventory, 'materials');
   return <div className="household-v2">
     <PanelV2 title="Household" subtitle={nation.name} rowsLabel="Household" rows={[]}
-      stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), { label: 'Food', value: String(food) }, ...(residence ? [{ label: 'Residence', value: residence }] : []), { label: 'Pantry', value: `${food} food · ${materials} materials` }]} />
+      stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), ...(inventory ? [{ label: 'Food', value: String(food) }] : []), ...(residence ? [{ label: 'Residence', value: residence }] : []), ...(inventory && pantry ? [{ label: 'Pantry', value: `${food} food · ${materials} materials` }] : [])]} />
     <ul className="household-v2-family" aria-label="Household members">{valeFamily.map(member => <li key={member.id}>{/* eslint-disable-line @next/next/no-img-element -- 48px decorative static portraits; no Next image loader on this deploy */}<img src={member.image} alt="" width={48} height={48} loading="lazy" /><strong>{member.name}</strong><small>{member.relation}</small></li>)}</ul>
   </div>;
 }

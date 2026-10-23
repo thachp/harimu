@@ -12,3 +12,11 @@ export function householdWalletMinor(nationId: string, sparkMinor?: number | nul
   const value = nationId === 'kindle' ? sparkMinor : nationId === 'aurelle' ? aurelleMinor : nationId === 'korund' ? korundMinor : undefined;
   return value ?? undefined;
 }
+
+/** #861: the Household Food and Pantry rows use the nation's own stock, never another nation's. Kindle reads its inventory; Aurelle and Korund read their
+ *  plan's household food, and they have no materials count in existing data, so Pantry is hidden. Other nations have no stock data, so both rows hide. */
+export function householdStock(nationId: string, inventory?: readonly { item: string; quantity: number }[] | null, aurelleFood?: number | null, korundFood?: number | null): { inventory?: readonly { item: string; quantity: number }[]; pantry: boolean } {
+  if (nationId === 'kindle') return { inventory: inventory ?? undefined, pantry: true };
+  const food = nationId === 'aurelle' ? aurelleFood : nationId === 'korund' ? korundFood : undefined;
+  return { inventory: food == null ? undefined : [{ item: 'food', quantity: food }], pantry: false };
+}
