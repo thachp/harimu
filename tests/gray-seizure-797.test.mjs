@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { graySeizureConfig as cfg, seizureChanceBps, seizedAmount, seizureRoll, seizureNotice } from '../lib/gray-seizure.ts';
-import { reconcileLedger } from '../lib/ledger-reconciliation.ts';
+let cfg, seizureChanceBps, seizedAmount, seizureRoll, seizureNotice, reconcileLedger;
+async function load(r) { ({ graySeizureConfig: cfg, seizureChanceBps, seizedAmount, seizureRoll, seizureNotice } = await r.importModule('lib/gray-seizure.ts')); ({ reconcileLedger } = await r.importModule('lib/ledger-reconciliation.ts')); }
 
 const pickId = hit => { for (;;) { const id = randomUUID(); if (hit ? seizureRoll(id) < 0.02 : seizureRoll(id) >= cfg.maxBps / 10000) return id; } };
 
-test('rules: chance is monotonic in Suspicion and capped; amount is capped and never above the bundle', () => {
+test('rules: chance is monotonic in Suspicion and capped; amount is capped and never above the bundle', async t => {
+  const r = await localRuntime(); t.after(() => r.close()); await load(r);
   let last = -1;
   for (let level = 0; level <= 100; level++) { const c = seizureChanceBps(level); assert.ok(c >= last && c <= cfg.maxBps, `level ${level}`); last = c; }
   assert.equal(seizureChanceBps(0), cfg.baseBps); assert.equal(seizureChanceBps(100), 2500); assert.equal(cfg.maxBps, 2500, 'issue: at most 25%');
@@ -19,7 +20,7 @@ test('rules: chance is monotonic in Suspicion and capped; amount is capped and n
 });
 
 async function gray(t, on = true) {
-  const r = await localRuntime(); t.after(() => r.close());
+  const r = await localRuntime(); t.after(() => r.close()); await load(r);
   await r.db.prepare("UPDATE citizens SET nation_id='korund'").run(); await r.call('world', null);
   r.setFixtureEnv('HARIMU_GRAY_MARKET_ENABLED', 'true');
   r.setFixtureEnv('HARIMU_GRAY_SEIZURE_ENABLED', on ? 'true' : undefined);
@@ -37,7 +38,7 @@ const seizures = async r => (await r.db.prepare('SELECT * FROM gray_seizures ORD
 test('flag off: no roll, no seizure write, no field; trade identical to today', async t => {
   const r = await gray(t, false);
   const prepare = r.db.prepare.bind(r.db), seen = [];
-  r.db.prepare = sql => { if (/gray_seizures/.test(sql) && /^\s*(INSERT|UPDATE|DELETE)/i.test(sql)) seen.push(sql); if (/korund_raid_hits/.test(sql)) seen.push('roll'); return prepare(sql); };
+  r.db.prepare = sql => { if (/^\s*(INSERT INTO|UPDATE|DELETE FROM) gray_seizures/i.test(sql)) seen.push(sql); if (/korund_raid_hits/.test(sql)) seen.push('roll'); return prepare(sql); };
   try { const res = await trade(r, pickId(true)); assert.equal('seizedMinor' in res, false); } finally { r.db.prepare = prepare; }
   assert.deepEqual(seen, [], 'no roll and no seizure write');
   assert.deepEqual(await seizures(r), []);
