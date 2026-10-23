@@ -129,6 +129,8 @@ body:has(.harimu-game){overflow:auto}
 .national-news.nation-document[data-nation-theme] :is(.news-statistics,.national-news-items article,.news-source){border-color:var(--nation-edge);background:transparent;color:var(--nation-ink)}
 .national-news.nation-document[data-nation-theme] time { color:var(--nation-ink); }
 .national-news.nation-document[data-nation-theme] .national-news-items article { border-left:3px solid var(--nation-accent); }
+/* #243 (ARC): visually hidden "Wire: " byline prefix, same hidden-text pattern as .game-notifications-live / .map-overlays-status (the repo has no shared sr-only class) */
+.wire-stories .wire-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
 /* #243: filler wire stories (NEXT_PUBLIC_HARIMU_WIRE_BYLINES; app/wire-stories.tsx). Text keeps the document ink (inherited), so contrast is the edition's own;
    each outlet differs by the shape of its byline rule (free-press top rule, State Media dashed stamp, Court Gazette double rule and italic), not by color alone. */
 .wire-stories{margin-top:16px;padding-top:12px;border-top:1px solid var(--nation-edge,#34535d)}

@@ -38,7 +38,7 @@ for(const flag of ['false','true'])test(`National news edition with NEXT_PUBLIC_
   assert.match(html,new RegExp(`class="wire-stories wire-${pack.outlet}" aria-labelledby="wire-${id}"><h3 id="wire-${id}">${pack.byline.name}</h3>`));
   for(const story of pack.templates){
    const at=html.indexOf(`id="${story.id}-h"`);assert.ok(at>0,story.id);const art=html.slice(at,html.indexOf('</article>',at));
-   const h=art.indexOf(story.headline.replace(/'/g,'&#x27;')),b=art.indexOf(`class="wire-byline">${pack.byline.name}`),p=art.indexOf(story.body[0].replace(/'/g,'&#x27;').replace(/"/g,'&quot;'));
+   const h=art.indexOf(story.headline.replace(/'/g,'&#x27;')),b=art.indexOf(`class="wire-byline"><span class="wire-sr">Wire: </span>${pack.byline.name}`),p=art.indexOf(story.body[0].replace(/'/g,'&#x27;').replace(/"/g,'&quot;'));
    assert.ok(h>=0&&b>h&&p>b,`${story.id}: headline, then byline, then body`);
    assert.equal(/AI generated|aria-label="AI"|ai-badge/i.test(art.slice(b,p)),story.aiBadge,`${story.id}: AI badge only on Crown/Presidium voices`);
   }
@@ -49,4 +49,11 @@ test('byline CSS: text keeps the document ink (no color set), outlets differ by 
  const css=readFileSync(new URL('../app/game-shell.css',import.meta.url),'utf8'),block=css.slice(css.indexOf('/* #243:'),css.indexOf('/* #243:')+3000).split('\n').filter(l=>l.startsWith('.wire-')).join('\n');
  assert.doesNotMatch(block,/(^|[;{])color:/m,'no text color: contrast is the nation document ink on its paper');
  for(const [outlet,shape] of [['free-press',/border-top:1px solid/],['state-media',/dashed/],['court-gazette',/double/]])assert.match(block.split('\n').find(l=>l.startsWith(`.wire-${outlet}`))??'',shape,outlet);
+});
+
+test('#243 ARC: every byline is announced as "Wire: <service>" while the prefix stays visually hidden', () => {
+  const css=readFileSync(new URL('../app/game-shell.css',import.meta.url),'utf8');
+  const rule=css.match(/\.wire-stories \.wire-sr\{([^}]*)\}/)?.[1]??'';
+  for (const d of ['position:absolute','width:1px','height:1px','overflow:hidden','clip:rect(0 0 0 0)','clip-path:inset(50%)','white-space:nowrap']) assert.ok(rule.includes(d),`.wire-sr needs ${d}`);
+  assert.ok(!/display:\s*none|visibility:\s*hidden/.test(rule),'hidden text must stay in the accessibility tree');
 });

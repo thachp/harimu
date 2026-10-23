@@ -1,6 +1,6 @@
 /** #243 check: filler wire stories under their in-world byline (NEXT_PUBLIC_HARIMU_WIRE_BYLINES) in the real National news dialog, Kindle, Korund and Aurelle,
  *  flag off and on, at 1280x800, 390x844 and 320x700, 100/125/150% text. Flag on:
- *  - the nation's wire section follows the recorded articles, every story reads headline, byline, body in DOM order, and the byline names the pack's wire service;
+ *  - the nation's wire section follows the recorded articles, every story reads headline, byline, body in DOM order, and the byline reads "Wire: <service>" with the prefix visually hidden (ARC);
  *  - byline and headline text is never clipped and never splits mid-word; byline, headline and body text are at least 4.5:1 against the paper under them.
  *  Flag off: no wire section. Both: the dialog never scrolls sideways. With LAYOUT_SHOTS_DIR, shots go to docs/screenshots/243. Used by hud-layout-check.mjs; runs on its own too. */
 import { bundleShell } from './hud-tooltip-check.mjs';
@@ -32,7 +32,9 @@ const probe = ({ on, byline }) => {
   for (const a of stories) {
     const h = a.querySelector('h4'), b = a.querySelector('.wire-byline'), p = a.querySelector('p:not(.wire-byline)'), name = h?.textContent ?? '?';
     if (!h || !b || !p || !(h.compareDocumentPosition(b) & 4) || !(b.compareDocumentPosition(p) & 4)) issues.push(`${name}: not headline, byline, body`);
-    if (b && !b.textContent.startsWith(byline)) issues.push(`${name}: byline "${b.textContent}"`);
+    if (b && !b.textContent.startsWith(`Wire: ${byline}`)) issues.push(`${name}: byline reads "${b.textContent}"`); // ARC: announced as "Wire: <service>"
+          const sr = b?.querySelector('.wire-sr'), sb = sr?.getBoundingClientRect();
+          if (!sr || sb.width > 1.5 || sb.height > 1.5 || getComputedStyle(sr).clipPath !== 'inset(50%)') issues.push(`${name}: "Wire:" prefix is visible or missing (${sb?.width}x${sb?.height} ${sr && getComputedStyle(sr).clipPath})`);
     for (const el of [h, b, p].filter(Boolean)) {
       const cs = getComputedStyle(el), k = (Math.max(lum(cs.color), lum(ground(el))) + 0.05) / (Math.min(lum(cs.color), lum(ground(el))) + 0.05); min = Math.min(min, k);
       if (k < 4.5) issues.push(`${name}: ${el.tagName.toLowerCase()} contrast ${k.toFixed(2)}:1`);
