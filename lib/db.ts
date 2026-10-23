@@ -45,7 +45,7 @@ import { aiReviewQueueSchemas } from './ai-review-queue'; // #753
 import { homeCityMoveSchemas } from './home-move'; // #781
 import { savingsShieldCreditsSchema } from './market-orders'; // #824
 import { pollingSchemas } from './polling'; // #740
-import { armySchemas } from './army'; // #738
+import { armySchemas, armyDrillSchemas } from './army'; // #738
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
 import { townHallSchemas } from './town-hall'; // #441
@@ -249,6 +249,7 @@ async function initialize(database: GameDatabase) {
     ...aiReviewQueueSchemas.map(sql=>database.prepare(sql)), // #753
     ...pollingSchemas.map(sql=>database.prepare(sql)), // #740
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
+    ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),

@@ -71,6 +71,10 @@ export const unitMembership={
  joined:L('You joined {unit}.'),
  left:L('You left {unit}.'),
  drillsHelper:L('Your drills raise the unit\'s strength and morale.'),
+ // #738 slice 2 (proposal, for Content): the drill button and its two outcomes.
+ drillButton:'Drill with your unit',
+ drilled:L('You drilled with {unit}.'),
+ drilledToday:L('You already drilled this game day.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),
