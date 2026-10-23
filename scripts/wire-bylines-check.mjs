@@ -33,7 +33,7 @@ const probe = ({ on, byline }) => {
     const h = a.querySelector('h4'), b = a.querySelector('.wire-byline'), p = a.querySelector('p:not(.wire-byline)'), name = h?.textContent ?? '?';
     if (!h || !b || !p || !(h.compareDocumentPosition(b) & 4) || !(b.compareDocumentPosition(p) & 4)) issues.push(`${name}: not headline, byline, body`);
     if (b && !b.textContent.startsWith(`Wire: ${byline}`)) issues.push(`${name}: byline reads "${b.textContent}"`); // ARC: announced as "Wire: <service>"
-          const sr = b?.querySelector('.wire-sr'), sb = sr?.getBoundingClientRect();
+          const sr = b?.querySelector('.sr-only'), sb = sr?.getBoundingClientRect();
           if (!sr || sb.width > 1.5 || sb.height > 1.5 || getComputedStyle(sr).clipPath !== 'inset(50%)') issues.push(`${name}: "Wire:" prefix is visible or missing (${sb?.width}x${sb?.height} ${sr && getComputedStyle(sr).clipPath})`);
     for (const el of [h, b, p].filter(Boolean)) {
       const cs = getComputedStyle(el), k = (Math.max(lum(cs.color), lum(ground(el))) + 0.05) / (Math.min(lum(cs.color), lum(ground(el))) + 0.05); min = Math.min(min, k);

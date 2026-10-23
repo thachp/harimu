@@ -2265,3 +2265,6 @@ html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; 
 
 /* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
 button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+
+/* Shared screen-reader-only utility (#243 follow-up): text stays in the accessibility tree (never display:none / visibility:hidden) but takes no visible space. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
