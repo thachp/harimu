@@ -104,8 +104,10 @@ export function FaithPanel({ api, initialPick = null }: { api: FaithApi; initial
   const changeReason = busy ? 'Saving…' : cooldown ?? (choice === current ? 'Pick a different faith to change.' : leaving);
   const copy = copyFor(current), worship = faith.worship;
   const devotion = faith.devotion;
+  const harmony = (faith as FaithState & { harmony?: { line: string } }).harmony; // #842: present only with HARIMU_RELIGIOUS_HARMONY_ENABLED on
   return <section className="faith-panel" aria-labelledby="faith-heading">
     <h2 id="faith-heading">Faith and Devotion</h2>
+    {harmony && <p className="faith-harmony">{harmony.line}</p>}
     <div className="faith-current">
       <h3>{copy.name}</h3>
       {copy.tagline && <p className="faith-tagline">{copy.tagline}</p>}

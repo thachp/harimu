@@ -77,6 +77,9 @@ export const unitMembership={
  drilledToday:L('You already drilled this game day.'),
  // #738 slice 3: PLACEHOLDER copy, marked for Content (proposal: true), not final wording. A conscript's call-up note; Leave is hidden until the term ends.
  calledUp:L('You were called up to serve in {unit}. You can leave when your term ends.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): staying in the unit after the term (ARC on #839).
+ stayButton:'Stay after my term',
+ stayed:L('You will stay in {unit} after your term.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),

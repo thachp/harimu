@@ -115,12 +115,16 @@
     "HARIMU_CIVIC_RANK_ENABLED": "false",
     // #738 slice 1: army units: volunteer for your nation's home-guard unit, leave it, pick a squad stance. Needs HARIMU_WAR_ENABLED too. Off: /api/army is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMIES_ENABLED": "false",
+    // #842: Religious Harmony (docs 14.5): a per-nation 0–100 score from festival holidays, festival joins, banned-festival joins and Korund raids, feeding Stability (±5) and shown on the faith panel (Korund: band only). Off: no Stability input, no panel line, no reads. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_RELIGIOUS_HARMONY_ENABLED": "false",
     // #738 slice 2: army drills: one drill per member per game day; current members' drills and shifts raise unit strength and morale on the card. Needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED too. Off: POST /api/army/drill is 404 and /api/army has no strength or morale. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMY_DRILLS_ENABLED": "false",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "false",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_KINDLE_POLLING_ENABLED": "false",
+    // #831: Kindle platform plank up-votes (docs 9.4): party members up-vote up to 3 of their party's pledges for the party AI to consider; visibility only, never votes or currency. Off: /api/planks is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_PLANK_VOTES_ENABLED": "false",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).

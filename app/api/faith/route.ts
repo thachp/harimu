@@ -4,6 +4,8 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { appealDuty, attendWorship, chooseFaith, joinFestival, parseFaithCommand, readFaith, withGraySuspicion, worshipUnderground } from '@/lib/faith';
 import { travelBlock } from '@/lib/travel';
+import { harmonyEnabled, harmonyLine, readHarmonySignals, religiousHarmony, type HarmonyNation } from '@/lib/religious-harmony';
+import { holidayNationsOn } from '@/lib/festivals';
 import { acceptMission, answerMission, requestMission, setMissionaryMute } from '@/lib/missionary-actions'; // #225
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +21,13 @@ const favorDecayAt = (now: number) => flags().HARIMU_FAVOR_DECAY_ENABLED === 'tr
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  return privateJson(await readFaith(await getDatabase(), userId, Math.floor(Date.now() / 1000), faithEnabled(), favorDecayAt(Math.floor(Date.now() / 1000)), { graySuspicion: graySuspicionOn() }));
+  const db = await getDatabase(), now = Math.floor(Date.now() / 1000);
+  const faith = await readFaith(db, userId, now, faithEnabled(), favorDecayAt(now), { graySuspicion: graySuspicionOn() });
+  // #842: the nation's Religious Harmony line (Korund: band only). Flag off: no extra reads and no harmony key.
+  const nation = faith.nationId as HarmonyNation | null;
+  if (!harmonyEnabled(env) || !nation || !['kindle', 'korund', 'aurelle'].includes(nation)) return privateJson(faith);
+  const score = religiousHarmony(nation, await readHarmonySignals(db, nation, now, holidayNationsOn(Math.floor(now / 7200), 7200).has(nation)));
+  return privateJson({ ...faith, harmony: { line: harmonyLine(nation, score) } });
 }
 
 // #67: choose-faith (once per 60 real days) and attend-worship (once per game day, idempotent per requestId).
