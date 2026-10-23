@@ -36,17 +36,18 @@ export async function POST(request: Request) {
   try { body = await readCommandObject(request, 4096); } catch { return json({ error: 'Invalid request.' }, 400); }
   const c = await citizen(request); if (c.error) return c.error;
   const { db, userId, nationId } = c, t = now();
-  if (typeof body.expectedCityId !== 'string') return json({ error: 'Refresh the city conversation first.', reason: 'bad_request' }, 400);
-  const { currentCityId } = await readCityLocation(db, userId, nationId, t);
-  if (body.expectedCityId !== currentCityId) return json({ error: 'City changed. Refresh your current city first.', reason: 'city_changed' }, 409);
   if (typeof body.id !== 'string' || !uuidPattern.test(body.id)) return json({ error: 'Invalid message.' }, 400);
   const id = body.id.toLowerCase();
-  if (body.action === 'delete') {
+  if (body.action === 'delete') { // own post only, in any city of the citizen's nation (a citizen who moved can still remove an old post)
     const done = await db.prepare("UPDATE city_chat_messages SET deleted=1,body='[removed]' WHERE id=? AND user_id=? AND nation_id=? AND deleted=0").bind(id, userId, nationId).run();
     if (!done.meta.changes) return json({ error: 'Message unavailable.' }, 404);
     return view(db, userId, nationId, t);
   }
   if (body.action !== 'post') return json({ error: 'Unknown action.' }, 400);
+  if (typeof body.expectedCityId !== 'string') return json({ error: 'Refresh the city conversation first.', reason: 'bad_request' }, 400);
+  const { currentCityId } = await readCityLocation(db, userId, nationId, t);
+  const moved = () => json({ error: 'City changed. Refresh your current city first.', reason: 'city_changed' }, 409);
+  if (body.expectedCityId !== currentCityId) return moved();
   if (!validSquareText(body.text)) return json({ error: 'Use 1–280 plain-text characters.' }, 400);
   const text = body.text.trim();
   const blocked = await travelBlock(db, userId, t, vars().HARIMU_TRAVEL_ENABLED === 'true'); if (blocked) return json({ error: blocked, reason: 'traveling' }, 409);
@@ -57,7 +58,12 @@ export async function POST(request: Request) {
   const result = await db.prepare(postCityChatSql).bind(...postCityChatBinds(id, text, t, userId, nationId, currentCityId)).run();
   if (!result.meta.changes) {
     const replay = await db.prepare('SELECT user_id,body,city_id,deleted FROM city_chat_messages WHERE id=?').bind(id).first<{ user_id: string; body: string; city_id: string; deleted: number }>();
-    if (!same(replay)) return json({ error: 'Wait 10 seconds between messages; limit 20 per hour.', reason: 'rate_limited' }, 429);
+    if (!same(replay)) {
+      if (replay) return json({ error: 'Request already used.' }, 409); // another citizen won the same id
+      const still = await db.prepare('SELECT current_city_id FROM citizen_city_locations WHERE user_id=? AND nation_id=?').bind(userId, nationId).first<{ current_city_id: string }>();
+      if (still?.current_city_id !== currentCityId) return moved(); // moved between the check and the write: the INSERT's city check refused it
+      return json({ error: 'Wait 10 seconds between messages; limit 20 per hour.', reason: 'rate_limited' }, 429);
+    }
   } else if (isShadowMuted(parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE), userId, t)) logShadowMuted(userId, id); // #790
   return view(db, userId, nationId, t);
 }

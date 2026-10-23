@@ -90,4 +90,46 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(Number((await c.r.db.prepare('SELECT COUNT(*) AS n FROM city_chat_messages').first()).n), 0, 'and deleted from the table');
     assert.ok(kept.status === 200);
   });
+
+  test(`#881 ${backend}: QA3 mutants: travel block, a reused id from another citizen, the exact 10 s gap, the nation filter on the read`, async t => {
+    const c = await setup(t, backend); await c.read('alice'); await c.read('bob');
+    c.r.setFixtureEnv('HARIMU_TRAVEL_ENABLED', 'true'); const t0 = c.now();
+    await c.r.db.prepare("INSERT INTO citizen_travel (user_id,nation_id,from_x,from_y,to_x,to_y,departed_at,traveling_until,request_id) VALUES ('alice','kindle',0,0,1,1,?,?,?)").bind(t0, t0 + 600, randomUUID()).run();
+    const away = await c.post('alice', 'from the road'); assert.equal(away.status, 409); assert.equal(away.data.reason, 'traveling');
+    c.later(601); const id = randomUUID();
+    assert.equal((await c.r.call('city-chat', 'alice', { action: 'post', id, text: 'arrived', expectedCityId: 'forgehaven' })).status, 200);
+    const stolen = await c.r.call('city-chat', 'bob', { action: 'post', id, text: 'arrived', expectedCityId: 'forgehaven' });
+    assert.equal(stolen.status, 409, 'same id and text from another citizen'); assert.equal(stolen.data.error, 'Request already used.');
+    c.later(9); assert.equal((await c.post('alice', 'nine seconds')).status, 429, '9 s is too soon');
+    c.later(1); assert.equal((await c.post('alice', 'ten seconds')).status, 200, 'exactly 10 s is allowed');
+    await c.citizen('kora', 'korund'); await c.r.db.prepare('INSERT OR IGNORE INTO square_handles(user_id,handle) VALUES (?,?)').bind('kora', 'Citizen-kora0000000000000').run();
+    await c.r.db.prepare("INSERT INTO city_chat_messages (id,user_id,nation_id,city_id,body,posted_at) VALUES (?,'kora','korund','forgehaven','same city id, other nation',?)").bind(randomUUID(), c.now()).run();
+    assert.deepEqual((await c.read('alice')).messages.map(m => m.body), ['arrived', 'ten seconds'], 'the read is filtered by nation too');
+  });
+
+  test(`#881 ${backend}: the INSERT re-checks the city, so a citizen who moves between the check and the write is refused`, async t => {
+    const c = await setup(t, backend); await c.read('alice');
+    const prepare = c.r.db.prepare.bind(c.r.db);
+    c.r.db.prepare = sql => { if (/^INSERT INTO city_chat_messages/.test(sql)) { c.r.db.prepare = prepare; return { bind: (...a) => ({ run: async () => { await c.moveTo('alice', 'tarrek-foundry'); return prepare(sql).bind(...a).run(); } }) }; } return prepare(sql); };
+    const res = await c.r.call('city-chat', 'alice', { action: 'post', id: randomUUID(), text: 'mid-move', expectedCityId: 'forgehaven' });
+    c.r.db.prepare = prepare;
+    assert.equal(res.status, 409); assert.equal(res.data.reason, 'city_changed');
+    assert.equal(Number((await c.r.db.prepare('SELECT COUNT(*) AS n FROM city_chat_messages').first()).n), 0);
+  });
+
+  test(`#881 ${backend}: reports accept a live city message only in the reporter's own nation and current city; an author can delete an old post after moving`, async t => {
+    const c = await setup(t, backend); c.r.setFixtureEnv('HARIMU_REPORTS_ENABLED', 'true');
+    await c.read('alice'); await c.read('bob'); await c.citizen('kora', 'korund'); await c.read('kora');
+    const res = await c.post('bob', 'report me'); assert.equal(res.data.reportsEnabled, true); const msg = res.data.messages[0].id;
+    const report = user => c.r.call('reports', user, { requestId: randomUUID(), targetKind: 'citizen-message', targetId: msg, reasonId: 'spam-other' });
+    assert.equal((await report('bob')).status, 404, 'not by its author');
+    assert.equal((await report('kora')).status, 404, 'not from another nation');
+    await c.moveTo('alice', 'tarrek-foundry'); assert.equal((await report('alice')).status, 404, 'not from another city');
+    await c.moveTo('alice', 'forgehaven'); assert.equal((await report('alice')).status, 201, 'same nation and city');
+    await c.moveTo('bob', 'kolt-savanna');
+    assert.equal((await c.r.call('city-chat', 'bob', { action: 'delete', id: msg })).status, 200, 'the author deletes it from another city');
+    assert.deepEqual((await c.read('alice')).messages, []);
+    await c.citizen('carl', 'kindle'); await c.read('carl'); assert.equal((await report('carl')).status, 404, 'a deleted message is not reportable');
+  });
 }
+
