@@ -6,7 +6,7 @@
  *  The same id may appear more than once; windows of one id must not overlap. Empty entries (trailing or doubled commas) are ignored.
  *  A malformed var fails safe: it mutes nobody and logs a warning. No imports: the plain-node production scripts load this file. */
 export const shadowMuteIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
-const isoPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+const isoPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/;
 /** At most 90 entries, closed windows included (D1 bound-parameter limit: 100 per query; see readSquare's batching). */
 export const SHADOW_MUTE_MAX_IDS = 90;
 /** Visible-interval terms per feed query: 4 fixed binds + 3 per term, so 32 terms = 100 binds. */
@@ -30,7 +30,7 @@ function parse(raw: unknown): Parsed {
     const id = part.slice(0, at), [muteText, unmuteText, extra] = part.slice(at + 1).split('..');
     if (!shadowMuteIdPattern.test(id) || reservedWords.has(id.toLowerCase())) return { problem: 'must use citizen ids of [A-Za-z0-9_-], 1-64 characters', entries };
     const from = time(muteText), to = unmuteText === undefined ? null : time(unmuteText);
-    if (extra !== undefined || Number.isNaN(from) || (to !== null && Number.isNaN(to))) return { problem: 'must use ISO 8601 times with a zone (id@2026-10-23T07:00:00Z or id@start..end)', entries };
+    if (extra !== undefined || Number.isNaN(from) || (to !== null && Number.isNaN(to))) return { problem: 'must use ISO 8601 times with a zone and whole seconds (id@2026-10-23T07:00:00Z or id@start..end)', entries };
     if (to !== null && to <= from) return { problem: 'must put the unmute time after the mute time (inverted window)', entries };
     entries.set(id, [...(entries.get(id) ?? []), { from, to }]);
   }

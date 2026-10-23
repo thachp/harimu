@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { parseShadowMute, logShadowMuted, isShadowMuted, visibleIntervals, SHADOW_MUTE_MAX_IDS } from '../lib/chat-shadow-mute.ts';
 
-const iso = seconds => new Date(seconds * 1000).toISOString();
+const iso = seconds => new Date(seconds * 1000).toISOString().replace('.000Z', 'Z');
 const entries = n => Array.from({ length: n }, (_, i) => `u${i}@2026-10-23T07:00:00Z`).join(',');
 function capture(t) {
   const lines = { info: [], warn: [] }, info = console.info, warn = console.warn;
@@ -34,6 +34,7 @@ test('parse: id@mute or id@mute..unmute windows; duplicates allowed; bare ids, s
   const bads = ['alice', 'alice,bob', 'all', 'ALL', 'true', 'False', `all@${T(7)}`, 'alice@', 'alice@yesterday', 'alice@2026-10-23', 'alice@2026-10-23T07:00:00',
     `alice@${T(9)}..`, `alice@${T(9)}..${T(9)}`, `alice@${T(10)}..${T(9)}`, `alice@${T(9)}..${T(11)}..${T(12)}`, `alice@${T(9)}..${T(11)},alice@${T(10)}`,
     `alice@${T(9)},alice@${T(12)}..${T(13)}`, `alice@${T(9)},alice@${T(10)}`, `a b@${T(7)}`, 42, entries(91), `${entries(89)},alice@${T(1)}..${T(2)},alice@${T(3)}`];
+  bads.push(`alice@2026-10-23T07:00:00.000Z`, `alice@2026-10-23T07:00:00.5Z`, `alice@${T(9)}..2026-10-23T11:00:00.250+00:00`); // QA1 nit: fractional seconds refused
   for (const bad of bads) assert.equal(parseShadowMute(bad, w).size, 0, String(bad).slice(0, 40));
   assert.equal(warned.length, bads.length); assert.match(warned[0], /bare ids are refused.*mutes nobody/);
   assert.equal(SHADOW_MUTE_MAX_IDS, 90); assert.equal(parseShadowMute(entries(90), w).size, 90, '90 entries: the D1 bound-parameter cap');
@@ -96,4 +97,19 @@ test('empty var: no visible change; malformed var (bare id) mutes nobody and war
 test('config: empty by default in preview and production', () => {
   const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
   for (const file of ['wrangler.jsonc', 'wrangler.prod.jsonc']) assert.equal(strip(readFileSync(file, 'utf8')).vars.HARIMU_CHAT_SHADOW_MUTE, '', file);
+});
+
+test('merge tie-break matches SQL ORDER BY posted_at DESC, id DESC across the unlisted and listed-author queries (QA1 nit)', async t => {
+  capture(t); const r = await setup(t);
+  await post(r, 'alice', 'Handle alice'); await post(r, 'bob', 'Handle bob'); // the feed joins square_handles
+  const at = sec(r) + 5;
+  r.setFixtureEnv('HARIMU_CHAT_SHADOW_MUTE', `alice@${iso(at + 1000)}`); // alice listed (future window), bob unlisted: separate queries
+  const ids = { alice: ['9fffffff-0000-4000-8000-000000000001', 'b0000000-0000-4000-8000-000000000003'], bob: ['10000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000004'] };
+  for (const [user, list] of Object.entries(ids)) for (const id of list)
+    await r.db.prepare("INSERT INTO square_messages(id,user_id,nation_id,body,posted_at) VALUES (?,?,'kindle',?,?)").bind(id, user, `Fixture ${id.slice(0, 2)}`, at).run();
+  r.setNow((at + 1) * 1000);
+  const sql = (await r.db.prepare("SELECT id FROM square_messages WHERE nation_id='kindle' AND posted_at=? ORDER BY posted_at DESC, id DESC").bind(at).all()).results.map(x => x.id);
+  assert.deepEqual(sql, [ids.alice[1], ids.bob[1], ids.alice[0], ids.bob[0]], 'SQL id DESC on TEXT ids is byte order');
+  const res = await r.call('square', 'bob'); assert.equal(res.status, 200);
+  assert.deepEqual(res.data.messages.map(m => m.body).filter(b => b.startsWith('Fixture ')), sql.map(id => `Fixture ${id.slice(0, 2)}`).reverse(), "the feed shows oldest first: reverse of the SQL order");
 });
