@@ -3,6 +3,7 @@
 import { scopeNotice, type NoticeScope } from '@/lib/notice-scope';
 import { useEffect, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { nationMark, nationSymbolsEnabled, nationTheme } from '@/lib/nation-themes';
+import { nationSkin } from '@/lib/nation-skin';
 import { identityStatus, nationEmblem, topBarEmblemEnabled, uiV2TopbarEnabled } from '@/lib/nation-emblem';
 import { helpClosed, helpIdOf, reduceHelp, type HelpEvent } from '@/lib/hud-help';
 import { GlobeHemisphereWest, House, Hammer, Storefront, Bank, UsersThree, X, Coins, Lightning, Bread, Cube, BookOpen, Compass, CaretRight } from '@phosphor-icons/react';
@@ -155,7 +156,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}${railOn ? ' game-rail-on' : ''}${cityStripHidden(view) ? ' game-city-v2' : ''}`}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
     <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{railOn ? null : breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} visitor={visitor} overlays={mapOverlays} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
-    <header className={topbarV2 ? 'game-hud game-hud-v2' : 'game-hud'} {...hudHelpHandlers}>
+    <header className={topbarV2 ? 'game-hud game-hud-v2' : 'game-hud'} data-nation-skin={nationSkin(citizenNation?.id) ?? undefined} {...hudHelpHandlers}>
       <div className="game-identity"><span className="game-crest" aria-hidden="true">H</span><div><strong>HARIMU</strong><span><span role="status">{identityHold === 'loading' ? 'Loading your citizen…' : null}</span>{identityHold !== 'none' ? null : <>{emblemOn && <NationEmblemMark id={resourceNation.id} name={resourceNation.name} />}{resourceNation.name}<i />{identityStatus({ guestDemo, localDemo, hasCitizenNation: Boolean(citizenNation) }, emblemOn)}</>}</span></div></div>
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>
         {guestDemo ? <span>No account · sample actions only</span> : !citizenNation && !localDemo ? <HudHelp label="Resources" open={isOpen("Resources")} help="Work capacity, money, food, materials and knowledge unlock after citizenship. Exploring nations does not create a citizen."><span>Resources unlock after citizenship</span></HudHelp> : <>
