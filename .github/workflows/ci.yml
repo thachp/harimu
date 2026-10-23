@@ -68,7 +68,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22 # package.json engines: >=22.13.0
+          node-version: 22 # package.json engines: >=22.18.0 (type stripping on by default; scripts import lib .ts)
           cache: npm
 
       - uses: actions/setup-python@v5

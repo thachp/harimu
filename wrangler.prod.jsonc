@@ -23,6 +23,8 @@
   "workers_dev": false,
   "preview_urls": false,
   "vars": {
+    // #790: square chat shadow-mute (docs 21.3), new messages only. Operator list of citizenId@muteISO or citizenId@muteISO..unmuteISO entries (max 90; unmute by closing the window, not deleting it), comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.
+    "HARIMU_CHAT_SHADOW_MUTE": "",
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaGFyaW11LmNvbSQ",
     "HARIMU_ACCOUNT_ELECTION_POC_ENABLED": "false",
     "HARIMU_STORAGE_MAINTENANCE": "false",
@@ -67,6 +69,8 @@
     "HARIMU_KORUND_MEDALS_ENABLED": "false",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
     "HARIMU_KORUND_SHORTFALL_ENABLED": "false",
+    // #781: move your home city within your own nation for a fee of 10 units of the nation's wallet currency (SPK Kindle, LN Korund; no wallet currency: not_open_yet), once per 7 real days (POST /api/city/home). Off: 404 before auth, no read or write; home stays the capital.
+    "HARIMU_HOME_CITY_MOVE_ENABLED": "false",
     // #777: goods-market seller fee (0.5%, rounded down) written as a sink row with each fill and netted from the wallet. Off: no fee written or read.
     "HARIMU_MARKET_FEE_ENABLED": "false",
     // #758: Korund wallet shows the rumored LN street rate (from #43 trades, display only) to citizens who have traded on the gray market. Off: no read, wallet unchanged.
@@ -174,6 +178,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "false",
     // #243: filler wire stories (lib/press-templates.ts packs) in the National news edition under their in-world byline; they give way once a player paper publishes.
     "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "false",
+    // #85: nation skin PoC on the top bar (Kindle / Korund / Aurelle colors + one CSS motif each); guests and pre-citizens keep the neutral bar.
+    "NEXT_PUBLIC_HARIMU_NATION_SKIN": "false",
     "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },

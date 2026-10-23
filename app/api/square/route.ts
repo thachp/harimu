@@ -5,6 +5,9 @@ import { travelBlock } from '@/lib/travel';
 import { env } from 'cloudflare:workers';
 import { postSquareSql, readSquare, uuidPattern, validSquareText } from '@/lib/square-chat';
 import { latchAfterWrite } from '@/lib/first-week-server';
+import { parseShadowMute, logShadowMuted, isShadowMuted } from '@/lib/chat-shadow-mute';
+// #790: operator shadow-mute list (comma-separated citizenId@ISO8601 entries, not a secret; new posts only). Empty: no change.
+const shadowMuted=()=>parseShadowMute((env as unknown as {HARIMU_CHAT_SHADOW_MUTE?:string}).HARIMU_CHAT_SHADOW_MUTE);
 export const dynamic='force-dynamic';
 // #743: the client shows the Report control only when intake is on.
 const reportsEnabled=()=>(env as unknown as {HARIMU_REPORTS_ENABLED?:string}).HARIMU_REPORTS_ENABLED==='true';
@@ -20,7 +23,7 @@ export async function GET(request:Request) {
   const ctx=await context(request);
   if(!ctx)return privateResponse({error:'Sign in required.'},401);
   if(!ctx.nationId)return privateResponse({error:'Enroll in a nation first.'},403);
-  return privateResponse({...await readSquare(ctx.db,ctx.userId,ctx.nationId,ctx.now),reportsEnabled:reportsEnabled()});
+  return privateResponse({...await readSquare(ctx.db,ctx.userId,ctx.nationId,ctx.now,shadowMuted()),reportsEnabled:reportsEnabled()});
 }
 // #194: a square post can complete a first-week goal; latch after a successful write.
 export async function POST(request:Request) {
@@ -36,7 +39,7 @@ async function handleSquarePost(request:Request) {
   if(!ctx.nationId)return privateResponse({error:'Enroll in a nation first.'},403);
   let body: Record<string,unknown>;
   try { const reader=request.body?.getReader();if(!reader)throw Error();const chunks:Uint8Array[]=[];let size=0;for(;;){const part=await reader.read();if(part.done)break;size+=part.value.byteLength;if(size>4096){await reader.cancel();throw Error();}chunks.push(part.value);}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}const raw=new TextDecoder().decode(bytes);const parsed=JSON.parse(raw);if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error();body=parsed; }catch{return privateResponse({error:'Invalid request.'},400);}
-  const {db,userId,nationId,now}=ctx;
+  const {db,userId,nationId,now}=ctx;const muted=shadowMuted();
   if((body.action==='post'||body.action==='delete')&&typeof body.expectedNationId!=='string')return privateResponse({error:'Refresh the conversation before submitting a nation-scoped command.'},400);
   if(body.expectedNationId!==undefined&&body.expectedNationId!==nationId)return privateResponse({error:'Citizenship changed. Refresh your citizen before reopening the conversation.'},409);
   if(body.action==='post'){const blocked=await travelBlock(db,userId,now,(env as unknown as {HARIMU_TRAVEL_ENABLED?:string}).HARIMU_TRAVEL_ENABLED==='true');if(blocked)return privateResponse({error:blocked,reason:'traveling'},409);} // #123
@@ -60,6 +63,7 @@ async function handleSquarePost(request:Request) {
     } else {
       await db.prepare('INSERT OR IGNORE INTO square_handles(user_id,handle) VALUES (?,?)').bind(userId,`Citizen-${crypto.randomUUID().replaceAll('-','').slice(0,16)}`).run();
       const result=await db.prepare(postSquareSql).bind(id,text,now,userId,nationId,id,userId,now-10,userId,now-3600).run();
+      if(result.meta.changes&&isShadowMuted(muted,userId,now))logShadowMuted(userId,id); // #790: stored, shown only to the author
       if(!result.meta.changes) {
         const replay=await db.prepare('SELECT user_id,body,nation_id,deleted FROM square_messages WHERE id=?').bind(id).first<{user_id:string;body:string;nation_id:string;deleted:number}>();
         if(!replay||replay.user_id!==userId||replay.body!==text||replay.nation_id!==nationId||replay.deleted){
@@ -70,5 +74,5 @@ async function handleSquarePost(request:Request) {
       }
     }
   } else return privateResponse({error:'Unknown action.'},400);
-  return privateResponse({...await readSquare(db,userId,nationId,now),reportsEnabled:reportsEnabled()});
+  return privateResponse({...await readSquare(db,userId,nationId,now,muted),reportsEnabled:reportsEnabled()});
 }

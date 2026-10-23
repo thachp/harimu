@@ -12,6 +12,7 @@
  *  (#392 S4) The zoom rail (scripts/ui-v2-rail-check.mjs).
  *  (#392 S7) City hotspot pills and no bottom strip (scripts/ui-v2-city-check.mjs).
  *  (#243) Filler wire stories under their byline in the National news dialog (scripts/wire-bylines-check.mjs).
+ *  (#85) Nation skin on the top bar: same layout and text, AA text, visible focus (scripts/nation-skin-check.mjs).
  *  (#392 S6) The Nation panel (scripts/ui-v2-nation-check.mjs).
  *  (#800) Rare resource node marker on the Resources overlay, flag off and on (scripts/rare-marker-check.mjs).
  *  (#779) Nation fact-list labels never split mid-word (scripts/nation-fact-label-check.mjs).
@@ -40,6 +41,7 @@ import { checkNationFactLabels } from './nation-fact-label-check.mjs';
 import { checkUiV2World } from './ui-v2-world-check.mjs';
 import { checkUiV2City } from './ui-v2-city-check.mjs';
 import { checkWireBylines } from './wire-bylines-check.mjs';
+import { checkNationSkin } from './nation-skin-check.mjs';
 import { checkUiV2Nation } from './ui-v2-nation-check.mjs';
 import { checkUiV2Rail } from './ui-v2-rail-check.mjs';
 import { checkUiV2Topbar } from './ui-v2-topbar-check.mjs';
@@ -209,6 +211,7 @@ try {
   await checkUiV2Nation({ browser, css, preflight, failures, rows }); // #392 S6: Nation panel shape, institution rows, Explore {nation}
   await checkUiV2City({ browser, css, preflight, failures, rows }); // #392 S7: City hotspot pills, strip removed
   await checkWireBylines({ browser, css, preflight, failures, rows }); // #243: wire story bylines
+  await checkNationSkin({ browser, css, preflight, failures, rows }); // #85: nation skin on the top bar
   await checkUiV2Rail({ browser, css, preflight, failures, rows }); // #392 S4: zoom rail beside the stage, places-only top tabs
   await checkUiV2Topbar({ browser, css, preflight, failures, rows }); // #392 S2: UI v2 top bar restyle (flag off, emblem-only, v2 on)
   await checkBellBadge({ browser, css, preflight, failures, rows }); // #682: the bell's unread badge (99, 99+) stays inside the 44px phone bell

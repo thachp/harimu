@@ -10,11 +10,15 @@ export async function readCityLocation(db:GameDatabase,userId:string,nationId:st
  const capital=capitalCityForNation(nationId);if(!capital)throw new Error('Unknown nation city.');
  const ids=citiesForNation(nationId).map(city=>city.id);
  const placeholders=ids.map(()=>'?').join(',');
+ // #781: a home recorded by a home_city_moves row for this nation and still a city of it is kept; otherwise (no move, nation changed, unknown city) home resets to the capital as before.
+ const kept=`(citizen_city_locations.nation_id=excluded.nation_id AND citizen_city_locations.home_city_id IN (${placeholders}) AND EXISTS(SELECT 1 FROM home_city_moves m WHERE m.clerk_user_id=citizen_city_locations.user_id AND m.nation_id=excluded.nation_id AND m.to_city_id=citizen_city_locations.home_city_id))`;
  await db.prepare(`INSERT INTO citizen_city_locations(user_id,nation_id,home_city_id,current_city_id,updated_at)
  SELECT clerk_user_id,nation_id,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?
- ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,home_city_id=excluded.home_city_id,current_city_id=excluded.current_city_id,updated_at=excluded.updated_at
- WHERE citizen_city_locations.nation_id!=excluded.nation_id OR citizen_city_locations.home_city_id!=excluded.home_city_id OR citizen_city_locations.current_city_id NOT IN (${placeholders})`)
- .bind(capital.id,capital.id,now,userId,nationId,...ids).run();
+ ON CONFLICT(user_id) DO UPDATE SET home_city_id=CASE WHEN ${kept} THEN citizen_city_locations.home_city_id ELSE excluded.home_city_id END,
+ current_city_id=CASE WHEN ${kept} AND citizen_city_locations.current_city_id IN (${placeholders}) THEN citizen_city_locations.current_city_id ELSE excluded.current_city_id END,
+ nation_id=excluded.nation_id,updated_at=excluded.updated_at
+ WHERE citizen_city_locations.nation_id!=excluded.nation_id OR citizen_city_locations.current_city_id NOT IN (${placeholders}) OR (citizen_city_locations.home_city_id!=excluded.home_city_id AND NOT ${kept})`)
+ .bind(capital.id,capital.id,now,userId,nationId,...ids,...ids,...ids,...ids,...ids).run();
  const row=await db.prepare('SELECT nation_id,home_city_id,current_city_id FROM citizen_city_locations WHERE user_id=? AND nation_id=?').bind(userId,nationId).first<{nation_id:string;home_city_id:string;current_city_id:string}>();
  return {nationId,homeCityId:row?.home_city_id??capital.id,currentCityId:row?.current_city_id??capital.id};
 }

@@ -5,16 +5,18 @@
  *            - coupon prices paid
  *            + LN received in accepted gray-market trades (as the accepting buyer)
  *            - LN given in accepted gray-market trades (as the posting seller)
- *            - LN seized at a checkpoint and destroyed (#797 gray_seizures, the sink; credited to nobody).
+ *            - LN seized at a checkpoint and destroyed (#797 gray_seizures, the sink; credited to nobody)
+ *            - LN home-move fees (#781 home_city_moves with currency 'LN', a sink).
  * Pure and dependency-free (no imports) so SQL-fixture tests can load it directly. */
-export const laborNoteParams = 5;
+export const laborNoteParams = 6;
 /** `user` is the SQL for the citizen id: `?` (then bind laborNoteBinds(id)) or a column such as `citizens.clerk_user_id` (no binds). */
 export function laborNoteSql(user: string): string {
   return `(COALESCE((SELECT SUM(wage_minor) FROM korund_settlements WHERE clerk_user_id=${user}),0)`
     + `-COALESCE((SELECT SUM(price_minor) FROM korund_coupon_redemptions WHERE clerk_user_id=${user}),0)`
     + `+COALESCE((SELECT SUM(amount_minor) FROM gray_trades WHERE buyer_id=${user}),0)`
     + `-COALESCE((SELECT SUM(amount_minor) FROM gray_trades WHERE seller_id=${user}),0)`
-    + `-COALESCE((SELECT SUM(amount_minor) FROM gray_seizures WHERE clerk_user_id=${user}),0))`;
+    + `-COALESCE((SELECT SUM(amount_minor) FROM gray_seizures WHERE clerk_user_id=${user}),0)`
+    + `-COALESCE((SELECT SUM(fee_minor) FROM home_city_moves WHERE clerk_user_id=${user} AND currency='LN'),0))`;
 }
 /** The binds for laborNoteSql('?'): the citizen id once per `?` in the expression. */
 export const laborNoteBinds = (userId: string): string[] => Array.from({ length: laborNoteParams }, () => userId);
