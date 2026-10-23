@@ -32,6 +32,8 @@ export const directTransferSources: readonly DirectTransferSource[] = []; // non
 
 /** One idempotent statement: every matching (vote, transfer, reason) not yet recorded. It starts with INSERT (the Postgres adapter runs only SELECT/INSERT/UPDATE/DELETE);
  *  re-running adds nothing (primary key + ON CONFLICT DO NOTHING). */
+// SECURITY: `sources` (each name and sql) is interpolated into the SQL text, not bound. It must stay a code-constant list (directTransferSources)
+// and must never come from user, request, env or config input.
 export const voteBuyingSweepSql = (sources: readonly DirectTransferSource[]) => `INSERT INTO vote_buying_events (election_key, voter_id, sender_id, transfer_id, reason, created_at)
 WITH r AS (${receipts}), t AS (${sources.map(x => `SELECT '${x.name}:'||id AS id, sender, recipient, at FROM (${x.sql}) s`).join(' UNION ALL ')}),
  hits AS (SELECT r.ekey, r.uid, t.sender, t.id FROM r JOIN t ON t.recipient=r.uid AND t.sender<>r.uid AND t.at>=r.at-? AND t.at<=r.at+?)
