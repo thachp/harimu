@@ -9,13 +9,15 @@ import { productionBuildEnv } from '../scripts/build-production.mjs';
 import ts from 'typescript';
 
 const checkedIn = readProductionConfigRaw(), realId = '0123456789abcdef0123456789abcdef';
+const placeholder = { ...checkedIn, hyperdrive: [{ binding: 'HYPERDRIVE', id: 'PLACEHOLDER-production-hyperdrive-config-id' }] };
 const good = (change = c => c) => { const c = structuredClone(checkedIn); c.hyperdrive[0].id = realId; change(c); return c; };
 const problems = change => productionConfigProblems(good(change));
 const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
 
-test('the checked-in production config fails only on the Hyperdrive placeholder; with a real id it is clean', () => {
-  const found = productionConfigProblems(checkedIn); assert.equal(found.length, 1); assert.match(found[0], /placeholder/);
-  assert.throws(() => assertProductionConfig(checkedIn), /Production config refused:\n- .*placeholder/);
+test('a placeholder Hyperdrive id is the only refusal; the checked-in config (preview\'s id, Patrick Oct 22) is clean', () => {
+  const found = productionConfigProblems(placeholder); assert.equal(found.length, 1); assert.match(found[0], /placeholder/);
+  assert.throws(() => assertProductionConfig(placeholder), /Production config refused:\n- .*placeholder/);
+  assert.deepEqual(productionConfigProblems(checkedIn), []); assert.equal(sharesPreviewHyperdrive(checkedIn), true);
   assert.deepEqual(problems(() => {}), []);
   const previewId = readFileSync('wrangler.jsonc', 'utf8').match(/"id": "([a-f0-9]{32})"/)[1];
   assert.deepEqual(problems(c => { c.hyperdrive[0].id = previewId; }), [], 'shared database (Patrick, Oct 15): preview\'s Hyperdrive id is accepted, it is only a config value');
@@ -29,7 +31,7 @@ test('assertProductionConfig refuses each wrong shape, naming it', () => {
   refuses(c => { c.d1_databases = [{ binding: 'DB' }]; }, /d1_databases/); refuses(c => { c.workers_dev = true; }, /workers_dev/); refuses(c => { c.preview_urls = true; }, /preview_urls/);
   for (const route of [{ pattern: 'harimu.com', custom_domain: true }, { pattern: '*.harimu.com', custom_domain: true }, { pattern: 'app.harimu.com' }, 'app.harimu.com']) refuses(c => { c.routes = [route]; }, /only allowed route/);
   refuses(c => { c.routes = [{ pattern: 'app.harimu.com', custom_domain: true }, { pattern: 'www.harimu.com', custom_domain: true }]; }, /only allowed route/);
-  refuses(c => { c.hyperdrive[0].id = checkedIn.hyperdrive[0].id; }, /placeholder/);
+  refuses(c => { c.hyperdrive[0].id = placeholder.hyperdrive[0].id; }, /placeholder/);
   refuses(c => { c.hyperdrive.push({ binding: 'OTHER', id: realId }); }, /Exactly one HYPERDRIVE/); refuses(c => { c.hyperdrive[0].localConnectionString = 'x'; }, /only binding and id/); refuses(c => { delete c.hyperdrive; }, /Exactly one HYPERDRIVE/);
   for (const name of ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_AI_PRICE_REVIEWED_UNTIL', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']) refuses(c => { c.vars[name] = 'true'; }, new RegExp(`${name} must not exist`));
   for (const bad of [undefined, 'TRUE', 'false', '1', '']) refuses(c => { if (bad === undefined) delete c.vars.HARIMU_PRODUCTION_STORAGE; else c.vars.HARIMU_PRODUCTION_STORAGE = bad; }, /HARIMU_PRODUCTION_STORAGE is missing or has the wrong value/);
@@ -43,14 +45,16 @@ test('deploy-production refuses without explicit production env and approval inp
   const ok = { HARIMU_DEPLOY_ENVIRONMENT: 'production' }, run = { GITHUB_ACTIONS: 'true', GITHUB_REF: 'refs/heads/main', CLOUDFLARE_API_TOKEN: 't', CLOUDFLARE_ACCOUNT_ID: checkedIn.account_id, PRODUCTION_DATABASE_ADMIN_URL: 'u' };
   const found = (argv, env) => productionDeployProblems({ argv, env, head }).join('\n'), sha = `--qa2-go-sha=${head}`;
   assert.match(found([], {}), /HARIMU_DEPLOY_ENVIRONMENT=production is required[^]*qa2-go-sha/);
-  assert.match(found([sha], {}), /HARIMU_DEPLOY_ENVIRONMENT/); assert.match(found(['--qa2-go-sha=abc'], ok), /full 40 hex/); assert.match(found([`--qa2-go-sha=${'a'.repeat(40)}`], ok), /must equal the checked-out commit/);
+  assert.match(found([sha], {}), /HARIMU_DEPLOY_ENVIRONMENT/); assert.match(found(['--qa2-go-sha=abc'], ok), /full 40 hex/); assert.match(found([`--qa2-go-sha=${'a'.repeat(40)}`], ok), /must equal the checked-out commit or have the identical tree/);
+  assert.equal(productionDeployProblems({ argv: [`--qa2-go-sha=${'c'.repeat(40)}`, '--dry-run'], env: ok, head, treeOf: s => (s === head || s === 'c'.repeat(40) ? 'T' : null) }).join(), '', 'a merge commit with the approved tree is accepted');
+  assert.match(productionDeployProblems({ argv: [`--qa2-go-sha=${'c'.repeat(40)}`, '--dry-run'], env: ok, head, treeOf: s => (s === head ? 'T' : 'U') }).join(), /identical tree/, 'a different tree refuses');
   assert.match(found([sha], { ...ok, GITHUB_SHA: 'b'.repeat(40) }), /GITHUB_SHA does not match/); assert.equal(found([sha, '--dry-run'], ok), '', 'a dry run needs only the environment and the approved sha');
   assert.match(found([sha], ok), /refs\/heads\/main[^]*CLOUDFLARE_API_TOKEN is not set[^]*PRODUCTION_DATABASE_ADMIN_URL is not set/);
   assert.equal(databaseUrlEnv([]), 'PRODUCTION_DATABASE_ADMIN_URL'); assert.equal(found([sha, '--database-url-env=PREVIEW_DATABASE_ADMIN_URL'], { ...ok, ...run, PRODUCTION_DATABASE_ADMIN_URL: undefined, PREVIEW_DATABASE_ADMIN_URL: 'u' }), '', 'a shared database reuses preview\'s secret name');
   assert.match(found([sha, '--database-url-env=PREVIEW_DATABASE_ADMIN_URL'], { ...ok, ...run }), /PREVIEW_DATABASE_ADMIN_URL is not set/); assert.match(found([sha, '--database-url-env=HARIMU_ADMIN_TOKEN'], { ...ok, ...run }), /--database-url-env must be one of/);
   assert.match(found([sha], { ...ok, ...run, GITHUB_REF: 'refs/heads/dev' }), /only from refs\/heads\/main/); assert.match(found([sha], { ...ok, ...run, CLOUDFLARE_ACCOUNT_ID: 'x' }), /not the approved account/); assert.equal(found([sha], { ...ok, ...run }), '');
   await assert.rejects(deployMain([], { PATH: '' }), /Production deploy refused/);
-  await assert.rejects(deployMain([sha, '--dry-run'], { ...ok, PATH: process.env.PATH }), /Production config refused[^]*placeholder/, 'even a dry run stops on the Hyperdrive placeholder');
+  assert.equal(await deployMain([sha, '--dry-run'], { ...ok, PATH: process.env.PATH }), 0, 'the checked-in config passes a dry run');
   assert.deepEqual(productionDeployArgs(false), ['deploy', '--config', 'dist/server/wrangler.json']); assert.deepEqual(productionDeployArgs(false, 'b'.repeat(40)).slice(-2), ['--tag', 'b'.repeat(40)], '#486: tagged with its commit'); assert.ok(productionDeployArgs(true).includes('--dry-run')); assert.ok(!productionDeployArgs(false).includes('--keep-vars'));
   for (const script of ['deploy-production.mjs', 'build-production.mjs']) { const r = spawnSync(process.execPath, [`scripts/${script}`], { env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 20000 }); assert.equal(r.status, 1, script); assert.match(r.stderr, /refused|required/); }
 });
@@ -84,7 +88,7 @@ test('journal optional: production writes keep no journal and need no retention 
   const storage = readFileSync('lib/storage-selection.ts', 'utf8'), db = readFileSync('lib/db.ts', 'utf8');
   assert.match(productionJournalProblems(storage.replace('productionKeepsWriteJournal=false', 'productionKeepsWriteJournal=true'), db).join(), /unbounded write journal/, 'the gate refuses a production that keeps the journal');
   assert.match(productionJournalProblems(storage, db.replace("||productionKeepsWriteJournal)", ")")).join(), /no longer passes/);
-  await assert.rejects(deployMain([`--qa2-go-sha=${head}`, '--dry-run'], { HARIMU_DEPLOY_ENVIRONMENT: 'production', PATH: process.env.PATH }), /Production config refused/, 'with the journal fixed, the remaining refusal is the placeholder');
+  assert.equal(await deployMain([`--qa2-go-sha=${head}`, '--dry-run'], { HARIMU_DEPLOY_ENVIRONMENT: 'production', PATH: process.env.PATH }), 0, 'with the journal fixed, a dry run passes');
 });
 
 test('#742: HARIMU_AI_TEMPLATES_ONLY is the one named operator exemption; other HARIMU_* vars must still be "false"', () => {

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  // #501 slice b: the PRODUCTION Worker config. Inactive until the deploy workflow (slice d) exists: nothing reads this file yet, there is no route, and the Hyperdrive id is a placeholder.
+  // #501 slice b: the PRODUCTION Worker config, deployed only by the manual deploy-production workflow.
   // tests/wrangler-prod-501b.test.mjs keeps it in sync with wrangler.jsonc; the differences are listed there. Never put a secret value in this file (Worker secrets are set on the Worker only).
   "name": "harimu-production",
   "account_id": "143bccf1a31c2161142c43845a8fc65d",
@@ -12,14 +12,14 @@
   "placement": { "region": "gcp:us-central1" },
   // #247: scheduled Worker for AI Cabinet petition responses (no-op unless HARIMU_AI_CABINET_RESPONSES_ENABLED="true").
   "triggers": { "crons": ["*/15 * * * *"] },
-  // PLACEHOLDER: the production Hyperdrive config does not exist yet (Patrick creates it, pointing at the PlanetScale runtime role). Replace the id with the real config id, which is not a secret.
-  // The id below is deliberately not a valid id, and assertProductionConfig (slice c) refuses to deploy while it is a placeholder.
+  // Patrick (Oct 22): production shares preview's PlanetScale database, so this is preview's Hyperdrive config id (not a secret). Splitting later is a config change only.
   "hyperdrive": [{
     "binding": "HYPERDRIVE",
-    "id": "PLACEHOLDER-production-hyperdrive-config-id"
+    "id": "a1f662c88f3b485190c402d9548ae360"
   }],
   "ai": { "binding": "AI" },
-  // No routes and no zone yet (inactive): the custom domain app.harimu.com is added by the production deploy slice, never here by hand.
+  // The one allowed route: the custom domain app.harimu.com (Cloudflare creates its DNS record on the first real deploy).
+  "routes": [{ "pattern": "app.harimu.com", "custom_domain": true }],
   "workers_dev": false,
   "preview_urls": false,
   "vars": {

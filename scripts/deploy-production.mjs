@@ -26,13 +26,15 @@ export function rollbackFloorProblem(version, spawn = spawnSync) {
   if (ancestor.status !== 0) return `target version ${version} was built from commit ${tag}, which does not contain the required floor commit ${rollbackFloorCommit} (#724's merge); roll back only to a version built from a descendant of it`;
   return null;
 }
-export function productionDeployProblems({ argv, env, head }) {
+/** QA2's go sha is accepted when it is the run commit, or when the run commit has the identical tree (a release->main merge commit of exactly that release head). A different tree always refuses. */
+export const gitTree = (sha, spawn = spawnSync) => { const r = spawn('git', ['rev-parse', '--verify', '--quiet', `${sha}^{tree}`], { encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : null; };
+export function productionDeployProblems({ argv, env, head, treeOf = gitTree }) {
   const problems = [], urlEnv = databaseUrlEnv(argv), sha = argv.find(a => a.startsWith('--qa2-go-sha='))?.slice('--qa2-go-sha='.length), dryRun = argv.includes('--dry-run'), rollback = rollbackVersion(argv);
   if (env.HARIMU_DEPLOY_ENVIRONMENT !== 'production') problems.push('HARIMU_DEPLOY_ENVIRONMENT=production is required.');
   if (rollback !== undefined) { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(rollback)) problems.push('--rollback=<Worker version id (uuid)> is invalid.'); }
   else {
     if (!/^[a-f0-9]{40}$/.test(sha ?? '')) problems.push('--qa2-go-sha=<full 40 hex commit> is required.');
-    else if (sha !== head) problems.push('--qa2-go-sha must equal the checked-out commit.');
+    else if (sha !== head && (!treeOf(sha) || treeOf(sha) !== treeOf(head))) problems.push('--qa2-go-sha must equal the checked-out commit or have the identical tree.');
     if (env.GITHUB_SHA && env.GITHUB_SHA !== head) problems.push('GITHUB_SHA does not match the checked-out commit.');
     if (!databaseUrlEnvNames.includes(urlEnv)) problems.push(`--database-url-env must be one of ${databaseUrlEnvNames.join(', ')}.`);
   }
