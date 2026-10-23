@@ -85,7 +85,7 @@ test('GET /market/orders with the fee on makes no writes', async t => {
 });
 
 test('migrations: both dialects add the fee table and net it in the wallet view', async () => {
-  for (const f of ['../drizzle/0069_market_fee.sql', '../db/postgres/0069_market_fee.sql']) {
+  for (const f of ['../drizzle/0071_market_fee.sql', '../db/postgres/0071_market_fee.sql']) {
     const sql = await readFile(new URL(f, import.meta.url), 'utf8');
     assert.match(sql, /CREATE TABLE IF NOT EXISTS market_trade_fees/); assert.match(sql, /- COALESCE\(\(SELECT SUM\(fee_minor\) FROM market_trade_fees WHERE seller_id = c\.clerk_user_id\), 0\)/);
     assert.match(sql, /market-fee-v1/);
