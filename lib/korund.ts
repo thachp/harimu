@@ -101,7 +101,8 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  // #759: last closed week's unit food vs the quota (read-only, Korund only, flag on only); null = met or no closed week yet.
  const shortfall=options.shortfall&&citizen?.nation_id==='korund'?{shortfall:w.number<2?null:korundShortfall(w.number-1,Number((await db.prepare('SELECT COALESCE(SUM(food_output),0) AS n FROM korund_settlements WHERE settled_at>=? AND settled_at<?').bind(w.start-gameWeekSeconds,w.start).first<{n:number}>())?.n??0))}:{};
  // #758: rumored street rate under the wallet, Korund only, flag on only; null = not heard of the gray market (hidden).
- const streetRate=options.streetRate&&citizen?.nation_id==='korund'?{streetRate:await readWalletStreetRate(db,userId,now)}:{};
+ // QA1 on #775: the rumor needs the gray market itself on (HARIMU_GRAY_MARKET_ENABLED) as well as the street-rate flag.
+ const streetRate=options.streetRate&&options.grayMarket&&citizen?.nation_id==='korund'?{streetRate:await readWalletStreetRate(db,userId,now)}:{};
  return {...extra,...bureau,...gray,...medals,...shortfall,...streetRate,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};

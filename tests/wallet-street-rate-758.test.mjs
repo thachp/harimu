@@ -58,6 +58,14 @@ test('flag off: no streetRate field and no street-rate query (spy) vs a flag-on 
   assert.equal('streetRate' in (await plan(off)), false);
 });
 
+test('QA1 on #775: street-rate flag on but gray market flag off shows no line and runs no street-rate query', async t => {
+  const r = await setup(t); await trade(r);
+  assert.ok((await plan(r)).streetRate, 'baseline: both flags on');
+  r.setFixtureEnv('HARIMU_GRAY_MARKET_ENABLED', undefined);
+  assert.equal((await sqlDuring(r, () => plan(r))).filter(isHeardQuery).length, 0);
+  assert.equal('streetRate' in (await plan(r)), false);
+});
+
 test('Korund only: a citizen who traded then left Korund gets no field or query', async t => {
   const r = await setup(t); await trade(r);
   await r.db.prepare("UPDATE citizens SET nation_id='kindle' WHERE clerk_user_id='alice'").run();
