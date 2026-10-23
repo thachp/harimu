@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS vote_buying_events (
  voter_id TEXT COLLATE "C" NOT NULL,
  sender_id TEXT COLLATE "C" NOT NULL,
  transfer_id TEXT COLLATE "C" NOT NULL,
- reason TEXT COLLATE "C" NOT NULL CHECK(reason IN ('party-member','campaign','ring')),
+ reason TEXT COLLATE "C" NOT NULL CHECK(reason IN ('party-member','campaign')),
  created_at BIGINT NOT NULL,
  PRIMARY KEY(election_key, voter_id, transfer_id, reason)
 );

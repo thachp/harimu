@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS vote_buying_events (
  voter_id TEXT NOT NULL,
  sender_id TEXT NOT NULL,
  transfer_id TEXT NOT NULL,
- reason TEXT NOT NULL CHECK(reason IN ('party-member','campaign','ring')),
+ reason TEXT NOT NULL CHECK(reason IN ('party-member','campaign')),
  created_at INTEGER NOT NULL,
  PRIMARY KEY(election_key, voter_id, transfer_id, reason)
 );

@@ -100,7 +100,7 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
      { name: 'warEndings', on: options.war === true && options.warEndings === true, run: () => decideWarEndings(db, now, { enabled: options.warWeariness === true, losses: options.warWearinessLosses === true }).catch(warnOnly('war endings')) }],
     // #612: the Founding Period's one day-30 event per MVP nation (idempotent).
     [{ name: 'foundingDay30', on: options.foundingPeriod === true, run: () => runFoundingDay30(db, now).catch(warnOnly('founding day-30')) }],
-    // #825 Kindle vote-buying watch: one idempotent sweep statement (HARIMU_VOTE_BUYING_WATCH_ENABLED; citizen POST path only, never a GET).
+    // #825 Kindle vote-buying watch: one idempotent sweep statement over direct transfers/gifts only (none exist yet, so no query) (HARIMU_VOTE_BUYING_WATCH_ENABLED; citizen POST path only, never a GET).
     [{ name: 'voteBuyingWatch', on: options.voteBuyingWatch === true, run: () => runVoteBuyingWatch(db, now).catch(warnOnly('vote-buying watch')) }],
   ];
 }
