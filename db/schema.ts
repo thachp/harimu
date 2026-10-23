@@ -81,6 +81,7 @@ export const citizens = sqliteTable('citizens', {
   standing: text('standing').notNull().default('Good standing'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  lastActiveAt: text('last_active_at'), // #739 (0069)
 });
 
 export const citizenPlans = sqliteTable('citizen_plans', {
