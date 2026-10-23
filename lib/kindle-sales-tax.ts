@@ -3,7 +3,8 @@
  *  (lib/economy kindleTreasuryBalanceSql adds it; the wallet view and the daily reconciliation subtract it from the seller), so the ledger stays balanced.
  *  The buyer pays the listed price unchanged. [ASSUMPTION] 5% (500 bps), one config value; the Assembly setting the rate is out of scope.
  *  [ASSUMPTION] NPC supplier sellers (citizen_id NULL) and trades that round to 0 write no row; written in the same batch as the fill (POST path).
- *  Flag HARIMU_KINDLE_SALES_TAX_ENABLED: "true" in preview, "false" in production. Off: no row written, no tax query, responses unchanged. */
+ *  Flag HARIMU_KINDLE_SALES_TAX_ENABLED: "true" in preview, "false" in production. Off: no tax row is written and no tax INSERT runs on any write path, and the budget route adds no field or tax read.
+ *  The wallet view, treasury balance and reconciliation always sum the tax tables, which stay empty, so balances and responses are unchanged. */
 export const kindleSalesTaxEnabled = (env: { HARIMU_KINDLE_SALES_TAX_ENABLED?: string } | null | undefined) => env?.HARIMU_KINDLE_SALES_TAX_ENABLED === 'true';
 export const kindleSalesTaxBps = 500;
 export const kindleSalesTaxMinor = (grossMinor: number, bps = kindleSalesTaxBps): number => Math.floor(grossMinor * bps / 10000);

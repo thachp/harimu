@@ -1,5 +1,5 @@
 /** #844 follow-up (ARC on #845): fixed-lot listing sales are taxed like order-book fills (seller-paid, Kindle seller, same flag), and the budget card
- *  gets a "Sales tax today" line behind the same flag. Flag off: no tax row, no tax query, no new budget field. */
+ *  gets a "Sales tax today" line behind the same flag. Flag off: no tax row, no tax INSERT on buy-listing, no new budget field or tax read. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -46,6 +46,26 @@ for (const backend of ['sqlite', 'postgres']) {
     try { assert.equal((await buy(id)).status, 200); } finally { r.db.prepare = prepare; }
     assert.deepEqual(seen.filter(q => /sales_tax/.test(q)), []);
     assert.deepEqual(await taxes(), []); assert.equal(await wallet('bob'), bob0 + 2000); assert.equal(await treasury(), tr0);
+  });
+
+  test(`${backend}: QA1: a fixed-lot sale by a non-Kindle seller writes no player_fill_sales_tax row; the seller keeps the full price`, async t => {
+    const { r, wallet, treasury, taxes } = await lots(t, { backend });
+    await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
+    // The fill route refuses non-Kindle sellers, so the fill row is a fixture; the tax SQL is the one the route passes.
+    await r.db.prepare("INSERT INTO player_listings (id,seller_id,item,quantity,unit_minor,created_at) VALUES ('NK1','bob','food',2,1000,1)").run();
+    await r.db.prepare("INSERT INTO player_fills (request_id,listing_id,buyer_id,seller_id,item,quantity,amount_minor,filled_at) VALUES ('NKF','NK1','alice','bob','food',2,2000,2)").run();
+    const bob0 = await wallet('bob'), tr0 = await treasury();
+    const { playerFillSalesTaxSql } = await r.importModule('lib/kindle-sales-tax.ts');
+    await r.db.prepare(playerFillSalesTaxSql).bind('NKF').run();
+    assert.deepEqual(await taxes(), []); assert.equal(await wallet('bob'), bob0); assert.equal(await treasury(), tr0);
+  });
+
+  test(`${backend}: QA1: a 0-tax fixed-lot sale (gross 19) lands the fill with no tax row`, async t => {
+    const { r, wallet, sell, buy, taxes } = await lots(t, { backend });
+    const id = await sell(1, 19); const bob0 = await wallet('bob');
+    assert.equal((await buy(id)).status, 200);
+    assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM player_fills WHERE listing_id=?').bind(id).first()).n), 1);
+    assert.deepEqual(await taxes(), []); assert.equal(await wallet('bob'), bob0 + 19);
   });
 
   test(`${backend}: budget "Sales tax today" sums both markets for this game day only; flag off has no field`, async t => {
