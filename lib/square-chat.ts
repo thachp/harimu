@@ -19,7 +19,9 @@ export async function readSquare(db:GameDatabase,userId:string,nationId:string,n
   const hidden=[...muted].filter(id=>id!==userId);
   await db.batch([db.prepare('DELETE FROM square_messages WHERE posted_at<=?').bind(now-604800),db.prepare('DELETE FROM square_presence WHERE expires_at<=?').bind(now)]);
   const location=await readCityLocation(db,userId,nationId,now);
-  const messages=await db.prepare(`SELECT m.id,h.handle,m.body,m.posted_at FROM square_messages m JOIN square_handles h ON h.user_id=m.user_id WHERE m.nation_id=? AND m.deleted=0 AND m.posted_at>?${hidden.length?` AND m.user_id NOT IN (${hidden.map(()=>'?').join(',')})`:''} AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id=?) ORDER BY m.posted_at DESC,m.id DESC LIMIT 50`).bind(nationId,now-604800,...hidden,userId,nationId).all<{id:string;handle:string;body:string;posted_at:number}>();
+  const feedSql=`SELECT m.id,h.handle,m.body,m.posted_at FROM square_messages m JOIN square_handles h ON h.user_id=m.user_id WHERE m.nation_id=? AND m.deleted=0 AND m.posted_at>? AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id=? AND nation_id=?) ORDER BY m.posted_at DESC,m.id DESC LIMIT 50`;
+  // #790: the muted variant only inserts the author filter; the base feed SQL stays one static literal (tests/square-chat.test.py reads it).
+  const messages=await db.prepare(hidden.length?feedSql.replace(' AND EXISTS',` AND m.user_id NOT IN (${hidden.map(()=>'?').join(',')}) AND EXISTS`):feedSql).bind(nationId,now-604800,...hidden,userId,nationId).all<{id:string;handle:string;body:string;posted_at:number}>();
   const presence=await cityPresence(db,nationId,now);
   const own = await db.prepare(`SELECT id FROM square_messages WHERE user_id=? AND nation_id=? AND deleted=0 AND posted_at>? ORDER BY posted_at DESC LIMIT 50`).bind(userId,nationId,now-604800).all<{id:string}>();
   const ownIds=new Set(own.results.map(row=>row.id));

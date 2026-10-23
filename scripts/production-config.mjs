@@ -47,7 +47,7 @@ const forbiddenVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_QA_TEST
 export const aiTemplatesOnlyNations = ['kindle', 'korund', 'aurelle']; // must match lib/ai-kill-switch.ts (checked by tests/production-deploy-501c)
 const nationAlt = aiTemplatesOnlyNations.join('|');
 // #764: the per-persona mute is the second operator setting: "", "all" or a comma list of persona ids (lib/ai-kill-switch.ts fails closed on unknown ids).
-export const operatorVars = Object.freeze({ HARIMU_AI_TEMPLATES_ONLY: new RegExp(`^(|all|(${nationAlt})(,(${nationAlt}))*)$`), HARIMU_AI_MUTED_PERSONAS: /^(|all|[a-z0-9-]+(,[a-z0-9-]+)*)$/ });
+export const operatorVars = Object.freeze({ HARIMU_AI_TEMPLATES_ONLY: new RegExp(`^(|all|(${nationAlt})(,(${nationAlt}))*)$`), HARIMU_AI_MUTED_PERSONAS: /^(|all|[a-z0-9-]+(,[a-z0-9-]+)*)$/, HARIMU_CHAT_SHADOW_MUTE: /^(|[A-Za-z0-9_-]{1,64}(,[A-Za-z0-9_-]{1,64})*)$/ }); // #790: citizen ids, never "all"
 const requiredVars = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_PRODUCTION_STORAGE: 'true', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_AI_DAILY_BUDGET_MICRO: /^\d+$/, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: /^pk_live_/ };
 export const readPreviewHyperdriveId = () => JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, '')).hyperdrive?.[0]?.id;
 
@@ -87,7 +87,7 @@ export function productionConfigProblems(config) {
   for (const name of forbiddenVars) if (name in vars) problems.push(`${name} must not exist on production.`);
   for (const [name, expected] of Object.entries(requiredVars)) if (typeof vars[name] !== 'string' || (expected instanceof RegExp ? !expected.test(vars[name]) : vars[name] !== expected)) problems.push(`${name} is missing or has the wrong value.`);
   for (const [name, value] of Object.entries(vars)) {
-    if (name in operatorVars) { if (typeof value !== 'string' || !operatorVars[name].test(value)) problems.push(`${name} must be "", "all" or a comma list of ${name === 'HARIMU_AI_MUTED_PERSONAS' ? 'persona' : 'nation'} ids on production.`); }
+    if (name in operatorVars) { if (typeof value !== 'string' || !operatorVars[name].test(value)) problems.push(name === 'HARIMU_CHAT_SHADOW_MUTE' ? `${name} must be "" or a comma list of citizen ids on production.` : `${name} must be "", "all" or a comma list of ${name === 'HARIMU_AI_MUTED_PERSONAS' ? 'persona' : 'nation'} ids on production.`); }
     else if (!(name in requiredVars) && value !== 'false') problems.push(`${name} must be "false" on production.`);
     if (/SECRET|TOKEN|PASSWORD|ADMIN_URL|PRIVATE/.test(name) || /^(sk_|postgres(ql)?:\/\/)/.test(String(value))) problems.push(`${name} looks like a secret and must not be in the config.`);
   }
