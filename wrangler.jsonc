@@ -162,6 +162,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "true",
+    "NEXT_PUBLIC_HARIMU_RARE_MARKER": "true",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"
   },

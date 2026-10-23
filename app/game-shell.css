@@ -413,6 +413,10 @@ body:has(.harimu-game){overflow:auto}
 .map-resources>span{position:absolute;transform:translate(15%,-115%);font-size:calc(11px * var(--text-scale, 1));line-height:1;color:#f3ecd6;text-shadow:0 0 2px #0b2631,0 0 2px #0b2631}
 .map-resources[data-low-graphics]>span{text-shadow:none}
 .map-resources>span[data-rare]{border:1px solid #d0ad54;border-radius:50%;padding:1px}
+/* #800 (NEXT_PUBLIC_HARIMU_RARE_MARKER): rare nodes become a filled navy badge with a 2px gold rim, larger glyph and a dark outer halo, so they read at globe zoom on any terrain and in low graphics; the badge (shape and fill), not color, marks rare. The legend shows the same badge. */
+.map-resources[data-rare-marker]>span[data-rare],.map-overlays-legend .map-rare-key{display:inline-flex;align-items:center;justify-content:center;min-width:1.7em;height:1.7em;padding:0;border:2px solid #e2c36b;border-radius:50%;background:#0b2631;color:#f6e3a1;box-shadow:0 0 0 1.5px #0b2631;font-size:calc(13px * var(--text-scale, 1));line-height:1;text-shadow:none}
+.map-resources[data-rare-marker]>span[data-rare]{z-index:1}
+.map-overlays-legend .map-rare-key{font-size:inherit;min-width:1.6em;height:1.6em;margin-right:2px;vertical-align:middle}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
 .game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}
