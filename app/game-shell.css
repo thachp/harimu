@@ -445,12 +445,12 @@ body:has(.harimu-game){overflow:auto}
   .game-mobile-v2 .game-inspector{border-top:1px solid #49616a;border-radius:14px 14px 0 0;box-shadow:0 -6px 16px #0006;padding-top:14px}
   /* S8 follow-up (#377, ARC): the City scene is the screen minus the bars (heights from app/game-shell.tsx); 44dvh / 260px stay as the fallback */
   .harimu-game.game-mobile-v2.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) auto var(--s8-sheet,0px) minmax(0,auto)} /* #847: the 4th track reserves the fixed sheet's height so no free space inflates the top bar */
-  .game-mobile-v2.game-city-v2 .game-stage{min-height:0;height:max(140px,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px) - var(--s8-sheet,0px)))}
+  .game-mobile-v2.game-city-v2 .game-stage{min-height:0;height:max(130px,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px) - var(--s8-sheet,0px)))}
   .game-mobile-v2.game-city-v2:not([style*="--s8-top"]) .game-stage{height:44dvh}
   /* #847 (ARC): a fixed bottom sheet above the tab bar and dock, opened and closed by one button (the existing Collapse details / Show … details toggle,
-     aria-expanded, Escape closes); no drag, no snap points. Open, it is at most 45dvh and the screen minus the bars and the 140px scene minimum, and its body scrolls. */
+     aria-expanded, Escape closes); no drag, no snap points. Open, it is at most 45dvh and the screen minus the bars and the 130px scene minimum, and its body scrolls. */
   .game-mobile-v2.game-rail-on .game-inspector,.game-mobile-v2.game-rail-on .game-reopen-panel{position:fixed;z-index:8;left:0;right:0;top:auto;bottom:calc(var(--s8-tabs,0px) + var(--s8-dock,0px));width:auto;margin:0}
-  .game-mobile-v2.game-rail-on .game-inspector{display:flex;flex-direction:column;max-height:max(96px,min(45dvh,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px) - 140px)))}
+  .game-mobile-v2.game-rail-on .game-inspector{display:flex;flex-direction:column;max-height:max(96px,min(45dvh,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px) - 130px)))}
   .game-mobile-v2.game-rail-on .game-inspector-body{flex:1 1 auto;min-height:0;overflow-y:auto}
   .game-mobile-v2.game-rail-on .game-reopen-panel{justify-content:center;min-height:44px;padding:4px 14px;border-radius:14px 14px 0 0;border-width:1px 0 0}
   .game-mobile-v2.game-rail-on .game-inspector-title button svg{transform:rotate(90deg)}.game-mobile-v2.game-rail-on .game-reopen-panel>svg:last-child{transform:rotate(-90deg)}
