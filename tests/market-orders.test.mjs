@@ -90,13 +90,13 @@ test('#195 0016 applies after 0017 is already recorded (out-of-order merge), and
   const { bootstrapEmptyPostgres, applyPostgresMigrations, assertPostgresMigrationsApplied } = await import('../scripts/postgres-migrations.mjs');
   const dir = mkdtempSync(join(tmpdir(), 'pg0016-'));
   for (const f of ['compatibility.sql', 'schema.sql']) copyFileSync(join('db/postgres', f), join(dir, f));
-  for (const m of postgresMigrations().filter(m => m.number !== '0016' && m.number !== '0021' && m.number !== '0022' && m.number !== '0029')) copyFileSync(join('db/postgres', m.file), join(dir, m.file));
+  for (const m of postgresMigrations().filter(m => m.number !== '0016' && m.number !== '0021' && m.number !== '0022' && m.number !== '0029' && m.number !== '0069')) copyFileSync(join('db/postgres', m.file), join(dir, m.file));
   const pg = new PGlite(); await pg.waitReady; t.after(() => pg.close());
   const db = { query: (q, p) => pg.query(q, p), exec: q => pg.exec(q) };
   await bootstrapEmptyPostgres(db, { dir });
   assert.ok((await pg.query("SELECT 1 FROM schema_migrations WHERE id LIKE '0017%'")).rows.length, '0017 recorded first');
   await assert.rejects(assertPostgresMigrationsApplied(db), /0016_market_orders\.sql \(not applied\)/);
-  assert.deepEqual((await applyPostgresMigrations(db)).applied, ['0016_market_orders.sql', '0021_market_spoilage.sql', '0022_kindle_income_tax.sql', '0029_tessera_exchange.sql']); // #86/#210: 0022 and 0029 swap the wallet view built on 0016
+  assert.deepEqual((await applyPostgresMigrations(db)).applied, ['0016_market_orders.sql', '0021_market_spoilage.sql', '0022_kindle_income_tax.sql', '0029_tessera_exchange.sql', '0069_market_fee.sql']); // #86/#210/#777: 0022, 0029 and 0069 swap the wallet view built on 0016
   await assertPostgresMigrationsApplied(db);
   assert.equal((await pg.query('SELECT COUNT(*)::int AS n FROM market_goods')).rows[0].n, 3);
 });
