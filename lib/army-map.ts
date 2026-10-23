@@ -20,11 +20,14 @@ export const moveSeconds = (terrain: string | undefined) => armyMoveSeconds[terr
 /** [ASSUMPTION] A marching unit stops this many squares short of the enemy capital (staging for a siege; battles are a later slice). */
 export const ARMY_STAGING_DISTANCE = 1;
 
+/** ARC-approved route rule (#891): a straight Chebyshev line, diagonal steps first, one square per step, no pathfinding or blocked squares. */
+export const ARMY_ROUTE_RULE = 'straight-chebyshev-diagonal-first' as const;
+export const ARMY_ROUTE_STEP_SQUARES = 1;
 type Point = { x: number; y: number };
 /** The straight route from `from` toward `to` (diagonal steps first, Chebyshev), stopping `stop` squares short. Excludes `from`. */
 export function marchRoute(from: Point, to: Point, stop = ARMY_STAGING_DISTANCE): Point[] {
   const route: Point[] = []; let { x, y } = from;
-  while (Math.max(Math.abs(to.x - x), Math.abs(to.y - y)) > stop) { x += Math.sign(to.x - x); y += Math.sign(to.y - y); route.push({ x, y }); }
+  while (Math.max(Math.abs(to.x - x), Math.abs(to.y - y)) > stop) { x += ARMY_ROUTE_STEP_SQUARES * Math.sign(to.x - x); y += ARMY_ROUTE_STEP_SQUARES * Math.sign(to.y - y); route.push({ x, y }); }
   return route;
 }
 /** Where a unit is `elapsed` seconds after it set out on `route`, paying each square's terrain cost on entry. */

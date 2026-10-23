@@ -15,6 +15,9 @@ const cap = id => Z.mappedNations.find(n => n.id === id).capital;
 test('rules: three flags; terrain costs are named constants inside 20–60 minutes; route stops one square short; terrain paid on entry', () => {
   assert.equal(M.armyMapEnabled(ON), true); for (const k of Object.keys(ON)) assert.equal(M.armyMapEnabled({ ...ON, [k]: 'false' }), false, k); assert.equal(M.armyMapEnabled(null), false);
   assert.deepEqual([M.ARMY_MOVE_SECONDS_FAST, M.ARMY_MOVE_SECONDS_MEDIUM, M.ARMY_MOVE_SECONDS_SLOW, M.ARMY_MOVE_SECONDS_ROUGH, M.ARMY_STAGING_DISTANCE], [1200, 1800, 2400, 3600, 1]);
+  assert.deepEqual([M.ARMY_ROUTE_RULE, M.ARMY_ROUTE_STEP_SQUARES], ['straight-chebyshev-diagonal-first', 1]);
+  assert.match(readFileSync('app/api/army/positions/route.ts', 'utf8'), /positions are public for MVP; a future fog-of-war setting may restrict this/);
+  const body = readFileSync('lib/army-map.ts', 'utf8').split('export function marchRoute')[1].split('\n}')[0]; assert.doesNotMatch(body, /[^\w.]([2-9]|\d{2,})\b/, 'no inline movement numbers');
   for (const s of Object.values(M.armyMoveSeconds)) assert.ok(s >= 1200 && s <= 3600); assert.equal(M.moveSeconds('lava'), M.ARMY_MOVE_SECONDS_SLOW);
   assert.deepEqual(M.marchRoute({ x: 0, y: 0 }, { x: 3, y: 1 }), [{ x: 1, y: 1 }, { x: 2, y: 1 }]); assert.deepEqual(M.marchRoute({ x: 0, y: 0 }, { x: 1, y: 1 }), []);
   const route = [{ x: 1, y: 0 }, { x: 2, y: 0 }], terrain = p => (p.x === 1 ? 'plains' : 'hills');
