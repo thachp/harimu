@@ -21,7 +21,7 @@ import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { countryWord } from '@/lib/ui-v2-rail';
 import { NationPanel } from './nation-panel-v2';
-import { CitySummary, HouseholdSummary, MarketSummary, WorkSummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
+import { CitySummary, GovernmentSummary, HouseholdSummary, MarketSummary, WorkSummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
@@ -1774,6 +1774,7 @@ export default function Home() {
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
       {viewMode === 'government' && <>
+        <GovernmentSummary nation={citizenNation} account={clerkConfigured} />{/* #871 S11 */}
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
         {citizenNation.id === 'confluence' && <ConfluencePillars />}{/* #487: read-only Four Pillars */}
         {simulation?.sieges && <SiegePanel sieges={simulation.sieges} nationId={citizenNation.id} />}
