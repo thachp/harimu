@@ -49,14 +49,14 @@ test('overlay rules: Army positions toggles only as a real overlay, combines wit
 
 async function spy(r, fn) { const prepare = r.db.prepare.bind(r.db), seen = { sql: [] }; r.db.prepare = q => { seen.sql.push(q); return prepare(q); }; try { seen.result = await fn(); } finally { r.db.prepare = prepare; } return seen; }
 for (const backend of ['sqlite', 'postgres']) {
-  test(`${backend}: flag off (any of the three) is 404 with no database access; citizen flags.armyMap follows the flag`, async t => {
+  test(`${backend}: flag off (any of the three) is 404 with no database access; citizen flags.armyMap appears only while on`, async t => {
     const r = await localRuntime({ backend }); t.after(() => r.close()); await r.call('citizen', 'alice');
     for (const [k, v] of Object.entries(ON)) r.setFixtureEnv(k, v);
     for (const k of Object.keys(ON)) {
       r.setFixtureEnv(k, 'false');
       const off = await spy(r, async () => [await r.call('army/positions', null), await r.call('army/positions', 'alice')]);
       assert.deepEqual(off.result.map(x => x.status), [404, 404], k); assert.deepEqual(off.sql, [], `${k}: no database access`);
-      assert.equal((await r.call('citizen', 'alice')).data.flags.armyMap, false, k);
+      assert.equal('armyMap' in (await r.call('citizen', 'alice')).data.flags, false, `${k}: no key while off`);
       r.setFixtureEnv(k, 'true');
     }
     assert.equal((await r.call('citizen', 'alice')).data.flags.armyMap, true);
