@@ -12,8 +12,9 @@ export const voteKindLabels: Readonly<Record<VoteKind, string>> = { civic: 'the 
 export const iVotedSql = `SELECT 'civic' AS kind, election_id, checked_at FROM civic_voter_receipts WHERE clerk_user_id=? AND ballot_written=1
  UNION ALL SELECT 'poc' AS kind, election_id, checked_at FROM poc_voter_receipts WHERE clerk_user_id=? AND ballot_written=1
  UNION ALL SELECT 'primary' AS kind, election_id, checked_at FROM primary_voter_receipts WHERE clerk_user_id=? AND ballot_written=1
- ORDER BY checked_at DESC, election_id`;
-/** Newest first; the card shows the first. */
+ ORDER BY checked_at DESC, election_id
+ LIMIT 1`; // #813: the card shows only the newest badge, so the read never grows with the number of elections
+/** The newest badge only (LIMIT 1, #813): at most one row, however many elections the citizen voted in. */
 export async function readIVoted(db: GameDatabase, userId: string): Promise<IVotedBadge[]> {
   const { results } = await db.prepare(iVotedSql).bind(userId, userId, userId).all<{ kind: VoteKind; election_id: string; checked_at: number }>();
   return (results ?? []).map(r => ({ kind: r.kind, electionId: r.election_id, votedAt: Number(r.checked_at) }));

@@ -97,16 +97,57 @@ test(`#197 ${backend}: retries are idempotent, ids cannot be reused, limits and 
   const buy = randomUUID(); await place('alice', 'buy', 2, 50, buy); await place('alice', 'buy', 2, 50, buy);
   assert.equal(await goods('alice'), 2); assert.equal(await wallet('alice'), 5000 - 100);
   // Escrow and caps.
-  assert.equal((await place('alice', 'buy', 100, 10000)).status, 409, 'cannot reserve more Spark than held');
-  assert.equal((await place('alice', 'sell', 3, 10)).status, 409, 'cannot sell goods not held');
+  const spark = await place('alice', 'buy', 100, 10000);
+  assert.equal(spark.status, 409, 'cannot reserve more Spark than held');
+  assert.equal(spark.data.refusedCheck, 'insufficient_spark', '#733: names the failed check');
+  assert.match(spark.data.error, /^Order refused:/, '#733: the error text is unchanged');
+  const sell = await place('alice', 'sell', 3, 10);
+  assert.equal(sell.status, 409, 'cannot sell goods not held'); assert.equal(sell.data.refusedCheck, 'insufficient_goods');
   for (let i = 0; i < orderBookLimits.maxOpenOrders; i++) assert.equal((await place('alice', 'buy', 1, 1)).status, 200);
-  assert.equal((await place('alice', 'buy', 1, 1)).status, 409, 'open-order cap');
+  const cap = await place('alice', 'buy', 1, 1);
+  assert.equal(cap.status, 409, 'open-order cap'); assert.equal(cap.data.refusedCheck, 'open_order_cap');
   // Cancelling someone else's order is refused.
   const bobBid = (await r.db.prepare("SELECT id FROM market_orders WHERE citizen_id='bob' AND side='buy'").first()).id;
   assert.equal((await cancel('alice', bobBid)).status, 409);
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
-  assert.equal((await place('bob', 'sell', 1, 10)).status, 409, 'non-Kindle citizens rejected');
+  const foreign = await place('bob', 'sell', 1, 10);
+  assert.equal(foreign.status, 409, 'non-Kindle citizens rejected'); assert.equal(foreign.data.refusedCheck, 'not_kindle_citizen');
+  const again = randomUUID(); await place('alice', 'sell', 1, 10, again);
+  assert.equal((await place('alice', 'sell', 1, 10, again)).data.refusedCheck, 'open_order_cap', '#733: a retried refusal names the same check');
   assert.equal((await cancel('bob', bobBid)).status, 200, 'owners can still reclaim escrow after leaving Kindle');
+});
+
+test(`#733 ${backend}: several failing checks name the first guard; the refusal lookup only reads`, async t => {
+  const { r, place } = await market(t);
+  for (const u of ['alice', 'bob']) for (let i = 0; i < orderBookLimits.maxOpenOrders; i++) assert.equal((await place(u, 'buy', 1, 1)).status, 200);
+  const huge = [orderBookLimits.maxQty, orderBookLimits.maxUnitMinor]; // far beyond either wallet
+  const short = await place('alice', 'buy', ...huge);
+  assert.equal(short.status, 409); assert.equal(short.data.refusedCheck, 'open_order_cap', 'cap before Spark');
+  const noGoods = await place('alice', 'sell', 3, 10);
+  assert.equal(noGoods.status, 409); assert.equal(noGoods.data.refusedCheck, 'open_order_cap', 'cap before goods');
+  await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
+  const all = await place('bob', 'buy', ...huge);
+  assert.equal(all.status, 409); assert.equal(all.data.refusedCheck, 'not_kindle_citizen', 'citizenship before cap and Spark');
+  // Read-only: wrap the db and record every statement prepared after the refused place INSERT.
+  const { executeOrderCommand } = await r.importModule('lib/order-book.ts');
+  const seen = [];
+  const spy = new Proxy(r.db, { get(target, key) {
+    const v = Reflect.get(target, key);
+    if (key === 'prepare') return sql => { seen.push(sql); return v.call(target, sql); };
+    if (key === 'batch') return stmts => { seen.push('BATCH'); return v.call(target, stmts); };
+    return typeof v === 'function' ? v.bind(target) : v;
+  } });
+  for (const [user, side] of [['alice', 'buy'], ['alice', 'sell'], ['bob', 'buy']]) {
+    seen.length = 0;
+    const res = await executeOrderCommand(spy, user, { action: 'market-order-place', requestId: randomUUID(), side, good: 'fruit', qty: side === 'buy' ? huge[0] : 3, limitUnitMinor: side === 'buy' ? huge[1] : 10 }, 1);
+    assert.equal(res.status, 409); assert.ok(res.refusedCheck);
+    const insert = seen.findIndex(q => /^\s*INSERT INTO market_orders/.test(q));
+    assert.ok(insert >= 0, 'the guarded INSERT ran');
+    const after = seen.slice(insert + 1);
+    assert.ok(after.length > 0);
+    for (const q of after) assert.match(q, /^\s*SELECT\b/i, `only SELECTs after the refused insert: ${q.slice(0, 60)}`);
+  }
+  assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM market_orders WHERE citizen_id='alice'").first()).n * 1, orderBookLimits.maxOpenOrders, 'nothing written');
 });
 
 test(`#197 ${backend}: concurrent overspend and oversell attempts never double-spend`, async t => {

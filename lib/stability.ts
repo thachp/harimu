@@ -82,19 +82,25 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
 const iso = (seconds: number) => new Date(seconds*1000).toISOString();
 /** Reads the inputs for one nation as of `at` (unix seconds). Every input is windowed on `at`, so a catch-up tick
  * reads that game day's records: a petition resolved after `at` still counts as backlog for that tick (#142). */
-export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>} = {}): Promise<StabilityInputs> {
+/** #739 slice 2 (ARC): Dormant = no activity for DORMANCY_DAYS.dormant (30) real days. Only a well-formed ISO last_active_at (24 chars, as written by the heartbeat and 0069)
+ *  can make a citizen Dormant; NULL or malformed counts as active (never excluded on bad data). */
+export const dormantAt = (at: number) => new Date((at - 30*86400)*1000).toISOString();
+const notDormant = " AND NOT (c.last_active_at IS NOT NULL AND length(c.last_active_at)=24 AND c.last_active_at<=?)";
+export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; excludeDormant?: boolean} = {}): Promise<StabilityInputs> {
  const since = at-signalWindowSeconds;
+ // #739 slice 2 (ARC): with excludeDormant (flag on, live tick only), the citizens/fed/worked counts leave out citizens Dormant at `at`, so food and work shares exclude them. Flag off: the SQL text is unchanged (tests/world-repair-cap-679 matches it).
+ const nd = options.excludeDormant ? notDormant : '', cut = options.excludeDormant ? [dormantAt(at)] : [];
  const meals = nationId === 'kindle' ? "SELECT clerk_user_id FROM citizen_economy_events WHERE kind='meal' AND occurred_at>? AND occurred_at<=?"
   : nationId === 'korund' ? 'SELECT clerk_user_id FROM korund_meals WHERE occurred_at>? AND occurred_at<=?'
   : 'SELECT clerk_user_id FROM aurelle_meals WHERE occurred_at>? AND occurred_at<=?';
  const row = await db.prepare(`SELECT
-  (SELECT COUNT(*) FROM citizens WHERE nation_id=?) AS citizens,
-  (SELECT COUNT(*) FROM citizens WHERE nation_id=? AND clerk_user_id IN (${meals})) AS fed,
-  (SELECT COUNT(*) FROM citizens c WHERE c.nation_id=? AND EXISTS(SELECT 1 FROM work_shifts s WHERE s.clerk_user_id=c.clerk_user_id AND s.started_at>? AND s.started_at<=?)) AS worked,
+  (SELECT COUNT(*) FROM citizens${nd ? ` c WHERE c.nation_id=?${nd}` : ' WHERE nation_id=?'}) AS citizens,
+  (SELECT COUNT(*) FROM citizens${nd ? ` c WHERE c.nation_id=?${nd} AND c.` : ' WHERE nation_id=? AND '}clerk_user_id IN (${meals})) AS fed,
+  (SELECT COUNT(*) FROM citizens c WHERE c.nation_id=?${nd} AND EXISTS(SELECT 1 FROM work_shifts s WHERE s.clerk_user_id=c.clerk_user_id AND s.started_at>? AND s.started_at<=?)) AS worked,
   (SELECT COUNT(*) FROM government_petition_resolutions r JOIN government_reviews v ON v.nation_id=r.nation_id AND v.period_start=r.period_start WHERE r.nation_id=? AND r.status='accepted' AND v.reviewed_at>? AND v.reviewed_at<=?) AS kept,
   (SELECT COUNT(*) FROM government_petition_resolutions r JOIN government_reviews v ON v.nation_id=r.nation_id AND v.period_start=r.period_start WHERE r.nation_id=? AND r.status='deferred' AND v.reviewed_at>? AND v.reviewed_at<=?) AS broken,
   (SELECT COUNT(*) FROM government_petitions p WHERE p.nation_id=? AND p.occurred_at<=? AND NOT EXISTS(SELECT 1 FROM government_petition_resolutions r JOIN government_reviews v ON v.nation_id=r.nation_id AND v.period_start=r.period_start WHERE r.request_id=p.request_id AND v.reviewed_at<=?)) AS backlog`)
-  .bind(nationId, nationId, since, at, nationId, iso(since), iso(at), nationId, at-promiseWindowSeconds, at, nationId, at-promiseWindowSeconds, at, nationId, at, at)
+  .bind(nationId, ...cut, nationId, ...cut, since, at, nationId, ...cut, iso(since), iso(at), nationId, at-promiseWindowSeconds, at, nationId, at-promiseWindowSeconds, at, nationId, at, at)
   .first<{citizens:number;fed:number;worked:number;kept:number;broken:number;backlog:number}>();
  // #291: the caller (world tick, only while HARIMU_FAITH_ENABLED is on) names the nations whose game day is an endorsed festival holiday (lib/festivals.ts).
  const holiday = options.holidayNations?.has(nationId) ?? false;
@@ -103,7 +109,7 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
 }
 
 /** Statements that record one game day's scores. INSERT OR IGNORE makes retries no-ops. */
-export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>} = {}) {
+export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; excludeDormant?: boolean} = {}) {
  return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); const score = computeStability(inputs);
   return db.prepare('INSERT OR IGNORE INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)')
    .bind(nationId, tick, scheduledAt, now, score.stability, score.unrest, JSON.stringify(inputs), JSON.stringify(score.breakdown)); }));

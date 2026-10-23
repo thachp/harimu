@@ -9,6 +9,7 @@ test('rules: flag is exactly "true"; the SQL reads receipts only (never a ballot
   assert.equal(iVotedFlagOn({ HARIMU_I_VOTED_BADGE_ENABLED: 'true' }), true);
   for (const e of [{}, { HARIMU_I_VOTED_BADGE_ENABLED: 'false' }, { HARIMU_I_VOTED_BADGE_ENABLED: 'TRUE' }, null]) assert.equal(iVotedFlagOn(e), false);
   assert.equal(/ballots|ranking|party_id|candidate/i.test(iVotedSql), false, 'no ballot content is selected');
+  assert.match(iVotedSql, /ORDER BY checked_at DESC, election_id\s+LIMIT 1\s*$/, '#813: one row, newest first');
   assert.equal(iVotedSql.match(/ballot_written=1/g).length, 3); assert.equal(iVotedSql.match(/clerk_user_id=\?/g).length, 3);
   assert.deepEqual(Object.keys(voteKindLabels), ['civic', 'poc', 'primary']);
   assert.equal(/wallet|spk|currency_|INSERT|UPDATE/i.test(readFileSync('lib/i-voted.ts', 'utf8').replace(/never currency|No currency, no wallet/g, '')), false, 'read-only, no currency');
@@ -48,7 +49,7 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.ok(on.sql.every(q => /^\s*SELECT/i.test(q)), 'read-only');
   });
 
-  test(`I Voted (${backend}): only written ballots count, per kind, per citizen; one per election; newest first; no ballot content`, async t => {
+  test(`I Voted (${backend}): only written ballots count, per kind, per citizen; one per election; newest only (#813); no ballot content`, async t => {
     const r = await localRuntime({ backend }); t.after(() => r.close());
     await r.call('citizen', 'alice'); await r.call('citizen', 'bob');
     r.setFixtureEnv('HARIMU_I_VOTED_BADGE_ENABLED', 'true');
@@ -59,16 +60,20 @@ for (const backend of ['sqlite', 'postgres']) {
     // Each kind on its own, so dropping any one UNION branch or any one ballot_written filter fails.
     await vote(r, 'civic', 'civic-1', 'alice', 300, 1);
     assert.deepEqual(await badges('alice'), [{ kind: 'civic', electionId: 'civic-1', votedAt: 300 }]);
-    await vote(r, 'poc', 'poc-1', 'alice', 200, 1);
+    await vote(r, 'poc', 'poc-1', 'alice', 350, 1);
+    assert.deepEqual(await badges('alice'), [{ kind: 'poc', electionId: 'poc-1', votedAt: 350 }], 'newest only (#813 LIMIT 1)');
     await vote(r, 'primary', 'primary-1', 'alice', 400, 1);
-    assert.deepEqual((await badges('alice')).map(b => [b.kind, b.electionId, b.votedAt]), [['primary', 'primary-1', 400], ['civic', 'civic-1', 300], ['poc', 'poc-1', 200]], 'newest first');
+    assert.deepEqual(await badges('alice'), [{ kind: 'primary', electionId: 'primary-1', votedAt: 400 }], 'newest only (#813 LIMIT 1)');
     // Another citizen's ballots are never the caller's badge (each clerk_user_id filter).
     assert.deepEqual(await badges('bob'), []);
     for (const kind of ['civic', 'poc', 'primary']) await vote(r, kind, `${kind}-1`, 'bob', 500, 1);
-    assert.equal((await badges('bob')).length, 3); assert.equal((await badges('alice')).length, 3);
+    assert.equal((await badges('bob')).length, 1); assert.equal((await badges('alice')).length, 1);
     // One per citizen per election: a replayed/second receipt is refused by the receipt key, so the badge cannot duplicate.
     await assert.rejects(r.db.prepare(receipts.civic).bind('civic-1', 'alice', 'rq-replay', 600, 1).run());
-    assert.equal((await badges('alice')).filter(b => b.electionId === 'civic-1').length, 1);
+    assert.deepEqual((await badges('alice')).map(b => b.electionId), ['primary-1']);
+    // #813: the read is bounded: many written ballots still give exactly one row, the newest.
+    for (let i = 0; i < 40; i++) await vote(r, 'civic', `civic-many-${i}`, 'alice', 1000 + i, 1);
+    assert.deepEqual(await badges('alice'), [{ kind: 'civic', electionId: 'civic-many-39', votedAt: 1039 }]);
     const body = JSON.stringify(await r.call('citizen/i-voted', 'alice'));
     assert.equal(/steady-hand|ranking|candidate|"a"|request|rq-/.test(body), false, 'the badge holds no ballot content or request ids');
     assert.deepEqual(Object.keys((await badges('alice'))[0]).sort(), ['electionId', 'kind', 'votedAt']);

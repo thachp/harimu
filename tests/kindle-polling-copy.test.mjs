@@ -73,9 +73,9 @@ test('the header names no other lib module path', () => {
   const head=readFileSync('lib/kindle-polling-copy.ts','utf8').split('*/')[0];
   assert.doesNotMatch(head,/\blib\/|\.ts\b|app\/|components\//);
 });
-test('unwired: nothing in app/, components/ or lib/ imports kindle-polling-copy', () => {
+test('wired only by #740: the poll card imports kindle-polling-copy; nothing else does', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('kindle-polling-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/kindle-polling-copy/,f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('kindle-polling-copy.ts')&&f!=='app/poll-card.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/kindle-polling-copy/,f);
 });
 test('one canonical byline: the press bodies open with the Kindle pack byline from the press templates, and this module defines none of its own', () => {
   assert.deepEqual(kindlePress.byline,{name:'Republic Wire Service',proposal:true});
