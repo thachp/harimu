@@ -20,7 +20,7 @@ const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
 // Feature flags the preview turns on for QA (the preview-flags-on change). Production keeps every one "false". Adding a flag here is a deliberate preview-only decision.
 // Build-time UI flags (baked into the client bundle at build): on in preview, always "false" in production. Exactly these four.
-const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD'];
+const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION'];
 const previewOnFlags = [
   'HARIMU_TEST_FAUCET_ENABLED',
   'HARIMU_LABOR_BUREAU_ENABLED',

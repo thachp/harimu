@@ -10,6 +10,7 @@
  *  (#346) The top bar, shift chip and collapsed-panel button at 320-1280px wide and 100-150% text (scripts/hud-zoom-check.mjs).
  *  (#79) The color-blind-safe nation symbol chips, flag on and off (scripts/nation-symbols-check.mjs).
  *  (#392 S4) The zoom rail (scripts/ui-v2-rail-check.mjs).
+ *  (#392 S6) The Nation panel (scripts/ui-v2-nation-check.mjs).
  *  (#779) Nation fact-list labels never split mid-word (scripts/nation-fact-label-check.mjs).
  *  (#392 S5) World crest chips (scripts/ui-v2-world-check.mjs).
  *  (#392 S3) The UI v2 panel shape, World and City (scripts/ui-v2-panel-check.mjs).
@@ -33,6 +34,7 @@ import { checkNationCrests } from './nation-crests-check.mjs';
 import { checkUiV2Panel } from './ui-v2-panel-check.mjs';
 import { checkNationFactLabels } from './nation-fact-label-check.mjs';
 import { checkUiV2World } from './ui-v2-world-check.mjs';
+import { checkUiV2Nation } from './ui-v2-nation-check.mjs';
 import { checkUiV2Rail } from './ui-v2-rail-check.mjs';
 import { checkUiV2Topbar } from './ui-v2-topbar-check.mjs';
 import { checkBellBadge } from './bell-badge-check.mjs';
@@ -197,6 +199,7 @@ try {
   await checkUiV2Panel({ browser, css, preflight, failures, rows }); // #392 S3: panel shape in the World and City side panel
   await checkNationFactLabels({ browser, css, preflight, failures, rows }); // #779: fact labels never split mid-word
   await checkUiV2World({ browser, css, preflight, failures, rows }); // #392 S5: crest chips in the World nation strip
+  await checkUiV2Nation({ browser, css, preflight, failures, rows }); // #392 S6: Nation panel shape, institution rows, Explore {nation}
   await checkUiV2Rail({ browser, css, preflight, failures, rows }); // #392 S4: zoom rail beside the stage, places-only top tabs
   await checkUiV2Topbar({ browser, css, preflight, failures, rows }); // #392 S2: UI v2 top bar restyle (flag off, emblem-only, v2 on)
   await checkBellBadge({ browser, css, preflight, failures, rows }); // #682: the bell's unread badge (99, 99+) stays inside the 44px phone bell

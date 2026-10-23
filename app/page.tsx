@@ -19,6 +19,7 @@ import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/gu
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { countryWord } from '@/lib/ui-v2-rail';
+import { NationPanel } from './nation-panel-v2';
 import { CitySummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
@@ -53,7 +54,6 @@ import { WalletPanel, type WalletRewards } from './wallet-panel';
 import { ShiftQualityStep } from './shift-quality-step';
 import { qualityWorkOrderId, harvestQuestions, type QualityInput, type QualityQuestion } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
-import { NationInstitutions } from './nation-institutions';
 import { DailyLoop } from './daily-loop';
 import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction, type GrayCommand } from './korund-plan-panel';
@@ -1819,7 +1819,7 @@ export default function Home() {
 
     {(!clerkConfigured || !citizenNationId) && <SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
-    <NationInstitutions incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
+    <NationPanel onNationMap={() => changeView('country')} incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
