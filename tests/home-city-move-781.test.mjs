@@ -102,3 +102,9 @@ test('the control is mounted with the city scene and names fee, cooldown date an
   for (const s of ['Make this my home city', "cooldown", "funds", "not_your_nation", '/api/city/home']) assert.ok(card.includes(s), s);
   assert.match(await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'), /<HomeMoveCard /);
 });
+
+test('funds boundary: a wallet of exactly the fee can move and ends at zero', async t => {
+  const { wallet, move } = await world(t, { cash: 1000 - 0 });
+  const w0 = await wallet(); assert.equal(w0, 1000);
+  const res = await move(tarrek); assert.equal(res.status, 200, JSON.stringify(res.data)); assert.equal(await wallet(), 0);
+});
