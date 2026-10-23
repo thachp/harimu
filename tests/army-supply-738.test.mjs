@@ -32,6 +32,8 @@ test('card and legend: the cut line comes from army-copy (Content copy, #887 fol
   const { unitMembership: AC } = await import('../lib/army-copy.ts');
   assert.doesNotMatch(readFileSync('lib/army-copy.ts', 'utf8'), /PLACEHOLDER copy[^\n]*slice 5/);
   assert.ok(readFileSync('app/map-overlays.tsx', 'utf8').includes(' · '+AC.supplyCutLegend.text.replace('{pct}', '${u.supply.strengthLossPct}')), 'legend matches army-copy (inline: army-copy is imported only by the army card and rules)');
+  assert.equal(AC.supplyCut.text, 'Supply line cut. Strength is down {pct}% and drops each game day the line stays cut, to at most half.');
+  assert.equal(S.ARMY_SUPPLY_LOSS_CAP_PCT, 50, '"at most half" matches the cap');
   for (const l of [AC.supplyCut.text, AC.supplyCutLegend.text]) { assert.match(l, /\{pct\}%/); assert.doesNotMatch(l.replace('{pct}', ''), /\d|["“”]|Chairman|Crown|Marshal|President|Directorate|General|orders?\b/, l); assert.ok(l.replace('{pct}', '100').length <= 100, l); }
 });
 
