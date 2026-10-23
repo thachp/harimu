@@ -5,6 +5,9 @@ import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { armiesEnabled, armyDrillsEnabled, parseArmyCommand } from '@/lib/army-rules';
 import { readArmy, runArmyCommand } from '@/lib/army';
 import { serviceUntil } from '@/lib/army-conscription';
+import { readActiveWars } from '@/lib/army-map';
+import { applySupplyLoss, armySupplyEnabled, unitSupply } from '@/lib/army-supply';
+import { unitById } from '@/lib/army-rules';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -18,7 +21,13 @@ export async function GET(request: Request) {
   const db = await getDatabase(), now = Math.floor(Date.now() / 1000);
   // ARC on #839: GET never writes; the draft and term-end release run on POST /api/army/draft (the card's open action).
   const until = await serviceUntil(db, userId, now);
-  return privateJson({ army: { ...await readArmy(db, userId, now, armyDrillsEnabled(env)), ...(until ? { serveUntil: until } : {}) } });
+  const army = await readArmy(db, userId, now, armyDrillsEnabled(env)), unit = army.unit;
+  // #738 slice 5: a cut supply line lowers the shown strength (only while HARIMU_ARMY_SUPPLY_ENABLED is on and strength is shown; off: no extra read).
+  if (unit && unit.strength !== undefined && armySupplyEnabled(env)) {
+    const supply = unitSupply(unitById(unit.id)?.nationId ?? '', await readActiveWars(db), now);
+    army.unit = { ...unit, strength: applySupplyLoss(unit.strength, supply.strengthLossPct), supply };
+  }
+  return privateJson({ army: { ...army, ...(until ? { serveUntil: until } : {}) } });
 }
 
 /** POST {action:'join', unitId} | {action:'leave'} | {action:'stance', stance}, each with a requestId (replay returns the current state, writes nothing). */

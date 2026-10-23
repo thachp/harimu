@@ -82,6 +82,8 @@ export const unitMembership={
  stayed:L('You will stay in {unit} after your term.'),
  // PLACEHOLDER copy, marked for Content (proposal: true): a refused stay (not a conscript, or the term already ended) (#738 stay-error follow-up).
  stayRefused:L('You cannot stay in {unit}: you are not serving a term right now.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): #738 slice 5, a cut supply line on the card and the map legend.
+ supplyCut:L('Supply cut for {days} game days: strength down {pct}%.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),
