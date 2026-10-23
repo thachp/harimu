@@ -177,6 +177,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "true",
+    // #243: filler wire stories (lib/press-templates.ts packs) in the National news edition under their in-world byline; they give way once a player paper publishes.
+    "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "true",
     // #85: nation skin PoC on the top bar (Kindle / Korund / Aurelle colors + one CSS motif each); guests and pre-citizens keep the neutral bar.
     "NEXT_PUBLIC_HARIMU_NATION_SKIN": "true",
     "NEXT_PUBLIC_HARIMU_RARE_MARKER": "true",

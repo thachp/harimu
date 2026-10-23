@@ -129,6 +129,20 @@ body:has(.harimu-game){overflow:auto}
 .national-news.nation-document[data-nation-theme] :is(.news-statistics,.national-news-items article,.news-source){border-color:var(--nation-edge);background:transparent;color:var(--nation-ink)}
 .national-news.nation-document[data-nation-theme] time { color:var(--nation-ink); }
 .national-news.nation-document[data-nation-theme] .national-news-items article { border-left:3px solid var(--nation-accent); }
+/* #243 (ARC): visually hidden "Wire: " byline prefix, same hidden-text pattern as .game-notifications-live / .map-overlays-status (the repo has no shared sr-only class) */
+.wire-stories .wire-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+/* #243: filler wire stories (NEXT_PUBLIC_HARIMU_WIRE_BYLINES; app/wire-stories.tsx). Text keeps the document ink (inherited), so contrast is the edition's own;
+   each outlet differs by the shape of its byline rule (free-press top rule, State Media dashed stamp, Court Gazette double rule and italic), not by color alone. */
+.wire-stories{margin-top:16px;padding-top:12px;border-top:1px solid var(--nation-edge,#34535d)}
+.wire-stories>h3{margin:0;font-size:calc(13px * var(--text-scale, 1));letter-spacing:.05em;text-transform:uppercase}
+.wire-stories>ol{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:10px}
+.wire-stories article{padding:10px 12px;border:1px solid var(--nation-edge,#34535d);border-radius:3px}
+.wire-stories article>h4{margin:0;font-size:calc(14px * var(--text-scale, 1));overflow-wrap:normal}
+.wire-stories article>p{margin:6px 0 0;line-height:1.5;overflow-wrap:break-word}
+.wire-stories .wire-byline{display:inline-block;margin:4px 0 2px;font-size:calc(12px * var(--text-scale, 1));font-weight:700;letter-spacing:.02em;overflow-wrap:normal}
+.wire-free-press .wire-byline{padding-top:2px;border-top:1px solid currentColor}
+.wire-state-media .wire-byline{padding:1px 6px;border:2px dashed var(--nation-accent,currentColor);transform:rotate(-1.5deg)}
+.wire-court-gazette .wire-byline{padding-bottom:2px;border-bottom:3px double var(--nation-accent,currentColor);font-style:italic}
 
 .notable-conversation form { display: grid; gap: 10px; }
 .notable-conversation textarea { width: 100%; max-width: 100%; min-height: 96px; box-sizing: border-box; resize: vertical; }
