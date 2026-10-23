@@ -1780,7 +1780,7 @@ export default function Home() {
         {simulation?.sieges && <SiegePanel sieges={simulation.sieges} nationId={citizenNation.id} />}
         <FoundingBanner founding={government?.founding} nationId={citizenNation.id} />
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
-        <ArmyCard />
+        <ArmyCard key={`army:${citizenSessionKey}`}/>{/* QA2 preview report: remount after sign-in like the other session cards; mounted once with no key it kept the signed-out null forever */}
         {citizenNation.id==='kindle'&&clerkConfigured&&<PrimaryCard key={`primary:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={`ranked:${citizenSessionKey}`} onSnapshot={setElection}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
