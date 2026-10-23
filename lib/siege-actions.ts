@@ -149,7 +149,7 @@ async function squareZones(db: GameDatabase, squares: readonly { x: number; y: n
   for (const s of squares) { const row = await db.prepare('SELECT zone FROM world_squares WHERE x=? AND y=?').bind(s.x, s.y).first<{ zone: string }>(); if (row) zones.set(`${s.x},${s.y}`, row.zone); }
   return zones;
 }
-const refusedCapture = (r: { lost: number; limit: number }) => fail(409, 'weekly_loss_cap', `The defender has already lost ${r.lost} of the ${r.limit} frontier squares it can lose this week; the city stays contested.`);
+const refusedCapture = (r: { lost?: number; limit?: number }) => fail(409, 'weekly_loss_cap', `The defender has already lost ${r.lost ?? 0} of the ${r.limit ?? 1} frontier squares it can lose this week; the city stays contested.`);
 async function view(db: GameDatabase, s: SiegeRow): Promise<SiegeView> {
   return { id: s.id, warId: s.war_id, cityKey: s.city_key, attacker: s.attacker_nation, defender: s.defender_nation, days: (await progress(db, s.id)).length, needed: 2, capturedAt: s.captured_at === null ? null : Number(s.captured_at) };
 }
