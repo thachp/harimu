@@ -27,9 +27,12 @@ test('rules: flag chain (unset means off), named constants, cut time, daily loss
   assert.equal(S.unitSupply('kindle', [], 10 ** 7).cut, false, 'war over: home and supplied');
 });
 
-test('card and legend: the cut line comes from army-copy (placeholder for Content)', () => {
+test('card and legend: the cut line comes from army-copy (Content copy, #887 follow-up)', async () => {
   assert.match(readFileSync('app/army-card.tsx', 'utf8'), /\{unit\.supply\?\.cut && <p>\{supplyCutLine\(unit\.supply\)\}<\/p>\}/);
-  assert.match(readFileSync('lib/army-copy.ts', 'utf8'), /PLACEHOLDER copy, marked for Content[^\n]*slice 5[^\n]*\n supplyCut:L\(/);
+  const { unitMembership: AC } = await import('../lib/army-copy.ts');
+  assert.doesNotMatch(readFileSync('lib/army-copy.ts', 'utf8'), /PLACEHOLDER copy[^\n]*slice 5/);
+  assert.ok(readFileSync('app/map-overlays.tsx', 'utf8').includes(' · '+AC.supplyCutLegend.text.replace('{pct}', '${u.supply.strengthLossPct}')), 'legend matches army-copy (inline: army-copy is imported only by the army card and rules)');
+  for (const l of [AC.supplyCut.text, AC.supplyCutLegend.text]) { assert.match(l, /\{pct\}%/); assert.doesNotMatch(l.replace('{pct}', ''), /\d|["“”]|Chairman|Crown|Marshal|President|Directorate|General|orders?\b/, l); assert.ok(l.replace('{pct}', '100').length <= 100, l); }
 });
 
 async function spy(r, fn) { const prepare = r.db.prepare.bind(r.db), seen = { sql: [] }; r.db.prepare = q => { seen.sql.push(q); return prepare(q); }; try { seen.result = await fn(); } finally { r.db.prepare = prepare; } return seen; }

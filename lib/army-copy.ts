@@ -82,8 +82,10 @@ export const unitMembership={
  stayed:L('You will stay in {unit} after your term.'),
  // PLACEHOLDER copy, marked for Content (proposal: true): a refused stay (not a conscript, or the term already ended) (#738 stay-error follow-up).
  stayRefused:L('You cannot stay in {unit}: you are not serving a term right now.'),
- // PLACEHOLDER copy, marked for Content (proposal: true): #738 slice 5, a cut supply line on the card and the map legend.
- supplyCut:L('Supply cut for {days} game days: strength down {pct}%.'),
+ // Content (#887 follow-up), docs §15.3 Logistics: units need supply lines from depots; a cut line lowers strength each game day.
+ // {pct} is the server's loss figure; no other figure is stated. The depot and range are [ASSUMPTION]s in lib/army-supply.ts, so they go unnamed.
+ supplyCut:L('Supply line cut. Strength is down {pct}% and drops each game day the line stays cut.'),
+ supplyCutLegend:L('supply line cut, strength down {pct}%'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),

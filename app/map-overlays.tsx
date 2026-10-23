@@ -84,7 +84,7 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true, armies = fal
         {active.map(id => <section key={id}>
           <strong>{overlayLabel(id)}</strong>
           {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}><span aria-hidden="true">{bandMark(step).symbol}</span> {step}</li>)}</ol> : null}
-          {id === 'armies' && units ? <ul className="map-ownership-key">{units.map(u => <li key={u.unitId}><span aria-hidden="true">{ARMY_MARK}</span> {armyLegendLine(u)}{u.supply?.cut ? ` · supply cut (strength down ${u.supply.strengthLossPct}%)` : ''}</li>)}</ul> : null}
+          {id === 'armies' && units ? <ul className="map-ownership-key">{units.map(u => <li key={u.unitId}><span aria-hidden="true">{ARMY_MARK}</span> {armyLegendLine(u)}{u.supply?.cut ? ` · supply line cut, strength down ${u.supply.strengthLossPct}%` : ''}</li>)}</ul> : null}
           {id === 'unrest' && unrest ? <ul className="map-ownership-key">{unrest.nations.map(({ nationId, unrest: score, band }) => <li key={nationId}><span aria-hidden="true">{bandMark(band).symbol}</span> {nationMark(nationId)?.name ?? nationId}: {band} ({score})</li>)}
             {unrest.unpublished.map(id => <li key={id}>{unpublishedLabel(nationMark(id)?.name ?? id)}</li>)}<li>{NO_DATA}</li></ul> : null}
           {id === 'resources' && resources ? <ul className="map-ownership-key">{resources.totals.map(({ resource, squares }) => <li key={resource}><span aria-hidden="true" className={rareMarker && resourceIcon(resource).rare ? 'map-rare-key' : undefined}>{resourceIcon(resource).symbol}</span> {resourceName(resource)}{resourceIcon(resource).rare ? ' (rare)' : ''}: {squares} {squares === 1 ? 'square' : 'squares'}</li>)}</ul>
