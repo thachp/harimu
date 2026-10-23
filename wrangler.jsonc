@@ -63,6 +63,8 @@
     "HARIMU_KORUND_MEDALS_ENABLED": "true",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
     "HARIMU_KORUND_SHORTFALL_ENABLED": "true",
+    // #777: goods-market seller fee (0.5%, rounded down) written as a sink row with each fill and netted from the wallet. Off: no fee written or read.
+    "HARIMU_MARKET_FEE_ENABLED": "true",
     // #758: Korund wallet shows the rumored LN street rate (from #43 trades, display only) to citizens who have traded on the gray market. Off: no read, wallet unchanged.
     "HARIMU_WALLET_STREET_RATE_ENABLED": "true",
     // #776: a closed-week plan shortfall withdraws goods (then clothing) coupons from the next week's book; the food ration is never cut (derived on read). Off: coupons unchanged.

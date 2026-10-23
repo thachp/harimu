@@ -9,6 +9,7 @@ import { orderBookLimits, type OrderBookState } from '@/lib/order-book-rules';
 import { shelfLifeDays } from '@/lib/spoilage-rules';
 import { boardLabels, cancelConfirmation, emptyStates, escrowPreview, fillNotice, orderStateLines, rejectionFor, rejectionForReason, rejections, spoilageHints, type Line, type RejectionKey } from '@/lib/market-board-copy';
 import { ActionButton } from './action-button';
+import { marketFeeLabel } from '@/lib/market-fee'; // #777
 import { freshLiveText, moveLabel, priceMoves, startTicker, tickAnnouncer, tickerCopy, type Moves } from '@/lib/market-ticker';
 import { useDisplayTimestamp } from './display-preferences';
 
@@ -181,6 +182,7 @@ export function MarketBoard({ api, economy }: { api: OrderBookApi; economy: Econ
     <h4>{boardLabels.myOpenOrders}</h4>
     {book.myOrders.length ? <ul className="board-orders">{book.myOrders.map(o => <OrderRow key={o.id} order={o} goods={goods} reason={busy ? 'Saving…' : null} onCancel={() => void api.cancel(o.id)} />)}</ul>
       : <p className="board-note">{emptyStates.noOpenOrders.text}</p>}
+    {book.myFees?.length ? <ul className="board-fees" aria-label="Recent sale fees">{book.myFees.map(f => <li key={f.tradeId}>Sold {f.qty} {f.good} at {(f.unitMinor / 100).toFixed(2)} SPK · {marketFeeLabel(f.feeMinor)}</li>)}</ul> : null}
 
     <form className="board-form" onSubmit={e => { e.preventDefault(); if (!reason && valid) void api.place({ side, good: info.good, qty: q, limitUnitMinor: minor! }); }}>
       <fieldset disabled={busy}><legend>{boardLabels.placeOrder}</legend>
