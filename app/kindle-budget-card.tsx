@@ -13,7 +13,11 @@ export function KindleBudgetCard() {
       .catch(() => {});
     return () => controller.abort();
   }, []);
-  if (!budget) return null;
+  return budget ? <KindleBudgetView budget={budget} /> : null;
+}
+
+/** Presentational: the server's integer minor units, shown as SPK (render-tested in tests/kindle-budget-789.test.mjs). */
+export function KindleBudgetView({ budget }: { budget: KindleBudget }) {
   return <section className="kindle-budget-card" aria-label="National budget">
     <h3>National budget</h3>
     <dl>

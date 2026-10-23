@@ -48,3 +48,28 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(on.result.data.budget.treasuryMinor, 150);
   });
 }
+
+// QA3 on #806: the card's rendering. Compiled with the TypeScript transpiler and rendered with renderToStaticMarkup, as tests/civic-copy-619 does.
+test('KindleBudgetView renders each server value under its own label, minor units as SPK, the rate and every category', async () => {
+  const [{ readFile }, { createRequire }, React, { renderToStaticMarkup }, ts] = await Promise.all([import('node:fs/promises'), import('node:module'), import('react'), import('react-dom/server'), import('typescript')]);
+  const require = createRequire(import.meta.url);
+  const compiled = ts.default.transpileModule(await readFile(new URL('../app/kindle-budget-card.tsx', import.meta.url), 'utf8'), { compilerOptions: { jsx: ts.default.JsxEmit.ReactJSX, module: ts.default.ModuleKind.CommonJS } }).outputText;
+  const exports = {}; new Function('exports', 'require', compiled)(exports, id => require(id));
+  const categories = ['Defense', 'Infrastructure', 'Welfare', 'Culture, propaganda and faith', 'Administration', 'Reserves'].map(name => ({ name, spentMinor: null }));
+  const render = budget => renderToStaticMarkup(React.default.createElement(exports.KindleBudgetView, { budget: { gameDayStartsAt: '2027-01-15T08:00:00.000Z', rateSource: 'set by the AI Assembly', categories, ...budget } }));
+  const row = (html, label) => html.match(new RegExp(`<dt>${label}</dt><dd>([^<]*)</dd>`))?.[1];
+  const cases = [[499, 49], [49, 0], [0, 499], [123456789012, 4], [100, 1]];
+  for (const [treasuryMinor, todayTaxMinor] of cases) {
+    const html = render({ treasuryMinor, todayTaxMinor, ratePercent: 15 });
+    const spk = m => `${(m / 100).toFixed(2)} SPK`;
+    assert.equal(row(html, 'Treasury balance'), spk(treasuryMinor)); assert.equal(row(html, 'Income tax collected this game day'), spk(todayTaxMinor));
+  }
+  const literal = render({ treasuryMinor: 123456789012, todayTaxMinor: 499, ratePercent: 15 });
+  assert.equal(row(literal, 'Treasury balance'), '1234567890.12 SPK'); assert.equal(row(literal, 'Income tax collected this game day'), '4.99 SPK');
+  const edges = render({ treasuryMinor: 49, todayTaxMinor: 0, ratePercent: 15 });
+  assert.equal(row(edges, 'Treasury balance'), '0.49 SPK'); assert.equal(row(edges, 'Income tax collected this game day'), '0.00 SPK');
+  assert.equal(row(literal, 'Income tax rate'), '15% (set by the AI Assembly)');
+  assert.equal(row(render({ treasuryMinor: 1, todayTaxMinor: 2, ratePercent: 0 }), 'Income tax rate'), 'Not collected');
+  for (const c of categories) assert.ok(literal.includes(`<li>${c.name.replace(/,/g, ',')}: no spending yet</li>`), `${c.name}: no spending yet`);
+  assert.equal(literal.match(/: no spending yet<\/li>/g).length, 6);
+});

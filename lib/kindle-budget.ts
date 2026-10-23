@@ -14,7 +14,10 @@ export type KindleBudget = {
   categories: { name: (typeof budgetCategories)[number]; spentMinor: null }[];
 };
 const int = (v: unknown) => { const n = Number(v ?? 0); return Number.isSafeInteger(n) ? n : 0; };
-/** Start of the current game day (12x clock: 2 real hours), as the ISO text settled_at is stored in. */
+/** Start of the current game day (12x clock: 2 real hours), as the ISO text settled_at is stored in.
+ *  Why the Unix epoch and not the world clock's epoch: advanceWorld stores world_clock.epoch_seconds as floor(now / tickSeconds) * tickSeconds, a multiple of 7200, so
+ *  world-clock game days start on the same 2-hour boundaries as Unix-epoch ones (only the day number differs, which this view never shows). Using the Unix epoch, as
+ *  lib/faith.ts gameDayOf does, needs no world_clock read and works before the first tick. If the world epoch ever stops being 7200-aligned, read it here instead. */
 export const gameDayStartIso = (nowSeconds: number) => new Date(Math.floor(nowSeconds / gameDaySeconds) * gameDaySeconds * 1000).toISOString();
 
 export async function readKindleBudget(db: GameDatabase, nowSeconds: number, ratePercent: number): Promise<KindleBudget> {
