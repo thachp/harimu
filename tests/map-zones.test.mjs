@@ -68,7 +68,8 @@ test('committed D1 migration matches the generator and applies idempotently', as
   const file = await readFile(new URL('../drizzle/0011_world_squares.sql', import.meta.url), 'utf8');
   assert.equal(file, sqliteWorldSquaresMigration());
   const sqlite = new DatabaseSync(':memory:'); sqlite.exec(file); sqlite.exec(file);
-  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM world_squares').get().n, mapWidth * mapHeight);
+  const { from } = zones.gridGrowth486; // #486: 0011 is the original 24x18 seed; 0066 / the boot seed add the rest
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM world_squares').get().n, from.width * from.height);
 });
 test('a partially seeded table falls back to the full seed', async () => {
   const sqlite = new DatabaseSync(':memory:'); sqlite.exec(worldSquaresSchema); sqlite.exec(worldSquaresSeedSql()[0]);

@@ -37,6 +37,8 @@ const flagOffPins = {
   HARIMU_GRAY_DAILY_CAP_ENABLED: 'gray-daily-cap-736.test.mjs',
   HARIMU_GRAY_SUSPICION_ENABLED: 'gray-suspicion-749.test.mjs',
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
+  HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
+  HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',
   HARIMU_NATION_READINESS_ENABLED: 'nation-readiness-486.test.mjs',
   HARIMU_FAVOR_DECAY_ENABLED: 'favor-decay-529.test.mjs',
@@ -54,6 +56,7 @@ const flagOffPins = {
   HARIMU_FAITH_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_DIPLOMATIC_HALL_ENABLED: 'diplomatic-hall-599.test.mjs',
   HARIMU_MAP_OVERLAYS_ENABLED: 'map-overlays-82.test.mjs',
+  HARIMU_CIVIC_RANK_ENABLED: 'civic-rank-741.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
@@ -75,6 +78,7 @@ const flagOffPins = {
   HARIMU_SPARK_SUPPLY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_LEDGER_RECONCILIATION_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_AI_COST_DASHBOARD_ENABLED: 'ai-costs-614.test.mjs',
+  HARIMU_AI_REVIEW_QUEUE_ENABLED: 'ai-review-queue-753.test.mjs',
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.

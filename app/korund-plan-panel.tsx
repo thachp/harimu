@@ -10,10 +10,10 @@ import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
-import { quotaPercent, korundMedalCopy, korundQuotaValueText } from '@/lib/korund-coupons';
+import { quotaPercent, korundMedalCopy, korundQuotaValueText, korundShortfallCopy } from '@/lib/korund-coupons';
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
-import { grayText, grayRefusal, ln, fc, rate, rumorLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
+import { grayText, grayRefusal, ln, fc, rate, rumorLine, walletStreetRateLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
 
 export type KorundPlanView = KorundPlan;
 export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal' | 'korund-join-ration-queue' | 'korund-cancel-ration-queue' | 'korund-redeem-coupon' | 'korund-set-preferences' | 'korund-request-assignment' | 'korund-gray-post-offer' | 'korund-gray-accept-offer';
@@ -41,7 +41,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
     <h3>{scene === 'workplace' ? (plan.bureau ? 'Labor Bureau assignment' : 'Brigade assignment') /* #453: the Bureau name only when HARIMU_LABOR_BUREAU_ENABLED sends plan.bureau */ : scene === 'market' ? 'State ration counter' : 'Korund household account'}</h3>
     <p>Bounded state planning · AI/SI roles follow deterministic rules. Labor Notes are non-convertible; Korund has no legal private market.</p>
     <p>Labor Note wages are recorded in a separate ledger. Labor Notes are spent only on weekly clothing and goods coupons at fixed prices; food comes from free food coupons.</p>
-    <dl><dt>Labor Notes</dt><dd>{(plan.walletMinor / 100).toFixed(2)} LN</dd><dt>Household food</dt><dd>{plan.foodQuantity}</dd>
+    <dl><dt>Labor Notes</dt><dd>{(plan.walletMinor / 100).toFixed(2)} LN{plan.streetRate && <><br /><small className="wallet-street-rate">{walletStreetRateLine(plan.streetRate.rumoredRate)}</small></>}</dd><dt>Household food</dt><dd>{plan.foodQuantity}</dd>
       <dt>Work capacity</dt><dd>{capacity} / 24 WC</dd><dt>Ration book</dt><dd>Game week {plan.gameWeek} · {plan.couponFoodRemaining} food coupons · <GameTimer endsAt={plan.couponExpiresAt} label="Ration coupons expire" /></dd></dl>
     {uncertain && <div role="alert"><p>Confirm the previous Korund action before starting another. Retry uses the same request.</p><ActionButton type="button" reason={pendingActionReason(pending)} onClick={onRetry}>Confirm previous action</ActionButton></div>}
     {error && <p role="alert">{error}</p>}
@@ -49,6 +49,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
     {scene === 'workplace' ? <>
       <h4>{plan.assignment.name}</h4><p>{plan.assignment.capacityCost} WC · {formatDuration(plan.assignment.hours * 3600000)} real / {formatDuration(plan.assignment.hours * 3600000 * gameTimeCompression)} game · {(plan.assignment.wageMinor / 100).toFixed(2)} LN wages · {plan.assignment.foodOutput} food added to the state pool on collection.</p>
       {plan.quota && <QuotaBar quota={plan.quota} medals={plan.medals} />}
+      {plan.shortfall && <section className="korund-shortfall" aria-label="Plan inspection"><p role="status">{korundShortfallCopy.notice(plan.shortfall.workUnit, plan.shortfall.percent)}</p><p>{korundShortfallCopy.ledger}</p><p><small>City feed: {plan.shortfall.press}</small></p></section>}
       {plan.bureau ? <LaborBureau bureau={plan.bureau} pending={pending} uncertain={uncertain} formatTime={formatTime} onCommand={onCommand} /> : null}
       <p>One assigned shift at a time. {plan.bureau ? 'Bureau placement is recorded; shift pay is unchanged.' : 'Job preferences, reassignment and production-drive progression are planned.'}</p>
       {active ? <><GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" /><p>{active.orderName} · {ready ? 'Complete · collect your Labor Notes' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remaining` : 'Checking timing…'}</p>

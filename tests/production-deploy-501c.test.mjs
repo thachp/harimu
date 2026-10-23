@@ -95,3 +95,9 @@ test('#742: HARIMU_AI_TEMPLATES_ONLY is the one named operator exemption; other 
   for (const v of ['true', 'false', 'ALL', 'korund,', ' all', 'atlantis', 'x;y']) assert.ok(withVars({ HARIMU_AI_TEMPLATES_ONLY: v }).some(p => /HARIMU_AI_TEMPLATES_ONLY must be/.test(p)), v);
   for (const v of ['', 'all', 'true']) assert.ok(withVars({ HARIMU_AI_NEWS_ENABLED: v }).some(p => p === 'HARIMU_AI_NEWS_ENABLED must be "false" on production.'), v);
 });
+
+test('#764: HARIMU_AI_MUTED_PERSONAS is the second operator exemption: "", "all" or a persona id list', () => {
+  const withVars = extra => { const c = good(); return productionConfigProblems({ ...c, vars: { ...c.vars, ...extra } }); };
+  for (const v of ['', 'all', 'kindle-journalist', 'kindle-journalist,kindle-cabinet']) assert.deepEqual(withVars({ HARIMU_AI_MUTED_PERSONAS: v }).filter(p => /MUTED_PERSONAS/.test(p)), [], v);
+  for (const v of ['true ', 'ALL', 'kindle-journalist,', ' all', 'x;y']) assert.ok(withVars({ HARIMU_AI_MUTED_PERSONAS: v }).some(p => p === 'HARIMU_AI_MUTED_PERSONAS must be "", "all" or a comma list of persona ids on production.'), v);
+});

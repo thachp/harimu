@@ -39,7 +39,7 @@ test('Postgres: every existing row is byte-identical after 0066 (including chang
 });
 
 test('SQLite/D1 accepts the same statements with the same guarantees', () => {
-  const db = new DatabaseSync(':memory:'); db.exec(z.worldSquaresSchema); for (const s of z.worldSquaresSeedSql()) db.exec(s);
+  const db = new DatabaseSync(':memory:'); db.exec(z.worldSquaresSchema); for (const s of z.worldSquaresSeedSql(100, 'sqlite', from)) db.exec(s);
   const before = db.prepare('SELECT * FROM world_squares ORDER BY y,x').all();
   db.exec(body); db.exec(body);
   const after = db.prepare('SELECT * FROM world_squares WHERE x < ? AND y < ? ORDER BY y,x').all(from.width, from.height);

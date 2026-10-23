@@ -36,6 +36,8 @@
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
+    // #764: per-persona AI mute (operator control, not a feature flag). "" = off; "all" or a comma list of persona ids (Notable ids, <nation>-news-desk, kindle-cabinet, kindle-town-hall, kindle-debate) skips that persona's model calls. Unknown values fail closed to "all".
+    "HARIMU_AI_MUTED_PERSONAS": "",
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
     // #626 (Decision 111): the Spark-to-Tessera kiosk exchange, separate from square purchases. Off: buy-tessera is refused and the kiosk stays closed.
@@ -61,6 +63,10 @@
     "HARIMU_GRAY_SUSPICION_ENABLED": "false",
     // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
     "HARIMU_KORUND_MEDALS_ENABLED": "false",
+    // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
+    "HARIMU_KORUND_SHORTFALL_ENABLED": "false",
+    // #758: Korund wallet shows the rumored LN street rate (from #43 trades, display only) to citizens who have traded on the gray market. Off: no read, wallet unchanged.
+    "HARIMU_WALLET_STREET_RATE_ENABLED": "false",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).
     // #487: "true" in preview only so the Confluence cooperative job runs for QA-allowlisted accounts; production "false".
     "HARIMU_NATION_WORK_ENABLED": "false",
@@ -90,6 +96,8 @@
     "HARIMU_DIPLOMATIC_HALL_ENABLED": "false",
     // #82: map overlay toggles (Ownership, Resources, Unrest) next to the zoom cluster. Off: GET /api/citizen sends flags.mapOverlays false and nothing renders. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_MAP_OVERLAYS_ENABLED": "false",
+    // #741: Kindle civic rank ladder (Resident → Leading Citizen; an honor, no office or vote weight). Off: GET /api/citizen/civic-rank is 404, /api/citizen sends no civicRank and kindle-7-rank is unavailable. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_CIVIC_RANK_ENABLED": "false",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
@@ -131,6 +139,8 @@
     "HARIMU_LEDGER_RECONCILIATION_ENABLED": "false",
     // #614: read-only admin AI cost dashboard (GET /api/admin/ai-costs, JSON only). "false" in preview too (ARC exception): it needs the HARIMU_ADMIN_TOKEN Worker secret, set in the dashboard, never in this file.
     "HARIMU_AI_COST_DASHBOARD_ENABLED": "false",
+    // #753: staff AI review queue (docs §21.4): filter-failed Notable replies plus a ~1% sample of passing ones; admin list at /api/admin/ai-review-queue behind HARIMU_ADMIN_TOKEN.
+    "HARIMU_AI_REVIEW_QUEUE_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",

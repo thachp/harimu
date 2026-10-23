@@ -11,6 +11,7 @@
  *  (#79) The color-blind-safe nation symbol chips, flag on and off (scripts/nation-symbols-check.mjs).
  *  (#392 S4) The zoom rail (scripts/ui-v2-rail-check.mjs).
  *  (#392 S6) The Nation panel (scripts/ui-v2-nation-check.mjs).
+ *  (#779) Nation fact-list labels never split mid-word (scripts/nation-fact-label-check.mjs).
  *  (#392 S5) World crest chips (scripts/ui-v2-world-check.mjs).
  *  (#392 S3) The UI v2 panel shape, World and City (scripts/ui-v2-panel-check.mjs).
  *  (#392 S1) The nation crest in the inspector header, flag on and off, all ten nations (scripts/nation-crests-check.mjs).
@@ -31,6 +32,7 @@ import { checkDevelopmentPreviewNote } from './hud-preview-note-check.mjs';
 import { checkNationSymbols } from './nation-symbols-check.mjs';
 import { checkNationCrests } from './nation-crests-check.mjs';
 import { checkUiV2Panel } from './ui-v2-panel-check.mjs';
+import { checkNationFactLabels } from './nation-fact-label-check.mjs';
 import { checkUiV2World } from './ui-v2-world-check.mjs';
 import { checkUiV2Nation } from './ui-v2-nation-check.mjs';
 import { checkUiV2Rail } from './ui-v2-rail-check.mjs';
@@ -195,6 +197,7 @@ try {
   await checkNationSymbols({ browser, css, preflight, failures, rows }); // #79: nation symbol chips on the strip, comparison table and globe labels
   await checkNationCrests({ browser, css, preflight, failures, rows }); // #392 S1: nation crest in the inspector header (flag on and off)
   await checkUiV2Panel({ browser, css, preflight, failures, rows }); // #392 S3: panel shape in the World and City side panel
+  await checkNationFactLabels({ browser, css, preflight, failures, rows }); // #779: fact labels never split mid-word
   await checkUiV2World({ browser, css, preflight, failures, rows }); // #392 S5: crest chips in the World nation strip
   await checkUiV2Nation({ browser, css, preflight, failures, rows }); // #392 S6: Nation panel shape, institution rows, Explore {nation}
   await checkUiV2Rail({ browser, css, preflight, failures, rows }); // #392 S4: zoom rail beside the stage, places-only top tabs
