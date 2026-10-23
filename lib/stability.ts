@@ -26,6 +26,8 @@ export type StabilityInputs = {
  festivalHoliday?: 1;
  /** #423: Unrest points the nation's active wars have added (war weariness, lib/war-rules.ts), only while HARIMU_WAR_WEARINESS_ENABLED is on. Absent when zero. */
  warWeariness?: number;
+ /** #739/#822: 1 when Dormant citizens were excluded (dormancy flag on, live tick). Absent otherwise, so flag-off inputs_json is unchanged. */
+ activeOnly?: 1;
 };
 export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war';
 export type ScoreTerm = {input: StabilityInputId; points: number; detail: string};
@@ -61,7 +63,8 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
  const rawWork = workTerms(i.worked, i.citizens);
  const food = foodTerms(i.fed, i.citizens), work = holiday ? {...rawWork, stability: Math.max(0, rawWork.stability), unrest: 0} : rawWork, promise = promiseTerms(i.promisesKept, i.promisesBroken), petitions = petitionTerms(i.petitionBacklog, i.citizens);
  // #815 (QA1 nit): with no counted citizens (none at all, or every one Dormant, #739) the shares are the neutral 50, so the copy says so instead of a made-up 50%.
- const none = i.citizens === 0, noneDetail = 'No active citizens: neutral score';
+ // #822 (QA1): only on the live dormancy path; flag off keeps the exact previous copy (and breakdown_json) even for a nation with zero citizens.
+ const none = raw.activeOnly === 1 && i.citizens === 0, noneDetail = 'No active citizens: neutral score';
  const foodDetail = none ? noneDetail : `${food.coverage}% of citizens ate in the last 24 real hours`, workDetail = (none ? noneDetail : `${work.share}% worked a shift in the last 24 real hours`)+(holiday?' (public holiday: one fewer shift expected, a shortfall is not counted)':'');
  const promiseDetail = promise.rate === null ? 'No petition reviews in the last 7 real days' : `${promise.rate}% of reviewed petitions were accepted in the last 7 real days`;
  const petitionDetail = `${i.petitionBacklog} petitions awaiting review (${petitions.share} per 100 citizens)`;
@@ -106,7 +109,7 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
  // #291: the caller (world tick, only while HARIMU_FAITH_ENABLED is on) names the nations whose game day is an endorsed festival holiday (lib/festivals.ts).
  const holiday = options.holidayNations?.has(nationId) ?? false;
  const war = Math.floor(Number(options.warWeariness?.[nationId] ?? 0)); // #423: precomputed by the world tick from the wars table (lib/war-weariness.ts)
- return {citizens: Number(row?.citizens ?? 0), fed: Number(row?.fed ?? 0), worked: Number(row?.worked ?? 0), promisesKept: Number(row?.kept ?? 0), promisesBroken: Number(row?.broken ?? 0), petitionBacklog: Number(row?.backlog ?? 0), ...(holiday ? {festivalHoliday: 1 as const} : {}), ...(war > 0 ? {warWeariness: war} : {})};
+ return {citizens: Number(row?.citizens ?? 0), fed: Number(row?.fed ?? 0), worked: Number(row?.worked ?? 0), promisesKept: Number(row?.kept ?? 0), promisesBroken: Number(row?.broken ?? 0), petitionBacklog: Number(row?.backlog ?? 0), ...(holiday ? {festivalHoliday: 1 as const} : {}), ...(war > 0 ? {warWeariness: war} : {}), ...(options.dormantBefore ? {activeOnly: 1 as const} : {})};
 }
 
 /** Statements that record one game day's scores. INSERT OR IGNORE makes retries no-ops. */
