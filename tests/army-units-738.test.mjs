@@ -30,7 +30,7 @@ test('card copy (QA3 on #793): member count label from army-copy, neutral failur
   for (const action of ['leave', 'stance']) { const note = armyFailureNote(action, 'Kindle Home Guard', 'You are not in a unit.'); assert.equal(note, unitMembership.actionFailed.text.replace('{reason}', 'You are not in a unit.')); assert.doesNotMatch(note, /join/i, action); }
   assert.match(card, /armyFailureNote\(/); assert.doesNotMatch(card, /notEligible/, 'the card never picks the join template itself');
   assert.match(card, /!unit\.openToVolunteers \? <p>\{unitMembership\.notOpenYet\.text\}<\/p> : <button/, 'Korund/Aurelle see the not-open-yet copy, no Join button');
-  const page = readFileSync('app/page.tsx', 'utf8'); assert.match(page, /<FoundingBanner [^\n]*\/>\s*<ArmyCard \/>/, 'mounted after FoundingBanner (siege-panel-620 pin)');
+  const page = readFileSync('app/page.tsx', 'utf8'); assert.match(page, /<GovernmentPanel [^\n]*\/>\s*<ArmyCard \/>/, 'mounted after GovernmentPanel (siege-panel-620 and founding-period-ui-612 pins)');
 });
 
 for (const backend of ['sqlite', 'postgres']) {
