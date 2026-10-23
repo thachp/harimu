@@ -115,6 +115,15 @@ export const savingsShieldCreditsSchema = `CREATE TABLE IF NOT EXISTS savings_sh
  status TEXT NOT NULL CHECK(status IN ('paid', 'skipped')), reason TEXT NOT NULL,
  CHECK((status = 'paid') = (credit_minor > 0))
 )`;
+/** #863 Kindle campaign donations: one row per donation; netted by walletViewSql (citizen debit) and summed per party (party-account credit, lib/party-donations.ts). */
+export const partyDonationsSchema = `CREATE TABLE IF NOT EXISTS party_donations (
+ request_id TEXT PRIMARY KEY,
+ clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+ party_id TEXT NOT NULL,
+ amount_minor INTEGER NOT NULL CHECK(typeof(amount_minor) = 'integer' AND amount_minor > 0),
+ week INTEGER NOT NULL, donated_at INTEGER NOT NULL
+)`;
+export const partyDonationsIndex = `CREATE INDEX IF NOT EXISTS idx_party_donations_user ON party_donations(clerk_user_id, party_id, week)`;
 export const marketSchemas = [marketGoodsSchema, marketOrdersSchema, marketCancellationsSchema, marketTradesSchema, ...marketIndexes, marketSpoilageSchema, ...marketSpoilageIndexes, marketOpenOrdersView];
 export const marketGoodsSeedSql = marketGoods.map(g =>
   `INSERT OR IGNORE INTO market_goods (good, label, unit, perishable, shelf_life_days) VALUES ('${g.good}', '${g.label}', '${g.unit}', ${g.perishable ? 1 : 0}, ${g.shelfLifeDays ?? 'NULL'})`);
