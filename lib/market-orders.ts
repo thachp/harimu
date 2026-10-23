@@ -102,6 +102,13 @@ export const marketSalesTaxSchema = `CREATE TABLE IF NOT EXISTS market_sales_tax
   tax_minor INTEGER NOT NULL CHECK(typeof(tax_minor) = 'integer' AND tax_minor > 0),
   charged_at INTEGER NOT NULL
 )`;
+/** #844 follow-up: the same tax on fixed-lot listing sales (player_fills), one row per taxed fill. */
+export const playerFillSalesTaxSchema = `CREATE TABLE IF NOT EXISTS player_fill_sales_tax (
+  request_id TEXT PRIMARY KEY REFERENCES player_fills(request_id) ON DELETE CASCADE,
+  seller_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+  tax_minor INTEGER NOT NULL CHECK(typeof(tax_minor) = 'integer' AND tax_minor > 0),
+  charged_at INTEGER NOT NULL
+)`;
 /** #781 home-move fee sink (one row per move; currency SPK or LN). Netted by walletViewSql (SPK) and lib/korund-wallet (LN). */
 export const homeCityMovesSchema = `CREATE TABLE IF NOT EXISTS home_city_moves (
  request_id TEXT PRIMARY KEY,

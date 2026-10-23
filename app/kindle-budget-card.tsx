@@ -28,6 +28,7 @@ export function KindleBudgetView({ budget }: { budget: KindleBudget }) {
     <dl>
       <dt>Treasury balance</dt><dd>{spk(budget.treasuryMinor)}</dd>
       <dt>Income tax collected this game day</dt><dd>{spk(budget.todayTaxMinor)}</dd>
+      {budget.salesTaxTodayMinor !== undefined ? <><dt>Sales tax today</dt><dd>{spk(budget.salesTaxTodayMinor)}</dd></> : null}
       <dt>Income tax rate</dt><dd>{budget.ratePercent > 0 ? `${budget.ratePercent}% (${budget.rateSource})` : 'Not collected'}</dd>
     </dl>
     <h4>Spending</h4>

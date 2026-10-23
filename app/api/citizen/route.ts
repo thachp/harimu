@@ -13,6 +13,7 @@ import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
+import { kindleSalesTaxEnabled, playerFillSalesTaxSql } from '@/lib/kindle-sales-tax'; // #844 follow-up
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
@@ -27,11 +28,12 @@ import { readCivicRank } from '@/lib/civic-rank';
 import { civicRankFlagOn } from '@/lib/civic-rank-rules';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { env } from 'cloudflare:workers';
+import { armyMapEnabled } from '@/lib/army-map'; // #738 slice 4
 import { getDatabase } from '@/lib/db';
 import { travelBlock } from '@/lib/travel';
 import { availableWith, checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
 import { qaTestCitizenAllowed, qaTestNationSql } from '@/lib/qa-tools';
-import { nationPlayable } from '@/lib/nation-openings'; // #485, #489
+import { liveNations, nationPlayable, playableNationIds } from '@/lib/nation-openings'; // #485, #489, #872
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
@@ -217,7 +219,9 @@ export async function GET(request: Request) {
   ]);
   if (profile && capacity) profile.capacity = capacity.capacity;
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
-  return privateJson({
+  // #872 (ARC ruling): nations this account may play here beyond the live three (nationPlayable, never a flag alone). Absent when none: production and the public unchanged.
+  const playable = playableNationIds(env as never, userId), flagPlayable = playable.some(id => !(liveNations as readonly string[]).includes(id));
+  return privateJson({ ...(flagPlayable ? { openNations: playable } : {}),
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountElectionId}:{})}:null,
     collectivePetitions,
@@ -226,7 +230,7 @@ export async function GET(request: Request) {
     ...(() => { const board = confluencePriceBoard(profile?.nation_id, userId, env as never); return board ? { confluencePriceBoard: board } : {}; })(), // #487: pure, no query
     firstWeek,
     ...(civicRank ? { civicRank } : {}), // #741: Kindle only, flag on only
-    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true', mapOverlays: (env as unknown as { HARIMU_MAP_OVERLAYS_ENABLED?: string }).HARIMU_MAP_OVERLAYS_ENABLED === 'true', ...(civicRankOn ? { civicRank: true } : {}), ...((env as unknown as { HARIMU_KINDLE_BUDGET_VIEW_ENABLED?: string }).HARIMU_KINDLE_BUDGET_VIEW_ENABLED === 'true' ? { kindleBudget: true } : {}) }, // #811: flag off adds nothing // #82: the Overlays group renders only while this is true; // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
+    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true', mapOverlays: (env as unknown as { HARIMU_MAP_OVERLAYS_ENABLED?: string }).HARIMU_MAP_OVERLAYS_ENABLED === 'true', ...(armyMapEnabled(env) ? { armyMap: true } : {}), /* #738 slice 4: only when on, like civicRank */ ...(civicRankOn ? { civicRank: true } : {}), ...((env as unknown as { HARIMU_KINDLE_BUDGET_VIEW_ENABLED?: string }).HARIMU_KINDLE_BUDGET_VIEW_ENABLED === 'true' ? { kindleBudget: true } : {}) }, // #811: flag off adds nothing // #82: the Overlays group renders only while this is true; // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
     simulation,
     verification,
     economy,
@@ -366,7 +370,7 @@ async function handlePost(request: Request) {
   if (body.action === 'create-listing' || body.action === 'buy-listing' || body.action === 'cancel-listing') {
     if (!validPlayerCommand(body)) return privateJson({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: typeof body.listingId === 'string' ? body.listingId.toLowerCase() : undefined };
-    const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000));
+    const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), kindleSalesTaxEnabled(env as never) ? { salesTaxSql: playerFillSalesTaxSql } : {}); // #844 follow-up
     return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),
       playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
   }

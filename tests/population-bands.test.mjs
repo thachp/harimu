@@ -66,10 +66,10 @@ test('#212 rendered /api/world output: bands only, no enrollment counts; preview
 test('strip and preview panel show the band as text; pioneer note is a keyboard-reachable disclosure', async () => {
   const page=await readFile(new URL('../app/page.tsx',import.meta.url),'utf8');
   const shell=await readFile(new URL('../app/game-shell.tsx',import.meta.url),'utf8');
-  assert.match(page,/badge: nation\.populationBand && populationBandLabel\[nation\.populationBand\]/);
+  assert.match(page,/badge: nation\.populationBand && !\(nation\.populationBand === 'coming-soon' && openNations\?\.includes\(nation\.id\)\) \? populationBandLabel\[nation\.populationBand\]/);
   assert.match(shell,/item\.badge && <small className="population-band-badge" data-band=\{item\.badge\}>\{item\.badge\}<\/small>/);
   // #392 S3: the band <dd> is built in page.tsx and placed under its Population label by app/scene-panels-v2.tsx (flag off: facts list; flag on: stats row)
-  assert.match(page,/const populationFact = selected\.populationBand \? <dd className="population-band" data-band=\{selected\.populationBand\}>\{populationBandLabel\[selected\.populationBand\]\}<\/dd> : null;/);
+  assert.match(page,/const populationFact = selected\.populationBand && !\(selected\.populationBand === 'coming-soon' && openNations\?\.includes\(selected\.id\)\) \? <dd className="population-band" data-band=\{selected\.populationBand\}>\{populationBandLabel\[selected\.populationBand\]\}<\/dd> : null;/);
   const panels=await readFile(new URL('../app/scene-panels-v2.tsx',import.meta.url),'utf8');
   assert.match(panels,/\{population && <><dt>Population<\/dt>\{population\}<\/>\}/);
   assert.match(panels,/population \? \[\{ label: 'Population', value: population \}\]/);
@@ -79,5 +79,5 @@ test('strip and preview panel show the band as text; pioneer note is a keyboard-
   assert.match(css,/\.pioneer-note>summary:focus-visible\{outline:2px solid/);
   assert.match(css,/\.population-band-badge\{[^}]*font-size:calc\(12px \* var\(--text-scale, 1\)\)/,'#212 badge is at least 12px and scales');
   assert.doesNotMatch(css,/\.population-band-badge\{[^}]*font-size:calc\(1[01]px/);
-  assert.match(shell,/nationIsPreview\(item\.id\) && item\.badge !== 'Coming soon'/,'no double Preview + Coming soon badge');
+  assert.match(shell,/nationIsPreview\(item\.id, openNations\) && item\.badge !== 'Coming soon'/,'no double Preview + Coming soon badge');
 });

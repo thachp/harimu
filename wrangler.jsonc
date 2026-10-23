@@ -70,7 +70,7 @@
     "HARIMU_KORUND_SHORTFALL_ENABLED": "true",
     // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
     "HARIMU_SAVINGS_SHIELD_ENABLED": "true",
-    // #844: Kindle sales tax: each fill on Kindle's goods market (any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migration 0081). Off: no row written, no tax query.
+    // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
     // #781: move your home city within your own nation for a fee of 10 units of the nation's wallet currency (SPK Kindle, LN Korund; no wallet currency: not_open_yet), once per 7 real days (POST /api/city/home). Off: 404 before auth, no read or write; home stays the capital.
     "HARIMU_HOME_CITY_MOVE_ENABLED": "true",
@@ -117,6 +117,8 @@
     "HARIMU_RELIGIOUS_HARMONY_ENABLED": "true",
     // #738 slice 2: army drills: one drill per member per game day; current members' drills and shifts raise unit strength and morale on the card. Needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED too. Off: POST /api/army/drill is 404 and /api/army has no strength or morale. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMY_DRILLS_ENABLED": "true",
+    // #738 slice 4: army units on the map: the "Army positions" overlay shows each unit at its capital, or marching toward the enemy capital in a war its nation declared. Needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED too. Off: GET /api/army/positions is 404 and the overlay stays "Not available yet". Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_ARMY_MAP_ENABLED": "true",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
