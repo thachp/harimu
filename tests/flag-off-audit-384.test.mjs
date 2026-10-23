@@ -84,6 +84,7 @@ const flagOffPins = {
   HARIMU_WAR_WEARINESS_LOSSES_ENABLED: 'war-weariness-losses-495.test.mjs',
   HARIMU_WAR_DECLARATION_LIMITS_ENABLED: 'war-limits.test.mjs',
   HARIMU_WAR_ASSEMBLY_ENABLED: 'war-assembly-427.test.mjs',
+  HARIMU_WAR_LOSS_CAP_ENABLED: 'war-loss-cap-912.test.mjs',
   HARIMU_WAR_ENDINGS_ENABLED: 'war-endings-427.test.mjs',
   HARIMU_DIPLOMACY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_EMBARGO_ENABLED: 'embargo.test.mjs',
