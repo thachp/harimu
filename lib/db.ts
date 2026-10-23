@@ -49,6 +49,7 @@ import { pollingSchemas } from './polling'; // #740
 import { plankVoteSchemas } from './plank-votes'; // #831
 import { armySchemas, armyDrillSchemas } from './army'; // #738
 import { conscriptionSchemas, conscriptStayColumn } from './army-conscription'; // #738 slice 3
+import { holySiteSchemas } from './holy-sites'; // #855
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
 import { townHallSchemas } from './town-hall'; // #441
@@ -255,6 +256,7 @@ async function initialize(database: GameDatabase) {
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...conscriptionSchemas.map(sql=>database.prepare(sql)), // #738 slice 3
+    ...holySiteSchemas.map(sql=>database.prepare(sql)), // #855
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),

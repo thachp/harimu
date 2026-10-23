@@ -14,7 +14,7 @@ import { runAurelleCoup } from './aurelle-coup';
 import { runKorundPresidium } from './korund-presidium';
 import { runNpcSupply } from './npc-supply';
 import { readPublicWeariness, readWarWeariness, type PublicWeariness } from './war-weariness'; // #423
-import { holidayNationsOn } from './festivals';
+import { festivalStance, holidayNationsOn } from './festivals';
 import { readHarmonyScores } from './religious-harmony';
 import { readWars, type WarState } from './war'; // #309
 import { readSiegeSnapshot, type SiegeSnapshotItem } from './siege-actions'; // #620
@@ -157,7 +157,7 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       const holidays = options.faithFestivals ? holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds) : undefined;
       // QA3 on #854: Harmony (one query for all nations) is read alongside war weariness, so it adds no sequential round trip when both are on.
       const [weariness, harmony] = await Promise.all([options.warWeariness ? readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined,
-        options.religiousHarmony ? readHarmonyScores(db,Number(row.scheduled_at),holidays) : undefined]);
+        options.religiousHarmony ? readHarmonyScores(db,Number(row.scheduled_at),holidays,festivalStance) : undefined]);
       return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(harmony?{harmony}:{}),...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
     });
     if (statements.length) await db.batch(statements.flat());
