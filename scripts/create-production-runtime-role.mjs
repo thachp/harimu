@@ -12,9 +12,11 @@ export const ledgerTables = ['schema_migrations', 'harimu_storage_migrations', '
 
 export async function roleGrantSql(db, role = runtimeRole) {
   const present = new Set((await db.query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename = ANY($1)", [ledgerTables])).rows.map(r => r.tablename));
+  const missing = ledgerTables.filter(t => !present.has(t)); // QA3: a ledger created after the role would inherit the default write grants
+  if (missing.length) throw new Error(`Refusing: every migration ledger must exist before the runtime role is created; missing: ${missing.join(', ')}.`);
   return [
     ...runtimeRoleGrantSql(role).filter(sql => !/ FROM PUBLIC$/.test(sql)),
-    ...ledgerTables.filter(t => present.has(t)).map(t => `REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ${t} FROM ${role}`),
+    ...ledgerTables.map(t => `REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ${t} FROM ${role}`),
     `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${role}`,
     `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO ${role}`,
   ];
@@ -37,10 +39,11 @@ export async function roleProblems(db) {
 
 export async function createRuntimeRole(admin, password, { role = runtimeRole, log = console.log } = {}) {
   if (!/^[A-Za-z0-9]{24,}$/.test(password ?? '')) throw new Error('PRODUCTION_RUNTIME_ROLE_PASSWORD must be at least 24 letters or digits.');
+  const grants = await roleGrantSql(admin, role); // refuses before any role change when a ledger is missing
   const exists = (await admin.query('SELECT 1 FROM pg_roles WHERE rolname=$1', [role])).rows.length > 0;
   await admin.query(`${exists ? 'ALTER' : 'CREATE'} ROLE ${role} WITH ${roleAttributes} PASSWORD '${password}'`);
   log(exists ? `Role ${role} existed: attributes and password reset.` : `Role ${role} created.`);
-  for (const sql of await roleGrantSql(admin, role)) { await admin.query(sql); log(`ok: ${sql}`); }
+  for (const sql of grants) { await admin.query(sql); log(`ok: ${sql}`); }
 }
 
 async function main(env = process.env) {
