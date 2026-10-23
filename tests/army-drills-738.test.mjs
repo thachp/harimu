@@ -91,6 +91,17 @@ for (const backend of ['sqlite', 'postgres']) {
     r.setNow(r.now + 1000); await join('alice'); assert.equal((await read('bob')).strength, 20, 'old drills do not count after rejoining');
   });
 
+  test(`${backend}: ARC on #836: a shift settled before joining adds nothing; one settled after joining adds 1`, async t => {
+    const { r, join, read } = await world(t, backend);
+    const order = (await r.db.prepare('SELECT id FROM work_orders LIMIT 1').first()).id;
+    const settle = (sid, atMs) => { const at = new Date(atMs).toISOString(); return r.db.batch([r.db.prepare('INSERT INTO work_shifts VALUES (?,?,?,?,?,?,?,?,?)').bind(sid, 'alice', order, 'Fixture shift', 'fixture', 4, at, at, at),
+      r.db.prepare('INSERT INTO shift_settlements (shift_id, clerk_user_id, wage_minor, item, quantity, settled_at) VALUES (?,?,?,?,?,?)').bind(sid, 'alice', 800, 'food', 0, at)]); };
+    await settle('vet-1', r.now - 60_000); // a veteran's shift, inside the window but before joining
+    await join('alice'); assert.equal((await read('alice')).strength, 10, 'pre-join shift adds nothing');
+    r.setNow(r.now + 60_000); await settle('new-1', r.now);
+    assert.equal((await read('alice')).strength, 11, 'post-join shift adds 1');
+  });
+
   test(`${backend}: concurrency: the same request id twice and two ids on one game day each pay once; only the winning insert reports replayed false`, async t => {
     const { r, join, drill } = await world(t, backend); await join('alice');
     const id = rid(), same = await Promise.all([drill('alice', id), drill('alice', id)]);

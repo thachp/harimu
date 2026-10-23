@@ -21,8 +21,8 @@ export const armiesEnabled = (env: unknown) => { const e = (env ?? {}) as { HARI
 export const armyDrillsEnabled = (env: unknown) => armiesEnabled(env) && (env as { HARIMU_ARMY_DRILLS_ENABLED?: string }).HARIMU_ARMY_DRILLS_ENABLED === 'true';
 /** A game day is 2 real hours (12x clock; the same length as gray-market GAME_DAY_SECONDS, pinned by a test). */
 export const ARMY_GAME_DAY_SECONDS = 7200;
-/** [ASSUMPTION] Participation counts over the last 7 game days. Strength = 10 per member + 3 per drill + 1 per settled shift by current
- *  members in the window. Morale = 50 + 50 × (share of members who drilled in the window), so 50 to 100. The docs give no figures. */
+/** ARC rulings (Oct 23) on #836: participation counts over the last 7 game days. Strength = 10 per member + 3 per drill + 1 per shift
+ *  settled after the member joined, in the window. Morale = 50 + 50 × (share of members who drilled in the window), so 50 to 100. The docs give no figures. */
 export const armyParticipation = { windowDays: 7, perMember: 10, perDrill: 3, perShift: 1, moraleBase: 50, moraleSpan: 50 } as const;
 export function unitStrength(members: number, drills: number, shifts: number) {
   const p = armyParticipation; return Math.max(0, members) * p.perMember + Math.max(0, drills) * p.perDrill + Math.max(0, shifts) * p.perShift;
