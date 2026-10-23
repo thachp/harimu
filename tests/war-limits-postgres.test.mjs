@@ -5,7 +5,7 @@
  *  Runs only with a real server: set HARIMU_TEST_POSTGRES_URL to an admin URL (it CREATEs and DROPs a scratch database), e.g.
  *    docker run -d --rm --name pg575 -e POSTGRES_PASSWORD=pw -p 127.0.0.1:55432:5432 postgres:16
  *    HARIMU_TEST_POSTGRES_URL=postgres://postgres:pw@127.0.0.1:55432/postgres node --experimental-strip-types --test --test-concurrency=1 tests/war-limits-postgres.test.mjs
- *  CI does not provide a Postgres service, so those tests are skipped there: CI proves the adapter lock is taken, a real server proves what it does. */
+ *  CI's postgres-tests job provides a postgres:17 service and sets this URL (#915), so both run there. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
