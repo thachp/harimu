@@ -17,7 +17,14 @@ export function HomeMoveCard({ nationId, currentCityId, homeCityId }: { nationId
   const [note, setNote] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [now, setNow] = useState<number | null>(null); // read the clock in an effect, never during render (react-hooks/purity)
-  useEffect(() => { const tick = () => setNow(Date.now() / 1000); const first = setTimeout(tick, 0), t = setInterval(tick, 60000); return () => { clearTimeout(first); clearInterval(t); }; }, [info?.nextMoveAt]);
+  useEffect(() => {
+    // No interval: read the clock once, and only while a cooldown is pending, wake once when it ends (capped at 24 days for setTimeout). Both timers are cleared on unmount.
+    const next = info?.nextMoveAt ?? null;
+    const first = setTimeout(() => setNow(Date.now() / 1000), 0);
+    const wait = next === null ? -1 : next * 1000 - Date.now();
+    const end = wait > 0 ? setTimeout(() => setNow(Date.now() / 1000), Math.min(wait + 1000, 2 ** 31 - 1)) : undefined;
+    return () => { clearTimeout(first); if (end !== undefined) clearTimeout(end); };
+  }, [info?.nextMoveAt]);
   useEffect(() => {
     let live = true;
     void fetch('/api/city/home', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => { if (live) setInfo(d as HomeInfo | null); }).catch(() => undefined);
