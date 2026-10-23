@@ -2,7 +2,7 @@
  * membership, the ballot and the count, and no UI imports this. lib/campaign-copy.ts (#300) already holds the primaries explainer
  * ("Primaries are for party members", AI citizens do not vote), the AI hopeful card and the nominee-announced lines; this module adds
  * only what #341 found missing: join and leave party, "already a member" and "not a member" lines, the ballot chrome (rank-list
- * instructions, submit, locked after submit) and a Republic Wire Service result headline. Canon: harimu-docs politics/elections
+ * instructions, submit, locked after submit) and a Kindle Press result headline. Canon: harimu-docs politics/elections
  * §9.1 (Primaries: "Human party members vote among the AI hopefuls (instant-runoff); AI citizens do not vote in primaries"), §9.4
  * (human citizens join AI parties as members and vote in primaries), MVP Scope Politics row, and the Kindle press voice (#237, Republic
  * Wire Service).
@@ -51,9 +51,9 @@ export const primaryBallotCopy={
  proposal:true,
 } as const;
 
-/** One wire result headline per closed primary (Republic Wire Service). No winner, no counts. */
+/** One wire result headline per closed primary (Kindle Press). No winner, no counts. */
 export const primaryResultCopy={
- byline:{name:'Republic Wire Service',proposal:true},
+ byline:{name:'Kindle Press',proposal:false},
  headline:'{party} has a nominee',
  summary:L('The {party} primary is closed. Members have made their choice.'),
  aiBadge:false,

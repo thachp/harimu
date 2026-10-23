@@ -56,7 +56,7 @@ test('nothing about Suspicion, seizure, checkpoints, police or ration trade; no 
 });
 test('system chrome: no byline, no AI badge, no State Media or press voice; plain, no blame or pressure', () => {
   assert.equal('aiBadge' in C,false); assert.equal('byline' in C,false);
-  for (const t of all()) { assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|Chairman|Crown|AI-generated|Notable|@|!/,t); assert.doesNotMatch(t,/\b(must|hurry|stupid|fool\w*|cheat\w*|punish\w*|illegal|risky)\b/i,t); }
+  for (const t of all()) { assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|Chairman|Crown|AI-generated|Notable|@|!/,t); assert.doesNotMatch(t,/\b(must|hurry|stupid|fool\w*|cheat\w*|punish\w*|illegal|risky)\b/i,t); }
   assert.equal(new Set(all()).size,all().length);
 });
 test('does not repeat the existing gray market copy lines', () => {

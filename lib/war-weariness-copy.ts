@@ -1,7 +1,7 @@
 /** War weariness copy (issue #434, companion to #423; folds in #438's per-nation banner wording and home-front news). Content only: #423
  * owns the weekly Unrest step and the levels, and no UI imports this. Canon: harimu-docs territory-cities-warfare §15.3 (War weariness:
  * every game week at war adds Unrest, more in Kindle, less in Korund, and casualties and lost squares accelerate it), trade-diplomacy
- * §13 (Kindle's AI legislature weighs war-weariness polls), the Kindle, Korund and Aurelle press voices (Republic Wire Service, Korund
+ * §13 (Kindle's AI legislature weighs war-weariness polls), the Kindle, Korund and Aurelle press voices (Kindle Press, Korund
  * State Media, Court Gazette; bylines are checked against lib/press-templates.ts) and ai-leadership (the Crown and the Chairman speak
  * for the state). The docs give only the weekly addition and what speeds it up, so no band, threshold or amount is written, and the
  * relief lines say only that the war adds no more Unrest once it is over (no weariness wording, because they are system lines a Korund citizen sees).
@@ -64,10 +64,10 @@ export const wearinessBanners:Readonly<Record<WearinessNation,Readonly<Record<We
 
 /** Home-front news, one notice per nation and level, in each press voice. Korund (state's own war) and the Crown's decree are badged. */
 export const wearinessNews:readonly WearinessNationNews[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
-  rising:w('kindle-rising','War weariness is rising','Republic Wire Service: war weariness is rising. Citizens ask how long the war must last.'),
-  high:w('kindle-high','Calls to end the war grow','Republic Wire Service: polls show doubt about the war. Officials are weighing the calls to end it.'),
-  severe:w('kindle-severe','The war weighs on the Republic','Republic Wire Service: weariness is severe. Pressure on officials to end the war is hard to ignore.')}},
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,notices:{
+  rising:w('kindle-rising','War weariness is rising','Kindle Press: war weariness is rising. Citizens ask how long the war must last.'),
+  high:w('kindle-high','Calls to end the war grow','Kindle Press: polls show doubt about the war. Officials are weighing the calls to end it.'),
+  severe:w('kindle-severe','The war weighs on the Republic','Kindle Press: weariness is severe. Pressure on officials to end the war is hard to ignore.')}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
   rising:w('korund-rising','Resolve is being tested','Korund State Media reports: the war tests the resolve of Korund. Brigades hold the plan.',true),
   high:w('korund-high','Resolve holds','Korund State Media reports: resolve holds as the war goes on. Order is kept.',true),

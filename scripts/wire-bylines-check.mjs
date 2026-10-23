@@ -51,7 +51,7 @@ const probe = ({ on, byline }) => {
 };
 
 export async function checkWireBylines({ browser, css, preflight, failures, rows }) {
-  const shots = process.env.LAYOUT_SHOTS_DIR, bylines = { kindle: 'Republic Wire Service', korund: 'Korund State Media', aurelle: 'Court Gazette' };
+  const shots = process.env.LAYOUT_SHOTS_DIR, bylines = { kindle: 'Kindle Press', korund: 'Korund State Media', aurelle: 'Court Gazette' };
   for (const flag of ['false', 'true']) {
     const script = await bundleShell(entry, { NEXT_PUBLIC_HARIMU_WIRE_BYLINES: flag }), on = flag === 'true';
     for (const [w, h] of [[1280, 800], [390, 844], [320, 700]]) for (const scale of [1, 1.25, 1.5]) {

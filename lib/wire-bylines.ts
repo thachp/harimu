@@ -1,5 +1,5 @@
 /** Build-time flag NEXT_PUBLIC_HARIMU_WIRE_BYLINES (#243): the nation's press template pack (lib/press-templates.ts, #242/#238/#239) runs as filler
- *  wire stories in the National news edition, each under its in-world wire byline (Republic Wire Service, Korund State Media, Court Gazette).
+ *  wire stories in the National news edition, each under its in-world wire byline (Kindle Press, Korund State Media, Court Gazette).
  *  FILLER ONLY (ARC): the pack shows only while no player paper has published in that nation. "true" in preview, "false" in production;
  *  only the exact string "true" enables it. Import-free (the caller passes lib/press-templates.ts pressPacks), so plain Node tests can load it. */
 import type { PressPack } from './press-templates';

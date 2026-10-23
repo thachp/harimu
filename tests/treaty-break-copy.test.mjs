@@ -75,7 +75,7 @@ test('NAP refusal names the counterpart, says a pact is in force and says no war
   for (const t of lines()) assert.doesNotMatch(t,/\b(Chairman|Crown|Assembly|President|Monarch|clerk|official)\b/,t);
 });
 test('voices: Kindle frank and names the Legitimacy hit; Korund calls its own break a necessary correction; Aurelle cites the Crown\'s honor', () => {
-  assert.match(breakNewsFor('kindle').notices.own.body,/^Republic Wire Service: /); assert.match(breakNewsFor('kindle').notices.other.body,/^Republic Wire Service: /);
+  assert.match(breakNewsFor('kindle').notices.own.body,/^Kindle Press: /); assert.match(breakNewsFor('kindle').notices.other.body,/^Kindle Press: /);
   assert.match(breakNewsFor('korund').notices.own.body,/necessary correction/); assert.equal(breakNewsFor('korund').notices.own.headline,'A necessary correction');
   assert.match(breakNewsFor('korund').notices.own.body,/^Korund State Media reports: /); assert.match(breakNewsFor('korund').notices.other.body,/^Korund State Media reports: /);
   assert.match(breakNewsFor('aurelle').notices.own.body,/honor of the realm/); assert.match(breakNewsFor('aurelle').notices.other.body,/^The Court Gazette reports that /);

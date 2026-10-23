@@ -3,7 +3,7 @@
  * forbids all trade with a target; targeted sanctions ban specific goods or named officials, freezing their foreign assets and
  * exchange access; sanctions also hurt the sanctioning economy through lost exports), §13.3.1 (a bilateral embargo stops
  * Clearing House netting between the pair), §13.1 (every negotiator and ratifying body is an AI), MVP Scope Diplomacy row
- * ("embargo"), and the three press voices: Kindle (#237, Republic Wire Service), Korund State Media (#238/#244) and the
+ * ("embargo"), and the three press voices: Kindle (#237, Kindle Press), Korund State Media (#238/#244) and the
  * Aurelle Court Gazette (#239). Bylines match lib/press-templates.ts, as in lib/diplomacy-copy.ts.
  *
  * Rules: no invented figures: no tariff percentages, reserve amounts, street rates, durations or trade volumes. A duration is shown
@@ -65,7 +65,7 @@ export const targetedSanctions={
 /** Press: a fixed headline and one report per event in each nation's voice, with {actor} and {target}. Aurelle also has Crown lines
  * for when the Crown itself acts; they use {target} only and are AI-badged. */
 export const embargoPress:readonly EmbargoPress[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,
   headline:{imposed:'A trade embargo is imposed',lifted:'A trade embargo is lifted'},
   report:{imposed:P('Embargo: {actor} ends all trade with {target}.'),lifted:P('Lifted: {actor} reopens trade with {target}.')}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,

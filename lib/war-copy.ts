@@ -46,7 +46,7 @@ const n=(id:string,headline:string,body:string,bodyNoGrievance:string,aiBadge=fa
 
 /** Declaration notices in each nation's own voice. Mobilization is 48 real hours before any attack (docs §15.3). */
 export const declarationNotices:readonly WarNationNotices[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,notices:{
   ours:n('kindle-ours','{attacker} declares war',
    'War on {defender}, citing {casusBelli}. Nothing can happen for 48 real hours. Officials must say why.',
    'War on {defender}, with no grievance given. Nothing can happen for 48 real hours. Officials must say why.'),
@@ -85,7 +85,7 @@ export type MobilizationEndedNotice={id:string;headline:string;body:string;aiBad
 export type MobilizationEndedNotices={nationId:WarNation;byline:{name:string;proposal:boolean};notices:Readonly<Record<DeclarationSide,MobilizationEndedNotice>>;proposal:true};
 const m=(id:string,headline:string,body:string,aiBadge=false):MobilizationEndedNotice=>({id,headline,body,aiBadge,proposal:true});
 export const mobilizationEndedNotices:readonly MobilizationEndedNotices[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,notices:{
   ours:m('kindle-end-ours','Mobilization is over','The 48 real hours are up. The war on {defender} is active. Officials must say what comes next.'),
   'against-us':m('kindle-end-against-us','The war on the Republic is active','{attacker}\'s 48 real hours are up. The war is active. Assaults on cities and forts resolve only in our defense window.'),
   world:m('kindle-end-world','A war is now active','{attacker} and {defender} have finished mobilizing. The war is active.')}},

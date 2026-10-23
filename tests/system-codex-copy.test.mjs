@@ -44,7 +44,7 @@ test('figures: none; no digits, number words or numeric weights', () => {
   for (const t of all()) assert.doesNotMatch(t,/\d|%|percent|\b(two|three|four|five|six|seven|ten|twice|half)\b|\b(weights?|thresholds?)\b/i,t);
 });
 test('neutral voice: no nation press voice, byline or AI voice, no marketing or judgment words, and no badge field', () => {
-  for (const t of all()) assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|by royal decree\.|\b(best|worst|ideal|perfect|tyran\w*|dictator\w*|oppress\w*|regime|utopi\w*|villain\w*|evil|superior|inferior|glorious|great)\b/i,t);
+  for (const t of all()) assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|by royal decree\.|\b(best|worst|ideal|perfect|tyran\w*|dictator\w*|oppress\w*|regime|utopi\w*|villain\w*|evil|superior|inferior|glorious|great)\b/i,t);
   for (const o of [HD,...SC]) assert.equal('aiBadge' in o,false); for (const n of SC) for (const l of [...n.power,n.goods,n.voice,n.strength,n.weakness]) assert.equal('aiBadge' in l,false);
 });
 test('no real country, people, party or leader: not even the nation pages\' Inspiration rows', () => {

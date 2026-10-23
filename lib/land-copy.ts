@@ -5,7 +5,7 @@
  * owned land can be bought from the World Registry; an Expedition travels to a Wildlands site and on arrival claims a radius-2
  * block; minimum distance between cities is 6 squares; since v0.7 the nation's AI leadership decides: Kindle the AI government,
  * Korund the AI Chairman's order, Aurelle a royal charter, often a new fief) and economy-currency §12.5 (the World Registry is a
- * system-run institution). Bylines match lib/press-templates.ts (Republic Wire Service, Korund State Media, Court Gazette).
+ * system-run institution). Bylines match lib/press-templates.ts (Kindle Press, Korund State Media, Court Gazette).
  *
  * Refusals: one neutral line per reason code that lib/world-registry.ts and lib/city-founding.ts return (the test reads both
  * sources, so a new code fails until it has a line). The founding "too close" and "not Wildlands" refusals also have a line in each
@@ -99,7 +99,7 @@ export const foundingRefusals:Readonly<Record<FoundingReason,Line>>={
 /** Founding in each nation's own voice, reflecting who decides (§15.1, v0.7: the nation's AI leadership). {site} is where the
  * expedition goes, {city} the new city's name. */
 export const landNations:readonly LandNationCopy[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,
   authority:L('The AI government decides where Kindle founds cities.'),
   expeditionDeparts:V('The AI government sends an expedition to {site}.'),
   expeditionArrives:V('The expedition reached {site}. The land is claimed.'),

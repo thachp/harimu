@@ -35,7 +35,7 @@ test('voted: badge shown and no ballot form', () => {
 test('closed: per-district count of human votes only (no AI bloc column), and the wire headlines', () => {
   const result = rules.assemblyResult({ forgehaven: { 'steady-hand': 3, 'open-ledger': 1, 'dockside-builders': 2 } });
   const out = html({ snapshot: { ...base(), status: 'closed', result, headlines: rules.assemblyHeadlines(result) } });
-  assert.ok(out.includes('<th>Human votes</th><th>Seats won</th>')); assert.equal(out.includes('AI bloc'), false); assert.ok(out.includes(copy.resultsCaption.humanVotesOnly.text)); assert.ok(out.includes('Republic Wire Service'));
+  assert.ok(out.includes('<th>Human votes</th><th>Seats won</th>')); assert.equal(out.includes('AI bloc'), false); assert.ok(out.includes(copy.resultsCaption.humanVotesOnly.text)); assert.ok(out.includes('Kindle Press'));
   assert.ok(out.includes('<td>Steady Hand Party</td><td>3</td><td>2</td><td>3</td>'), 'S: 3 human, 2 won, 3 seats now');
   assert.ok(out.includes('No ballots were cast here'), 'uncontested districts say so'); assert.equal(out.includes('Cast ballot'), false);
 });
