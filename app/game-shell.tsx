@@ -128,7 +128,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
     const observer = new ResizeObserver(sync), watched = new Set<Element>();
     const attach = () => { for (const el of root.querySelectorAll('.game-hud, .game-nav-row, .citizen-dock')) if (!watched.has(el)) { watched.add(el); observer.observe(el); } sync(); };
     // Bars that mount later (the citizen dock after signing in on City) or unmount are picked up: a child-list change re-attaches and re-measures.
-    const mutations = new MutationObserver(attach); mutations.observe(root, { childList: true, subtree: true }); attach();
+    const mutations = new MutationObserver(attach); mutations.observe(root, { childList: true }); attach();
     return () => { observer.disconnect(); mutations.disconnect(); };
   }, [mobileV2, view]);
   useEffect(() => { document.getElementById('game-details')?.querySelector('.game-inspector-body')?.scrollTo({top:0,left:0}); }, [view,nation.id]);
