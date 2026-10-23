@@ -57,6 +57,7 @@ const flagOffPins = {
   HARIMU_DIPLOMATIC_HALL_ENABLED: 'diplomatic-hall-599.test.mjs',
   HARIMU_MAP_OVERLAYS_ENABLED: 'map-overlays-82.test.mjs',
   HARIMU_CIVIC_RANK_ENABLED: 'civic-rank-741.test.mjs',
+  HARIMU_ARMIES_ENABLED: 'army-units-738.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
