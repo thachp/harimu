@@ -102,12 +102,13 @@ test('wrangler.prod.jsonc has only full-line // comments (the #633 rule) and par
   assert.equal(prod.name, productionWorker);
 });
 
-test('identity and bindings: own Worker, same account and runtime shape, no D1, no route, no workers.dev', () => {
+test('identity and bindings: own Worker, same account and runtime shape, no D1, only the app.harimu.com custom domain, no workers.dev', () => {
   assert.notEqual(prod.name, preview.name); assert.equal(prod.account_id, preview.account_id, 'same Cloudflare account (Patrick ruling 3)');
   for (const key of ['main', 'compatibility_date', 'compatibility_flags', 'placement', 'triggers', 'ai', 'durable_objects', 'migrations']) assert.deepEqual(prod[key], preview[key], key);
-  for (const key of ['d1_databases', 'routes', 'route', 'kv_namespaces', 'r2_buckets', 'services', 'queues', 'tail_consumers', 'env']) assert.equal(prod[key], undefined, `${key} must not exist on production yet`);
+  assert.deepEqual(prod.routes, [{ pattern: 'app.harimu.com', custom_domain: true }], 'the one custom-domain route');
+  for (const key of ['d1_databases', 'route', 'kv_namespaces', 'r2_buckets', 'services', 'queues', 'tail_consumers', 'env']) assert.equal(prod[key], undefined, `${key} must not exist on production yet`);
   assert.equal(prod.workers_dev, false); assert.equal(prod.preview_urls, false);
-  assert.deepEqual(Object.keys(prod).sort(), Object.keys(preview).filter(key => !previewOnlyTopLevelKeys.includes(key)).sort(), 'no top-level key beyond the preview set (minus the preview-only keys)');
+  assert.deepEqual(Object.keys(prod).filter(key => key !== 'routes').sort(), Object.keys(preview).filter(key => !previewOnlyTopLevelKeys.includes(key)).sort(), 'no top-level key beyond the preview set (minus the preview-only keys)');
 });
 
 test('observability: on in preview only; production carries no observability block', () => {
@@ -160,8 +161,7 @@ test('flag comments copied into wrangler.prod.jsonc equal the preview comments (
 test('Hyperdrive: one binding, id only (no connection string), checked-in id is a detected placeholder', () => {
   assert.equal(prod.hyperdrive.length, 1); assert.deepEqual(Object.keys(prod.hyperdrive[0]).sort(), ['binding', 'id']); assert.equal(prod.hyperdrive[0].binding, 'HYPERDRIVE');
   const previewId = preview.hyperdrive[0].id;
-  assert.match(hyperdriveIdProblem(prod.hyperdrive[0].id), /placeholder/, 'slice c must refuse to deploy with this id');
-  assert.match(prod.hyperdrive[0].id, /^PLACEHOLDER/);
+  assert.equal(prod.hyperdrive[0].id, previewId, 'Patrick Oct 22: production shares preview\'s database and Hyperdrive config');
   assert.equal(hyperdriveIdProblem('0123456789abcdef0123456789abcdef'), null, 'a real-looking id is accepted');
   assert.equal(hyperdriveIdProblem(previewId), null, 'Patrick Oct 15: production may share preview\'s Hyperdrive config for now (a config value only)');
   for (const bad of [undefined, null, '', 'PLACEHOLDER-production-hyperdrive-config-id', 'A1F662C88F3B485190C402D9548AE360', 'abc123', 'a1f662c88f3b485190c402d9548ae36', 'a1f662c88f3b485190c402d9548ae360 ', 42]) assert.match(hyperdriveIdProblem(bad), /placeholder or not a valid/, String(bad));
