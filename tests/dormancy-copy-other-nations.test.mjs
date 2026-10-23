@@ -17,10 +17,10 @@ const fill=t=>t.replaceAll('{daysAway}','x'.repeat(DORMANCY_NAME_MAX)).replaceAl
 test('#773 follow-up: one frame per other nation, shaped like the MVP frames', () => {
   assert.deepEqual(WB.map(w=>w.nationId),[...DORMANCY_OTHER_NATIONS]); assert.equal(WB.length,7);
   for (const w of WB) {
-    assert.equal(welcomeBackOtherFor(w.nationId),w); assert.equal(w.aiBadge,false); assert.equal(w.proposal,true);
+    assert.equal(welcomeBackOtherFor(w.nationId),w); assert.equal(w.aiBadge,false); assert.equal(w.proposal,true); if (w.byline) assert.equal(w.byline.proposal,false,w.byline.name);
     for (const l of [w.greeting,w.news]) { assert.equal(l.proposal,true); assert.ok(fill(l.text).length<=DORMANCY_LINE_MAX,l.text); assert.ok(!/\d/.test(l.text),l.text);
       for (const m of l.text.match(/\{[^}]+\}/g)??[]) assert.ok(DORMANCY_PLACEHOLDERS.includes(m),m);
-      assert.doesNotMatch(l.text,/missed you|penalt|hurry/i); assert.doesNotMatch(l.text,LEADER_VOICE,l.text);
+      assert.doesNotMatch(l.text,/missed you|penalt|hurry/i); assert.doesNotMatch(w.byline?l.text.replace(w.byline.name+':',''):l.text,LEADER_VOICE,l.text); // the canonical byline itself may name a body (Directorate Bulletin, Steamgate Herald)
       if (w.byline) assert.ok(l.text.startsWith(w.byline.name+':'),l.text); }
     assert.match(w.greeting.text,/\{daysAway\}/); assert.match(w.news.text,/\{headlineCount\}/);
   }
