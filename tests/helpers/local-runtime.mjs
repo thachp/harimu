@@ -10,6 +10,8 @@ class Statement {
   constructor(db, sql, params = []) { this.db = db; this.sql = sql; this.params = params; }
   bind(...params) { return new Statement(this.db, this.sql, params); }
   execute() {
+    // As D1's batch does, a SELECT in a batch returns its rows (#679 slice 3: the world clock insert and reads share one batch).
+    if (/^\s*SELECT\b/i.test(this.sql)) return { success: true, results: this.db.sqlite.prepare(this.sql).all(...this.params), meta: { changes: 0 } };
     const result = this.db.sqlite.prepare(this.sql).run(...this.params);
     return { success: true, meta: { changes: result.changes, last_row_id: result.lastInsertRowid } };
   }
