@@ -80,6 +80,8 @@ export const unitMembership={
  // PLACEHOLDER copy, marked for Content (proposal: true): staying in the unit after the term (ARC on #839).
  stayButton:'Stay after my term',
  stayed:L('You will stay in {unit} after your term.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): a refused stay (not a conscript, or the term already ended) (#738 stay-error follow-up).
+ stayRefused:L('You cannot stay in {unit}: you are not serving a term right now.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),
