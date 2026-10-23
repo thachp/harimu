@@ -16,7 +16,7 @@ const entry = `
   const nation = { id: 'kindle', name: 'Kindle Republic', capital: 'Forgehaven', currency: 'Spark', color: '#c7643a' };
   window.mount = (props, dock) => { window.__root?.unmount(); window.__root = createRoot(document.getElementById('root')); const city = props.view === 'square';
     window.__root.render(<GameShell {...props} nation={nation} citizenNation={nation} nations={[nation]} onNavigate={() => {}} onSelectNation={() => {}} onSelect={() => {}} accountControls={null}
-      socialDock={dock ? <nav className="citizen-dock" aria-label="Citizen communications"><button type="button">Chat</button><button type="button">News</button></nav> : null}
+      socialDock={dock ? <nav className="citizen-dock" aria-label="Citizen communications"><button type="button">Chat</button><button type="button">Diplomatic hall</button><button type="button">News</button><button type="button">Civic inbox<strong> · 1 unread</strong></button></nav> : null}
       contextTitle={city ? 'City destinations' : undefined} contextItems={city ? cityDestinations('kindle', true).map(c => ({ ...c, onSelect: () => {} })) : undefined}
       panel={<CitySummary cityName="Forgehaven" city={{ capital: true }} nation={nation} destinations={cityDestinations('kindle', true)} onView={() => {}} />} />); };`;
 
@@ -49,6 +49,9 @@ const probe = ({ on, phone, view, scale }) => {
     if (!sh || getComputedStyle(sh).position !== 'fixed' || Math.abs(shr.bottom - rects.nav.t) > 1) issues.push(`sheet is not fixed on the tab bar (${sh ? `${getComputedStyle(sh).position} ${Math.round(shr.bottom)}` : 'missing'})`);
     const tg = q('#game-details .game-inspector-title button[aria-controls=game-details], #game-reopen'), tr = tg?.getBoundingClientRect();
     if (!tg || !tg.hasAttribute('aria-expanded') || tr.height < 43.5 || tr.width < 43.5) issues.push(`sheet toggle missing, without aria-expanded or under 44px`);
+    for (const b of document.querySelectorAll('.citizen-dock>button')) { const r = b.getBoundingClientRect(); // #838: dock labels wrap, never clip; the dock is never under the tab bar
+      if (b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1) issues.push(`dock "${b.textContent.trim()}" is truncated`); if (r.height < 43.5) issues.push(`dock "${b.textContent.trim()}" is ${Math.round(r.height)}px tall`);
+      const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (t && !b.contains(t)) issues.push(`dock "${b.textContent.trim()}" is covered`); }
     const p = q('.game-inspector'); if (p && parseFloat(getComputedStyle(p).borderTopLeftRadius) < 8) issues.push('panel is not a sheet');
   } else if (phone && rects.stage && rects.nav.t > rects.stage.t) issues.push('flag off: nav row is not above the scene');
   return { issues, names, rects };
@@ -59,7 +62,7 @@ const atEnd = () => { if (!document.querySelector('.game-nav-row')) return []; w
   window.scrollTo(0, 0); return issues; };
 
 // #847: keyboard collapse then expand. The toggle reports aria-expanded, focus moves to the other end, and the scene resizes to the sheet each time.
-const sheetToggle = async page => {
+const sheetToggle = async (page, tight) => { // tight: 320x640 at 150% has no room for the 140px scene minimum under the bars; there the open sheet and the Show-details bar may overlay the map controls
   const state = () => page.evaluate(() => { const g = document.querySelector('.harimu-game'), o = document.querySelector('#game-reopen'), sh = document.querySelector(':is(#game-details, #game-reopen)'), st = document.querySelector('.game-stage');
     return { open: !!document.querySelector('#game-details'), exp: (o ?? document.querySelector('#game-details .game-inspector-title button'))?.getAttribute('aria-expanded'), focus: document.activeElement?.id || document.activeElement?.closest('#game-details') ? (document.activeElement.id || 'in-sheet') : '', h: o?.getBoundingClientRect().height ?? 0,
       gap: Math.round(sh.getBoundingClientRect().top - st.getBoundingClientRect().bottom), sheetVar: g.style.getPropertyValue('--s8-sheet'), sh: Math.round(sh.getBoundingClientRect().height) }; });
@@ -67,7 +70,7 @@ const sheetToggle = async page => {
   await page.focus('#game-details .game-inspector-title button'); await page.keyboard.press('Enter'); await page.waitForTimeout(250);
   let s = await state();
   if (s.open || s.exp !== 'false' || s.focus !== 'game-reopen' || s.h < 43.5) issues.push(`collapse by keyboard: ${JSON.stringify(s)}`);
-  if (s.gap < -1.5) issues.push(`collapsed, the scene still runs ${-s.gap}px under the Show details bar`);
+  if (s.gap < -1.5 && !tight) issues.push(`collapsed, the scene still runs ${-s.gap}px under the Show details bar`);
   if (`${s.sh}px` !== s.sheetVar && Math.abs(parseFloat(s.sheetVar) - s.sh) > 1) issues.push(`collapsed sheet not measured (${s.sheetVar} vs ${s.sh})`);
   await page.keyboard.press('Enter'); await page.waitForTimeout(250); s = await state();
   if (!s.open || s.exp !== 'true' || !s.focus) issues.push(`expand by keyboard: ${JSON.stringify(s)}`);
@@ -90,7 +93,7 @@ export async function checkUiV2Mobile({ browser, css, preflight, failures, rows 
           const main = document.querySelector('.harimu-game'), d = document.createElement('nav'); d.className = 'citizen-dock'; d.style.height = '45px'; main.appendChild(d);
           await new Promise(r => setTimeout(r, 120)); const v = main.style.getPropertyValue('--s8-dock'); d.remove(); await new Promise(r => setTimeout(r, 120));
           return v === '45px' && main.style.getPropertyValue('--s8-dock') === '0px' ? '' : `late dock not measured (--s8-dock ${v})`; }) : '';
-        const toggle = on && phone && view === 'square' ? await sheetToggle(page) : [];
+        const toggle = on && phone && view === 'square' ? await sheetToggle(page, h <= 640 && scale === 1.5) : [];
         const r = await page.evaluate(probe, { on, phone, view, scale }), issues = [...toggle, ...(late ? [late] : []), ...r.issues, ...(on && phone ? await page.evaluate(atEnd) : [])];
         if (!on) base[key] = r; else if (base[key]) {
           if (base[key].names && r.names && base[key].names.join() !== r.names.join()) issues.push(`controls changed: ${r.names.join()} vs ${base[key].names.join()}`);
