@@ -2,6 +2,7 @@ import { aurelleRisingSchemas } from './aurelle-rising';
 import { aurelleCoupSchemas } from './aurelle-coup';
 import { laborBureauSchemas } from './labor-bureau';
 import { grayMarketSchemas } from './gray-market';
+import { graySeizureSchemas } from './gray-seizure';
 import { nationWorkSchemas } from './nation-work'; // #490
 import { presidiumSchemas } from './korund-presidium';
 import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView, marketTradeFeesSchema, marketTradeFeesIndex } from './market-orders';
@@ -257,7 +258,7 @@ async function initialize(database: GameDatabase) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
-    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
+    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...graySeizureSchemas.map(sql => database.prepare(sql)), /* #797 seizure sink (always created; written only with the flag on) */ ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),

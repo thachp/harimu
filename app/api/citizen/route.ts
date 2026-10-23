@@ -71,7 +71,9 @@ const korundShortfallOn = () => (env as unknown as { HARIMU_KORUND_SHORTFALL_ENA
 const walletStreetRateOn = () => (env as unknown as { HARIMU_WALLET_STREET_RATE_ENABLED?: string }).HARIMU_WALLET_STREET_RATE_ENABLED === 'true';
 // #776: a closed-week plan shortfall withdraws ration coupons from this week's book (HARIMU_KORUND_RATION_CUT_ENABLED); off = coupons unchanged.
 const korundRationCutOn = () => (env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string }).HARIMU_KORUND_RATION_CUT_ENABLED === 'true';
-const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn() });
+// #797: gray-market checkpoint seizure of cash bundles, destroyed as a sink (HARIMU_GRAY_SEIZURE_ENABLED); off = no roll, no write, no read.
+const graySeizureOn = () => (env as unknown as { HARIMU_GRAY_SEIZURE_ENABLED?: string }).HARIMU_GRAY_SEIZURE_ENABLED === 'true';
+const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';

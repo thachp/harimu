@@ -62,6 +62,8 @@
     "HARIMU_GRAY_DAILY_CAP_ENABLED": "true",
     // #749: each completed Korund gray-market trade adds private Suspicion (capped per day, never starts Correction Duty). Off: Suspicion from discoveries only.
     "HARIMU_GRAY_SUSPICION_ENABLED": "true",
+    // #797: after an accepted gray-market trade a checkpoint may seize part of the buyer's LN bundle (chance rises with Suspicion, capped; one per game day); seized LN is destroyed. Off: no roll, no write.
+    "HARIMU_GRAY_SEIZURE_ENABLED": "true",
     // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
     "HARIMU_KORUND_MEDALS_ENABLED": "true",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
