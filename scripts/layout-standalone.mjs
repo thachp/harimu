@@ -10,10 +10,21 @@ export async function runStandalone(name, check) {
   const root = new URL('../', import.meta.url);
   const css = (await readFile(new URL('app/globals.css', root), 'utf8')).replace(/@import[^;]+;/g, '') + (await readFile(new URL('app/game-shell.css', root), 'utf8'));
   const preflight = '*,::before,::after{box-sizing:border-box;margin:0;padding:0;border:0 solid}button{background:none;font:inherit;color:inherit}svg{display:block}';
-  const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] }), failures = [], rows = [];
+  const browser = fontsBeforeShots(await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] })), failures = [], rows = [];
   try { await check({ browser, css, preflight, failures, rows }); } finally { await browser.close(); }
   for (const row of rows) console.log(`  ${row}`);
   if (failures.length) { console.error(`${name} check FAILED (${failures.length}):\n${[...new Set(failures)].join('\n')}`); process.exit(1); }
   if (!rows.length) { console.error(`${name} check ran no cases`); process.exit(1); }
   console.log(`${name} check passed: ${rows.length} case(s).`);
+}
+
+/** #905: wait for web fonts before every screenshot. Under Inter, a capture taken before Chromium has loaded the system font comes out with no text.
+ *  Wraps every page the browser opens (browser.newPage and context.newPage), so each check gets this without editing its own capture code. */
+export function fontsBeforeShots(browser) {
+  const wrapPage = page => { const shot = page.screenshot.bind(page); page.screenshot = async options => { await page.evaluate(() => document.fonts.ready); await page.waitForTimeout(300); return shot(options); }; return page; };
+  const wrapContext = context => { const open = context.newPage.bind(context); context.newPage = async () => wrapPage(await open()); return context; };
+  const newContext = browser.newContext.bind(browser), newPage = browser.newPage.bind(browser);
+  browser.newContext = async options => wrapContext(await newContext(options));
+  browser.newPage = async options => wrapPage(await newPage(options));
+  return browser;
 }

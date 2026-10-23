@@ -60,6 +60,7 @@ import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { checkGlobeLabelPressed } from './globe-label-pressed-check.mjs';
 import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
+import { fontsBeforeShots } from './layout-standalone.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
 const root = new URL('../', import.meta.url);
@@ -110,7 +111,7 @@ const preflight = '*,::before,::after{box-sizing:border-box;margin:0;padding:0;b
 const { GameShell } = await load('game-shell');
 const { FaithPanel, HolidayBanner } = await load('faith-panel');
 
-const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] });
+const browser = fontsBeforeShots(await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] })); // #905
 const failures = []; const rows = [];
 try {
   for (const v of variants) {
