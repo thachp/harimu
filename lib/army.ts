@@ -1,4 +1,4 @@
-/** #738 slice 1: army membership reads and commands. Migration 0069 (drizzle/ + db/postgres/) mirrors armySchemas. */
+/** #738 slice 1: army membership reads and commands. Migration 0072 (drizzle/ + db/postgres/) mirrors armySchemas. */
 import type { GameDatabase } from './database-contract';
 import { volunteerNations, defaultStance, unitById, unitForNation, type ArmyCommand } from './army-rules';
 export const armySchemas = [
