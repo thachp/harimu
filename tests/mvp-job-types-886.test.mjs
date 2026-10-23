@@ -15,22 +15,22 @@ test('the eight ARC-approved types, each with a §11.3 family; job ids are uniqu
   for (const job of mvpJobs) assert.ok(mvpJobTypeIds.includes(job.type), job.id);
 });
 
-test('pin: every seeded work order and every Labor Bureau post is in the catalog with one type; playable = seeded work order', async () => {
+test('pin: every seeded work order and every Labor Bureau post is in the catalog with one type; playable = seeded orders, posts and charters', async () => {
   const db = await readFile(new URL('../lib/db.ts', import.meta.url), 'utf8');
   const seeds = db.slice(db.indexOf('const workOrderSeeds = ['), db.indexOf('] as const;', db.indexOf('const workOrderSeeds = [')));
   const seeded = [...seeds.matchAll(/^\s*\['([a-z-]+)', '(kindle|korund|aurelle)'/gm)].map(m => [m[1], m[2]]);
   assert.equal(seeded.length, 8, 'the 8 playable orders the audit counted');
   for (const [id, nation] of seeded) { const job = mvpJobs.find(j => j.id === id); assert.ok(job, id); assert.equal(job.nation, nation); assert.equal(job.status, 'playable', id); }
-  assert.deepEqual(mvpJobs.filter(j => j.status === 'playable').map(j => j.id).sort(), seeded.map(([id]) => id).sort());
+  assert.deepEqual(mvpJobs.filter(j => j.status === 'playable').map(j => j.id).sort(), [...seeded.map(([id]) => id), ...bureauJobs.map(j => j.id).filter(id => id !== 'korund-food-production'), 'aurelle-quarry-charter', 'aurelle-foundry-charter'].sort(), '#886 (b)/(c): posts and charters are playable');
   for (const id of Object.keys(shiftRules)) assert.ok(jobTypeOf(id), `shift rule ${id}`);
   for (const post of bureauJobs) assert.ok(jobTypeOf(post.id), `bureau post ${post.id}`);
   assert.equal(jobTypeOf('nope'), null); assert.equal(jobTypeOf(undefined), null);
 });
 
-test('catalog: today 6 of 8 types are playable; quarrying and foundry wait for #886 (b)/(c); each MVP nation has its approved jobs', () => {
+test('catalog: all 8 types are playable after #886 (b)/(c); each MVP nation has its approved jobs', () => {
   const catalog = jobTypeCatalog();
   assert.deepEqual(catalog.map(t => t.id), [...mvpJobTypeIds]);
-  assert.deepEqual(catalog.filter(t => !t.playable).map(t => t.id), ['quarrying', 'foundry']);
+  assert.deepEqual(catalog.filter(t => !t.playable).map(t => t.id), []); assert.equal(mvpJobs.filter(j => j.status === 'planned').length, 0);
   const of = nation => mvpJobs.filter(j => j.nation === nation).map(j => j.type);
   assert.deepEqual(of('kindle'), ['farming', 'orchard', 'herding', 'forestry', 'freight', 'archive']);
   assert.deepEqual(of('korund'), ['farming', 'quarrying', 'foundry', 'freight', 'archive']);

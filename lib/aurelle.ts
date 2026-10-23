@@ -7,11 +7,24 @@ export const aurelleFoodPriceMinor=150;
 export const aurelleMealFood=2;
 export const aurelleMealCapacity=4;
 export const aurelleMealSeconds=7200;
+/** #886 (c): ARC ruling on #886: Aurelle gets two charter jobs (quarrying, foundry) paid in Crowns from the estate treasury (aurelle_resources 'estate'),
+ *  and every payment writes one Crown issuance record (crown_issuances), the ledger #885's Crown cap will read. Behind HARIMU_MVP_JOB_TYPES_ENABLED: with the flag on,
+ *  aurelle-start-work may name one of these as `jobId`; without it (or with the flag off) the food-estate service runs exactly as before. Migration 0091.
+ *  [ASSUMPTION] (ARC: copy the existing shift values): 4 WC, 2 hours, 800 CRN, like aurelleJob; no estate food and no Royal Favor (those stay with the food estate). */
+export const aurelleCharterJobs={
+ 'aurelle-quarry-charter':{name:'Chartered quarry service',output:'Stone cut under the Highspire quarry charter'},
+ 'aurelle-foundry-charter':{name:'Chartered foundry service',output:'Castings poured under the royal foundry charter'},
+} as const;
+export const aurelleCharterTerms={capacityCost:4,hours:2,wageMinor:800} as const;
+export const isAurelleCharter=(id:unknown):id is keyof typeof aurelleCharterJobs=>typeof id==='string'&&Object.hasOwn(aurelleCharterJobs,id);
+const charterList=Object.keys(aurelleCharterJobs).map(id=>`'${id}'`).join(','); // code constants, never user input
 export const aurelleSchemas=[
  `CREATE TABLE aurelle_resources(id TEXT PRIMARY KEY,initial_food INTEGER NOT NULL CHECK(initial_food>=0),initial_minor INTEGER NOT NULL CHECK(initial_minor>=0))`,
  `CREATE TABLE aurelle_receipts(id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),action TEXT NOT NULL CHECK(action IN ('aurelle-start-work','aurelle-claim-work','aurelle-buy-food','aurelle-household-meal')),quantity INTEGER NOT NULL CHECK(quantity BETWEEN 0 AND 2),shift_id TEXT,occurred_at INTEGER NOT NULL,capacity_applied INTEGER NOT NULL DEFAULT 0 CHECK(capacity_applied IN (0,1)))`,
  `CREATE TABLE aurelle_settlements(shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),wage_minor INTEGER NOT NULL CHECK(wage_minor=800),food_output INTEGER NOT NULL CHECK(food_output=4),favor INTEGER NOT NULL CHECK(favor=2),settled_at INTEGER NOT NULL)`,
  `CREATE TABLE aurelle_purchases(id TEXT PRIMARY KEY REFERENCES aurelle_receipts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),quantity INTEGER NOT NULL CHECK(quantity IN (1,2)),spend_minor INTEGER NOT NULL CHECK(spend_minor=quantity*150))`,
+ `CREATE TABLE aurelle_charter_settlements(shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),job_id TEXT NOT NULL,wage_minor INTEGER NOT NULL CHECK(wage_minor>0),settled_at INTEGER NOT NULL)`,
+ `CREATE TABLE crown_issuances(id TEXT PRIMARY KEY,shift_id TEXT NOT NULL UNIQUE REFERENCES aurelle_charter_settlements(shift_id),clerk_user_id TEXT NOT NULL,amount_minor INTEGER NOT NULL CHECK(amount_minor>0),source TEXT NOT NULL CHECK(source IN ('aurelle-charter-wage')),issued_at INTEGER NOT NULL)`,
  `CREATE TABLE aurelle_meals(id TEXT PRIMARY KEY REFERENCES aurelle_receipts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),quantity INTEGER NOT NULL CHECK(quantity=2),occurred_at INTEGER NOT NULL)`,
 ] as const;
 /** #289: Royal Favor is spent here (docs 14.2 / daily loops: "spent on petitions, ranks, estates, pardons"; leaving the Kinward Rite costs Royal Favor).
@@ -54,8 +67,8 @@ export async function royalFavorBalance(db:GameDatabase,userId:string,decayAt?:n
  catch(error){if(!/no such table|does not exist|42P01/i.test(String((error as {code?:string})?.code??'')+' '+String((error as Error)?.message??error)))throw error;/* only a missing aurelle_favor_spends falls back: any other failure must not read as a balance (inline: tests/aurelle.test.py loads this file without a resolver, so no ./db-errors import) */const row=decayAt===undefined?await db.prepare('SELECT MIN(100,COALESCE(SUM(favor),0)) AS favor FROM aurelle_settlements WHERE clerk_user_id=?').bind(userId).first<{favor:number}>():await db.prepare(`SELECT CAST(MIN(${favorCap*favorDecaySeconds},${favorEarnedDecayed('?')})/${favorDecaySeconds} AS INTEGER) AS favor`).bind(...fadeBinds(decayAt),userId).first<{favor:number}>();return Number(row?.favor??0);}
 }
 const publicFood=`initial_food+COALESCE((SELECT SUM(food_output) FROM aurelle_settlements),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_purchases),0)`;
-const publicFunds=`initial_minor+COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements),0)`;
-const privateWallet=`COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id=citizens.clerk_user_id),0)-COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id=citizens.clerk_user_id),0)`;
+const publicFunds=`initial_minor+COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_charter_settlements),0)`;
+const privateWallet=`COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id=citizens.clerk_user_id),0)+COALESCE((SELECT SUM(wage_minor) FROM aurelle_charter_settlements WHERE clerk_user_id=citizens.clerk_user_id),0)-COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id=citizens.clerk_user_id),0)`;
 const privateFood=`COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=citizens.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=citizens.clerk_user_id),0)`;
 // Every eligibility and request binding lives inside the transactional writes.
 export const aurelleStartReceiptSql=`INSERT OR IGNORE INTO aurelle_receipts(id,clerk_user_id,action,quantity,occurred_at)
@@ -92,11 +105,33 @@ export const aurelleMealSql=`INSERT OR IGNORE INTO aurelle_meals(id,clerk_user_i
  SELECT id,clerk_user_id,2,occurred_at FROM aurelle_receipts WHERE id=? AND clerk_user_id=? AND action='aurelle-household-meal' AND quantity=2`;
 export const aurelleMealCapacitySql=`UPDATE citizens SET capacity=MIN(24,capacity+4),updated_at=? WHERE clerk_user_id=? AND EXISTS(
  SELECT 1 FROM aurelle_receipts r JOIN aurelle_meals m ON m.id=r.id WHERE r.id=? AND r.clerk_user_id=citizens.clerk_user_id AND r.action='aurelle-household-meal' AND r.capacity_applied=0)`;
+// #886 (c) charter-job SQL. Start reuses aurelleStartReceiptSql (citizen, WC, no active shift, the treasury can cover a wage); these replace only the order-specific steps.
+/** Bind (jobId, name, output): the charter's work order, written lazily (closed, so it never shows on the open work board). */
+export const aurelleCharterOrderSql=`INSERT OR IGNORE INTO work_orders (id,nation_id,name,detail,capacity_cost,status,sort_order) VALUES (?,'aurelle',?,?,${aurelleCharterTerms.capacityCost},'closed',1000)`;
+/** Bind (jobId, name, output, startedIso, completesIso, id, userId). */
+export const aurelleCharterStartSql=`INSERT OR IGNORE INTO work_shifts(id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at)
+ SELECT id,clerk_user_id,?,?,?,${aurelleCharterTerms.capacityCost},?,? FROM aurelle_receipts WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND quantity=0 AND capacity_applied=0`;
+/** Bind (iso, userId, id). */
+export const aurelleCharterDebitSql=`UPDATE citizens SET capacity=capacity-${aurelleCharterTerms.capacityCost},updated_at=? WHERE clerk_user_id=? AND EXISTS(
+ SELECT 1 FROM aurelle_receipts r JOIN work_shifts s ON s.id=r.id WHERE r.id=? AND r.clerk_user_id=citizens.clerk_user_id AND r.action='aurelle-start-work' AND r.capacity_applied=0 AND s.work_order_id IN (${charterList}))`;
+/** Bind (id, now, shiftId, userId, iso, id): same shape as aurelleClaimReceiptSql for a charter shift. */
+export const aurelleCharterClaimReceiptSql=`INSERT OR IGNORE INTO aurelle_receipts(id,clerk_user_id,action,quantity,shift_id,occurred_at)
+ SELECT ?,s.clerk_user_id,'aurelle-claim-work',0,s.id,? FROM work_shifts s JOIN aurelle_receipts r ON r.id=s.id
+ WHERE s.id=? AND s.clerk_user_id=? AND s.work_order_id IN (${charterList}) AND s.completes_at<=? AND r.capacity_applied=1 AND r.action='aurelle-start-work'
+ AND NOT EXISTS(SELECT 1 FROM work_shifts WHERE id=?) AND ${aurelleCharterTerms.wageMinor}<=(SELECT ${publicFunds} FROM aurelle_resources WHERE id='estate')`;
+/** Bind (now, receiptId, userId). Pays only while the treasury can cover it. */
+export const aurelleCharterSettleSql=`INSERT OR IGNORE INTO aurelle_charter_settlements(shift_id,clerk_user_id,job_id,wage_minor,settled_at)
+ SELECT s.id,s.clerk_user_id,s.work_order_id,${aurelleCharterTerms.wageMinor},? FROM work_shifts s JOIN aurelle_receipts r ON r.shift_id=s.id
+ WHERE r.id=? AND r.clerk_user_id=? AND r.action='aurelle-claim-work' AND s.clerk_user_id=r.clerk_user_id AND s.claimed_at IS NULL AND s.work_order_id IN (${charterList})
+ AND ${aurelleCharterTerms.wageMinor}<=(SELECT ${publicFunds} FROM aurelle_resources WHERE id='estate')`;
+/** Bind (shiftId): one Crown issuance record per payment, same batch as the settlement; nothing when it did not land. */
+export const crownIssuanceSql=`INSERT OR IGNORE INTO crown_issuances(id,shift_id,clerk_user_id,amount_minor,source,issued_at)
+ SELECT 'crn-wage:'||shift_id,shift_id,clerk_user_id,wage_minor,'aurelle-charter-wage',settled_at FROM aurelle_charter_settlements WHERE shift_id=?`;
 export type AurellePlan={available:boolean;mode:'bounded charter economy';charter:{id:string;name:string;active:boolean};job:typeof aurelleJob;
  walletMinor:number;foodQuantity:number;favor:number;publicFoodRemaining:number;publicFundMinor:number;mealReadyAt:string|null;shifts:WorkShift[];
  /** #362: read-only mint parity, Currency Confidence and official rate strip; present only while HARIMU_CROWN_DEBASEMENT_ENABLED is on. */
  mint?:CrownMint};
-export type AurelleCommand={action:'aurelle-start-work'|'aurelle-claim-work'|'aurelle-buy-food'|'aurelle-household-meal';requestId:string;shiftId?:string;quantity?:number};
+export type AurelleCommand={action:'aurelle-start-work'|'aurelle-claim-work'|'aurelle-buy-food'|'aurelle-household-meal';requestId:string;shiftId?:string;quantity?:number;jobId?:string};
 const uuid=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export function validAurelleCommand(body:Record<string,unknown>):body is Record<string,unknown>&AurelleCommand {
  if(!uuid(body.requestId)) return false;
@@ -109,21 +144,21 @@ export async function readAurelle(db:GameDatabase,userId:string,options:{favorDe
  const [citizen,ledger,shifts,favor]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
  db.prepare(`SELECT ${publicFood} AS public_food,${publicFunds} AS funds,
- COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id=?),0) AS wallet,
+ COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id=?),0)+COALESCE((SELECT SUM(wage_minor) FROM aurelle_charter_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id=?),0) AS wallet,
  COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=?),0) AS food,
  (SELECT MAX(occurred_at) FROM aurelle_meals WHERE clerk_user_id=?) AS last_meal FROM aurelle_resources WHERE id='estate'`)
- .bind(userId,userId,userId,userId,userId).first<{public_food:number;funds:number;wallet:number;food:number;last_meal:number|null}>(),
- db.prepare("SELECT * FROM work_shifts WHERE clerk_user_id=? AND work_order_id='aurelle-food-estate' ORDER BY started_at DESC LIMIT 20").bind(userId)
- .all<{id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
+ .bind(userId,userId,userId,userId,userId,userId).first<{public_food:number;funds:number;wallet:number;food:number;last_meal:number|null}>(),
+ db.prepare(`SELECT * FROM work_shifts WHERE clerk_user_id=? AND work_order_id IN ('aurelle-food-estate',${charterList}) ORDER BY started_at DESC LIMIT 20`).bind(userId)
+ .all<{id:string;work_order_id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
  royalFavorBalance(db,userId,options.favorDecayAt), // #289, #529: the one Favor rule (earned, capped at 100, decayed when the flag is on, minus spent)
  ]);
  return {available:citizen?.nation_id==='aurelle',mode:'bounded charter economy',charter:{id:'food-estate',name:'Highspire food-estate charter',active:true},job:aurelleJob,
  walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,favor:favor,publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,
  mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+(options.mealSeconds??aurelleMealSeconds))*1000).toISOString(),
- shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,rewardItem:'estate food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
+ shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,...(isAurelleCharter(s.work_order_id)?{}:{rewardItem:'estate food',rewardQuantity:4}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
 /** #531: mealSeconds is the household-meal cooldown; only a chartered citizen (flag on) passes a shorter one. The SQL keeps its literal 7200, so the shorter window is a shifted reference time. */
-export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds){
+export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds,options:{mvpJobTypes?:boolean}={}){
  const id=command.requestId.toLowerCase(),shiftId=command.shiftId?.toLowerCase()??null;
  const quantity=command.action==='aurelle-buy-food'?command.quantity!:command.action==='aurelle-household-meal'?2:0;
  const receipt=()=>db.prepare('SELECT clerk_user_id,action,quantity,shift_id FROM aurelle_receipts WHERE id=?').bind(id).first<{clerk_user_id:string;action:string;quantity:number;shift_id:string|null}>();
@@ -133,7 +168,20 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  if(citizen?.nation_id!=='aurelle'&&command.action!=='aurelle-claim-work') return {status:409,error:'Aurelle citizenship required. Original balances remain in their own currency.'};
  const iso=new Date(now*1000).toISOString();
- if(command.action==='aurelle-start-work') await db.batch([
+ // #886 (c): flag on and a named charter job: start it; a charter shift's claim pays into aurelle_charter_settlements with its Crown issuance record (keyed on the shift, not the flag).
+ const charter=command.action==='aurelle-start-work'&&options.mvpJobTypes&&isAurelleCharter(command.jobId)?command.jobId:null;
+ const claimsCharter=command.action==='aurelle-claim-work'&&isAurelleCharter((await db.prepare('SELECT work_order_id FROM work_shifts WHERE id=? AND clerk_user_id=?').bind(shiftId,userId).first<{work_order_id:string}>())?.work_order_id);
+ if(charter){const job=aurelleCharterJobs[charter];await db.batch([
+ db.prepare(aurelleCharterOrderSql).bind(charter,job.name,job.output),
+ db.prepare(aurelleStartReceiptSql).bind(id,now,userId,id),db.prepare(aurelleCharterStartSql).bind(charter,job.name,job.output,iso,new Date((now+aurelleCharterTerms.hours*3600)*1000).toISOString(),id,userId),
+ db.prepare(aurelleCharterDebitSql).bind(iso,userId,id),
+ db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)").bind(id,userId,id,userId),
+ ]);}
+ else if(claimsCharter) await db.batch([
+ db.prepare(aurelleCharterClaimReceiptSql).bind(id,now,shiftId,userId,iso,id),db.prepare(aurelleCharterSettleSql).bind(now,id,userId),db.prepare(crownIssuanceSql).bind(shiftId),
+ db.prepare("UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM aurelle_charter_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)").bind(iso,shiftId,userId,userId),
+ ]);
+ else if(command.action==='aurelle-start-work') await db.batch([
  db.prepare(aurelleStartReceiptSql).bind(id,now,userId,id),db.prepare(aurelleStartSql).bind(iso,new Date((now+7200)*1000).toISOString(),id,userId),
  db.prepare(aurelleStartDebitSql).bind(iso,userId,id),
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)").bind(id,userId,id,userId),
