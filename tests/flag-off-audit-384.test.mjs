@@ -36,6 +36,7 @@ const flagOffPins = {
   HARIMU_GRAY_MARKET_ENABLED: 'gray-market-43.test.mjs',
   HARIMU_GRAY_DAILY_CAP_ENABLED: 'gray-daily-cap-736.test.mjs',
   HARIMU_GRAY_SUSPICION_ENABLED: 'gray-suspicion-749.test.mjs',
+  HARIMU_GRAY_SEIZURE_ENABLED: 'gray-seizure-797.test.mjs',
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
   HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
