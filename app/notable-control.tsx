@@ -45,7 +45,7 @@ export function NotableControl({nationId}:{nationId:string}){const [served,setSe
    if(!request.current.current(attempt.epoch)||activeNation.current!==expectedNation)return;
    if(!response.ok){if(!notableFailureAcknowledged(response.status,value))throw Error('Response unavailable.');acknowledged=true;setError(value.error as string);return;}
    if((value.source!=='model'&&value.source!=='authored')||typeof value.reply!=='string')throw Error('Response unavailable.');
-   acknowledged=true;const intent=attempt.intent;const label=value.source==='authored'?'Authored topic example (AI reply did not pass review): ':'';setTranscript(turns=>[...turns,{id:intent.requestId,ask:intent.question??notableTopics[intent.topic].question,reply:label+(value.reply as string)}].slice(-20));if(intent.question!==undefined)setQuestion('');
+   acknowledged=true;const intent=attempt.intent;const label=value.personaMuted===true?'':value.source==='authored'?'Authored topic example (AI reply did not pass review): ':'';setTranscript(turns=>[...turns,{id:intent.requestId,ask:intent.question??notableTopics[intent.topic].question,reply:label+(value.reply as string)}].slice(-20));if(intent.question!==undefined)setQuestion('');
   }catch{
    if(request.current.current(attempt.epoch)&&activeNation.current===expectedNation)setError('The response could not be confirmed. Confirm the original request before asking another topic.');
   }finally{

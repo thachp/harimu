@@ -4,7 +4,7 @@
  *  list item, a non-string) fails closed and is treated as "all". It is an operator control, not a feature flag: "" in both wrangler files. */
 export const aiTemplatesOnlyNations = ['kindle', 'korund', 'aurelle'] as const;
 export type AiTemplatesOnlyMode = 'off' | 'all' | readonly string[];
-export type AiTemplatesOnlyEnv = { HARIMU_AI_TEMPLATES_ONLY?: unknown };
+export type AiTemplatesOnlyEnv = { HARIMU_AI_TEMPLATES_ONLY?: unknown; HARIMU_AI_MUTED_PERSONAS?: unknown };
 export type AiNarrativePath = 'ai-news' | 'notables' | 'cabinet-response' | 'town-hall' | 'debate';
 
 export function aiTemplatesOnlyMode(raw: unknown): AiTemplatesOnlyMode {
@@ -43,5 +43,40 @@ export function logAiTemplatesOnly(path: AiNarrativePath, nationId: string, env:
 export function skipForTemplates(path: AiNarrativePath, env: AiTemplatesOnlyEnv | null | undefined, nationId: string, now: number) {
   if (!aiTemplatesOnly(env, nationId)) return false;
   logAiTemplatesOnly(path, nationId, env, Number.isFinite(now) ? now : 0);
+  return true;
+}
+
+/** #764 slice 1: per-persona mute (docs moderation-safety §21.4: "Staff can mute a persona's narrative output"). One operator var, HARIMU_AI_MUTED_PERSONAS:
+ *  "" (off), "all", or a comma list of persona ids. Notables use their profile id; the other AI paths speak as one fixed persona each (below). A muted
+ *  persona's path makes no model call and no reservation; Notables answer with the shared "persona muted" notice copy. An unknown id or
+ *  a non-string fails closed to "all". It is an operator control, not a feature flag: "" in both wrangler files. The logged switch record is a later slice. */
+export const aiPathPersonas = { 'ai-news': (nationId: string) => `${nationId}-news-desk`, 'cabinet-response': () => 'kindle-cabinet', 'town-hall': () => 'kindle-candidates', debate: () => 'kindle-candidates' } as const;
+// Every Notable profile id (lib/notable-profiles.ts, lib/notable-roster.ts, lib/wave2-notable-roster.ts; kept in step by tests/ai-persona-mute-764) plus the path personas.
+export const aiNotablePersonas = ['kindle-journalist', 'korund-chronicler', 'aurelle-courtier', 'kindle-union-organizer', 'kindle-emberball-owner', 'kindle-cartoonist', 'korund-brigade-leader', 'korund-canteen-cook', 'korund-veteran-builder', 'aurelle-guild-master', 'aurelle-hearth-keeper', 'aurelle-landless-knight', 'confluence-cooperative-manager', 'confluence-almoner', 'confluence-faith-registrar', 'confluence-canal-captain', 'confluence-local-editor', 'confluence-party-cadre', 'hoarvale-coalition-whip', 'hoarvale-board-observer', 'hoarvale-mint-economist', 'hoarvale-bathhouse-keeper', 'hoarvale-sketch-comedian', 'hoarvale-crown-herald'] as const;
+export const aiMutablePersonas: readonly string[] = [...aiNotablePersonas, ...aiTemplatesOnlyNations.map(n => aiPathPersonas['ai-news'](n)), 'kindle-cabinet', 'kindle-candidates'];
+export type AiMutedPersonasEnv = { HARIMU_AI_MUTED_PERSONAS?: unknown };
+export function aiMutedPersonasMode(raw: unknown): AiTemplatesOnlyMode {
+  if (raw === undefined || raw === null) return 'off';
+  if (typeof raw !== 'string') return 'all';
+  const value = raw.trim().toLowerCase();
+  if (value === '') return 'off';
+  if (value === 'all') return 'all';
+  const ids = value.split(',').map(id => id.trim());
+  if (ids.some(id => !aiMutablePersonas.includes(id))) return 'all';
+  return [...new Set(ids)];
+}
+/** True when this persona's narrative output is muted. */
+export function aiPersonaMuted(env: AiMutedPersonasEnv | null | undefined, personaId: string | null | undefined): boolean {
+  const mode = aiMutedPersonasMode(env?.HARIMU_AI_MUTED_PERSONAS);
+  if (mode === 'off') return false;
+  if (mode === 'all') return true;
+  return typeof personaId === 'string' && mode.includes(personaId);
+}
+const lastMuteLogged = new Map<string, number>();
+/** Check and log in one step: path and persona id only, never user data, once per path and persona per minute. */
+export function skipForMutedPersona(path: AiNarrativePath, env: AiMutedPersonasEnv | null | undefined, personaId: string, now: number) {
+  if (!aiPersonaMuted(env, personaId)) return false;
+  const key = `${path}:${personaId}`, bucket = Math.floor((Number.isFinite(now) ? now : 0) / aiTemplatesOnlyLogSeconds);
+  if (lastMuteLogged.get(key) !== bucket) { lastMuteLogged.set(key, bucket); console.info(`[ai-kill-switch] persona muted: path=${path} persona=${personaId}`); }
   return true;
 }

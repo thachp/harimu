@@ -4,7 +4,8 @@ import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiRes
 import {readNationalNews} from './national-news';
 import {notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 import {nationNotables} from './notable-choice';
-import {skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
+import {skipForMutedPersona,skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
+import {personaMuted} from './kill-switch-copy';
 import {enqueueAiReview} from './ai-review-queue';
 export {notableFor,nationNotables} from './notable-choice';
 export {notableProfile,notableTopics,notableDailyLimit,validNotableCommand} from './notable-profiles';
@@ -23,6 +24,8 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
  if(!enabled||!binding||!budget)return fail(503,'AI conversations are disabled. Authored topic examples remain available.');
  // #742: templates-only mode answers with the authored topic example: no model call, no reservation, nothing charged.
  if(skipForTemplates('notables',killSwitch,nation!,now))return {status:200,reply:notableTopics[command.topic].authored,source:'authored' as const,templatesOnly:true};
+ // #764: a muted Notable answers with the "persona muted" notice: no model call, no reservation, nothing charged.
+ if(skipForMutedPersona('notables',killSwitch,profile.id,now))return {status:200,reply:personaMuted.notablesPanel.text,source:'authored' as const,personaMuted:true};
  const prefix=await ownerPrefix(userId),id=prefix+command.requestId.toLowerCase();
  if(await db.prepare('SELECT request_id FROM harimu_ai_reservations WHERE request_id=?').bind(id).first())return fail(409,'This request was already attempted. Repeating it makes no further inference call.');
  const news=await readNationalNews(db,citizen!.nation_id,now*1000);if(!news)return fail(503,'Public context is unavailable.');const facts=publicNewsFacts(news);

@@ -1,7 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import {deniedAiText} from './ai-denylist';
 import type {NationalNews,NewsItem} from './national-news';
-import {skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
+import {skipForMutedPersona,aiPathPersonas,skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
 import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiMeteredCall,type AiBudgetConfig} from './ai-budget';
 export const aiNewsEnabled=true; // Preview activation approved 2026-10-14; runtime flags and pricing expiry still gate inference.
 export const aiNewsSchemas=[aiBudgetSchema,
@@ -50,6 +50,8 @@ export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number
  if(!enabled||!Number.isSafeInteger(now))return;
  // #742: templates-only mode skips the model call and the reservation; the edition keeps its deterministic items.
  if(skipForTemplates('ai-news',killSwitch,news.nationId,now))return;
+ // #764: a muted news desk makes no model call and no reservation; the edition keeps its deterministic items.
+ if(skipForMutedPersona('ai-news',killSwitch,aiPathPersonas['ai-news'](news.nationId),now))return;
  // #140: flag on but no binding/budget used to return silently; say why so preview checks can see it.
  if(!binding||!budget){console.warn(`[ai-news] enabled but skipped: ${!binding?'no AI binding':'invalid HARIMU_AI_DAILY_BUDGET_MICRO/HARIMU_AI_GATEWAY_ID'}`);return;}
  const facts=publicNewsFacts(news),id=`${facts.nationId}:${new Date(now*1000).toISOString().slice(0,10)}`;
