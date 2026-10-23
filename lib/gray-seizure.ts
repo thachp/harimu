@@ -43,17 +43,29 @@ async function suspicionNow(db: GameDatabase, userId: string, now: number): Prom
   return suspicionLevelWithGray(raids, trades, now);
 }
 
-/** Rolls the checkpoint for a trade the buyer just completed. Returns the seized amount (0 = none). Idempotent per trade (offer id is the key). */
-export async function rollSeizure(db: GameDatabase, buyerId: string, offerId: string, bundleMinor: number, now: number, rng: (offerId: string) => number = seizureRoll): Promise<number> {
-  const amount = seizedAmount(bundleMinor);
-  if (amount < 1 || rng(offerId) * 10000 >= seizureChanceBps(await suspicionNow(db, buyerId, now))) return 0;
+/** Rolls the checkpoint for a trade the courier (the accepting buyer, who carries the LN bundle) just completed. Returns the seized amount (0 = none).
+ *  ARC on #801: only the courier's bundle is seized (never the seller), and the bundle is read from the server-side trade record, never from the caller.
+ *  Idempotent per trade (offer id is the key). */
+export async function rollSeizure(db: GameDatabase, courierId: string, offerId: string, now: number, rng: (offerId: string) => number = seizureRoll): Promise<number> {
+  const trade = await db.prepare('SELECT amount_minor FROM gray_trades WHERE offer_id=? AND buyer_id=?').bind(offerId, courierId).first<{ amount_minor: number }>();
+  const amount = seizedAmount(Number(trade?.amount_minor ?? 0));
+  if (amount < 1 || rng(offerId) * 10000 >= seizureChanceBps(await suspicionNow(db, courierId, now))) return 0;
   // ON CONFLICT covers the trade key and the one-per-game-day key. The LN guard keeps the wallet from going negative.
   await db.prepare(`INSERT INTO gray_seizures(offer_id, clerk_user_id, game_day, amount_minor, seized_at)
     SELECT t.offer_id, t.buyer_id, ?, ?, ? FROM gray_trades t WHERE t.offer_id=? AND t.buyer_id=? AND ?<=t.amount_minor AND ?<=${laborNoteSql('?')}
-    ON CONFLICT DO NOTHING`).bind(Math.floor(now / GAME_DAY_SECONDS), amount, now, offerId, buyerId, amount, amount, ...laborNoteBinds(buyerId)).run();
-  const row = await db.prepare('SELECT amount_minor FROM gray_seizures WHERE offer_id=? AND clerk_user_id=?').bind(offerId, buyerId).first<{ amount_minor: number }>();
-  return Number(row?.amount_minor ?? 0);
+    ON CONFLICT DO NOTHING`).bind(Math.floor(now / GAME_DAY_SECONDS), amount, now, offerId, courierId, amount, amount, ...laborNoteBinds(courierId)).run();
+  const row = await db.prepare('SELECT amount_minor FROM gray_seizures WHERE offer_id=? AND clerk_user_id=?').bind(offerId, courierId).first<{ amount_minor: number }>();
+  if (!row) return 0;
+  // ARC on #801: committed re-check, the conditional-delete pattern of the coupon guard (#47). Under Postgres READ COMMITTED a concurrent coupon
+  // redemption can pass its own guard against the pre-seizure balance. After commit, whichever re-check runs later sees both rows; if the LN
+  // balance is negative the seizure is withdrawn (fail closed: the checkpoint never overdraws a wallet), and the coupon's own re-check does the same.
+  if (await laborNoteBalance(db, courierId) < 0) {
+    await db.prepare('DELETE FROM gray_seizures WHERE offer_id=? AND clerk_user_id=?').bind(offerId, courierId).run();
+    return 0;
+  }
+  return Number(row.amount_minor);
 }
+const laborNoteBalance = async (db: GameDatabase, userId: string) => Number((await db.prepare(`SELECT ${laborNoteSql('?')} AS n`).bind(...laborNoteBinds(userId)).first<{ n: number }>())?.n ?? 0);
 
 /** The notice for the latest seizure within the last game day, or null. Read-only. */
 export async function latestSeizureNotice(db: GameDatabase, userId: string, now: number): Promise<string | null> {
