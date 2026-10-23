@@ -48,6 +48,16 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await events(r), [{ election_key: 'civic:e825', voter_id: 'v2', sender_id: cand, transfer_id: 'gift:c1', reason: 'campaign' }]);
   });
 
+  test(`(${backend}) QA3: the candidate list is exactly the primaries hopefuls; an empty list skips the clause and the sweep SQL still runs`, async t => {
+    const { r, now, gifts, w } = await setup(backend); t.after(() => r.close());
+    const { hopefuls } = await r.importModule('lib/primaries-rules.ts');
+    assert.deepEqual([...w.voteBuyingCandidateIds], hopefuls.map(h => h.id)); assert.ok(w.voteBuyingCandidateIds.length > 0);
+    assert.equal(w.candidateSenderSql([]), ''); assert.equal(w.candidateSenderSql(["o'k"]), "h.sender IN ('o''k') OR ");
+    const sql = w.voteBuyingSweepSql(gifts([['g', 'plain', 'v1', now]]));
+    for (const c of w.voteBuyingCandidateIds) assert.ok(sql.includes(`'${c}'`), c);
+    await r.db.prepare(sql.replace(w.candidateSenderSql(w.voteBuyingCandidateIds), w.candidateSenderSql([]))).bind(now, now, now, 1, 1, now).run();
+  });
+
   test(`sweep (${backend}): an ordinary market purchase at the listed price by a party member records no event (and with no direct sources there is no query)`, async t => {
     const { r, now, vote, fill, w } = await setup(backend); t.after(() => r.close());
     await fill('boss', 'v1', vote + H); await fill('canvasser', 'v2', vote - H);
