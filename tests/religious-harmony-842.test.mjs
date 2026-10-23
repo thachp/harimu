@@ -35,7 +35,8 @@ test('ARC (Oct 23): every number is a named exported constant with the approved 
   for (const head of ['export function religiousHarmony', 'export const harmonyBand =']) assert.doesNotMatch(fnBody(src, head), tuning, head);
   const stab = readFileSync('lib/stability.ts', 'utf8'), mapping = stab.slice(stab.indexOf('export function harmonyStabilityPoints')).split('\n}')[0];
   assert.doesNotMatch(mapping, tuning, 'Stability mapping has no inline numbers');
-  assert.match(src, /TODO\(#842 follow-up, ARC on #854\): read festival stances from the per-nation policy table/);
+  // #855 replaced the ARC TODO: festival stances come from the per-nation policy table (stanceOf = festivalStance), not a Korund rule.
+  assert.doesNotMatch(src, /TODO\(#842 follow-up/); assert.match(readFileSync('lib/world-simulation.ts', 'utf8'), /readHarmonyScores\(db,Number\(row\.scheduled_at\),holidays,festivalStance\)/);
 });
 
 test('Stability: harmony term with its points and detail; totals still add up and stay 0–100; absent input = no term', () => {
