@@ -23,7 +23,7 @@ const probe = () => {
 
 export async function checkModConsole({ browser, preflight, failures, rows }) {
   const out = await build({ stdin: { contents: entry, resolveDir: root, loader: 'tsx' }, bundle: true, write: false, outdir: '/out', format: 'iife', jsx: 'automatic', loader: { '.module.css': 'local-css' },
-    alias: { '@': root }, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_MOD_CONSOLE': '"true"' }, logLevel: 'silent' });
+    alias: { '@': root }, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_MOD_CONSOLE': '"true"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR': '"false"' }, logLevel: 'silent' });
   const js = out.outputFiles.find(f => f.path.endsWith('.js')).text, css = out.outputFiles.find(f => f.path.endsWith('.css'))?.text ?? '', shots = process.env.LAYOUT_SHOTS_DIR;
   { // ARC (#880): no data before the server accepts the token: nothing loads or renders before Load, and a refused token renders no table or rows
     const context = await browser.newContext(), page = await context.newPage(), issues = [];
