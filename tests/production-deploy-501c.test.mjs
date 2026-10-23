@@ -101,3 +101,15 @@ test('#764: HARIMU_AI_MUTED_PERSONAS is the second operator exemption: "", "all"
   for (const v of ['', 'all', 'kindle-journalist', 'kindle-journalist,kindle-cabinet']) assert.deepEqual(withVars({ HARIMU_AI_MUTED_PERSONAS: v }).filter(p => /MUTED_PERSONAS/.test(p)), [], v);
   for (const v of ['true ', 'ALL', 'kindle-journalist,', ' all', 'x;y']) assert.ok(withVars({ HARIMU_AI_MUTED_PERSONAS: v }).some(p => p === 'HARIMU_AI_MUTED_PERSONAS must be "", "all" or a comma list of persona ids on production.'), v);
 });
+
+test('#790: HARIMU_CHAT_SHADOW_MUTE takes id@mute or id@mute..unmute entries; refuses bare ids, switch words, bad, inverted or overlapping windows and over 90; "" and up to 90 pass', () => {
+  const list = n => Array.from({ length: n }, (_, i) => `user_${i}@2026-10-23T07:00:00Z`).join(',');
+  const set = value => problems(c => { c.vars.HARIMU_CHAT_SHADOW_MUTE = value; });
+  const A = '2026-10-23T07:00:00Z', B = '2026-10-23T08:00:00Z', C = '2026-10-23T09:00:00Z';
+  for (const bad of ['all', 'ALL', 'All', 'true', 'TRUE', 'false', 'False', 'alice', 'alice,bob', `alice@${A},all`, 'alice@not-a-time', 'alice@2026-10-23', list(91),
+    `a b@${A}`, `alice@${B}..${A}`, `alice@${A}..${A}`, `alice@${A}..${C},alice@${B}`, `alice@${A},alice@${B}..${C}`, `alice@${A}..`])
+    assert.match(set(bad).join('\n'), /HARIMU_CHAT_SHADOW_MUTE .* on production/, String(bad).slice(0, 24));
+  for (const ok of ['', ',', `alice@${A}`, `alice@${A},`, `alice@${A}..${B},alice@${B}..${C},alice@2026-10-24T00:00:00Z`, `alice@${A},user_2X-y@2026-10-23T09:00:00+02:00`, list(90)])
+    assert.deepEqual(set(ok), [], String(ok).slice(0, 24));
+  assert.match(set(list(91)).join('\n'), /at most 90 entries \(D1 bound-parameter limit\)/);
+});
