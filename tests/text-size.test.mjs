@@ -66,7 +66,8 @@ test('HUD, mobile top bar, resources, context strip and dock size to their conte
   for (const sel of ['game-hud', 'game-resources', 'game-context-strip']) assert.match(mobile, new RegExp(`\\.${sel}\\{height:auto;min-height:calc\\(`), sel);
   assert.match(mobile, /\.game-dockbuttonspan\{overflow-wrap:anywhere/, 'dock labels wrap instead of overflowing');
   for (const rows of css.match(/grid-template-rows:[^;}]*/g).filter(r => r.includes('260px') || r.includes('620px'))) {
-    assert.ok(rows.startsWith('grid-template-rows:autominmax(calc(40px*var(--text-scale,1)),auto)'), rows);
+    // #392 S8 (.game-mobile-v2) moves the nav row to a bottom tab bar, so its top track collapses to 0 there; every other template keeps the text-scaled row.
+    assert.ok(rows.startsWith('grid-template-rows:autominmax(calc(40px*var(--text-scale,1)),auto)') || rows.startsWith('grid-template-rows:auto0minmax(260px,'), rows);
     assert.doesNotMatch(rows, /\)\s*calc\(\d+px/, `${rows}: fixed context row`);
   }
 });
