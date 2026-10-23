@@ -63,6 +63,7 @@ const flagOffPins = {
   HARIMU_MAP_OVERLAYS_ENABLED: 'map-overlays-82.test.mjs',
   HARIMU_CIVIC_RANK_ENABLED: 'civic-rank-741.test.mjs',
   HARIMU_ARMIES_ENABLED: 'army-units-738.test.mjs',
+  HARIMU_RELIGIOUS_HARMONY_ENABLED: 'religious-harmony-842.test.mjs',
   HARIMU_ARMY_DRILLS_ENABLED: 'army-drills-738.test.mjs',
   HARIMU_I_VOTED_BADGE_ENABLED: 'i-voted-782.test.mjs',
   HARIMU_KINDLE_POLLING_ENABLED: 'kindle-polling-740.test.mjs',

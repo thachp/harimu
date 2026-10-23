@@ -15,6 +15,7 @@ import { runKorundPresidium } from './korund-presidium';
 import { runNpcSupply } from './npc-supply';
 import { readPublicWeariness, readWarWeariness, type PublicWeariness } from './war-weariness'; // #423
 import { holidayNationsOn } from './festivals';
+import { readHarmonyScores } from './religious-harmony';
 import { readWars, type WarState } from './war'; // #309
 import { readSiegeSnapshot, type SiegeSnapshotItem } from './siege-actions'; // #620
 import { readTreaties, runDiplomacy, type TreatyState } from './diplomacy'; // #308
@@ -114,7 +115,7 @@ export async function runWorldChains(chains: WorldRunner[][]): Promise<void> {
 }
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { religiousHarmony?: boolean; reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
@@ -153,7 +154,10 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       // (due while no request arrived) and #679-repaired past ticks keep the old full count, even after deploy: no flag-on time is recorded, and dormancy history
       // is not reconstructed (last_active_at is only the current value). Pinned by tests/dormancy-stability-739.test.mjs.
       const live = options.dormancy === true && Number(row.scheduled_at)+tickSeconds>now;
-      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
+      // #842: Religious Harmony as of the tick's own time, only while HARIMU_RELIGIOUS_HARMONY_ENABLED is on (flag off: no reads, inputs unchanged).
+      const holidays = options.faithFestivals ? holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds) : undefined;
+      const harmony = options.religiousHarmony ? await readHarmonyScores(db,Number(row.scheduled_at),holidays) : undefined;
+      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(harmony?{harmony}:{}),...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
     });
     if (statements.length) await db.batch(statements.flat());
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
