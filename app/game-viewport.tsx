@@ -30,12 +30,14 @@ export type GameViewportProps = {
   className?: string;
   /** #82: GET /api/citizen flags.mapOverlays. False renders no Overlays group. */
   overlays?: boolean;
+  /** #738 slice 4: flags.armyMap. */
+  armyMap?: boolean;
   /** #392 S7: City labels as icon pills with a leader dot. Defaults to NEXT_PUBLIC_HARIMU_UI_V2_CITY. */
   cityPills?: boolean;
 };
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
 
-export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '', cityPills = uiV2CityEnabled(), overlays = false }: GameViewportProps) {
+export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '', cityPills = uiV2CityEnabled(), armyMap = false, overlays = false }: GameViewportProps) {
   const {preferences:{graphics}}=useDisplayPreferences();
   const host = useRef<HTMLDivElement>(null);
   const callback = useRef(onSelect);
@@ -261,7 +263,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       }} />
     {fallback && <p className="viewport-fallback">3D unavailable. Use the bottom strip to continue.</p>}
     <div className="viewport-controls" aria-label="Camera controls">
-      <MapOverlaysControl enabled={overlays} lowGraphics={graphics === 'low'} mapLayer={mode === 'world'} />
+      <MapOverlaysControl enabled={overlays} lowGraphics={graphics === 'low'} mapLayer={mode === 'world'} armies={armyMap} />
       <button type="button" onClick={() => controls.current?.zoom(.15)} aria-label="Zoom in">+</button>
       <span aria-live="polite">{cameraLabel}</span>
       <button type="button" onClick={() => controls.current?.zoom(-.15)} aria-label="Zoom out">−</button>

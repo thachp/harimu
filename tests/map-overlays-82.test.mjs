@@ -104,7 +104,7 @@ test('phone placement: beside the World chip when it fits, else a bottom sheet w
 
 test('wiring: the group sits first in viewport-controls (left of the zoom cluster) and gets the flag through GameShell and page', async () => {
   const vp = await readFile(new URL('../app/game-viewport.tsx', import.meta.url), 'utf8');
-  assert.match(vp, /<div className="viewport-controls" aria-label="Camera controls">\s*<MapOverlaysControl enabled=\{overlays\} lowGraphics=\{graphics === 'low'\} mapLayer=\{mode === 'world'\} \/>\s*<button type="button".*aria-label="Zoom in"/);
+  assert.match(vp, /<div className="viewport-controls" aria-label="Camera controls">\s*<MapOverlaysControl enabled=\{overlays\} lowGraphics=\{graphics === 'low'\} mapLayer=\{mode === 'world'\}(?: armies=\{armyMap\})? \/>\s*<button type="button".*aria-label="Zoom in"/);
   assert.match(vp, /overlays = false \}: GameViewportProps/);
   const shell = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
   assert.match(shell, /mapOverlays = false,/); assert.match(shell, /<GameViewport marketOpen=\{marketVisible\([^)]*\)\} visitor=\{visitor\} overlays=\{mapOverlays\}/);
