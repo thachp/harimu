@@ -69,7 +69,24 @@ export async function matchOpen(db: GameDatabase, orderId: string, now: number, 
   }
 }
 
-export async function executeOrderCommand(db: GameDatabase, userId: string, command: OrderCommand, now: number, options: { fee?: boolean } = {}): Promise<{ status: number; replayed?: boolean; error?: string }> {
+/** #733: which place guard refused the order. Additive to the refusal (status and `error` unchanged); absent when no single guard explains it. */
+export type RefusedCheck = 'not_kindle_citizen' | 'open_order_cap' | 'insufficient_spark' | 'insufficient_goods';
+export const REFUSED_CHECKS: readonly RefusedCheck[] = ['not_kindle_citizen', 'open_order_cap', 'insufficient_spark', 'insufficient_goods'];
+/** #733: read-only, after the refused INSERT. Same guards and order as placeBuySql/placeSellSql; no guard changes. */
+export async function refusedCheck(db: GameDatabase, userId: string, command: Extract<OrderCommand, { action: 'market-order-place' }>): Promise<RefusedCheck | undefined> {
+  const row = await db.prepare(`SELECT c.nation_id,
+      (SELECT COUNT(*) FROM market_open_orders WHERE citizen_id = c.clerk_user_id) AS open_orders,
+      COALESCE((SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id = c.clerk_user_id), 0) AS wallet,
+      COALESCE((SELECT quantity FROM citizen_inventory_balances WHERE clerk_user_id = c.clerk_user_id AND item = ?), 0) AS goods
+    FROM citizens c WHERE c.clerk_user_id = ?`).bind(command.good, userId).first<{ nation_id: string | null; open_orders: number; wallet: number; goods: number }>();
+  if (!row || row.nation_id !== 'kindle') return 'not_kindle_citizen';
+  if (Number(row.open_orders) >= orderBookLimits.maxOpenOrders) return 'open_order_cap';
+  if (command.side === 'buy' && Number(row.wallet) < command.qty * command.limitUnitMinor) return 'insufficient_spark';
+  if (command.side === 'sell' && Number(row.goods) < command.qty) return 'insufficient_goods';
+  return undefined;
+}
+
+export async function executeOrderCommand(db: GameDatabase, userId: string, command: OrderCommand, now: number, options: { fee?: boolean } = {}): Promise<{ status: number; replayed?: boolean; error?: string; refusedCheck?: RefusedCheck }> {
   const find = () => db.prepare(receiptSql).bind(command.requestId, command.requestId).first<Receipt>();
   const existing = await find();
   if (existing) return sameIntent(existing, userId, command) ? { status: 200, replayed: true } : { status: 409, error: 'Request identifier already used for another intent.' };
@@ -88,9 +105,12 @@ export async function executeOrderCommand(db: GameDatabase, userId: string, comm
     if (!(await find())) throw error;
   }
   const saved = await find();
-  if (!sameIntent(saved, userId, command)) return { status: 409, error: command.action === 'market-order-place'
-    ? 'Order refused: check Kindle citizenship, available Spark or goods for escrow, and the 10 open-order limit.'
-    : 'Order not open, already cancelled, or not yours.' };
+  if (!sameIntent(saved, userId, command)) {
+    const check = command.action === 'market-order-place' && !saved ? await refusedCheck(db, userId, command) : undefined;
+    return { status: 409, error: command.action === 'market-order-place'
+      ? 'Order refused: check Kindle citizenship, available Spark or goods for escrow, and the 10 open-order limit.'
+      : 'Order not open, already cancelled, or not yours.', ...(check ? { refusedCheck: check } : {}) };
+  }
   if (command.action === 'market-order-place') await matchOpen(db, command.requestId, now, undefined, options);
   return { status: 200 };
 }

@@ -93,6 +93,13 @@ test('API rejections show Content\'s plain words, with the API limits filled in;
   assert.equal(rejectionText(403, 'The city order book is not open yet.', 'closed'), rejections.find(r => r.key === 'closed').line.text);
   assert.match(rejectionText(400, 'Send a requestId', 'bad_request'), /quantity up to 100 and a price up to 100\.00 SPK/);
   assert.match(rejectionText(409, 'Order refused: check Kindle citizenship, available Spark or goods for escrow, and the 10 open-order limit.'), /at most 10\)/);
+  // #733: a named check picks its own line; unknown or missing checks keep the generic line.
+  assert.match(rejectionText(409, 'Order refused: x', undefined, 'not_kindle_citizen'), /Only Kindle citizens/);
+  assert.match(rejectionText(409, 'Order refused: x', undefined, 'open_order_cap'), /already have 10 open orders/);
+  assert.match(rejectionText(409, 'Order refused: x', undefined, 'insufficient_spark'), /enough free Spark/);
+  assert.match(rejectionText(409, 'Order refused: x', undefined, 'insufficient_goods', 'fruit'), /Not enough free fruit to sell/);
+  assert.doesNotMatch(rejectionText(409, 'Order refused: x', undefined, 'insufficient_goods', 'fruit'), /Kindle citizens/);
+  assert.match(rejectionText(409, 'Order refused: x', undefined, 'toString'), /at most 10\)/);
   assert.equal(rejectionText(409, 'Order not open, already cancelled, or not yours.'), rejections.find(r => r.key === 'order_not_open').line.text);
   assert.equal(rejectionText(409, 'Request identifier already used for another intent.'), rejections.find(r => r.key === 'request_reused').line.text);
   assert.equal(rejectionText(401, 'Sign in required.'), rejections.find(r => r.key === 'unauthenticated').line.text);

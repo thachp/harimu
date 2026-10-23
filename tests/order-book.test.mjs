@@ -97,15 +97,23 @@ test(`#197 ${backend}: retries are idempotent, ids cannot be reused, limits and 
   const buy = randomUUID(); await place('alice', 'buy', 2, 50, buy); await place('alice', 'buy', 2, 50, buy);
   assert.equal(await goods('alice'), 2); assert.equal(await wallet('alice'), 5000 - 100);
   // Escrow and caps.
-  assert.equal((await place('alice', 'buy', 100, 10000)).status, 409, 'cannot reserve more Spark than held');
-  assert.equal((await place('alice', 'sell', 3, 10)).status, 409, 'cannot sell goods not held');
+  const spark = await place('alice', 'buy', 100, 10000);
+  assert.equal(spark.status, 409, 'cannot reserve more Spark than held');
+  assert.equal(spark.data.refusedCheck, 'insufficient_spark', '#733: names the failed check');
+  assert.match(spark.data.error, /^Order refused:/, '#733: the error text is unchanged');
+  const sell = await place('alice', 'sell', 3, 10);
+  assert.equal(sell.status, 409, 'cannot sell goods not held'); assert.equal(sell.data.refusedCheck, 'insufficient_goods');
   for (let i = 0; i < orderBookLimits.maxOpenOrders; i++) assert.equal((await place('alice', 'buy', 1, 1)).status, 200);
-  assert.equal((await place('alice', 'buy', 1, 1)).status, 409, 'open-order cap');
+  const cap = await place('alice', 'buy', 1, 1);
+  assert.equal(cap.status, 409, 'open-order cap'); assert.equal(cap.data.refusedCheck, 'open_order_cap');
   // Cancelling someone else's order is refused.
   const bobBid = (await r.db.prepare("SELECT id FROM market_orders WHERE citizen_id='bob' AND side='buy'").first()).id;
   assert.equal((await cancel('alice', bobBid)).status, 409);
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
-  assert.equal((await place('bob', 'sell', 1, 10)).status, 409, 'non-Kindle citizens rejected');
+  const foreign = await place('bob', 'sell', 1, 10);
+  assert.equal(foreign.status, 409, 'non-Kindle citizens rejected'); assert.equal(foreign.data.refusedCheck, 'not_kindle_citizen');
+  const again = randomUUID(); await place('alice', 'sell', 1, 10, again);
+  assert.equal((await place('alice', 'sell', 1, 10, again)).data.refusedCheck, 'open_order_cap', '#733: a retried refusal names the same check');
   assert.equal((await cancel('bob', bobBid)).status, 200, 'owners can still reclaim escrow after leaving Kindle');
 });
 
