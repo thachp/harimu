@@ -2,8 +2,11 @@
 .nation-inspector h2,.nation-inspector h3,.nation-inspector h4,.nation-inspector p{margin:0}
 .nation-inspector h2{font-size:calc(22px * var(--text-scale, 1))}.nation-inspector h3{font-size:calc(17px * var(--text-scale, 1))}.nation-inspector h4{font-size:calc(14px * var(--text-scale, 1))}
 .nation-inspector p,.nation-inspector dd{overflow-wrap:anywhere;line-height:1.5}
-.nation-inspector dl{display:grid;grid-template-columns:minmax(70px,.8fr) minmax(0,1.6fr);gap:8px 12px;margin:0;font-size:calc(13px * var(--text-scale, 1))}
-.nation-inspector dt{color:#94b0ba}.nation-inspector dd{margin:0}
+.nation-inspector dl{display:grid;grid-template-columns:minmax(max(70px,min-content),.8fr) minmax(0,1.6fr);gap:8px 12px;margin:0;font-size:calc(13px * var(--text-scale, 1))}
+.nation-inspector dt{color:#94b0ba;overflow-wrap:normal;word-break:normal}
+/* #779: labels never split mid-word: the label column grows to its longest word, and narrow panels stack label over value */
+@media (max-width:420px){.nation-inspector dl{grid-template-columns:minmax(0,1fr);gap:2px 0}.nation-inspector dd{margin-bottom:6px}}
+.nation-inspector dd{margin:0}
 .nation-inspector details{padding:10px;border:1px solid #34535d;border-radius:3px;font-size:calc(12px * var(--text-scale, 1))}.nation-inspector summary{cursor:pointer}.nation-inspector details[open] summary{margin-bottom:8px}.nation-inspector details p{margin-bottom:8px}
 .nation-inspector-systems,.nation-inspector-links{display:flex;flex-wrap:wrap;gap:7px}
 .nation-inspector-systems button{flex:1 1 85px}.nation-inspector button{min-height:44px;white-space:normal;text-align:left;padding:9px 12px;border:1px solid #3b6670;border-radius:3px;background:#1a4650;color:#e1f2ef;font:inherit;font-size:calc(12px * var(--text-scale, 1));cursor:pointer}

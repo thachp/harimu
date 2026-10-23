@@ -72,7 +72,8 @@ export type KorundShortfall={week:number;workUnit:string;unitFood:number;targetF
 export const shortfallPercent=(unitFood:number,target=korundWeeklyQuotaFood)=>target>0&&unitFood<target?Math.max(1,Math.round((target-unitFood)*100/target)):0;
 export const korundShortfallCopy={
  notice:(unit:string,pct:number)=>`Inspection: ${unit} finished last week ${pct}% short of its quota.`,
- ledger:(week:number)=>`Week ${week} work-unit bonus: 0.00 LN withheld (quota shortfall).`,
+ // ARC follow-up to #759/#767: plain wording; the ledger reason stays quota_shortfall. [ASSUMPTION] no work-unit bonus exists yet, so nothing is withheld.
+ ledger:'No bonus withheld (work-unit bonus not yet active).',
  press:(unit:string)=>`Plan inspectors visit the ${unit} after a weekly shortfall.`,
 } as const;
 /** Shortfall for closed week `week` (null when the unit met its target or there is no closed week yet). */

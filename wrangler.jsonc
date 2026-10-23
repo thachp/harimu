@@ -61,6 +61,8 @@
     "HARIMU_KORUND_MEDALS_ENABLED": "true",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
     "HARIMU_KORUND_SHORTFALL_ENABLED": "true",
+    // #758: Korund wallet shows the rumored LN street rate (from #43 trades, display only) to citizens who have traded on the gray market. Off: no read, wallet unchanged.
+    "HARIMU_WALLET_STREET_RATE_ENABLED": "true",
     // #776: a closed-week plan shortfall withdraws goods (then clothing) coupons from the next week's book; the food ration is never cut (derived on read). Off: coupons unchanged.
     "HARIMU_KORUND_RATION_CUT_ENABLED": "true",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).

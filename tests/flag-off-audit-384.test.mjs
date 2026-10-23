@@ -38,6 +38,7 @@ const flagOffPins = {
   HARIMU_GRAY_SUSPICION_ENABLED: 'gray-suspicion-749.test.mjs',
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
+  HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
   HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',
   HARIMU_NATION_READINESS_ENABLED: 'nation-readiness-486.test.mjs',

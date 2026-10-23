@@ -32,6 +32,9 @@ export const grayText = {
 
 /** The rumor line for a figure (first #314 variant): the rate arrives as one pre-formatted approximate value. */
 export const rumorLine = (hundredths: number): string => fillGray(rumoredRate.lines[0].text, { rate: rate(hundredths) });
+/** #758 [not in #314] wallet line under the LN balance; always labeled a rumor, never official. */
+export const walletRumorTag = 'rumor, not official';
+export const walletStreetRateLine = (hundredths: number | null): string => hundredths === null ? `Rumored street rate: no recent trades (${walletRumorTag})` : `Rumored street rate: about ${rate(hundredths)} (${walletRumorTag})`;
 export const noOffersLine = offerLines.none[0].text;
 export const postedLine = (amountMinor: number, askRate: number): string => fillGray(offerLines.posted[0].text, { amount: ln(amountMinor), askRate: rate(askRate) });
 export const acceptedLine = (amountMinor: number, askRate: number): string => fillGray(offerLines.accepted[0].text, { amount: ln(amountMinor), askRate: rate(askRate) });
