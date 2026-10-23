@@ -24,7 +24,7 @@ import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/pop
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
 import { marketVisible } from '@/lib/market-visibility';
-import { WelcomeBack, type WelcomeBackData } from './welcome-back'; // #739
+import { WelcomeBack, sendHeartbeat, type WelcomeBackData } from './welcome-back'; // #739
 import { firstWeekTracker, newlyDone, serverFirstWeekProgressStore, stubFirstWeekProgressStore } from '@/lib/first-week-progress';
 import { firstWeekDay, visibleGoals, withoutMarketGoals, type WeekDay } from '@/lib/first-week';
 const visibleWeekDay = (day: WeekDay | null, marketOpen = true): WeekDay | null => withoutMarketGoals(day && {...day, goals: visibleGoals(day)}, marketOpen);
@@ -465,7 +465,6 @@ function ClerkAccountControl() {
 type CitizenSnapshot = {
   flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean };
   firstWeek?: { completed: string[] } | null;
-  welcomeBack?: WelcomeBackData; // #739
   profile: {
     nationId: string | null;
     displayName: string | null;
@@ -525,11 +524,13 @@ function ClerkCitizenSession({
   onHydrate,
   onStatus,
   onIdentity,
+  onWelcomeBack,
   retryKey,
 }: {
   onHydrate: (snapshot: CitizenSnapshot, requestedAtMs?: number) => void;
   onStatus: (status: CitizenSessionStatus) => void;
   onIdentity: (userId: string | null) => void;
+  onWelcomeBack: (data: WelcomeBackData) => void;
   retryKey: number;
 }) {
   const { isLoaded, user } = useUser();
@@ -561,6 +562,7 @@ function ClerkCitizenSession({
         if (controller.signal.aborted) return;
         onHydrate(snapshot, requestedAt);
         onStatus('ready');
+        void sendHeartbeat(controller.signal).then(data => { if (data && !controller.signal.aborted) onWelcomeBack(data); }); // #739: once per load; GET stays pure
       } catch (error) {
         if (!controller.signal.aborted && (error as Error).name !== 'AbortError') onStatus('error');
       }
@@ -568,7 +570,7 @@ function ClerkCitizenSession({
 
     void loadCitizen();
     return () => controller.abort();
-  }, [isLoaded, onHydrate, onStatus, onIdentity, userId, retryKey]);
+  }, [isLoaded, onHydrate, onStatus, onIdentity, onWelcomeBack, userId, retryKey]);
 
   return null;
 }
@@ -1331,7 +1333,6 @@ export default function Home() {
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
     if (snapshot.flags) { setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); }
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
-    if (snapshot.welcomeBack) setWelcomeBack(snapshot.welcomeBack); // #739: sent once; kept until dismissed
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
     setDemoStarterGranted(snapshot.demoStarterGranted ?? false);
@@ -1890,7 +1891,7 @@ export default function Home() {
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? `${countryWord()} travel` : 'Household';
   return <>
-    {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
+    {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} onWelcomeBack={setWelcomeBack} />}
     <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}

@@ -68,6 +68,9 @@ export const welcomeBack:readonly WelcomeBack[]=[
   news:L('Court Gazette: {headlineCount} reports were printed while you were away.'),aiBadge:false,proposal:true},
 ];
 
+/** A neutral frame for a nation without its own (no byline, no nation voice, not badged): a plain report, used until that nation's frame is written. */
+export const welcomeBackGeneric={byline:null,greeting:L('Welcome back. You were away for {daysAway}.'),news:L('There are {headlineCount} reports to catch up on.'),aiBadge:false,proposal:true} as const;
+
 /** When a citizen returns from Dormant or Archived their job slot has been released: one line each on how to find work again. */
 export const jobReleased:readonly JobReleased[]=[
  {nationId:'kindle',line:L('Your job slot was released. Open the job board to find work.'),proposal:true},
@@ -82,4 +85,4 @@ export const dormancyStatusFor=(key:DormancyStatusKey)=>dormancyStatuses.find(s=
 export const welcomeBackFor=(nationId:DormancyNation)=>welcomeBack.find(w=>w.nationId===nationId);
 export const jobReleasedFor=(nationId:DormancyNation)=>jobReleased.find(j=>j.nationId===nationId);
 
-export const dormancyCopy={statuses:dormancyStatuses,title:WELCOME_BACK_TITLE,welcomeBack,jobReleased,savingsShield,proposal:true} as const;
+export const dormancyCopy={statuses:dormancyStatuses,title:WELCOME_BACK_TITLE,welcomeBack,welcomeBackGeneric,jobReleased,savingsShield,proposal:true} as const;
