@@ -5,7 +5,8 @@
  *  - every visible text in the bar has at least 4.5:1 against the ground under it; a keyboard focus ring (at least 2px) shows on the first bar control;
  *  - QA1 on #819: for every focusable control in the bar, the rendered pixels just outside and just inside its focus ring (ground, chips and the nation motif strips)
  *    are at least 3:1 against the ring color (sampled from a screenshot with the control focused, straight edges only, corners skipped);
- *  - ARC on #819: a hovered resource chip's border (the nation accent) is at least 3:1 against the bar.
+ *  - ARC on #819: a hovered resource chip's border (the nation accent) is at least 3:1 against the bar;
+ *  - QA1 on #819: the focus band (box-shadow spread) of a focused control never overlaps a text box elsewhere in the bar. Runs with S2 (UI_V2_TOPBAR) off and on.
  *  Both: the page never scrolls sideways. With LAYOUT_SHOTS_DIR, shots of the bar go to docs/screenshots/85. Used by hud-layout-check.mjs; runs on its own too. */
 import { bundleShell, shellProps } from './hud-tooltip-check.mjs';
 import { isMain, runStandalone } from './layout-standalone.mjs';
@@ -64,10 +65,26 @@ const ringContrast = async ([png, ring]) => {
   return { worst, at };
 };
 
+/** Runs in the page: the focused control's focus band (largest box-shadow spread) against every text box in the bar outside that control. */
+const bandOverlap = () => {
+  const el = document.activeElement, bar = document.querySelector('header.game-hud'); if (!el || !bar.contains(el)) return '';
+  const t = el.matches('details') ? el.querySelector('summary') : el, r = t.getBoundingClientRect();
+  const spreads = [...getComputedStyle(t).boxShadow.matchAll(/(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px/g)].map(m => Number(m[4]));
+  const d = Math.max(0, ...spreads); if (!d) return '';
+  const band = { l: r.left - d, t: r.top - d, r: r.right + d, b: r.bottom + d };
+  const walker = document.createTreeWalker(bar, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!n.textContent.trim() || t.contains(n) || n.parentElement.closest('.game-hud-tip,[role=tooltip],.skip-link,[class*="skip"]')) continue;
+    const range = document.createRange(); range.selectNodeContents(n);
+    for (const x of range.getClientRects()) { const w = Math.min(band.r, x.right) - Math.max(band.l, x.left), h = Math.min(band.b, x.bottom) - Math.max(band.t, x.top);
+      if (w > 0.5 && h > 0.5) return `"${n.textContent.trim().slice(0, 30)}" by ${w.toFixed(1)}x${h.toFixed(1)}px (band ${d}px)`; }
+  }
+  return '';
+};
 export async function checkNationSkin({ browser, css, preflight, failures, rows }) {
   const shots = process.env.LAYOUT_SHOTS_DIR, baseline = {};
-  for (const flag of ['false', 'true']) {
-    const script = await bundleShell(entry, { NEXT_PUBLIC_HARIMU_NATION_SKIN: flag }), on = flag === 'true';
+  for (const s2 of ['false', 'true']) for (const flag of ['false', 'true']) {
+    const script = await bundleShell(entry, { NEXT_PUBLIC_HARIMU_NATION_SKIN: flag, NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR: s2, NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM: s2 }), on = flag === 'true', v2 = s2 === 'true' ? ' S2' : '';
     for (const [w, h] of [[1280, 800], [390, 844], [320, 700]]) for (const scale of [1, 1.25, 1.5]) {
       const context = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: w <= 760 }), page = await context.newPage(); page.setDefaultTimeout(90000);
       await page.setContent(`<!doctype html><html style="--text-scale:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${preflight}${css}</style></head><body><div id="root"></div></body></html>`);
@@ -75,12 +92,12 @@ export async function checkNationSkin({ browser, css, preflight, failures, rows 
       const grounds = new Set();
       for (const id of ['kindle', 'korund', 'aurelle', null]) {
         let minRing = Infinity, rings = 0;
-        const label = `${w}x${h} @${scale * 100}% #85 skin ${id ?? 'guest'} (flag ${on ? 'on' : 'off'})`, fail = m => failures.push(`${label}: ${m}`);
+        const label = `${w}x${h} @${scale * 100}% #85 skin ${id ?? 'guest'}${v2} (flag ${on ? 'on' : 'off'})`, fail = m => failures.push(`${label}: ${m}`);
         await page.evaluate(([p, n]) => window.mount(p, n), [{ ...shellProps, view: 'square', citizenNation: undefined }, id]); await page.waitForSelector('header.game-hud'); await page.waitForTimeout(100);
         const r = await page.evaluate(probe);
         for (const i of r.issues) fail(i);
         const want = on && id ? id : null; if (r.skin !== want) fail(`data-nation-skin is ${r.skin}, expected ${want}`);
-        const key = `${w}x${h}@${scale}/${id}`; if (!on) baseline[key] = r; else {
+        const key = `${w}x${h}@${scale}/${id}${v2}`; if (!on) baseline[key] = r; else {
           if (baseline[key].text !== r.text) fail(`bar text changed: "${r.text}" vs "${baseline[key].text}"`);
           const moved = r.boxes.findIndex((b, i) => b !== baseline[key].boxes[i]); if (moved >= 0 || r.boxes.length !== baseline[key].boxes.length) fail(`layout changed at element ${moved}: ${r.boxes[moved]} vs ${baseline[key].boxes[moved]}`);
           if (id) grounds.add(r.bg); }
@@ -97,6 +114,7 @@ export async function checkNationSkin({ browser, css, preflight, failures, rows 
             const png = (await page.locator('header.game-hud').screenshot({ animations: 'disabled' })).toString('base64');
             const { worst, at } = await page.evaluate(ringContrast, [png, ring]); minRing = Math.min(minRing, worst);
             if (worst < 3) fail(`focus ring on "${ring.name}" is ${worst.toFixed(2)}:1 against ${at}`);
+            const hit = await page.evaluate(bandOverlap); if (hit) fail(`focus band on "${ring.name}" covers ${hit}`);
           }
           if (!rings) fail('no focus ring measured');
           await page.evaluate(() => document.activeElement?.blur()); const chip = page.locator('header.game-hud .game-resources>:is(.game-hud-help,.game-wallet-button)').first();
@@ -108,9 +126,9 @@ export async function checkNationSkin({ browser, css, preflight, failures, rows 
         await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(0, h - 1);
 
         rows.push(`${label}: text ≥ ${r.min.toFixed(1)}:1${on && id ? `, ring ≥ ${minRing.toFixed(1)}:1` : ''}${r.issues.length ? ' ✗' : ''}`);
-        if (shots && scale !== 1.25 && (on || id === 'kindle')) await page.locator('header.game-hud').screenshot({ path: `${shots}/85-${on ? 'on' : 'off'}-${id ?? 'guest'}-${w}-${scale * 100}.png` });
+        if (shots && scale !== 1.25 && (on || id === 'kindle')) await page.locator('header.game-hud').screenshot({ path: `${shots}/85-${on ? 'on' : 'off'}${v2 ? '-s2' : ''}-${id ?? 'guest'}-${w}-${scale * 100}.png` });
       }
-      if (on && grounds.size !== 3) failures.push(`${w}x${h} @${scale * 100}% #85: the three nation bars share a ground (${[...grounds].join(' | ')})`);
+      if (on && grounds.size !== 3) failures.push(`${w}x${h} @${scale * 100}%${v2} #85: the three nation bars share a ground (${[...grounds].join(' | ')})`);
       await context.close();
     }
   }

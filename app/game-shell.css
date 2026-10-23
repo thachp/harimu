@@ -426,8 +426,9 @@ body:has(.harimu-game){overflow:auto}
 header.game-hud[data-nation-skin]{--skin-ground:#071820;--skin-chip:#0d2530;--skin-edge:#2f4d57;--skin-accent:#d0ad54;background:var(--skin-ground);border-bottom-color:var(--skin-edge)}
 header.game-hud[data-nation-skin] .game-resources>div,header.game-hud[data-nation-skin] .game-resources>.game-hud-help,header.game-hud[data-nation-skin] .game-resources>.game-wallet-button{background:var(--skin-chip);border-color:var(--skin-edge)}
 header.game-hud[data-nation-skin] .game-crest{border-color:var(--skin-accent)}
-/* QA1 on #819: a focused control gets a halo of the solid ground just past its ring (2px outline, offset up to 3px), so the ring never sits next to a motif strip or chip edge */
-header.game-hud[data-nation-skin] :focus-visible{box-shadow:0 0 0 6px var(--skin-ground)}
+/* QA1 on #819: a focused control gets a halo of the solid ground just past its ring, so the ring never sits next to a motif strip or chip edge. The ring sits
+   1px off the control edge and the halo is 4px, so it stays clear of neighbouring text such as the S2 clock line (scripts/nation-skin-check.mjs) */
+header.game-hud[data-nation-skin] :focus-visible{outline-offset:1px;box-shadow:0 0 0 4px var(--skin-ground)}
 /* ARC on #819: resource chip hover and open use the nation accent (each accent measures >=3:1 against its own ground; pinned in tests/nation-skin-85.test.mjs) on the nation chip ground */
 header.game-hud[data-nation-skin] .game-resources>.game-hud-help:hover,header.game-hud[data-nation-skin] .game-resources>.game-wallet-button:hover,header.game-hud[data-nation-skin] .game-resources>.game-hud-help[open]{border-color:var(--skin-accent);background:var(--skin-chip)}
 /* Kindle, a modern civic form: basalt ground, ember header rule, brass base line */
