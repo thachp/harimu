@@ -111,6 +111,31 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
+test('QA3 nit (#827): a negative wallet at return stores balance 0 in the skip row (the floor is applied before storing)', async t => {
+  const w = await world(t, { cash: 0 });
+  await w.r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'buy','fixture-debt',1,-500,1)").bind(randomUUID(), 'alice').run();
+  assert.equal(await w.wallet(), -500);
+  assert.equal((await w.beat()).data.welcomeBack.shield, undefined);
+  const row = await w.r.db.prepare('SELECT balance_minor, status, reason FROM savings_shield_credits').first();
+  assert.deepEqual([Number(row.balance_minor), row.status, row.reason], [0, 'skipped', 'no_balance']);
+});
+
+for (const backend of ['sqlite', 'postgres']) {
+  test(`${backend}: QA3 nit (#827): two concurrent returns with a short treasury log one treasury_short warning, from the winning insert only`, async t => {
+    const w = await world(t, { backend, treasury: 0 });
+    const warn = console.warn, warnings = []; console.warn = (...a) => warnings.push(a.join(' '));
+    // Barrier: both requests pass the "already recorded?" read before either inserts, so the race is real on both backends.
+    const prepare = w.r.db.prepare.bind(w.r.db); let arrived = 0, open; const gate = new Promise(r => { open = r; });
+    w.r.db.prepare = q => { const st = prepare(q); if (!/^SELECT clerk_user_id, status/.test(q)) return st;
+      return { bind: (...a) => { const b = st.bind(...a); return { first: async () => { const out = await b.first(); if (arrived < 2) { if (++arrived === 2) open(); await gate; } return out; } }; } }; };
+    const { applySavingsShield } = await w.r.importModule('lib/savings-shield.ts');
+    let both; try { both = await Promise.all([0, 1].map(() => applySavingsShield(w.r.db, 'alice', w.last, w.now, true))); } finally { console.warn = warn; w.r.db.prepare = prepare; }
+    assert.deepEqual(both.map(x => x.replayed).sort(), [false, true], 'one winner, one replay'); assert.ok(both.every(x => x.status === 'skipped'));
+    assert.deepEqual(warnings.filter(x => x.includes('[savings-shield]')).length, 1, JSON.stringify(warnings));
+    assert.deepEqual(await w.rows(), [{ status: 'skipped', credit_minor: 0, reason: 'treasury_short' }]);
+  });
+}
+
 test('thresholds and scope: Away (29 days) and Korund pay nothing; exactly 30 days (Dormant) and Archived pay', async t => {
   for (const [idleDays, nation, paid] of [[29, 'kindle', false], [30, 'kindle', true], [181, 'kindle', true], [40, 'korund', false]]) {
     const w = await world(t, { idleDays, nation });

@@ -111,6 +111,8 @@
     "HARIMU_CIVIC_RANK_ENABLED": "true",
     // #738 slice 1: army units: volunteer for your nation's home-guard unit, leave it, pick a squad stance. Needs HARIMU_WAR_ENABLED too. Off: /api/army is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMIES_ENABLED": "true",
+    // #738 slice 2: army drills: one drill per member per game day; current members' drills and shifts raise unit strength and morale on the card. Needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED too. Off: POST /api/army/drill is 404 and /api/army has no strength or morale. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_ARMY_DRILLS_ENABLED": "true",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.

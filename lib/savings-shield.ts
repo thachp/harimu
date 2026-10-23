@@ -40,7 +40,8 @@ export async function applySavingsShield(db: GameDatabase, userId: string, lastA
     + COALESCE((SELECT SUM(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.sell_order_id WHERE o.citizen_id = ? AND t.filled_at > ?), 0) AS inflow`)
     .bind(userId, new Date(lastActiveAt * 1000).toISOString(), userId, lastActiveAt, userId, lastActiveAt, userId, lastActiveAt).first<{ inflow: number }>();
   const atReturn = Math.trunc(Number(wallet?.balance ?? 0));
-  const balance = Math.max(0, Math.min(atReturn, Math.max(0, atReturn - Math.trunc(Number(inflow?.inflow ?? 0)))));
+  // QA3 nit on #827: one floor at 0, applied before the value is stored (paid and skip rows alike); a negative wallet (open buy orders) stores 0.
+  const balance = Math.max(0, Math.min(atReturn, atReturn - Math.max(0, Math.trunc(Number(inflow?.inflow ?? 0)))));
   const [start, end] = await Promise.all([readReserveBoard(db, lastActiveAt), readReserveBoard(db, now)]);
   const credit = shieldCreditMinor(balance, start.priceIndex, end.priceIndex);
   const row = `INSERT INTO savings_shield_credits (absence_key, clerk_user_id, absence_started_at, returned_at, balance_minor, index_start_tenths, index_end_tenths, credit_minor, status, reason)
@@ -55,6 +56,7 @@ export async function applySavingsShield(db: GameDatabase, userId: string, lastA
     db.prepare(`${row} WHERE NOT EXISTS (SELECT 1 FROM savings_shield_credits WHERE absence_key = ?) ON CONFLICT (absence_key) DO NOTHING`).bind(...binds(0, 'skipped', 'treasury_short'), key),
   ])).some(r => Number(r.meta?.changes ?? 0) === 1);
   const saved = (await read())!;
+  // QA3 nit on #827: only the winning insert logs; a request that lost the race is a replay and stays silent.
   if (won && saved.reason === 'treasury_short') console.warn(`[savings-shield] skipped ${key}: the Kindle treasury cannot cover ${credit}`);
   return { status: saved.status, creditMinor: Number(saved.credit_minor), reason: saved.reason, replayed: !won };
 }
