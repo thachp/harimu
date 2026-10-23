@@ -41,6 +41,7 @@ import { checkNationFactLabels } from './nation-fact-label-check.mjs';
 import { checkUiV2World } from './ui-v2-world-check.mjs';
 import { checkUiV2City } from './ui-v2-city-check.mjs';
 import { checkUiV2Mobile } from './ui-v2-mobile-check.mjs';
+import { checkUiV2Household } from './ui-v2-household-check.mjs';
 import { checkWireBylines } from './wire-bylines-check.mjs';
 import { checkNationSkin } from './nation-skin-check.mjs';
 import { checkUiV2Nation } from './ui-v2-nation-check.mjs';
@@ -211,7 +212,8 @@ try {
   await checkUiV2World({ browser, css, preflight, failures, rows }); // #392 S5: crest chips in the World nation strip
   await checkUiV2Nation({ browser, css, preflight, failures, rows }); // #392 S6: Nation panel shape, institution rows, Explore {nation}
   await checkUiV2City({ browser, css, preflight, failures, rows }); // #392 S7: City hotspot pills, strip removed
-  await checkUiV2Mobile({ browser, css, preflight, failures, rows }); // #392 S8: phone bottom tab bar and bottom-sheet panel
+  await checkUiV2Mobile({ browser, css, preflight, failures, rows });
+  await checkUiV2Household({ browser, css, preflight, failures, rows }); // #392 S9: Household panel // #392 S8: phone bottom tab bar and bottom-sheet panel
   await checkWireBylines({ browser, css, preflight, failures, rows }); // #243: wire story bylines
   await checkNationSkin({ browser, css, preflight, failures, rows }); // #85: nation skin on the top bar
   await checkUiV2Rail({ browser, css, preflight, failures, rows }); // #392 S4: zoom rail beside the stage, places-only top tabs
