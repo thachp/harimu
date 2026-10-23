@@ -20,7 +20,7 @@ export function ModConsole({ load = loadReviewQueue }: { load?: typeof loadRevie
       <button type="submit" disabled={busy} aria-busy={busy}>Load</button>
     </form>
     <p role="status" className={styles.status}>{busy ? 'Loading…' : result ? (result.ok ? `${result.items.length} items${result.items.length >= PAGE ? ` (newest ${PAGE}; older entries not shown)` : ''}` : `${result.status || 'Error'}: ${result.error}`) : ''}</p>
-    {result?.ok && <div className={styles.scroll} tabIndex={0} role="region" aria-label="AI review queue">
+    {result?.ok && result.items.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="AI review queue">
       <table className={styles.table}><caption>AI review queue</caption>
         <thead><tr>{['created_at', 'nation_id', 'persona', 'source', 'reason', 'filter_result', 'output_text', 'reviewed_at', 'reviewer_note'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
         <tbody>{result.items.map(item => <tr key={item.id}><td>{utc(item.created_at)}</td><td>{item.nation_id}</td><td>{item.persona}</td><td>{item.source}</td><td>{item.reason}</td>
