@@ -205,7 +205,7 @@ test('#351 the privacy fence and the flags are unchanged: assembly ballot tables
   const database = await readFile(new URL('../lib/postgres/database.ts', import.meta.url), 'utf8');
   assert.match(database, /\(civic\|poc\|assembly\|primary\)_\(anonymous_ballots\|voter_receipts\)/, 'the ballot and receipt tables are in the PostgreSQL ballot fence');
   const wrangler = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.match(wrangler, /"HARIMU_KINDLE_ASSEMBLY_ENABLED": "false"/); assert.doesNotMatch(wrangler, /^\s*"HARIMU_KINDLE_CYCLE_START_AT"/m, 'no cycle start is configured by default');
+  assert.match(wrangler, /"HARIMU_KINDLE_ASSEMBLY_ENABLED": "true"/); assert.match(await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'), /"HARIMU_KINDLE_ASSEMBLY_ENABLED": "false"/); assert.doesNotMatch(wrangler, /^\s*"HARIMU_KINDLE_CYCLE_START_AT"/m, 'no cycle start is configured by default');
   assert.doesNotMatch(wrangler, /^\s*"HARIMU_KINDLE_ASSEMBLY_OPEN_AT"/m);
   const route = await readFile(new URL('../app/api/assembly/route.ts', import.meta.url), 'utf8');
   assert.match(route, /if \(!assemblyEnabled\(bindings\(\)\)\) return json\(\{ enabled: false \}, 404\)/);

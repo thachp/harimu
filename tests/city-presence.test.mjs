@@ -47,10 +47,12 @@ test('authorized socket routes to its nation:city object with server-set identit
   assert.equal(f.headers['x-harimu-presence-user'], 'alice'); assert.equal(f.headers['x-harimu-presence-city'], 'kindle:forgehaven');
   assert.equal(f.headers['x-harimu-presence-name'], 'Ember-12');
 });
-test('wrangler binds the Durable Object and both flags default off', async () => {
+test('wrangler binds the Durable Object; both flags on in preview, off in production', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   assert.match(cfg, /"main": "\.\/worker\/entry\.ts"/);
   assert.match(cfg, /"name": "CITY_PRESENCE", "class_name": "CityPresence"/);
   assert.match(cfg, /"new_sqlite_classes": \["CityPresence"\]/);
-  assert.match(cfg, /"HARIMU_REALTIME_PRESENCE": "false"/); assert.match(cfg, /"NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false"/);
+  assert.match(cfg, /"HARIMU_REALTIME_PRESENCE": "true"/); assert.match(cfg, /"NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "true"/);
+  const prod = await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8');
+  assert.match(prod, /"HARIMU_REALTIME_PRESENCE": "false"/); assert.match(prod, /"NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false"/);
 });

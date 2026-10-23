@@ -90,11 +90,12 @@ test('pure site check: Commons inside the block, and seed capitals keep the dist
   assert.deepEqual(Object.values(m.foundingAuthorities).map(a => a.action), ['kindle-charter', 'korund-chairman-order', 'aurelle-royal-charter']);
 });
 
-test('wrangler.jsonc ships city founding off by default (every vars block)', async () => {
+test('wrangler.jsonc ships city founding on in preview (every vars block) and off in production', async () => {
   const { readFile } = await import('node:fs/promises');
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   const values = [...cfg.matchAll(/"HARIMU_CITY_FOUNDING_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]);
   assert.ok(values.length >= 1, 'flag is declared');
-  assert.ok(values.every(v => v === 'false'), JSON.stringify(values));
+  assert.ok(values.every(v => v === 'true'), JSON.stringify(values));
+  assert.match(await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'), /"HARIMU_CITY_FOUNDING_ENABLED": "false"/);
   assert.equal([...cfg.matchAll(/"vars"\s*:/g)].length, values.length, 'declared in each vars block');
 });

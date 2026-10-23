@@ -39,7 +39,8 @@ test('#442 rules: gain is base 10 in an untouched district and diminishes, never
 
 test('#442: the flag defaults to "false", migration 0046 only adds a table, and no ballot, count or AI-share module can read visibility', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_CANVASSING_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_CANVASSING_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
+  assert.match(await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'), /"HARIMU_CANVASSING_ENABLED": "false"/);
   for (const file of ['../drizzle/0046_canvass_quests.sql', '../db/postgres/0046_canvass_quests.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.equal(isDestructive(sql), false, file); assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS canvass_quests/);
