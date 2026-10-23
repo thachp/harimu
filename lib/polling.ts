@@ -1,4 +1,4 @@
-/** #740 slice 1: voluntary Kindle voter-intent answers and one published poll per election per real day (migration 0073 mirrors pollingSchemas).
+/** #740 slice 1: voluntary Kindle voter-intent answers and one published poll per election per real day (migration 0074 mirrors pollingSchemas).
  *  Reads return only the caller's own answer and published aggregates, never another citizen's answer or who answered. */
 import type { GameDatabase } from './database-contract';
 import { drawSample, maximumSample, pollDay, pollSeed, tallyPoll, type PollResult } from './polling-rules';

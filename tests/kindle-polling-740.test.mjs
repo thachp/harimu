@@ -77,9 +77,8 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await r.call('polling', 'bob')).data.eligible, false);
     assert.deepEqual([(await post('bob', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-x4' })).data.reason, await rows(r, 'kindle_poll_answers')], ['not_eligible', 0]);
     r.setFixtureEnv('HARIMU_ACCOUNT_ELECTION_POC_ENABLED', 'true');
-    await r.db.prepare("UPDATE civic_elections SET closed_at=closes_at, closes_at=closes_at").run().catch(() => {});
     r.setNow(r.now + 4 * 86400000);
-    assert.equal((await post('bob', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-x5' })).data.reason, 'closed', 'after the window');
+    assert.equal((await post('bob', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-x5' })).data.reason, 'closed', 'after the window (closed_at still NULL: the closes_at check alone)');
   });
 
   test(`/api/polling (${backend}): no poll under 10 answers; one seeded snapshot per day from answers before the day; never an individual answer`, async t => {
