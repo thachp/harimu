@@ -95,6 +95,16 @@ export const marketTradeFeesSchema = `CREATE TABLE IF NOT EXISTS market_trade_fe
   charged_at INTEGER NOT NULL
 )`;
 export const marketTradeFeesIndex = `CREATE INDEX IF NOT EXISTS idx_market_trade_fees_seller ON market_trade_fees(seller_id, charged_at)`;
+/** #781 home-move fee sink (one row per move; currency SPK or LN). Netted by walletViewSql (SPK) and lib/korund-wallet (LN). */
+export const homeCityMovesSchema = `CREATE TABLE IF NOT EXISTS home_city_moves (
+ request_id TEXT PRIMARY KEY,
+ clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+ nation_id TEXT NOT NULL, from_city_id TEXT NOT NULL, to_city_id TEXT NOT NULL,
+ currency TEXT NOT NULL CHECK(currency IN ('SPK', 'LN')),
+ fee_minor INTEGER NOT NULL CHECK(typeof(fee_minor) = 'integer' AND fee_minor > 0),
+ moved_at INTEGER NOT NULL
+)`;
+export const homeCityMovesIndex = `CREATE INDEX IF NOT EXISTS idx_home_city_moves_user ON home_city_moves(clerk_user_id, moved_at)`;
 export const marketSchemas = [marketGoodsSchema, marketOrdersSchema, marketCancellationsSchema, marketTradesSchema, ...marketIndexes, marketSpoilageSchema, ...marketSpoilageIndexes, marketOpenOrdersView];
 export const marketGoodsSeedSql = marketGoods.map(g =>
   `INSERT OR IGNORE INTO market_goods (good, label, unit, perishable, shelf_life_days) VALUES ('${g.good}', '${g.label}', '${g.unit}', ${g.perishable ? 1 : 0}, ${g.shelfLifeDays ?? 'NULL'})`);

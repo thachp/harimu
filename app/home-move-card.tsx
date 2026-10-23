@@ -16,6 +16,8 @@ export function HomeMoveCard({ nationId, currentCityId, homeCityId }: { nationId
   const [info, setInfo] = useState<HomeInfo | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [now, setNow] = useState<number | null>(null); // read the clock in an effect, never during render (react-hooks/purity)
+  useEffect(() => { const tick = () => setNow(Date.now() / 1000); const first = setTimeout(tick, 0), t = setInterval(tick, 60000); return () => { clearTimeout(first); clearInterval(t); }; }, [info?.nextMoveAt]);
   useEffect(() => {
     let live = true;
     void fetch('/api/city/home', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).then(d => { if (live) setInfo(d as HomeInfo | null); }).catch(() => undefined);
@@ -24,8 +26,7 @@ export function HomeMoveCard({ nationId, currentCityId, homeCityId }: { nationId
   const city = currentCityId ? cityForNation(nationId, currentCityId) : undefined;
   const home = info?.homeCityId ?? homeCityId;
   if (!info || !info.currency || !city || city.id === home) return null;
-  const now = Date.now() / 1000;
-  const waiting = info.nextMoveAt !== null && now < info.nextMoveAt;
+  const waiting = info.nextMoveAt !== null && (now === null || now < info.nextMoveAt);
   async function move() {
     if (!city) return;
     setPending(true); setNote(null);

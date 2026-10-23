@@ -112,7 +112,7 @@ test('funds boundary: a wallet of exactly the fee can move and ends at zero', as
 // ARC ruling on #781: 10 units of the nation's own wallet currency; no wallet currency (Aurelle: Royal Favor is not money) is 403 not_open_yet.
 for (const backend of ['sqlite', 'postgres']) {
   test(`${backend}: Korund pays 10 LN from the labor-note wallet; Spark is untouched; LN shortfall is refused`, async t => {
-    const { r } = await world(t, { backend, cash: 0 });
+    const { r, move } = await world(t, { backend });
     const at = new Date(r.now).toISOString();
     for (const id of ['kim', 'kip']) await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'korund',?,18,0,'Good standing',?,?)").bind(id, id, at, at).run();
     const settle = async (user, i) => { const id = randomUUID(), iso = new Date((1 + i) * 1000).toISOString();
@@ -131,6 +131,9 @@ for (const backend of ['sqlite', 'postgres']) {
     const poor = await r.call('city-home', 'kip', { cityId: krel, requestId: randomUUID() });
     assert.equal(poor.status, 402); assert.equal(poor.data.reason, 'funds'); assert.equal(await ln('kip'), 800);
     const row = await r.db.prepare("SELECT currency FROM home_city_moves WHERE clerk_user_id='kim'").first(); assert.equal(row.currency, 'LN');
+    await move(tarrek); // plus an SPK move, so both sink legs hold rows
+    const rec = await (await r.importModule('lib/ledger-reconciliation.ts')).reconcileLedger(r.db);
+    assert.equal(rec.mismatchCount, 0, JSON.stringify(rec)); // QA2: reconciliation is clean with SPK and LN move rows present
   });
 
   test(`${backend}: Kindle pays in SPK; Aurelle has no wallet currency and is refused not_open_yet with nothing charged`, async t => {

@@ -6,6 +6,7 @@ import type {GameDatabase} from './database-contract';
 import {cityForNation} from './cities';
 import {readCityLocation} from './city-location';
 import {laborNoteSql} from './korund-wallet';
+import {homeCityMovesSchema,homeCityMovesIndex} from './market-orders';
 export const homeMoveFeeMinor=1000; // 10 units of the nation's wallet currency (ARC ruling on #781)
 /** ARC ruling on #781: the fee is charged in the nation's own wallet currency. Royal Favor is not money; a nation without a wallet currency here
  *  (Aurelle, and any nation not yet open) refuses the move with not_open_yet and charges nothing. */
@@ -13,14 +14,8 @@ export const homeMoveCurrencies:Readonly<Record<string,'SPK'|'LN'>>={kindle:'SPK
 export const homeMoveCurrency=(nationId:string):'SPK'|'LN'|null=>homeMoveCurrencies[nationId]??null;
 const balanceSql={SPK:'COALESCE((SELECT balance FROM citizen_wallet_balances w WHERE w.clerk_user_id=c.clerk_user_id),0)',LN:laborNoteSql('c.clerk_user_id')} as const;
 export const homeMoveCooldownSeconds=7*86400; // 7 real days
-export const homeCityMoveSchemas=[`CREATE TABLE IF NOT EXISTS home_city_moves (
- request_id TEXT PRIMARY KEY,
- clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
- nation_id TEXT NOT NULL, from_city_id TEXT NOT NULL, to_city_id TEXT NOT NULL,
- currency TEXT NOT NULL CHECK(currency IN ('SPK', 'LN')),
- fee_minor INTEGER NOT NULL CHECK(typeof(fee_minor) = 'integer' AND fee_minor > 0),
- moved_at INTEGER NOT NULL
-)`,'CREATE INDEX IF NOT EXISTS idx_home_city_moves_user ON home_city_moves(clerk_user_id, moved_at)'];
+// The table lives in lib/market-orders.ts beside market_trade_fees so the SQL fixture tests (tests/*.test.py) can read it with the wallet view.
+export const homeCityMoveSchemas=[homeCityMovesSchema,homeCityMovesIndex];
 export type HomeMoveRefusal='not_open_yet'|'request_conflict'|'not_your_nation'|'already_home'|'cooldown'|'funds';
 export type HomeMoveResult={ok:true;homeCityId:string;feeMinor:number;currency:string;nextMoveAt:number;replayed:boolean}|{ok:false;reason:HomeMoveRefusal;status:number;nextMoveAt?:number};
 /** Earliest time the next move is allowed: last move + 7 days (allowed AT the boundary), or null when never moved. */
