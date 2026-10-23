@@ -89,6 +89,7 @@ import { Newspaper } from '@phosphor-icons/react';
 import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHeadline } from '@/lib/morning-brief';
 import { CityCoResidents } from './city-coresidents';
 import { CivicRankCard } from './civic-rank-card';
+import { ArmyCard } from './army-card'; // #738
 import { IVotedBadge } from './i-voted-badge'; // #782
 import type { CivicRank } from '@/lib/civic-rank-rules';
 import { WorldZones } from './world-zones';
@@ -1755,6 +1756,7 @@ export default function Home() {
         {simulation?.sieges && <SiegePanel sieges={simulation.sieges} nationId={citizenNation.id} />}
         <FoundingBanner founding={government?.founding} nationId={citizenNation.id} />
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
+        <ArmyCard />
         {citizenNation.id==='kindle'&&clerkConfigured&&<PrimaryCard key={`primary:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={`ranked:${citizenSessionKey}`} onSnapshot={setElection}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
