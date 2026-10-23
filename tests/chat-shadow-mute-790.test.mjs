@@ -26,8 +26,10 @@ test('parse: empty mutes nobody; a list mutes its ids; malformed fails safe with
   for (const empty of [undefined, null, '', '  ']) assert.equal(parseShadowMute(empty, w).size, 0);
   assert.deepEqual([...parseShadowMute(' alice , user_2X-y ', w)], ['alice', 'user_2X-y']);
   assert.equal(warned.length, 0);
-  for (const bad of ['alice;bob', 'alice, b ob', ',,', 'x'.repeat(65), 42, Array.from({ length: 201 }, (_, i) => `u${i}`).join(',')]) assert.equal(parseShadowMute(bad, w).size, 0, String(bad).slice(0, 20));
-  assert.equal(warned.length, 6); assert.match(warned[0], /malformed.*mutes nobody/);
+  const bads = ['alice;bob', 'alice, b ob', ',,', 'x'.repeat(65), 42, 'all', 'ALL', 'true', 'False', 'alice,all', Array.from({ length: 91 }, (_, i) => `u${i}`).join(',')];
+  for (const bad of bads) assert.equal(parseShadowMute(bad, w).size, 0, String(bad).slice(0, 20));
+  assert.equal(warned.length, bads.length);
+  assert.equal(parseShadowMute(Array.from({ length: 90 }, (_, i) => `u${i}`).join(','), w).size, 90, '90 ids: the D1 bound-parameter cap'); assert.match(warned[0], /malformed.*mutes nobody/);
   const logged = []; logShadowMuted('alice', 'm1', l => logged.push(l));
   assert.deepEqual(JSON.parse(logged[0]), { event: 'square_chat_shadow_muted', citizenId: 'alice', messageId: 'm1', reason: 'operator_shadow_mute' });
 });
