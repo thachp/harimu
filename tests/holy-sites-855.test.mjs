@@ -42,6 +42,11 @@ test('#889: faith-panel buttons render and post pilgrimage and charity; the outc
   globalThis.fetch = async (url, init) => { sent.push([url, JSON.parse(init.body)]); if (reply === 'throw') throw new Error('offline'); return { ok: reply.status < 400, status: reply.status, json: async () => reply.body }; };
   const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
   await act(async () => root.render(React.createElement(mod.exports.HolySiteActions)));
+  for (const b of el.querySelectorAll('button')) { // QA1 on #902: every button names its helper line, which comes first in its group
+    const help = el.querySelector(`[id="${b.getAttribute('aria-describedby')}"]`); assert.ok(help, b.textContent);
+    assert.equal(help.textContent, b.textContent === C.charity ? C.helper.charity : C.helper.pilgrimage, b.textContent);
+    assert.equal(help.parentElement, b.parentElement); assert.equal(b.parentElement.firstElementChild, help);
+  }
   const click = async label => act(async () => { [...el.querySelectorAll('button')].find(b => b.textContent === label).dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await new Promise(r => setTimeout(r, 0)); });
   await click(C.pilgrimage['high-retreat']); assert.ok(el.textContent.includes(C.outcome.denied));
   assert.deepEqual([sent[0][0], sent[0][1].action, sent[0][1].siteId, typeof sent[0][1].requestId], ['/api/faith/holy-sites', 'pilgrimage', 'high-retreat', 'string']);
