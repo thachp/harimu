@@ -23,7 +23,7 @@ export const utc = (seconds: number | null) => seconds == null ? '' : new Date(s
 export const modConsoleCopy = {
   proposal: true,
   title: 'Mod console', token: 'Admin token', load: 'Load queue', loading: 'Loading…',
-  empty: 'The queue is empty.', noMatch: 'No entries match these filters',
+  empty: 'The queue is empty.', noMatch: 'No entries match these filters.',
   count: (n: number) => n === 1 ? '1 entry' : `${n} entries`,
   newest: (page: number) => ` · newest ${page} shown, older entries not shown`,
 } as const;

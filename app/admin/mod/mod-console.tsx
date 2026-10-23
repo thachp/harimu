@@ -10,7 +10,9 @@ const PAGE = 50;
 export function ModConsole({ load = loadReviewQueue }: { load?: typeof loadReviewQueue }) {
   const [token, setToken] = useState(''), [reason, setReason] = useState(''), [nation, setNation] = useState('');
   const [busy, setBusy] = useState(false), [result, setResult] = useState<QueueResult | null>(null);
-  const submit = async (event: FormEvent) => { event.preventDefault(); if (!token) return; setBusy(true); setResult(null); setResult(await load(token, { reason, nation })); setBusy(false); };
+  /** QA2 on #923: whether filters were set when this load was submitted, so changing a menu afterwards does not change the empty-result message. */
+  const [loadedFiltered, setLoadedFiltered] = useState(false);
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!token) return; setBusy(true); setLoadedFiltered(Boolean(reason || nation)); setResult(null); setResult(await load(token, { reason, nation })); setBusy(false); };
   return <main className={styles.console}>
     <h1>{C.title}</h1>
     <form className={styles.filters} onSubmit={submit} aria-label="AI review queue filters">
@@ -19,7 +21,7 @@ export function ModConsole({ load = loadReviewQueue }: { load?: typeof loadRevie
       <label>nation<select value={nation} onChange={e => setNation(e.target.value)}><option value="">all</option><option value="kindle">kindle</option><option value="korund">korund</option><option value="aurelle">aurelle</option></select></label>
       <button type="submit" disabled={busy} aria-busy={busy}>{C.load}</button>
     </form>
-    <p role="status" className={styles.status}>{busy ? C.loading : result ? (result.ok ? queueStatus(result.items.length, Boolean(reason || nation), PAGE) : `${result.status || 'Error'}: ${result.error}`) : ''}</p>
+    <p role="status" className={styles.status}>{busy ? C.loading : result ? (result.ok ? queueStatus(result.items.length, loadedFiltered, PAGE) : `${result.status || 'Error'}: ${result.error}`) : ''}</p>
     {result?.ok && result.items.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="AI review queue">
       <table className={styles.table}><caption>AI review queue</caption>
         <thead><tr>{['created_at', 'nation_id', 'persona', 'source', 'reason', 'filter_result', 'output_text', 'reviewed_at', 'reviewer_note'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>

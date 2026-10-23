@@ -42,23 +42,46 @@ test('the console renders a labelled form and, after a load, a captioned table w
   const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
   const html = renderToStaticMarkup(React.createElement(ModConsole));
   assert.match(html, /<h1>Mod console<\/h1>/); assert.match(html, /<label>Admin token<input type="password" autoComplete="off" required=""/);
-  assert.match(html, /role="status"/); assert.equal((html.match(/<button/g) ?? []).length, 1, 'one button: Load');
+  assert.match(html, /role="status"/); assert.equal((html.match(/<button/g) ?? []).length, 1, 'one button: Load queue');
 });
 
 test('ARC: no data before the server accepts the token; the older-entries cue uses the route\'s 50-entry page', async () => {
   const ui = await read('app/admin/mod/mod-console.tsx');
-  assert.match(ui, /\{result\?\.ok && result\.items\.length > 0 && <div className=\{styles\.scroll\}/, 'the table renders only from an accepted, non-empty response (empty queue: status "0 items", no table)');
+  assert.match(ui, /\{result\?\.ok && result\.items\.length > 0 && <div className=\{styles\.scroll\}/, 'the table renders only from an accepted, non-empty response (empty result: "The queue is empty." or "No entries match these filters.", no table)');
   assert.equal((ui.match(/<table/g) ?? []).length, 1); assert.doesNotMatch(ui, /useEffect/, 'nothing loads before Load');
   assert.match(ui, /setResult\(null\); setResult\(await load\(/, 'a new load clears the previous data first');
-  assert.match(ui, /const PAGE = 50;/); assert.match(ui, /queueStatus\(result\.items\.length, Boolean\(reason \|\| nation\), PAGE\)/); assert.match(await read('lib/mod-console.ts'), /older entries not shown/);
+  assert.match(ui, /const PAGE = 50;/); assert.match(ui, /queueStatus\(result\.items\.length, loadedFiltered, PAGE\)/); assert.match(await read('lib/mod-console.ts'), /older entries not shown/);
   assert.match(await read('lib/ai-review-queue.ts'), /limit=50/);
 });
 
 test('#880 copy (Content): status line for counts, an empty queue and an empty filter result', async () => {
   const { queueStatus, modConsoleCopy: C } = await import('../lib/mod-console.ts');
-  assert.equal(queueStatus(0, true, 50), 'No entries match these filters');
+  assert.equal(queueStatus(0, true, 50), 'No entries match these filters.');
   assert.equal(queueStatus(0, false, 50), 'The queue is empty.');
   assert.equal(queueStatus(1, false, 50), '1 entry'); assert.equal(queueStatus(3, true, 50), '3 entries');
   assert.equal(queueStatus(50, false, 50), '50 entries · newest 50 shown, older entries not shown');
   assert.equal(C.proposal, true); assert.equal(C.load, 'Load queue');
+});
+
+test('QA2 on #923: the empty-result message follows the filters as submitted, not the menus changed after the load', async () => {
+  const { build } = await import('esbuild');
+  const out = await build({ entryPoints: [new URL('../app/admin/mod/mod-console.tsx', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
+    packages: 'external', loader: { '.css': 'empty', '.module.css': 'empty' }, logLevel: 'silent', alias: { '@': new URL('..', import.meta.url).pathname.replace(/\/$/, '') } });
+  const code = out.outputFiles[0].text.replace(/from "([^".][^"]*)"/g, (_, m) => `from "${import.meta.resolve(m)}"`);
+  const { Window } = await import('happy-dom'), w = new Window({ url: 'http://localhost/' });
+  globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const { ModConsole } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
+  const React = (await import('react')).default, { createRoot } = await import('react-dom/client'), { act } = React;
+  const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
+  await act(async () => root.render(React.createElement(ModConsole, { load: async () => ({ ok: true, items: [] }) })));
+  const status = () => el.querySelector('[role=status]').textContent;
+  const setValue = async (node, value) => act(async () => { const proto = Object.getPrototypeOf(node), set = Object.getOwnPropertyDescriptor(proto, 'value').set; set.call(node, value); node.dispatchEvent(new w.Event(node.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); });
+  const submit = async () => act(async () => { el.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await new Promise(r => setTimeout(r, 0)); });
+  const [reason] = el.querySelectorAll('select');
+  await setValue(el.querySelector('input[type=password]'), 'a-staff-token-1234');
+  await submit(); assert.equal(status(), 'The queue is empty.');
+  await setValue(reason, 'flagged'); assert.equal(status(), 'The queue is empty.', 'a menu change after the load does not change the message');
+  await submit(); assert.equal(status(), 'No entries match these filters.');
+  await setValue(reason, ''); assert.equal(status(), 'No entries match these filters.', 'clearing the menu after the load does not change it either');
+  await act(async () => root.unmount());
 });
