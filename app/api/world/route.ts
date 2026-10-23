@@ -4,8 +4,7 @@ import { shiftRules } from '@/lib/work-shifts';
 import { advanceWorld } from '@/lib/world-simulation';
 import { getDatabase } from '@/lib/db';
 import { populationBands } from '@/lib/population-bands';
-import { liveNations, nationIsPreview } from '@/lib/nation-discovery';
-import { liveNationIds } from '@/lib/nation-openings'; // #872
+import { nationIsPreview } from '@/lib/nation-discovery';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
 
@@ -88,15 +87,11 @@ export async function GET() {
     // Population bands (#81): only the band leaves the server, never the counts.
     database.prepare('SELECT nation_id, COUNT(*) AS citizens FROM citizens WHERE nation_id IS NOT NULL GROUP BY nation_id').all<{ nation_id: string; citizens: number }>(),
   ]);
-  // #872: per-nation opening flags count. With every flag off (production) this is exactly liveNations and no `openNations` field is sent.
-  const openNations = liveNationIds(env as never);
-  const flagOpened = openNations.length > liveNations.length;
-  const bands = populationBands(nationResult.results.map(nation => nation.id), Object.fromEntries(enrollmentResult.results.map(row => [row.nation_id, Number(row.citizens)])), undefined, id => !nationIsPreview(id, openNations));
+  const bands = populationBands(nationResult.results.map(nation => nation.id), Object.fromEntries(enrollmentResult.results.map(row => [row.nation_id, Number(row.citizens)])), undefined, id => !nationIsPreview(id));
 
   return Response.json(
     {
       simulation,
-      ...(flagOpened ? { openNations } : {}), // #872
       nations: nationResult.results.map((nation) => ({
         id: nation.id,
         name: nation.name,

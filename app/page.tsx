@@ -473,6 +473,8 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
+  /** #872: present only when a flag-opened nation is playable for this account (nationPlayable). */
+  openNations?: string[];
   flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; civicRank?: boolean; kindleBudget?: boolean };
   civicRank?: CivicRank;
   firstWeek?: { completed: string[] } | null;
@@ -600,7 +602,7 @@ export default function Home() {
   const [korundCommand, setKorundCommand] = useState<KorundCommand | null>(null);
   const korundIntent = useRef<KorundCommand | null>(null);
   const [worldNations, setWorldNations] = useState<Nation[]>(fallbackNations);
-  const [openNations, setOpenNations] = useState<readonly string[] | undefined>(); // #872: sent only when a per-nation flag opens a nation
+  const [openNations, setOpenNations] = useState<readonly string[] | undefined>(); // #872: from GET /api/citizen, only when a flag-opened nation is playable for this account
   const [availableWorkOrders, setAvailableWorkOrders] = useState<WorkOrder[]>(fallbackWorkOrders);
   const [availablePlanningItems, setAvailablePlanningItems] = useState<PlanningTask[]>(fallbackPlanningItems);
   const [worldEvents, setWorldEvents] = useState<WorldEvent[]>(fallbackWorldEvents);
@@ -915,10 +917,8 @@ export default function Home() {
         planningTasks: PlanningTask[];
         worldEvents: WorldEvent[];
         simulation?: SimulationState;
-        openNations?: string[];
       };
       if (data.nations.length) setWorldNations(data.nations);
-      if (data.openNations) setOpenNations(data.openNations);
       if (data.workOrders.length) setAvailableWorkOrders(data.workOrders);
       if (data.planningTasks.length) setAvailablePlanningItems(data.planningTasks);
       if (data.worldEvents.length) setWorldEvents(data.worldEvents);
@@ -1363,6 +1363,7 @@ export default function Home() {
         setEconomy((current) => current ? { ...current, inventory: [{ item: 'food', quantity: (current.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) + 2 }, ...current.inventory.filter((entry) => entry.item !== 'food')] } : current);
       }
     }
+    setOpenNations(snapshot.openNations); // #872
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
       // #411: an existing citizen's own nation is the viewed nation unless the URL names one (once per citizen nation, so a later visit elsewhere is kept).
@@ -1791,7 +1792,7 @@ export default function Home() {
     </>}
   </section>;
 
-  const populationFact = selected.populationBand ? <dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd> : null;
+  const populationFact = selected.populationBand && !(selected.populationBand === 'coming-soon' && openNations?.includes(selected.id)) ? <dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd> : null;
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
     {guestAllowed && (firstVisitGuideOpen
       ? tourOpen ? <GlobeTour onFocus={setTourFocusNation} onClose={finishTour} /> : <FirstVisitGuide stage={firstVisitStage} onStageChange={setFirstVisitStage} onShortlist={setShortlistIds} onStartTour={() => setTourOpen(true)} onTryGuest={startGuestDemo} onDismiss={() => { stopTour(); setFirstVisitGuideOpen(false); }} />
@@ -1892,7 +1893,7 @@ export default function Home() {
       ] : viewMode === 'government' ? (government?.roles ?? []).map(role => ({
         id: role.name, label: role.name, detail: role.controller,
       })) : viewMode === 'world' || viewMode === 'nation' ? worldNations.map(nation => ({
-        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, badge: nation.populationBand && populationBandLabel[nation.populationBand], detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
+        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, badge: nation.populationBand && !(nation.populationBand === 'coming-soon' && openNations?.includes(nation.id)) ? populationBandLabel[nation.populationBand] : undefined, // #872 detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
       })) : viewMode === 'square' ? cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown)).map(card => ({ ...card, onSelect: () => changeView(card.id) })) : [];
   const briefInventory = citizenNation?.id === 'aurelle' ? aurellePlan?.foodQuantity : citizenNation?.id === 'korund' ? korundPlan?.foodQuantity : economy ? goods('food') : undefined;
   const briefStorageKey = citizenNation ? `harimu:morning-brief:${citizenNation.id}` : null;

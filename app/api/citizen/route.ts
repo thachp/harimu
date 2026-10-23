@@ -31,7 +31,8 @@ import { getDatabase } from '@/lib/db';
 import { travelBlock } from '@/lib/travel';
 import { availableWith, checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
 import { qaTestCitizenAllowed, qaTestNationSql } from '@/lib/qa-tools';
-import { nationPlayable } from '@/lib/nation-openings'; // #485, #489
+import { nationPlayable, playableNationIds } from '@/lib/nation-openings'; // #485, #489, #872
+import { isLiveNation } from '@/lib/nation-discovery'; // #872
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
@@ -217,7 +218,9 @@ export async function GET(request: Request) {
   ]);
   if (profile && capacity) profile.capacity = capacity.capacity;
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
-  return privateJson({
+  // #872 (ARC ruling): nations this account may play here beyond the live three (nationPlayable, never a flag alone). Absent when none: production and the public unchanged.
+  const flagPlayable = playableNationIds(env as never, userId).filter(id => !isLiveNation(id));
+  return privateJson({ ...(flagPlayable.length ? { openNations: playableNationIds(env as never, userId) } : {}),
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountElectionId}:{})}:null,
     collectivePetitions,
