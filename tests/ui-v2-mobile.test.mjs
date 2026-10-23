@@ -55,3 +55,14 @@ test('every harness that defines UI_V2_CITY defines UI_V2_MOBILE; the check is r
   }
   assert.match(await read('scripts/hud-layout-check.mjs'), /checkUiV2Mobile/);
 });
+
+test('#847: the fixed phone sheet is scoped to the S8 flag and phones; no drag or snap; one aria-expanded toggle each way', async () => {
+  const css = await read('app/game-shell.css'), shell = await read('app/game-shell.tsx');
+  const rules = css.split('\n').filter(l => /position:fixed;z-index:8;left:0;right:0/.test(l));
+  assert.equal(rules.length, 1); assert.match(rules[0], /^\s*\.game-mobile-v2\.game-rail-on \.game-inspector,\.game-mobile-v2\.game-rail-on \.game-reopen-panel\{/, 'flag-scoped');
+  const phone = css.slice(css.lastIndexOf('@media(max-width:760px)', css.indexOf(rules[0])), css.indexOf(rules[0])); assert.doesNotMatch(phone, /\n\}\n/, 'inside the 760px block');
+  assert.doesNotMatch(css + shell, /touchmove|pointermove|scroll-snap|snap-point|draggable/i);
+  assert.match(shell, /aria-label="Collapse details" aria-expanded="true" aria-controls="game-details"/);
+  assert.match(shell, /id="game-reopen" className="game-reopen-panel" type="button" aria-expanded="false" aria-controls="game-details"/);
+  assert.match(shell, /\['--s8-sheet', ':is\(#game-details, #game-reopen\)'\]/, 'the scene ends at the sheet');
+});

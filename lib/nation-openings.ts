@@ -108,4 +108,9 @@ export const nationPlayable = (id: unknown, bindings?: OpeningBindings, userId?:
   if (!readinessAllows(opening, bindings)) return false; // #486
   return qaTestCitizenAllowed(bindings, userId);
 };
+/** #872 (ARC ruling on the issue): the nations this account may play here, in catalog order: exactly those where nationPlayable is true, never a flag alone.
+ *  The Preview badge, comparison table and population bands follow this (sent to the client as GET /api/citizen `openNations`); enroll and the QA switch call nationPlayable itself.
+ *  Without a signed-in user only the live list qualifies, so the public answer and production (every flag "false") are unchanged. */
+export const playableNationIds = (bindings?: OpeningBindings, userId?: string | null): readonly NationId[] =>
+  nationIds.filter(id => nationPlayable(id, bindings, userId));
 export { liveNations };

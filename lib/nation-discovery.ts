@@ -6,4 +6,6 @@ export const liveNations = ['kindle','korund','aurelle'] as const;
 export type LiveNationId = typeof liveNations[number];
 export const isLiveNation = (id: unknown): id is LiveNationId => typeof id === 'string' && (liveNations as readonly string[]).includes(id);
 /** The ten nations always show in default order; the discovery filter and sort rows were removed. A nation is a preview until its economy is playable. */
-export function nationIsPreview(id:string){return !isLiveNation(id);}
+/** #872: `open` is the server's list of nations open in this environment (`liveNationIds`, lib/nation-openings: a live nation, or one whose HARIMU_<ID>_ENABLED is "true"
+ *  and that passes the readiness check). Omitted or empty: the hardcoded live list alone, exactly as before. */
+export function nationIsPreview(id:string,open?:readonly string[]){return !isLiveNation(id)&&!(Array.isArray(open)&&open.includes(id));} // Array.isArray: safe as a .filter callback
