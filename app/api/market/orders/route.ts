@@ -6,12 +6,15 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { advanceWorld } from '@/lib/world-simulation';
+import { kindleSalesTaxEnabled } from '@/lib/kindle-sales-tax'; // #844
 import { executeOrderCommand, readOrderBook, validOrderCommand, orderBookLimits } from '@/lib/order-book';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 // #777: goods-market seller fee as a money sink (HARIMU_MARKET_FEE_ENABLED); off = no fee written or read.
 const feeOn = () => (env as unknown as { HARIMU_MARKET_FEE_ENABLED?: string }).HARIMU_MARKET_FEE_ENABLED === 'true';
+// #844: Kindle sales tax on fills, credited to kindle-treasury (HARIMU_KINDLE_SALES_TAX_ENABLED); off = the options object is unchanged.
+const writeOptions = () => ({ fee: feeOn(), ...(kindleSalesTaxEnabled(env as never) ? { salesTax: true } : {}) });
 const enabled = () => (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true';
 
 // #197: Kindle city order book for fruit, meat and wood. Off unless HARIMU_ORDER_BOOK_ENABLED=true.
@@ -41,6 +44,6 @@ export async function POST(request: Request) {
   const command = { ...body, requestId: body.requestId.toLowerCase(), ...('orderId' in body && typeof body.orderId === 'string' ? { orderId: body.orderId.toLowerCase() } : {}) } as typeof body;
   const db = await getDatabase();
   await advanceWorld(db, undefined, { dormancy: (env as unknown as { HARIMU_DORMANCY_ENABLED?: string }).HARIMU_DORMANCY_ENABLED === 'true', npcSupply: true, faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings) }); // #198
-  const result = await executeOrderCommand(db, userId, command, Math.floor(Date.now() / 1000), { fee: feeOn() });
+  const result = await executeOrderCommand(db, userId, command, Math.floor(Date.now() / 1000), writeOptions());
   return privateJson({ ...result, book: await readOrderBook(db, userId, { fee: feeOn() }) }, result.status);
 }
