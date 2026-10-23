@@ -38,17 +38,22 @@ export function positionAfter(from: Point, route: readonly Point[], elapsed: num
 }
 
 export type ArmyWar = { attacker_nation: string; defender_nation: string; mobilization_ends_at: number; declared_at: number };
-export type ArmyPosition = { unitId: string; nationId: string; name: string; x: number; y: number; status: 'home' | 'marching' | 'staged'; towardNationId: string | null };
+export type ArmyPosition = { unitId: string; nationId: string; name: string; x: number; y: number; status: 'home' | 'marching' | 'staged'; towardNationId: string | null; supply?: { cut: boolean; cutDays: number; strengthLossPct: number } };
 /** Pure. AI officer orders, derived [ASSUMPTION]: a unit whose nation attacks in an active war marches from its capital toward the defender's capital once
  *  mobilization ends (the earliest-declared such war); every other unit holds at its own capital. When the war ends the unit is home again. */
+export const nationCapital = (id: string) => mappedNations.find(n => n.id === id)?.capital ?? null;
+/** The march a nation's unit is on at `now` (slice 4 orders), or null while it holds at home. #738 slice 5 reuses it for supply. */
+export function unitMarch(nationId: string, wars: readonly ArmyWar[], now: number) {
+  const home = nationCapital(nationId), war = [...wars].filter(w => w.attacker_nation === nationId && w.mobilization_ends_at <= now).sort((a, b) => a.declared_at - b.declared_at)[0];
+  const target = war ? nationCapital(war.defender_nation) : null;
+  return home && war && target ? { home, war, route: marchRoute(home, target) } : null;
+}
 export function armyPositions(wars: readonly ArmyWar[], now: number, terrain: ReadonlyMap<string, string> = terrainMap()): ArmyPosition[] {
-  const capital = (id: string) => mappedNations.find(n => n.id === id)?.capital ?? null;
   return armyUnits.flatMap((unit): ArmyPosition[] => {
-    const home = capital(unit.nationId); if (!home) return [];
-    const war = [...wars].filter(w => w.attacker_nation === unit.nationId && w.mobilization_ends_at <= now).sort((a, b) => a.declared_at - b.declared_at)[0];
-    const target = war ? capital(war.defender_nation) : null;
-    if (!war || !target) return [{ unitId: unit.id, nationId: unit.nationId, name: unit.name, ...home, status: 'home' as const, towardNationId: null }];
-    const p = positionAfter(home, marchRoute(home, target), now - war.mobilization_ends_at, s => terrain.get(`${s.x},${s.y}`));
+    const home = nationCapital(unit.nationId); if (!home) return [];
+    const march = unitMarch(unit.nationId, wars, now), war = march?.war;
+    if (!march || !war) return [{ unitId: unit.id, nationId: unit.nationId, name: unit.name, ...home, status: 'home' as const, towardNationId: null }];
+    const p = positionAfter(home, march.route, now - war.mobilization_ends_at, s => terrain.get(`${s.x},${s.y}`));
     return [{ unitId: unit.id, nationId: unit.nationId, name: unit.name, x: p.x, y: p.y, status: p.arrived ? 'staged' as const : 'marching' as const, towardNationId: war.defender_nation }];
   });
 }
@@ -56,7 +61,10 @@ let cached: Map<string, string> | null = null;
 export const terrainMap = () => cached ??= new Map(seedWorldSquares(mappedNations).map(s => [`${s.x},${s.y}`, s.terrain]));
 
 /** One read: the active wars. GET only; it never writes. */
-export async function readArmyPositions(db: GameDatabase, now: number) {
+export async function readActiveWars(db: GameDatabase): Promise<ArmyWar[]> {
   const wars = (await db.prepare('SELECT attacker_nation, defender_nation, mobilization_ends_at, declared_at FROM wars WHERE ended_at IS NULL').all<ArmyWar>()).results ?? [];
-  return { width: WORLD_GRID.width, height: WORLD_GRID.height, units: armyPositions(wars.map(w => ({ ...w, mobilization_ends_at: Number(w.mobilization_ends_at), declared_at: Number(w.declared_at) })), now) };
+  return wars.map(w => ({ ...w, mobilization_ends_at: Number(w.mobilization_ends_at), declared_at: Number(w.declared_at) }));
+}
+export async function readArmyPositions(db: GameDatabase, now: number, wars?: readonly ArmyWar[]) {
+  return { width: WORLD_GRID.width, height: WORLD_GRID.height, units: armyPositions(wars ?? await readActiveWars(db), now) };
 }

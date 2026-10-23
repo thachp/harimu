@@ -28,6 +28,7 @@ export function ArmyCard() {
     <p>{fill(unitCard.commanderLabel, unit.name, unit.officer)}</p>
     <p>{unitCard.memberCountLabel}: {unit.memberCount}</p>
     {unit.strength !== undefined && <p>{unitCard.strengthLabel}: {unit.strength} · {unitCard.moraleLabel}: {unit.morale}</p>}
+    {unit.supply?.cut && <p>{supplyCutLine(unit.supply)}</p>}
     {army.member ? <>
       <fieldset><legend>{squadStance.label}</legend>
         {armyStances.map(s => <label key={s}><input type="radio" name="stance" checked={army.stance === s} onChange={() => void send({ action: 'stance', stance: s }, squadStance.helpers[s].text)} />{squadStance.labels[s]}</label>)}
@@ -39,3 +40,6 @@ export function ArmyCard() {
     {note && <p role="status">{note}</p>}
   </section>;
 }
+
+/** #738 slice 5: the cut-supply line (placeholder copy from army-copy, marked for Content). */
+export const supplyCutLine = (s: { cutDays: number; strengthLossPct: number }) => unitMembership.supplyCut.text.replace('{days}', String(s.cutDays)).replace('{pct}', String(s.strengthLossPct));

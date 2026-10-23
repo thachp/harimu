@@ -8,7 +8,7 @@ export const armySchemas = [
   // [ASSUMPTION] Leave and stance need replay too, and a deleted member row cannot remember its request id, so every command is logged once here.
   `CREATE TABLE IF NOT EXISTS army_requests (request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL, action TEXT NOT NULL CHECK(action IN ('join','leave','stance')), occurred_at INTEGER NOT NULL)`,
 ];
-export type ArmyView = { serveUntil?: number; unit: { id: string; name: string; officer: string; memberCount: number; openToVolunteers: boolean; strength?: number; morale?: number } | null; member: boolean; stance: string | null };
+export type ArmyView = { serveUntil?: number; unit: { id: string; name: string; officer: string; memberCount: number; openToVolunteers: boolean; strength?: number; morale?: number; supply?: { cut: boolean; cutDays: number; strengthLossPct: number } } | null; member: boolean; stance: string | null };
 type Fail = { ok: false; status: 403 | 409; error: string; reason: string };
 /** The citizen's own nation's unit, membership and stance, and the unit's member count. Never another member's identity. */
 export async function readArmy(db: GameDatabase, userId: string, nowSec = 0, readiness = false): Promise<ArmyView> {
