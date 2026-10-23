@@ -49,10 +49,13 @@ const expectFor = (flag, view, html) => {
   assert.equal(/>Country( map| travel)?</.test(html), !on, `no visible "Country" with the flag on (${view})`);
   if (on) {
     const r = rail(html);
-    assert.deepEqual([...r.matchAll(/aria-label="Open ([^"]+)"/g)].map(m => m[1]), ['World', 'Nation', 'City']);
-    const current = [...r.matchAll(/<button[^>]*aria-label="Open ([^"]+)"[^>]*aria-current="([^"]+)"/g)].map(m => `${m[1]}:${m[2]}`);
+    assert.match(html, /<nav class="game-zoom-rail" aria-label="Zoom level"/, 'QA1 #755: the rail is named "Zoom level"');
+    const levels = [...r.matchAll(/<button([^>]*)>[\s\S]*?<span>([^<]+)<\/span><\/button>/g)];
+    assert.deepEqual(levels.map(m => m[2]), ['World', 'Nation', 'City']);
+    for (const [, attrs] of levels) assert.doesNotMatch(attrs, /aria-label=/, 'QA1 #755: a rail button reads just its level name');
+    const current = levels.filter(([, attrs]) => /aria-current=/.test(attrs)).map(([, attrs, name]) => `${name}:${attrs.match(/aria-current="([^"]+)"/)[1]}`);
     assert.deepEqual(current, [{ world: 'World:page', country: 'Nation:page', square: 'City:page', household: 'City:location' }[view]], `${view}: aria-current on the active level`);
-    const world = r.match(/<button[^>]*aria-label="Open World"[^>]*>/)[0];
+    const world = levels[0][1];
     for (const attr of ['type="submit"', 'form="world-tab-form"', 'name="view"', 'value="world"']) assert.ok(world.includes(attr), `World keeps the #379 no-JS submit (${attr})`);
   }
 };
@@ -72,7 +75,8 @@ test('S4 CSS sits before the S2 block (whose rules must all be .game-hud-v2 scop
   const css = await read('app/game-shell.css');
   const start = css.indexOf('/* #392 S4 zoom rail'), end = css.indexOf('/* #392 S2:');
   assert.ok(start > 0 && start < end);
-  const block = css.slice(css.indexOf('*/', start) + 2, end).replace(/@media\([^)]*\)\{/g, '');
+  // up to the next stage's block (S5 sits between S4 and S2)
+  const next = css.indexOf('/* #392 S', start + 1), block = css.slice(css.indexOf('*/', start) + 2, next > 0 && next < end ? next : end).replace(/@media\([^)]*\)\{/g, '');
   for (const sel of [...block.matchAll(/([^{}]+)\{[^{}]*\}/g)].map(m => m[1].trim()).filter(Boolean)) for (const part of sel.split(',')) assert.match(part, /\.game-rail-on|\.game-zoom-rail/, `unscoped S4 selector: ${part}`);
 });
 

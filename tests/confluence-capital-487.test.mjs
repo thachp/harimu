@@ -27,7 +27,7 @@ test('migration 0060 is exactly the generated upsert, additive, and idempotent o
   assert.equal(sql.split('\n').filter(l => !l.startsWith('--')).join('\n'), [...z.nationSquaresUpsertSql('confluence').map(s => s + ';'), ''].join('\n'));
   const { isDestructive } = await import('../scripts/postgres-migrations.mjs'); assert.equal(isDestructive(sql), false);
   const pg = new PGlite(); t.after(() => pg.close());
-  await pg.exec(z.postgresWorldSquaresMigration());
+  await pg.exec(z.postgresWorldSquaresMigration()); for (const s of z.gridGrowthSql()) await pg.exec(s); // 0011, then #486's 0066 (order-independent)
   const read = async () => (await pg.query('SELECT x,y,zone,owner,terrain,resource,feature FROM world_squares ORDER BY y,x')).rows;
   await pg.exec(sql); const once = await read(); await pg.exec(sql);
   assert.deepEqual(await read(), once, 'a second run changes nothing');

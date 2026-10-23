@@ -51,7 +51,8 @@ test('QA3: every marker, the stand-ins included, is drawn on land', () => {
 });
 
 test('stand-ins: distinct, on the grid, clear of capital blocks and at least minCommonsDistance from the Commons centre', () => {
-  const squares = nationGlobeSquares(nationOpenings.map(o => o.capital), WORLD_GRID, 3, commons), standIns = squares.filter((_, i) => !nationOpenings[i].capital);
+  // #486: every nation now has a capital, so the stand-in rule is exercised with only the mapped (biome) nations' capitals, as before #486
+  const squares = nationGlobeSquares(nationOpenings.map(o => o.biome ? o.capital : undefined), WORLD_GRID, 3, commons), standIns = squares.filter((_, i) => !nationOpenings[i].biome);
   assert.equal(new Set(squares.map(s => `${s.x},${s.y}`)).size, squares.length);
   assert.ok(squares.every(s => s.x >= 0 && s.y >= 0 && s.x < WORLD_GRID.width && s.y < WORLD_GRID.height));
   assert.equal(standIns.length, 6);

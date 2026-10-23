@@ -20,10 +20,12 @@ test('derived mvpNations: same ids, order, capitals, outposts and biomes as befo
   const { z, reg } = await load(t);
   assert.deepEqual(z.mvpNations.map(n => n.id), ['kindle', 'korund', 'aurelle']);
   assert.equal(sha(z.mvpNations), golden.mvp, 'mvpNations is identical to the old literal');
-  assert.equal(sha(z.seedWorldSquares()), golden.squares, 'all 432 squares are byte-identical');
-  assert.equal(sha(z.worldSquaresSeedSql()), golden.seedSql); assert.equal(sha(z.worldSquaresSeedSql(200, 'postgres')), golden.seedSqlPg);
-  assert.deepEqual(reg.nationOpenings.filter(o => o.capital).map(o => o.id), ['kindle', 'confluence', 'korund', 'aurelle'], '#487: Confluence is the only new capital');
-  for (const o of reg.nationOpenings.filter(o => o.openingFlag !== null && o.id !== 'confluence')) assert.deepEqual([o.capital, o.outpost, o.biome], [undefined, undefined, undefined], o.id);
+  const old = z.gridGrowth486.from; // #486: the 30x24 grid keeps the 24x18 squares byte-identical
+  assert.equal(sha(z.seedWorldSquares().filter(s => s.x < old.width && s.y < old.height)), golden.squares, 'all 432 original squares are byte-identical on the 30x24 grid');
+  assert.equal(sha(z.seedWorldSquares(z.mvpNations, old)), golden.squares);
+  assert.equal(sha(z.worldSquaresSeedSql(100, 'sqlite', old)), golden.seedSql); assert.equal(sha(z.worldSquaresSeedSql(200, 'postgres', old)), golden.seedSqlPg);
+  assert.deepEqual(reg.nationOpenings.filter(o => o.biome).map(o => o.id), ['kindle', 'confluence', 'korund', 'aurelle'], '#487: Confluence is the only new mapped nation (#486 capitals carry no biome yet)');
+  for (const o of reg.nationOpenings.filter(o => o.openingFlag !== null && o.id !== 'confluence')) assert.deepEqual([o.outpost, o.biome], [undefined, undefined], o.id); // #486: position only
   assert.deepEqual(z.bootNationSquaresSql(), z.nationSquaresUpsertSql('confluence'), '#487: the boot step adds only Confluence');
 });
 
@@ -96,7 +98,7 @@ test('the same upsert runs on Postgres (PGlite) and is idempotent there', async 
   const { z } = await load(t);
   const nations = [...z.mvpNations, hypothetical];
   const pg = new PGlite(); t.after(() => pg.close());
-  await pg.exec(z.postgresWorldSquaresMigration());
+  await pg.exec(z.postgresWorldSquaresMigration()); for (const sql of z.gridGrowthSql()) await pg.exec(sql); // 0011 then #486's 0066
   const read = async () => (await pg.query('SELECT x,y,zone,owner,terrain,resource,feature FROM world_squares ORDER BY y,x')).rows;
   const base = await read(); assert.equal(base.length, z.mapWidth * z.mapHeight);
   for (const sql of z.nationSquaresUpsertSql('confluence', nations)) await pg.exec(sql);
@@ -109,9 +111,9 @@ test('the same upsert runs on Postgres (PGlite) and is idempotent there', async 
 test('the shipped local runtime seeds the original grid plus, via the boot step, only Confluence\'s block (#487)', async t => {
   const { r, z } = await load(t);
   const { squares, source } = await z.readWorldSquares(r.db);
-  assert.equal(source, 'table'); assert.equal(sha(squares), sha(z.seedWorldSquares(z.mappedNations)));
+  assert.equal(source, 'table'); assert.equal(sha(squares), sha(z.withRareNodes(z.seedWorldSquares(z.mappedNations)))); // #745: plus the rare node placements
   const block = new Set(z.nationBlockSquares('confluence').map(s => `${s.x},${s.y}`));
-  assert.equal(sha(squares.filter(s => !block.has(`${s.x},${s.y}`))), sha(z.seedWorldSquares().filter(s => !block.has(`${s.x},${s.y}`))), 'outside the block: the original grid');
+  assert.equal(sha(squares.filter(s => !block.has(`${s.x},${s.y}`))), sha(z.withRareNodes(z.seedWorldSquares()).filter(s => !block.has(`${s.x},${s.y}`))), 'outside the block: the original grid (with #745 rare nodes)');
 });
 
 test('plain-Node importers: the zone vocabulary lives in an import-free file, so a component test that loads app/world-zones.tsx never needs the registry (CI regression on #550)', async () => {

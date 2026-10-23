@@ -1,4 +1,4 @@
-/** #392 S4 check: the zoom rail (NEXT_PUBLIC_HARIMU_UI_V2_RAIL) in the real GameShell with the shipped CSS, at 1280x800, 390x844 and 320x700, 100% and 150% text,
+/** #392 S4 check: the zoom rail (NEXT_PUBLIC_HARIMU_UI_V2_RAIL) in the real GameShell with the shipped CSS, at 1280x800, 390x844, 320x700 and 320x640, 100%, 125% and 150% text,
  *  in the World, Country, City and Household views (plus a 7%-wider-glyph variant at 150%, so the result does not depend on the machine's fonts):
  *  - the rail has World / Nation / City, exactly one with aria-current, every button at least 44x44 and uncovered, no label split mid-word
  *  - the rail never overlaps the stage (where the canvas labels sit; #377, #392 320px note), the top tabs or the HUD, and the page never scrolls sideways
@@ -17,6 +17,8 @@ const probe = () => {
   if (tabs.join() !== 'Open Household,Open Work,Open Market,Open Civic') issues.push(`top tabs are ${tabs.join()}`);
   const buttons = [...rail.querySelectorAll('button')];
   if (buttons.map(b => b.textContent).join() !== 'World,Nation,City') issues.push(`rail levels ${buttons.map(b => b.textContent).join()}`);
+  if (rail.getAttribute('aria-label') !== 'Zoom level') issues.push(`rail named "${rail.getAttribute('aria-label')}"`);
+  for (const b of buttons) if (b.hasAttribute('aria-label')) issues.push(`"${b.textContent}" has its own aria-label (QA1 #755: just the level name)`);
   if (buttons.filter(b => b.hasAttribute('aria-current')).length !== 1) issues.push('not exactly one current level');
   for (const b of buttons) {
     const br = b.getBoundingClientRect(); if (br.width < 43.5 || br.height < 43.5) issues.push(`"${b.textContent}" is ${Math.round(br.width)}x${Math.round(br.height)} (< 44)`);
@@ -30,7 +32,7 @@ const probe = () => {
 
 export async function checkUiV2Rail({ browser, css, preflight, failures, rows }) {
   const script = await bundleShell(undefined, { NEXT_PUBLIC_HARIMU_UI_V2_RAIL: 'true' }), shots = process.env.LAYOUT_SHOTS_DIR;
-  for (const [w, h] of [[1280, 800], [390, 844], [320, 700]]) for (const scale of [1, 1.5]) for (const wide of scale === 1.5 ? [false, true] : [false]) {
+  for (const [w, h] of [[1280, 800], [390, 844], [320, 700], [320, 640]]) for (const scale of [1, 1.25, 1.5]) for (const wide of scale === 1.5 ? [false, true] : [false]) {
     const context = await browser.newContext({ viewport: { width: w, height: h } }), page = await context.newPage(); page.setDefaultTimeout(90000);
     await page.setContent(`<!doctype html><html style="--text-scale:${scale}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${preflight}${css}${wide ? '*{letter-spacing:.07em!important}' : ''}</style></head><body><div id="root"></div><form id="world-tab-form"></form></body></html>`);
     await page.addScriptTag({ content: script });
@@ -44,7 +46,7 @@ export async function checkUiV2Rail({ browser, css, preflight, failures, rows })
         if (focused !== 'Nation') failures.push(`${id}: ArrowDown from World focused "${focused}"`);
         await page.keyboard.press('End'); if (await page.evaluate(() => document.activeElement?.textContent) !== 'City') failures.push(`${id}: End did not focus City`);
       }
-      if (shots && !wide && (view === 'square' || view === 'world' && w === 1280)) await page.screenshot({ path: `${shots}/s4-rail-${view === 'square' ? 'city' : view}-${w}-${scale * 100}.png`, fullPage: w < 600 });
+      if (shots && !wide && h !== 640 && scale !== 1.25 && (view === 'square' || view === 'world' && w === 1280)) await page.screenshot({ path: `${shots}/s4-rail-${view === 'square' ? 'city' : view}-${w}-${scale * 100}.png`, fullPage: w < 600 });
       rows.push(`${id}: rail fits, beside the stage, tabs are places only`);
     }
     await context.close();

@@ -16,7 +16,7 @@ test('registry: one entry per nation for all ten ids; the three live ids are the
   assert.deepEqual([...disc.liveNations], oldLive, 'the live list is unchanged');
   assert.deepEqual([...reg.liveNations], [...disc.liveNations], 'the registry re-exports the same list');
   for (const id of disc.liveNations) assert.ok(ten.includes(id), 'every live id is a catalog nation');
-  for (const o of reg.nationOpenings.filter(o => o.openingFlag !== null)) { assert.equal(o.openingFlag, `HARIMU_${o.id.toUpperCase()}_ENABLED`); if (o.id === 'confluence') assert.deepEqual(o.capital, { x: 4, y: 13 }, '#487: Meetwater'); else assert.equal(o.capital, undefined, `${o.id} has no capital yet`); }
+  for (const o of reg.nationOpenings.filter(o => o.openingFlag !== null)) { assert.equal(o.openingFlag, `HARIMU_${o.id.toUpperCase()}_ENABLED`); if (o.id === 'confluence') assert.deepEqual(o.capital, { x: 4, y: 13 }, '#487: Meetwater'); else assert.ok(o.capital && !o.biome, `${o.id}: #486 capital position, no biome yet yet`); }
   assert.equal(new Set(reg.nationOpenings.map(o => o.openingFlag).filter(Boolean)).size, 7, 'seven distinct flags');
   const seeded = (await r.db.prepare('SELECT id FROM nations ORDER BY id').all()).results.map(x => x.id).sort();
   assert.deepEqual(seeded, [...ten].sort(), 'the registry covers exactly the seeded nations');
