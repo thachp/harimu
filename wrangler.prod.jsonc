@@ -72,7 +72,7 @@
     "HARIMU_KORUND_SHORTFALL_ENABLED": "false",
     // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
     "HARIMU_SAVINGS_SHIELD_ENABLED": "false",
-    // #844: Kindle sales tax: each goods-market fill with a Kindle citizen seller remits 5% of the gross from the proceeds to kindle-treasury (migration 0081). Off: no row written, no tax query.
+    // #844: Kindle sales tax: each fill on Kindle's goods market (any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migration 0081). Off: no row written, no tax query.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
     // #781: move your home city within your own nation for a fee of 10 units of the nation's wallet currency (SPK Kindle, LN Korund; no wallet currency: not_open_yet), once per 7 real days (POST /api/city/home). Off: 404 before auth, no read or write; home stays the capital.
     "HARIMU_HOME_CITY_MOVE_ENABLED": "false",
