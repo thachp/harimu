@@ -94,7 +94,7 @@ export const marketTradeFeesSchema = `CREATE TABLE IF NOT EXISTS market_trade_fe
   fee_minor INTEGER NOT NULL CHECK(typeof(fee_minor) = 'integer' AND fee_minor > 0),
   charged_at INTEGER NOT NULL
 )`;
-export const marketTradeFeesIndex = 'CREATE INDEX IF NOT EXISTS idx_market_trade_fees_seller ON market_trade_fees(seller_id, charged_at)';
+export const marketTradeFeesIndex = `CREATE INDEX IF NOT EXISTS idx_market_trade_fees_seller ON market_trade_fees(seller_id, charged_at)`;
 export const marketSchemas = [marketGoodsSchema, marketOrdersSchema, marketCancellationsSchema, marketTradesSchema, ...marketIndexes, marketSpoilageSchema, ...marketSpoilageIndexes, marketOpenOrdersView];
 export const marketGoodsSeedSql = marketGoods.map(g =>
   `INSERT OR IGNORE INTO market_goods (good, label, unit, perishable, shelf_life_days) VALUES ('${g.good}', '${g.label}', '${g.unit}', ${g.perishable ? 1 : 0}, ${g.shelfLifeDays ?? 'NULL'})`);

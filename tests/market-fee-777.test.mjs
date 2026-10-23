@@ -55,6 +55,18 @@ test('tiny trade pays 0 and writes no fee row; resting citizen seller filled by 
   assert.deepEqual(await fees(), [{ seller_id: 'bob', fee_minor: 3 }]); assert.equal(await wallet('bob'), bob0 + 150 + 600 - 3);
 });
 
+test('QA3: inserting the fee twice for one trade id leaves one row, no error, and a balanced ledger (relies on OR IGNORE)', async t => {
+  const { r, wallet, place, fees } = await market(t);
+  await place('bob', 'sell', 4, 1000); await place('alice', 'buy', 4, 1000);
+  const { marketFeeSql } = await r.importModule('lib/market-fee.ts');
+  assert.match(marketFeeSql, /^INSERT OR IGNORE INTO market_trade_fees/, 'idempotent insert');
+  const tradeId = (await r.db.prepare('SELECT trade_id FROM market_trade_fees').first()).trade_id;
+  const bob1 = await wallet('bob');
+  await r.db.prepare(marketFeeSql).bind(tradeId).run(); await r.db.batch([r.db.prepare(marketFeeSql).bind(tradeId), r.db.prepare(marketFeeSql).bind(tradeId)]);
+  assert.deepEqual(await fees(), [{ seller_id: 'bob', fee_minor: 20 }]); assert.equal(await wallet('bob'), bob1, 'no second debit');
+  const m = await r.importModule('lib/ledger-reconciliation.ts'); assert.equal((await m.reconcileLedger(r.db)).mismatchCount, 0);
+});
+
 test('flag off: no fee row, seller receives full price, no myFees field and no fee query on GET', async t => {
   const { r, wallet, place, fees } = await market(t, { fee: false });
   const bob0 = await wallet('bob');
