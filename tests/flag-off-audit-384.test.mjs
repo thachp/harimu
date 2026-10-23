@@ -40,6 +40,7 @@ const flagOffPins = {
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
   HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
+  HARIMU_HOME_CITY_MOVE_ENABLED: 'home-city-move-781.test.mjs',
   HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
   HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',

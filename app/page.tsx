@@ -12,6 +12,7 @@ import { GameTimer } from './game-timer';
 import { ActionButton } from './action-button';
 import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import { CountryScene } from './country-scene';
+import { HomeMoveCard } from './home-move-card'; // #781
 import { capitalCityForNation, cityForNation } from '@/lib/cities';
 import type { CityLocation, CoResident } from '@/lib/city-location';
 import { NationComparison } from './nation-comparison';
@@ -1812,7 +1813,7 @@ export default function Home() {
   const countryCityId = countryOwnNation ? currentCityAccount?.currentCityId ?? null : clerkConfigured && citizenNation ? null : previewCity?.id ?? capitalCityForNation(countryNation.id)?.id ?? null;
   const countryHomeId = countryOwnNation ? currentCityAccount?.homeCityId ?? null : clerkConfigured && citizenNation ? null : capitalCityForNation(countryNation.id)?.id ?? null;
   const canCityTravel = !clerkConfigured || citizenSessionStatus === 'anonymous' || Boolean(countryOwnNation && currentCityAccount && citizenSessionStatus === 'ready');
-  const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} /></>;
+  const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} />{countryOwnNation ? <HomeMoveCard nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} /> : null}</>;
   const countryPanel = <section aria-label={`${countryWord()} travel`}><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
     <CitySummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} city={activeCity} nation={citizenNation ?? selected} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} onView={changeView} />
