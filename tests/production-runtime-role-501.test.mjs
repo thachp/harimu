@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
 import { bootstrapEmptyPostgres } from '../scripts/postgres-migrations.mjs';
-import { createRuntimeRole, ledgerTables, roleGrantSql, roleProblems, runtimeRole } from '../scripts/create-production-runtime-role.mjs';
+import { createRuntimeRole, ledgerTables, main, roleGrantSql, roleProblems, runtimeRole } from '../scripts/create-production-runtime-role.mjs';
 
 const adapter = pg => ({ query: (t, p) => pg.query(t, p), exec: t => pg.exec(t) });
 const password = 'Abc123'.repeat(5);
@@ -53,4 +53,15 @@ test('refuses (and changes nothing) unless all three ledgers already exist', asy
     assert.equal((await pg.query('SELECT 1 FROM pg_roles WHERE rolname=$1', [runtimeRole])).rows.length, 0, 'no role created');
     await pg.close();
   }
+});
+
+test('main() runs end to end against connectPostgres\'s shape ({ query, close }, no end)', async () => {
+  const pg = new PGlite(); await pg.waitReady;
+  await bootstrapEmptyPostgres(adapter(pg), { freshWorld: true }); await pg.exec('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)');
+  const urls = [], connect = async url => { urls.push(new URL(url).username); await pg.exec(new URL(url).username === runtimeRole ? `SET ROLE ${runtimeRole}` : 'RESET ROLE'); return { query: (t, p) => pg.query(t, p), close: async () => {} }; };
+  const out = [], log = console.log; console.log = line => out.push(String(line));
+  try { assert.equal(await main({ PREVIEW_DATABASE_ADMIN_URL: 'postgres://admin:adminpw@db.example:5432/harimu', PRODUCTION_RUNTIME_ROLE_PASSWORD: password }, { connect }), 0); } finally { console.log = log; }
+  assert.deepEqual(urls, ['admin', runtimeRole], 'admin first, then the role check as the role');
+  assert.match(out.at(-1), /would accept it/); assert.ok(!out.join('\n').includes(password) && !out.join('\n').includes('adminpw'));
+  await pg.close();
 });

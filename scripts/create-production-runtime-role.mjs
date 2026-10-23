@@ -46,19 +46,20 @@ export async function createRuntimeRole(admin, password, { role = runtimeRole, l
   for (const sql of grants) { await admin.query(sql); log(`ok: ${sql}`); }
 }
 
-async function main(env = process.env) {
+/** connectPostgres returns { query, close } (no end): the run on Oct 22 failed on admin.end(). `connect` is injectable for the test. */
+export async function main(env = process.env, { connect } = {}) {
   const adminUrl = env.PREVIEW_DATABASE_ADMIN_URL, password = env.PRODUCTION_RUNTIME_ROLE_PASSWORD;
   if (!adminUrl || !password) throw new Error('PREVIEW_DATABASE_ADMIN_URL and PRODUCTION_RUNTIME_ROLE_PASSWORD are required.');
-  const { connectPostgres } = await import('./postgres-migrations.mjs');
+  const connectPostgres = connect ?? (await import('./postgres-migrations.mjs')).connectPostgres;
   const admin = await connectPostgres(adminUrl);
-  try { await createRuntimeRole(admin, password); } finally { await admin.end(); }
+  try { await createRuntimeRole(admin, password); } finally { await admin.close(); }
   const url = new URL(adminUrl); url.username = runtimeRole; url.password = password;
   const app = await connectPostgres(url.toString());
   try {
     const problems = await roleProblems(app);
     if (problems.length) throw new Error(`Runtime role refused:\n- ${problems.join('\n- ')}`);
     console.log(`Role check as ${runtimeRole}: no superuser, no CREATE on public, ledgers (${ledgerTables.join(', ')}) read-only. assertPostgresApplicationRole would accept it.`);
-  } finally { await app.end(); }
+  } finally { await app.close(); }
   return 0;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().then(c => process.exit(c), e => { console.error(String(e?.message ?? e).replace(/postgres(ql)?:\/\/\S+/g, '<redacted>')); process.exit(1); });
