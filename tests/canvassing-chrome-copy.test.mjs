@@ -53,7 +53,7 @@ test('visibility, not votes: the lines that mention visibility say it is display
 });
 test('system chrome: no byline, no AI badge, no press voice, no in-game voice lines', () => {
   for (const o of [J,A,S,V]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
-  for (const t of all()) assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|Chairman|Crown|AI-generated|AI candidate/,t);
+  for (const t of all()) assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|Chairman|Crown|AI-generated|AI candidate/,t);
 });
 test('does not repeat the existing canvassing copy lines', () => {
   const camp=readFileSync('lib/campaign-copy.ts','utf8');

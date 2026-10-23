@@ -119,13 +119,13 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
-  await db.prepare("INSERT OR IGNORE INTO world_clock (id,epoch_seconds) VALUES ('main',?)")
-    .bind(Math.floor(now/tickSeconds)*tickSeconds).run();
-  // #679: the two clock reads are independent, so they share one round trip.
-  const [clock, last] = await Promise.all([
-    db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>(),
-    db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
+  // #679 slice 3: the clock insert and the two clock reads share one batch (one round trip, one transaction), so the reads still see the insert, as when they ran after it.
+  const [, clockResult, lastResult] = await db.batch([
+    db.prepare("INSERT OR IGNORE INTO world_clock (id,epoch_seconds) VALUES ('main',?)").bind(Math.floor(now/tickSeconds)*tickSeconds),
+    db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'"),
+    db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks'),
   ]);
+  const clock = clockResult?.results[0] as {epoch_seconds:number} | undefined, last = lastResult?.results[0] as {tick:number} | undefined;
   const epoch = clock!.epoch_seconds;
   const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
   for (let tick=(last?.tick ?? 0)+1; tick<=Math.min(due,(last?.tick ?? 0)+maximumCatchupTicks); tick++) {

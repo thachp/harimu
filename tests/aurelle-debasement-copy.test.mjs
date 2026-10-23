@@ -58,7 +58,7 @@ test('AI badge (#381): Crown decrees are badged; Gazette reports, rumors and Kin
 });
 test('bylines match lib/press-templates.ts; Kindle and Korund reports carry their own byline', () => {
   assert.deepEqual(DEBASEMENT_BYLINES.gazette,aurelleGazette.byline); assert.deepEqual(DEBASEMENT_BYLINES.kindle,kindlePress.byline); assert.deepEqual(DEBASEMENT_BYLINES.korund,korundStateMedia.byline);
-  assert.match(pressReportFor('kindle').text,/^Republic Wire Service: /); assert.match(pressReportFor('korund').text,/^Korund State Media: /);
+  assert.match(pressReportFor('kindle').text,/^Kindle Press: /); assert.match(pressReportFor('korund').text,/^Korund State Media: /);
   assert.deepEqual(PR.map(x=>x.outlet),['kindle','korund']); for (const x of PR) assert.match(x.text,/Crown/);
 });
 test('rumors are marked as rumor and never state an official rate', () => {

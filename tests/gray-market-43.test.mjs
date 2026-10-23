@@ -230,7 +230,7 @@ test('static: one shared LN function; no inline copy of the wage-minus-coupons f
     assert.doesNotMatch(text.replace(/korundCouponSpendSql[^\n]*/, ''), /SUM\(wage_minor\) FROM korund_settlements WHERE clerk_user_id=\?\),0\)-COALESCE/, `${name} still copies the LN formula`);
   }
   assert.match(korund, /laborNoteBinds\(userId\)/);
-  const sql = laborNoteSql('?'); assert.equal((sql.match(/\?/g) ?? []).length, laborNoteParams); assert.deepEqual(laborNoteBinds('u'), ['u', 'u', 'u', 'u', 'u', 'u']); assert.match(sql, /home_city_moves WHERE clerk_user_id=\? AND currency='LN'/); // #781 LN move-fee sink
+  const sql = laborNoteSql('?'); assert.equal((sql.match(/\?/g) ?? []).length, laborNoteParams); assert.deepEqual(laborNoteBinds('u'), Array(7).fill('u')); assert.match(sql, /korund_post_settlements WHERE clerk_user_id=\?/); // #886 (b) assert.match(sql, /home_city_moves WHERE clerk_user_id=\? AND currency='LN'/); // #781 LN move-fee sink
   assert.match(sql, /korund_settlements/); assert.match(sql, /korund_coupon_redemptions/); assert.match(sql, /gray_trades WHERE buyer_id/); assert.match(sql, /gray_trades WHERE seller_id/);
   assert.equal(laborNoteSql('c.id').includes('?'), false);
 });

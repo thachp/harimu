@@ -5,7 +5,7 @@
  * §13.2 (non-aggression pact: no war declarations between signatories, a fixed term, and breaking it costs Legitimacy and
  * global Reputation; trade agreement: tariff reductions, quotas and guaranteed supply contracts), §13.5 (an accepted
  * draft goes to the nation's ratifying body; treaties are public on signature), and the three press voices: Kindle (#237,
- * plain and argumentative, Republic Wire Service), Korund State Media (#238/#244) and the Aurelle Court Gazette (#239).
+ * plain and argumentative, Kindle Press), Korund State Media (#238/#244) and the Aurelle Court Gazette (#239).
  * Bylines match lib/press-templates.ts, as in lib/war-copy.ts (#315).
  *
  * Rules: no invented figures. The only quantity wording is the docs' own "two-thirds" (Kindle treaty vote) and "simple
@@ -31,7 +31,7 @@ export type RatificationNews={key:RatificationKey;nationId:RatifyingNation;body:
 export const TREATY_STATUSES:readonly TreatyStatus[]=['proposed','ratified','in-force','expired','broken'];
 export const RATIFICATION_KEYS:readonly RatificationKey[]=['kindle:treaty','kindle:trade','korund:any','aurelle:any'];
 export const DIPLOMACY_BYLINES={
- kindle:{name:'Republic Wire Service',proposal:true},
+ kindle:{name:'Kindle Press',proposal:false},
  korund:{name:'Korund State Media',proposal:false},
  aurelle:{name:'Court Gazette',proposal:false},
 } as const;

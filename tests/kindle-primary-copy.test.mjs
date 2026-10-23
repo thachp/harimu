@@ -50,7 +50,7 @@ test('no invented figures: no digits, counts, shares, turnout or winner in the r
   for (const t of all()) assert.doesNotMatch(t.replace('one party at a time',''),/\d|%|percent|\b(one|two|three|four|five|six|ten|first round|round|rounds)\b|\bvotes\b|turnout|margin|landslide|majority|plurality|dues/i, t.replace('one party at a time',''));
   assert.doesNotMatch(R.headline+R.summary.text,/\{(hopeful|candidate)\}|wins?\b|won\b|elected|defeat/i);
 });
-test('Republic Wire Service headline: canon byline, plain wire report, no quotes or AI persona', () => {
+test('Kindle Press headline: canon byline, plain wire report, no quotes or AI persona', () => {
   assert.deepEqual(R.byline,kindlePress.byline);
   for (const t of [R.headline,R.summary.text]) { assert.doesNotMatch(t,/["“”]|\bsaid\b|\bsays\b|Be it known|State Media|Gazette/i, t); }
   assert.ok(R.headline.includes('{party}')); assert.ok(R.summary.text.includes('{party}')&&B.scope.text.includes('{party}'));

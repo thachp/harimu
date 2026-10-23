@@ -22,7 +22,7 @@ test('bylines are the culture bible working names, marked as proposals; the MVP 
   assert.deepEqual(confluencePress.byline,{name:'The Current Daily',proposal:true}); assert.deepEqual(hoarvalePress.byline,{name:'The Rimehall Ledger',proposal:true});
   const mvp=Object.values(pressPacks).map(p=>p.byline.name);
   for (const p of packs) { assert.ok(p.byline.name.length<=WAVE2_PRESS_HEADLINE_MAX); assert.ok(!mvp.includes(p.byline.name)); assert.doesNotMatch(p.byline.name,/sample|template|filler|demo/i); }
-  assert.deepEqual(mvp.sort(),['Court Gazette','Korund State Media','Republic Wire Service']);
+  assert.deepEqual(mvp.sort(),['Court Gazette','Kindle Press','Korund State Media']);
 });
 test('length limits: headlines 40, paragraphs 140', () => {
   for (const p of packs) for (const x of p.templates) { assert.ok(x.headline.length<=WAVE2_PRESS_HEADLINE_MAX, `${x.headline.length}: ${x.headline}`);
@@ -45,7 +45,7 @@ test('Confluence reads as the one official paper, covers the culture bible topic
   assert.doesNotMatch(text,/Four Pillars|General Secretary|Premier|Politburo|President/);
   assert.doesNotMatch(text,/mock|fool|puppet|useless|ridicul|corrupt|rigged/i);
   assert.doesNotMatch(text,/Moot|Sovereign|Prime Minister|Rime\b|Trading House|Honors|Kinward/);
-  assert.doesNotMatch(text,/State Media|Court Gazette|Republic Wire|Be it known|the plan advances|Foreign reports/i);
+  assert.doesNotMatch(text,/State Media|Court Gazette|Kindle Press|Be it known|the plan advances|Foreign reports/i);
 });
 test('Hoarvale reads as free press, covers the culture bible topics, and never insults the Sovereign', () => {
   const topics=new Set(hoarvalePress.templates.map(x=>x.topic));
@@ -54,7 +54,7 @@ test('Hoarvale reads as free press, covers the culture bible topics, and never i
   for (const r of [/Moot/,/Sovereign/,/Prime Minister/,/Question Time/,/Trading House/,/Rime\b/,/Aurora Night/,/Honors/,/tenure/i,/coalition/i,/bathhouse/i,/Kinward Rite/]) assert.match(text,r);
   for (const x of hoarvalePress.templates) if (/Sovereign/.test(lines(x).join(' '))) assert.doesNotMatch(lines(x).join(' '),/mock|fool|puppet|useless|ridicul|insult|idle|figurehead|spend/i, x.id);
   assert.doesNotMatch(text,/Guidance Plan|cooperative|Party|Four Pillars|Congress|Current\b|Meetwater|Bureau/);
-  assert.doesNotMatch(text,/State Media|Court Gazette|Republic Wire|Be it known|royal decree|the plan advances/i);
+  assert.doesNotMatch(text,/State Media|Court Gazette|Kindle Press|Be it known|royal decree|the plan advances/i);
 });
 test('voices stay distinct and none is a copy of an MVP template', () => {
   const mvp=new Set(Object.values(pressPacks).flatMap(p=>p.templates.flatMap(lines)));

@@ -6,7 +6,7 @@
  * (News voice). All prose is new wording, so `proposal: true`. Authored copy, not AI output, so no AI-text flag. No people named, no
  * "Notable", no real-world references.
  * FILLER ONLY (as in #237-#239): a pack is shown only when no player paper has published in that nation. Bylines: the MVP bylines
- * (Republic Wire Service, Korund State Media, Court Gazette) are unchanged and not used here. The culture bible's working names are
+ * (Kindle Press, Korund State Media, Court Gazette) are unchanged and not used here. The culture bible's working names are
  * new proposals, so both bylines are `proposal: true`: The Current Daily (Confluence, calm, collective and target-focused) and The
  * Rimehall Ledger (Hoarvale, sober, wry and polite). Confluence copy never mocks the Four Pillars (§2 Voice) and Hoarvale copy never
  * insults the Sovereign (Crown Etiquette). The mid-term and satirical Hoarvale weekly is out of scope. */

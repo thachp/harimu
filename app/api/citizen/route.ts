@@ -34,6 +34,7 @@ import { travelBlock } from '@/lib/travel';
 import { availableWith, checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWrite, latchFirstWeekGoals, readFirstWeekProgress } from '@/lib/first-week-server';
 import { qaTestCitizenAllowed, qaTestNationSql } from '@/lib/qa-tools';
 import { liveNations, nationPlayable, playableNationIds } from '@/lib/nation-openings'; // #485, #489, #872
+import { mvpJobTypesEnabled } from '@/lib/mvp-job-types'; // #886 (b)
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
@@ -75,7 +76,7 @@ const walletStreetRateOn = () => (env as unknown as { HARIMU_WALLET_STREET_RATE_
 const korundRationCutOn = () => (env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string }).HARIMU_KORUND_RATION_CUT_ENABLED === 'true';
 // #797: gray-market checkpoint seizure of cash bundles, destroyed as a sink (HARIMU_GRAY_SEIZURE_ENABLED); off = no roll, no write, no read.
 const graySeizureOn = () => (env as unknown as { HARIMU_GRAY_SEIZURE_ENABLED?: string }).HARIMU_GRAY_SEIZURE_ENABLED === 'true';
-const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn() });
+const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';

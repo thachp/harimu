@@ -62,3 +62,21 @@ export function HouseholdSummary({ nation, walletMinor, inventory, pantry = true
     <ul className="household-v2-family" aria-label="Household members">{valeFamily.map(member => <li key={member.id}>{/* eslint-disable-line @next/next/no-img-element -- 48px decorative static portraits; no Next image loader on this deploy */}<img src={member.image} alt="" width={48} height={48} loading="lazy" /><strong>{member.name}</strong><small>{member.relation}</small></li>)}</ul>
   </div>;
 }
+
+/** #392 S10 (NEXT_PUBLIC_HARIMU_UI_V2_PANEL): the Work and Market panel heads, in the S3 shape. Existing copy and data only: the titles and taglines are the City
+ *  destination cards', the rows jump to the sections already below (nothing is removed or moved), and the primary is the view's existing closing action. */
+const jump = (selector: string) => () => { const el = document.querySelector<HTMLElement>(selector); el?.scrollIntoView({ block: 'start' }); el?.querySelector<HTMLElement>('h2, h3')?.focus?.(); };
+export function WorkSummary({ capacity, contributions, onMarket, enabled = uiV2PanelEnabled() }: { capacity: number; contributions: number; onMarket?: () => void; enabled?: boolean }) {
+  if (!enabled) return null;
+  return <PanelV2 title="Workplace" subtitle="Contributions and earnings" rowsLabel="Workplace" stats={[{ label: 'WC', value: `${capacity} / 24` }, { label: 'Available contributions', value: String(contributions) }]}
+    rows={[{ id: 'shifts', label: 'Your work shifts', icon: cityPlaceIcon('workplace'), onSelect: jump('#citizen-work-shifts') }, { id: 'orders', label: 'Available contributions', onSelect: jump('.scene-work-orders') }]}
+    primary={onMarket ? { label: 'Take your earnings to market', icon: cityPlaceIcon('market'), onSelect: onMarket } : undefined} />;
+}
+export function MarketSummary({ nation, walletMinor, food, board, listings, onHousehold, enabled = uiV2PanelEnabled() }: { nation: Pick<Nation, 'name' | 'currency'>; walletMinor?: number | null; food?: number | null; board: boolean; listings: boolean; onHousehold: () => void; enabled?: boolean }) {
+  if (!enabled) return null;
+  return <PanelV2 title="Market" subtitle="Goods and citizen listings" rowsLabel="Market"
+    stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), ...(food == null ? [] : [{ label: 'Food', value: String(food) }])]}
+    rows={[{ id: 'starter', label: 'Kindle starter market', icon: cityPlaceIcon('market'), onSelect: jump('.citizen-market:not(.player-market)') },
+      ...(board ? [{ id: 'board', label: 'City market board', onSelect: jump('.market-board') }] : []), ...(listings ? [{ id: 'listings', label: 'Kindle citizen listings', onSelect: jump('.player-market') }] : [])]}
+    primary={{ label: 'Return to household', icon: cityPlaceIcon('household'), onSelect: onHousehold }} />;
+}

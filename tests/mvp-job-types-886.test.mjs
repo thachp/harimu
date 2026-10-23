@@ -51,6 +51,7 @@ test('GET /api/jobs/types: flag off is 404, the catalog when on; no database sta
   r.setFixtureEnv('HARIMU_MVP_JOB_TYPES_ENABLED', 'true');
   const on = await r.call('jobs/types', 'anyone');
   assert.equal(on.status, 200); assert.deepEqual(on.data.jobTypes, jobTypeCatalog());
+  assert.equal(on.cache, 'no-store', 'QA3: no-store like the other flagged routes'); assert.equal(off.cache, 'no-store');
   const route = await readFile(new URL('../app/api/jobs/types/route.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(route, /getDatabase|prepare\(/);
 });

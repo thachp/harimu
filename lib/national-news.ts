@@ -8,6 +8,7 @@ import { readTreaties, treatyNewsItems } from './diplomacy'; // #308
 import { embargoNewsItems, readEmbargoes } from './embargo'; // #363
 import { goodsSanctionNewsItems, readGoodsSanctions } from './goods-sanctions'; // #601
 import { undergroundNewsItems } from './korund-underground'; // #295
+import { rallyNewsItems } from './rallies'; // #867
 
 export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model';kind?:NewsItemKind};
 /** record: system ledger fact; template: Korund State Media template built only from ledger figures; decree: Aurelle court gazette entry; article: model-written article. */
@@ -16,7 +17,7 @@ export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean}={}):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean}={}):Promise<NationalNews|null> {
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
  if(!edition)return null;
@@ -41,6 +42,7 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  if(nationId==='korund'&&options.faith)items.push(...await undergroundNewsItems(db,Math.floor(now/1000))); // #295 State Media inspection rumors, derived on read (no faith, shrine or person named)
  if(options.war)items.push(...warNewsItems((await readWars(db,Math.floor(now/1000))).wars,nationId)); // #309 declaration, mobilization end and war end lines, derived on read
  if(options.diplomacy)items.push(...treatyNewsItems((await readTreaties(db,Math.floor(now/1000))).treaties,nationId)); // #308 ratification and broken-pact lines, derived on read
+ if(options.rallies&&nationId==='kindle')for(const r of await rallyNewsItems(db))items.push({id:r.id,title:r.title,text:r.text,occurredAt:r.occurredAt,source:'deterministic',kind:'template'}); // #867 AI-labeled rally clips
  if(options.foundingPeriod)items.push(...foundingNewsItems(await readFoundingEvents(db),nationId)); // #612 day-30 event line, derived on read
  if(options.targetedSanctions)items.push(...goodsSanctionNewsItems((await readGoodsSanctions(db)).sanctions,nationId)); // #601 impose and lift lines, derived on read
  if(options.embargo)items.push(...embargoNewsItems((await readEmbargoes(db)).embargoes,nationId)); // #363 impose and lift lines, derived on read

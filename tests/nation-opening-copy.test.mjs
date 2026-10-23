@@ -46,7 +46,7 @@ test('no figures, no promise of an opening date: "coming soon" only in the label
 test('no real-world country or people names and no nation named in a line; refusals are out of character', () => {
   for (const t of all()) { assert.doesNotMatch(t,/\b(America\w*|Europe\w*|England|English|France|French|Germany|German|Japan\w*|China|Chinese|Russia\w*|India\w*|Korea\w*|Brazil\w*|Canada|Canadian|Mexic\w*|Spain|Spanish|Italy|Italian|Egypt\w*|Rome|Roman|Persia\w*|Ottoman)\b/,t); assert.doesNotMatch(t,/\b(Kindle|Korund|Aurelle|Varkand|Meridian|Ilmar|Veldwood|Hoarvale|Fulmara|Confluence)\b/,t); }
   for (const t of [R.enroll.text,R.change.text,R.generic.text]) assert.match(t,/not open yet/,t);
-  for (const t of all()) assert.doesNotMatch(t,/Chairman|Crown|President|Assembly|Republic Wire|State Media|Court Gazette|Be it known|Notable|@/,t);
+  for (const t of all()) assert.doesNotMatch(t,/Chairman|Crown|President|Assembly|Kindle Press|State Media|Court Gazette|Be it known|Notable|@/,t);
 });
 test('system lines only: no byline, no AI badge; plain tone', () => {
   for (const o of [CS,R,W]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }

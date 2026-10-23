@@ -141,7 +141,13 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
         const blocked = [...(container.closest('.harimu-game')?.querySelectorAll('.game-stage-overlay > *') ?? [])].map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0)
           .map(r => ({ x: r.left - here.left + r.width / 2, y: r.bottom - here.top, w: r.width, h: r.height })).filter(b => b.y > 0 && b.y - b.h < h && b.x + b.w / 2 > 0 && b.x - b.w / 2 < w);
         shown.forEach(({ button }) => { button.dataset.anchor = `${button.style.left},${button.style.top}`; }); // where the building is, so a check can measure how far a label moved
-        const spots = placeLabels(shown.map(({ button }) => ({ x: parseFloat(button.style.left), y: parseFloat(button.style.top), w: button.offsetWidth, h: button.offsetHeight })), { w, h }, 4, blocked);
+        const anchors = shown.map(({ button }) => ({ x: parseFloat(button.style.left), y: parseFloat(button.style.top) }));
+        const place = () => placeLabels(shown.map(({ button }, i) => ({ ...anchors[i], w: button.offsetWidth, h: button.offsetHeight })), { w, h }, 4, blocked);
+        const crowded = (boxes: { x: number; y: number; w: number; h: number }[]) => boxes.some((a, i) => boxes.some((b, j) => j > i && Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 1 && Math.abs(a.y - b.y) < (a.h + b.h) / 2 - 1)); // centres on x, bottoms on y (same height)
+        // #874: when the map is too short for every full label (320px at 150% text, ~140px of map), the S7 pills show their icon only; the text stays in the DOM and the "Select …" name is unchanged.
+        const pills = shown.some(({ button }) => button.classList.contains('viewport-city-pill'));
+        container.toggleAttribute('data-compact-pills', false); let spots = place();
+        if (pills && crowded(spots)) { container.toggleAttribute('data-compact-pills', true); spots = place(); }
         shown.forEach(({ button }, index) => { button.style.left = `${spots[index].x}px`; button.style.top = `${spots[index].y}px`; });
       }
       if (mode === 'world' && window.matchMedia?.('(max-width: 760px)').matches) { // #486: on the 30x24 grid northern capitals (Korund, y=4) sit at higher latitude, so a label drawn above its marker can rise past the canvas top on a phone; keep each label box inside (desktop untouched)

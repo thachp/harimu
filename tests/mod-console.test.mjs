@@ -12,7 +12,7 @@ test('flag: preview on, production off, only the exact string "true" enables it;
   assert.equal(modConsoleEnabled('true'), true); for (const v of [undefined, '', 'false', 'TRUE', '1']) assert.equal(modConsoleEnabled(v), false);
   for (const f of (await readdir(new URL('../scripts/', import.meta.url))).filter(f => f.endsWith('.mjs'))) {
     const src = await read(`scripts/${f}`);
-    if (/['"]process\.env\.NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD['"]\s*:/.test(src) && f !== 'ui-v2-household-check.mjs') assert.match(src, /['"]process\.env\.NEXT_PUBLIC_HARIMU_MOD_CONSOLE['"]\s*:\s*'"false"'/, f);
+    if (/['"]process\.env\.NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD['"]\s*:/.test(src) && !['ui-v2-household-check.mjs', 'mod-console-check.mjs'].includes(f)) assert.match(src, /['"]process\.env\.NEXT_PUBLIC_HARIMU_MOD_CONSOLE['"]\s*:\s*'"false"'/, f);
   }
 });
 
@@ -47,7 +47,7 @@ test('the console renders a labelled form and, after a load, a captioned table w
 
 test('ARC: no data before the server accepts the token; the older-entries cue uses the route\'s 50-entry page', async () => {
   const ui = await read('app/admin/mod/mod-console.tsx');
-  assert.match(ui, /\{result\?\.ok && <div className=\{styles\.scroll\}/, 'the table renders only from an accepted response');
+  assert.match(ui, /\{result\?\.ok && result\.items\.length > 0 && <div className=\{styles\.scroll\}/, 'the table renders only from an accepted, non-empty response (empty queue: status "0 items", no table)');
   assert.equal((ui.match(/<table/g) ?? []).length, 1); assert.doesNotMatch(ui, /useEffect/, 'nothing loads before Load');
   assert.match(ui, /setResult\(null\); setResult\(await load\(/, 'a new load clears the previous data first');
   assert.match(ui, /const PAGE = 50;/); assert.match(ui, /older entries not shown/);

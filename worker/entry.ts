@@ -5,6 +5,7 @@ import { getDatabase } from '../lib/db';
 import { readCityLocation } from '../lib/city-location';
 import { runCabinetCron } from '../lib/cabinet-cron';
 import { cronJobsOn, type CronFlagBindings } from '../lib/cron-gates';
+import { runRallyCron } from '../lib/rallies'; // #867
 import { runDiplomacyCron } from '../lib/diplomacy';
 import { runCrownCron } from '../lib/crown-debasement';
 import { runTownHallCron } from '../lib/town-hall-ai';
@@ -47,6 +48,9 @@ const worker = {
     if (on.ledger) ctx.waitUntil((async () => runLedgerReconciliationCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_LEDGER_RECONCILIATION_ENABLED?: string }).HARIMU_LEDGER_RECONCILIATION_ENABLED === 'true' }))()
       .then(() => undefined, error => { console.warn('[cron] Ledger reconciliation failed', error instanceof Error ? error.name : 'unknown'); }));
     // #465: earned-Tessera epoch close (one entry per verified settled shift, pro-rata from a fixed daily pool); a no-op unless HARIMU_TESSERA_REWARDS_ENABLED="true" (default "false"). Idempotent; never runs on a read.
+    // #867: publish one AI-labeled news clip per Kindle rally whose time has passed; a no-op unless HARIMU_KINDLE_RALLIES_ENABLED is "true". Never runs on a read.
+    if (on.rallies) ctx.waitUntil((async () => runRallyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000)))()
+      .then(() => undefined, error => { console.warn('[cron] Rally clips failed', error instanceof Error ? error.name : 'unknown'); }));
     if (on.tesseraRewards) ctx.waitUntil((async () => runTesseraRewardCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_TESSERA_REWARDS_ENABLED?: string }, async userId => (await readVerification(userId)).countedActionsEligible))()
       .then(() => undefined, error => { console.warn('[cron] Tessera reward epoch close failed', error instanceof Error ? error.name : 'unknown'); }));
   },

@@ -5,7 +5,7 @@
  * one ceasefire-broken press line per nation. Canon: harimu-docs trade-diplomacy-sanctions §13.2 (ceasefire or peace ends a war and may
  * include reparations, cessions and demilitarized zones; peace locks war declarations for 10 real days), §13.5 (the 10-day peace lock
  * is a docs [ASSUMPTION]), §13.1 (every negotiator and ratifier is an AI), territory-cities-warfare §15.3, MVP Scope Diplomacy and War
- * rows, and the three press voices: Kindle (#237, Republic Wire Service), Korund State Media (#238/#244) and the Aurelle Court Gazette
+ * rows, and the three press voices: Kindle (#237, Kindle Press), Korund State Media (#238/#244) and the Aurelle Court Gazette
  * (#239). Bylines match lib/press-templates.ts, as in lib/war-copy.ts and lib/diplomacy-copy.ts.
  *
  * Rules: no figures. The lock length is the docs' own number, but it is never written in prose: the end time comes only through
@@ -56,7 +56,7 @@ export const peaceLockBanner={
 /** Press: a fixed headline and one report per event in each nation's voice, from the nation's own war. Aurelle also has a Crown line
  * for the signing, AI-badged ("Be it known"). */
 export const peacePress:readonly PeacePress[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,
   headline:{signed:'Peace is signed',ceasefireBroken:'A ceasefire is broken'},
   report:{signed:P('Peace signed with {other}. Ask officials what the terms are.'),ceasefireBroken:P('The ceasefire with {other} is broken. Officials must explain.')}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,

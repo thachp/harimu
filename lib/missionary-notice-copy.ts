@@ -6,7 +6,7 @@
  * give the time only through {readyAt}, and one public host-city feed line in the host nation's press voice.
  * Canon: harimu-docs religion-faiths §14.8 (invitations are opt-in; conversion happens only if the citizen accepts; host permission
  * is free in pluralist nations, Kinward Rite only in Aurelle, banned in Korund), §14.3 (conversion prompts are always opt-in),
- * MVP Scope Religion row, and the press voices Kindle (#237, Republic Wire Service) and the Aurelle Court Gazette (#239).
+ * MVP Scope Religion row, and the press voices Kindle (#237, Kindle Press) and the Aurelle Court Gazette (#239).
  *
  * Rules: placeholders are only {readyAt}, {faith} and {city}, all pre-formatted strings; no figure is written here, so no day counts
  * and no conversion counts. No line names a player or says who converted. Private UI lines are nation-neutral and faith-neutral
@@ -55,6 +55,6 @@ export const missionaryCooldowns={
 
 /** Public host-city feed line, one per nation that allows public preaching. Korund bans preaching, so it has none. */
 export const missionaryFeed:Readonly<Record<FeedNation,FeedLine>>={
- kindle:{text:'A missionary of {faith} preached in {city}.',byline:{name:'Republic Wire Service',proposal:true},aiBadge:false,proposal:true},
+ kindle:{text:'A missionary of {faith} preached in {city}.',byline:{name:'Kindle Press',proposal:false},aiBadge:false,proposal:true},
  aurelle:{text:'A missionary of {faith} was heard in {city}.',byline:{name:'Court Gazette',proposal:false},aiBadge:false,proposal:true},
 };

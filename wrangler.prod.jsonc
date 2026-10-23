@@ -123,6 +123,8 @@
     "HARIMU_ARMY_DRILLS_ENABLED": "false",
     // #738 slice 4: army units on the map: the "Army positions" overlay shows each unit at its capital, or marching toward the enemy capital in a war its nation declared. Needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED too. Off: GET /api/army/positions is 404 and the overlay stays "Not available yet". Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMY_MAP_ENABLED": "false",
+    // #738 slice 5: supply lines from depots (each nation's capital); a unit marching beyond supply range loses strength each game day, shown on the army card and the Army positions legend. Needs HARIMU_ARMY_MAP_ENABLED and its flags. Off: no supply reads and the slice-4 shapes. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_ARMY_SUPPLY_ENABLED": "false",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "false",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
@@ -131,6 +133,8 @@
     "HARIMU_PLANK_VOTES_ENABLED": "false",
     // #863: Kindle campaign donations PoC (docs 9.4): Tier-1 citizens donate Spark to an AI party, capped per party per week and publicly listed; never votes, ballot or primary weight. Off: /api/party-donations is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_PARTY_DONATIONS_ENABLED": "false",
+    // #867: Kindle rallies PoC (docs 9.4): one weekly rally per AI candidate in a Kindle city square, citizens mark attend once, an AI-labeled news clip after the rally; visibility only, never votes. Off: /api/rallies is 404, the card and news clips are hidden, the cron job never opens the database. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_KINDLE_RALLIES_ENABLED": "false",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
