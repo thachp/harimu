@@ -438,11 +438,14 @@ body:has(.harimu-game){overflow:auto}
 @media(max-width:760px){
   .harimu-game.game-mobile-v2>.game-hud{grid-row:1 / span 2} /* the top bar fills the nav row's (text-scaled, #80) track, so the empty row leaves no gap */
   .game-mobile-v2.game-rail-on .game-nav-row{grid-row:8;position:sticky;bottom:0;z-index:8;border-top:1px solid #49616a;border-bottom:0;box-shadow:0 -4px 12px #0007}
-  .game-mobile-v2.game-rail-on:has(.citizen-dock) .game-nav-row{bottom:45px}
+  .game-mobile-v2.game-rail-on:has(.citizen-dock) .game-nav-row{bottom:max(45px,var(--s8-dock,45px))}
+  /* #838 follow-up: dock labels ("Civic inbox · 1 unread") wrap instead of clipping at 320px; the dock grows with them (45px minimum) and the tab bar and page end follow its measured height (--s8-dock, app/game-shell.tsx). */
+  .harimu-game.game-mobile-v2 .citizen-dock{height:auto;min-height:45px}.harimu-game.game-mobile-v2:has(.citizen-dock){padding-bottom:max(45px,var(--s8-dock,45px))}
+  .harimu-game.game-mobile-v2 .citizen-dock{flex-wrap:wrap}.harimu-game.game-mobile-v2 .citizen-dock>button{flex:1 1 0;min-width:min-content;padding:4px 6px;white-space:normal;overflow-wrap:normal;word-break:normal;line-height:1.2}
   .game-mobile-v2 .game-inspector{border-top:1px solid #49616a;border-radius:14px 14px 0 0;box-shadow:0 -6px 16px #0006;padding-top:14px}
   /* S8 follow-up (#377, ARC): the City scene is the screen minus the bars (heights from app/game-shell.tsx); 44dvh / 260px stay as the fallback */
   .harimu-game.game-mobile-v2.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) auto 0 minmax(0,auto)}
-  .game-mobile-v2.game-city-v2 .game-stage{min-height:0;height:max(200px,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px)))}
+  .game-mobile-v2.game-city-v2 .game-stage{min-height:0;height:max(160px,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px)))}
   .game-mobile-v2.game-city-v2:not([style*="--s8-top"]) .game-stage{height:44dvh}
   .game-mobile-v2 .game-inspector::before{content:"";display:block;width:36px;height:4px;margin:0 auto 6px;border-radius:2px;background:#6f8a92}
 }
