@@ -10,7 +10,7 @@ import {enqueueAiReview} from './ai-review-queue';
 export {notableFor,nationNotables} from './notable-choice';
 export {notableProfile,notableTopics,notableDailyLimit,validNotableCommand} from './notable-profiles';
 export const notablesEnabled=true; // Explicit preview approval; independent runtime switch and shared pricing gate remain required.
-async function ownerPrefix(userId:string){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(userId));return 'notable:'+Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')+':';}
+export async function ownerPrefix(userId:string){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(userId));return 'notable:'+Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')+':';}
 
 /** No conversation history, household drafts, account IDs or private chat enter a model prompt. */
 export async function answerNotable(db:GameDatabase,userId:string,command:NotableCommand,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,killSwitch=null as AiTemplatesOnlyEnv|null,reviewQueue=false}={}){
