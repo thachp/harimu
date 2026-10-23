@@ -8,6 +8,7 @@ import type { readFaith } from '../lib/faith';
 import type { readCongregations } from '../lib/congregations';
 import { faithCopy, korundFaithCopy, unaffiliatedCopy, type FaithId } from '../lib/faith-copy';
 import { clergyGateHelp } from '../lib/clergy-gate-copy';
+import { holySiteCopy, holySites, type HolySiteId } from '../lib/holy-sites';
 import { ActionButton } from './action-button';
 import { GameTimer } from './game-timer';
 import { AiBadge } from './ai-disclosure';
@@ -108,6 +109,7 @@ export function FaithPanel({ api, initialPick = null }: { api: FaithApi; initial
   return <section className="faith-panel" aria-labelledby="faith-heading">
     <h2 id="faith-heading">Faith and Devotion</h2>
     {harmony && <p className="faith-harmony">{harmony.line}</p>}
+    {harmony && <HolySiteActions />}
     <div className="faith-current">
       <h3>{copy.name}</h3>
       {copy.tagline && <p className="faith-tagline">{copy.tagline}</p>}
@@ -211,5 +213,22 @@ function CongregationBlock({ faith, state, api }: { faith: FaithState; state: Co
       </>}
     </div>
     <p className="faith-note">{state.explanation}</p>
+  </div>;
+}
+
+/** #889: pilgrimage and clergy-charity buttons, shown only with the harmony line (HARIMU_RELIGIOUS_HARMONY_ENABLED on). POST /api/faith/holy-sites. */
+export function HolySiteActions() {
+  const [note, setNote] = useState('');
+  const act = async (body: Record<string, unknown>) => {
+    try {
+      const res = await fetch('/api/faith/holy-sites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, requestId: crypto.randomUUID() }) });
+      const data = await (res.json() as Promise<{ outcome?: string; error?: string }>).catch(() => ({} as { outcome?: string; error?: string }));
+      setNote(res.ok && data.outcome ? holySiteCopy.outcome[data.outcome] ?? '' : holySiteCopy.failed.replace('{reason}', data.error ?? String(res.status)));
+    } catch { setNote(holySiteCopy.failed.replace('{reason}', 'network')); }
+  };
+  return <div className="faith-holy-sites"><h3>{holySiteCopy.heading}</h3>
+    {(Object.keys(holySites) as HolySiteId[]).map(id => <button key={id} type="button" onClick={() => void act({ action: 'pilgrimage', siteId: id })}>{holySiteCopy.pilgrimage[id]}</button>)}
+    <button type="button" onClick={() => void act({ action: 'charity' })}>{holySiteCopy.charity}</button>
+    {note && <p role="status">{note}</p>}
   </div>;
 }

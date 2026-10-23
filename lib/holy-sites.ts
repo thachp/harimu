@@ -53,3 +53,11 @@ export async function runHarmonyAct(db: GameDatabase, userId: string, command: H
     return { ok: false as const, status: 403, reason: 'not_clergy', error: 'Only a seated officiant can give clergy charity.' };
   return { ok: false as const, status: 409, reason: 'already_today', error: 'You already did that this game day.' };
 }
+/** #889: faith-panel buttons. PLACEHOLDER copy, marked for Content (proposal: true). */
+export const holySiteCopy = {
+  heading: 'Holy sites and charity', proposal: true,
+  pilgrimage: { 'hearth-of-first-names': 'Pilgrimage to the Hearth of First Names', 'high-retreat': 'Pilgrimage to the High Retreat' } as Record<HolySiteId, string>,
+  charity: 'Give clergy charity',
+  outcome: { granted: 'Pilgrimage granted. Harmony rises.', denied: 'Pilgrimage denied. Harmony falls.', given: 'Charity given. Harmony rises.' } as Record<string, string>,
+  failed: 'That did not go through: {reason}',
+} as const;

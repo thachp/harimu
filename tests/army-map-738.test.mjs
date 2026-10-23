@@ -14,6 +14,7 @@ const cap = id => Z.mappedNations.find(n => n.id === id).capital;
 
 test('rules: three flags; terrain costs are named constants inside 20–60 minutes; route stops one square short; terrain paid on entry', () => {
   assert.equal(M.armyMapEnabled(ON), true); for (const k of Object.keys(ON)) assert.equal(M.armyMapEnabled({ ...ON, [k]: 'false' }), false, k); assert.equal(M.armyMapEnabled(null), false);
+  assert.equal(M.armyMapEnabled({ HARIMU_ARMIES_ENABLED: 'true', HARIMU_WAR_ENABLED: 'true' }), false, 'QA3 on #891: unset HARIMU_ARMY_MAP_ENABLED means off');
   assert.deepEqual([M.ARMY_MOVE_SECONDS_FAST, M.ARMY_MOVE_SECONDS_MEDIUM, M.ARMY_MOVE_SECONDS_SLOW, M.ARMY_MOVE_SECONDS_ROUGH, M.ARMY_STAGING_DISTANCE], [1200, 1800, 2400, 3600, 1]);
   assert.deepEqual([M.ARMY_ROUTE_RULE, M.ARMY_ROUTE_STEP_SQUARES], ['straight-chebyshev-diagonal-first', 1]);
   assert.match(readFileSync('app/api/army/positions/route.ts', 'utf8'), /positions are public for MVP; a future fog-of-war setting may restrict this/);
