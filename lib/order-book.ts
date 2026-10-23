@@ -15,6 +15,7 @@ import { marketGoods, type MarketGood } from './market-orders';
  * Fixed-lot player listings (lib/player-market.ts) stay as they are while this API is behind
  * HARIMU_ORDER_BOOK_ENABLED (default off); #200's board replaces them, and they are retired then.
  */
+import { marketFeeSql } from './market-fee'; // #777
 import { orderBookCityId, orderBookLimits, matchOrder, tradeSql, type OrderCommand, type OrderBookState, type RestingOrder } from './order-book-rules';
 export * from './order-book-rules';
 export type BookLevel = { unitMinor: number; qty: number; npc: boolean };
@@ -42,7 +43,7 @@ const sameIntent = (r: Receipt | null, userId: string, c: OrderCommand) => !!r &
 /** Match an open order against the book. Re-reads after each guarded batch so a concurrent change only shortens the fill.
  *  #679: `known` is the order's own city, good and side when the caller already has them (the NPC farm just posted it), so each round reads the
  *  order and its opposite book together instead of one after the other. A mismatch with the stored order falls back to reading the book again. */
-export async function matchOpen(db: GameDatabase, orderId: string, now: number, known?: { cityId: string; good: string; side: 'buy' | 'sell' }) {
+export async function matchOpen(db: GameDatabase, orderId: string, now: number, known?: { cityId: string; good: string; side: 'buy' | 'sell' }, options: { fee?: boolean } = {}) {
   const readBook = (cityId: string, good: string, side: string) => db.prepare(`SELECT id, citizen_id, side, limit_unit_minor, remaining, created_at FROM market_open_orders
       WHERE city_id = ? AND good = ? AND side != ? AND id != ?`).bind(cityId, good, side, orderId).all<RestingOrder>();
   for (let round = 0; round < orderBookLimits.matchRounds; round++) {
@@ -58,15 +59,17 @@ export async function matchOpen(db: GameDatabase, orderId: string, now: number, 
     const fills = matchOrder({ side: me.side, limitUnitMinor: Number(me.limit_unit_minor), remaining: Number(me.remaining), citizenId: me.citizen_id }, book);
     if (!fills.length) return;
     // Trade ids are deterministic (order, round, index): a retried batch can't insert a second copy, and ids sort in fill order.
-    const results = await db.batch(fills.map((f, i) => {
-      const [buy, sell] = me.side === 'buy' ? [orderId, f.restingId] : [f.restingId, orderId];
-      return db.prepare(tradeSql).bind(`t:${orderId}:${round}:${String(i).padStart(3, '0')}`, f.qty, f.unitMinor, now, buy, sell, f.qty, f.qty, f.unitMinor, f.unitMinor);
+    // #777: with the fee on, each trade INSERT is followed by its guarded fee INSERT in the same batch (no fee row unless the trade row landed).
+    const results = await db.batch(fills.flatMap((f, i) => {
+      const [buy, sell] = me.side === 'buy' ? [orderId, f.restingId] : [f.restingId, orderId], id = `t:${orderId}:${round}:${String(i).padStart(3, '0')}`;
+      const trade = db.prepare(tradeSql).bind(id, f.qty, f.unitMinor, now, buy, sell, f.qty, f.qty, f.unitMinor, f.unitMinor);
+      return options.fee ? [trade, db.prepare(marketFeeSql).bind(id)] : [trade];
     }));
-    if (results.every(r => (r.meta?.changes ?? 0) > 0)) return;
+    if (results.filter((_, i) => !options.fee || i % 2 === 0).every(r => (r.meta?.changes ?? 0) > 0)) return;
   }
 }
 
-export async function executeOrderCommand(db: GameDatabase, userId: string, command: OrderCommand, now: number): Promise<{ status: number; replayed?: boolean; error?: string }> {
+export async function executeOrderCommand(db: GameDatabase, userId: string, command: OrderCommand, now: number, options: { fee?: boolean } = {}): Promise<{ status: number; replayed?: boolean; error?: string }> {
   const find = () => db.prepare(receiptSql).bind(command.requestId, command.requestId).first<Receipt>();
   const existing = await find();
   if (existing) return sameIntent(existing, userId, command) ? { status: 200, replayed: true } : { status: 409, error: 'Request identifier already used for another intent.' };
@@ -88,11 +91,11 @@ export async function executeOrderCommand(db: GameDatabase, userId: string, comm
   if (!sameIntent(saved, userId, command)) return { status: 409, error: command.action === 'market-order-place'
     ? 'Order refused: check Kindle citizenship, available Spark or goods for escrow, and the 10 open-order limit.'
     : 'Order not open, already cancelled, or not yours.' };
-  if (command.action === 'market-order-place') await matchOpen(db, command.requestId, now);
+  if (command.action === 'market-order-place') await matchOpen(db, command.requestId, now, undefined, options);
   return { status: 200 };
 }
 
-export async function readOrderBook(db: GameDatabase, userId: string): Promise<OrderBookState> {
+export async function readOrderBook(db: GameDatabase, userId: string, options: { fee?: boolean } = {}): Promise<OrderBookState> {
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>();
   type Row = { good: string; side: string; limit_unit_minor: number; qty: number; npc: number };
   const levels = (await db.prepare(`SELECT good, side, limit_unit_minor, SUM(remaining) AS qty, MAX(CASE WHEN npc_id IS NULL THEN 0 ELSE 1 END) AS npc
@@ -101,6 +104,9 @@ export async function readOrderBook(db: GameDatabase, userId: string): Promise<O
     .bind(g.good).first<{ unit_minor: number }>()));
   const mine = (await db.prepare(`SELECT id, side, good, qty, remaining, limit_unit_minor, created_at FROM market_open_orders WHERE citizen_id = ?
     ORDER BY created_at DESC, id`).bind(userId).all<{ id: string; side: 'buy' | 'sell'; good: MarketGood; qty: number; remaining: number; limit_unit_minor: number; created_at: number }>()).results;
+  // #777 (flag on only, read-only): the citizen's latest fee lines.
+  const fees = options.fee ? (await db.prepare(`SELECT f.trade_id, t.good, t.qty, t.unit_minor, f.fee_minor, t.filled_at FROM market_trade_fees f JOIN market_trades t ON t.id = f.trade_id
+    WHERE f.seller_id = ? ORDER BY t.filled_at DESC, f.trade_id DESC LIMIT 5`).bind(userId).all<{ trade_id: string; good: string; qty: number; unit_minor: number; fee_minor: number; filled_at: number }>()).results : null;
   const level = (r: Row): BookLevel => ({ unitMinor: Number(r.limit_unit_minor), qty: Number(r.qty), npc: Number(r.npc) === 1 });
   return {
     available: citizen?.nation_id === 'kindle',
@@ -113,5 +119,6 @@ export async function readOrderBook(db: GameDatabase, userId: string): Promise<O
     }),
     myOrders: mine.map(o => ({ id: o.id, side: o.side, good: o.good, qty: Number(o.qty), remaining: Number(o.remaining), limitUnitMinor: Number(o.limit_unit_minor),
       createdAt: new Date(Number(o.created_at) * 1000).toISOString() })),
+    ...(fees ? { myFees: fees.map(f => ({ tradeId: f.trade_id, good: f.good, qty: Number(f.qty), unitMinor: Number(f.unit_minor), feeMinor: Number(f.fee_minor), filledAt: new Date(Number(f.filled_at) * 1000).toISOString() })) } : {}),
   };
 }

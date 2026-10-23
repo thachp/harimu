@@ -62,9 +62,9 @@ test('no string here repeats a string from another lib module, and no real-world
   for (const t of all()) assert.ok(!others.includes(`'${t}'`)&&!others.includes(`"${t}"`)&&!others.includes(`\`${t}\``), t);
   assert.doesNotMatch(all().join(' '),/\b(Earth|real world|therapy|diagnos\w*|Tessera|chain|NFT|token|wallet)\b/i);
 });
-test('wired only where intended: app/national-news.tsx and lib/ai-news.ts import kill-switch-copy, nothing else does', () => {
+test('wired only where intended: app/national-news.tsx, lib/ai-news.ts and lib/notables.ts (#764) import kill-switch-copy, nothing else does', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  const allowed=new Set(['app/national-news.tsx','lib/ai-news.ts']);
+  const allowed=new Set(['app/national-news.tsx','lib/ai-news.ts','lib/notables.ts']);
   for (const f of allowed) assert.match(readFileSync(f,'utf8'),/kill-switch-copy/, f);
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('kill-switch-copy.ts')&&!allowed.has(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/kill-switch-copy/, f);
 });

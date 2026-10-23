@@ -3,7 +3,7 @@ import {reserveAiCabinetSequence,markAiReservationSent,releaseAiReservation,sett
 import {inferenceText,supportedNewsDraft,newsVerificationResponseFormat,type NewsAiBinding} from './ai-news';
 import {validPetitionText} from './collective-petitions';
 import {deniedAiText} from './ai-denylist';
-import {skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
+import {skipForMutedPersona,aiPathPersonas,skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
 /** Issue #20: the mandatory public Cabinet response to a petition that reached 3%.
  * Follows the ai-news pattern: off unless the runtime flag, binding and a valid
  * aiBudgetConfig are present; one reservation (own ledger operation) covers draft, check and guard,
@@ -23,6 +23,8 @@ export async function prepareAiCabinetResponse(db:GameDatabase,now:number,bindin
  if(!enabled||!binding||!budget||!Number.isSafeInteger(now))return {status:'disabled' as const};
  // #742: templates-only mode makes no model call and no reservation; the petition keeps its existing "awaiting response" state.
  if(skipForTemplates('cabinet-response',killSwitch,'kindle',now))return {status:'templates-only' as const};
+ // #764: a muted persona makes no model call and no reservation either.
+ if(skipForMutedPersona('cabinet-response',killSwitch,aiPathPersonas['cabinet-response'](),now))return {status:'persona-muted' as const};
  const day=new Date(now*1000).toISOString().slice(0,10);
  // Skip petitions already attempted today so one failing petition cannot starve newer ones.
  const p=await db.prepare("SELECT id,title,demand,reached_at FROM civic_petitions p WHERE nation_id='kindle' AND reached_at IS NOT NULL AND reached_at<=? AND response_text IS NULL AND NOT EXISTS(SELECT 1 FROM harimu_ai_reservations r WHERE r.request_id='cabinet:'||p.id||':'||?) ORDER BY reached_at,id LIMIT 1").bind(now,day).first<Awaiting>();
