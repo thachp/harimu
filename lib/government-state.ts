@@ -63,6 +63,11 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
   // #679: the Aurelle crown read touches only the Rising and coup tables, which nothing below writes, so it starts with the first reads instead of last
   // (parked so a run that returns early never leaves an unhandled rejection; the crown branch still rethrows).
   const crownRead = nationId === 'aurelle' ? parked(readCrown(db)) : null;
+  // #679: the latest persisted review is also read up front. It is used only when no petition day is reviewed below (the usual case), since a review
+  // written below would change it; otherwise it is read again after the loop, as before. Parked so the unused read leaves no unhandled rejection.
+  const latestReview = () => db.prepare('SELECT period_start,reviewed_at,petition_count,snapshot_json FROM government_reviews WHERE nation_id=? ORDER BY period_start DESC LIMIT 1')
+    .bind(nationId).first<ReviewRow>();
+  const earlyReview = parked(latestReview());
   const [budget, needs, days] = await Promise.all([
     db.prepare("SELECT initial_minor AS cap, initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements),0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions),0) AS balance FROM economy_funds WHERE id='kindle-employer'").first<{ balance: number; cap: number }>(),
     db.prepare(`SELECT COUNT(*) AS households, SUM(CASE WHEN CASE WHEN c.nation_id='korund' THEN COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=c.clerk_user_id),0) WHEN c.nation_id='aurelle' THEN COALESCE((SELECT SUM(quantity) FROM aurelle_purchases WHERE clerk_user_id=c.clerk_user_id),0)-COALESCE((SELECT SUM(quantity) FROM aurelle_meals WHERE clerk_user_id=c.clerk_user_id),0) ELSE COALESCE(i.quantity,0) END >= 2 THEN 1 ELSE 0 END) AS supplied
@@ -98,8 +103,7 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       db.prepare(petitionResolutionSql).bind(nationId,day.period_start),
     ]);
   }
-  const persisted = await db.prepare('SELECT period_start,reviewed_at,petition_count,snapshot_json FROM government_reviews WHERE nation_id=? ORDER BY period_start DESC LIMIT 1')
-    .bind(nationId).first<ReviewRow>();
+  const persisted = await (days.results.length ? latestReview() : earlyReview);
   const latestProjected = [...projected.values()].sort((a,b)=>b.period_start-a.period_start)[0];
   const review = latestProjected && (!persisted || latestProjected.period_start > persisted.period_start) ? latestProjected : persisted;
   const reviewedSnapshot = review ? JSON.parse(review.snapshot_json) as import('./government').GovernmentSnapshot & { verificationPolicy?: string } : null;
