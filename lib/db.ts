@@ -44,6 +44,7 @@ import { warEndingsSchemas } from './war-endings'; // #427 slice 2
 import { aiReviewQueueSchemas } from './ai-review-queue'; // #753
 import { homeCityMoveSchemas } from './home-move'; // #781
 import { voteBuyingEventsSchema } from './vote-buying-watch'; // #825
+import { savingsShieldCreditsSchema } from './market-orders'; // #824
 import { pollingSchemas } from './polling'; // #740
 import { armySchemas } from './army'; // #738
 import { crownDecreeSchemas } from './crown-debasement'; // #362
@@ -265,7 +266,7 @@ async function initialize(database: GameDatabase) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
-    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), ...homeCityMoveSchemas.map(sql => database.prepare(sql)), database.prepare(voteBuyingEventsSchema), /* #825 (migration 0079) */ /* #781 move-fee sink (always created; written only with the flag on) */ /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...graySeizureSchemas.map(sql => database.prepare(sql)), /* #797 seizure sink (always created; written only with the flag on) */ ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
+    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), ...homeCityMoveSchemas.map(sql => database.prepare(sql)), database.prepare(voteBuyingEventsSchema), /* #825 (migration 0079) */ database.prepare(savingsShieldCreditsSchema), /* #824 */ /* #781 move-fee sink (always created; written only with the flag on) */ /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...graySeizureSchemas.map(sql => database.prepare(sql)), /* #797 seizure sink (always created; written only with the flag on) */ ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
@@ -335,6 +336,14 @@ async function initialize(database: GameDatabase) {
     await database.batch([
       database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('home-move-v1')"),
+    ]);
+  }
+  // #824: balances add paid Savings Shield credits. Same atomic wallet-view swap as home-move-v1.
+  const shieldInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'savings-shield-v1'").first();
+  if (!shieldInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('savings-shield-v1')"),
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));
