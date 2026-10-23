@@ -54,6 +54,7 @@ export const walletViewSql = `CREATE VIEW IF NOT EXISTS citizen_wallet_balances 
     - COALESCE((SELECT SUM(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id = c.clerk_user_id), 0)
     - COALESCE((SELECT SUM(fee_minor) FROM market_trade_fees WHERE seller_id = c.clerk_user_id), 0)
     - COALESCE((SELECT SUM(tax_minor) FROM market_sales_tax WHERE seller_id = c.clerk_user_id), 0)
+    - COALESCE((SELECT SUM(tax_minor) FROM player_fill_sales_tax WHERE seller_id = c.clerk_user_id), 0)
     - COALESCE((SELECT SUM(fee_minor) FROM home_city_moves WHERE clerk_user_id = c.clerk_user_id AND currency = 'SPK'), 0)
     + COALESCE((SELECT SUM(credit_minor) FROM savings_shield_credits WHERE clerk_user_id = c.clerk_user_id AND status = 'paid'), 0)
     - COALESCE((SELECT SUM(amount_minor) FROM party_donations WHERE clerk_user_id = c.clerk_user_id), 0)

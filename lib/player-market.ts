@@ -64,7 +64,7 @@ export function parseSparkPrice(value: string): number | null {
   const minor = Number(whole) * 100 + Number(cents.padEnd(2, '0'));
   return minor >= 1 && minor <= 1000 ? minor : null;
 }
-export async function executePlayerCommand(db: GameDatabase, userId: string, command: PlayerCommand, now: number) {
+export async function executePlayerCommand(db: GameDatabase, userId: string, command: PlayerCommand, now: number, options: { salesTaxSql?: string } = {}) {
   const find = () => db.prepare(`SELECT r.user_id, r.action, r.listing_id, l.item, l.quantity, l.unit_minor
     FROM player_request_receipts r JOIN player_listings l ON l.id = r.listing_id WHERE r.request_id = ?`)
     .bind(command.requestId).first<{ user_id: string; action: string; listing_id: string; item: string; quantity: number; unit_minor: number }>();
@@ -78,7 +78,10 @@ export async function executePlayerCommand(db: GameDatabase, userId: string, com
     await db.prepare(createListingSql).bind(command.requestId, command.item, command.quantity, command.unitMinor, now,
       userId, command.item, command.quantity, command.requestId).run();
   } else if (command.action === 'buy-listing') {
-    await db.prepare(fillListingSql).bind(command.requestId, now, userId, command.listingId, command.requestId).run();
+    const fill = db.prepare(fillListingSql).bind(command.requestId, now, userId, command.listingId, command.requestId);
+    // #844 follow-up: with the sales tax on, the route passes lib/kindle-sales-tax playerFillSalesTaxSql (kept out of this file so it has no runtime import);
+    // the guarded tax INSERT rides in the same batch (no row unless the fill landed). Off: the single run, unchanged.
+    if (options.salesTaxSql) await db.batch([fill, db.prepare(options.salesTaxSql).bind(command.requestId)]); else await fill.run();
   } else {
     await db.prepare(cancelListingSql).bind(command.requestId, now, command.listingId, userId, command.requestId).run();
   }

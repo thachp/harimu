@@ -59,6 +59,9 @@ test('with the fee on too, both rows land per fill; tiny trades and an incoming 
   const bob0 = await wallet('bob'), tr0 = await treasury();
   await place('bob', 'sell', 1, 15); await place('alice', 'buy', 1, 15);        // gross 15 -> tax 0, fee 0
   assert.deepEqual(await taxes(), []);
+  // QA1: a 0-tax fill must not look like a lost trade (only every `per`-th batch result is a trade): exactly one trade, both orders done.
+  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM market_trades').first()).n), 1);
+  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM market_open_orders').first()).n), 0);
   await place('alice', 'buy', 2, 300); await place('bob', 'sell', 2, 300);      // resting buy: gross 600 -> tax 30, fee 3
   assert.deepEqual(await taxes(), [{ seller_id: 'bob', tax_minor: 30 }]);
   assert.equal(await wallet('bob'), bob0 + 15 + 600 - 30 - 3); assert.equal(await treasury(), tr0 + 30);
