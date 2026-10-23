@@ -86,6 +86,8 @@ export const aurelleClaimReceiptSql=`INSERT OR IGNORE INTO aurelle_receipts(id,c
  AND NOT EXISTS(SELECT 1 FROM work_shifts WHERE id=?)
  AND (EXISTS(SELECT 1 FROM aurelle_settlements WHERE shift_id=s.id AND clerk_user_id=s.clerk_user_id)
  OR 800<=(SELECT ${publicFunds} FROM aurelle_resources WHERE id='estate'))`;
+/** #906: first statement of the pool-paid claim batch: row-locks the estate treasury so concurrent claims on Postgres queue here (see lib/korund korundPoolLockSql). */
+export const aurellePoolLockSql="UPDATE aurelle_resources SET initial_minor=initial_minor WHERE id='estate'";
 export const aurelleSettleSql=`INSERT OR IGNORE INTO aurelle_settlements(shift_id,clerk_user_id,wage_minor,food_output,favor,settled_at)
  SELECT s.id,s.clerk_user_id,800,4,2,? FROM work_shifts s JOIN aurelle_receipts r ON r.shift_id=s.id
  WHERE r.id=? AND r.clerk_user_id=? AND r.action='aurelle-claim-work' AND s.clerk_user_id=r.clerk_user_id AND s.claimed_at IS NULL
@@ -176,7 +178,7 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)").bind(id,userId,id,userId),
  ]);}
  else if(claimsCharter) await db.batch([
- db.prepare(aurelleCharterClaimReceiptSql).bind(id,now,shiftId,userId,iso,id),db.prepare(aurelleCharterSettleSql).bind(now,id,userId),db.prepare(crownIssuanceSql).bind(shiftId),
+ db.prepare(aurellePoolLockSql),db.prepare(aurelleCharterClaimReceiptSql).bind(id,now,shiftId,userId,iso,id),db.prepare(aurelleCharterSettleSql).bind(now,id,userId),db.prepare(crownIssuanceSql).bind(shiftId),
  db.prepare("UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM aurelle_charter_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)").bind(iso,shiftId,userId,userId),
  ]);
  else if(command.action==='aurelle-start-work') await db.batch([
@@ -185,7 +187,7 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)").bind(id,userId,id,userId),
  ]);
  else if(command.action==='aurelle-claim-work') await db.batch([
- db.prepare(aurelleClaimReceiptSql).bind(id,now,shiftId,userId,iso,id),db.prepare(aurelleSettleSql).bind(now,id,userId),
+ db.prepare(aurellePoolLockSql),db.prepare(aurelleClaimReceiptSql).bind(id,now,shiftId,userId,iso,id),db.prepare(aurelleSettleSql).bind(now,id,userId),
  db.prepare("UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM aurelle_receipts WHERE id=? AND clerk_user_id=? AND action='aurelle-claim-work' AND shift_id=work_shifts.id) AND EXISTS(SELECT 1 FROM aurelle_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)").bind(iso,shiftId,userId,id,userId,userId),
  ]);
  else if(command.action==='aurelle-buy-food') await db.batch([
