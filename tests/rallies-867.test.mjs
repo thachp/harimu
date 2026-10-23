@@ -99,4 +99,29 @@ for (const backend of ['sqlite', 'postgres']) {
     await runRallyCron(r.db, nowS(r) + 8 * 86400);
     assert.deepEqual(await tally(), baseline, 'ballot, primary and membership tallies are unchanged by rallies');
   });
+  test(`/api/rallies (${backend}): a published clip appears only in the Kindle edition, never in Aurelle's or Korund's`, async t => {
+    const r = await setup(t, backend);
+    const { runRallyCron } = await r.importModule('lib/rallies.ts');
+    const iso = new Date(r.now).toISOString();
+    await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES ('kim','korund','Kim',18,0,'Good standing',?,?)").bind(iso, iso).run();
+    const first = (await r.call('rallies', 'alice')).data.rallies[0];
+    r.setNow((first.startsAt + 60) * 1000); await runRallyCron(r.db, first.startsAt + 60);
+    assert.ok((await clipTitles(r, 'alice')).length >= 1, 'Kindle edition has the clip');
+    for (const u of ['cara', 'kim']) {
+      const news = await r.call('news', u); assert.equal(news.status, 200, u);
+      assert.deepEqual((news.data.items ?? []).filter(i => /rally/i.test(i.id) || /rall(y|ies)/i.test(i.title)), [], `${u}: no rally items`);
+    }
+  });
+
+  test(`/api/rallies (${backend}): parallel attends write one row each; parallel publish writes one clip per rally`, async t => {
+    const r = await setup(t, backend);
+    const { runRallyCron } = await r.importModule('lib/rallies.ts');
+    const first = (await r.call('rallies', 'alice')).data.rallies[0];
+    const a = await Promise.all([...Array(8)].flatMap(() => [attend(r, 'alice', first.id), attend(r, 'bob', first.id)]));
+    assert.ok(a.every(x => x.status === 200)); assert.equal(await rows(r), 2);
+    const runs = await Promise.all([...Array(6)].map(() => runRallyCron(r.db, first.startsAt + 60)));
+    assert.equal(runs.reduce((n, x) => n + x.published, 0), 3, 'one clip per candidate across all runs');
+    assert.equal(await rows(r, 'rally_clips'), 3);
+    assert.equal(Number((await r.db.prepare('SELECT humans FROM rally_clips WHERE rally_id=?').bind(first.id).first()).humans), 2);
+  });
 }

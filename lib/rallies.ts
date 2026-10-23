@@ -56,7 +56,7 @@ export async function rallyNewsItems(db: GameDatabase) {
   const rows = (await db.prepare('SELECT rally_id, candidate_id, city_id, humans, ai_crowd, speech, published_at FROM rally_clips ORDER BY published_at DESC, rally_id LIMIT 6').all<{ rally_id: string; candidate_id: string; city_id: string; humans: number; ai_crowd: number; speech: string; published_at: number }>()).results ?? [];
   return rows.map(r => {
     const name = electionCandidates.find(c => c.id === r.candidate_id)?.name ?? r.candidate_id, city = citiesForNation('kindle').find(c => c.id === r.city_id)?.name ?? r.city_id;
-    return { id: `kindle:rally:${r.rally_id}`, title: `AI clip: ${name} rallies in ${city}`, ai: true as const,
+    return { id: `kindle:rally:${r.rally_id}`, title: `AI clip: ${name} rallies in ${city}`,
       text: `AI-generated rally clip. ${Number(r.humans)} citizens and ${Number(r.ai_crowd)} AI citizens attended. ${r.speech}`, occurredAt: Number(r.published_at) * 1000 };
   });
 }
