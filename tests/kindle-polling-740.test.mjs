@@ -123,7 +123,6 @@ for (const backend of ['sqlite', 'postgres']) {
     const { r, day0, citizen, answer } = await setup(t, backend);
     for (let i = 0; i < 20; i++) await citizen(`c${i}`);
     for (let i = 0; i < 10; i++) await answer(`c${i}`, 'mara-quell', day0 + i);
-    assert.equal((await r.call('polling', 'bob', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-b0' })).status, 200); // bob answers before the first cut-off
     const d1 = day0 + 86400; r.setNow((d1 + 60) * 1000);
     const one = (await r.call('polling', 'alice')).data.polling.poll; assert.deepEqual(one.shares.map(s => s.share), [0, 0, 100]);
     const change = (id, cand, when) => r.db.prepare('UPDATE kindle_poll_answers SET candidate_id=?, answered_at=? WHERE clerk_user_id=?').bind(cand, when, id).run();
@@ -136,15 +135,33 @@ for (const backend of ['sqlite', 'postgres']) {
     r.setNow((d1 + 86400 + 120) * 1000);
     assert.equal((await r.call('polling', 'alice', { action: 'decline' })).status, 200);
     assert.equal((await r.call('polling', 'alice', { action: 'answer', candidateId: 'ines-varro', requestId: 'req-740-a2' })).status, 200);
-    assert.equal((await r.call('polling', 'bob', { action: 'decline' })).status, 200); // bob declines and answers again: he answered before the cut-off, so not new
-    assert.equal((await r.call('polling', 'bob', { action: 'answer', candidateId: 'tobin-achterberg', requestId: 'req-740-b1' })).status, 200);
     for (let i = 10; i < 18; i++) await answer(`c${i}`, 'tobin-achterberg', d1 + 86400 + 200 + i); // alice (day 1) + 8 = 9 new so far
     r.setNow((d1 + 2 * 86400 + 60) * 1000);
-    assert.equal((await r.call('polling', 'bob')).data.polling.poll.day, one.day, '9 new respondents (alice once; bob answered before the cut-off): still the old snapshot');
+    assert.equal((await r.call('polling', 'bob')).data.polling.poll.day, one.day, '9 new respondents (alice counted once): still the old snapshot');
     await answer('c18', 'tobin-achterberg', d1 + 2 * 86400 + 100);
     r.setNow((d1 + 3 * 86400 + 60) * 1000);
     const three = (await r.call('polling', 'bob')).data.polling.poll;
     assert.equal(three.day, d1 / 86400 + 3, '10 new distinct respondents publish');
+  });
+
+  test(`/api/polling (${backend}): QA3: after a skip no table holds the citizen's choice (answers, requests, snapshots)`, async t => {
+    const { r } = await setup(t, backend);
+    for (const [cand, id] of [['mara-quell', 'req-740-k1'], ['ines-varro', 'req-740-k2']]) assert.equal((await r.call('polling', 'alice', { action: 'answer', candidateId: cand, requestId: id })).status, 200);
+    assert.equal((await r.call('polling', 'alice', { action: 'decline' })).status, 200);
+    for (const table of ['kindle_poll_answers', 'kindle_poll_requests']) assert.equal(Number((await r.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE clerk_user_id='alice'`).first()).n), 0, table);
+    const cols = async table => (await r.db.prepare(`SELECT * FROM ${table}`).all()).results.flatMap(row => Object.values(row).map(String));
+    for (const table of ['kindle_poll_answers', 'kindle_poll_requests', 'kindle_poll_snapshots']) assert.ok(!(await cols(table)).some(v => /alice|req-740-k/.test(v)), `${table} keeps nothing of alice`);
+    const requestCols = (await r.db.prepare("INSERT INTO kindle_poll_requests (request_id,clerk_user_id,election_id,answered_at) VALUES ('req-740-probe','bob','kindle-presidential-poc-1',1) RETURNING *").first());
+    assert.deepEqual(Object.keys(requestCols).sort(), ['answered_at', 'clerk_user_id', 'election_id', 'request_id'], 'the request log stores no candidate');
+  });
+
+  test(`/api/polling (${backend}): a concurrent duplicate of one request id is a replay, not a 409, and applies once`, async t => {
+    const { r } = await setup(t, backend);
+    const body = { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-dup1' };
+    const res = await Promise.all([r.call('polling', 'alice', body), r.call('polling', 'alice', body), r.call('polling', 'alice', body)]);
+    assert.deepEqual(res.map(x => x.status), [200, 200, 200], JSON.stringify(res.map(x => x.data?.reason)));
+    assert.deepEqual([await rows(r, 'kindle_poll_answers'), await rows(r, 'kindle_poll_requests')], [1, 1]);
+    assert.equal((await r.call('polling', 'alice')).data.polling.myAnswer, 'mara-quell');
   });
 
   test(`/api/polling (${backend}): two first reads of a day racing keep exactly one snapshot`, async t => {

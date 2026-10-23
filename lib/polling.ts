@@ -6,7 +6,7 @@ import { electionId } from './elections';
 export const pollingSchemas = [
   `CREATE TABLE IF NOT EXISTS kindle_poll_answers (election_id TEXT NOT NULL, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, candidate_id TEXT NOT NULL, answered_at INTEGER NOT NULL, first_answered_at INTEGER NOT NULL, request_id TEXT NOT NULL UNIQUE, PRIMARY KEY (election_id, clerk_user_id))`,
   `CREATE TABLE IF NOT EXISTS kindle_poll_snapshots (election_id TEXT NOT NULL, poll_day INTEGER NOT NULL, n INTEGER NOT NULL CHECK(n >= 10), margin_tenths INTEGER NOT NULL, shares_json TEXT NOT NULL, published_at INTEGER NOT NULL, PRIMARY KEY (election_id, poll_day))`,
-  `CREATE TABLE IF NOT EXISTS kindle_poll_requests (request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, election_id TEXT NOT NULL, candidate_id TEXT NOT NULL, answered_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS kindle_poll_requests (request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, election_id TEXT NOT NULL, answered_at INTEGER NOT NULL)`,
 ];
 type Election = { id: string; slate: string[]; names: Record<string, string>; open: boolean };
 async function readOpenElection(db: GameDatabase, now: number): Promise<Election | null> {
@@ -19,11 +19,11 @@ async function readOpenElection(db: GameDatabase, now: number): Promise<Election
 export async function publishDailyPoll(db: GameDatabase, election: Election, now: number) {
   const day = pollDay(now), dayStart = day * 86400;
   if (await db.prepare('SELECT 1 AS x FROM kindle_poll_snapshots WHERE election_id=? AND poll_day=?').bind(election.id, day).first()) return;
-  // ARC rulings (b) and on #803: count distinct NEW respondents only: an answer given in [last cut-off, today's start) by a citizen with no answer request before the
-  // last cut-off. A changed answer (or a re-answer after declining) from someone who answered before does not count. Under minimumNewAnswers the previous snapshot is served.
+  // ARC rulings (b) and on #803: count distinct NEW respondents only, by first_answered_at in [last cut-off, today's start); a changed answer keeps its first time and does not count.
+  // A skip erases everything about the citizen's answer (QA3), so an answer after a skip is a new first answer. Under minimumNewAnswers the previous snapshot is served.
   const last = await db.prepare('SELECT MAX(poll_day) AS d FROM kindle_poll_snapshots WHERE election_id=?').bind(election.id).first<{ d: number | null }>();
   if (last?.d != null) {
-    const added = await db.prepare('SELECT COUNT(DISTINCT a.clerk_user_id) AS c FROM kindle_poll_answers a WHERE a.election_id=? AND a.first_answered_at>=? AND a.first_answered_at<? AND NOT EXISTS (SELECT 1 FROM kindle_poll_requests q WHERE q.election_id=a.election_id AND q.clerk_user_id=a.clerk_user_id AND q.answered_at<?)').bind(election.id, Number(last.d) * 86400, dayStart, Number(last.d) * 86400).first<{ c: number }>();
+    const added = await db.prepare('SELECT COUNT(DISTINCT a.clerk_user_id) AS c FROM kindle_poll_answers a WHERE a.election_id=? AND a.first_answered_at>=? AND a.first_answered_at<?').bind(election.id, Number(last.d) * 86400, dayStart).first<{ c: number }>();
     if (Number(added?.c ?? 0) < minimumNewAnswers) return;
   }
   const { results } = await db.prepare('SELECT candidate_id FROM kindle_poll_answers WHERE election_id=? AND answered_at<? ORDER BY clerk_user_id').bind(election.id, dayStart).all<{ candidate_id: string }>();
@@ -46,14 +46,20 @@ export type PollCommand = { action: 'answer'; candidateId: string; requestId: st
 export async function runPollCommand(db: GameDatabase, userId: string, cmd: PollCommand, now: number): Promise<{ ok: true } | { ok: false; status: 403 | 409 | 400; error: string; reason: string }> {
   const election = await readOpenElection(db, now);
   if (!election?.open) return { ok: false, status: 409, error: 'There is no open election to poll.', reason: 'closed' };
-  if (cmd.action === 'decline') { await db.prepare('DELETE FROM kindle_poll_answers WHERE election_id=? AND clerk_user_id=?').bind(election.id, userId).run(); return { ok: true }; }
+  // QA3: a skip leaves no trace of the citizen's choice: the answer and its request log go together.
+  if (cmd.action === 'decline') { await db.batch([db.prepare('DELETE FROM kindle_poll_answers WHERE election_id=? AND clerk_user_id=?').bind(election.id, userId), db.prepare('DELETE FROM kindle_poll_requests WHERE election_id=? AND clerk_user_id=?').bind(election.id, userId)]); return { ok: true }; }
   if (!election.slate.includes(cmd.candidateId)) return { ok: false, status: 400, error: 'Choose one of the candidates.', reason: 'bad_candidate' };
   // Every answer request id is kept, so replaying an older one after a change returns the stored result and never re-applies the old answer.
   const used = await db.prepare('SELECT clerk_user_id FROM kindle_poll_requests WHERE request_id=?').bind(cmd.requestId).first<{ clerk_user_id: string }>();
   if (used) return used.clerk_user_id === userId ? { ok: true } : { ok: false, status: 409, error: 'That request identifier was already used.', reason: 'request_conflict' };
-  const claim = await db.prepare('INSERT INTO kindle_poll_requests (request_id, clerk_user_id, election_id, candidate_id, answered_at) VALUES (?,?,?,?,?) ON CONFLICT (request_id) DO NOTHING').bind(cmd.requestId, userId, election.id, cmd.candidateId, now).run();
-  if (!Number((claim as { meta?: { changes?: number } }).meta?.changes)) return { ok: false, status: 409, error: 'That request identifier was already used.', reason: 'request_conflict' };
-  await db.prepare(`INSERT INTO kindle_poll_answers (election_id, clerk_user_id, candidate_id, answered_at, first_answered_at, request_id) VALUES (?,?,?,?,?,?)
-    ON CONFLICT (election_id, clerk_user_id) DO UPDATE SET candidate_id=excluded.candidate_id, answered_at=excluded.answered_at, request_id=excluded.request_id`).bind(election.id, userId, cmd.candidateId, now, now, cmd.requestId).run();
+  // One batch: the request log (no candidate stored) and the answer. A concurrent duplicate of the same id finds the answer already written by that id and applies nothing.
+  await db.batch([
+    db.prepare('INSERT INTO kindle_poll_requests (request_id, clerk_user_id, election_id, answered_at) VALUES (?,?,?,?) ON CONFLICT (request_id) DO NOTHING').bind(cmd.requestId, userId, election.id, now),
+    db.prepare(`INSERT INTO kindle_poll_answers (election_id, clerk_user_id, candidate_id, answered_at, first_answered_at, request_id)
+      SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM kindle_poll_requests WHERE request_id=? AND clerk_user_id=?) AND NOT EXISTS (SELECT 1 FROM kindle_poll_answers WHERE request_id=?)
+      ON CONFLICT (election_id, clerk_user_id) DO UPDATE SET candidate_id=excluded.candidate_id, answered_at=excluded.answered_at, request_id=excluded.request_id`).bind(election.id, userId, cmd.candidateId, now, now, cmd.requestId, cmd.requestId, userId, cmd.requestId),
+  ]);
+  const owner = await db.prepare('SELECT clerk_user_id FROM kindle_poll_requests WHERE request_id=?').bind(cmd.requestId).first<{ clerk_user_id: string }>();
+  if (owner?.clerk_user_id !== userId) return { ok: false, status: 409, error: 'That request identifier was already used.', reason: 'request_conflict' };
   return { ok: true };
 }
