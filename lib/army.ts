@@ -7,7 +7,7 @@ export const armySchemas = [
   // [ASSUMPTION] Leave and stance need replay too, and a deleted member row cannot remember its request id, so every command is logged once here.
   `CREATE TABLE IF NOT EXISTS army_requests (request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL, action TEXT NOT NULL CHECK(action IN ('join','leave','stance')), occurred_at INTEGER NOT NULL)`,
 ];
-export type ArmyView = { unit: { id: string; name: string; officer: string; memberCount: number } | null; member: boolean; stance: string | null };
+export type ArmyView = { unit: { id: string; name: string; officer: string; memberCount: number; openToVolunteers: boolean } | null; member: boolean; stance: string | null };
 type Fail = { ok: false; status: 403 | 409; error: string; reason: string };
 /** The citizen's own nation's unit, membership and stance, and the unit's member count. Never another member's identity. */
 export async function readArmy(db: GameDatabase, userId: string): Promise<ArmyView> {
@@ -15,7 +15,7 @@ export async function readArmy(db: GameDatabase, userId: string): Promise<ArmyVi
   const unit = unitById(row?.unit_id) ?? unitForNation(row?.nation_id);
   if (!unit) return { unit: null, member: false, stance: null };
   const count = await db.prepare('SELECT COUNT(*) AS n FROM army_members WHERE unit_id=?').bind(unit.id).first<{ n: number }>();
-  return { unit: { id: unit.id, name: unit.name, officer: unit.officer, memberCount: Number(count?.n ?? 0) }, member: !!row?.unit_id, stance: row?.stance ?? null };
+  return { unit: { id: unit.id, name: unit.name, officer: unit.officer, memberCount: Number(count?.n ?? 0), openToVolunteers: volunteerNations.includes(unit.nationId) }, member: !!row?.unit_id, stance: row?.stance ?? null };
 }
 export async function runArmyCommand(db: GameDatabase, userId: string, cmd: ArmyCommand, nowSec: number, retried = false): Promise<({ ok: true; replayed: boolean } & ArmyView) | Fail> {
   const seen = await db.prepare('SELECT clerk_user_id, action FROM army_requests WHERE request_id=?').bind(cmd.requestId).first<{ clerk_user_id: string; action: string }>();

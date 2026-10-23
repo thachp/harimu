@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { readFileSync } from 'node:fs';
 import { armiesEnabled, parseArmyCommand, armyUnits, unitForNation } from '../lib/army-rules.ts';
+import { unitCard, unitMembership, armyFailureNote } from '../lib/army-copy.ts';
 
 test('rules: both flags, command parsing boundaries, one unit per MVP nation', () => {
   assert.equal(armiesEnabled({ HARIMU_ARMIES_ENABLED: 'true', HARIMU_WAR_ENABLED: 'true' }), true);
@@ -20,6 +22,16 @@ test('rules: both flags, command parsing boundaries, one unit per MVP nation', (
 async function spy(r, fn) { const prepare = r.db.prepare.bind(r.db), seen = { sql: [] }; r.db.prepare = q => { seen.sql.push(q); return prepare(q); }; try { seen.result = await fn(); } finally { r.db.prepare = prepare; } return seen; }
 const rows = async (r, t) => Number((await r.db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).first()).n);
 let n = 0; const rid = () => `req-738-${String(++n).padStart(4, '0')}`;
+
+test('card copy (QA3 on #793): member count label from army-copy, neutral failure note for leave/stance, not-open-yet instead of Join', () => {
+  const card = readFileSync('app/army-card.tsx', 'utf8');
+  assert.doesNotMatch(card, />\s*Members\b|'Members|"Members/, 'no hard-coded member label'); assert.match(card, /unitCard\.memberCountLabel/); assert.equal(unitCard.memberCountLabel, 'Members');
+  assert.equal(armyFailureNote('join', 'Kindle Home Guard', 'X'), unitMembership.notEligible.text.replace('{reason}', 'X'));
+  for (const action of ['leave', 'stance']) { const note = armyFailureNote(action, 'Kindle Home Guard', 'You are not in a unit.'); assert.equal(note, unitMembership.actionFailed.text.replace('{reason}', 'You are not in a unit.')); assert.doesNotMatch(note, /join/i, action); }
+  assert.match(card, /armyFailureNote\(/); assert.doesNotMatch(card, /notEligible/, 'the card never picks the join template itself');
+  assert.match(card, /!unit\.openToVolunteers \? <p>\{unitMembership\.notOpenYet\.text\}<\/p> : <button/, 'Korund/Aurelle see the not-open-yet copy, no Join button');
+  const page = readFileSync('app/page.tsx', 'utf8'); assert.match(page, /<FoundingBanner [^\n]*\/>\s*<ArmyCard \/>/, 'mounted after FoundingBanner (siege-panel-620 pin)');
+});
 
 for (const backend of ['sqlite', 'postgres']) {
   test(`/api/army (${backend}): flag off (either flag) is 404 for GET and POST before auth or any database access, and writes nothing`, async t => {
@@ -45,7 +57,7 @@ for (const backend of ['sqlite', 'postgres']) {
     const post = (u, body) => r.call('army', u, { requestId: rid(), ...body });
     assert.equal((await r.call('army', null)).status, 401); assert.equal((await post(null, { action: 'leave' })).status, 401);
     assert.equal((await r.call('army', 'alice', { action: 'leave', requestId: rid() }, 'https://evil.invalid')).status, 403, 'same origin only');
-    assert.deepEqual((await r.call('army', 'alice')).data.army, { unit: { id: 'kindle-home-guard', name: 'Kindle Home Guard', officer: 'Captain Arden', memberCount: 0 }, member: false, stance: null });
+    assert.deepEqual((await r.call('army', 'alice')).data.army, { unit: { id: 'kindle-home-guard', name: 'Kindle Home Guard', officer: 'Captain Arden', memberCount: 0, openToVolunteers: true }, member: false, stance: null });
     assert.equal((await post('alice', { action: 'stance', stance: 'charge' })).status, 400);
     for (const unitId of ['korund-home-guard', 'nowhere']) { const x = await post('alice', { action: 'join', unitId }); assert.deepEqual([x.status, x.data.reason], [403, 'not_eligible'], unitId); }
     assert.equal((await post('cam', { action: 'join', unitId: 'kindle-home-guard' })).status, 403, 'no MVP nation, no unit');
@@ -68,6 +80,7 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual([await rows(r, 'army_members'), await rows(r, 'army_requests')], before2, 'not_open_yet writes nothing');
     assert.equal((await post('kim', { action: 'join', unitId: 'kindle-home-guard' })).data.reason, 'not_eligible', 'korund citizen, kindle unit');
     assert.deepEqual([(await r.call('army', 'kim')).data.army.unit.id, (await r.call('army', 'kim')).data.army.unit.memberCount], ['korund-home-guard', 0], 'counts are per unit');
+    for (const u of ['kim', 'ava']) assert.equal((await r.call('army', u)).data.army.unit.openToVolunteers, false, `${u}: the card shows not-open-yet`);
     const stanceId = rid();
     assert.equal((await r.call('army', 'alice', { action: 'stance', stance: 'advance', requestId: stanceId })).data.army.stance, 'advance');
     assert.equal((await r.call('army', 'alice', { action: 'stance', stance: 'fall_back', requestId: stanceId })).data.army.stance, 'advance', 'stance replay returns the stored state');
@@ -79,5 +92,24 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await r.call('army', 'kim')).data.army.unit.memberCount, 0);
     assert.equal((await post('alice', { action: 'leave' })).data.reason, 'not_member');
     assert.equal((await post('alice', { action: 'join', unitId: 'kindle-home-guard' })).data.army.member, true, 'can rejoin after leaving');
+  });
+}
+
+for (const backend of ['sqlite', 'postgres']) {
+  test(`army race (${backend}): a same-request-id race that loses the batch re-reads once and replays, never a 500`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close());
+    await r.call('citizen', 'alice');
+    const army = await r.importModule('lib/army.ts');
+    const cmd = { action: 'join', unitId: 'kindle-home-guard', requestId: 'req-race-0001' };
+    assert.equal((await army.runArmyCommand(r.db, 'alice', cmd, 100)).replayed, false);
+    // The racing twin read before the winner committed: no request row and no membership on its first look, so its batch hits the keys.
+    let blind = 2;
+    const stale = { [String(/FROM army_requests WHERE request_id=\?/)]: null, [String(/SELECT c\.nation_id, m\.unit_id FROM citizens/)]: { nation_id: 'kindle', unit_id: null } };
+    const racing = { batch: s => r.db.batch(s), prepare: q => { const hit = blind > 0 && Object.keys(stale).find(k => new RegExp(k.slice(1, -1)).test(q)); if (!hit) return r.db.prepare(q); blind--; return { bind: () => ({ first: async () => stale[hit] }) }; } };
+    const before = Number((await r.db.prepare('SELECT COUNT(*) AS n FROM army_requests').first()).n);
+    const result = await army.runArmyCommand(racing, 'alice', cmd, 101);
+    assert.deepEqual([result.ok, result.replayed, result.member], [true, true, true], 'the retry finds the winner and replays');
+    assert.equal(blind, 0, 'the race was forced (both stale reads served)');
+    assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM army_requests').first()).n), before, 'nothing new written');
   });
 }
