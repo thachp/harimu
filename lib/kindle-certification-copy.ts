@@ -5,9 +5,9 @@
  * flags; Transition: the outgoing AI President cannot spend treasury or declare war), §9.5 (fraud flags quarantine suspicious ballots for
  * review; results, verified-human turnout and per-district counts are published) and Decision 65 (NPCs cast no election ballots).
  *
- * Voice: Kindle is plain and civic. The byline is not defined here: it is the Kindle pack's Republic Wire Service byline in the separate press
+ * Voice: Kindle is plain and civic. The byline is not defined here: it is the Kindle pack's Kindle Press byline in the separate press
  * templates module, the one canonical form, and the press bodies open with that name. Every state line and caption is a system notice about the count, and the two press frames are bylined
- * Republic Wire Service reports about the court's work, not lines spoken for an AI leader or body, so nothing here carries the AI badge
+ * Kindle Press reports about the court's work, not lines spoken for an AI leader or body, so nothing here carries the AI badge
  * (#381 / ui-ux §23.2). The review line is neutral: it accuses nobody, names no candidate and gives no count of flagged ballots.
  *
  * Rules: the only written figure is the docs' 24 hours, once. Everything else arrives through pre-formatted placeholders: {closesAt},
@@ -68,8 +68,8 @@ export const transitionBanner={
 
 /** Press frames: reports about the court's work, unbadged. */
 export const certPress:readonly PressFrame[]=[
- {key:'certified',headline:'High Court certifies the election',body:'Republic Wire Service: the AI High Court has certified the result. {winner} takes office at inauguration.',aiBadge:false,proposal:true},
- {key:'under-review',headline:'Certification waits on a ballot review',body:'Republic Wire Service: certification is on hold while flagged ballots are reviewed. The court has named nobody.',aiBadge:false,proposal:true},
+ {key:'certified',headline:'High Court certifies the election',body:'Kindle Press: the AI High Court has certified the result. {winner} takes office at inauguration.',aiBadge:false,proposal:true},
+ {key:'under-review',headline:'Certification waits on a ballot review',body:'Kindle Press: certification is on hold while flagged ballots are reviewed. The court has named nobody.',aiBadge:false,proposal:true},
 ];
 
 export const certStateFor=(key:CertStateKey)=>certStates.find(s=>s.key===key);

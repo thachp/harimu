@@ -53,7 +53,7 @@ test('AI badge (#381, ui-ux 23.2): the Chairman\'s State Media frame and the Cro
 test('byline: Korund\'s frame is State Media and matches lib/press-templates.ts; no other nation carries a byline', () => {
   assert.deepEqual(nationDisclosureFor('korund').byline,korundStateMedia.byline); assert.match(nationDisclosureFor('korund').frame.text,/^Korund State Media reports: /);
   assert.equal('byline' in nationDisclosureFor('kindle'),false); assert.equal('byline' in nationDisclosureFor('aurelle'),false);
-  for (const t of [WL.accessibleName,RM.text,...ND.map(n=>n.notPublished.text)]) assert.doesNotMatch(t,/State Media|Republic Wire|Court Gazette|Be it known/,t);
+  for (const t of [WL.accessibleName,RM.text,...ND.map(n=>n.notPublished.text)]) assert.doesNotMatch(t,/State Media|Kindle Press|Court Gazette|Be it known/,t);
 });
 test('tone: no real-world names, no other nations, no Notable, no blame', () => {
   const t=all().join(' ');

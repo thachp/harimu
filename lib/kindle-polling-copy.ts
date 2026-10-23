@@ -5,8 +5,8 @@
  * Decision 65 (one verified human person, one election vote; NPCs cast no election ballots) and §9.5 (AI candidates cannot see who voted how;
  * they see only published results and polls).
  *
- * Voice: Kindle is plain and civic. The byline is not defined here: it is the Kindle pack's Republic Wire Service byline in the separate press
- * templates module, the one canonical form, and the press bodies open with that name. The press frames are bylined Republic Wire Service reports about a poll, not lines spoken for an AI leader
+ * Voice: Kindle is plain and civic. The byline is not defined here: it is the Kindle pack's Kindle Press byline in the separate press
+ * templates module, the one canonical form, and the press bodies open with that name. The press frames are bylined Kindle Press reports about a poll, not lines spoken for an AI leader
  * or body, so none carries the AI badge (#381 / ui-ux §23.2), and nothing here is badged. No line says or implies that answering a poll casts a
  * ballot, and every resident-mood line says it is not a vote. The privacy line says only what the docs say: AI candidates see the published
  * poll, not an answer. Nothing promises how long an answer is kept.
@@ -69,9 +69,9 @@ export const residentMood={
 /** Press headline frames for a poll release. Reports about a poll: unbadged. */
 export const pollPress:readonly PressFrame[]=[
  {key:'lead-change',headline:'{candidate} takes the lead in the latest poll',
-  body:'Republic Wire Service: the latest poll puts {candidate} ahead of {rival}, with a margin of ±{margin}.',aiBadge:false,proposal:true},
+  body:'Kindle Press: the latest poll puts {candidate} ahead of {rival}, with a margin of ±{margin}.',aiBadge:false,proposal:true},
  {key:'race-tightens',headline:'The race tightens',
-  body:'Republic Wire Service: {candidate} and {rival} are now within the margin of ±{margin} in the latest poll.',aiBadge:false,proposal:true},
+  body:'Kindle Press: {candidate} and {rival} are now within the margin of ±{margin} in the latest poll.',aiBadge:false,proposal:true},
 ];
 export const pollPressFor=(key:PressFrameKey)=>pollPress.find(f=>f.key===key);
 

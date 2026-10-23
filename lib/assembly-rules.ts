@@ -116,7 +116,7 @@ export function assemblyResult(byDistrict: Readonly<Record<string, PartySeats>>,
 }
 
 const hash = (text: string) => { let h = 2166136261; for (const ch of text) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
-/** Republic Wire Service items (Content #299) for a count: one per party per district that had seats up or won some, picked by
+/** Kindle Press items (Content #299) for a count: one per party per district that had seats up or won some, picked by
  *  seat change. Names are filled at runtime and refused if over the shared cap. */
 export function assemblyHeadlines(result: AssemblyResult): { districtId: string; partyId: string; stage: 'results-gain' | 'results-hold' | 'results-loss'; headline: string; body: string }[] {
   const out: { districtId: string; partyId: string; stage: 'results-gain' | 'results-hold' | 'results-loss'; headline: string; body: string }[] = [];

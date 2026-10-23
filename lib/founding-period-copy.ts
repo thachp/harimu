@@ -6,7 +6,7 @@
  * refusal for a blocked declaration already exists in the war copy modules and is not repeated; a test checks it.
  *
  * Voice: the banner, caption, explainer, programme, tenure and ended lines are plain system lines (no byline, no badge). The three day-30
- * previews are in each nation's press voice with the byline checked against lib/press-templates.ts: Republic Wire Service (Kindle), Korund
+ * previews are in each nation's press voice with the byline checked against lib/press-templates.ts: Kindle Press (Kindle), Korund
  * State Media and the Court Gazette. #381 / ui-ux §23.2: Korund State Media announcing the state's own act (the Congress confirming the
  * Chairman) is AI-badged; the Kindle and Gazette reports about the election and the rival houses are not.
  *
@@ -56,8 +56,8 @@ export const foundingTenure={
 const d=(nationId:FoundingNation,byline:{name:string;proposal:boolean},headline:string,body:string,aiBadge=false):DayThirtyPreview=>({nationId,byline,headline,body,aiBadge,proposal:true});
 /** Day-30 previews from the §10.6 day-30 events. Only the Korund line, the state's own act in State Media, is AI-badged. */
 export const dayThirtyPreviews:readonly DayThirtyPreview[]=[
- d('kindle',{name:'Republic Wire Service',proposal:true},'Day 30: the first election',
-  'Republic Wire Service: the first election is held on day 30. Citizens vote, and the candidates are AI.'),
+ d('kindle',{name:'Kindle Press',proposal:false},'Day 30: the first election',
+  'Kindle Press: the first election is held on day 30. Citizens vote, and the candidates are AI.'),
  d('korund',{name:'Korund State Media',proposal:false},'Day 30: the Chairman is confirmed',
   'Korund State Media reports: on day 30 the Congress confirms the Chairman. The plan goes on.',true),
  d('aurelle',{name:'Court Gazette',proposal:false},'Day 30: the houses publish claims',
