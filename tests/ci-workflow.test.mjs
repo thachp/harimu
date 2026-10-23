@@ -9,9 +9,9 @@ test('required check rejects failed, cancelled, skipped and absent prerequisite 
   const gate = workflow.slice(workflow.indexOf('\n  check:\n'));
   assert.match(gate, /if: \$\{\{ always\(\) \}\}/);
   // #706: every test job, including all Postgres shards, gates the required check.
-  assert.match(gate, /needs: \[node-tests, postgres-tests, validation\]/);
+  assert.match(gate, /needs: \[node-tests, postgres-tests, validation, ai-evals\]/);
   assert.match(gate, /NEEDS_JSON: \$\{\{ toJSON\(needs\) \}\}/);
-  assert.match(gate, /for job in node-tests postgres-tests validation; do/);
+  assert.match(gate, /for job in node-tests postgres-tests validation ai-evals; do/);
   const command = gate.match(/        run: \|\n((?:          .*\n?)+)/)[1].replace(/^ {10}/gm, '');
   const results = ['success', 'failure', 'cancelled', 'skipped', undefined];
   for (const node of results) for (const postgres of results) for (const validation of results) {
