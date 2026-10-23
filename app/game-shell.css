@@ -498,6 +498,8 @@ header.game-hud[data-nation-skin=aurelle]{--skin-ground:#0d1c2b;--skin-chip:#142
 @media(max-width:760px){.harimu-game.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,44dvh) 0 minmax(0,auto)}}
 @media(max-width:760px){.viewport-world-label.viewport-city-pill{min-height:44px;gap:4px;padding:6px 10px 6px 8px;font-size:calc(11px * var(--text-scale, 1));transform:translate(-50%,-100%)!important}.viewport-city-pill-dot{display:none}}
 @media(max-width:360px){.viewport-world-label.viewport-city-pill{padding:6px 10px}.viewport-city-pill-icon{display:none}} /* the 320 canvas has no room for icons: pills keep the label's own size so #377 placement still fits them */
+/* #874: on a map too short for every full pill (app/game-viewport.tsx sets data-compact-pills), each pill is its 44px icon only; text and "Select …" name stay. */
+@media(max-width:760px){[data-compact-pills] .viewport-world-label.viewport-city-pill{width:44px;min-width:44px;padding:0;gap:0;justify-content:center;font-size:0;border-radius:50%}[data-compact-pills] .viewport-city-pill .viewport-city-pill-icon{display:inline-flex}}
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
    this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
 .game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}
