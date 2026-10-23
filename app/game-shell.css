@@ -420,6 +420,18 @@ body:has(.harimu-game){overflow:auto}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
 .game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}
+/* #85: nation skin PoC on the top bar (NEXT_PUBLIC_HARIMU_NATION_SKIN; app/game-shell.tsx sets data-nation-skin only for a signed-in Kindle, Korund or Aurelle citizen).
+   Colors come from each nation's crest palette (lib/nation-crests.ts) on dark grounds, so every existing top bar text color keeps AA contrast; each nation also gets
+   one motif drawn with inset shadows or a background image (no borders, padding or size change, so layout is identical). The header type selector keeps these rules above the later S2 chip rules. The nation name stays in text, so no meaning is carried by color alone. */
+header.game-hud[data-nation-skin]{--skin-ground:#071820;--skin-chip:#0d2530;--skin-edge:#2f4d57;--skin-accent:#d0ad54;background:var(--skin-ground);border-bottom-color:var(--skin-edge)}
+header.game-hud[data-nation-skin] .game-resources>div,header.game-hud[data-nation-skin] .game-resources>.game-hud-help,header.game-hud[data-nation-skin] .game-resources>.game-wallet-button{background:var(--skin-chip);border-color:var(--skin-edge)}
+header.game-hud[data-nation-skin] .game-crest{border-color:var(--skin-accent)}
+/* Kindle, a modern civic form: basalt ground, ember header rule, brass base line */
+header.game-hud[data-nation-skin=kindle]{--skin-ground:#1a110c;--skin-chip:#26180f;--skin-edge:#6b4426;--skin-accent:#d9692b;box-shadow:inset 0 3px 0 #d9692b,inset 0 -1px 0 #b08a4a}
+/* Korund, a stamped ration booklet: slate ground, ochre perforated edge */
+header.game-hud[data-nation-skin=korund]{--skin-ground:#1b1a17;--skin-chip:#26231c;--skin-edge:#5f5238;--skin-accent:#c08a2e;background-image:repeating-linear-gradient(90deg,#c08a2e 0 7px,transparent 7px 12px);background-size:100% 2px;background-position:left bottom;background-repeat:no-repeat}
+/* Aurelle, a sealed scroll: sky-blue night ground, double gilt rules top and bottom */
+header.game-hud[data-nation-skin=aurelle]{--skin-ground:#0d1c2b;--skin-chip:#14283c;--skin-edge:#3c6488;--skin-accent:#d0ad54;box-shadow:inset 0 2px 0 #d0ad54,inset 0 4px 0 #0d1c2b,inset 0 5px 0 #d0ad5499,inset 0 -2px 0 #d0ad54,inset 0 -4px 0 #0d1c2b,inset 0 -5px 0 #d0ad5499}
 /* #392 S4 zoom rail (flag NEXT_PUBLIC_HARIMU_UI_V2_RAIL; class .game-rail-on): World / Nation / City in a left rail beside the stage (never over it), the top tabs keep the places. On phones the rail is a row before the tabs, in the page flow, so it cannot cover canvas labels. */
 .game-rail-on{--rail-width:calc(78px * var(--text-scale, 1))}.game-rail-on .game-nav-row{display:contents}
 .game-zoom-rail{position:absolute;z-index:5;top:var(--hud-height);bottom:var(--context-height);left:0;width:var(--rail-width);display:flex;flex-direction:column;gap:6px;padding:10px 6px;background:#102934;border-right:1px solid #334650;overflow-y:auto}
@@ -461,15 +473,3 @@ body:has(.harimu-game){overflow:auto}
 .game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]:hover{border-color:#d0ad5499}
 @media(max-width:760px){.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]{gap:3px;padding-left:3px}.game-hud-v2 .game-account button[aria-controls="harimu-account-menu"]::before{width:14px;height:14px}.game-hud-v2 .game-account{column-gap:3px}.game-hud-v2 .game-resources{gap:3px}.game-hud-v2 .game-resources>*,.game-hud-v2 .game-resources>.game-hud-help{flex-basis:calc(64px * var(--text-scale, 1))}.game-hud-v2 .game-resources>div,.game-hud-v2 .game-resources>.game-hud-help>summary,.game-hud-v2 .game-resources>.game-wallet-button{padding-inline:3px;column-gap:3px}}
 @media(min-width:1101px){.game-hud-v2 .game-account{gap:10px}}
-/* #85: nation skin PoC on the top bar (NEXT_PUBLIC_HARIMU_NATION_SKIN; app/game-shell.tsx sets data-nation-skin only for a signed-in Kindle, Korund or Aurelle citizen).
-   Colors come from each nation's crest palette (lib/nation-crests.ts) on dark grounds, so every existing top bar text color keeps AA contrast; each nation also gets
-   one motif drawn with inset shadows or a background image (no borders, padding or size change, so layout is identical). The nation name stays in text, so no meaning is carried by color alone. */
-.game-hud[data-nation-skin]{--skin-ground:#071820;--skin-chip:#0d2530;--skin-edge:#2f4d57;--skin-accent:#d0ad54;background:var(--skin-ground);border-bottom-color:var(--skin-edge)}
-.game-hud[data-nation-skin] .game-resources>div,.game-hud[data-nation-skin] .game-resources>.game-hud-help,.game-hud[data-nation-skin] .game-resources>.game-wallet-button{background:var(--skin-chip);border-color:var(--skin-edge)}
-.game-hud[data-nation-skin] .game-crest{border-color:var(--skin-accent)}
-/* Kindle, a modern civic form: basalt ground, ember header rule, brass base line */
-.game-hud[data-nation-skin=kindle]{--skin-ground:#1a110c;--skin-chip:#26180f;--skin-edge:#6b4426;--skin-accent:#d9692b;box-shadow:inset 0 3px 0 #d9692b,inset 0 -1px 0 #b08a4a}
-/* Korund, a stamped ration booklet: slate ground, ochre perforated edge */
-.game-hud[data-nation-skin=korund]{--skin-ground:#1b1a17;--skin-chip:#26231c;--skin-edge:#5f5238;--skin-accent:#c08a2e;background-image:repeating-linear-gradient(90deg,#c08a2e 0 7px,transparent 7px 12px);background-size:100% 2px;background-position:left bottom;background-repeat:no-repeat}
-/* Aurelle, a sealed scroll: sky-blue night ground, double gilt rules top and bottom */
-.game-hud[data-nation-skin=aurelle]{--skin-ground:#0d1c2b;--skin-chip:#14283c;--skin-edge:#3c6488;--skin-accent:#d0ad54;box-shadow:inset 0 2px 0 #d0ad54,inset 0 4px 0 #0d1c2b,inset 0 5px 0 #d0ad5499,inset 0 -2px 0 #d0ad54,inset 0 -4px 0 #0d1c2b,inset 0 -5px 0 #d0ad5499}

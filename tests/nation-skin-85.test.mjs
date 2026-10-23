@@ -45,24 +45,24 @@ for (const flag of ['false', 'true']) test(`top bar with NEXT_PUBLIC_HARIMU_NATI
 });
 
 const css = readFileSync(new URL('../app/game-shell.css', import.meta.url), 'utf8');
-const block = css.slice(css.indexOf('/* #85:'));
+const block = css.slice(css.indexOf('/* #85:'), css.indexOf('/* #392 S4 zoom rail'));
 const rules = [...block.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ sel: m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(), body: m[2] }));
 const lum = hex => { const h = hex.replace('#', '').slice(0, 6); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4).reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i], 0); };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 
 test('skin CSS: scoped to [data-nation-skin], no layout properties, three distinct nations with one motif each', () => {
-  assert.ok(rules.length >= 5); for (const r of rules) assert.match(r.sel, /^\.game-hud\[data-nation-skin(=(kindle|korund|aurelle))?\]/, r.sel);
+  assert.ok(rules.length >= 5); for (const r of rules) assert.match(r.sel, /^header\.game-hud\[data-nation-skin(=(kindle|korund|aurelle))?\]/, r.sel);
   for (const r of rules) assert.doesNotMatch(r.body, /(^|;)\s*(padding|margin|width|height|min-|max-|font|display|position|gap|flex|grid|border-width|border:|line-height|letter-spacing|top|left|right|bottom|inset:)/, 'skin only: ' + r.sel);
-  const grounds = skinnedNations.map(id => rules.find(r => r.sel === `.game-hud[data-nation-skin=${id}]`)?.body.match(/--skin-ground:(#[0-9a-f]{6})/)?.[1]);
+  const grounds = skinnedNations.map(id => rules.find(r => r.sel === `header.game-hud[data-nation-skin=${id}]`)?.body.match(/--skin-ground:(#[0-9a-f]{6})/)?.[1]);
   assert.equal(new Set(grounds).size, 3, 'each nation has its own ground');
-  for (const id of skinnedNations) assert.match(rules.find(r => r.sel === `.game-hud[data-nation-skin=${id}]`).body, /box-shadow|background-image/, id + ' motif');
+  for (const id of skinnedNations) assert.match(rules.find(r => r.sel === `header.game-hud[data-nation-skin=${id}]`).body, /box-shadow|background-image/, id + ' motif');
 });
 
 test('contrast: every top bar text color is AA (4.5:1) and every focus outline is 3:1 on each nation ground and chip', () => {
   const textColors = ['#e4f1ef', '#dce7e8', '#d6ebe8', '#ead08a', '#d0ad54', '#a9bfc2', '#99afb4', '#95b3bd', '#91a9ae', '#77c7b8'];
   const focus = ['#80d8ce', '#8ad9cc', '#d6b45c', '#d8b35a', '#f7d080'];
   for (const id of skinnedNations) {
-    const body = rules.find(r => r.sel === `.game-hud[data-nation-skin=${id}]`).body;
+    const body = rules.find(r => r.sel === `header.game-hud[data-nation-skin=${id}]`).body;
     for (const ground of ['ground', 'chip'].map(k => body.match(new RegExp(`--skin-${k}:(#[0-9a-f]{6})`))[1])) {
       for (const c of textColors) assert.ok(ratio(c, ground) >= 4.5, `${id} ${c} on ${ground}: ${ratio(c, ground).toFixed(2)}`);
       for (const c of focus) assert.ok(ratio(c, ground) >= 3, `${id} focus ${c} on ${ground}`);
