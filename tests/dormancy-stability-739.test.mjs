@@ -49,3 +49,15 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await kindleScores(r)).find(s => s.tick === past[0].tick).citizens, base, 'repaired past tick unchanged');
   });
 }
+
+// ARC on #815: with the flag on, a catch-up tick uses the full count and only the live tick excludes Dormant citizens (no flag-on time is recorded).
+test('flag on: a catch-up tick keeps the full count; the live tick excludes the Dormant citizen', async t => {
+  const { r, t0, world, stab } = await setup('sqlite'); t.after(() => r.close());
+  const full = (await stab.readStabilityInputs(r.db, 'kindle', t0)).citizens;
+  await world.advanceWorld(r.db, t0, { dormancy: true });
+  const before = (await kindleScores(r)).length;
+  await world.advanceWorld(r.db, t0 + 2 * 7200 + 10, { dormancy: true }); // two ticks due: one catch-up, one live
+  const [catchUp, live] = (await kindleScores(r)).slice(before);
+  assert.equal(catchUp.citizens, full, 'catch-up tick: full count');
+  assert.equal(live.citizens, full - 1, 'live tick: Dormant alice excluded');
+});

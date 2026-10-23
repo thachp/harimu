@@ -145,7 +145,9 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
     const statements = await mapLimited(missing.results, scoreRepairConcurrency, async row => {
       // #423: war weariness reads the wars table as of the tick's own time (only while both war flags are on), so a catch-up or repaired tick scores the same as a live one.
       const weariness = options.warWeariness ? await readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined;
-      // #739 slice 2 (ARC (b): no retroactive repair): only the live tick (the latest due one) excludes Dormant citizens; a caught-up or repaired past tick keeps the old denominators.
+      // #739 slice 2 (ARC on #815): only the live-scored tick (the latest due one, scheduled_at + tickSeconds > now) excludes Dormant citizens. Catch-up ticks
+      // (due while no request arrived) and #679-repaired past ticks keep the old full count, even after deploy: no flag-on time is recorded, and dormancy history
+      // is not reconstructed (last_active_at is only the current value). Pinned by tests/dormancy-stability-739.test.mjs.
       const live = options.dormancy === true && Number(row.scheduled_at)+tickSeconds>now;
       return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(live?{excludeDormant:true}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
     });
