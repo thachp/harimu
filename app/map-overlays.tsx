@@ -19,8 +19,8 @@ const session = () => { try { return window.sessionStorage; } catch { return und
 
 /** #800: rareMarker (NEXT_PUBLIC_HARIMU_RARE_MARKER) draws rare resource nodes as a filled, gold-rimmed badge (shape and fill, not color alone), the same badge in the legend. */
 export function MapOverlays({ lowGraphics = false, mapLayer = true, armies = false, rareMarker = process.env.NEXT_PUBLIC_HARIMU_RARE_MARKER === 'true' }: { lowGraphics?: boolean; mapLayer?: boolean; armies?: boolean; rareMarker?: boolean }) {
-  const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session()).filter(id => armies || id !== 'armies')); // #738 slice 4: a remembered Army toggle is dropped while the flag is off
-  const [units, setUnits] = useState<ArmyPosition[] | null>(null); // ARC: remembered for the browser session, off in a new one
+  const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session()).filter(id => armies || id !== 'armies')); // ARC: remembered for the browser session, off in a new one; #738 slice 4: a remembered Army toggle is dropped while the flag is off
+  const [units, setUnits] = useState<ArmyPosition[] | null>(null);
   const [ownership, setOwnership] = useState<OwnershipMap | null>(null);
   const [unrest, setUnrest] = useState<UnrestMap | null>(null);
   const [resources, setResources] = useState<ResourceMap | null>(null);

@@ -30,7 +30,36 @@ async function scene(t, backend, on = true) {
 const scores = async r => H.readHarmonyScores(r.db, Math.floor(r.now / 1000) + 1, new Set(), (await r.importModule('lib/festivals.ts')).festivalStance);
 const spy = async (r, fn) => { const prepare = r.db.prepare.bind(r.db), sql = []; r.db.prepare = q => { sql.push(q); return prepare(q); }; try { return { result: await fn(), sql }; } finally { r.db.prepare = prepare; } };
 
+test('#889: faith-panel buttons render and post pilgrimage and charity; the outcome or a failure shows (stubbed fetch)', async () => {
+  const { Window } = await import('happy-dom'), ts = (await import('typescript')).default, { createRequire } = await import('node:module'), { readFileSync } = await import('node:fs');
+  const require = createRequire(import.meta.url), w = new Window({ url: 'http://localhost/' }); globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const React = require('react'), { createRoot } = require('react-dom/client'), { act } = React;
+  const src = readFileSync('app/faith-panel.tsx', 'utf8'); assert.match(src, /\{harmony && <HolySiteActions \/>\}/, 'shown only with the harmony line (flag on)');
+  const js = ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
+  const mod = { exports: {} }; new Function('exports', 'require', 'module', js)(mod.exports, n => n.startsWith('../lib/') ? require(`${n}.ts`) : n.startsWith('./') ? {} : require(n), mod);
+  const { holySiteCopy: C } = require('../lib/holy-sites.ts'), sent = [];
+  let reply = { status: 200, body: { outcome: 'denied' } };
+  globalThis.fetch = async (url, init) => { sent.push([url, JSON.parse(init.body)]); if (reply === 'throw') throw new Error('offline'); return { ok: reply.status < 400, status: reply.status, json: async () => reply.body }; };
+  const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
+  await act(async () => root.render(React.createElement(mod.exports.HolySiteActions)));
+  const click = async label => act(async () => { [...el.querySelectorAll('button')].find(b => b.textContent === label).dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await new Promise(r => setTimeout(r, 0)); });
+  await click(C.pilgrimage['high-retreat']); assert.ok(el.textContent.includes(C.outcome.denied));
+  assert.deepEqual([sent[0][0], sent[0][1].action, sent[0][1].siteId, typeof sent[0][1].requestId], ['/api/faith/holy-sites', 'pilgrimage', 'high-retreat', 'string']);
+  reply = { status: 403, body: { error: 'Only a seated officiant can give clergy charity.' } }; await click(C.charity);
+  assert.equal(sent[1][1].action, 'charity'); assert.ok(el.textContent.includes('Only a seated officiant'));
+  reply = 'throw'; await click(C.charity); assert.ok(el.textContent.includes(C.failed.replace('{reason}', 'network')));
+  await act(async () => root.unmount());
+});
+
 for (const backend of ['sqlite', 'postgres']) {
+  test(`${backend}: #889: denied pilgrimages count at most HARMONY_DENIED_ACTS_PER_SOURCE_NATION per source nation`, async t => {
+    const r = await scene(t, backend), before = await scores(r);
+    for (const id of ['k2', 'k3']) await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'kindle',?,18,0,'Good standing',?,?)").bind(id, id, at(r), at(r)).run();
+    for (const u of ['kim', 'k2', 'k3', 'ava']) assert.equal((await r.call('faith/holy-sites', u, { action: 'pilgrimage', siteId: 'high-retreat', requestId: rid() })).data.outcome, 'denied', u);
+    assert.equal(H.HARMONY_DENIED_ACTS_PER_SOURCE_NATION, 2);
+    assert.equal(before.korund - (await scores(r)).korund, (2 + 1) * H.HARMONY_POINTS_PER_DENIED, 'three Kindle denials count as two; one Aurelle denial counts');
+  });
+
   test(`${backend}: a granted pilgrimage raises the custodian's Harmony, a denied one lowers it, clergy charity raises the officiant's nation; replay pays once`, async t => {
     const r = await scene(t, backend), before = await scores(r);
     const id = rid(), go = await r.call('faith/holy-sites', 'kim', { action: 'pilgrimage', siteId: 'hearth-of-first-names', requestId: id });

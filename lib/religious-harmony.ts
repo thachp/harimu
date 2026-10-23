@@ -30,6 +30,8 @@ export const HARMONY_POINTS_PER_PILGRIMAGE = 2;   // a granted holy-site pilgrim
 export const HARMONY_PILGRIMAGE_CAP = 10;
 export const HARMONY_POINTS_PER_DENIED = 3;       // a denied pilgrimage
 export const HARMONY_DENIED_CAP = 15;
+/** #889 (QA1 on #866): denied pilgrimages by one source nation's citizens count at most this many acts against a custodian (2 acts = 6 points). */
+export const HARMONY_DENIED_ACTS_PER_SOURCE_NATION = 2;
 export const HARMONY_POINTS_PER_CHARITY = 2;      // a clergy charity act
 export const HARMONY_CHARITY_CAP = 10;
 /** Band thresholds: Strained below the first, Uneasy below the second, Calm below the third, Harmonious from it. */
@@ -65,7 +67,8 @@ export async function readAllHarmonySignals(db: GameDatabase, at: number, holida
     const joins = `SELECT COUNT(*) FROM citizen_festival_joins j JOIN citizens c ON c.clerk_user_id = j.user_id WHERE c.nation_id = '${nation}' AND `;
     col(joins + faithIn(harmonyFestivalFaiths.filter(f => !banned(nation, f))), `${nation}_joins`);
     col(joins + faithIn(harmonyFestivalFaiths.filter(f => banned(nation, f))), `${nation}_banned`);
-    for (const outcome of ['granted', 'denied', 'given']) col(`SELECT COUNT(*) FROM faith_harmony_acts a WHERE a.nation_id = '${nation}' AND a.outcome = '${outcome}'`, `acts_${nation}_${outcome}`);
+    for (const source of harmonyNations) col(`SELECT COUNT(*) FROM faith_harmony_acts a JOIN citizens c ON c.clerk_user_id = a.user_id WHERE a.nation_id = '${nation}' AND a.outcome = 'denied' AND c.nation_id = '${source}'`, `acts_${nation}_denied_${source}`);
+    for (const outcome of ['granted', 'given']) col(`SELECT COUNT(*) FROM faith_harmony_acts a WHERE a.nation_id = '${nation}' AND a.outcome = '${outcome}'`, `acts_${nation}_${outcome}`);
   }
   const row = await db.prepare(`SELECT ${cols.join(', ')},
       (SELECT COUNT(*) FROM korund_raids WHERE raided_at > ? AND raided_at <= ?) AS raids,
@@ -75,7 +78,7 @@ export async function readAllHarmonySignals(db: GameDatabase, at: number, holida
   for (const nation of harmonyNations) {
     const korund = nation === 'korund';
     out[nation] = { festivalHoliday: holidays.has(nation) ? 1 : 0, festivalJoins: n(row?.[`${nation}_joins`]), bannedFestivalJoins: n(row?.[`${nation}_banned`]), raids: korund ? n(row?.raids) : 0, raidHits: korund ? n(row?.hits) : 0,
-      pilgrimagesGranted: n(row?.[`acts_${nation}_granted`]), pilgrimagesDenied: n(row?.[`acts_${nation}_denied`]), charityActs: n(row?.[`acts_${nation}_given`]) };
+      pilgrimagesGranted: n(row?.[`acts_${nation}_granted`]), pilgrimagesDenied: harmonyNations.reduce((sum, source) => sum + Math.min(HARMONY_DENIED_ACTS_PER_SOURCE_NATION, n(row?.[`acts_${nation}_denied_${source}`])), 0), charityActs: n(row?.[`acts_${nation}_given`]) };
   }
   return out;
 }

@@ -144,10 +144,30 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-test('stay-error follow-up (#738): a refused stay shows the placeholder refusal copy, marked for Content; never the generic failure note', () => {
-  const card = readFileSync('app/army-card.tsx', 'utf8'), copy = readFileSync('lib/army-copy.ts', 'utf8');
-  // QA2 on #859: stayRefused only for 409 + not_conscripted; any other non-OK (401/403/404/500) and network errors keep the generic stance failure note.
-  assert.match(card, /setNote\(r\.ok \? fill\(unitMembership\.stayed\.text, unit\.name\) : r\.status === 409 && reason === 'not_conscripted' \? fill\(unitMembership\.stayRefused\.text, unit\.name\) : armyFailureNote\('stance', unit\.name, String\(r\.status\)\)\); \}\)\.catch\(\(\) => setNote\(armyFailureNote\('stance', unit\.name, 'network'\)\)\)/);
-  assert.match(card, /const reason = r\.ok \? '' : \(\(await r\.json\(\)\.catch\(\(\) => \(\{\}\)\)\) as \{ reason\?: string \}\)\.reason;/);
-  assert.match(copy, /PLACEHOLDER copy, marked for Content[^\n]*refused stay[^\n]*\n stayRefused:L\('You cannot stay in \{unit\}: you are not serving a term right now\.'\)/);
+test('stay-error (#738, #889 render test): a refused stay shows stayRefused only for 409 not_conscripted; other failures and network errors show the generic note', async () => {
+  const { Window } = await import('happy-dom'), ts = (await import('typescript')).default, { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url), w = new Window({ url: 'http://localhost/' }); globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const React = require('react'), { createRoot } = require('react-dom/client'), { act } = React;
+  const js = ts.transpileModule(readFileSync('app/army-card.tsx', 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
+  const mod = { exports: {} }; new Function('exports', 'require', 'module', js)(mod.exports, n => n.startsWith('@/lib/') ? require(`../lib/${n.slice(6)}.ts`) : require(n), mod);
+  const { unitMembership, armyFailureNote } = require('../lib/army-copy.ts');
+  const army = { unit: { id: 'korund-home-guard', name: 'Korund Home Brigade', officer: 'Colonel Veshko', memberCount: 1, openToVolunteers: false }, member: true, stance: 'hold', serveUntil: 9e9 };
+  const json = (status, body) => ({ ok: status < 400, status, json: async () => body });
+  for (const [stay, expected] of [
+    [() => json(409, { reason: 'not_conscripted' }), unitMembership.stayRefused.text.replace('{unit}', army.unit.name)],
+    [() => json(409, { reason: 'other' }), armyFailureNote('stance', army.unit.name, '409')],
+    [() => json(500, {}), armyFailureNote('stance', army.unit.name, '500')],
+    [() => json(401, { reason: 'not_conscripted' }), armyFailureNote('stance', army.unit.name, '401')],
+    [() => { throw new Error('offline'); }, armyFailureNote('stance', army.unit.name, 'network')],
+    [() => json(200, { stayed: true }), unitMembership.stayed.text.replace('{unit}', army.unit.name)],
+  ]) {
+    globalThis.fetch = async (url, init) => url === '/api/army' && !init ? json(200, { army }) : url === '/api/army/draft' && init?.body === '{"action":"stay"}' ? stay() : json(200, {});
+    const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
+    await act(async () => root.render(React.createElement(mod.exports.ArmyCard)));
+    const button = [...el.querySelectorAll('button')].find(b => b.textContent === unitMembership.stayButton);
+    await act(async () => { button.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await new Promise(r => setTimeout(r, 0)); });
+    assert.ok(el.textContent.includes(expected), expected);
+    await act(async () => root.unmount()); el.remove();
+  }
+  assert.match(readFileSync('lib/army-copy.ts', 'utf8'), /PLACEHOLDER copy, marked for Content[^\n]*refused stay[^\n]*\n stayRefused:L\(/);
 });
