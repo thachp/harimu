@@ -54,8 +54,8 @@ test('no claim that NPCs or residents vote; the residents note says they are not
   assert.match(RC.npcNote.text,/Residents do not vote/); assert.match(RC.npcNote.text,/not part of the count/);
   for (const t of all()) assert.doesNotMatch(t,/\bNPCs? (vote|voted|ballots?)\b|residents (vote|voted)\b|AI (voters?|bloc)/i,t);
 });
-test('badge (§23.2 / #381): system notices and Republic Wire Service reports are unbadged; no AI voice, Crown or other nation', () => {
-  for (const f of CP) { assert.equal(f.aiBadge,false); assert.match(f.body,/^Republic Wire Service: /); }
+test('badge (§23.2 / #381): system notices and Kindle Press reports are unbadged; no AI voice, Crown or other nation', () => {
+  for (const f of CP) { assert.equal(f.aiBadge,false); assert.match(f.body,/^Kindle Press: /); }
   for (const o of [VO,RC,TB,C,...CS]) assert.equal('aiBadge' in o,false);
   for (const t of all()) assert.doesNotMatch(t,/^Be it known|By royal decree|\bI am an AI\b|Crown|State Media|Court Gazette|Chairman|Korund|Aurelle|Varkand|["“”]/,t);
 });
@@ -79,8 +79,8 @@ test('unwired: nothing in app/, components/ or lib/ imports kindle-certification
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('kindle-certification-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/kindle-certification-copy/,f);
 });
 test('one canonical byline: the press bodies open with the Kindle pack byline from the press templates, and this module defines none of its own', () => {
-  assert.deepEqual(kindlePress.byline,{name:'Republic Wire Service',proposal:true});
+  assert.deepEqual(kindlePress.byline,{name:'Kindle Press',proposal:false});
   const src=readFileSync('lib/kindle-certification-copy.ts','utf8');
-  assert.doesNotMatch(src,/name:'Republic Wire Service'/); assert.doesNotMatch(src,/BYLINE=/); assert.doesNotMatch(src,/^import /m);
+  assert.doesNotMatch(src,/name:'Kindle Press'/); assert.doesNotMatch(src,/BYLINE=/); assert.doesNotMatch(src,/^import /m);
   for (const b of bodies()) assert.ok(b.startsWith(`${kindlePress.byline.name}: `),b);
 });

@@ -101,6 +101,8 @@
     "HARIMU_TESSERA_REWARDS_ENABLED": "false",
     // #283: Kindle mid-term Assembly election (D'Hondt per district, 5% district share). Off until QA. #351: the real calendar is driven by the world clock: set HARIMU_KINDLE_CYCLE_START_AT (epoch seconds, start of day 0 of the first 120-day cycle) and the vote opens at day 60 of every cycle for 72 hours. Without it, HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) is a manual one-off open. Neither set: it never opens.
     "HARIMU_KINDLE_ASSEMBLY_ENABLED": "true",
+    // #878: preview world day 0 = 2026-10-19T00:00:00Z (epoch seconds). Drives lib/election-calendars (Kindle cycle, Korund Congress, Aurelle claims). Production leaves it unset: every calendar is held.
+    "HARIMU_KINDLE_CYCLE_START_AT": "1792368000",
     // #307: Kindle party membership and human primaries. Off until QA. Opening is manual: set HARIMU_PRIMARIES_OPEN_AT (epoch seconds) to open the 72-hour primary.
     "HARIMU_PRIMARIES_ENABLED": "true",
     "HARIMU_TRAVEL_ENABLED": "true",
@@ -135,6 +137,8 @@
     "HARIMU_PARTY_DONATIONS_ENABLED": "true",
     // #867: Kindle rallies PoC (docs 9.4): one weekly rally per AI candidate in a Kindle city square, citizens mark attend once, an AI-labeled news clip after the rally; visibility only, never votes. Off: /api/rallies is 404, the card and news clips are hidden, the cron job never opens the database. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_KINDLE_RALLIES_ENABLED": "true",
+    // #876: model-written Kindle rally speeches through the town hall AI pipeline (budget, platform-card check, safety model) on the rallies cron; templates-only or a muted kindle-rally persona keeps the #867 template speech. Needs HARIMU_KINDLE_RALLIES_ENABLED, the AI binding and budget. Off: no model call, the template speech is shown. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_AI_RALLY_SPEECHES_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
@@ -195,6 +199,7 @@
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_PANEL": "true",
+    "NEXT_PUBLIC_HARIMU_MOD_CONSOLE": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "true",

@@ -1,3 +1,4 @@
+import { KINDLE_CALENDAR } from './election-calendars';
 import { citiesForNation } from './cities';
 import { kindleParties } from './kindle-parties';
 import { assemblyStage, ASSEMBLY_NAME_MAX } from './assembly-copy';
@@ -9,11 +10,11 @@ import { assemblyStage, ASSEMBLY_NAME_MAX } from './assembly-copy';
  *  are placeholders until Design rules otherwise. */
 export const assemblySeatsPerDistrict = 6; // [ASSUMPTION]
 export const assemblySeatsUp = 3; // half
-export const assemblyWindowSeconds = 72 * 3600; // same 72 real hours as the presidential PoC
+export const assemblyWindowSeconds = KINDLE_CALENDAR.voteHours * 3600; // same 72 real hours as the presidential PoC
 /** #351: the real calendar (docs politics/elections §9.1). A cycle is 120 real days (4 game years at 12x) and the mid-term Assembly election opens
  *  at day 60 of each cycle for the same 72-hour window. Real seconds on the world clock, not game time. */
-export const assemblyCycleSeconds = 120 * 86400;
-export const assemblyMidtermOffsetSeconds = 60 * 86400;
+export const assemblyCycleSeconds = KINDLE_CALENDAR.cycleDays * 86400; // #878: named calendar constant
+export const assemblyMidtermOffsetSeconds = KINDLE_CALENDAR.assemblyMidtermDay * 86400;
 /** #351 (ARC, #356 item 2): a party needs at least this share of the district's human ballots to take part in the D'Hondt award. No separate turnout floor. */
 export const assemblyMinSharePercent = 5;
 /** #463 (ARC ruling): a district counts only with at least this many human ballots. An absolute count floor, not a turnout share, applied before the
@@ -116,7 +117,7 @@ export function assemblyResult(byDistrict: Readonly<Record<string, PartySeats>>,
 }
 
 const hash = (text: string) => { let h = 2166136261; for (const ch of text) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
-/** Republic Wire Service items (Content #299) for a count: one per party per district that had seats up or won some, picked by
+/** Kindle Press items (Content #299) for a count: one per party per district that had seats up or won some, picked by
  *  seat change. Names are filled at runtime and refused if over the shared cap. */
 export function assemblyHeadlines(result: AssemblyResult): { districtId: string; partyId: string; stage: 'results-gain' | 'results-hold' | 'results-loss'; headline: string; body: string }[] {
   const out: { districtId: string; partyId: string; stage: 'results-gain' | 'results-hold' | 'results-loss'; headline: string; body: string }[] = [];

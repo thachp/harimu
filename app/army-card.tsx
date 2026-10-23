@@ -42,7 +42,7 @@ export function ArmyCard() {
   </section>;
 }
 
-/** #738 slice 5: the cut-supply line (placeholder copy from army-copy, marked for Content). */
+/** #738 slice 5: the cut-supply line (Content copy from army-copy, #887 follow-up). */
 export const supplyCutLine = (s: { cutDays: number; strengthLossPct: number }) => unitMembership.supplyCut.text.replace('{days}', String(s.cutDays)).replace('{pct}', String(s.strengthLossPct));
 /** #738 battles: the card's battle line (placeholder copy from army-copy, marked for Content). */
 export const battleLine = (b: { opponentNationId: string; attacking: boolean; rounds: number; status: string }) => {

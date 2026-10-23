@@ -53,7 +53,7 @@ test('AI memory: view and clear are the player\'s; the toggles say off unless tu
 });
 test('one neutral system voice: no byline, no AI badge, no nation or leader voice, no legal text, no real-world references, no on-chain topics', () => {
   for (const o of [EX,XP,DL,AM,OI]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
-  for (const t of all()) { assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|Chairman|Crown|President|Kindle|Korund|Aurelle|AI-generated|Notable|@|!/,t); assert.doesNotMatch(t,/\b(Earth|America\w*|Europe\w*|England|France|Japan|China|Russia|Tessera|NFT|on-chain|token\w*|privacy policy|terms|consent form|hereby|pursuant)\b/i,t); }
+  for (const t of all()) { assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|Chairman|Crown|President|Kindle|Korund|Aurelle|AI-generated|Notable|@|!/,t); assert.doesNotMatch(t,/\b(Earth|America\w*|Europe\w*|England|France|Japan|China|Russia|Tessera|NFT|on-chain|token\w*|privacy policy|terms|consent form|hereby|pursuant)\b/i,t); }
 });
 test('the explainer says what the game keeps, not what other players can see: faith can be private, so nothing says the world, others or players see it; no reward, badge, prize or XP wording anywhere', () => {
   for (const t of [...explainerLines(),EX.intro.text]) assert.doesNotMatch(t,/\b(the world knows|everyone|others? can see|visible|publicly|shown to|seen by)\b/i,t);

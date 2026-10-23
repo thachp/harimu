@@ -88,6 +88,7 @@ const SPK: CurrencySpec = {
 const LN: CurrencySpec = {
   currency: 'LN',
   legs: `SELECT clerk_user_id AS acct, wage_minor AS delta FROM korund_settlements
+    UNION ALL SELECT clerk_user_id, wage_minor FROM korund_post_settlements
     UNION ALL SELECT clerk_user_id, -price_minor FROM korund_coupon_redemptions
     UNION ALL SELECT buyer_id, amount_minor FROM gray_trades
     UNION ALL SELECT seller_id, -amount_minor FROM gray_trades
@@ -96,24 +97,30 @@ const LN: CurrencySpec = {
   appBalances: `SELECT c.clerk_user_id AS acct, ${laborNoteSql('c.clerk_user_id')} AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('LN', 'korund_settlements', 'clerk_user_id', 'wage_minor', true),
+    ...integerAndSign('LN', 'korund_post_settlements', 'clerk_user_id', 'wage_minor', true), // #886 (b)
+    { currency: 'LN', check: 'post_wage_without_issuance', sql: 'SELECT p.shift_id AS acct FROM korund_post_settlements p LEFT JOIN labor_note_issuances i ON i.shift_id = p.shift_id WHERE i.shift_id IS NULL OR i.amount_minor <> p.wage_minor' },
     ...integerAndSign('LN', 'korund_coupon_redemptions', 'clerk_user_id', 'price_minor', true),
     ...integerAndSign('LN', 'gray_trades', 'buyer_id', 'amount_minor', true),
     ...integerAndSign('LN', 'gray_seizures', 'offer_id', 'amount_minor', true), // #797
     { currency: 'LN', check: 'seizure_not_buyer_or_over_bundle', sql: 'SELECT z.offer_id AS acct FROM gray_seizures z LEFT JOIN gray_trades t ON t.offer_id = z.offer_id WHERE t.offer_id IS NULL OR t.buyer_id <> z.clerk_user_id OR z.amount_minor > t.amount_minor' },
-    { currency: 'LN', check: 'fund_negative:korund-state', sql: `SELECT r.id AS acct FROM korund_resources r WHERE r.id = 'state' AND r.initial_minor - COALESCE((SELECT SUM(wage_minor) FROM korund_settlements), 0) < 0` },
+    { currency: 'LN', check: 'fund_negative:korund-state', sql: `SELECT r.id AS acct FROM korund_resources r WHERE r.id = 'state' AND r.initial_minor - COALESCE((SELECT SUM(wage_minor) FROM korund_settlements), 0) - COALESCE((SELECT SUM(wage_minor) FROM korund_post_settlements), 0) < 0` },
   ],
 };
 const CRN: CurrencySpec = {
   currency: 'CRN',
   legs: `SELECT clerk_user_id AS acct, wage_minor AS delta FROM aurelle_settlements
+    UNION ALL SELECT clerk_user_id, wage_minor FROM aurelle_charter_settlements
     UNION ALL SELECT clerk_user_id, -spend_minor FROM aurelle_purchases`,
   appBalances: `SELECT c.clerk_user_id AS acct, COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id = c.clerk_user_id), 0)
+    + COALESCE((SELECT SUM(wage_minor) FROM aurelle_charter_settlements WHERE clerk_user_id = c.clerk_user_id), 0)
     - COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id = c.clerk_user_id), 0) AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('CRN', 'aurelle_settlements', 'clerk_user_id', 'wage_minor', true),
+    ...integerAndSign('CRN', 'aurelle_charter_settlements', 'clerk_user_id', 'wage_minor', true), // #886 (c)
+    { currency: 'CRN', check: 'charter_wage_without_issuance', sql: 'SELECT p.shift_id AS acct FROM aurelle_charter_settlements p LEFT JOIN crown_issuances i ON i.shift_id = p.shift_id WHERE i.shift_id IS NULL OR i.amount_minor <> p.wage_minor' },
     ...integerAndSign('CRN', 'aurelle_purchases', 'clerk_user_id', 'spend_minor', true),
     { currency: 'CRN', check: 'purchase_not_quantity_times_price', sql: 'SELECT clerk_user_id AS acct FROM aurelle_purchases WHERE spend_minor <> quantity * 150' },
-    { currency: 'CRN', check: 'fund_negative:aurelle-estate', sql: `SELECT r.id AS acct FROM aurelle_resources r WHERE r.id = 'estate' AND r.initial_minor + COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases), 0) - COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements), 0) < 0` },
+    { currency: 'CRN', check: 'fund_negative:aurelle-estate', sql: `SELECT r.id AS acct FROM aurelle_resources r WHERE r.id = 'estate' AND r.initial_minor + COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases), 0) - COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements), 0) - COALESCE((SELECT SUM(wage_minor) FROM aurelle_charter_settlements), 0) < 0` },
   ],
 };
 // The app's own Tessera balance (lib/tessera-exchange.ts tesseraBalanceSql), correlated to each citizen row.

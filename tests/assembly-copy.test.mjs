@@ -23,7 +23,7 @@ const fill=t=>ASSEMBLY_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(ASSE
 
 test('shape: stages in order, 2-3 variants, every line proposal, byline matches the Kindle pack', () => {
   assert.deepEqual(assemblyPress.map(s=>s.stage),[...ASSEMBLY_STAGES]);
-  assert.deepEqual(ASSEMBLY_BYLINE,kindlePress.byline); assert.equal(ASSEMBLY_BYLINE.name,'Republic Wire Service');
+  assert.deepEqual(ASSEMBLY_BYLINE,kindlePress.byline); assert.equal(ASSEMBLY_BYLINE.name,'Kindle Press');
   const ids=new Set();
   for (const s of assemblyPress) { assert.equal(s.proposal,true); assert.equal(assemblyStage(s.stage),s); assert.ok(s.items.length>=2&&s.items.length<=3, s.stage);
     for (const i of s.items) { assert.equal(i.proposal,true); assert.ok(!ids.has(i.id)); ids.add(i.id); } }

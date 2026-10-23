@@ -12,6 +12,7 @@ spec=importlib.util.spec_from_file_location('economy_fixture',pathlib.Path(__fil
 fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
 source=(pathlib.Path(__file__).parents[1]/'lib/korund.ts').read_text()
 queue_source=(pathlib.Path(__file__).parents[1]/'lib/korund-queue.ts').read_text()
+posts_source=(pathlib.Path(__file__).parents[1]/'lib/korund-posts.ts').read_text() # #886 (b): korund_post_settlements, read by the pool
 active_queue=re.search(r'export const activeRationQueue=`([^`]+)`',queue_source).group(1)
 def sql(name):return re.search(r'export const '+name+r' = `([^`]+)`',source).group(1).replace('${activeRationQueue}',active_queue)
 
@@ -22,7 +23,7 @@ class KorundTests(unittest.TestCase):
         self.db.execute('DELETE FROM shift_rewards')
         self.db.execute("UPDATE citizens SET nation_id='korund',capacity=18")
         self.db.execute("INSERT INTO work_orders VALUES ('korund-food-production')")
-        for schema in re.findall(r'`(CREATE [^`]+)`',source+queue_source):self.db.execute(schema)
+        for schema in re.findall(r'`(CREATE [^`]+)`',source+queue_source+posts_source):self.db.execute(schema)
         self.db.execute("INSERT INTO korund_resources VALUES ('state',40,100000)");self.db.commit()
     def tearDown(self):self.db.close()
     def race(self,workers):

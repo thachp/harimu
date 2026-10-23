@@ -8,10 +8,11 @@
  *            - LN seized at a checkpoint and destroyed (#797 gray_seizures, the sink; credited to nobody)
  *            - LN home-move fees (#781 home_city_moves with currency 'LN', a sink).
  * Pure and dependency-free (no imports) so SQL-fixture tests can load it directly. */
-export const laborNoteParams = 6;
+export const laborNoteParams = 7;
 /** `user` is the SQL for the citizen id: `?` (then bind laborNoteBinds(id)) or a column such as `citizens.clerk_user_id` (no binds). */
 export function laborNoteSql(user: string): string {
   return `(COALESCE((SELECT SUM(wage_minor) FROM korund_settlements WHERE clerk_user_id=${user}),0)`
+    + `+COALESCE((SELECT SUM(wage_minor) FROM korund_post_settlements WHERE clerk_user_id=${user}),0)` // #886 (b)
     + `-COALESCE((SELECT SUM(price_minor) FROM korund_coupon_redemptions WHERE clerk_user_id=${user}),0)`
     + `+COALESCE((SELECT SUM(amount_minor) FROM gray_trades WHERE buyer_id=${user}),0)`
     + `-COALESCE((SELECT SUM(amount_minor) FROM gray_trades WHERE seller_id=${user}),0)`

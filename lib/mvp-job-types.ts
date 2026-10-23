@@ -3,7 +3,7 @@
  *  Pure data, no runtime imports (tests load it directly). Read-only: nothing here starts, pays or changes a shift.
  *  Flag HARIMU_MVP_JOB_TYPES_ENABLED: "true" in preview, "false" in production. Off: GET /api/jobs/types is 404 and nothing else reads this file.
  *  Later slices (ARC on #886): (b) Korund's quarry, foundry, rail and plan-clerk posts become playable shifts paid in Labor Notes, (c) Aurelle gets
- *  quarrying and foundry charter jobs paid in Crowns; each payment writes an issuance record (unblocks #885). Until then those are `planned`. */
+ *  quarrying and foundry charter jobs paid in Crowns; each payment writes an issuance record (unblocks #885). (b) and (c) have landed, so every entry is now `playable` (Korund posts: lib/korund-posts; Aurelle charters: lib/aurelle). */
 export const mvpJobTypesEnabled = (env: { HARIMU_MVP_JOB_TYPES_ENABLED?: string } | null | undefined) => env?.HARIMU_MVP_JOB_TYPES_ENABLED === 'true';
 
 export const mvpJobTypeIds = ['farming', 'orchard', 'herding', 'forestry', 'quarrying', 'foundry', 'freight', 'archive'] as const;
@@ -21,7 +21,7 @@ export const mvpJobTypes: Readonly<Record<MvpJobTypeId, { name: string; family: 
 };
 
 export type MvpNation = 'kindle' | 'korund' | 'aurelle';
-/** `playable`: a shift exists today (lib/db.ts workOrderSeeds). `planned`: an approved #886 (b)/(c) job, or a Labor Bureau post with no shift yet. */
+/** `playable`: a shift exists (a lib/db.ts workOrderSeeds order, a #886 (b) Korund post or a #886 (c) Aurelle charter, the last two behind the flag). `planned`: approved but not yet built (none today). */
 export type JobEntry = { id: string; nation: MvpNation; type: MvpJobTypeId; status: 'playable' | 'planned'; source: 'work-order' | 'labor-bureau' | 'charter' };
 export const mvpJobs: readonly JobEntry[] = [
   { id: 'harvest', nation: 'kindle', type: 'farming', status: 'playable', source: 'work-order' },
@@ -31,13 +31,13 @@ export const mvpJobs: readonly JobEntry[] = [
   { id: 'freight', nation: 'kindle', type: 'freight', status: 'playable', source: 'work-order' },
   { id: 'archive', nation: 'kindle', type: 'archive', status: 'playable', source: 'work-order' },
   { id: 'korund-food-production', nation: 'korund', type: 'farming', status: 'playable', source: 'work-order' },
-  { id: 'korund-quarry-gang', nation: 'korund', type: 'quarrying', status: 'planned', source: 'labor-bureau' },
-  { id: 'korund-foundry-hand', nation: 'korund', type: 'foundry', status: 'planned', source: 'labor-bureau' },
-  { id: 'korund-rail-crew', nation: 'korund', type: 'freight', status: 'planned', source: 'labor-bureau' },
-  { id: 'korund-plan-clerk', nation: 'korund', type: 'archive', status: 'planned', source: 'labor-bureau' },
+  { id: 'korund-quarry-gang', nation: 'korund', type: 'quarrying', status: 'playable', source: 'labor-bureau' },
+  { id: 'korund-foundry-hand', nation: 'korund', type: 'foundry', status: 'playable', source: 'labor-bureau' },
+  { id: 'korund-rail-crew', nation: 'korund', type: 'freight', status: 'playable', source: 'labor-bureau' },
+  { id: 'korund-plan-clerk', nation: 'korund', type: 'archive', status: 'playable', source: 'labor-bureau' },
   { id: 'aurelle-food-estate', nation: 'aurelle', type: 'farming', status: 'playable', source: 'work-order' },
-  { id: 'aurelle-quarry-charter', nation: 'aurelle', type: 'quarrying', status: 'planned', source: 'charter' },
-  { id: 'aurelle-foundry-charter', nation: 'aurelle', type: 'foundry', status: 'planned', source: 'charter' },
+  { id: 'aurelle-quarry-charter', nation: 'aurelle', type: 'quarrying', status: 'playable', source: 'charter' },
+  { id: 'aurelle-foundry-charter', nation: 'aurelle', type: 'foundry', status: 'playable', source: 'charter' },
 ];
 export const jobTypeOf = (jobId: unknown): MvpJobTypeId | null => mvpJobs.find(job => job.id === jobId)?.type ?? null;
 

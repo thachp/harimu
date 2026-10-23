@@ -38,7 +38,7 @@ test('no placeholders, no figures, no schedule promise', () => {
 });
 test('system chrome: no byline, no AI badge, no in-character voice', () => {
   assert.equal('aiBadge' in C,false); assert.equal('byline' in C,false);
-  for (const t of all()) assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|Chairman|Crown|AI-generated|AI answer|model|Notable|@|!/,t);
+  for (const t of all()) assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|Chairman|Crown|AI-generated|AI answer|model|Notable|@|!/,t);
 });
 test('does not repeat the existing debate copy and leaves vote counts alone', () => {
   const dc=readFileSync('lib/debate-copy.ts','utf8');

@@ -82,8 +82,10 @@ export const unitMembership={
  stayed:L('You will stay in {unit} after your term.'),
  // PLACEHOLDER copy, marked for Content (proposal: true): a refused stay (not a conscript, or the term already ended) (#738 stay-error follow-up).
  stayRefused:L('You cannot stay in {unit}: you are not serving a term right now.'),
- // PLACEHOLDER copy, marked for Content (proposal: true): #738 slice 5, a cut supply line on the card and the map legend.
- supplyCut:L('Supply cut for {days} game days: strength down {pct}%.'),
+ // Content (#887 follow-up), docs §15.3 Logistics: units need supply lines from depots; a cut line lowers strength each game day.
+ // {pct} is the server's loss figure. Depot (the capital), range, daily rate and the half-strength cap were approved by ARC on #897 (lib/army-supply.ts); the card names only the cap.
+ supplyCut:L('Supply line cut. Strength is down {pct}% and drops each game day the line stays cut, to at most half.'),
+ supplyCutLegend:L('supply line cut, strength down {pct}%'),
  // PLACEHOLDER copy, marked for Content (proposal: true): #738 battles, the card line. The capital is never captured.
  battleOngoing:L('Battle with {nation}: round {round}.'),
  battleWon:L('Battle with {nation} won after {round} rounds. No capital changes hands.'),

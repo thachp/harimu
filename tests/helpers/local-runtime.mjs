@@ -37,14 +37,14 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const modules = [
     'lib/storage-selection.ts','lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'lib/map-zones.ts', 'lib/globe-mapping.ts', 'lib/map-zone-labels.ts', 'lib/city-founding.ts', 'app/api/world/found-city/route.ts', 'lib/map-ownership.ts', 'app/api/world/ownership/route.ts', 'lib/map-unrest.ts', 'app/api/world/unrest/route.ts', 'lib/civic-rank-rules.ts', 'lib/civic-rank.ts', 'app/api/citizen/civic-rank/route.ts', 'lib/kindle-budget.ts', 'app/api/kindle/budget/route.ts', 'lib/map-resources.ts', 'app/api/world/resources/route.ts', 'app/api/city/route.ts', 'lib/home-move.ts', 'app/api/city/home/route.ts',
-    'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
+    'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','lib/election-calendars.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
     'lib/mvp-job-types.ts', 'app/api/jobs/types/route.ts', 'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/government.ts',
     'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts','lib/chat-shadow-mute.ts', 'lib/diplomatic-hall.ts', 'lib/founding-period.ts', 'lib/founding-period-copy.ts', 'lib/aurelle-succession.ts', 'lib/aurelle-succession-rules.ts', 'app/api/aurelle-succession/route.ts', 'lib/diplomatic-hall-copy.ts', 'app/api/diplomatic-hall/route.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/religious-harmony.ts','lib/holy-sites.ts','app/api/faith/holy-sites/route.ts','lib/world-simulation.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',
-    'lib/qa-tools.ts','lib/nation-openings.ts','lib/onboarding-preferences.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
+    'lib/qa-tools.ts','lib/nation-openings.ts','lib/onboarding-preferences.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund-posts.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
     'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts','lib/war-authority.ts','lib/war-actions.ts','lib/war-assembly.ts','lib/war-endings.ts','lib/war-weariness.ts','lib/war-weariness-copy.ts','lib/siege.ts','lib/siege-actions.ts','lib/siege-copy.ts', // #309, #350, #423, #419
     'lib/labor-bureau-rules.ts','lib/labor-bureau-text.ts','lib/labor-bureau-copy.ts','lib/labor-bureau.ts','lib/korund-wallet.ts','lib/gray-market.ts','lib/gray-seizure.ts','lib/gray-market-rules.ts','lib/korund-medals-rules.ts','lib/market-fee.ts','lib/wallet-street-rate.ts','lib/gray-market-text.ts','lib/gray-market-copy.ts','lib/nation-work.ts','lib/confluence-price-band.ts','lib/diplomacy.ts','lib/diplomacy-rules.ts','lib/diplomacy-copy.ts','lib/game-time.ts', // #308
@@ -63,7 +63,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/polling-rules.ts','lib/polling.ts','app/api/polling/route.ts', // #740
     'lib/plank-votes-rules.ts','lib/plank-votes.ts','app/api/planks/route.ts', // #831
     'lib/party-donations-rules.ts','lib/party-donations.ts','app/api/party-donations/route.ts', // #863
-    'lib/rallies-rules.ts','lib/rallies.ts','app/api/rallies/route.ts', // #867
+    'lib/rallies-rules.ts','lib/rallies.ts','lib/rally-speech-ai.ts','app/api/rallies/route.ts', // #867, #876
     'lib/reports.ts','lib/report-copy.ts','app/api/reports/route.ts', // #743
     'lib/dormancy-rules.ts','lib/dormancy-copy.ts','lib/savings-shield.ts','lib/kindle-sales-tax.ts', 'app/api/citizen/heartbeat/route.ts', // #739
     'lib/army-copy.ts','lib/army-rules.ts','lib/army-conscription.ts','lib/army.ts','app/api/army/route.ts','app/api/army/drill/route.ts','app/api/army/draft/route.ts','lib/army-map.ts','lib/army-supply.ts','lib/army-battle.ts','app/api/army/battles/route.ts','app/api/army/positions/route.ts', // #738

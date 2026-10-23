@@ -61,7 +61,7 @@ test('scope: proposals only; no break, ended or war-declaration wording (#435 ow
 });
 test('voices: Kindle\'s President and Secretary of State (docs 13.1 negotiators) speak plainly; Korund State Media reports the Chairman\'s own act; Aurelle opens "Be it known" for the Crown; recipients are reported with a byline', () => {
   for (const k of PROPOSAL_KINDS) {
-    assert.match(aiProposalNewsFor('kindle').notices.proposer[k].body,/^President and Secretary of State: we propose/); assert.match(aiProposalNewsFor('kindle').notices.recipient[k].body,/^Republic Wire Service: /);
+    assert.match(aiProposalNewsFor('kindle').notices.proposer[k].body,/^President and Secretary of State: we propose/); assert.match(aiProposalNewsFor('kindle').notices.recipient[k].body,/^Kindle Press: /);
     assert.match(aiProposalNewsFor('korund').notices.proposer[k].body,/^Korund State Media reports: the Chairman offers/); assert.match(aiProposalNewsFor('korund').notices.recipient[k].body,/^Korund State Media reports: /);
     assert.match(aiProposalNewsFor('aurelle').notices.proposer[k].body,/^Be it known: the Crown offers/); assert.match(aiProposalNewsFor('aurelle').notices.recipient[k].body,/^The Court Gazette reports that /);
   }

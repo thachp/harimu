@@ -2,7 +2,7 @@
  * `breakTreaty` and the penalty, lib/war.ts owns the declaration block, and no UI imports this. Canon: harimu-docs trade-diplomacy-sanctions
  * §13.2 (a non-aggression pact bars war declarations between signatories for its term, and breaking it costs Legitimacy and global
  * Reputation; the docs name no cost for a trade agreement, so none is written for one), §13.1 (every ratifier is an AI body), ai-leadership
- * (the Crown and the Chairman speak for the state) and the three press voices (Republic Wire Service, Korund State Media, Court Gazette;
+ * (the Crown and the Chairman speak for the state) and the three press voices (Kindle Press, Korund State Media, Court Gazette;
  * bylines are checked against lib/press-templates.ts). The failure reasons mirror the keys `breakTreaty` returns (`disabled`, `bad_nations`,
  * `not_found`, `not_signatory`, `not_in_force`), the refusal mirrors the `non_aggression` declaration block, and a test reads both source
  * files to keep the keys in step. Wording differs from the existing lines in lib/diplomacy-copy.ts (`brokenPactLine`) and lib/war-copy.ts
@@ -83,9 +83,9 @@ const b=(id:string,headline:string,body:string,aiBadge=false):BreakNotice=>({id,
 /** Break news about a non-aggression pact in each press voice. `own`: our nation broke it ({other} is the counterpart). `other`: the other side broke it
  * ({breaker}). The Chairman's and the Crown's own breaks are AI-badged. */
 export const breakNews:readonly BreakNationNews[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
-  own:b('kindle-own','Officials break a pact','Republic Wire Service: officials broke the pact with {other}. Breaking it costs Legitimacy and global Reputation.'),
-  other:b('kindle-other','A pact with the Republic is broken','Republic Wire Service: {breaker} broke its pact with the Republic. Officials must say what comes next.')}},
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,notices:{
+  own:b('kindle-own','Officials break a pact','Kindle Press: officials broke the pact with {other}. Breaking it costs Legitimacy and global Reputation.'),
+  other:b('kindle-other','A pact with the Republic is broken','Kindle Press: {breaker} broke its pact with the Republic. Officials must say what comes next.')}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
   own:b('korund-own','A necessary correction','Korund State Media reports: the Chairman ends the pact with {other}. A necessary correction.',true),
   other:b('korund-other','A pact is broken','Korund State Media reports: {breaker} has broken its pact with Korund. Order is kept.')}},

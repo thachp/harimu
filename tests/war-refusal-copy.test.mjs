@@ -66,14 +66,14 @@ test('does not repeat refusals owned elsewhere: no Founding Period, non-aggressi
   for (const t of [...refusalLines(),...captions()]) { assert.ok(!war.includes(t),t); assert.ok(!brk.includes(t),t); }
 });
 test('countdown captions: each nation has its own, system captions with no byline, officials or badge; no weakness for Korund; Aurelle formal', () => {
-  for (const t of captions()) { assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|Chairman|Crown|Assembly/,t); assert.match(t,/before then|before \{endsAt\}/); }
+  for (const t of captions()) { assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|Chairman|Crown|Assembly/,t); assert.match(t,/before then|before \{endsAt\}/); }
   assert.match(MC.kindle.text,/^The Republic is mobilizing\./); assert.match(MC.korund.text,/^Brigades hold the plan/); assert.match(MC.aurelle.text,/^The realm musters/);
   assert.doesNotMatch(MC.korund.text,/weari|weary|tired|doubt|fear|afraid/i);
 });
 test('AI badge (#381, ui-ux 23.2): every line is a system line, so none is badged and none carries an aiBadge field', () => {
   for (const x of DR) { assert.equal('aiBadge' in x,false); for (const l of x.lines) assert.equal('aiBadge' in l,false); }
   for (const n of REFUSAL_NATIONS) assert.equal('aiBadge' in MC[n],false); assert.equal('aiBadge' in ML,false);
-  for (const t of all()) assert.doesNotMatch(t,/Be it known|by royal decree|State Media|Republic Wire Service|Court Gazette/,t);
+  for (const t of all()) assert.doesNotMatch(t,/Be it known|by royal decree|State Media|Kindle Press|Court Gazette/,t);
 });
 test('tone: nothing glorifies war; no violence, no real-world names, no Notable, no other nations', () => {
   const t=all().join(' ');

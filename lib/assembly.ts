@@ -1,3 +1,4 @@
+import { kindleCycleStartAt } from './election-calendars';
 import type { GameDatabase } from './database-contract';
 import { accountElectionEnabled } from './preview-election';
 import { trustedBallotPrivacyReady, ballotPrivacyReason } from './ballot-privacy';
@@ -57,11 +58,7 @@ export function assemblyOpenAt(b: AssemblyBindings): number | null {
 }
 /** #351: the start of day 0 of Kindle's first 120-day cycle (epoch seconds). Set: the mid-term Assembly election opens at day 60 of every cycle on the world clock.
  *  Unset (and no manual open time): never opens. The presidential election is not wired to it yet. */
-export function assemblyCycleStartAt(b: AssemblyBindings): number | null {
-  const raw = b.HARIMU_KINDLE_CYCLE_START_AT;
-  if (typeof raw !== 'string' || !/^\d{1,12}$/.test(raw)) return null;
-  return Number(raw);
-}
+export const assemblyCycleStartAt = (b: AssemblyBindings): number | null => kindleCycleStartAt(b); // #878: one fail-closed parser (lib/election-calendars)
 export const assemblyTiming = (b: AssemblyBindings): AssemblyTiming => ({ openAt: assemblyOpenAt(b), cycleStartAt: assemblyCycleStartAt(b) });
 /** Same privacy gate as the presidential PoC: the certified Tier-1 gate (hard-false today) or the owner-approved account preview. Null means closed. */
 export function assemblyScope(b: AssemblyBindings, privacyReady = trustedBallotPrivacyReady()): AssemblyScope | null {

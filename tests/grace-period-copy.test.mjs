@@ -63,7 +63,7 @@ test('no promise beyond the docs: nothing on the lifetime limit, immigration, as
 });
 test('one neutral system voice: no byline, no AI badge, no nation or leader voice, no pressure', () => {
   for (const o of [B,CF,EX]) { assert.equal('aiBadge' in o,false); assert.equal('byline' in o,false); }
-  for (const t of all()) { assert.doesNotMatch(t,/Republic Wire|State Media|Court Gazette|Be it known|Chairman|Crown|Kindle|Korund|Aurelle|AI-generated|Notable|@|!/,t); assert.doesNotMatch(t,/\b(hurry|last chance|must|regret\w*|mistake|punish\w*|fail\w*)\b/i,t); }
+  for (const t of all()) { assert.doesNotMatch(t,/Kindle Press|State Media|Court Gazette|Be it known|Chairman|Crown|Kindle|Korund|Aurelle|AI-generated|Notable|@|!/,t); assert.doesNotMatch(t,/\b(hurry|last chance|must|regret\w*|mistake|punish\w*|fail\w*)\b/i,t); }
 });
 test('unwired: nothing in app/, components/ or lib/ imports grace-period-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };

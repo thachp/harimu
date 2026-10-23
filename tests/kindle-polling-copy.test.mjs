@@ -53,8 +53,8 @@ test('voluntary and private only as the docs say: skipping costs nothing, AI can
   assert.match(PC.sampleExplainer.text,/random sample of voluntary answers from human citizens/);
   for (const t of all()) assert.doesNotMatch(t,/\b(anonymous\w*|confidential\w*|deleted|erased|forever|stored|kept for|encrypted|secure\w*|guarantee\w*|private\w*)\b/i,t);
 });
-test('press frames: Republic Wire Service reports about a poll, unbadged, no AI voice, margin only via placeholder', () => {
-  for (const f of PP) { assert.equal(f.aiBadge,false); assert.match(f.body,/^Republic Wire Service: /); assert.match(f.body,/±\{margin\}/); }
+test('press frames: Kindle Press reports about a poll, unbadged, no AI voice, margin only via placeholder', () => {
+  for (const f of PP) { assert.equal(f.aiBadge,false); assert.match(f.body,/^Kindle Press: /); assert.match(f.body,/±\{margin\}/); }
   for (const o of [VP,PC,RM,C]) assert.equal('aiBadge' in o,false);
   for (const t of all()) assert.doesNotMatch(t,/^Be it known|By royal decree|\bI am an AI\b|Crown|State Media|Court Gazette|Chairman|["“”]/,t);
 });
@@ -78,8 +78,8 @@ test('wired only by #740: the poll card imports kindle-polling-copy; nothing els
   for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('kindle-polling-copy.ts')&&f!=='app/poll-card.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/kindle-polling-copy/,f);
 });
 test('one canonical byline: the press bodies open with the Kindle pack byline from the press templates, and this module defines none of its own', () => {
-  assert.deepEqual(kindlePress.byline,{name:'Republic Wire Service',proposal:true});
+  assert.deepEqual(kindlePress.byline,{name:'Kindle Press',proposal:false});
   const src=readFileSync('lib/kindle-polling-copy.ts','utf8');
-  assert.doesNotMatch(src,/name:'Republic Wire Service'/); assert.doesNotMatch(src,/BYLINE=/); assert.doesNotMatch(src,/^import /m);
+  assert.doesNotMatch(src,/name:'Kindle Press'/); assert.doesNotMatch(src,/BYLINE=/); assert.doesNotMatch(src,/^import /m);
   for (const b of bodies()) assert.ok(b.startsWith(`${kindlePress.byline.name}: `),b);
 });

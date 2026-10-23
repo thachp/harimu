@@ -67,7 +67,7 @@ test('result states are plain and consistent: sent, already reported, failed wit
 test('AI badge (#381, ui-ux 23.2): all system lines, no byline, no AI voice, no badge field', () => {
   for (const o of [HD,NT,AC,ST,...TG,...RS]) assert.equal('aiBadge' in o,false);
   for (const l of [HD.line,NT.placeholder,ST.sent,ST.duplicate,ST.failed]) assert.equal('aiBadge' in l,false);
-  for (const x of all()) assert.doesNotMatch(x,/Be it known|by royal decree|State Media|Republic Wire Service|Court Gazette|Republic Wire/,x);
+  for (const x of all()) assert.doesNotMatch(x,/Be it known|by royal decree|State Media|Kindle Press|Court Gazette|Kindle Press/,x);
 });
 test('tone: no real-world names, places, parties or symbols, no other nations', () => {
   const x=all().join(' ');

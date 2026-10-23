@@ -1,0 +1,16 @@
+/* #880: staff console. Text ≥ 4.5:1 and borders/focus ≥ 3:1 on #0b2029; 44px targets; wraps without sideways page scroll (the table scrolls in its own region). */
+.console{min-height:100dvh;padding:20px;background:#0b2029;color:#dce7e8;font:calc(14px * var(--text-scale, 1))/1.45 Inter, ui-sans-serif, system-ui, sans-serif}
+.console h1{margin:0 0 16px;font-size:1.5em}
+.filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+.filters label{display:flex;flex-direction:column;gap:4px;min-width:0;color:#b9cfd3}
+.filters input,.filters select,.filters button{min-height:44px;padding:8px 12px;border:1px solid #6f8a92;border-radius:4px;background:#102934;color:#f3ecd6;font:inherit;max-width:100%}
+.filters button{border-color:#d6b45c;color:#f3ecd6;font-weight:600;cursor:pointer}
+.filters button:disabled{opacity:.7;cursor:progress}
+.console :focus-visible{outline:2px solid #80d8ce;outline-offset:2px}
+.status{min-height:1.45em;margin:12px 0}
+.scroll{max-width:100%;overflow-x:auto}
+.table{border-collapse:collapse;min-width:100%}
+.table caption{text-align:left;font-weight:600;padding:4px 0 8px}
+.table th,.table td{padding:8px;border-bottom:1px solid #49616a;text-align:left;vertical-align:top}
+.table th{color:#b9cfd3;font-weight:600;white-space:nowrap}
+.text{min-width:16em;max-width:40em;white-space:pre-wrap;overflow-wrap:break-word}
