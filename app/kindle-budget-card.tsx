@@ -4,15 +4,20 @@ import { useEffect, useState } from 'react';
 import type { KindleBudget } from '@/lib/kindle-budget';
 
 const spk = (minor: number) => `${(minor / 100).toFixed(2)} SPK`;
-export function KindleBudgetCard() {
+/** #811: one fetch shared by the card and the Nation panel's Treasury row. `enabled` false: no request, null. */
+export function useKindleBudget(enabled: boolean): KindleBudget | null {
   const [budget, setBudget] = useState<KindleBudget | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     fetch('/api/kindle/budget', { cache: 'no-store', signal: controller.signal })
       .then(async r => { if (r.ok) setBudget(((await r.json()) as { budget?: KindleBudget }).budget ?? null); })
       .catch(() => {});
     return () => controller.abort();
-  }, []);
+  }, [enabled]);
+  return enabled ? budget : null;
+}
+export function KindleBudgetCard({ budget }: { budget: KindleBudget | null }) {
   return budget ? <KindleBudgetView budget={budget} /> : null;
 }
 
