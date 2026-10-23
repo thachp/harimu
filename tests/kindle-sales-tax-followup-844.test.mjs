@@ -48,16 +48,25 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await taxes(), []); assert.equal(await wallet('bob'), bob0 + 2000); assert.equal(await treasury(), tr0);
   });
 
-  test(`${backend}: QA1: a fixed-lot sale by a non-Kindle seller writes no player_fill_sales_tax row; the seller keeps the full price`, async t => {
+  test(`${backend}: ARC option 1: a foreign (Korund) seller's fixed-lot sale is on Kindle's market, so it is taxed`, async t => {
     const { r, wallet, treasury, taxes } = await lots(t, { backend });
     await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
-    // The fill route refuses non-Kindle sellers, so the fill row is a fixture; the tax SQL is the one the route passes.
+    // buy-listing refuses non-Kindle sellers today, so the sale is a hand-inserted row; the tax SQL is the one the route passes.
     await r.db.prepare("INSERT INTO player_listings (id,seller_id,item,quantity,unit_minor,created_at) VALUES ('NK1','bob','food',2,1000,1)").run();
     await r.db.prepare("INSERT INTO player_fills (request_id,listing_id,buyer_id,seller_id,item,quantity,amount_minor,filled_at) VALUES ('NKF','NK1','alice','bob','food',2,2000,2)").run();
     const bob0 = await wallet('bob'), tr0 = await treasury();
     const { playerFillSalesTaxSql } = await r.importModule('lib/kindle-sales-tax.ts');
     await r.db.prepare(playerFillSalesTaxSql).bind('NKF').run();
-    assert.deepEqual(await taxes(), []); assert.equal(await wallet('bob'), bob0); assert.equal(await treasury(), tr0);
+    assert.deepEqual(await taxes(), [{ seller_id: 'bob', tax_minor: 100 }]); assert.equal(await wallet('bob'), bob0 - 100); assert.equal(await treasury(), tr0 + 100);
+  });
+
+  test(`${backend}: pin: fixed-lot listings are Kindle-only and have no market column (a market column must come first, then the tax SQL keys on it)`, async t => {
+    const { r } = await lots(t, { backend });
+    const cols = Object.keys((await r.db.prepare('SELECT * FROM player_listings LIMIT 0').all()).results[0] ?? {});
+    const { listingSchema, createListingSql, fillListingSql } = await r.importModule('lib/player-market.ts');
+    assert.doesNotMatch(listingSchema, /\b(city|market|venue|nation)\w*\b/i, 'player_listings gained a market column: update playerFillSalesTaxSql to key on it');
+    assert.match(createListingSql, /c\.nation_id = 'kindle'/); assert.match(fillListingSql, /b\.nation_id = 'kindle' AND s\.nation_id = 'kindle'/);
+    assert.ok(Array.isArray(cols));
   });
 
   test(`${backend}: QA1: a 0-tax fixed-lot sale (gross 19) lands the fill with no tax row`, async t => {
