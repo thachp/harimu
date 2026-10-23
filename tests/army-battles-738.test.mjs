@@ -74,9 +74,11 @@ for (const backend of ['sqlite', 'postgres']) {
     await Promise.all([AB.recordFinishedBattles(r.db, now), AB.recordFinishedBattles(r.db, now), r.call('world', null)]);
     const rows = (await r.db.prepare('SELECT * FROM army_battles').all()).results;
     assert.equal(rows.length, 1, 'exactly one stored row'); assert.deepEqual([rows[0].war_id, rows[0].attacker_unit, rows[0].status, Number(rows[0].attacker_strength)], ['wr', 'kindle-home-guard', 'attacker_won', 5]);
-    await r.call('citizen', 'bob');
-    await r.db.prepare("UPDATE citizens SET nation_id = 'korund' WHERE clerk_user_id = 'bob'").run().catch(() => {});
-    await r.call('army', 'bob', { action: 'join', unitId: 'korund-home-guard', requestId: 'battle-738-join3' });
+    const A = await r.importModule('lib/army.ts'), strength = async () => (await A.readUnitReadiness(r.db, 'kindle-home-guard', now)).strength;
+    const before = await strength();
+    await r.call('citizen', 'carol'); // a second Kindle soldier joins after the battle was stored (seeded directly: the fixture citizen may be another nation)
+    await r.db.prepare("INSERT INTO army_members (clerk_user_id, unit_id, stance, joined_at, request_id) SELECT c.clerk_user_id, m.unit_id, m.stance, m.joined_at, 'battle-738-join3' FROM citizens c, army_members m WHERE m.unit_id = 'kindle-home-guard' AND c.clerk_user_id NOT IN (SELECT clerk_user_id FROM army_members) LIMIT 1").run();
+    assert.ok(await strength() > before, 'the attacking unit really grew after the battle was stored');
     await AB.recordFinishedBattles(r.db, now + 3600);
     const after = (await r.db.prepare('SELECT * FROM army_battles').all()).results;
     assert.deepEqual(after, rows, 'replay leaves the stored result unchanged');
