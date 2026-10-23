@@ -48,6 +48,7 @@ const SPK: CurrencySpec = {
     UNION ALL SELECT seller_id, -tax_minor FROM player_fill_sales_tax
     UNION ALL SELECT clerk_user_id, -fee_minor FROM home_city_moves WHERE currency = 'SPK'
     UNION ALL SELECT clerk_user_id, credit_minor FROM savings_shield_credits WHERE status = 'paid'
+    UNION ALL SELECT clerk_user_id, -amount_minor FROM party_donations
     UNION ALL SELECT citizen_id, -(remaining * limit_unit_minor) FROM market_open_orders WHERE side = 'buy' AND citizen_id IS NOT NULL`,
   appBalances: 'SELECT clerk_user_id AS acct, balance FROM citizen_wallet_balances',
   probes: [
@@ -66,6 +67,7 @@ const SPK: CurrencySpec = {
     { currency: 'SPK', check: 'fill_tax_not_seller_or_over_gross', sql: 'SELECT x.request_id AS acct FROM player_fill_sales_tax x LEFT JOIN player_fills f ON f.request_id = x.request_id WHERE f.request_id IS NULL OR f.seller_id <> x.seller_id OR x.tax_minor > f.amount_minor' },
     ...integerAndSign('SPK', 'home_city_moves', 'request_id', 'fee_minor', true), // #781 move-fee sink leg
     ...integerAndSign('SPK', 'savings_shield_credits', 'absence_key', 'credit_minor', true), // #824 welfare-line credit
+    ...integerAndSign('SPK', 'party_donations', 'request_id', 'amount_minor', true), // #863 donation: citizen debit, party-account credit
     { currency: 'SPK', check: 'fund_negative:kindle-treasury', sql: `SELECT 'kindle-treasury' AS acct FROM (${kindleTreasuryBalanceSql}) t WHERE t.balance < 0` },
     { currency: 'SPK', check: 'fee_not_seller_or_over_gross', sql: 'SELECT f.trade_id AS acct FROM market_trade_fees f LEFT JOIN market_trades t ON t.id = f.trade_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE t.id IS NULL OR s.citizen_id IS NULL OR s.citizen_id <> f.seller_id OR f.fee_minor > t.qty * t.unit_minor' },
     // Transfers: the debit leg and the credit leg must agree with each other and with the counterpart's record.

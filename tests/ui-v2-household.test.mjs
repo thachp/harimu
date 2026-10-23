@@ -42,7 +42,7 @@ for (const flag of ['false', 'true']) test(`flag ${flag}: the Household panel sh
 
 test('page.tsx passes data, never the flag; every harness that defines UI_V2_MOBILE defines UI_V2_HOUSEHOLD; the check is registered', async () => {
   const page = await read('app/page.tsx');
-  assert.match(page, /<HouseholdSummary nation=\{citizenNation\} walletMinor=\{householdWalletMinor\(citizenNation\.id, economy\?\.walletMinor, aurellePlan\?\.walletMinor, korundPlan\?\.walletMinor\)\} inventory=\{economy\?\.inventory\}/);
+  assert.match(page, /<HouseholdSummary nation=\{citizenNation\} walletMinor=\{householdWalletMinor\(citizenNation\.id, economy\?\.walletMinor, aurellePlan\?\.walletMinor, korundPlan\?\.walletMinor\)\} \{\.\.\.householdStock\(citizenNation\.id, economy\?\.inventory, aurellePlan\?\.foodQuantity, korundPlan\?\.foodQuantity\)\}/);
   assert.doesNotMatch(page, /UI_V2_HOUSEHOLD|uiV2HouseholdEnabled/);
   for (const f of (await readdir(new URL('../scripts/', import.meta.url))).filter(f => f.endsWith('.mjs'))) {
     const src = await read(`scripts/${f}`);
@@ -63,4 +63,19 @@ test('non-Kindle nations: the Wallet row shows the nation\'s own balance, or hid
   assert.equal(householdWalletMinor('aurelle', 4000, null, 2), undefined, 'Aurelle plan not loaded: hidden, not Spark');
   const aurelle = await render('true', { nation: { name: 'Aurelle', currency: 'Crown (CRN) · gold-backed' }, walletMinor: 150 });
   assert.match(aurelle.html, /<dt>Wallet<\/dt><dd>1\.50 Crown \(CRN\) · gold-backed<\/dd>/);
+});
+
+test('#861 non-Kindle nations: Food and Pantry use the nation\'s own stock or hide (never Kindle\'s inventory)', async () => {
+  const { householdStock } = await import('../lib/ui-v2-household.ts'), kindle = [{ item: 'food', quantity: 6 }, { item: 'materials', quantity: 2 }];
+  assert.deepEqual(householdStock('kindle', kindle, 3, 4), { inventory: kindle, pantry: true });
+  assert.deepEqual(householdStock('aurelle', kindle, 3, 4), { inventory: [{ item: 'food', quantity: 3 }], pantry: false });
+  assert.deepEqual(householdStock('korund', kindle, 3, 4), { inventory: [{ item: 'food', quantity: 4 }], pantry: false });
+  assert.deepEqual(householdStock('korund', kindle, 3, null), { inventory: undefined, pantry: false }, 'Korund plan not loaded: hidden');
+  for (const id of ['gauge', 'confluence']) assert.deepEqual(householdStock(id, kindle, 3, 4), { inventory: undefined, pantry: false }, id);
+  const korund = await render('true', { nation: { name: 'Korund', currency: 'Labor Note (LN) + ration coupons' }, walletMinor: 275, ...householdStock('korund', kindle, 3, 4) });
+  assert.match(korund.html, /<dt>Food<\/dt><dd>4<\/dd>/);
+  assert.doesNotMatch(korund.html, /<dt>Pantry<\/dt>|<dd>6<\/dd>/, 'no Kindle counts, no Pantry without a materials count');
+  const gauge = await render('true', { nation: { name: 'Gauge Union', currency: 'Gauge (GAU)' }, walletMinor: undefined, ...householdStock('gauge', kindle) });
+  assert.doesNotMatch(gauge.html, /<dt>(Food|Pantry|Wallet)<\/dt>/);
+  assert.match(gauge.html, /<dt>Residence<\/dt>/);
 });

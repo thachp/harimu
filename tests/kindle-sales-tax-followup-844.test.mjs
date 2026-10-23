@@ -77,6 +77,26 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await taxes(), []); assert.equal(await wallet('bob'), bob0 + 19);
   });
 
+  test(`${backend}: QA1: a fixed-lot sale with gross 333 pays tax 16 (floor of 16.65)`, async t => {
+    const { sell, buy, taxes } = await lots(t, { backend });
+    const id = await sell(1, 333);
+    assert.equal((await buy(id)).status, 200);
+    assert.deepEqual(await taxes(), [{ seller_id: 'bob', tax_minor: 16 }]);
+  });
+
+  test(`${backend}: QA1: the fill-tax INSERT goes through the same db.batch as the fill`, async t => {
+    const { r, sell, buy } = await lots(t, { backend });
+    const id = await sell(2, 1000);
+    const sqlOf = new WeakMap(), batches = [], prepare = r.db.prepare.bind(r.db), batch = r.db.batch.bind(r.db);
+    r.db.prepare = sql => { const st = prepare(sql); sqlOf.set(st, sql); const bind = st.bind.bind(st); st.bind = (...v) => { const b = bind(...v); sqlOf.set(b, sql); return b; }; return st; };
+    r.db.batch = stmts => { batches.push(stmts.map(st => sqlOf.get(st) ?? '')); return batch(stmts); };
+    t.after(() => { r.db.prepare = prepare; r.db.batch = batch; });
+    assert.equal((await buy(id)).status, 200);
+    const withTax = batches.filter(b => b.some(sql => /INSERT OR IGNORE INTO player_fill_sales_tax/.test(sql)));
+    assert.equal(withTax.length, 1, 'exactly one batch carries the tax INSERT');
+    assert.ok(withTax[0].some(sql => /INSERT[\s\S]*INTO player_fills\b/.test(sql)), 'and that batch also writes the fill');
+  });
+
   test(`${backend}: budget "Sales tax today" sums both markets for this game day only; flag off has no field`, async t => {
     const { r } = await lots(t, { backend });
     const b = await r.importModule('lib/kindle-budget.ts');
@@ -104,6 +124,10 @@ test('budget card: "Sales tax today" row only when the field is present; route p
   assert.match(route, /kindleSalesTaxEnabled\(e\) \? \{ salesTax: true \} : \{\}/);
   const lib = await readFile(new URL('../lib/kindle-sales-tax.ts', import.meta.url), 'utf8');
   assert.match(lib, /export const kindleSalesTaxBps = 500;/); assert.equal((lib.match(/\* \$\{kindleSalesTaxBps\}/g) ?? []).length, 4, 'every SQL uses the constant');
+  for (const f of ['../drizzle/0088_wallet_view_fill_tax.sql', '../db/postgres/0088_wallet_view_fill_tax.sql']) { // after #863's 0085 view, both terms
+    const sql = await readFile(new URL(f, import.meta.url), 'utf8');
+    assert.match(sql, /FROM player_fill_sales_tax WHERE seller_id/); assert.match(sql, /FROM party_donations WHERE clerk_user_id/);
+  }
   for (const f of ['../drizzle/0083_kindle_fill_sales_tax.sql', '../db/postgres/0083_kindle_fill_sales_tax.sql']) {
     const sql = await readFile(new URL(f, import.meta.url), 'utf8');
     assert.match(sql, /CREATE TABLE IF NOT EXISTS player_fill_sales_tax/);
