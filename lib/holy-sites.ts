@@ -53,11 +53,17 @@ export async function runHarmonyAct(db: GameDatabase, userId: string, command: H
     return { ok: false as const, status: 403, reason: 'not_clergy', error: 'Only a seated officiant can give clergy charity.' };
   return { ok: false as const, status: 409, reason: 'already_today', error: 'You already did that this game day.' };
 }
-/** #889: faith-panel buttons. PLACEHOLDER copy, marked for Content (proposal: true). */
+/** #889 faith-panel buttons. Copy by Content (Refs #889), tone from docs religion-faiths: invented faiths, the state favors none, the
+ *  custodian nation sets access (§14.1), Religious Harmony rises with charity and granted access and falls with denied pilgrimages (§14.5).
+ *  Phone width: button labels at most 36 characters, helper and outcome lines at most 90. No figures, no faith named. `proposal: true`. */
 export const holySiteCopy = {
-  heading: 'Holy sites and charity', proposal: true,
-  pilgrimage: { 'hearth-of-first-names': 'Pilgrimage to the Hearth of First Names', 'high-retreat': 'Pilgrimage to the High Retreat' } as Record<HolySiteId, string>,
+  heading: 'Pilgrimage and charity', proposal: true,
+  pilgrimage: { 'hearth-of-first-names': 'Pilgrimage: Hearth of First Names', 'high-retreat': 'Pilgrimage: High Retreat' } as Record<HolySiteId, string>,
   charity: 'Give clergy charity',
-  outcome: { granted: 'Pilgrimage granted. Harmony rises.', denied: 'Pilgrimage denied. Harmony falls.', given: 'Charity given. Harmony rises.' } as Record<string, string>,
+  helper: {
+    pilgrimage: 'One pilgrimage a game day. The nation that keeps the site decides who may enter.',
+    charity: 'For seated officiants. One gift a game day, for your nation\'s Harmony.',
+  },
+  outcome: { granted: 'You were welcomed at the site. Harmony rises there.', denied: 'The way was closed to you. Harmony falls there.', given: 'Your charity was given. Harmony rises at home.' } as Record<string, string>,
   failed: 'That did not go through: {reason}',
 } as const;

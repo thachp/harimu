@@ -228,7 +228,9 @@ export function HolySiteActions() {
   };
   return <div className="faith-holy-sites"><h3>{holySiteCopy.heading}</h3>
     {(Object.keys(holySites) as HolySiteId[]).map(id => <button key={id} type="button" onClick={() => void act({ action: 'pilgrimage', siteId: id })}>{holySiteCopy.pilgrimage[id]}</button>)}
+    <p className="faith-holy-help">{holySiteCopy.helper.pilgrimage}</p>
     <button type="button" onClick={() => void act({ action: 'charity' })}>{holySiteCopy.charity}</button>
+    <p className="faith-holy-help">{holySiteCopy.helper.charity}</p>
     {note && <p role="status">{note}</p>}
   </div>;
 }
