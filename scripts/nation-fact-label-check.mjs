@@ -1,5 +1,6 @@
 /** #779 check: nation fact-list labels (Government, Economy, Official faith stance, Population, Treasury, Stability) never split mid-word.
  *  Covers all ten nations' real facts at 1280x800, 390x844 and 320x700, 100/125/150% text, with NEXT_PUBLIC_HARIMU_UI_V2_NATION off and on.
+ *  With the flag off, the system picker buttons (Capital, Currency, Trade, ...) must not split mid-word either (#786, same root cause as #779).
  *  Also checks that every label and value stays inside the panel and the page never scrolls sideways.
  *  With LAYOUT_SHOTS_DIR it saves fact-list shots (docs/screenshots/779). Used by hud-layout-check.mjs and runs on its own too. */
 import { readFile } from 'node:fs/promises';
@@ -23,7 +24,7 @@ const lore = [['kindle', 'Kindle Republic', 'Forgehaven', 'Liberal democracy', '
   ['fulmara', 'Fulmara', 'Arcport', 'Mercantile oligarchic republic', 'Chartered-company capitalism', 'Chartered pluralism']];
 const nations = lore.map(([id, name, capital, government, economy, religion]) => ({ id, name, shortName: name, capital, motto: '', government, economy, religion, currency: 'Crown · CRN', population: '1,000', treasury: '10,000', stability: 70, tradeStatus: 'Open corridor' }));
 
-const probe = () => {
+const probe = pickerToo => {
   const issues = [], vw = document.documentElement.clientWidth, panel = document.querySelector('.game-inspector');
   if (document.documentElement.scrollWidth > vw + 1) issues.push(`page scrolls sideways by ${document.documentElement.scrollWidth - vw}px`);
   const box = panel.getBoundingClientRect(), labels = [...document.querySelectorAll('.nation-inspector dl dt')];
@@ -35,6 +36,15 @@ const probe = () => {
   for (const el of document.querySelectorAll('.nation-inspector dl dt, .nation-inspector dl dd')) {
     const r = el.getBoundingClientRect(); if (r.left < box.left - 0.5 || r.right > box.right + 0.5) issues.push(`"${el.textContent}" overflows the panel`);
     if (el.scrollWidth > el.clientWidth + 1) issues.push(`"${el.textContent}" is clipped`);
+  }
+  if (pickerToo) {
+    const picker = [...document.querySelectorAll('.nation-inspector-systems button')];
+    if (picker.length < 5) issues.push(`only ${picker.length} system picker buttons`);
+    for (const b of picker) for (const node of [...b.childNodes].filter(n => n.nodeType === 3)) for (const m of node.textContent.matchAll(/\S+/g)) {
+      const range = document.createRange(); range.setStart(node, m.index); range.setEnd(node, m.index + m[0].length);
+      if (new Set([...range.getClientRects()].map(r => Math.round(r.top))).size > 1) issues.push(`picker "${b.textContent}" splits "${m[0]}" mid-word`);
+      const r = b.getBoundingClientRect(); if (r.left < box.left - 0.5 || r.right > box.right + 0.5) issues.push(`picker "${b.textContent}" overflows the panel`);
+    }
   }
   return issues;
 };
@@ -51,10 +61,10 @@ export async function checkNationFactLabels({ browser, css, preflight, failures,
       for (const nation of nations) {
         await page.evaluate(a => window.mount(a), { props: { ...shellProps, view: 'nation', nation: { id: nation.id, name: nation.name, capital: nation.capital } }, nation });
         await page.waitForSelector('.nation-inspector dl');
-        for (const issue of await page.evaluate(probe)) fail(`${nation.id}: ${issue}`);
+        for (const issue of await page.evaluate(probe, flag === 'false')) fail(`${nation.id}: ${issue}`);
         if (shots && flag === 'false' && nation.id === 'hoarvale' && scale !== 1.25) { const dl = page.locator('.nation-inspector dl').first(); await dl.scrollIntoViewIfNeeded(); await page.locator('.game-inspector').screenshot({ path: `${shots}/facts-${w}-${scale * 100}.png` }); }
       }
-      rows.push(`${id}: 10 nations, no fact label splits mid-word`);
+      rows.push(`${id}: 10 nations, no fact label${flag === 'false' ? ' or picker button' : ''} splits mid-word`);
       await context.close();
     }
   }

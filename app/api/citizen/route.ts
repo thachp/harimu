@@ -69,7 +69,9 @@ const korundMedalsOn = () => (env as unknown as { HARIMU_KORUND_MEDALS_ENABLED?:
 const korundShortfallOn = () => (env as unknown as { HARIMU_KORUND_SHORTFALL_ENABLED?: string }).HARIMU_KORUND_SHORTFALL_ENABLED === 'true';
 // #758: rumored LN street rate in the Korund wallet (HARIMU_WALLET_STREET_RATE_ENABLED); off = no read, wallet unchanged.
 const walletStreetRateOn = () => (env as unknown as { HARIMU_WALLET_STREET_RATE_ENABLED?: string }).HARIMU_WALLET_STREET_RATE_ENABLED === 'true';
-const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn() });
+// #776: a closed-week plan shortfall withdraws ration coupons from this week's book (HARIMU_KORUND_RATION_CUT_ENABLED); off = coupons unchanged.
+const korundRationCutOn = () => (env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string }).HARIMU_KORUND_RATION_CUT_ENABLED === 'true';
+const korundOptions = () => ({ laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 
 export const dynamic = 'force-dynamic';
