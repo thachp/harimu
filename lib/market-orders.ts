@@ -95,6 +95,13 @@ export const marketTradeFeesSchema = `CREATE TABLE IF NOT EXISTS market_trade_fe
   charged_at INTEGER NOT NULL
 )`;
 export const marketTradeFeesIndex = `CREATE INDEX IF NOT EXISTS idx_market_trade_fees_seller ON market_trade_fees(seller_id, charged_at)`;
+/** #844 Kindle sales tax: one row per taxed fill; the seller's debit leg and the kindle-treasury credit (see lib/kindle-sales-tax.ts). */
+export const marketSalesTaxSchema = `CREATE TABLE IF NOT EXISTS market_sales_tax (
+  trade_id TEXT PRIMARY KEY REFERENCES market_trades(id) ON DELETE CASCADE,
+  seller_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+  tax_minor INTEGER NOT NULL CHECK(typeof(tax_minor) = 'integer' AND tax_minor > 0),
+  charged_at INTEGER NOT NULL
+)`;
 /** #781 home-move fee sink (one row per move; currency SPK or LN). Netted by walletViewSql (SPK) and lib/korund-wallet (LN). */
 export const homeCityMovesSchema = `CREATE TABLE IF NOT EXISTS home_city_moves (
  request_id TEXT PRIMARY KEY,
