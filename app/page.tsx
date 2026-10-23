@@ -21,7 +21,7 @@ import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { countryWord } from '@/lib/ui-v2-rail';
 import { NationPanel } from './nation-panel-v2';
-import { CitySummary, HouseholdSummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
+import { CitySummary, HouseholdSummary, MarketSummary, WorkSummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
@@ -46,7 +46,7 @@ import type {ElectionSnapshot} from '../lib/elections';
 import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
-import { householdStock, householdWalletMinor } from '@/lib/ui-v2-household';
+import { householdStock, householdWalletMinor, itemCount } from '@/lib/ui-v2-household';
 import { SceneNews } from './world-scene';
 import { noticeboardEvents } from '@/lib/noticeboard'; // #375
 import { firstLoopStep } from '@/lib/first-loop';
@@ -1747,6 +1747,7 @@ export default function Home() {
         </details>
       </>}
       {viewMode === 'workplace' && !['korund','aurelle'].includes(citizenNation.id) && <>
+        <WorkSummary capacity={capacity} contributions={availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length} onMarket={marketShown ? () => changeView('market') : undefined} />
         <WorkShiftBoard onNavigate={changeView} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
           onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
         <section className="scene-work-orders"><h2>Available contributions</h2>
@@ -1758,6 +1759,8 @@ export default function Home() {
       </>}
       {viewMode === 'market' && !marketShown && <section className="scene-market-closed"><h2>Market</h2><p>The market is not open yet. Work a shift and check back soon.</p></section>}
       {viewMode === 'market' && marketShown && !['korund','aurelle'].includes(citizenNation.id) && <>
+        <MarketSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor)} food={citizenNation.id === 'kindle' && economy ? itemCount(economy.inventory, 'food') : null} board={Boolean(orderBookApi.book)}
+          listings={citizenNation.id !== 'confluence' && (!orderBookApi.book || Boolean(playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')))} onHousehold={() => changeView('household')} />
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
