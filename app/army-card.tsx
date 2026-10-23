@@ -8,7 +8,7 @@ import type { ArmyView } from '@/lib/army';
 const fill = (text: string, unit: string, officer = '') => text.replace('{unit}', unit).replace('{officer}', officer);
 export function ArmyCard() {
   const [army, setArmy] = useState<ArmyView | null>(null), [note, setNote] = useState('');
-  useEffect(() => { fetch('/api/army').then(r => r.ok ? r.json() as Promise<{ army?: ArmyView }> : null).then(d => setArmy(d?.army ?? null)).catch(() => setArmy(null)); }, []);
+  useEffect(() => { fetch('/api/army/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"action":"open"}' }).catch(() => null).then(() => fetch('/api/army')).then(r => r.ok ? r.json() as Promise<{ army?: ArmyView }> : null).then(d => setArmy(d?.army ?? null)).catch(() => setArmy(null)); }, []);
   if (!army?.unit) return null;
   const unit = army.unit;
   const send = async (body: Record<string, unknown>, done: string) => {
@@ -34,7 +34,7 @@ export function ArmyCard() {
       </fieldset>
       <p>{squadStance.oneInput.text}</p>
       {unit.strength !== undefined && <><p>{unitMembership.drillsHelper.text}</p><button type="button" onClick={() => void drill()}>{unitMembership.drillButton}</button></>}
-      {army.serveUntil ? <p>{fill(unitMembership.calledUp.text, unit.name)}</p> : <button type="button" onClick={() => void send({ action: 'leave' }, fill(unitMembership.left.text, unit.name))}>{unitMembership.leaveButton}</button>}
+      {army.serveUntil ? <><p>{fill(unitMembership.calledUp.text, unit.name)}</p><button type="button" onClick={() => void fetch('/api/army/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"action":"stay"}' }).then(r => setNote(r.ok ? fill(unitMembership.stayed.text, unit.name) : armyFailureNote('stance', unit.name, String(r.status))))}>{unitMembership.stayButton}</button></> : <button type="button" onClick={() => void send({ action: 'leave' }, fill(unitMembership.left.text, unit.name))}>{unitMembership.leaveButton}</button>}
     </> : !unit.openToVolunteers ? <p>{unitMembership.notOpenYet.text}</p> : <button type="button" onClick={() => void send({ action: 'join', unitId: unit.id }, fill(unitMembership.joined.text, unit.name))}>{unitMembership.joinButton}</button>}
     {note && <p role="status">{note}</p>}
   </section>;
