@@ -29,6 +29,7 @@ export function ArmyCard() {
     <p>{unitCard.memberCountLabel}: {unit.memberCount}</p>
     {unit.strength !== undefined && <p>{unitCard.strengthLabel}: {unit.strength} · {unitCard.moraleLabel}: {unit.morale}</p>}
     {unit.supply?.cut && <p>{supplyCutLine(unit.supply)}</p>}
+    {unit.battle && <p>{battleLine(unit.battle)}</p>}
     {army.member ? <>
       <fieldset><legend>{squadStance.label}</legend>
         {armyStances.map(s => <label key={s}><input type="radio" name="stance" checked={army.stance === s} onChange={() => void send({ action: 'stance', stance: s }, squadStance.helpers[s].text)} />{squadStance.labels[s]}</label>)}
@@ -43,3 +44,9 @@ export function ArmyCard() {
 
 /** #738 slice 5: the cut-supply line (placeholder copy from army-copy, marked for Content). */
 export const supplyCutLine = (s: { cutDays: number; strengthLossPct: number }) => unitMembership.supplyCut.text.replace('{days}', String(s.cutDays)).replace('{pct}', String(s.strengthLossPct));
+/** #738 battles: the card's battle line (placeholder copy from army-copy, marked for Content). */
+export const battleLine = (b: { opponentNationId: string; attacking: boolean; rounds: number; status: string }) => {
+  const won = b.status === (b.attacking ? 'attacker_won' : 'defender_won');
+  const line = b.status === 'ongoing' ? unitMembership.battleOngoing : won ? unitMembership.battleWon : unitMembership.battleLost;
+  return line.text.replace('{nation}', b.opponentNationId.charAt(0).toUpperCase() + b.opponentNationId.slice(1)).replace('{round}', String(b.rounds));
+};

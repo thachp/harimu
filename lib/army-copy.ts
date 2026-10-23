@@ -84,6 +84,10 @@ export const unitMembership={
  stayRefused:L('You cannot stay in {unit}: you are not serving a term right now.'),
  // PLACEHOLDER copy, marked for Content (proposal: true): #738 slice 5, a cut supply line on the card and the map legend.
  supplyCut:L('Supply cut for {days} game days: strength down {pct}%.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): #738 battles, the card line. The capital is never captured.
+ battleOngoing:L('Battle with {nation}: round {round}.'),
+ battleWon:L('Battle with {nation} won after {round} rounds. No capital changes hands.'),
+ battleLost:L('Battle with {nation} lost after {round} rounds. No capital changes hands.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),

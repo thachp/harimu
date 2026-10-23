@@ -48,6 +48,9 @@ export function unitMarch(nationId: string, wars: readonly ArmyWar[], now: numbe
   const target = war ? nationCapital(war.defender_nation) : null;
   return home && war && target ? { home, war, route: marchRoute(home, target) } : null;
 }
+/** #738 battles: when a march reaches its staging square (the end of the route), paying each square's terrain cost. */
+export const marchArrivalAt = (march: { war: ArmyWar; route: readonly Point[] }, terrain: ReadonlyMap<string, string> = terrainMap()) =>
+  march.war.mobilization_ends_at + march.route.reduce((sum, s) => sum + moveSeconds(terrain.get(`${s.x},${s.y}`)), 0);
 export function armyPositions(wars: readonly ArmyWar[], now: number, terrain: ReadonlyMap<string, string> = terrainMap()): ArmyPosition[] {
   return armyUnits.flatMap((unit): ArmyPosition[] => {
     const home = nationCapital(unit.nationId); if (!home) return [];
