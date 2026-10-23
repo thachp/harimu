@@ -88,4 +88,39 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await give(r, 'alice', 'steady-hand', 10000)).status, 200);
     assert.deepEqual(await tally(), baseline, 'ballot, primary, membership and plank tallies are unchanged by donations');
   });
+  test(`/api/party-donations (${backend}): a Kindle citizen who is not Tier-1 gets 403 not_eligible and no row`, async t => {
+    const r = await setup(t, backend);
+    await fund(r, 'alice', 10000);
+    r.setFixtureEnv('HARIMU_ACCOUNT_ELECTION_POC_ENABLED', 'false');
+    assert.equal((await r.call('party-donations', 'alice')).data.eligible, false);
+    const x = await give(r, 'alice', 'open-ledger', 100);
+    assert.deepEqual([x.status, x.data.reason, await rows(r)], [403, 'not_eligible', 0]);
+    assert.equal(await wallet(r, 'alice'), 10000);
+  });
+
+  test(`/api/party-donations (${backend}): the weekly cap resets in the next real week`, async t => {
+    const r = await setup(t, backend);
+    await fund(r, 'alice', 2 * donationWeeklyCapMinor + 1000);
+    assert.equal((await give(r, 'alice', 'open-ledger', donationWeeklyCapMinor)).status, 200);
+    assert.equal((await give(r, 'alice', 'open-ledger', 1)).data.reason, 'cap_reached');
+    const week = donationWeek(Math.floor(r.now / 1000));
+    r.setNow((week + 1) * 604800 * 1000 + 60000);
+    assert.deepEqual((await r.call('party-donations', 'alice')).data.donations.givenThisWeek, {}, 'givenThisWeek resets');
+    const next = await give(r, 'alice', 'open-ledger', 2500);
+    assert.equal(next.status, 200, 'new week: donation accepted');
+    assert.deepEqual(next.data.donations.givenThisWeek, { 'open-ledger': 2500 });
+    assert.equal(next.data.donations.parties.find(p => p.id === 'open-ledger').raisedMinor, donationWeeklyCapMinor + 2500);
+  });
+
+  test(`/api/party-donations (${backend}): parallel donations never overdraw the wallet or exceed the cap`, async t => {
+    const r = await setup(t, backend);
+    await fund(r, 'alice', 1000);
+    const a = await Promise.all(Array.from({ length: 10 }, () => give(r, 'alice', 'open-ledger', 300)));
+    assert.equal(a.filter(x => x.status === 200).length, 3); assert.equal(await wallet(r, 'alice'), 100);
+    await fund(r, 'bob', 200000);
+    const b = await Promise.all(Array.from({ length: 10 }, () => give(r, 'bob', 'steady-hand', 10000)));
+    assert.equal(b.filter(x => x.status === 200).length, 5, 'exactly the cap');
+    const id = randomUUID(), c = await Promise.all(Array.from({ length: 6 }, () => give(r, 'bob', 'dockside-builders', 100, id)));
+    assert.ok(c.every(x => x.status === 200)); assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM party_donations WHERE request_id=?').bind(id).first()).n), 1);
+  });
 }

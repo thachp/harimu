@@ -124,6 +124,7 @@ export const partyDonationsSchema = `CREATE TABLE IF NOT EXISTS party_donations 
  week INTEGER NOT NULL, donated_at INTEGER NOT NULL
 )`;
 export const partyDonationsIndex = `CREATE INDEX IF NOT EXISTS idx_party_donations_user ON party_donations(clerk_user_id, party_id, week)`;
+export const partyDonationsPartyIndex = `CREATE INDEX IF NOT EXISTS idx_party_donations_party ON party_donations(party_id, donated_at)`;
 export const marketSchemas = [marketGoodsSchema, marketOrdersSchema, marketCancellationsSchema, marketTradesSchema, ...marketIndexes, marketSpoilageSchema, ...marketSpoilageIndexes, marketOpenOrdersView];
 export const marketGoodsSeedSql = marketGoods.map(g =>
   `INSERT OR IGNORE INTO market_goods (good, label, unit, perishable, shelf_life_days) VALUES ('${g.good}', '${g.label}', '${g.unit}', ${g.perishable ? 1 : 0}, ${g.shelfLifeDays ?? 'NULL'})`);
