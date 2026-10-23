@@ -29,6 +29,10 @@ export const korundSettleSql = `INSERT OR IGNORE INTO korund_settlements(shift_i
  SELECT s.id,s.clerk_user_id,800,4,? FROM work_shifts s JOIN korund_work_starts k ON k.id=s.id JOIN citizens c ON c.clerk_user_id=s.clerk_user_id
  WHERE s.id=? AND s.clerk_user_id=? AND k.capacity_applied=1 AND s.claimed_at IS NULL AND s.completes_at<=?
  AND 800<=(SELECT initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0)-COALESCE((SELECT SUM(wage_minor) FROM korund_post_settlements),0) FROM korund_resources WHERE id='state')`;
+/** #906: the first statement of every pool-paid claim batch. It row-locks Korund's state pool (a no-op write), so on Postgres a concurrent claim waits here until
+ *  this one commits, and its guard (READ COMMITTED: a fresh snapshot per statement) then sees this wage. Without it two claims could both pass `800<=pool`
+ *  (QA2 on #900). It does not rely on the adapter's global writer lock; SQLite/D1 batches are already serial. */
+export const korundPoolLockSql="UPDATE korund_resources SET initial_minor=initial_minor WHERE id='state'";
 export const korundRationSql = `INSERT OR IGNORE INTO korund_rations(id,clerk_user_id,game_week,quantity,occurred_at)
  SELECT ?,clerk_user_id,?,2,? FROM citizens WHERE clerk_user_id=? AND nation_id='korund'
  AND 2<=(SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) FROM korund_resources WHERE id='state')
@@ -170,12 +174,12 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  // #886 (b): a post shift settles into korund_post_settlements with its Labor Note issuance record, in one batch (keyed on the shift, not the flag).
  const order=await db.prepare('SELECT work_order_id FROM work_shifts WHERE id=? AND clerk_user_id=?').bind(shiftId,userId).first<{work_order_id:string}>();
  if(isKorundPost(order?.work_order_id)){
-  await db.batch([db.prepare(postSettleSql).bind(now,shiftId,userId,iso),db.prepare(laborNoteIssuanceSql).bind(shiftId),
+  await db.batch([db.prepare(korundPoolLockSql),db.prepare(postSettleSql).bind(now,shiftId,userId,iso),db.prepare(laborNoteIssuanceSql).bind(shiftId),
   db.prepare('UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM korund_post_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)').bind(iso,shiftId,userId,userId)]);
   const paid=await db.prepare('SELECT shift_id FROM korund_post_settlements WHERE shift_id=? AND clerk_user_id=?').bind(shiftId,userId).first();
   return paid?{status:200}:{status:409,error:'Assigned shift is unavailable, unfinished, or the finite Labor Note fund cannot pay it yet.'};
  }
- await db.batch([db.prepare(korundSettleSql).bind(now,shiftId,userId,iso),
+ await db.batch([db.prepare(korundPoolLockSql),db.prepare(korundSettleSql).bind(now,shiftId,userId,iso),
  db.prepare('UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM korund_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)').bind(iso,shiftId,userId,userId)]);
  const settled=await db.prepare('SELECT shift_id FROM korund_settlements WHERE shift_id=? AND clerk_user_id=?').bind(shiftId,userId).first();
  return settled?{status:200}:{status:409,error:'Assigned shift is unavailable, unfinished, or the finite Labor Note fund cannot pay it yet.'};

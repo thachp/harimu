@@ -80,6 +80,6 @@ test('migration 0089 (pg and drizzle) creates both tables; the issuance row ride
     assert.match(sql, /CREATE TABLE IF NOT EXISTS korund_post_settlements/); assert.match(sql, /CREATE TABLE IF NOT EXISTS labor_note_issuances/);
   }
   const src = await readFile(new URL('../lib/korund.ts', import.meta.url), 'utf8');
-  assert.match(src, /db\.batch\(\[db\.prepare\(postSettleSql\)[^\n]*db\.prepare\(laborNoteIssuanceSql\)/);
+  assert.match(src, /db\.batch\(\[db\.prepare\(korundPoolLockSql\),db\.prepare\(postSettleSql\)[^\n]*db\.prepare\(laborNoteIssuanceSql\)/); // #906: pool row lock first
   assert.match(src, /const post=options\.mvpJobTypes\?/);
 });
