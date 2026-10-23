@@ -169,6 +169,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "false",
     "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },

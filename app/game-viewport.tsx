@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 import { nationSymbolElement } from './nation-symbol';
+import { dressCityPill } from './city-pill';
+import { uiV2CityEnabled } from '../lib/ui-v2-city';
 import { MapOverlaysControl } from './map-overlays';
 import { nationPlaces, projectOwnershipCells, WORLD_GRID } from '../lib/globe-mapping';
 import { mapFitRules, nationOpenings } from '../lib/nation-openings';
@@ -28,10 +30,12 @@ export type GameViewportProps = {
   className?: string;
   /** #82: GET /api/citizen flags.mapOverlays. False renders no Overlays group. */
   overlays?: boolean;
+  /** #392 S7: City labels as icon pills with a leader dot. Defaults to NEXT_PUBLIC_HARIMU_UI_V2_CITY. */
+  cityPills?: boolean;
 };
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
 
-export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '', overlays = false }: GameViewportProps) {
+export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '', cityPills = uiV2CityEnabled(), overlays = false }: GameViewportProps) {
   const {preferences:{graphics}}=useDisplayPreferences();
   const host = useRef<HTMLDivElement>(null);
   const callback = useRef(onSelect);
@@ -88,6 +92,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
     const anchors = mode === 'city'
       ? world.buildings.map(building => ({ object: building.object, label: locationLabel(building.location, building.label, visitor), selection: locationSelection(building.location, nationId, visitor) }))
       : world.selectables.filter(object => object.userData.kind === 'nation').map(object => ({ object, label: String(object.userData.label), selection: { kind: 'nation' as const, label: String(object.userData.label), detail: String(object.userData.detail), nationId: String(object.userData.nationId) } }));
+    const pillCleanups: (() => void)[] = [];
     const labels = anchors.map(anchor => {
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'viewport-world-label'; button.textContent = anchor.label;
@@ -95,6 +100,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       const nationId = 'nationId' in anchor.selection ? anchor.selection.nationId : undefined;
       const chip = mode === 'world' && nationId ? nationSymbolElement(nationId) : null;
       if (chip) button.insertBefore(chip, button.firstChild); // #79: symbol chip beside the nation name (flagged)
+      if (mode === 'city' && cityPills && 'location' in anchor.selection && anchor.selection.location) pillCleanups.push(dressCityPill(button, anchor.selection.location)); // #392 S7: icon pill + leader dot (flagged)
       Object.assign(button.style, { position: 'absolute', pointerEvents: 'auto', transform: 'translate(-50%, -100%)' });
       button.addEventListener('click', () => { highlight.setFromObject(anchor.object); highlight.visible = true; render(); callback.current(anchor.selection); });
       labelLayer.appendChild(button);
@@ -230,11 +236,11 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
         material.dispose();
       });
       textures.forEach(texture => texture.dispose());
-      sun.shadow.map?.dispose(); renderer.dispose(); renderer.forceContextLoss(); labelLayer.remove(); canvas.remove();
+      sun.shadow.map?.dispose(); renderer.dispose(); renderer.forceContextLoss(); pillCleanups.forEach(done => done()); labelLayer.remove(); canvas.remove();
     };
-  }, [mode, nationId, cityName, marketOpen, nationSignature, graphics, visitor]);
+  }, [mode, nationId, cityName, marketOpen, nationSignature, graphics, visitor, cityPills]);
   // #618: the scene (and so every label button) is rebuilt when any dependency of the effect above changes, so re-apply the selected nation, its aria-pressed and outline, after any of them: this list must hold every dependency of that effect (tests/globe-label-pressed.test.mjs).
-  useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, cityName, marketOpen, nationSignature, graphics, visitor]);
+  useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, cityName, marketOpen, nationSignature, graphics, visitor, cityPills]);
   useEffect(() => { if (cameraTourNationId && mode === 'world') controls.current?.focusNation(cameraTourNationId, false); }, [cameraTourNationId, mode, nationId, nationSignature, graphics]);
   useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId, cityName, graphics]);
   return <div className={`game-viewport ${className}`} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360 }}>

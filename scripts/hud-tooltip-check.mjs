@@ -15,15 +15,16 @@ const shellEntry = `
       import React from 'react'; import { createRoot } from 'react-dom/client'; import { GameShell } from './app/game-shell.tsx';
       window.mountShell = props => { const el = document.getElementById('root'); window.__root?.unmount(); window.__root = createRoot(el); window.__root.render(<GameShell {...props} onNavigate={() => {}} />); };`;
 /** Bundles the real GameShell (and whatever the entry adds) for the browser, with the app's heavy children stubbed. `env` sets process.env.* values. */
-export async function bundleShell(contents = shellEntry, env = {}) {
+/** realViewport: bundle the real three.js GameViewport instead of the null stub (#392 S7 city pills). */
+export async function bundleShell(contents = shellEntry, env = {}, { realViewport = false } = {}) {
   const result = await build({
     stdin: { resolveDir: root, loader: 'tsx', contents },
     bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', target: 'es2022', logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_PANEL': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_RAIL': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_WORLD': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_NATION': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_RARE_MARKER': '\"false\"', ...Object.fromEntries(Object.entries(env).map(([k, v]) => [`process.env.${k}`, JSON.stringify(v)])) }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
+    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_PANEL': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_RAIL': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_WORLD': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_NATION': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CITY': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_RARE_MARKER': '\"false\"', ...Object.fromEntries(Object.entries(env).map(([k, v]) => [`process.env.${k}`, JSON.stringify(v)])) }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
     plugins: [
       { name: 'stubs', setup(b) {
         const stubs = { './game-viewport': 'export default function V(){return null}', './game-timer': 'export function GameTimer({label}){return <span className="game-timer-stub"><strong>{label}</strong> · 1h 52m 10s real · 2d 19h game</span>}', './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useClerk=()=>({mountUserButton(){},unmountUserButton(){}})' };
-        b.onResolve({ filter: /^(\.\/game-viewport|\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ }, a => ({ path: a.path, namespace: 'stub' }));
+        b.onResolve({ filter: realViewport ? /^(\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ : /^(\.\/game-viewport|\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ }, a => ({ path: a.path, namespace: 'stub' }));
         b.onResolve({ filter: /\.module\.css$/ }, () => ({ path: 'css-module', namespace: 'stub' }));
         b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.path === 'css-module' ? 'export default new Proxy({}, { get: (_, k) => String(k) })' : stubs[a.path], loader: 'jsx', resolveDir: root }));
       } },
