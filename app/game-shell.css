@@ -433,6 +433,18 @@ body:has(.harimu-game){overflow:auto}
 .game-world-v2 .game-context-items .nation-crest svg{position:static}.game-world-v2 .game-context-items>button>svg{display:none}
 .game-world-v2 .game-context-items>button>span{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
 @media(max-width:760px){.game-world-v2 .game-context-items{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(96px * var(--text-scale, 1))),1fr))}.game-world-v2 .game-context-items>button{max-width:none}}
+/* #392 S7: City hotspots as icon pills with a leader dot (NEXT_PUBLIC_HARIMU_UI_V2_CITY; only buttons dressed by app/city-pill.tsx carry the class).
+   Navy pill, gold rim, light text (13.9:1); the dot and its stem sit on the building; on a phone (labels are moved apart, #377) the stem and dot are dropped. */
+.viewport-world-label.viewport-city-pill{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px 5px 9px;border:1px solid #d6b45c;border-radius:999px;background:#0b2631f2;color:#f3ecd6;font-size:calc(12px * var(--text-scale, 1));line-height:1.2;transform:translate(-50%,calc(-100% - 14px))!important;box-shadow:0 2px 6px #0008}
+.viewport-city-pill-icon{display:inline-flex;color:#e2c36b}
+.viewport-city-pill-dot{position:absolute;left:50%;top:calc(100% + 1px);width:2px;height:10px;margin-left:-1px;background:#e2c36b;pointer-events:none}
+.viewport-city-pill-dot::after{content:"";position:absolute;left:50%;top:100%;width:8px;height:8px;margin:-1px 0 0 -4px;border:2px solid #0b2631;border-radius:50%;background:#f3ecd6}
+.viewport-world-label.viewport-city-pill:hover{background:#123744f2}
+.viewport-world-label.viewport-city-pill:focus-visible{outline:2px solid #80d8ce;outline-offset:3px}
+.harimu-game.game-city-v2{--context-height:calc(0px * var(--text-scale, 1))} /* the bottom strip is not rendered: the scene takes its space */
+@media(max-width:760px){.harimu-game.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,44dvh) 0 minmax(0,auto)}}
+@media(max-width:760px){.viewport-world-label.viewport-city-pill{min-height:44px;gap:4px;padding:6px 10px 6px 8px;font-size:calc(11px * var(--text-scale, 1));transform:translate(-50%,-100%)!important}.viewport-city-pill-dot{display:none}}
+@media(max-width:360px){.viewport-world-label.viewport-city-pill{padding:6px 10px}.viewport-city-pill-icon{display:none}} /* the 320 canvas has no room for icons: pills keep the label's own size so #377 placement still fits them */
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
    this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
 .game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}

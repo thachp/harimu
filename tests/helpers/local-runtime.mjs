@@ -57,6 +57,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/ledger-reconciliation.ts','lib/ledger-reconciliation-rules.ts','app/api/admin/ledger-reconciliation/route.ts', // #432
     'lib/ai-costs.ts','lib/ai-denylist.ts','lib/ai-kill-switch.ts','lib/kill-switch-copy.ts','app/api/admin/ai-costs/route.ts', // #614
     'lib/ai-review-queue.ts','app/api/admin/ai-review-queue/route.ts', // #753
+    'lib/polling-rules.ts','lib/polling.ts','app/api/polling/route.ts', // #740
     'lib/reports.ts','lib/report-copy.ts','app/api/reports/route.ts', // #743
     'lib/dormancy-rules.ts','lib/dormancy-copy.ts','app/api/citizen/heartbeat/route.ts', // #739
     'lib/army-copy.ts','lib/army-rules.ts','lib/army.ts','app/api/army/route.ts', // #738
@@ -142,6 +143,7 @@ export async function readVerification(userId) {
   const ownershipRoute = await import(pathToFileURL(join(directory, 'app/api/world/ownership/route.mjs')).href); // #82
   const kindleBudgetRoute = await import(pathToFileURL(join(directory, 'app/api/kindle/budget/route.mjs')).href); // #789
   const civicRankRoute = await import(pathToFileURL(join(directory, 'app/api/citizen/civic-rank/route.mjs')).href); // #741
+  const pollingRoute = await import(pathToFileURL(join(directory, 'app/api/polling/route.mjs')).href); // #740
   const armyRoute = await import(pathToFileURL(join(directory, 'app/api/army/route.mjs')).href); // #738
   const iVotedRoute = await import(pathToFileURL(join(directory, 'app/api/citizen/i-voted/route.mjs')).href); // #782
   const unrestRoute = await import(pathToFileURL(join(directory, 'app/api/world/unrest/route.mjs')).href); // #82 slice 4
@@ -182,7 +184,7 @@ export async function readVerification(userId) {
     });
     if (user) identify(request, user);
     const handlers = endpoint === 'notables' ? notables : endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'world/found-city' ? foundCityRoute : endpoint === 'city' ? city : endpoint === 'city-home' ? cityHome : square;
-    const routed = endpoint === 'kindle/budget' ? kindleBudgetRoute : endpoint === 'citizen/heartbeat' ? heartbeatRoute : endpoint === 'army' ? armyRoute : endpoint === 'citizen/i-voted' ? iVotedRoute : endpoint === 'citizen/civic-rank' ? civicRankRoute : endpoint === 'world/ownership' ? ownershipRoute : endpoint === 'world/unrest' ? unrestRoute : endpoint === 'world/resources' ? resourcesRoute : endpoint === 'world/registry' ? registryRoute : endpoint === 'test-faucet' ? faucetRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'diplomatic-hall' ? hallRoute : endpoint === 'aurelle-succession' ? successionRoute : endpoint === 'aurelle/charters' ? chartersRoute : endpoint === 'tessera/rewards' ? rewardsRoute : endpoint === 'relocation/claim' ? reliefRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'canvassing' ? canvassingRoute : endpoint === 'town-hall' ? townHallRoute : endpoint === 'reports' ? reportsRoute : endpoint === 'debate' ? debateRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
+    const routed = endpoint === 'polling' ? pollingRoute : endpoint === 'kindle/budget' ? kindleBudgetRoute : endpoint === 'citizen/heartbeat' ? heartbeatRoute : endpoint === 'army' ? armyRoute : endpoint === 'citizen/i-voted' ? iVotedRoute : endpoint === 'citizen/civic-rank' ? civicRankRoute : endpoint === 'world/ownership' ? ownershipRoute : endpoint === 'world/unrest' ? unrestRoute : endpoint === 'world/resources' ? resourcesRoute : endpoint === 'world/registry' ? registryRoute : endpoint === 'test-faucet' ? faucetRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'diplomatic-hall' ? hallRoute : endpoint === 'aurelle-succession' ? successionRoute : endpoint === 'aurelle/charters' ? chartersRoute : endpoint === 'tessera/rewards' ? rewardsRoute : endpoint === 'relocation/claim' ? reliefRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'canvassing' ? canvassingRoute : endpoint === 'town-hall' ? townHallRoute : endpoint === 'reports' ? reportsRoute : endpoint === 'debate' ? debateRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
     const response = await routed[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };

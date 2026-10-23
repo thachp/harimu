@@ -83,6 +83,15 @@ export const rejections:readonly Rejection[]=[
  r('order_refused',409,null,'Order refused:','The order was not placed. Check your Spark or goods and your open orders (at most {maxOrders}). Kindle citizens only.'),
  r('order_not_open',409,null,'Order not open, already cancelled, or not yours.','That order is no longer open. Refresh your open orders.'),
 ];
+/** #733: one line per place guard, keyed by the API's `refusedCheck` (lib/order-book.ts). Shown instead of the generic
+ * `order_refused` line when the API names the check; the generic line stays for older responses. */
+export type RefusedCheckKey='not_kindle_citizen'|'open_order_cap'|'insufficient_spark'|'insufficient_goods';
+export const refusedCheckLines:Readonly<Record<RefusedCheckKey,Line>>={
+ not_kindle_citizen:L('The order was not placed. Only Kindle citizens can trade here. Check your citizenship.'),
+ open_order_cap:L('The order was not placed. You already have {maxOrders} open orders. Cancel an order and try again.'),
+ insufficient_spark:L('The order was not placed. You do not have enough free Spark for this buy. Check your Spark held in open buys.'),
+ insufficient_goods:L('The order was not placed. Not enough free {good} to sell. Check what you hold, what spoiled and your open sells.'),
+};
 export const REJECTION_KEYS:readonly RejectionKey[]=['unauthenticated','traveling','cross_origin','closed','bad_request','request_reused','order_refused','order_not_open'];
 export const rejectionFor=(key:RejectionKey)=>rejections.find(x=>x.key===key);
 export const rejectionForReason=(code:string)=>rejections.find(x=>x.code===code);

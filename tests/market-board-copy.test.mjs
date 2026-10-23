@@ -20,7 +20,7 @@ const book=readFileSync('lib/order-book.ts','utf8');
 const apiSource=route+'\n'+book;
 
 const labels=()=>Object.entries(BL).filter(([k])=>k!=='proposal').map(([,v])=>v);
-const lines=()=>[E.buy,E.sell,...ORDER_STATES.map(s=>OS[s]),fillNotice,cancelConfirmation,SH.fruit,SH.meat,ES.noOrdersOnGood,ES.noOpenOrders,...RJ.map(x=>x.line)].map(l=>l.text);
+const lines=()=>[E.buy,E.sell,...ORDER_STATES.map(s=>OS[s]),fillNotice,cancelConfirmation,SH.fruit,SH.meat,ES.noOrdersOnGood,ES.noOpenOrders,...RJ.map(x=>x.line),...Object.values(M.refusedCheckLines)].map(l=>l.text);
 const all=()=>[...labels(),...lines()];
 const fill=t=>MARKET_BOARD_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(MARKET_BOARD_NAME_MAX)),t);
 
@@ -72,6 +72,13 @@ test('each rejection says what the player can do next, in plain words with no ra
     assert.doesNotMatch(t,/\b(\d{3}|HTTP|API|error|reason|code|requestId|UUID|undefined|null|invalid|bad_request|same-origin)\b|_/i,t); }
   assert.match(rejectionFor('order_refused').line.text,/Spark or goods/); assert.match(rejectionFor('order_refused').line.text,/Kindle citizens/);
   assert.match(rejectionFor('bad_request').line.text,/\{maxQty\}/); assert.match(rejectionFor('bad_request').line.text,/\{maxPrice\}/); assert.match(rejectionFor('order_refused').line.text,/\{maxOrders\}/);
+});
+test('#733: one plain line per refused check, matching the API checks, no raw codes or figures', () => {
+  const refusedCheckLines = M.refusedCheckLines;
+  const REFUSED_CHECKS = [...book.match(/REFUSED_CHECKS[^=]*=\s*\[([^\]]*)\]/)[1].matchAll(/'(\w+)'/g)].map(m => m[1]);
+  assert.deepEqual(Object.keys(refusedCheckLines).sort(), [...REFUSED_CHECKS].sort());
+  for (const [k, l] of Object.entries(refusedCheckLines)) { assert.match(l.text, /\b(check|try again)\b/i, k); assert.doesNotMatch(l.text.replace(/\{[^}]*\}/g, ''), /\d|_/, k); assert.ok(l.text.length <= MARKET_BOARD_BODY_MAX, k); }
+  assert.doesNotMatch(refusedCheckLines.insufficient_goods.text, /citizen/i, '#721: a goods refusal does not point at citizenship');
 });
 test('no invented figures: no digits or number words anywhere; limits and shelf life only through placeholders', () => {
   for (const t of all()) assert.doesNotMatch(t.replace(/\{[^}]*\}/g,''),/\d|%|percent|\b(one|two|three|four|five|ten|hundred|thousand|once|twice)\b|\b(days?|hours?|weeks?|minutes?|min)\b|\bfees?\b|\btax\b/i,t);

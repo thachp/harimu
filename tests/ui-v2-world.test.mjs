@@ -52,7 +52,7 @@ test('render: GameShell with the flag off and on, same assertions (World gets ch
 test('game-shell reads the flag itself, once, and S5 CSS is scoped and sits before the S2 block', async () => {
   const shell = await read('app/game-shell.tsx'), css = await read('app/game-shell.css');
   assert.equal((shell.match(/uiV2WorldEnabled\(\)/g) || []).length, 1);
-  const start = css.indexOf('/* #392 S5 World crest chips'), end = css.indexOf('/* #392 S2:');
+  const start = css.indexOf('/* #392 S5 World crest chips'), end = css.indexOf('/* #392 S', start + 1); // the S5 block ends at the next stage's block (S7, then S2)
   assert.ok(start > 0 && start < end);
   const block = css.slice(css.indexOf('*/', start) + 2, end).replace(/@media\([^)]*\)\{/g, '');
   for (const sel of [...block.matchAll(/([^{}]+)\{[^{}]*\}/g)].map(m => m[1].trim()).filter(Boolean)) for (const part of sel.split(',')) assert.match(part, /^\.game-world-v2 /, `unscoped S5 selector: ${part}`);
