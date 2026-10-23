@@ -117,6 +117,8 @@
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_KINDLE_POLLING_ENABLED": "true",
+    // #831: Kindle platform plank up-votes (docs 9.4): party members up-vote up to 3 of their party's pledges for the party AI to consider; visibility only, never votes or currency. Off: /api/planks is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_PLANK_VOTES_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
@@ -181,6 +183,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "true",
+    // #392 S8: phone layout for UI v2 (rail and tabs as a bottom tab bar, panel as a bottom sheet); needs UI_V2_RAIL.
+    "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "true",
     // #243: filler wire stories (lib/press-templates.ts packs) in the National news edition under their in-world byline; they give way once a player paper publishes.
     "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "true",
     // #85: nation skin PoC on the top bar (Kindle / Korund / Aurelle colors + one CSS motif each); guests and pre-citizens keep the neutral bar.

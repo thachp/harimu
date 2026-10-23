@@ -171,9 +171,11 @@ export async function endWar(db: GameDatabase, warId: string, kind: WarEndKind, 
 
 /** Read-only. With the flag off the caller does not call this; a database without migration 0031 reads as no wars. */
 export async function readWars(db: GameDatabase, now: number): Promise<WarState> {
-  const rows = (await db.prepare(`SELECT ${columns} FROM wars ORDER BY declared_at DESC, id LIMIT 20`).all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] }))).results;
-  const started = await shardStartedAt(db);
-  return { wars: rows.map(row => publicWar(row, now)), foundingPeriodEndsAt: started === null ? null : foundingPeriodEnd(started), defenseWindows: await readDefenseWindows(db) };
+  // #679: the three reads are independent and read-only, so they share one round trip instead of three in a row.
+  const [{ results: rows }, started, defenseWindows] = await Promise.all([
+    db.prepare(`SELECT ${columns} FROM wars ORDER BY declared_at DESC, id LIMIT 20`).all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] })),
+    shardStartedAt(db), readDefenseWindows(db)]);
+  return { wars: rows.map(row => publicWar(row, now)), foundingPeriodEndsAt: started === null ? null : foundingPeriodEnd(started), defenseWindows };
 }
 
 type WindowRow = { nation_id: WarNationId; start_hour_utc: number; changed_at: number };
