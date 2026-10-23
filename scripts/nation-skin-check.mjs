@@ -2,7 +2,9 @@
  *  at 1280x800, 390x844 and 320x700, 100/125/150% text. Flag on:
  *  - the bar carries data-nation-skin for the three citizens and none for the guest, and the three bars look different (ground color);
  *  - layout is identical: the bar and every element in it keep the flag-off box (position and size), and the bar text is unchanged;
- *  - every visible text in the bar has at least 4.5:1 against the ground under it; a keyboard focus ring (at least 2px) shows on the first bar control.
+ *  - every visible text in the bar has at least 4.5:1 against the ground under it; a keyboard focus ring (at least 2px) shows on the first bar control;
+ *  - QA1 on #819: for every focusable control in the bar, the rendered pixels just outside and just inside its focus ring (ground, chips and the nation motif strips)
+ *    are at least 3:1 against the ring color (sampled from a screenshot with the control focused, straight edges only, corners skipped).
  *  Both: the page never scrolls sideways. With LAYOUT_SHOTS_DIR, shots of the bar go to docs/screenshots/85. Used by hud-layout-check.mjs; runs on its own too. */
 import { bundleShell, shellProps } from './hud-tooltip-check.mjs';
 import { isMain, runStandalone } from './layout-standalone.mjs';
@@ -36,6 +38,31 @@ const probe = () => {
   return { issues, boxes, text: bar.innerText.replace(/\s+/g, ' ').trim(), skin: bar.dataset.nationSkin ?? null, bg: getComputedStyle(bar).backgroundColor, min };
 };
 
+/** Runs in the page: ring geometry of the focused control, in CSS px relative to the bar. */
+const ringOf = () => {
+  const el = document.activeElement, bar = document.querySelector('header.game-hud'); if (!el || !bar.contains(el)) return null;
+  const t = el.matches('details') ? el.querySelector('summary') : el, cs = getComputedStyle(t), r = t.getBoundingClientRect(), b = bar.getBoundingClientRect();
+  if (cs.outlineStyle === 'none' || !parseFloat(cs.outlineWidth) || !r.width) return null;
+  return { name: (t.getAttribute('aria-label') || t.textContent).trim().slice(0, 24), color: cs.outlineColor, w: parseFloat(cs.outlineWidth), off: parseFloat(cs.outlineOffset), radius: parseFloat(cs.borderTopLeftRadius) || 0,
+    x: r.left - b.left, y: r.top - b.top, width: r.width, height: r.height };
+};
+/** Runs in the page: decode the bar screenshot and return the worst ring-to-neighbour contrast along the ring's straight edges. */
+const ringContrast = async ([png, ring]) => {
+  const img = new Image(); img.src = 'data:image/png;base64,' + png; await img.decode();
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0); const px = g.getImageData(0, 0, c.width, c.height).data;
+  const lum = ([r, gg, b]) => [r, gg, b].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const L = lum((ring.color.match(/[\d.]+/g) ?? []).map(Number).slice(0, 3));
+  let worst = Infinity, at = null;
+  const sample = (x, y) => { x = Math.floor(x); y = Math.floor(y); if (x < 0 || y < 0 || x >= c.width || y >= c.height) return; const i = (y * c.width + x) * 4, p = [px[i], px[i + 1], px[i + 2]], l = lum(p), k = (Math.max(L, l) + 0.05) / (Math.min(L, l) + 0.05); if (k < worst) { worst = k; at = `${x},${y} rgb(${p})`; } };
+  for (const d of [ring.off + ring.w + 0.5, ring.off - 0.5]) { // the pixel row just outside the ring, and just inside it
+    if (d < -Math.min(ring.width, ring.height) / 2) continue;
+    const x0 = ring.x - d, y0 = ring.y - d, x1 = ring.x + ring.width + d, y1 = ring.y + ring.height + d, skip = ring.radius + Math.abs(d) + 2;
+    for (let x = x0 + skip; x <= x1 - skip; x++) { sample(x, y0); sample(x, y1); }
+    for (let y = y0 + skip; y <= y1 - skip; y++) { sample(x0, y); sample(x1, y); }
+  }
+  return { worst, at };
+};
+
 export async function checkNationSkin({ browser, css, preflight, failures, rows }) {
   const shots = process.env.LAYOUT_SHOTS_DIR, baseline = {};
   for (const flag of ['false', 'true']) {
@@ -46,6 +73,7 @@ export async function checkNationSkin({ browser, css, preflight, failures, rows 
       await page.addScriptTag({ content: script });
       const grounds = new Set();
       for (const id of ['kindle', 'korund', 'aurelle', null]) {
+        let minRing = Infinity, rings = 0;
         const label = `${w}x${h} @${scale * 100}% #85 skin ${id ?? 'guest'} (flag ${on ? 'on' : 'off'})`, fail = m => failures.push(`${label}: ${m}`);
         await page.evaluate(([p, n]) => window.mount(p, n), [{ ...shellProps, view: 'square', citizenNation: undefined }, id]); await page.waitForSelector('header.game-hud'); await page.waitForTimeout(100);
         const r = await page.evaluate(probe);
@@ -60,8 +88,20 @@ export async function checkNationSkin({ browser, css, preflight, failures, rows 
           const ring = await page.evaluate(() => { const b = document.activeElement; if (!b?.closest('header.game-hud')) return null; const cs = getComputedStyle(b.matches('details') ? b.querySelector('summary') : b); return { w: parseFloat(cs.outlineWidth), style: cs.outlineStyle, shadow: cs.boxShadow }; });
           if (ring && (ring.style === 'none' || ring.w < 2) && (!ring.shadow || ring.shadow === 'none')) fail(`keyboard focus ring missing (${JSON.stringify(ring)})`);
         }
+        if (on && id) { // QA1 on #819: focus ring contrast against every neighbouring pixel, for each focusable control in the bar
+          await page.keyboard.press('Tab'); const sel = 'header.game-hud :is(a,button,summary,[tabindex]:not([tabindex="-1"]))', count = await page.evaluate(s => document.querySelectorAll(s).length, sel);
+          for (let k = 0; k < count; k++) {
+            await page.evaluate(([s, k]) => document.querySelectorAll(s)[k].focus(), [sel, k]);
+            const ring = await page.evaluate(ringOf); if (!ring) continue; rings++;
+            const png = (await page.locator('header.game-hud').screenshot({ animations: 'disabled' })).toString('base64');
+            const { worst, at } = await page.evaluate(ringContrast, [png, ring]); minRing = Math.min(minRing, worst);
+            if (worst < 3) fail(`focus ring on "${ring.name}" is ${worst.toFixed(2)}:1 against ${at}`);
+          }
+          if (!rings) fail('no focus ring measured');
+        }
         await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(0, h - 1);
-        rows.push(`${label}: text ≥ ${r.min.toFixed(1)}:1${r.issues.length ? ' ✗' : ''}`);
+
+        rows.push(`${label}: text ≥ ${r.min.toFixed(1)}:1${on && id ? `, ring ≥ ${minRing.toFixed(1)}:1` : ''}${r.issues.length ? ' ✗' : ''}`);
         if (shots && scale !== 1.25 && (on || id === 'kindle')) await page.locator('header.game-hud').screenshot({ path: `${shots}/85-${on ? 'on' : 'off'}-${id ?? 'guest'}-${w}-${scale * 100}.png` });
       }
       if (on && grounds.size !== 3) failures.push(`${w}x${h} @${scale * 100}% #85: the three nation bars share a ground (${[...grounds].join(' | ')})`);
