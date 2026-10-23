@@ -21,6 +21,7 @@ import { locationVisible, marketVisible } from '@/lib/market-visibility';
 import { uiV2WorldEnabled } from '@/lib/ui-v2-world';
 import { countryWord, railCurrent, railKeyTarget, railLevels, uiV2RailEnabled } from '@/lib/ui-v2-rail';
 import { cityStripHidden } from '@/lib/ui-v2-city';
+import { uiV2MobileEnabled } from '@/lib/ui-v2-mobile';
 import { contextStripStatus } from '@/lib/context-strip-copy'; // #379: a visitor's strip says "Visitor preview", not "Citizen snapshot"
 
 type GameNation = { id: string; name: string; capital?: string; color?: string };
@@ -118,6 +119,15 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   // #379: a visitor (guest, signed out, local demo, or signed in with no citizenship yet) is not a citizen. `visitorSession` comes from isVisitorSession(), which is false while the session loads or errors, so a citizen reloading a city never sees visitor wording and the scene is not rebuilt after load.
   const visitor = !citizenNation && visitorSession;
   const hasPanel = !collapsed;
+  // #392 S8 follow-up (#377): on a phone the scene fills the screen between the top bar and the bottom tab bar (and citizen dock); CSS reads these heights.
+  const mobileV2 = uiV2MobileEnabled();
+  useEffect(() => {
+    if (!mobileV2 || typeof ResizeObserver === 'undefined') return;
+    const root = document.querySelector<HTMLElement>('.harimu-game.game-mobile-v2'); if (!root) return;
+    const sync = () => { for (const [name, sel] of [['--s8-top', '.game-hud'], ['--s8-tabs', '.game-nav-row'], ['--s8-dock', '.citizen-dock']] as const) root.style.setProperty(name, `${root.querySelector(sel)?.getBoundingClientRect().height ?? 0}px`); };
+    const observer = new ResizeObserver(sync); for (const el of root.querySelectorAll('.game-hud, .game-nav-row, .citizen-dock')) observer.observe(el); sync();
+    return () => observer.disconnect();
+  }, [mobileV2, view]);
   useEffect(() => { document.getElementById('game-details')?.querySelector('.game-inspector-body')?.scrollTo({top:0,left:0}); }, [view,nation.id]);
   const close = () => { setCollapsed(true); setSelection(null); requestAnimationFrame(() => document.getElementById('game-reopen')?.focus()); };
   useEffect(() => {
@@ -153,7 +163,7 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   const breadcrumbs = <nav className="game-location-banner game-breadcrumbs" aria-label="Current location"><button type="button" onClick={() => navigate('world')}>World</button>{view !== 'world' && <><span>›</span><button type="button" onClick={() => navigate('country')}>{shownNationName}</button></>}{view === 'nation' && <><span>›</span><span>{nation.capital ?? 'Capital'}</span></>}{!['world','country','nation'].includes(view) && <><span>›</span><button type="button" onClick={() => navigate('square')}>{viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City'}</button>{view !== 'square' && <><span>›</span><span>{sceneTitle}</span></>}</>}</nav>;
   // #189: in Country the stage scrolls, so the location row and shift chip sit in its flow instead of floating over the heading and controls.
   const shiftChip = shiftSummary ? <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong>{shiftSummary.endsAt !== undefined ? <GameTimer compact endsAt={shiftSummary.endsAt * 1000} label="Shift" expiredText={shiftSummary.expiredText} /> : <span>Active shift</span>}<CaretRight /></button> : null;
-  return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}${railOn ? ' game-rail-on' : ''}${cityStripHidden(view) ? ' game-city-v2' : ''}`}>
+  return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}${railOn ? ' game-rail-on' : ''}${cityStripHidden(view) ? ' game-city-v2' : ''}${uiV2MobileEnabled() ? ' game-mobile-v2' : ''}`}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
     <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{railOn ? null : breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} visitor={visitor} overlays={mapOverlays} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
     <header className={topbarV2 ? 'game-hud game-hud-v2' : 'game-hud'} data-nation-skin={nationSkin(citizenNation?.id) ?? undefined} {...hudHelpHandlers}>

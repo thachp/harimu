@@ -432,6 +432,20 @@ body:has(.harimu-game){overflow:auto}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
 .game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}
+/* #392 S8 mobile pass (NEXT_PUBLIC_HARIMU_UI_V2_MOBILE; class .game-mobile-v2, only with the S4 rail). Phones only: the rail + place tabs row leaves the top
+   (the top bar spans its text-scaled grid track) and becomes a bottom tab bar pinned to the screen bottom (sticky, above the fixed citizen dock); the panel reads as a bottom
+   sheet (rounded top, raised edge, decorative grab bar). DOM order, copy and controls are unchanged; desktop is untouched. */
+@media(max-width:760px){
+  .harimu-game.game-mobile-v2>.game-hud{grid-row:1 / span 2} /* the top bar fills the nav row's (text-scaled, #80) track, so the empty row leaves no gap */
+  .game-mobile-v2.game-rail-on .game-nav-row{grid-row:8;position:sticky;bottom:0;z-index:8;border-top:1px solid #49616a;border-bottom:0;box-shadow:0 -4px 12px #0007}
+  .game-mobile-v2.game-rail-on:has(.citizen-dock) .game-nav-row{bottom:45px}
+  .game-mobile-v2 .game-inspector{border-top:1px solid #49616a;border-radius:14px 14px 0 0;box-shadow:0 -6px 16px #0006;padding-top:14px}
+  /* S8 follow-up (#377, ARC): the City scene is the screen minus the bars (heights from app/game-shell.tsx); 44dvh / 260px stay as the fallback */
+  .harimu-game.game-mobile-v2.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) auto 0 minmax(0,auto)}
+  .game-mobile-v2.game-city-v2 .game-stage{min-height:0;height:max(200px,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px)))}
+  .game-mobile-v2.game-city-v2:not([style*="--s8-top"]) .game-stage{height:44dvh}
+  .game-mobile-v2 .game-inspector::before{content:"";display:block;width:36px;height:4px;margin:0 auto 6px;border-radius:2px;background:#6f8a92}
+}
 /* #85: nation skin PoC on the top bar (NEXT_PUBLIC_HARIMU_NATION_SKIN; app/game-shell.tsx sets data-nation-skin only for a signed-in Kindle, Korund or Aurelle citizen).
    Colors come from each nation's crest palette (lib/nation-crests.ts) on dark grounds, so every existing top bar text color keeps AA contrast; each nation also gets
    one motif drawn with inset shadows or a background image (no borders, padding or size change, so layout is identical). The header type selector keeps these rules above the later S2 chip rules. The nation name stays in text, so no meaning is carried by color alone. */

@@ -46,6 +46,7 @@ import { homeCityMoveSchemas } from './home-move'; // #781
 import { voteBuyingEventsSchema } from './vote-buying-watch'; // #825
 import { savingsShieldCreditsSchema } from './market-orders'; // #824
 import { pollingSchemas } from './polling'; // #740
+import { plankVoteSchemas } from './plank-votes'; // #831
 import { armySchemas, armyDrillSchemas } from './army'; // #738
 import { conscriptionSchemas, conscriptStayColumn } from './army-conscription'; // #738 slice 3
 import { crownDecreeSchemas } from './crown-debasement'; // #362
@@ -250,6 +251,7 @@ async function initialize(database: GameDatabase) {
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...aiReviewQueueSchemas.map(sql=>database.prepare(sql)), // #753
     ...pollingSchemas.map(sql=>database.prepare(sql)), // #740
+    ...plankVoteSchemas.map(sql=>database.prepare(sql)), // #831
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...conscriptionSchemas.map(sql=>database.prepare(sql)), // #738 slice 3
