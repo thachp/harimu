@@ -1,5 +1,6 @@
 /** #738 slice 1: army membership reads and commands. Migration 0072 (drizzle/ + db/postgres/) mirrors armySchemas. */
 import type { GameDatabase } from './database-contract';
+import { serviceUntil } from './army-conscription';
 import { volunteerNations, defaultStance, unitById, unitForNation, ARMY_GAME_DAY_SECONDS, armyParticipation, unitStrength, unitMorale, type ArmyCommand } from './army-rules';
 export const armySchemas = [
   `CREATE TABLE IF NOT EXISTS army_members (clerk_user_id TEXT PRIMARY KEY REFERENCES citizens(clerk_user_id), unit_id TEXT NOT NULL, stance TEXT NOT NULL CHECK(stance IN ('hold','advance','fall_back')), joined_at INTEGER NOT NULL, request_id TEXT NOT NULL UNIQUE)`,
@@ -7,7 +8,7 @@ export const armySchemas = [
   // [ASSUMPTION] Leave and stance need replay too, and a deleted member row cannot remember its request id, so every command is logged once here.
   `CREATE TABLE IF NOT EXISTS army_requests (request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL, action TEXT NOT NULL CHECK(action IN ('join','leave','stance')), occurred_at INTEGER NOT NULL)`,
 ];
-export type ArmyView = { unit: { id: string; name: string; officer: string; memberCount: number; openToVolunteers: boolean; strength?: number; morale?: number } | null; member: boolean; stance: string | null };
+export type ArmyView = { serveUntil?: number; unit: { id: string; name: string; officer: string; memberCount: number; openToVolunteers: boolean; strength?: number; morale?: number } | null; member: boolean; stance: string | null };
 type Fail = { ok: false; status: 403 | 409; error: string; reason: string };
 /** The citizen's own nation's unit, membership and stance, and the unit's member count. Never another member's identity. */
 export async function readArmy(db: GameDatabase, userId: string, nowSec = 0, readiness = false): Promise<ArmyView> {
@@ -33,6 +34,8 @@ export async function runArmyCommand(db: GameDatabase, userId: string, cmd: Army
     write = db.prepare('INSERT INTO army_members (clerk_user_id, unit_id, stance, joined_at, request_id) VALUES (?,?,?,?,?)').bind(userId, unit.id, defaultStance, nowSec, cmd.requestId);
   } else {
     if (!me?.unit_id) return { ok: false, status: 409, error: 'You are not in a unit.', reason: 'not_member' };
+    // #738 slice 3: a conscript cannot leave before the service term ends.
+    if (cmd.action === 'leave' && await serviceUntil(db, userId, nowSec)) return { ok: false, status: 409, error: 'You were called up and serve until your term ends.', reason: 'conscripted' };
     write = cmd.action === 'leave' ? db.prepare('DELETE FROM army_members WHERE clerk_user_id=?').bind(userId)
       : db.prepare('UPDATE army_members SET stance=? WHERE clerk_user_id=?').bind(cmd.stance, userId);
   }
