@@ -104,6 +104,8 @@ const switchOffPins = {
   HARIMU_QA_TEST_CITIZENS: 'flag-off-audit-384.test.mjs',
   HARIMU_STORAGE_MAINTENANCE: 'flag-off-audit-384.test.mjs',
 };
+// preview-flags-on: switches turned on in preview only (production keeps them "false", pinned by wrangler-prod-501b). Their off path is still pinned above.
+const previewOnSwitches = ['HARIMU_REALTIME_PRESENCE', 'NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE'];
 const notSwitches = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_PRODUCTION_STORAGE', 'HARIMU_POSTGRES_CUTOVER_READY', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED',
   'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_UI_V2_MOBILE', 'NEXT_PUBLIC_HARIMU_NATION_SKIN', 'NEXT_PUBLIC_HARIMU_WIRE_BYLINES', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
 
@@ -112,7 +114,7 @@ test('every boolean wrangler var that is not *_ENABLED is a registered switch (o
     const booleans = Object.entries(config.vars).filter(([name, value]) => !/_ENABLED$/.test(name) && /^(true|false)$/.test(value)).map(([name]) => name);
     const unknown = booleans.filter(name => !(name in switchOffPins) && !notSwitches.includes(name));
     assert.deepEqual(unknown, [], `${file}: register each new boolean switch in switchOffPins (or notSwitches)`);
-    for (const name of Object.keys(switchOffPins)) if (name in config.vars) assert.equal(config.vars[name], 'false', `${file}: ${name} ships "false"`);
+    for (const name of Object.keys(switchOffPins)) if (name in config.vars) assert.equal(config.vars[name], file === 'wrangler.jsonc' && previewOnSwitches.includes(name) ? 'true' : 'false', `${file}: ${name} ships its pinned value`);
   }
   for (const [name, file] of Object.entries(switchOffPins)) assert.ok(readFileSync(join('tests', file), 'utf8').includes(name), `${name}: ${file} never names it`);
 });
