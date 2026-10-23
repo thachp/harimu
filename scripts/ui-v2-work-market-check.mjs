@@ -10,7 +10,7 @@ const entry = `
   import React from 'react'; import { createRoot } from 'react-dom/client'; import { GameShell } from './app/game-shell.tsx'; import { MarketSummary, WorkSummary } from './app/scene-panels-v2.tsx';
   window.mount = props => { window.__root?.unmount(); window.__root = createRoot(document.getElementById('root'));
     window.__root.render(<GameShell {...props} onNavigate={() => {}} onSelectNation={() => {}} accountControls={null}
-      panel={<div className="s10-heads"><WorkSummary capacity={18} contributions={3} onMarket={() => {}} /><MarketSummary nation={{ name: 'Kindle Republic', currency: 'Spark' }} walletMinor={4000} food={6} board listings onHousehold={() => {}} /></div>} />); };`;
+      panel={<div className="s10-heads"><WorkSummary capacity={18} contributions={3} onMarket={() => {}} /><MarketSummary nation={{ id: 'kindle', name: 'Kindle Republic', currency: 'Spark' }} walletMinor={4000} food={6} board listings onHousehold={() => {}} /><section className="scene-work-orders"><h2>Available contributions</h2></section></div>} />); };`;
 
 /** Runs in the page. */
 const probe = on => {
@@ -45,9 +45,11 @@ export async function checkUiV2WorkMarket({ browser, css, preflight, failures, r
       await page.addScriptTag({ content: script }); await page.evaluate(p => window.mount(p), { ...shellProps, view: 'workplace' });
       await page.waitForSelector('.game-inspector', { state: 'attached' });
       await page.waitForTimeout(150);
-      const issues = await page.evaluate(probe, on); for (const i of issues) failures.push(`${id}: ${i}`);
+      const issues = await page.evaluate(probe, on);
+      if (on) { await page.locator('.panel-v2-rows button', { hasText: 'Available contributions' }).click(); // #894: the row moves focus to the section heading
+        const f = await page.evaluate(() => { const a = document.activeElement; return a?.matches('.scene-work-orders h2') && a.tabIndex === -1 ? '' : `focus on ${a?.tagName} "${a?.textContent?.slice(0, 30)}"`; }); if (f) issues.push(`row did not move focus: ${f}`); } for (const i of issues) failures.push(`${id}: ${i}`);
       rows.push(`${id}${issues.length ? ' ✗' : ''}`);
-      if (shots && h !== 640 && scale !== 1.25 && on) { await page.screenshot({ path: `${shots}/s10-work-market-${w}-${scale * 100}.png` }); }
+      if (shots && h !== 640 && scale !== 1.25 && on) { await page.evaluate(() => document.fonts.ready); await page.waitForTimeout(300); await page.screenshot({ path: `${shots}/s10-work-market-${w}-${scale * 100}.png` }); }
       await context.close();
     }
   }
