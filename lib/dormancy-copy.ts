@@ -86,3 +86,37 @@ export const welcomeBackFor=(nationId:DormancyNation)=>welcomeBack.find(w=>w.nat
 export const jobReleasedFor=(nationId:DormancyNation)=>jobReleased.find(j=>j.nationId===nationId);
 
 export const dormancyCopy={statuses:dormancyStatuses,title:WELCOME_BACK_TITLE,welcomeBack,welcomeBackGeneric,jobReleased,savingsShield,proposal:true} as const;
+
+/** Follow-up to #773: Welcome back frames for the seven nations beyond the MVP three, for SDE4 to wire (nothing reads these yet; the panel
+ * uses welcomeBackGeneric for them today). Same shape, placeholders, limits and rules as the frames above: reports to the citizen, never badged,
+ * no leader or body speaks. Bylines are the canonical paper names from harimu-docs systems/social-news-media §18.2 (ARC: §18.2 is canonical),
+ * all proposal false: The Current Daily, Steamgate Herald, The Lamp, The Directorate Bulletin, The Canopy. Free-press nations (Hoarvale, Fulmara) carry no byline, like Kindle, and put
+ * the nation's voice in the wording: Hoarvale's hearth ethos ("Keep the hearth, share the warmth"), Fulmara's ownership-on-the-masthead press.
+ * Varkand names no Alert Level (it changes); Ilmar names no Stillday. All wording is new: `proposal: true`. */
+export type DormancyOtherNation='confluence'|'meridian'|'ilmar'|'hoarvale'|'varkand'|'veldwood'|'fulmara';
+export type WelcomeBackOther=Omit<WelcomeBack,'nationId'>&{nationId:DormancyOtherNation};
+export const DORMANCY_OTHER_NATIONS:readonly DormancyOtherNation[]=['confluence','meridian','ilmar','hoarvale','varkand','veldwood','fulmara'];
+export const welcomeBackOtherNations:readonly WelcomeBackOther[]=[
+ {nationId:'confluence',byline:{name:'The Current Daily',proposal:false},
+  greeting:L('The Current Daily: Welcome back. You were away for {daysAway}.'),
+  news:L('The Current Daily: {headlineCount} reports were published while you were away.'),aiBadge:false,proposal:true},
+ {nationId:'meridian',byline:{name:'Steamgate Herald',proposal:false},
+  greeting:L('Steamgate Herald: Welcome back, citizen. You were away for {daysAway}.'),
+  news:L('Steamgate Herald: {headlineCount} approved reports were issued during your absence.'),aiBadge:false,proposal:true},
+ {nationId:'ilmar',byline:{name:'The Lamp',proposal:false},
+  greeting:L('The Lamp: Welcome back. You were away for {daysAway}.'),
+  news:L('The Lamp: {headlineCount} reports were recorded while you were away.'),aiBadge:false,proposal:true},
+ {nationId:'hoarvale',byline:null,
+  greeting:L('Welcome back. You were away for {daysAway}. The kettle is on.'),
+  news:L('There are {headlineCount} reports waiting for you by the hearth.'),aiBadge:false,proposal:true},
+ {nationId:'varkand',byline:{name:'The Directorate Bulletin',proposal:false},
+  greeting:L('The Directorate Bulletin: Welcome back, citizen. You were away for {daysAway}.'),
+  news:L('The Directorate Bulletin: {headlineCount} reports were issued while you were away.'),aiBadge:false,proposal:true},
+ {nationId:'veldwood',byline:{name:'The Canopy',proposal:false},
+  greeting:L('The Canopy: Welcome back to the grove. You were away for {daysAway}.'),
+  news:L('The Canopy: {headlineCount} reports were aired while you were away.'),aiBadge:false,proposal:true},
+ {nationId:'fulmara',byline:null,
+  greeting:L('Welcome back. You were away for {daysAway}. Here is what moved while you were gone.'),
+  news:L('There are {headlineCount} reports to catch up on, each with its owner on the masthead.'),aiBadge:false,proposal:true},
+];
+export const welcomeBackOtherFor=(nationId:DormancyOtherNation)=>welcomeBackOtherNations.find(w=>w.nationId===nationId);
