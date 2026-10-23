@@ -88,13 +88,45 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:layout
 
+  # #884: AI eval gate. Offline (fixture model outputs through each feature's real validator; no model call,
+  # no network, no secrets). Runs on every push; on PRs only when prompt/AI/validator files or the evals change.
+  ai-evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect AI or prompt changes
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" != pull_request ]; then echo "ai=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(git diff --name-only "$BASE_SHA"...HEAD)
+          echo "$files"
+          if echo "$files" | grep -qE '^(lib/(ai-[^/]*|[^/]*-ai|[^/]*-copy|daily-briefing|faith)\.ts|tests/ai-evals/|scripts/eval-ai\.mjs|tests/helpers/local-runtime\.mjs|package(-lock)?\.json|\.github/workflows/ci\.yml)'; then
+            echo "ai=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ai=false" >> "$GITHUB_OUTPUT"; echo "No AI/prompt changes; eval skipped."
+          fi
+      - if: steps.changed.outputs.ai == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.changed.outputs.ai == 'true'
+        run: npm ci
+      - if: steps.changed.outputs.ai == 'true'
+        run: npm run eval:ai
+
   # Keep the existing required context. A skipped required job can otherwise
   # appear green: explicitly accept only success from every prerequisite.
   # #706: `check` waits for every test job (both Node shards, all four Postgres shards,
   # validation); any failure, cancellation or skip in any shard fails the gate.
   check:
     if: ${{ always() }}
-    needs: [node-tests, postgres-tests, validation]
+    needs: [node-tests, postgres-tests, validation, ai-evals]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -103,7 +135,7 @@ jobs:
           NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
           echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          for job in node-tests postgres-tests validation; do
+          for job in node-tests postgres-tests validation ai-evals; do
             result=$(echo "$NEEDS_JSON" | jq -r --arg j "$job" '.[$j].result // "missing"')
             if [ "$result" != success ]; then echo "::error::$job result is $result"; exit 1; fi
           done
