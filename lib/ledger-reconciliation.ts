@@ -1,3 +1,4 @@
+import { kindleTreasuryBalanceSql } from './economy';
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { tesseraBalanceSql } from './tessera-exchange';
@@ -44,6 +45,7 @@ const SPK: CurrencySpec = {
     UNION ALL SELECT o.citizen_id, -(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT seller_id, -fee_minor FROM market_trade_fees
     UNION ALL SELECT clerk_user_id, -fee_minor FROM home_city_moves WHERE currency = 'SPK'
+    UNION ALL SELECT clerk_user_id, credit_minor FROM savings_shield_credits WHERE status = 'paid'
     UNION ALL SELECT citizen_id, -(remaining * limit_unit_minor) FROM market_open_orders WHERE side = 'buy' AND citizen_id IS NOT NULL`,
   appBalances: 'SELECT clerk_user_id AS acct, balance FROM citizen_wallet_balances',
   probes: [
@@ -57,6 +59,8 @@ const SPK: CurrencySpec = {
     ...integerAndSign('SPK', 'market_trades', 'id', 'qty', true),
     ...integerAndSign('SPK', 'market_trade_fees', 'trade_id', 'fee_minor', true), // #777 sink leg
     ...integerAndSign('SPK', 'home_city_moves', 'request_id', 'fee_minor', true), // #781 move-fee sink leg
+    ...integerAndSign('SPK', 'savings_shield_credits', 'absence_key', 'credit_minor', true), // #824 welfare-line credit
+    { currency: 'SPK', check: 'fund_negative:kindle-treasury', sql: `SELECT 'kindle-treasury' AS acct FROM (${kindleTreasuryBalanceSql}) t WHERE t.balance < 0` },
     { currency: 'SPK', check: 'fee_not_seller_or_over_gross', sql: 'SELECT f.trade_id AS acct FROM market_trade_fees f LEFT JOIN market_trades t ON t.id = f.trade_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE t.id IS NULL OR s.citizen_id IS NULL OR s.citizen_id <> f.seller_id OR f.fee_minor > t.qty * t.unit_minor' },
     // Transfers: the debit leg and the credit leg must agree with each other and with the counterpart's record.
     { currency: 'SPK', check: 'tax_over_gross', sql: 'SELECT clerk_user_id AS acct FROM shift_income_tax WHERE tax_minor > gross_minor' },

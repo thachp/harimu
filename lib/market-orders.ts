@@ -105,6 +105,16 @@ export const homeCityMovesSchema = `CREATE TABLE IF NOT EXISTS home_city_moves (
  moved_at INTEGER NOT NULL
 )`;
 export const homeCityMovesIndex = `CREATE INDEX IF NOT EXISTS idx_home_city_moves_user ON home_city_moves(clerk_user_id, moved_at)`;
+/** #824 Kindle Dormant Savings Shield: one row per returning absence; 'paid' rows are the treasury welfare-line debit and the wallet credit (lib/savings-shield.ts). */
+export const savingsShieldCreditsSchema = `CREATE TABLE IF NOT EXISTS savings_shield_credits (
+ absence_key TEXT PRIMARY KEY,
+ clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
+ absence_started_at INTEGER NOT NULL, returned_at INTEGER NOT NULL, balance_minor INTEGER NOT NULL,
+ index_start_tenths INTEGER NOT NULL, index_end_tenths INTEGER NOT NULL,
+ credit_minor INTEGER NOT NULL CHECK(typeof(credit_minor) = 'integer' AND credit_minor >= 0),
+ status TEXT NOT NULL CHECK(status IN ('paid', 'skipped')), reason TEXT NOT NULL,
+ CHECK((status = 'paid') = (credit_minor > 0))
+)`;
 export const marketSchemas = [marketGoodsSchema, marketOrdersSchema, marketCancellationsSchema, marketTradesSchema, ...marketIndexes, marketSpoilageSchema, ...marketSpoilageIndexes, marketOpenOrdersView];
 export const marketGoodsSeedSql = marketGoods.map(g =>
   `INSERT OR IGNORE INTO market_goods (good, label, unit, perishable, shelf_life_days) VALUES ('${g.good}', '${g.label}', '${g.unit}', ${g.perishable ? 1 : 0}, ${g.shelfLifeDays ?? 'NULL'})`);
