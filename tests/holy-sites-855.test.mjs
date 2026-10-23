@@ -52,6 +52,30 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM faith_harmony_acts').first()).n), 1);
   });
 
+  test(`${backend}: QA1: same user, same act, same game day at different seconds: the second is refused, one row stored`, async t => {
+    const r = await scene(t, backend); r.setNow(Math.floor(r.now / 7200000) * 7200000 + 1000);
+    for (const body of [{ action: 'pilgrimage', siteId: 'hearth-of-first-names' }, { action: 'charity' }]) {
+      const user = body.action === 'charity' ? 'kim' : 'ava';
+      assert.equal((await r.call('faith/holy-sites', user, { ...body, requestId: rid() })).status, 200);
+      r.setNow(r.now + 37 * 1000);
+      const again = await r.call('faith/holy-sites', user, { ...body, requestId: rid() });
+      assert.deepEqual([again.status, again.data.reason], [409, 'already_today'], body.action);
+      assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM faith_harmony_acts WHERE user_id = ? AND act = ?').bind(user, body.action).first()).n), 1, body.action);
+    }
+  });
+
+  test(`${backend}: QA1: user B reusing user A's request id gets 409 request_reused and none of A's act`, async t => {
+    const r = await scene(t, backend), id = rid();
+    assert.equal((await r.call('faith/holy-sites', 'ava', { action: 'pilgrimage', siteId: 'hearth-of-first-names', requestId: id })).status, 200);
+    for (const body of [{ action: 'pilgrimage', siteId: 'high-retreat' }, { action: 'charity' }]) {
+      const b = await r.call('faith/holy-sites', 'kim', { ...body, requestId: id });
+      assert.deepEqual([b.status, b.data.reason], [409, 'request_reused']);
+      assert.deepEqual(Object.keys(b.data).sort(), ['error', 'reason']);
+      assert.doesNotMatch(JSON.stringify(b.data), /ava|aurelle|hearth|granted|pilgrimage/);
+    }
+    assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM faith_harmony_acts').first()).n), 1, 'B stored nothing');
+  });
+
   test(`${backend}: flag off: 404 before auth or any database access; the world tick reads no acts`, async t => {
     const r = await scene(t, backend, false);
     const off = await spy(r, async () => [await r.call('faith/holy-sites', 'kim', { action: 'charity', requestId: rid() }), await r.call('faith/holy-sites', null, { action: 'charity', requestId: rid() })]);
