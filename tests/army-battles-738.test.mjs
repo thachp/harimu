@@ -25,7 +25,8 @@ test('rules: flag chain (unset means off), named constants, deterministic rounds
   assert.equal(mirror.status, mirror.attackerStrength * 1000 > mirror.defenderStrength * 1000 ? 'attacker_won' : 'defender_won', 'after max rounds: more of its start left wins, ties to the defender');
   assert.deepEqual([B.roundsAt(1000, 999), B.roundsAt(1000, 1599), B.roundsAt(1000, 1600)], [0, 0, 1]);
   const src = readFileSync('lib/army-battle.ts', 'utf8').split('export function resolveBattle')[1].split('\n}')[0]; assert.doesNotMatch(src, /[^\w.]([2-9]|\d{2,})\b/, 'no inline numbers');
-  assert.doesNotMatch(readFileSync('lib/army-battle.ts', 'utf8'), /UPDATE|INSERT|owner/, 'never writes, never captures');
+  const bsrc = readFileSync('lib/army-battle.ts', 'utf8'); assert.doesNotMatch(bsrc, /UPDATE|DELETE|owner/, 'never rewrites, never captures');
+  assert.deepEqual(bsrc.match(/INSERT[^`]*?DO NOTHING/gs)?.length, (bsrc.match(/INSERT/g) ?? []).length, 'every insert is conditional (store once)');
 });
 
 async function spy(r, fn) { const prepare = r.db.prepare.bind(r.db), seen = { sql: [] }; r.db.prepare = q => { seen.sql.push(q); return prepare(q); }; try { seen.result = await fn(); } finally { r.db.prepare = prepare; } return seen; }
@@ -61,5 +62,26 @@ for (const backend of ['sqlite', 'postgres']) {
     const card = (await r.call('army', 'alice')).data.army.unit;
     assert.deepEqual(card.battle, { opponentNationId: 'korund', attacking: true, rounds: 0, status: 'attacker_won' }); assert.equal(card.strength, 5);
     assert.match(readFileSync('app/army-card.tsx', 'utf8'), /\{unit\.battle && <p>\{battleLine\(unit\.battle\)\}<\/p>\}/);
+  });
+
+  test(`${backend}: the world tick stores a finished battle once; concurrent ticks store one row; a later strength change never alters it; GET reads it`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close()); await r.call('citizen', 'alice');
+    for (const [k, v] of Object.entries({ ...ON, HARIMU_ARMY_DRILLS_ENABLED: 'true' })) r.setFixtureEnv(k, v);
+    assert.equal((await r.call('army', 'alice', { action: 'join', unitId: 'kindle-home-guard', requestId: 'battle-738-join2' })).status, 200);
+    const now = Math.floor(r.now / 1000), mob = now - 30 * 86400;
+    await r.db.prepare("INSERT INTO wars (id,request_id,pair_key,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at) VALUES ('wr','r-738-bat2','kindle:korund','kindle','korund','','AI',?,?)").bind(mob - 172800, mob).run();
+    const AB = await r.importModule('lib/army-battle.ts');
+    await Promise.all([AB.recordFinishedBattles(r.db, now), AB.recordFinishedBattles(r.db, now), r.call('world', null)]);
+    const rows = (await r.db.prepare('SELECT * FROM army_battles').all()).results;
+    assert.equal(rows.length, 1, 'exactly one stored row'); assert.deepEqual([rows[0].war_id, rows[0].attacker_unit, rows[0].status, Number(rows[0].attacker_strength)], ['wr', 'kindle-home-guard', 'attacker_won', 5]);
+    await r.call('citizen', 'bob');
+    await r.db.prepare("UPDATE citizens SET nation_id = 'korund' WHERE clerk_user_id = 'bob'").run().catch(() => {});
+    await r.call('army', 'bob', { action: 'join', unitId: 'korund-home-guard', requestId: 'battle-738-join3' });
+    await AB.recordFinishedBattles(r.db, now + 3600);
+    const after = (await r.db.prepare('SELECT * FROM army_battles').all()).results;
+    assert.deepEqual(after, rows, 'replay leaves the stored result unchanged');
+    const read = await spy(r, () => r.call('army/battles', null));
+    assert.deepEqual(read.sql.filter(q => /^\s*(INSERT|UPDATE|DELETE)/i.test(q)), [], 'GET never writes');
+    assert.deepEqual([read.result.data.battles[0].status, read.result.data.battles[0].attackerStrength, read.result.data.battles[0].stored], ['attacker_won', 5, true]);
   });
 }

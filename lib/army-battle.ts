@@ -1,10 +1,11 @@
 /** #738 battles slice (docs §15.3 Resolution: battles resolve server-side in rounds every 10 real minutes from strength, terrain/fortification,
  *  supply and morale, with AI commanders deciding retreat). ARC rulings: a battle starts when an attacking unit is staged next to the defender's
  *  capital; deterministic, from current strength (which includes the #897 supply loss); every number a named constant; the capital is never
- *  captured. Derived on read (no table, no writes). Behind HARIMU_ARMY_BATTLES_ENABLED (needs HARIMU_ARMY_SUPPLY_ENABLED and its flags). */
+ *  captured. ARC on #910: a finished battle is stored once by the world tick (migration 0091 mirrors armyBattleSchemas); GETs read the stored row and derive only a
+ *  running battle. Behind HARIMU_ARMY_BATTLES_ENABLED (needs HARIMU_ARMY_SUPPLY_ENABLED and its flags). */
 import type { GameDatabase } from './database-contract';
 import { armyUnits, unitForNation } from './army-rules';
-import { marchArrivalAt, unitMarch, type ArmyWar } from './army-map';
+import { marchArrivalAt, readActiveWars, unitMarch, type ArmyWar } from './army-map';
 import { applySupplyLoss, armySupplyEnabled, PERCENT, unitSupply } from './army-supply';
 import { readUnitReadiness } from './army';
 
@@ -41,17 +42,51 @@ export function resolveBattle(attacker: Side, defender: Side, roundsElapsed: num
 /** Rounds played by `now`: the first round resolves BATTLE_ROUND_SECONDS after the unit is staged. */
 export const roundsAt = (stagedAt: number, now: number) => Math.max(0, Math.floor((now - stagedAt) / BATTLE_ROUND_SECONDS));
 
-export type Battle = BattleResult & { attackerNationId: string; defenderNationId: string; startedAt: number };
-/** The battles at `now` for every staged attacking unit. Reads current strength and morale of both units; GET only, never writes. */
-export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], now: number): Promise<Battle[]> {
-  const battles: Battle[] = [];
-  for (const unit of armyUnits) {
-    const march = unitMarch(unit.nationId, wars, now), defenderUnit = march ? unitForNation(march.war.defender_nation) : null;
-    if (!march || !defenderUnit) continue;
-    const startedAt = marchArrivalAt(march); if (now < startedAt) continue;
-    const [att, def] = await Promise.all([readUnitReadiness(db, unit.id, now), readUnitReadiness(db, defenderUnit.id, now)]);
-    const attacker = { strength: applySupplyLoss(att.strength, unitSupply(unit.nationId, wars, now).strengthLossPct), morale: att.morale };
-    battles.push({ attackerNationId: unit.nationId, defenderNationId: defenderUnit.nationId, startedAt, ...resolveBattle(attacker, def, roundsAt(startedAt, now)) });
-  }
-  return battles;
+export const armyBattleSchemas = [
+  `CREATE TABLE IF NOT EXISTS army_battles (
+ battle_key TEXT PRIMARY KEY,
+ war_id TEXT NOT NULL,
+ attacker_unit TEXT NOT NULL,
+ defender_unit TEXT NOT NULL,
+ started_at INTEGER NOT NULL,
+ rounds INTEGER NOT NULL CHECK(rounds >= 0),
+ status TEXT NOT NULL CHECK(status IN ('attacker_won','defender_won')),
+ retreated TEXT CHECK(retreated IN ('attacker','defender')),
+ attacker_strength INTEGER NOT NULL CHECK(attacker_strength >= 0),
+ defender_strength INTEGER NOT NULL CHECK(defender_strength >= 0),
+ recorded_at INTEGER NOT NULL
+)`,
+];
+/** One battle per war, attacking unit and staging arrival (ARC on #910). */
+export const battleKey = (warId: string, attackerUnit: string, startedAt: number) => `${warId}:${attackerUnit}:${startedAt}`;
+export type Battle = BattleResult & { attackerNationId: string; defenderNationId: string; startedAt: number; stored: boolean };
+type StoredRow = { battle_key: string; rounds: number; status: 'attacker_won' | 'defender_won'; retreated: 'attacker' | 'defender' | null; attacker_strength: number; defender_strength: number };
+/** The battles at `now` for every staged attacking unit: the stored result once decided (never changes), else derived from current strength and morale.
+ *  One read for stored rows; current strength is read only for battles not yet stored. Never writes. */
+export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], now: number): Promise<(Battle & { key: string; attackerUnit: string; defenderUnit: string; warId: string })[]> {
+  const staged = armyUnits.flatMap(unit => {
+    const march = unitMarch(unit.nationId, wars, now), defender = march ? unitForNation(march.war.defender_nation) : null;
+    if (!march || !defender || !march.war.id) return [];
+    const startedAt = marchArrivalAt(march);
+    return now < startedAt ? [] : [{ unit, defender, startedAt, warId: march.war.id, key: battleKey(march.war.id, unit.id, startedAt) }];
+  });
+  if (!staged.length) return [];
+  const stored = new Map(((await db.prepare(`SELECT battle_key, rounds, status, retreated, attacker_strength, defender_strength FROM army_battles WHERE battle_key IN (${staged.map(() => '?').join(',')})`)
+    .bind(...staged.map(s => s.key)).all<StoredRow>()).results ?? []).map(r => [r.battle_key, r]));
+  return Promise.all(staged.map(async s => {
+    const base = { attackerNationId: s.unit.nationId, defenderNationId: s.defender.nationId, startedAt: s.startedAt, key: s.key, attackerUnit: s.unit.id, defenderUnit: s.defender.id, warId: s.warId };
+    const row = stored.get(s.key);
+    if (row) return { ...base, stored: true, rounds: Number(row.rounds), status: row.status, retreated: row.retreated ?? null, attackerStrength: Number(row.attacker_strength), defenderStrength: Number(row.defender_strength) };
+    const [att, def] = await Promise.all([readUnitReadiness(db, s.unit.id, now), readUnitReadiness(db, s.defender.id, now)]);
+    const attacker = { strength: applySupplyLoss(att.strength, unitSupply(s.unit.nationId, wars, now).strengthLossPct), morale: att.morale };
+    return { ...base, stored: false, ...resolveBattle(attacker, def, roundsAt(s.startedAt, now)) };
+  }));
+}
+/** World tick (write path, behind the flag): store every finished, not yet stored battle once. INSERT ... ON CONFLICT DO NOTHING on the battle key, so
+ *  concurrent ticks store exactly one row and a later strength change never alters it. */
+export async function recordFinishedBattles(db: GameDatabase, now: number) {
+  const done = (await readBattles(db, await readActiveWars(db), now)).filter(b => !b.stored && b.status !== 'ongoing');
+  if (!done.length) return;
+  await db.batch(done.map(b => db.prepare(`INSERT INTO army_battles (battle_key, war_id, attacker_unit, defender_unit, started_at, rounds, status, retreated, attacker_strength, defender_strength, recorded_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (battle_key) DO NOTHING`).bind(b.key, b.warId, b.attackerUnit, b.defenderUnit, b.startedAt, b.rounds, b.status, b.retreated, b.attackerStrength, b.defenderStrength, now)));
 }
