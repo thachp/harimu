@@ -50,6 +50,15 @@ test('ARC: no data before the server accepts the token; the older-entries cue us
   assert.match(ui, /\{result\?\.ok && result\.items\.length > 0 && <div className=\{styles\.scroll\}/, 'the table renders only from an accepted, non-empty response (empty queue: status "0 items", no table)');
   assert.equal((ui.match(/<table/g) ?? []).length, 1); assert.doesNotMatch(ui, /useEffect/, 'nothing loads before Load');
   assert.match(ui, /setResult\(null\); setResult\(await load\(/, 'a new load clears the previous data first');
-  assert.match(ui, /const PAGE = 50;/); assert.match(ui, /older entries not shown/);
+  assert.match(ui, /const PAGE = 50;/); assert.match(ui, /queueStatus\(result\.items\.length, Boolean\(reason \|\| nation\), PAGE\)/); assert.match(await read('lib/mod-console.ts'), /older entries not shown/);
   assert.match(await read('lib/ai-review-queue.ts'), /limit=50/);
+});
+
+test('#880 copy (Content): status line for counts, an empty queue and an empty filter result', async () => {
+  const { queueStatus, modConsoleCopy: C } = await import('../lib/mod-console.ts');
+  assert.equal(queueStatus(0, true, 50), 'No entries match these filters');
+  assert.equal(queueStatus(0, false, 50), 'The queue is empty.');
+  assert.equal(queueStatus(1, false, 50), '1 entry'); assert.equal(queueStatus(3, true, 50), '3 entries');
+  assert.equal(queueStatus(50, false, 50), '50 entries · newest 50 shown, older entries not shown');
+  assert.equal(C.proposal, true); assert.equal(C.load, 'Load queue');
 });

@@ -18,3 +18,15 @@ export async function loadReviewQueue(token: string, filters: { reason?: string;
 
 /** Seconds since the epoch as a UTC timestamp (the routes store unix seconds). */
 export const utc = (seconds: number | null) => seconds == null ? '' : new Date(seconds * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+
+/** #880 console copy by Content (staff-only, plain and literal; filter and column labels stay the route's own field names). `proposal: true`. */
+export const modConsoleCopy = {
+  proposal: true,
+  title: 'Mod console', token: 'Admin token', load: 'Load queue', loading: 'Loading…',
+  empty: 'The queue is empty.', noMatch: 'No entries match these filters',
+  count: (n: number) => n === 1 ? '1 entry' : `${n} entries`,
+  newest: (page: number) => ` · newest ${page} shown, older entries not shown`,
+} as const;
+/** The status line for an accepted response: an empty result says whether the filters or the queue is empty. */
+export const queueStatus = (n: number, filtered: boolean, page: number) =>
+  n === 0 ? (filtered ? modConsoleCopy.noMatch : modConsoleCopy.empty) : modConsoleCopy.count(n) + (n >= page ? modConsoleCopy.newest(page) : '');
