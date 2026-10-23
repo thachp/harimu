@@ -189,6 +189,6 @@ export async function acceptOffer(db: GameDatabase, userId: string, offerId: str
     return { status: 409, reason: 'seller_short', error: 'The trade could not settle and was withdrawn.' };
   }
   // #797: checkpoint roll on the bundle the buyer just received (only after the trade has settled). Flag off: no roll, no write.
-  if (options.seizure) { const seized = await rollSeizure(db, userId, offerId, Number(offer.amount_minor), now, options.seizureRng); if (seized > 0) return { status: 200, seizedMinor: seized, notice: seizureNotice(seized) }; }
+  if (options.seizure) { const seized = await rollSeizure(db, userId, offerId, now, options.seizureRng); if (seized > 0) return { status: 200, seizedMinor: seized, notice: seizureNotice(seized) }; }
   return { status: 200 };
 }
