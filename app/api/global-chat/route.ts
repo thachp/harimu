@@ -53,6 +53,8 @@ export async function POST(request: Request) {
   if (!result.meta.changes) {
     const replay = await db.prepare('SELECT user_id,body,deleted FROM global_chat_messages WHERE id=?').bind(id).first<Prior>();
     if (replay && !same(replay)) return json({ error: 'Request already used.' }, 409); // another citizen won the same id
+    if (!replay && !(await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id)
+      return json({ error: 'Enroll in a nation first.' }, 403); // left the nation between the check and the write: the INSERT refused it
     if (!replay) return json({ error: 'Wait 10 seconds between messages; limit 20 per hour.', reason: 'rate_limited' }, 429);
   } else if (isShadowMuted(parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE), userId, t)) logShadowMuted(userId, id); // #790
   return view(db, userId, t);
