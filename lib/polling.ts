@@ -5,7 +5,7 @@ import { drawSample, maximumSample, pollDay, tallyPoll, type PollResult } from '
 import { electionId } from './elections';
 export const pollingSchemas = [
   `CREATE TABLE IF NOT EXISTS kindle_poll_answers (election_id TEXT NOT NULL, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, candidate_id TEXT NOT NULL, answered_at INTEGER NOT NULL, request_id TEXT NOT NULL UNIQUE, PRIMARY KEY (election_id, clerk_user_id))`,
-  `CREATE TABLE IF NOT EXISTS kindle_poll_snapshots (election_id TEXT NOT NULL, day INTEGER NOT NULL, n INTEGER NOT NULL CHECK(n >= 10), margin REAL NOT NULL, shares_json TEXT NOT NULL, published_at INTEGER NOT NULL, PRIMARY KEY (election_id, day))`,
+  `CREATE TABLE IF NOT EXISTS kindle_poll_snapshots (election_id TEXT NOT NULL, poll_day INTEGER NOT NULL, n INTEGER NOT NULL CHECK(n >= 10), margin_tenths INTEGER NOT NULL, shares_json TEXT NOT NULL, published_at INTEGER NOT NULL, PRIMARY KEY (election_id, poll_day))`,
 ];
 type Election = { id: string; slate: string[]; names: Record<string, string>; open: boolean };
 async function readOpenElection(db: GameDatabase, now: number): Promise<Election | null> {
@@ -17,21 +17,21 @@ async function readOpenElection(db: GameDatabase, now: number): Promise<Election
 /** Publish today's snapshot once (first read of the real day): a seeded sample of the answers given before the day began. Under the minimum, nothing is stored. */
 export async function publishDailyPoll(db: GameDatabase, election: Election, now: number) {
   const day = pollDay(now), dayStart = day * 86400;
-  if (await db.prepare('SELECT 1 AS x FROM kindle_poll_snapshots WHERE election_id=? AND day=?').bind(election.id, day).first()) return;
+  if (await db.prepare('SELECT 1 AS x FROM kindle_poll_snapshots WHERE election_id=? AND poll_day=?').bind(election.id, day).first()) return;
   const { results } = await db.prepare('SELECT candidate_id FROM kindle_poll_answers WHERE election_id=? AND answered_at<? ORDER BY clerk_user_id').bind(election.id, dayStart).all<{ candidate_id: string }>();
   const poll = tallyPoll(drawSample((results ?? []).map(r => r.candidate_id), maximumSample, `${election.id}:${day}`), election.slate);
-  if (poll) await db.prepare('INSERT INTO kindle_poll_snapshots (election_id, day, n, margin, shares_json, published_at) VALUES (?,?,?,?,?,?) ON CONFLICT (election_id, day) DO NOTHING').bind(election.id, day, poll.n, poll.margin, JSON.stringify(poll.shares), now).run();
+  if (poll) await db.prepare('INSERT INTO kindle_poll_snapshots (election_id, poll_day, n, margin_tenths, shares_json, published_at) VALUES (?,?,?,?,?,?) ON CONFLICT (election_id, poll_day) DO NOTHING').bind(election.id, day, poll.n, Math.round(poll.margin * 10), JSON.stringify(poll.shares), now).run();
 }
 export type PollView = { open: boolean; candidates: { id: string; name: string }[]; myAnswer: string | null; poll: (Omit<PollResult, 'shares'> & { day: number; publishedAt: number; shares: { candidateId: string; name: string; share: number }[] }) | null };
 export async function readPolling(db: GameDatabase, userId: string, now: number): Promise<PollView | null> {
   const election = await readOpenElection(db, now);
   if (!election) return null;
   await publishDailyPoll(db, election, now);
-  const latest = await db.prepare('SELECT day, n, margin, shares_json, published_at FROM kindle_poll_snapshots WHERE election_id=? ORDER BY day DESC LIMIT 1').bind(election.id).first<{ day: number; n: number; margin: number; shares_json: string; published_at: number }>();
+  const latest = await db.prepare('SELECT poll_day, n, margin_tenths, shares_json, published_at FROM kindle_poll_snapshots WHERE election_id=? ORDER BY poll_day DESC LIMIT 1').bind(election.id).first<{ poll_day: number; n: number; margin_tenths: number; shares_json: string; published_at: number }>();
   const mine = await db.prepare('SELECT candidate_id FROM kindle_poll_answers WHERE election_id=? AND clerk_user_id=?').bind(election.id, userId).first<{ candidate_id: string }>();
   return {
     open: election.open, candidates: election.slate.map(id => ({ id, name: election.names[id] })), myAnswer: mine?.candidate_id ?? null,
-    poll: latest ? { day: Number(latest.day), n: Number(latest.n), margin: Number(latest.margin), publishedAt: Number(latest.published_at), shares: (JSON.parse(latest.shares_json) as { candidateId: string; share: number }[]).map(s => ({ ...s, name: election.names[s.candidateId] })) } : null,
+    poll: latest ? { day: Number(latest.poll_day), n: Number(latest.n), margin: Number(latest.margin_tenths) / 10, publishedAt: Number(latest.published_at), shares: (JSON.parse(latest.shares_json) as { candidateId: string; share: number }[]).map(s => ({ ...s, name: election.names[s.candidateId] })) } : null,
   };
 }
 export type PollCommand = { action: 'answer'; candidateId: string; requestId: string } | { action: 'decline' };
