@@ -70,7 +70,7 @@ for (const backend of ['sqlite', 'postgres']) {
 
   test(`GET /api/citizen (${backend}): flag off adds nothing; on, Kindle gets civicRank from exactly one more (aggregate) query; Korund gets nothing`, async t => {
     const r = await localRuntime({ backend }); t.after(() => r.close());
-    await r.call('citizen', 'alice'); await r.call('citizen', 'kim'); await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='kim'").run();
+    await r.call('citizen', 'alice'); await r.call('citizen', 'bob'); await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run(); // a seeded citizen: the fixture seeds only alice and bob
     r.setFixtureEnv('HARIMU_CIVIC_RANK_ENABLED', 'false');
     const off = await spy(r, () => r.call('citizen', 'alice'));
     assert.equal('civicRank' in off.result.data, false); assert.equal('civicRank' in off.result.data.flags, false);
@@ -80,7 +80,8 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(on.sql.length, off.sql.length + 1, 'one extra statement, run in the second Promise.all wave with the election and first-week reads');
     assert.equal(on.result.data.civicRank.rank, 'Resident'); assert.equal(on.result.data.flags.civicRank, true);
     assert.equal(on.result.data.civicRank.progress.have.walletMinor, on.result.data.economy.walletMinor, 'the same wallet the citizen sees');
-    const korund = await spy(r, () => r.call('citizen', 'kim'));
+    const korund = await spy(r, () => r.call('citizen', 'bob'));
+    assert.equal(korund.result.status, 200); assert.equal(korund.result.data.profile.nationId, 'korund', 'a real Korund citizen, not an empty profile');
     assert.equal('civicRank' in korund.result.data, false); assert.equal(korund.sql.some(q => /primary_voter_receipts WHERE clerk_user_id/.test(q)), false);
   });
 
