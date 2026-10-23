@@ -4,6 +4,7 @@ import { PanelV2 } from './panel-v2';
 import { cityStatusStat, uiV2PanelEnabled } from '@/lib/ui-v2-panel';
 import { countryWord } from '@/lib/ui-v2-rail';
 import type { CityDestination } from '@/lib/city-destinations';
+import { itemCount, uiV2HouseholdEnabled } from '@/lib/ui-v2-household';
 
 /** #392 S3: the World and City side-panel pieces that change with NEXT_PUBLIC_HARIMU_UI_V2_PANEL. Each piece reads the build-time flag itself, so
  *  page.tsx never decides it (tests/ui-v2-panel.test.mjs renders these flag off and on, and pins that page.tsx passes no `enabled`). Existing copy only. */
@@ -37,4 +38,23 @@ export function CitySummary({ cityName, city, nation, destinations, onView, enab
   return <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
     rows={destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, onSelect: () => onView(card.id) }))}
     primary={home ? { label: home.label, onSelect: () => onView(home.id) } : undefined} />;
+}
+
+/** #392 S9 (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): the Household panel head, existing data only. Wallet, Food, Residence, and Pantry (food and materials from the
+ *  inventory); family cards with the four existing Vale portraits. Names and relations are the household's own from the original planning view (137d9d4);
+ *  no needs or mood are shown because no per-member data exists. The portraits are decorative (alt=""): each card's name is its text. */
+export const valeFamily = [
+  { id: 'citizen', name: 'You', relation: 'Citizen', image: '/assets/household/leora-vale.webp' },
+  { id: 'partner', name: 'Toma Vale', relation: 'Partner', image: '/assets/household/toma-vale.webp' },
+  { id: 'apprentice', name: 'Mika Vale', relation: 'Daughter', image: '/assets/household/mika-vale.webp' },
+  { id: 'child', name: 'Niko Vale', relation: 'Son', image: '/assets/household/niko-vale.webp' },
+] as const;
+export function HouseholdSummary({ nation, walletMinor, inventory, residence, enabled = uiV2HouseholdEnabled() }: { nation: Pick<Nation, 'name' | 'currency'>; walletMinor?: number | null; inventory?: readonly { item: string; quantity: number }[] | null; residence?: string | null; enabled?: boolean }) {
+  if (!enabled) return null;
+  const food = itemCount(inventory, 'food'), materials = itemCount(inventory, 'materials');
+  return <div className="household-v2">
+    <PanelV2 title="Household" subtitle={nation.name} rowsLabel="Household" rows={[]}
+      stats={[{ label: 'Wallet', value: `${((walletMinor ?? 0) / 100).toFixed(2)} ${nation.currency}` }, { label: 'Food', value: String(food) }, ...(residence ? [{ label: 'Residence', value: residence }] : []), { label: 'Pantry', value: `${food} food · ${materials} materials` }]} />
+    <ul className="household-v2-family" aria-label="Household members">{valeFamily.map(member => <li key={member.id}><img src={member.image} alt="" width={48} height={48} loading="lazy" /><strong>{member.name}</strong><small>{member.relation}</small></li>)}</ul>
+  </div>;
 }
