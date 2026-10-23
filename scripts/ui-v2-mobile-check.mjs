@@ -2,7 +2,7 @@
  *  City, Nation and World views, guest and signed in (citizen dock), flag off and on, at 1280x800, 390x844, 320x700 and 320x640, 100/125/150% text.
  *  Flag on, phone:
  *  - the rail + place tabs row is a bottom tab bar: at the top of the page it sits on the screen bottom (on the citizen dock when signed in), never covers the top bar,
- *    and at 100% text leaves the whole City scene uncovered (#377); scrolled to the end it sits under the panel, so nothing is hidden behind it;
+ *    may wrap to two rows (320 at 150%, ARC) but never truncates or scrolls sideways; the City scene fills the screen between the bars and its canvas fits (#377); scrolled to the end it sits under the panel, so nothing is hidden behind it;
  *  - every rail level and tab is at least 44px tall and uncovered; the panel is a bottom sheet (rounded top corners).
  *  Both: the same controls in the same DOM order with the same names as flag off; the page never scrolls sideways. Desktop with the flag on matches flag off.
  *  With LAYOUT_SHOTS_DIR, shots go to docs/screenshots/392-s8. Used by hud-layout-check.mjs; runs on its own too. */
@@ -36,7 +36,12 @@ const probe = ({ on, phone, view, scale }) => {
     if (overlaps(rects.nav, rects.hud)) issues.push('tab bar covers the top bar');
     if (rects.stage && Math.abs(rects.stage.t - rects.hud.b) > 1.5) issues.push(`${Math.round(rects.stage.t - rects.hud.b)}px gap between the top bar and the scene`);
     // A pinned bar overlays whatever scrolls under it; the page end is checked below (atEnd). At 100% text the City scene fits above the bar unscrolled (#377).
-    if (view === 'square' && scale === 1 && overlaps(rects.nav, rects.stage)) issues.push('tab bar covers the City scene at 100% text');
+    if (view === 'square' && overlaps(rects.nav, rects.stage)) issues.push('tab bar covers the City scene');
+    if (view === 'square') { const c = box('.game-stage .viewport-canvas'), d = box('.citizen-dock'), floor = Math.min(rects.nav.t, d ? d.t : vh); // #377: the canvas fits between the bars
+      if (!c || c.t < rects.hud.b - 1 || c.b > floor + 1) issues.push(`City canvas ${c ? `${Math.round(c.t)}-${Math.round(c.b)}` : 'missing'} does not fit between the bars (${Math.round(rects.hud.b)}-${Math.round(floor)})`);
+      else if (Math.abs(rects.stage.b - floor) > 1.5 && rects.stage.b - rects.stage.t > 261) issues.push(`scene ends ${Math.round(floor - rects.stage.b)}px above the tab bar`); }
+    for (const b of controls) { const t = b.querySelector('span') ?? b; if (t.scrollWidth > t.clientWidth + 1 || b.scrollWidth > b.clientWidth + 1) issues.push(`"${b.textContent.trim()}" is truncated`); } // ARC: the bar may wrap to two rows at 320/150%, never truncate
+    if (row.scrollWidth > row.clientWidth + 1) issues.push('tab bar scrolls sideways');
     for (const b of controls) { const r = b.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       if (r.height < 43.5) issues.push(`"${b.textContent.trim()}" is ${Math.round(r.height)}px tall`); if (t && !b.contains(t)) issues.push(`"${b.textContent.trim()}" is covered`); }
     const p = q('.game-inspector'); if (p && parseFloat(getComputedStyle(p).borderTopLeftRadius) < 8) issues.push('panel is not a sheet');
@@ -59,7 +64,12 @@ export async function checkUiV2Mobile({ browser, css, preflight, failures, rows 
       for (const view of ['square', 'country', 'world']) for (const dock of [false, true]) {
         const id = `${w}x${h} @${scale * 100}% S8 ${view}${dock ? ' signed in' : ''} (flag ${on ? 'on' : 'off'})`, key = `${w}x${h}@${scale}/${view}/${dock}`;
         await page.evaluate(([p, d]) => window.mount(p, d), [{ ...shellProps, view }, dock]); await page.waitForSelector('.game-nav-row', { state: 'attached', timeout: 5000 }).catch(() => {}); await page.waitForTimeout(200);
-        const r = await page.evaluate(probe, { on, phone, view, scale }), issues = [...r.issues, ...(on && phone ? await page.evaluate(atEnd) : [])];
+        if (phone) await page.waitForFunction(() => { const c = document.querySelector('.game-stage .viewport-canvas, .game-stage'); const h = Math.round(c?.getBoundingClientRect().height ?? 0); const same = h === window.__lastH; window.__lastH = h; return same; }, null, { polling: 100, timeout: 5000 }).catch(() => {}); // the canvas size has settled (deterministic shots)
+        const late = on && phone && view === 'square' && !dock ? await page.evaluate(async () => { // a dock that mounts after the shell (signing in on City) is measured too
+          const main = document.querySelector('.harimu-game'), d = document.createElement('nav'); d.className = 'citizen-dock'; d.style.height = '45px'; main.appendChild(d);
+          await new Promise(r => setTimeout(r, 120)); const v = main.style.getPropertyValue('--s8-dock'); d.remove(); await new Promise(r => setTimeout(r, 120));
+          return v === '45px' && main.style.getPropertyValue('--s8-dock') === '0px' ? '' : `late dock not measured (--s8-dock ${v})`; }) : '';
+        const r = await page.evaluate(probe, { on, phone, view, scale }), issues = [...(late ? [late] : []), ...r.issues, ...(on && phone ? await page.evaluate(atEnd) : [])];
         if (!on) base[key] = r; else if (base[key]) {
           if (base[key].names && r.names && base[key].names.join() !== r.names.join()) issues.push(`controls changed: ${r.names.join()} vs ${base[key].names.join()}`);
           if (!phone && JSON.stringify(base[key].rects) !== JSON.stringify(r.rects)) issues.push('desktop layout changed with the flag on');

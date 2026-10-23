@@ -18,8 +18,10 @@ export type Eligible = { id: string; city: string | null };
 
 export const conscriptionSchemas = [
   `CREATE TABLE IF NOT EXISTS army_drafts (nation_id TEXT NOT NULL, game_week INTEGER NOT NULL, token TEXT NOT NULL, drafted INTEGER NOT NULL CHECK(drafted >= 0), ran_at INTEGER NOT NULL, PRIMARY KEY (nation_id, game_week))`,
-  `CREATE TABLE IF NOT EXISTS army_conscripts (clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, nation_id TEXT NOT NULL, game_week INTEGER NOT NULL, serve_until INTEGER NOT NULL, PRIMARY KEY (clerk_user_id, game_week))`,
+  `CREATE TABLE IF NOT EXISTS army_conscripts (clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, nation_id TEXT NOT NULL, game_week INTEGER NOT NULL, serve_until INTEGER NOT NULL, stayed_at INTEGER, PRIMARY KEY (clerk_user_id, game_week))`,
 ];
+/** ARC on #839 (migration 0082): stayed_at marks a conscript who chose to stay after the term; they are not released. */
+export const conscriptStayColumn = 'ALTER TABLE army_conscripts ADD COLUMN stayed_at INTEGER';
 /** Stable 32-bit FNV-1a: the same week and roster always draw the same citizens, so a replayed or concurrent draft agrees. */
 const rank = (seed: string) => { let h = 0x811c9dc5; for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 0x01000193) >>> 0; return h; };
 export function pickConscripts(nation: string, week: number, eligible: readonly Eligible[]): string[] {
@@ -59,4 +61,20 @@ export async function serviceUntil(db: GameDatabase, userId: string, nowSec: num
   const row = await db.prepare('SELECT MAX(serve_until) AS until FROM army_conscripts WHERE clerk_user_id = ?').bind(userId).first<{ until: number | null }>();
   const until = Number(row?.until ?? 0);
   return until > nowSec ? until : null;
+}
+/** ARC on #839: at term end a conscript leaves the unit and is draft-eligible again, unless they chose to stay. Only the latest term counts,
+ *  so an older expired term never releases a newer one (conscription nations take no volunteers). Idempotent. */
+export async function releaseExpired(db: GameDatabase, nationId: string, nowSec: number) {
+  const unit = unitForNation(nationId);
+  if (!unit) return 0;
+  const res = await db.prepare(`DELETE FROM army_members WHERE unit_id = ? AND clerk_user_id IN (
+      SELECT c.clerk_user_id FROM army_conscripts c WHERE c.nation_id = ? AND c.serve_until <= ? AND c.stayed_at IS NULL
+        AND c.game_week = (SELECT MAX(game_week) FROM army_conscripts x WHERE x.clerk_user_id = c.clerk_user_id))`).bind(unit.id, nationId, nowSec).run();
+  return Number(res.meta?.changes ?? 0);
+}
+/** Marks the serving term as "stay"; true when a serving (or already staying) term exists. */
+export async function stayAfterTerm(db: GameDatabase, userId: string, nowSec: number) {
+  await db.prepare(`UPDATE army_conscripts SET stayed_at = ? WHERE clerk_user_id = ? AND stayed_at IS NULL AND serve_until > ?
+    AND game_week = (SELECT MAX(game_week) FROM army_conscripts x WHERE x.clerk_user_id = army_conscripts.clerk_user_id)`).bind(nowSec, userId, nowSec).run();
+  return !!(await db.prepare('SELECT 1 AS x FROM army_conscripts WHERE clerk_user_id = ? AND serve_until > ? AND stayed_at IS NOT NULL').bind(userId, nowSec).first());
 }

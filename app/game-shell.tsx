@@ -119,6 +119,18 @@ export function GameShell({ worldClock, holidayName, nextDeadline, view, nation,
   // #379: a visitor (guest, signed out, local demo, or signed in with no citizenship yet) is not a citizen. `visitorSession` comes from isVisitorSession(), which is false while the session loads or errors, so a citizen reloading a city never sees visitor wording and the scene is not rebuilt after load.
   const visitor = !citizenNation && visitorSession;
   const hasPanel = !collapsed;
+  // #392 S8 follow-up (#377): on a phone the scene fills the screen between the top bar and the bottom tab bar (and citizen dock); CSS reads these heights.
+  const mobileV2 = uiV2MobileEnabled();
+  useEffect(() => {
+    if (!mobileV2 || typeof ResizeObserver === 'undefined') return;
+    const root = document.querySelector<HTMLElement>('.harimu-game.game-mobile-v2'); if (!root) return;
+    const sync = () => { for (const [name, sel] of [['--s8-top', '.game-hud'], ['--s8-tabs', '.game-nav-row'], ['--s8-dock', '.citizen-dock']] as const) root.style.setProperty(name, `${root.querySelector(sel)?.getBoundingClientRect().height ?? 0}px`); };
+    const observer = new ResizeObserver(sync), watched = new Set<Element>();
+    const attach = () => { for (const el of root.querySelectorAll('.game-hud, .game-nav-row, .citizen-dock')) if (!watched.has(el)) { watched.add(el); observer.observe(el); } sync(); };
+    // Bars that mount later (the citizen dock after signing in on City) or unmount are picked up: a child-list change re-attaches and re-measures.
+    const mutations = new MutationObserver(attach); mutations.observe(root, { childList: true }); attach();
+    return () => { observer.disconnect(); mutations.disconnect(); };
+  }, [mobileV2, view]);
   useEffect(() => { document.getElementById('game-details')?.querySelector('.game-inspector-body')?.scrollTo({top:0,left:0}); }, [view,nation.id]);
   const close = () => { setCollapsed(true); setSelection(null); requestAnimationFrame(() => document.getElementById('game-reopen')?.focus()); };
   useEffect(() => {

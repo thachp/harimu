@@ -46,8 +46,9 @@ import { homeCityMoveSchemas } from './home-move'; // #781
 import { voteBuyingEventsSchema } from './vote-buying-watch'; // #825
 import { savingsShieldCreditsSchema, marketSalesTaxSchema } from './market-orders'; // #824, #844
 import { pollingSchemas } from './polling'; // #740
+import { plankVoteSchemas } from './plank-votes'; // #831
 import { armySchemas, armyDrillSchemas } from './army'; // #738
-import { conscriptionSchemas } from './army-conscription'; // #738 slice 3
+import { conscriptionSchemas, conscriptStayColumn } from './army-conscription'; // #738 slice 3
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
 import { townHallSchemas } from './town-hall'; // #441
@@ -250,6 +251,7 @@ async function initialize(database: GameDatabase) {
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...aiReviewQueueSchemas.map(sql=>database.prepare(sql)), // #753
     ...pollingSchemas.map(sql=>database.prepare(sql)), // #740
+    ...plankVoteSchemas.map(sql=>database.prepare(sql)), // #831
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...conscriptionSchemas.map(sql=>database.prepare(sql)), // #738 slice 3
@@ -397,6 +399,10 @@ async function initialize(database: GameDatabase) {
   if (!citizenColumnNames.has('last_active_at')) { // #739 (migration 0069): general activity for dormancy, backfilled with now (no false Welcome back)
     await database.batch([database.prepare('ALTER TABLE citizens ADD COLUMN last_active_at TEXT'), database.prepare("UPDATE citizens SET last_active_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE last_active_at IS NULL")]);
   }
+
+  // #738 (migration 0082): army_conscripts gained stayed_at; a local database created before it gets the column once.
+  const conscriptColumns = await database.prepare('PRAGMA table_info(army_conscripts)').all<{ name: string }>();
+  if (!conscriptColumns.results.some(column => column.name === 'stayed_at')) await database.prepare(conscriptStayColumn).run();
 
   // #400: treaties gained broken_by (migration 0040); a local database created before it gets the column once.
   const treatyColumns = await database.prepare('PRAGMA table_info(treaties)').all<{ name: string }>();
