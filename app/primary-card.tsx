@@ -5,6 +5,7 @@ import { primariesCopy } from '../lib/campaign-copy';
 import { NationDocument } from './nation-document';
 import { AiBadge } from './ai-disclosure';
 import { ActionButton } from './action-button';
+import { SessionRetry, useLoadRetry } from './session-retry';
 import { GameTimer } from './game-timer';
 
 type Snapshot = PrimarySnapshot & { eligibility?: { eligible: boolean; reason: string }; error?: string };
@@ -51,11 +52,12 @@ export function PrimaryPanel({ snapshot, ranking, onRank, onJoin, onLeave, onVot
 /** Renders nothing while the flag is off (GET /api/primaries answers 404). */
 export function PrimaryCard() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null), [ranking, setRanking] = useState<string[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const load = useLoadRetry(), { fail: loadFail, attempt: loadAttempt } = load;
   const refresh = useCallback(async (signal?: AbortSignal) => {
-    try { const response = await fetch('/api/primaries', { cache: 'no-store', signal }); if (!response.ok) { setSnapshot(null); return; } setSnapshot(await response.json() as Snapshot); } catch { /* the card simply stays as it was */ }
-  }, []);
-  useEffect(() => { const controller = new AbortController(); const timer = setTimeout(() => void refresh(controller.signal), 0); return () => { clearTimeout(timer); controller.abort(); }; }, [refresh]);
-  if (!snapshot) return null;
+    try { const response = await fetch('/api/primaries', { cache: 'no-store', signal }); if (!response.ok) { if (response.status >= 500) loadFail(); setSnapshot(null); return; } setSnapshot(await response.json() as Snapshot); } catch { if (!signal?.aborted) loadFail(); /* the card simply stays as it was; #928: Retry when there is nothing to show */ }
+  }, [loadFail]);
+  useEffect(() => { const controller = new AbortController(); const timer = setTimeout(() => void refresh(controller.signal), 0); return () => { clearTimeout(timer); controller.abort(); }; }, [refresh, loadAttempt]);
+  if (!snapshot) return load.failed ? <SessionRetry name={'Kindle party primaries'} onRetry={load.retry} /> : null;
   const reason = busy ? 'Saving.' : !snapshot.privacyReady ? snapshot.privacyReason : snapshot.eligibility && !snapshot.eligibility.eligible ? snapshot.eligibility.reason : null;
   const send = async (command: Record<string, unknown>) => {
     setBusy(true); setError('');

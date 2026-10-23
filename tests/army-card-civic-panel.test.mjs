@@ -14,7 +14,7 @@ test('Civic panel: ArmyCard renders after GovernmentPanel, keyed on the citizen 
   const require = createRequire(import.meta.url), w = new Window({ url: 'http://localhost/' }); globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const React = require('react'), { createRoot } = require('react-dom/client'), { act } = React;
   const js = ts.transpileModule(readFileSync('app/army-card.tsx', 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
-  const mod = { exports: {} }; new Function('exports', 'require', 'module', js)(mod.exports, n => n.startsWith('@/lib/') ? require(`../lib/${n.slice(6)}.ts`) : require(n), mod);
+  const mod = { exports: {} }; new Function('exports', 'require', 'module', js)(mod.exports, n => n === './session-retry' ? (() => { const m = { exports: {} }; new Function('exports', 'require', 'module', ts.transpileModule(readFileSync('app/session-retry.tsx', 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText)(m.exports, require, m); return m.exports; })() : n.startsWith('@/lib/') ? require(`../lib/${n.slice(6)}.ts`) : require(n), mod);
   const army = { unit: { id: 'kindle-home-guard', name: 'Kindle Home Guard', officer: 'Captain Ardent', memberCount: 0, openToVolunteers: true }, member: false, stance: null };
   let signedIn = false;
   globalThis.fetch = async url => ({ ok: url !== '/api/army' || signedIn, status: url === '/api/army' && !signedIn ? 401 : 200, json: async () => (url === '/api/army' ? { army } : {}) });

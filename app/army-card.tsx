@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react';
 import { armyFailureNote, squadStance, unitCard, unitMembership } from '@/lib/army-copy';
 import { armyStances, type ArmyCommand } from '@/lib/army-rules';
+import { SessionRetry, okOr5xx, useLoadRetry } from './session-retry';
 import type { ArmyView } from '@/lib/army';
 
 const fill = (text: string, unit: string, officer = '') => text.replace('{unit}', unit).replace('{officer}', officer);
 export function ArmyCard() {
   const [army, setArmy] = useState<ArmyView | null>(null), [note, setNote] = useState('');
-  useEffect(() => { fetch('/api/army/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"action":"open"}' }).catch(() => null).then(() => fetch('/api/army')).then(r => r.ok ? r.json() as Promise<{ army?: ArmyView }> : null).then(d => setArmy(d?.army ?? null)).catch(() => setArmy(null)); }, []);
-  if (!army?.unit) return null;
+  const load = useLoadRetry(), { fail: loadFail, attempt: loadAttempt } = load;
+  useEffect(() => { fetch('/api/army/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"action":"open"}' }).catch(() => null).then(() => fetch('/api/army')).then(okOr5xx).then(r => r.ok ? r.json() as Promise<{ army?: ArmyView }> : null).then(d => setArmy(d?.army ?? null)).catch(() => { setArmy(null); loadFail(); }); }, [loadAttempt, loadFail]); // #928: a 5xx or offline load offers Retry
+  if (!army?.unit) return load.failed ? <SessionRetry name={'Your unit'} onRetry={load.retry} /> : null;
   const unit = army.unit;
   const send = async (body: Record<string, unknown>, done: string) => {
     const res = await fetch('/api/army', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, requestId: crypto.randomUUID() }) });

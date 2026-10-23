@@ -1,12 +1,14 @@
 'use client';
 // #831: Kindle party plank up-votes. Hidden unless GET /api/planks answers (HARIMU_PLANK_VOTES_ENABLED on) and the citizen is a party member.
 import { useEffect, useState } from 'react';
+import { SessionRetry, okOr5xx, useLoadRetry } from './session-retry';
 import type { PlankView } from '@/lib/plank-votes';
 
 export function PlankVotes() {
   const [view, setView] = useState<PlankView | null>(null), [eligible, setEligible] = useState(false), [note, setNote] = useState('');
-  useEffect(() => { fetch('/api/planks').then(r => r.ok ? r.json() as Promise<{ planks?: PlankView; eligible?: boolean }> : null).then(d => { setView(d?.planks ?? null); setEligible(!!d?.eligible); }).catch(() => setView(null)); }, []);
-  if (!view?.party) return null;
+  const load = useLoadRetry(), { fail: loadFail, attempt: loadAttempt } = load;
+  useEffect(() => { fetch('/api/planks').then(okOr5xx).then(r => r.ok ? r.json() as Promise<{ planks?: PlankView; eligible?: boolean }> : null).then(d => { setView(d?.planks ?? null); setEligible(!!d?.eligible); }).catch(() => { setView(null); loadFail(); }); }, [loadAttempt, loadFail]); // #928: a 5xx or offline load offers Retry
+  if (!view?.party) return load.failed ? <SessionRetry name={'Platform planks'} onRetry={load.retry} /> : null;
   const send = async (action: 'upvote' | 'withdraw', pledgeKey: string) => {
     const res = await fetch('/api/planks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, pledgeKey }) });
     const data = await (res.json() as Promise<{ planks?: PlankView; error?: string }>).catch(() => ({ error: String(res.status) }) as { planks?: PlankView; error?: string });
