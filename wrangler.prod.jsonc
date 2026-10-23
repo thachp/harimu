@@ -23,7 +23,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "vars": {
-    // #790: square chat shadow-mute (docs 21.3), new messages only. Operator list of citizenId@ISO8601 entries (max 90), comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.
+    // #790: square chat shadow-mute (docs 21.3), new messages only. Operator list of citizenId@muteISO or citizenId@muteISO..unmuteISO entries (max 90; unmute by closing the window, not deleting it), comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.
     "HARIMU_CHAT_SHADOW_MUTE": "",
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaGFyaW11LmNvbSQ",
     "HARIMU_ACCOUNT_ELECTION_POC_ENABLED": "false",
