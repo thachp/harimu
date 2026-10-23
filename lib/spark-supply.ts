@@ -77,7 +77,11 @@ export async function readReserveBoard(db: GameDatabase, now: number): Promise<R
     db.prepare(`SELECT ${columns} FROM spark_issuances ORDER BY issued_at, supply_after_minor, id`).all<Row>()]));
   const seed = await seedRow(db);
   if (!seed) return { moneySupplyMinor: await liveSupply(db), lastIssuance: null, priceIndex: sparkConfig.priceBase };
-  const [latest, last, epoch, { results: rows }] = await reads;
+  const [early, last, epoch, { results: earlyRows }] = await reads;
+  // The early reads may predate the seed (first write) or each other. Serially, the latest row was read after the seed and the full rows after it, so
+  // re-read in that order when the early latest is missing or the early rows lack it; rows are append-only, so the early ones are otherwise no older.
+  const latest = early ?? await latestRow(db);
+  const rows = latest && earlyRows.some(row => row.id === latest.id) ? earlyRows : (await db.prepare(`SELECT ${columns} FROM spark_issuances ORDER BY issued_at, supply_after_minor, id`).all<Row>()).results;
   const supply = Number(latest!.supply_after_minor);
   // Weekly samples for the window, ending now: the supply at each week's end (from the rows) and the shifts settled in it (Kindle's shift ledger).
   const weekSeconds = sparkConfig.gameWeekSeconds, nowWeek = Math.floor((now - epoch) / weekSeconds), seedWeek = Math.floor((Number(seed.issued_at) - epoch) / weekSeconds);
