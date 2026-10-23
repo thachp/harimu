@@ -56,3 +56,13 @@ test('the size limit reports input-too-long, not input-unsafe, and sends nothing
  assert.equal(out.failureCode,'not-sent');assert.equal(out.rejectedAt,'input-too-long');assert.equal(ai.calls.length,0);
  assert.ok(lines.includes('[notables] reply rejected at input-too-long'));
 });
+test('#766: a time-window question gets a cumulative-ledger answer, and both prompts say so',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());
+ const question='What recorded work was completed in Kindle today?';
+ const draft={title:'Recorded work',summary:'The public ledger records completed paid shifts as a running record. It does not break that work down by day.',claims:['completedShifts']};
+ const ai=scripted(['safe',draft,{supported:true},'safe']);
+ const out=await r.answerNotable('alice',{...ask(),question},ai,{enabled:true,budget});
+ assert.equal(out.source,'model',JSON.stringify(out));assert.equal(out.rejectedAt,undefined);
+ assert.match(ai.calls[1].input.messages[0].content,/Facts are cumulative ledger counts, not per-day; if asked about a time window, say the record does not break it down by day\./);
+ assert.match(ai.calls[2].input.messages[0].content,/The server appends the claimed counts afterwards, so prose that only names the measured ledgers or says the record does not break things down by day is supported\./);
+});
