@@ -1,0 +1,30 @@
+# #501 one-off (Patrick, Oct 22): create or reset the restricted runtime role harimu_production_app on the shared PlanetScale database, then run the Worker's startup role check as it.
+# Manual only, behind the `production` environment approval. Secret NAMES only: PREVIEW_DATABASE_ADMIN_URL, PRODUCTION_RUNTIME_ROLE_PASSWORD. Idempotent; prints no values.
+name: Create production runtime role
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  role:
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && github.event.repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create the role and run the role check
+        env:
+          PREVIEW_DATABASE_ADMIN_URL: ${{ secrets.PREVIEW_DATABASE_ADMIN_URL }}
+          PRODUCTION_RUNTIME_ROLE_PASSWORD: ${{ secrets.PRODUCTION_RUNTIME_ROLE_PASSWORD }}
+        run: node scripts/create-production-runtime-role.mjs
