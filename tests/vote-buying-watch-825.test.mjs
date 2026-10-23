@@ -48,6 +48,25 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await events(r), [{ election_key: 'civic:e825', voter_id: 'v2', sender_id: cand, transfer_id: 'gift:c1', reason: 'campaign' }]);
   });
 
+  test(`(${backend}) QA3: the candidate list is exactly the primaries hopefuls; an empty list skips the clause and the sweep SQL still runs`, async t => {
+    const { r, now, gifts, w } = await setup(backend); t.after(() => r.close());
+    const { hopefuls } = await r.importModule('lib/primaries-rules.ts');
+    assert.deepEqual([...w.voteBuyingCandidateIds], hopefuls.map(h => h.id)); assert.ok(w.voteBuyingCandidateIds.length > 0);
+    assert.equal(w.candidateSenderSql([]), ''); assert.equal(w.candidateSenderSql(["o'k"]), "h.sender IN ('o''k') OR ");
+    const sql = w.voteBuyingSweepSql(gifts([['g', 'plain', 'v1', now]]));
+    for (const c of w.voteBuyingCandidateIds) assert.ok(sql.includes(`'${c}'`), c);
+    await r.db.prepare(sql.replace(w.candidateSenderSql(w.voteBuyingCandidateIds), w.candidateSenderSql([]))).bind(now, now, now, 1, 1, now).run();
+  });
+
+  test(`(${backend}) QA1: no event for a party-member gift at vote+49h, or a self-gift by a party member who voted`, async t => {
+    const { r, now, vote, gifts, w } = await setup(backend); t.after(() => r.close());
+    await r.db.prepare("INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,ballot_written,policy) SELECT election_id,'boss','rq-boss',checked_at,ballot_written,policy FROM civic_voter_receipts WHERE clerk_user_id='v1'").run();
+    await w.runVoteBuyingWatch(r.db, now + 40 * H, gifts([['late', 'boss', 'v1', vote + 49 * H]]));
+    assert.deepEqual(await events(r), [], '(a) after-vote limit: +49h is outside the 48h window');
+    await w.runVoteBuyingWatch(r.db, now, gifts([['self', 'boss', 'boss', vote + H]]));
+    assert.deepEqual(await events(r), [], '(c) self-gift: sender = voter never flags');
+  });
+
   test(`sweep (${backend}): an ordinary market purchase at the listed price by a party member records no event (and with no direct sources there is no query)`, async t => {
     const { r, now, vote, fill, w } = await setup(backend); t.after(() => r.close());
     await fill('boss', 'v1', vote + H); await fill('canvasser', 'v2', vote - H);
@@ -83,4 +102,14 @@ test('admin route: flag off or short token = 404, wrong bearer = 401, right bear
   assert.equal((await get('Bearer wrong-token-wrong-token')).status, 401);
   const ok = await get(`Bearer ${token}`); assert.equal(ok.status, 200);
   assert.deepEqual((await ok.json()).events.map(e => [e.voterId, e.senderId, e.reason]), [['v1', 'boss', 'party-member']]);
+});
+
+test('QA1 (b): a gift to a voter in a non-Kindle election records no event (sqlite: the CHECK pins civic elections to Kindle, so the fixture bypasses it)', async t => {
+  const { r, now, vote, gifts, w } = await setup('sqlite'); t.after(() => r.close());
+  await r.db.prepare('PRAGMA ignore_check_constraints=ON').run();
+  await r.db.prepare("INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) VALUES ('e-korund','korund','[\"a\",\"b\",\"c\"]',?,?)").bind(vote - H, vote - H + 259200).run();
+  await r.db.prepare('PRAGMA ignore_check_constraints=OFF').run();
+  await r.db.prepare("UPDATE civic_voter_receipts SET election_id='e-korund' WHERE clerk_user_id='v1'").run();
+  await w.runVoteBuyingWatch(r.db, now, gifts([['nk', 'boss', 'v1', vote + H]]));
+  assert.deepEqual(await events(r), []);
 });
