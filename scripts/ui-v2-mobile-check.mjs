@@ -71,6 +71,9 @@ const sheetToggle = async page => { // #874: collapsed, the map controls clear t
   const issues = [];
   await page.focus('#game-details .game-inspector-title button'); await page.keyboard.press('Enter'); await page.waitForTimeout(250);
   let s = await state();
+  const ring = await page.evaluate(() => { const o = document.querySelector('#game-reopen'), r = o.getBoundingClientRect(), cs = getComputedStyle(o), out = parseFloat(cs.outlineWidth) + parseFloat(cs.outlineOffset);
+    return cs.outlineStyle === 'none' ? 'no focus ring' : r.left - out < -0.5 || r.right + out > document.documentElement.clientWidth + 0.5 ? `focus ring off-screen by ${out}px` : ''; }); // #890 (QA1)
+  if (ring) issues.push(`Show details bar: ${ring}`);
   if (s.open || s.exp !== 'false' || s.focus !== 'game-reopen' || s.h < 43.5) issues.push(`collapse by keyboard: ${JSON.stringify(s)}`);
   if (s.gap < -1.5) issues.push(`collapsed, the scene still runs ${-s.gap}px under the Show details bar`);
   if (`${s.sh}px` !== s.sheetVar && Math.abs(parseFloat(s.sheetVar) - s.sh) > 1) issues.push(`collapsed sheet not measured (${s.sheetVar} vs ${s.sh})`);
