@@ -10,6 +10,7 @@ export const cronJobFlags = {
   spark: ['HARIMU_SPARK_SUPPLY_ENABLED'],
   ledger: ['HARIMU_LEDGER_RECONCILIATION_ENABLED'],
   tesseraRewards: ['HARIMU_TESSERA_REWARDS_ENABLED'],
+  rallies: ['HARIMU_KINDLE_RALLIES_ENABLED'],
 } as const;
 export type CronJob = keyof typeof cronJobFlags;
 

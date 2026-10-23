@@ -129,6 +129,8 @@
     "HARIMU_PLANK_VOTES_ENABLED": "true",
     // #863: Kindle campaign donations PoC (docs 9.4): Tier-1 citizens donate Spark to an AI party, capped per party per week and publicly listed; never votes, ballot or primary weight. Off: /api/party-donations is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_PARTY_DONATIONS_ENABLED": "true",
+    // #867: Kindle rallies PoC (docs 9.4): one weekly rally per AI candidate in a Kindle city square, citizens mark attend once, an AI-labeled news clip after the rally; visibility only, never votes. Off: /api/rallies is 404, the card and news clips are hidden, the cron job never opens the database. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_KINDLE_RALLIES_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).

@@ -47,6 +47,7 @@ import { voteBuyingEventsSchema } from './vote-buying-watch'; // #825
 import { savingsShieldCreditsSchema, marketSalesTaxSchema, playerFillSalesTaxSchema, partyDonationsSchema, partyDonationsIndex, partyDonationsPartyIndex } from './market-orders'; // #824, #844, #863
 import { pollingSchemas } from './polling'; // #740
 import { plankVoteSchemas } from './plank-votes'; // #831
+import { rallySchemas } from './rallies'; // #867
 import { armySchemas, armyDrillSchemas } from './army'; // #738
 import { conscriptionSchemas, conscriptStayColumn } from './army-conscription'; // #738 slice 3
 import { holySiteSchemas } from './holy-sites'; // #855
@@ -253,6 +254,7 @@ async function initialize(database: GameDatabase) {
     ...aiReviewQueueSchemas.map(sql=>database.prepare(sql)), // #753
     ...pollingSchemas.map(sql=>database.prepare(sql)), // #740
     ...plankVoteSchemas.map(sql=>database.prepare(sql)), // #831
+    ...rallySchemas.map(sql=>database.prepare(sql)), // #867
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...conscriptionSchemas.map(sql=>database.prepare(sql)), // #738 slice 3
