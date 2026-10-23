@@ -69,3 +69,12 @@ test('contrast: every top bar text color is AA (4.5:1) and every focus outline i
     }
   }
 });
+
+test('ARC on #819: chip hover uses the nation accent, and each accent is at least 3:1 against its own ground (otherwise the shared teal must stay)', () => {
+  const hover = rules.find(r => /:hover/.test(r.sel) && /\.game-resources/.test(r.sel)); assert.ok(hover, 'a skinned chip hover rule'); assert.match(hover.body, /border-color:var\(--skin-accent\)/);
+  for (const id of skinnedNations) {
+    const body = rules.find(r => r.sel === `header.game-hud[data-nation-skin=${id}]`).body, get = k => body.match(new RegExp(`--skin-${k}:(#[0-9a-f]{6})`))[1];
+    assert.ok(ratio(get('accent'), get('ground')) >= 3, `${id} accent ${get('accent')} on ${get('ground')}: ${ratio(get('accent'), get('ground')).toFixed(2)}`);
+    assert.ok(ratio(get('accent'), get('chip')) >= 3, `${id} accent on chip`);
+  }
+});

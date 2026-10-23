@@ -428,6 +428,8 @@ header.game-hud[data-nation-skin] .game-resources>div,header.game-hud[data-natio
 header.game-hud[data-nation-skin] .game-crest{border-color:var(--skin-accent)}
 /* QA1 on #819: a focused control gets a halo of the solid ground just past its ring (2px outline, offset up to 3px), so the ring never sits next to a motif strip or chip edge */
 header.game-hud[data-nation-skin] :focus-visible{box-shadow:0 0 0 6px var(--skin-ground)}
+/* ARC on #819: resource chip hover and open use the nation accent (each accent measures >=3:1 against its own ground; pinned in tests/nation-skin-85.test.mjs) on the nation chip ground */
+header.game-hud[data-nation-skin] .game-resources>.game-hud-help:hover,header.game-hud[data-nation-skin] .game-resources>.game-wallet-button:hover,header.game-hud[data-nation-skin] .game-resources>.game-hud-help[open]{border-color:var(--skin-accent);background:var(--skin-chip)}
 /* Kindle, a modern civic form: basalt ground, ember header rule, brass base line */
 header.game-hud[data-nation-skin=kindle]{--skin-ground:#1a110c;--skin-chip:#26180f;--skin-edge:#6b4426;--skin-accent:#d9692b;box-shadow:inset 0 3px 0 #d9692b,inset 0 -1px 0 #b08a4a}
 /* Korund, a stamped ration booklet: slate ground, ochre perforated edge */

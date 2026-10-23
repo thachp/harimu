@@ -4,7 +4,8 @@
  *  - layout is identical: the bar and every element in it keep the flag-off box (position and size), and the bar text is unchanged;
  *  - every visible text in the bar has at least 4.5:1 against the ground under it; a keyboard focus ring (at least 2px) shows on the first bar control;
  *  - QA1 on #819: for every focusable control in the bar, the rendered pixels just outside and just inside its focus ring (ground, chips and the nation motif strips)
- *    are at least 3:1 against the ring color (sampled from a screenshot with the control focused, straight edges only, corners skipped).
+ *    are at least 3:1 against the ring color (sampled from a screenshot with the control focused, straight edges only, corners skipped);
+ *  - ARC on #819: a hovered resource chip's border (the nation accent) is at least 3:1 against the bar.
  *  Both: the page never scrolls sideways. With LAYOUT_SHOTS_DIR, shots of the bar go to docs/screenshots/85. Used by hud-layout-check.mjs; runs on its own too. */
 import { bundleShell, shellProps } from './hud-tooltip-check.mjs';
 import { isMain, runStandalone } from './layout-standalone.mjs';
@@ -98,6 +99,11 @@ export async function checkNationSkin({ browser, css, preflight, failures, rows 
             if (worst < 3) fail(`focus ring on "${ring.name}" is ${worst.toFixed(2)}:1 against ${at}`);
           }
           if (!rings) fail('no focus ring measured');
+          await page.evaluate(() => document.activeElement?.blur()); const chip = page.locator('header.game-hud .game-resources>:is(.game-hud-help,.game-wallet-button)').first();
+          if (await chip.isVisible()) { await chip.hover(); await page.waitForTimeout(50); // ARC on #819: the hover border is the nation accent at >= 3:1 against the bar
+            const k = await page.evaluate(() => { const lum = c => (c.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+              const el = document.querySelector('header.game-hud .game-resources>:is(.game-hud-help,.game-wallet-button)'), a = lum(getComputedStyle(el).borderTopColor), b = lum(getComputedStyle(document.querySelector('header.game-hud')).backgroundColor); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); });
+            if (k < 3) fail(`chip hover border is ${k.toFixed(2)}:1 against the bar`); }
         }
         await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(0, h - 1);
 
