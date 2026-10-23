@@ -7,8 +7,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Economy } from '@/lib/economy';
 import { orderBookLimits, type OrderBookState } from '@/lib/order-book-rules';
 import { shelfLifeDays } from '@/lib/spoilage-rules';
-import { boardLabels, cancelConfirmation, emptyStates, escrowPreview, fillNotice, orderStateLines, rejectionFor, rejectionForReason, rejections, spoilageHints, type Line, type RejectionKey } from '@/lib/market-board-copy';
+import { boardLabels, cancelConfirmation, emptyStates, escrowPreview, fillNotice, orderStateLines, rejectionFor, refusedCheckLines, rejectionForReason, rejections, spoilageHints, type Line, type RejectionKey } from '@/lib/market-board-copy';
 import { ActionButton } from './action-button';
+import { marketFeeLabel } from '@/lib/market-fee'; // #777
 import { freshLiveText, moveLabel, priceMoves, startTicker, tickAnnouncer, tickerCopy, type Moves } from '@/lib/market-ticker';
 import { useDisplayTimestamp } from './display-preferences';
 
@@ -27,7 +28,9 @@ export function parseOrderPrice(value: string): number | null {
   return minor >= 1 && minor <= orderBookLimits.maxUnitMinor ? minor : null;
 }
 /** Maps an order API error to one of Content's rejection lines (by `reason` code, then by the API message), else the server's own words. */
-export function rejectionText(status: number, error: string | undefined, reason: string | undefined) {
+export function rejectionText(status: number, error: string | undefined, reason: string | undefined, refusedCheck?: string, good?: string) {
+  // #733: a refused order names the guard that failed; older responses without it keep the generic line.
+  if (refusedCheck && Object.hasOwn(refusedCheckLines, refusedCheck)) return fillLine(refusedCheckLines[refusedCheck as keyof typeof refusedCheckLines], { ...limitVars, good: good ?? 'goods' });
   const hit = (reason ? rejectionForReason(reason) : undefined) ?? (error ? rejections.find(r => r.code === null && error.includes(r.source)) : undefined)
     ?? (status === 401 ? rejectionFor('unauthenticated' satisfies RejectionKey) : undefined);
   return hit ? fillLine(hit.line, limitVars) : error ?? 'That did not work. Try again.';
@@ -95,10 +98,10 @@ export function useOrderBook(active: boolean) {
     intent.current = { key, requestId }; setBusy(true); setError(''); setMessage('');
     try {
       const r = await fetch('/api/market/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, requestId }) });
-      const data = await r.json().catch(() => ({})) as { error?: string; reason?: string; book?: OrderBookState };
+      const data = await r.json().catch(() => ({})) as { error?: string; reason?: string; refusedCheck?: string; book?: OrderBookState };
       const before = latest.current;
       if (data.book) setBook(data.book);
-      if (!r.ok) { if (r.status < 500) intent.current = null; throw new Error(rejectionText(r.status, data.error, data.reason)); }
+      if (!r.ok) { if (r.status < 500) intent.current = null; throw new Error(rejectionText(r.status, data.error, data.reason, data.refusedCheck, typeof body.good === 'string' ? body.good : undefined)); }
       intent.current = null;
       if (data.book) setMessage(success(data.book, before));
     } catch (e) { setError(e instanceof Error && e.message ? e.message : 'Connection interrupted. Retry to confirm the saved result.'); }
@@ -181,6 +184,7 @@ export function MarketBoard({ api, economy }: { api: OrderBookApi; economy: Econ
     <h4>{boardLabels.myOpenOrders}</h4>
     {book.myOrders.length ? <ul className="board-orders">{book.myOrders.map(o => <OrderRow key={o.id} order={o} goods={goods} reason={busy ? 'Saving…' : null} onCancel={() => void api.cancel(o.id)} />)}</ul>
       : <p className="board-note">{emptyStates.noOpenOrders.text}</p>}
+    {book.myFees?.length ? <ul className="board-fees" aria-label="Recent sale fees">{book.myFees.map(f => <li key={f.tradeId}>Sold {f.qty} {f.good} at {(f.unitMinor / 100).toFixed(2)} SPK · {marketFeeLabel(f.feeMinor)}</li>)}</ul> : null}
 
     <form className="board-form" onSubmit={e => { e.preventDefault(); if (!reason && valid) void api.place({ side, good: info.good, qty: q, limitUnitMinor: minor! }); }}>
       <fieldset disabled={busy}><legend>{boardLabels.placeOrder}</legend>

@@ -42,6 +42,7 @@ const SPK: CurrencySpec = {
     UNION ALL SELECT buyer_id, -amount_minor FROM player_fills
     UNION ALL SELECT o.citizen_id, t.qty * t.unit_minor FROM market_trades t JOIN market_orders o ON o.id = t.sell_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT o.citizen_id, -(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id IS NOT NULL
+    UNION ALL SELECT seller_id, -fee_minor FROM market_trade_fees
     UNION ALL SELECT citizen_id, -(remaining * limit_unit_minor) FROM market_open_orders WHERE side = 'buy' AND citizen_id IS NOT NULL`,
   appBalances: 'SELECT clerk_user_id AS acct, balance FROM citizen_wallet_balances',
   probes: [
@@ -53,6 +54,8 @@ const SPK: CurrencySpec = {
     ...integerAndSign('SPK', 'player_fills', 'buyer_id', 'amount_minor', true),
     ...integerAndSign('SPK', 'market_trades', 'id', 'unit_minor', true),
     ...integerAndSign('SPK', 'market_trades', 'id', 'qty', true),
+    ...integerAndSign('SPK', 'market_trade_fees', 'trade_id', 'fee_minor', true), // #777 sink leg
+    { currency: 'SPK', check: 'fee_not_seller_or_over_gross', sql: 'SELECT f.trade_id AS acct FROM market_trade_fees f LEFT JOIN market_trades t ON t.id = f.trade_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE t.id IS NULL OR s.citizen_id IS NULL OR s.citizen_id <> f.seller_id OR f.fee_minor > t.qty * t.unit_minor' },
     // Transfers: the debit leg and the credit leg must agree with each other and with the counterpart's record.
     { currency: 'SPK', check: 'tax_over_gross', sql: 'SELECT clerk_user_id AS acct FROM shift_income_tax WHERE tax_minor > gross_minor' },
     { currency: 'SPK', check: 'tax_gross_not_wage', sql: 'SELECT t.clerk_user_id AS acct FROM shift_income_tax t LEFT JOIN shift_settlements s ON s.shift_id = t.shift_id WHERE s.shift_id IS NULL OR t.gross_minor <> s.wage_minor' },
@@ -73,12 +76,15 @@ const LN: CurrencySpec = {
   legs: `SELECT clerk_user_id AS acct, wage_minor AS delta FROM korund_settlements
     UNION ALL SELECT clerk_user_id, -price_minor FROM korund_coupon_redemptions
     UNION ALL SELECT buyer_id, amount_minor FROM gray_trades
-    UNION ALL SELECT seller_id, -amount_minor FROM gray_trades`,
+    UNION ALL SELECT seller_id, -amount_minor FROM gray_trades
+    UNION ALL SELECT clerk_user_id, -amount_minor FROM gray_seizures`, // #797 sink leg: destroyed, credited to no account
   appBalances: `SELECT c.clerk_user_id AS acct, ${laborNoteSql('c.clerk_user_id')} AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('LN', 'korund_settlements', 'clerk_user_id', 'wage_minor', true),
     ...integerAndSign('LN', 'korund_coupon_redemptions', 'clerk_user_id', 'price_minor', true),
     ...integerAndSign('LN', 'gray_trades', 'buyer_id', 'amount_minor', true),
+    ...integerAndSign('LN', 'gray_seizures', 'offer_id', 'amount_minor', true), // #797
+    { currency: 'LN', check: 'seizure_not_buyer_or_over_bundle', sql: 'SELECT z.offer_id AS acct FROM gray_seizures z LEFT JOIN gray_trades t ON t.offer_id = z.offer_id WHERE t.offer_id IS NULL OR t.buyer_id <> z.clerk_user_id OR z.amount_minor > t.amount_minor' },
     { currency: 'LN', check: 'fund_negative:korund-state', sql: `SELECT r.id AS acct FROM korund_resources r WHERE r.id = 'state' AND r.initial_minor - COALESCE((SELECT SUM(wage_minor) FROM korund_settlements), 0) < 0` },
   ],
 };

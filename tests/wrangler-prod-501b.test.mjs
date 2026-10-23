@@ -13,18 +13,26 @@ const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
 // Vars present in preview and deliberately absent in production.
 const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']; // #501c: no journal in production
+// Top-level keys present in preview and deliberately absent in production (preview-only observability, Patrick approved via PM).
+const previewOnlyTopLevelKeys = ['d1_databases', 'observability'];
 // Vars production adds, with their required values.
 const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
 // Feature flags the preview turns on for QA (the preview-flags-on change). Production keeps every one "false". Adding a flag here is a deliberate preview-only decision.
 // Build-time UI flags (baked into the client bundle at build): on in preview, always "false" in production. Exactly these four.
-const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL'];
+const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
 const previewOnFlags = [
   'HARIMU_TEST_FAUCET_ENABLED',
   'HARIMU_LABOR_BUREAU_ENABLED',
   'HARIMU_GRAY_MARKET_ENABLED',
   'HARIMU_GRAY_DAILY_CAP_ENABLED', // #736
   'HARIMU_GRAY_SUSPICION_ENABLED', // #749
+  'HARIMU_GRAY_SEIZURE_ENABLED', // #797
+  'HARIMU_KORUND_MEDALS_ENABLED', // #737
+  'HARIMU_KORUND_SHORTFALL_ENABLED', // #759
+  'HARIMU_MARKET_FEE_ENABLED', // #777
+  'HARIMU_WALLET_STREET_RATE_ENABLED', // #758
+  'HARIMU_KORUND_RATION_CUT_ENABLED', // #776
   'HARIMU_FAVOR_DECAY_ENABLED',
   'HARIMU_KINDLE_INCOME_TAX_ENABLED',
   'HARIMU_ORDER_BOOK_ENABLED',
@@ -37,6 +45,10 @@ const previewOnFlags = [
   'HARIMU_FAITH_ENABLED',
   'HARIMU_DIPLOMATIC_HALL_ENABLED',
   'HARIMU_MAP_OVERLAYS_ENABLED', // #82
+  'HARIMU_CIVIC_RANK_ENABLED', // #741
+  'HARIMU_ARMIES_ENABLED', // #738
+  'HARIMU_I_VOTED_BADGE_ENABLED', // #782
+  'HARIMU_KINDLE_POLLING_ENABLED', // #740
   'HARIMU_FOUNDING_PERIOD_ENABLED',
   'HARIMU_AURELLE_SUCCESSION_ENABLED',
   'HARIMU_WAR_ENABLED',
@@ -46,6 +58,10 @@ const previewOnFlags = [
   'HARIMU_WAR_DECLARATION_LIMITS_ENABLED',
   'HARIMU_WAR_ASSEMBLY_ENABLED',
   'HARIMU_WAR_ENDINGS_ENABLED',
+  'HARIMU_AI_REVIEW_QUEUE_ENABLED', // #753
+  'HARIMU_REPORTS_ENABLED', // #743
+  'HARIMU_DORMANCY_ENABLED', // #739
+  'HARIMU_KINDLE_BUDGET_VIEW_ENABLED', // #789
   'HARIMU_DIPLOMACY_ENABLED',
   'HARIMU_EMBARGO_ENABLED',
   'HARIMU_TARGETED_SANCTIONS_ENABLED',
@@ -67,7 +83,7 @@ const previewOnFlags = [
 const previewOffFlags = ['HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_REWARDS_ENABLED', 'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_MERIDIAN_ENABLED', 'HARIMU_ILMAR_ENABLED', 'HARIMU_HOARVALE_ENABLED', 'HARIMU_VARKAND_ENABLED', 'HARIMU_VELDWOOD_ENABLED', 'HARIMU_FULMARA_ENABLED', 'HARIMU_AI_COST_DASHBOARD_ENABLED'];
 const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'], ...Object.fromEntries(previewOnFlags.map(name => [name, ['true', 'false']])) };
 // The only non-"false" values production may carry.
-const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, HARIMU_AI_TEMPLATES_ONLY: '', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
+const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, HARIMU_AI_TEMPLATES_ONLY: '', HARIMU_AI_MUTED_PERSONAS: '', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
 
 test('wrangler.prod.jsonc has only full-line // comments (the #633 rule) and parses', () => {
   const offenders = readFileSync('wrangler.prod.jsonc', 'utf8').split('\n').map((line, index) => ({ line, number: index + 1 }))
@@ -82,7 +98,14 @@ test('identity and bindings: own Worker, same account and runtime shape, no D1, 
   for (const key of ['main', 'compatibility_date', 'compatibility_flags', 'placement', 'triggers', 'ai', 'durable_objects', 'migrations']) assert.deepEqual(prod[key], preview[key], key);
   for (const key of ['d1_databases', 'routes', 'route', 'kv_namespaces', 'r2_buckets', 'services', 'queues', 'tail_consumers', 'env']) assert.equal(prod[key], undefined, `${key} must not exist on production yet`);
   assert.equal(prod.workers_dev, false); assert.equal(prod.preview_urls, false);
-  assert.deepEqual(Object.keys(prod).sort(), [...Object.keys(preview).filter(key => key !== 'd1_databases'), ].sort(), 'no top-level key beyond the preview set (minus D1)');
+  assert.deepEqual(Object.keys(prod).sort(), Object.keys(preview).filter(key => !previewOnlyTopLevelKeys.includes(key)).sort(), 'no top-level key beyond the preview set (minus the preview-only keys)');
+});
+
+test('observability: on in preview only; production carries no observability block', () => {
+  assert.deepEqual(preview.observability, { enabled: true, logs: { invocation_logs: false } }, 'invocation logs (which capture request headers, e.g. Cookie/Authorization) must stay off; console logs stay on');
+  assert.strictEqual(preview.observability.logs.invocation_logs, false);
+  assert.equal(prod.observability, undefined, 'production stays unchanged');
+  assert.equal(previewOnlyTopLevelKeys.every(key => key in preview), true, 'every listed preview-only key exists in preview');
 });
 
 test('vars: same names as preview except the listed differences; every flag false; no preview-only or secret-looking var', () => {
@@ -174,4 +197,9 @@ test('QA3 on #641: the runtime role grants, applied on a real Postgres (PGlite) 
 test('#742: the AI kill switch HARIMU_AI_TEMPLATES_ONLY is present and "" (off) in both files', () => {
   assert.equal(preview.vars.HARIMU_AI_TEMPLATES_ONLY, '');
   assert.equal(prod.vars.HARIMU_AI_TEMPLATES_ONLY, '');
+});
+
+test('#764: the per-persona mute HARIMU_AI_MUTED_PERSONAS is present and "" (off) in both files', () => {
+  assert.equal(preview.vars.HARIMU_AI_MUTED_PERSONAS, '');
+  assert.equal(prod.vars.HARIMU_AI_MUTED_PERSONAS, '');
 });

@@ -2,9 +2,10 @@ import { aurelleRisingSchemas } from './aurelle-rising';
 import { aurelleCoupSchemas } from './aurelle-coup';
 import { laborBureauSchemas } from './labor-bureau';
 import { grayMarketSchemas } from './gray-market';
+import { graySeizureSchemas } from './gray-seizure';
 import { nationWorkSchemas } from './nation-work'; // #490
 import { presidiumSchemas } from './korund-presidium';
-import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView } from './market-orders';
+import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView, marketTradeFeesSchema, marketTradeFeesIndex } from './market-orders';
 import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
@@ -24,7 +25,7 @@ import {assemblySchemas} from './assembly';
 import {primarySchemas} from './primaries';
 import {collectivePetitionSchemas} from './collective-petitions';
 import { cityLocationSchema } from './city-location';
-import { worldSquaresSchema, worldSquaresSeedSql, bootNationSquaresSql } from './map-zones';
+import { worldSquaresSchema, worldSquaresSeedSql, bootNationSquaresSql, rareNodesSql } from './map-zones';
 import { worldCitiesSchema } from './city-founding';
 import { aurelleCharterSchemas } from './aurelle-charters';
 import { tesseraRewardSchemas } from './tessera-rewards'; // #465
@@ -40,6 +41,9 @@ import { embargoSchemas } from './embargo'; // #363
 import { goodsSanctionSchemas } from './goods-sanctions'; // #601
 import { warAssemblySchemas } from './war-assembly'; // #427
 import { warEndingsSchemas } from './war-endings'; // #427 slice 2
+import { aiReviewQueueSchemas } from './ai-review-queue'; // #753
+import { pollingSchemas } from './polling'; // #740
+import { armySchemas } from './army'; // #738
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
 import { townHallSchemas } from './town-hall'; // #441
@@ -176,7 +180,8 @@ async function initialize(database: GameDatabase) {
       influence INTEGER DEFAULT 1240 NOT NULL,
       standing TEXT DEFAULT 'Good standing' NOT NULL,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      last_active_at TEXT
     )`),
     database.prepare(`CREATE TABLE IF NOT EXISTS citizen_plans (
       clerk_user_id TEXT PRIMARY KEY NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
@@ -239,6 +244,9 @@ async function initialize(database: GameDatabase) {
     ...congregationSchemas.map(sql=>database.prepare(sql)),
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
+    ...aiReviewQueueSchemas.map(sql=>database.prepare(sql)), // #753
+    ...pollingSchemas.map(sql=>database.prepare(sql)), // #740
+    ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),
@@ -248,13 +256,14 @@ async function initialize(database: GameDatabase) {
     database.prepare(worldSquaresSchema),
     ...worldSquaresSeedSql().map(sql => database.prepare(sql)),
     ...bootNationSquaresSql().map(sql => database.prepare(sql)), // #491: nothing today; adds a new nation's squares once it has a capital
+    ...rareNodesSql().map(sql => database.prepare(sql)), // #745: the seven missing rare node types (same as migration 0067)
     database.prepare(worldCitiesSchema),
     ...squareSchema.map(sql => database.prepare(sql)), ...hallSchema.map(sql => database.prepare(sql)), ...foundingSchema.map(sql => database.prepare(sql)), ...aurelleSuccessionSchemas.map(sql => database.prepare(sql)), // #599, #612, #613
     database.prepare(listingSchema), database.prepare(fillSchema), database.prepare(cancelSchema),
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
-    ...marketSchemas.map(sql => database.prepare(sql)), ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
+    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...graySeizureSchemas.map(sql => database.prepare(sql)), /* #797 seizure sink (always created; written only with the flag on) */ ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
@@ -310,6 +319,14 @@ async function initialize(database: GameDatabase) {
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('tessera-exchange-v1')"),
     ]);
   }
+  // #777: balances net out goods-market fees (sink). Same atomic wallet-view swap as tessera-exchange-v1.
+  const marketFeeInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'market-fee-v1'").first();
+  if (!marketFeeInstalled) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('market-fee-v1')"),
+    ]);
+  }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));
   await database.batch(aurelleFavorIndexes.map(sql => database.prepare(sql))); // #616: both tables exist by now (royalFavorSchemas ran in the batch above)
   await database.prepare("INSERT OR IGNORE INTO aurelle_resources(id,initial_food,initial_minor) VALUES ('estate',40,100000)").run();
@@ -346,6 +363,9 @@ async function initialize(database: GameDatabase) {
   const citizenColumnNames = new Set(citizenColumns.results.map((column) => column.name));
   if (!citizenColumnNames.has('nation_changes')) {
     await database.prepare('ALTER TABLE citizens ADD COLUMN nation_changes INTEGER NOT NULL DEFAULT 0').run();
+  }
+  if (!citizenColumnNames.has('last_active_at')) { // #739 (migration 0069): general activity for dormancy, backfilled with now (no false Welcome back)
+    await database.batch([database.prepare('ALTER TABLE citizens ADD COLUMN last_active_at TEXT'), database.prepare("UPDATE citizens SET last_active_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE last_active_at IS NULL")]);
   }
 
   // #400: treaties gained broken_by (migration 0040); a local database created before it gets the column once.

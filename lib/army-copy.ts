@@ -51,6 +51,7 @@ export const unitCard={
  supplyLabel:'Supply',
  supplyStates:{supplied:'Supplied',low:'Low supply',cut:'Supply cut'} as Readonly<Record<SupplyState,string>>,
  commanderLabel:'Commander: {officer} (AI)',
+ memberCountLabel:'Members',
  proposal:true,
 } as const;
 
@@ -71,8 +72,14 @@ export const unitMembership={
  left:L('You left {unit}.'),
  drillsHelper:L('Your drills raise the unit\'s strength and morale.'),
  notEligible:L('You cannot join this unit: {reason}'),
+ notOpenYet:L('This unit is not taking volunteers yet.'),
+ actionFailed:L('Your unit change did not go through: {reason}'),
  proposal:true,
 } as const;
+
+/** QA3 on #793: a failed join explains eligibility; a failed leave or stance uses the neutral template, never the join wording. */
+export const armyFailureNote=(action:'join'|'leave'|'stance',unitName:string,reason:string)=>
+ (action==='join'?unitMembership.notEligible.text:unitMembership.actionFailed.text).replace(/\{unit\}/g,unitName).replace(/\{reason\}/g,reason);
 
 /** Squad stance labels (40) and one-line helpers (100). Neutral names: the docs name no stances. */
 export const squadStance={

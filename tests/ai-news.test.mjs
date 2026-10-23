@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {localRuntime} from './helpers/local-runtime.mjs';
-import {reserveAiCall,reserveAiSequence,aiModelReservations,aiDailyBudgetMicroUsd} from '../lib/ai-budget.ts';
+import {reserveAiCall,reserveAiSequence,aiModelReservations,aiDailyBudgetMicroUsd,readAiBudget} from '../lib/ai-budget.ts';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace("'./ai-denylist'",JSON.stringify(new URL('../lib/ai-denylist.ts',import.meta.url).href)).replace("'./ai-kill-switch'",JSON.stringify(new URL('../lib/ai-kill-switch.ts',import.meta.url).href)).replace('30000','5');
@@ -44,10 +44,25 @@ test('unsafe output and uncertain calls never publish; reservations remain charg
  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM ai_news_articles').first()).n,0);
 });
 
-test('moderation reservations hit the cost ceiling, and prebooking protects completed requests across midnight',async t=>{
- const r=await localRuntime();t.after(()=>r.close());const guard='@cf/meta/llama-guard-3-8b';const results=await Promise.all(Array.from({length:20},()=>reserveAiCall(r.db,randomUUID(),guard,now,until)));assert.equal(results.filter(Boolean).length,15);
+// #769: fixed clocks; a reservation counts against the next UTC day only when it starts in the last 10 minutes before 00:00Z.
+const midday=Date.parse('2026-10-22T12:00:00Z')/1000,lateNight=Date.parse('2026-10-22T23:55:00Z')/1000;
+test('moderation reservations hit the cost ceiling, and a maxed-out day leaves the next day its full budget',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const guard='@cf/meta/llama-guard-3-8b';const results=await Promise.all(Array.from({length:20},()=>reserveAiCall(r.db,randomUUID(),guard,midday,until)));assert.equal(results.filter(Boolean).length,15);
  const cost=(await r.db.prepare('SELECT SUM(reserved_micro) AS n FROM harimu_ai_reservations').first()).n;assert.equal(cost,960000);
- await r.db.prepare("UPDATE harimu_ai_reservations SET status='finished'").run();assert.equal(await reserveAiCall(r.db,randomUUID(),guard,now+86400,until),false);
+ await r.db.prepare("UPDATE harimu_ai_reservations SET status='finished'").run();
+ assert.equal(await reserveAiCall(r.db,randomUUID(),guard,midday+3600,until),false,'the same day stays capped');
+ const next=await Promise.all(Array.from({length:20},()=>reserveAiCall(r.db,randomUUID(),guard,midday+86400,until)));assert.equal(next.filter(Boolean).length,15,'the next day keeps its full budget');
+ assert.equal((await readAiBudget(r.db,midday+86400,until)).remainingMicroUsd,10000);
+});
+test('#769 a reservation started in the last 10 minutes before 00:00Z also counts against the next day',async t=>{
+ const r=await localRuntime();t.after(()=>r.close());const guard='@cf/meta/llama-guard-3-8b';
+ assert.equal(await reserveAiCall(r.db,'early',guard,lateNight-600,until),true);
+ assert.equal((await r.db.prepare("SELECT next_utc_day AS d FROM harimu_ai_reservations WHERE request_id='early'").first()).d,'2026-10-22','10m01s+ before midnight: same day only');
+ const spill=await Promise.all(Array.from({length:20},()=>reserveAiCall(r.db,randomUUID(),guard,lateNight,until)));assert.equal(spill.filter(Boolean).length,14);
+ assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM harimu_ai_reservations WHERE next_utc_day='2026-10-23'").first()).n,14);
+ await r.db.prepare("UPDATE harimu_ai_reservations SET status='finished'").run();
+ const after=Date.parse('2026-10-23T00:05:00Z')/1000;assert.equal(await reserveAiCall(r.db,randomUUID(),guard,after,until),true);
+ assert.equal((await readAiBudget(r.db,after,until)).reservedMicroUsd,15*64000,'the spilled rows count on the next day');
 });
 test('a timed-out provider remains charged and a late response cannot publish',async t=>{
  const r=await localRuntime();t.after(()=>r.close());let finish;const binding={run:()=>new Promise(resolve=>{finish=resolve;})};

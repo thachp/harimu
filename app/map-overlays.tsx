@@ -15,7 +15,8 @@ export function MapOverlaysControl({ enabled, lowGraphics = false, mapLayer = tr
 }
 const session = () => { try { return window.sessionStorage; } catch { return undefined; } };
 
-export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraphics?: boolean; mapLayer?: boolean }) {
+/** #800: rareMarker (NEXT_PUBLIC_HARIMU_RARE_MARKER) draws rare resource nodes as a filled, gold-rimmed badge (shape and fill, not color alone), the same badge in the legend. */
+export function MapOverlays({ lowGraphics = false, mapLayer = true, rareMarker = process.env.NEXT_PUBLIC_HARIMU_RARE_MARKER === 'true' }: { lowGraphics?: boolean; mapLayer?: boolean; rareMarker?: boolean }) {
   const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session())); // ARC: remembered for the browser session, off in a new one
   const [ownership, setOwnership] = useState<OwnershipMap | null>(null);
   const [unrest, setUnrest] = useState<UnrestMap | null>(null);
@@ -75,7 +76,7 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
           {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}><span aria-hidden="true">{bandMark(step).symbol}</span> {step}</li>)}</ol> : null}
           {id === 'unrest' && unrest ? <ul className="map-ownership-key">{unrest.nations.map(({ nationId, unrest: score, band }) => <li key={nationId}><span aria-hidden="true">{bandMark(band).symbol}</span> {nationMark(nationId)?.name ?? nationId}: {band} ({score})</li>)}
             {unrest.unpublished.map(id => <li key={id}>{unpublishedLabel(nationMark(id)?.name ?? id)}</li>)}<li>{NO_DATA}</li></ul> : null}
-          {id === 'resources' && resources ? <ul className="map-ownership-key">{resources.totals.map(({ resource, squares }) => <li key={resource}><span aria-hidden="true">{resourceIcon(resource).symbol}</span> {resourceName(resource)}{resourceIcon(resource).rare ? ' (rare)' : ''}: {squares} {squares === 1 ? 'square' : 'squares'}</li>)}</ul>
+          {id === 'resources' && resources ? <ul className="map-ownership-key">{resources.totals.map(({ resource, squares }) => <li key={resource}><span aria-hidden="true" className={rareMarker && resourceIcon(resource).rare ? 'map-rare-key' : undefined}>{resourceIcon(resource).symbol}</span> {resourceName(resource)}{resourceIcon(resource).rare ? ' (rare)' : ''}: {squares} {squares === 1 ? 'square' : 'squares'}</li>)}</ul>
             : id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} {squares === 1 ? 'square' : 'squares'}</li>; })}</ul>
             : <span>{id === 'ownership' ? 'Loading owners.' : id === 'resources' ? 'Loading resources.' : id === 'unrest' && !unrest ? 'Loading unrest.' : LEGEND_TEXT[id]}</span>}
         </section>)}
@@ -91,7 +92,7 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true }: { lowGraph
     </div>
     <span className="map-overlays-status" aria-live="polite">{announcement}</span>
     {ownershipOn && mapLayer && ownership && viewport ? createPortal(<OwnershipLayer map={ownership} lowGraphics={lowGraphics} />, viewport) : null}
-    {resourcesOn && mapLayer && resources && viewport ? createPortal(<ResourcesLayer map={resources} lowGraphics={lowGraphics} />, viewport) : null}
+    {resourcesOn && mapLayer && resources && viewport ? createPortal(<ResourcesLayer map={resources} lowGraphics={lowGraphics} rareMarker={rareMarker} />, viewport) : null}
     {unrestOn && mapLayer && unrest && viewport ? createPortal(<UnrestLayer map={unrest} lowGraphics={lowGraphics} />, viewport) : null}
   </div>;
 }
@@ -105,8 +106,8 @@ function OwnershipLayer({ map, lowGraphics }: { map: OwnershipMap; lowGraphics: 
 }
 
 /** #82 slice 3: resource node icons on their globe squares (GameViewport places them, like Ownership). Static: no animation or transition, so reduced motion needs nothing. */
-function ResourcesLayer({ map, lowGraphics }: { map: ResourceMap; lowGraphics: boolean }) {
-  return <div className="map-resources" data-low-graphics={lowGraphics ? 'true' : undefined} data-width={map.width} data-height={map.height} aria-hidden="true">
+function ResourcesLayer({ map, lowGraphics, rareMarker }: { map: ResourceMap; lowGraphics: boolean; rareMarker: boolean }) {
+  return <div className="map-resources" data-low-graphics={lowGraphics ? 'true' : undefined} data-rare-marker={rareMarker ? 'true' : undefined} data-width={map.width} data-height={map.height} aria-hidden="true">
     {map.cells.map(([x, y, resource]) => { const icon = resourceIcon(resource); return <span key={`${x},${y}`} hidden data-resource={resource} data-rare={icon.rare ? 'true' : undefined} data-x={x} data-y={y}>{icon.symbol}</span>; })}
   </div>;
 }

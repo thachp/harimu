@@ -105,7 +105,7 @@ body:has(.harimu-game){overflow:auto}
 .national-news-dialog button{padding:8px 12px;background:#24434a;color:#e7efeb;border:1px solid #638c8d;border-radius:3px;cursor:pointer}.national-news-dialog button:disabled{opacity:.55;cursor:default}
 .national-news-dialog button:focus-visible,.national-news-dialog summary:focus-visible{outline:2px solid #8ad9cc;outline-offset:3px}
 .national-news-dialog p{font-size:calc(13px * var(--text-scale, 1));line-height:1.6}.national-news-dialog small,.national-news-dialog time{font-size:calc(11px * var(--text-scale, 1));line-height:1.5}
-.national-news-items{list-style:none;padding:0;display:grid;gap:12px}.national-news-items article{padding:12px 15px;border:1px solid #34505b;background:#17323b}.national-news-items h3{margin:0 0 8px}
+.national-news-items{list-style:none;padding:0;display:grid;gap:12px}.national-news-items article{padding:12px 15px;border:1px solid #34505b;background:#17323b}.national-news-items h3{margin:0 0 8px}.national-news-items .news-dateline{display:block;margin:0 0 8px}
 .news-source{display:inline-block;padding:2px 5px;border:1px solid #638c8d;border-radius:3px}.news-statistics{padding:12px;border:1px solid #638c8d}.news-statistics h3{margin-top:0}.news-statistics dl{display:flex;flex-wrap:wrap;gap:16px}.news-statistics dt{font-size:calc(11px * var(--text-scale, 1))}.news-statistics dd{margin:5px 0;font-weight:bold;font-size:calc(18px * var(--text-scale, 1))}
 .news-state{border-top:4px double #bf9981}.news-court{border-top:4px double #c7af75}.news-press{border-top:3px solid #80b9ad}
 @media(max-width:760px){.game-dock>button:last-child[aria-haspopup="dialog"]{margin-left:0}.national-news-dialog{padding:14px}.national-news-dialog>header{top:-14px;margin:-14px -14px 14px;padding:12px 14px}.national-news-dialog>header h1{font-size:calc(19px * var(--text-scale, 1))}}
@@ -413,6 +413,10 @@ body:has(.harimu-game){overflow:auto}
 .map-resources>span{position:absolute;transform:translate(15%,-115%);font-size:calc(11px * var(--text-scale, 1));line-height:1;color:#f3ecd6;text-shadow:0 0 2px #0b2631,0 0 2px #0b2631}
 .map-resources[data-low-graphics]>span{text-shadow:none}
 .map-resources>span[data-rare]{border:1px solid #d0ad54;border-radius:50%;padding:1px}
+/* #800 (NEXT_PUBLIC_HARIMU_RARE_MARKER): rare nodes become a filled navy badge with a 2px gold rim, larger glyph and a dark outer halo, so they read at globe zoom on any terrain and in low graphics; the badge (shape and fill), not color, marks rare. The legend shows the same badge. */
+.map-resources[data-rare-marker]>span[data-rare],.map-overlays-legend .map-rare-key{display:inline-flex;align-items:center;justify-content:center;min-width:1.7em;height:1.7em;padding:0;border:2px solid #e2c36b;border-radius:50%;background:#0b2631;color:#f6e3a1;box-shadow:0 0 0 1.5px #0b2631;font-size:calc(13px * var(--text-scale, 1));line-height:1;text-shadow:none}
+.map-resources[data-rare-marker]>span[data-rare]{z-index:1}
+.map-overlays-legend .map-rare-key{font-size:inherit;min-width:1.6em;height:1.6em;margin-right:2px;vertical-align:middle}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
 .game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}
@@ -423,6 +427,24 @@ body:has(.harimu-game){overflow:auto}
 .game-zoom-rail button:hover{background:#173a44;color:#e6f6f3}.game-zoom-rail button[aria-current]{color:#f1d58a;border-color:#6d5f3b}.game-zoom-rail button[aria-current=page]{background:#1f4a55}.game-zoom-rail button:focus-visible{outline:2px solid #d6b45c;outline-offset:2px}
 .game-rail-on .game-stage{left:var(--rail-width)}.game-rail-on .game-stage-overlay{left:calc(var(--rail-width) + 18px)}
 @media(max-width:760px){.game-rail-on .game-nav-row{display:flex;flex-wrap:wrap;align-items:stretch;grid-row:2;grid-column:1;min-width:0;background:#102934;border-bottom:1px solid #334650}.game-rail-on .game-zoom-rail{position:relative;inset:auto;width:auto;flex-direction:row;gap:2px;padding:0 4px;overflow:visible;border-right:1px solid #334650;background:transparent}.game-rail-on .game-zoom-rail button{min-height:44px;min-width:48px;padding:4px 6px}.game-rail-on .game-nav-row>.game-dock{flex:1 1 auto;min-width:0;border-bottom:0}.game-rail-on .game-stage,.game-rail-on .game-stage-overlay{left:auto}}
+/* #392 S5 World crest chips (flag NEXT_PUBLIC_HARIMU_UI_V2_WORLD; class .game-world-v2 on the World strip): crest, name and the existing badges; the detail line stays for screen readers (the selected nation's facts are in the panel). */
+.game-world-v2 .game-context-items>button{flex:1 0 calc(92px * var(--text-scale, 1));max-width:160px;align-items:center;text-align:center;padding:10px 8px 12px;gap:4px;min-height:44px}
+.game-world-v2 .game-context-items>button>strong{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:calc(12px * var(--text-scale, 1))}
+.game-world-v2 .game-context-items .nation-crest svg{position:static}.game-world-v2 .game-context-items>button>svg{display:none}
+.game-world-v2 .game-context-items>button>span{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+@media(max-width:760px){.game-world-v2 .game-context-items{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(96px * var(--text-scale, 1))),1fr))}.game-world-v2 .game-context-items>button{max-width:none}}
+/* #392 S7: City hotspots as icon pills with a leader dot (NEXT_PUBLIC_HARIMU_UI_V2_CITY; only buttons dressed by app/city-pill.tsx carry the class).
+   Navy pill, gold rim, light text (13.9:1); the dot and its stem sit on the building; on a phone (labels are moved apart, #377) the stem and dot are dropped. */
+.viewport-world-label.viewport-city-pill{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px 5px 9px;border:1px solid #d6b45c;border-radius:999px;background:#0b2631f2;color:#f3ecd6;font-size:calc(12px * var(--text-scale, 1));line-height:1.2;transform:translate(-50%,calc(-100% - 14px))!important;box-shadow:0 2px 6px #0008}
+.viewport-city-pill-icon{display:inline-flex;color:#e2c36b}
+.viewport-city-pill-dot{position:absolute;left:50%;top:calc(100% + 1px);width:2px;height:10px;margin-left:-1px;background:#e2c36b;pointer-events:none}
+.viewport-city-pill-dot::after{content:"";position:absolute;left:50%;top:100%;width:8px;height:8px;margin:-1px 0 0 -4px;border:2px solid #0b2631;border-radius:50%;background:#f3ecd6}
+.viewport-world-label.viewport-city-pill:hover{background:#123744f2}
+.viewport-world-label.viewport-city-pill:focus-visible{outline:2px solid #80d8ce;outline-offset:3px}
+.harimu-game.game-city-v2{--context-height:calc(0px * var(--text-scale, 1))} /* the bottom strip is not rendered: the scene takes its space */
+@media(max-width:760px){.harimu-game.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,44dvh) 0 minmax(0,auto)}}
+@media(max-width:760px){.viewport-world-label.viewport-city-pill{min-height:44px;gap:4px;padding:6px 10px 6px 8px;font-size:calc(11px * var(--text-scale, 1));transform:translate(-50%,-100%)!important}.viewport-city-pill-dot{display:none}}
+@media(max-width:360px){.viewport-world-label.viewport-city-pill{padding:6px 10px}.viewport-city-pill-icon{display:none}} /* the 320 canvas has no room for icons: pills keep the label's own size so #377 placement still fits them */
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
    this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
 .game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}

@@ -1,5 +1,5 @@
 import type { GameDatabase } from './database-contract';
-import { skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
+import { skipForMutedPersona, aiPathPersonas, skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
 import { electionCandidates } from './elections';
 import { kindleCandidatePlatforms, pledge } from './kindle-parties';
 import { aiBudgetConfig, aiGatewayOptions, markAiReservationSent, markAiReservationUncertain, meteredAiCost, releaseAiReservation, reserveAiCabinetSequence, settleAiReservation, type AiBudgetConfig, type AiMeteredCall, type AiModel } from './ai-budget';
@@ -77,6 +77,8 @@ export async function prepareTownHallAnswer(db: GameDatabase, now: number, bindi
   if (!options.enabled || !binding || !options.budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
   // #742: templates-only mode (the candidates are Kindle's) makes no model call and no reservation; the question stays unanswered.
   if (skipForTemplates('town-hall', options.killSwitch, 'kindle', now)) return { status: 'templates-only' as const };
+  // #764: a muted persona makes no model call and no reservation either.
+  if (skipForMutedPersona('town-hall', options.killSwitch, aiPathPersonas['town-hall'](), now)) return { status: 'persona-muted' as const };
   const day = new Date(now * 1000).toISOString().slice(0, 10);
   const q = await nextPending(db, now, day);
   if (!q) return { status: 'idle' as const };

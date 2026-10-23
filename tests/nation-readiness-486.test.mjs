@@ -57,13 +57,13 @@ test('QA1 nit 2: map ready also needs the 7x7 block to fit (grid, capitals >= 7,
   assert.equal(mapFitRules.blockRadius, z.frontierRadius, 'QA1: block radius pinned to map-zones'); assert.deepEqual(mapFitRules.commonsCentre, z.commonsCentre, 'QA1: Commons centre pinned to map-zones');
   assert.equal(capitalFits({ x: 3, y: 10 }, []), true, 'west edge: x=3 fits'); assert.equal(capitalFits({ x: 2, y: 10 }, []), false, 'x=2 does not');
   assert.equal(capitalFits({ x: 20, y: 3 }, []), true, 'north edge: y=3 fits'); assert.equal(capitalFits({ x: 20, y: 2 }, []), false, 'y=2 does not');
-  assert.equal(capitalFits({ x: 20, y: 14 }, []), true, 'east and south edges: x=20, y=14 fit');
+  assert.equal(capitalFits({ x: 26, y: 20 }, []), true, 'east and south edges on 30x24: x=26, y=20 fit'); assert.equal(capitalFits({ x: 27, y: 10 }, []), false); assert.equal(capitalFits({ x: 10, y: 21 }, []), false);
   const full = nationOpening('confluence');
   const at = capital => openingReadiness({ ...full, capital }).map;
   assert.equal(at({ x: 4, y: 13 }), true, 'Meetwater as placed');
-  assert.equal(at({ x: 2, y: 13 }), false, 'block off the west edge'); assert.equal(at({ x: 21, y: 12 }), false, 'off the east edge');
-  assert.equal(at({ x: 20, y: 2 }), false, 'off the north edge'); assert.equal(at({ x: 19, y: 15 }), false, 'off the south edge');
-  assert.equal(at({ x: 6, y: 13 }), false, 'Chebyshev 6 from Aurelle (12,14)'); assert.equal(at({ x: 19, y: 11 }), true, 'the one free corner site on #486');
+  assert.equal(at({ x: 2, y: 13 }), false, 'block off the west edge'); assert.equal(at({ x: 27, y: 12 }), false, 'off the east edge');
+  assert.equal(at({ x: 20, y: 2 }), false, 'off the north edge'); assert.equal(at({ x: 10, y: 21 }), false, 'off the south edge');
+  assert.equal(at({ x: 6, y: 13 }), false, 'Chebyshev 6 from Aurelle (12,14)'); assert.equal(at({ x: 19, y: 11 }), false, '#486: Varkand now stands at (19,11)');
   assert.equal(capitalFits({ x: 12, y: 10 }, []), false, 'Chebyshev 4 from the Commons centre'); assert.equal(capitalFits({ x: 12, y: 11 }, []), true, 'Chebyshev 5 from the Commons centre');
   assert.equal(capitalFits({ x: 10, y: 14 }, [{ x: 17, y: 14 }]), true, 'exactly 7'); assert.equal(capitalFits({ x: 10, y: 14 }, [{ x: 16, y: 14 }]), false, '6');
   for (const id of ['kindle', 'korund', 'aurelle', 'confluence']) assert.equal(nationReadiness(id).ready, true, id);

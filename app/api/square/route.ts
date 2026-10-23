@@ -6,6 +6,8 @@ import { env } from 'cloudflare:workers';
 import { postSquareSql, readSquare, uuidPattern, validSquareText } from '@/lib/square-chat';
 import { latchAfterWrite } from '@/lib/first-week-server';
 export const dynamic='force-dynamic';
+// #743: the client shows the Report control only when intake is on.
+const reportsEnabled=()=>(env as unknown as {HARIMU_REPORTS_ENABLED?:string}).HARIMU_REPORTS_ENABLED==='true';
 async function context(request:Request) {
   const userId=await authenticatedUserId(request);
   if(!userId)return null;
@@ -18,7 +20,7 @@ export async function GET(request:Request) {
   const ctx=await context(request);
   if(!ctx)return privateResponse({error:'Sign in required.'},401);
   if(!ctx.nationId)return privateResponse({error:'Enroll in a nation first.'},403);
-  return privateResponse(await readSquare(ctx.db,ctx.userId,ctx.nationId,ctx.now));
+  return privateResponse({...await readSquare(ctx.db,ctx.userId,ctx.nationId,ctx.now),reportsEnabled:reportsEnabled()});
 }
 // #194: a square post can complete a first-week goal; latch after a successful write.
 export async function POST(request:Request) {
@@ -68,5 +70,5 @@ async function handleSquarePost(request:Request) {
       }
     }
   } else return privateResponse({error:'Unknown action.'},400);
-  return privateResponse(await readSquare(db,userId,nationId,now));
+  return privateResponse({...await readSquare(db,userId,nationId,now),reportsEnabled:reportsEnabled()});
 }

@@ -10,6 +10,8 @@ import { executeOrderCommand, readOrderBook, validOrderCommand, orderBookLimits 
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
+// #777: goods-market seller fee as a money sink (HARIMU_MARKET_FEE_ENABLED); off = no fee written or read.
+const feeOn = () => (env as unknown as { HARIMU_MARKET_FEE_ENABLED?: string }).HARIMU_MARKET_FEE_ENABLED === 'true';
 const enabled = () => (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true';
 
 // #197: Kindle city order book for fruit, meat and wood. Off unless HARIMU_ORDER_BOOK_ENABLED=true.
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
   if (!enabled()) return privateJson({ open: false });
   const db = await getDatabase();
   const ticker = marketTickerOn(env); // #459: the board polls only when this key is present
-  return privateJson({ open: true, book: await readOrderBook(db, userId), ...(ticker ? { ticker: true } : {}) });
+  return privateJson({ open: true, book: await readOrderBook(db, userId, { fee: feeOn() }), ...(ticker ? { ticker: true } : {}) });
 }
 
 export async function POST(request: Request) {
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
   if (!validOrderCommand(body)) return privateJson({ error: `Send a requestId (UUID) and either a buy/sell order for fruit, meat or wood with quantity 1–${orderBookLimits.maxQty} and an integer limit price 1–${orderBookLimits.maxUnitMinor} Spark cents, or an orderId to cancel.`, reason: 'bad_request' }, 400);
   const command = { ...body, requestId: body.requestId.toLowerCase(), ...('orderId' in body && typeof body.orderId === 'string' ? { orderId: body.orderId.toLowerCase() } : {}) } as typeof body;
   const db = await getDatabase();
-  await advanceWorld(db, undefined, { npcSupply: true, faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings) }); // #198
-  const result = await executeOrderCommand(db, userId, command, Math.floor(Date.now() / 1000));
-  return privateJson({ ...result, book: await readOrderBook(db, userId) }, result.status);
+  await advanceWorld(db, undefined, { dormancy: (env as unknown as { HARIMU_DORMANCY_ENABLED?: string }).HARIMU_DORMANCY_ENABLED === 'true', npcSupply: true, faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings) }); // #198
+  const result = await executeOrderCommand(db, userId, command, Math.floor(Date.now() / 1000), { fee: feeOn() });
+  return privateJson({ ...result, book: await readOrderBook(db, userId, { fee: feeOn() }) }, result.status);
 }

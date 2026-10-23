@@ -10,10 +10,10 @@ import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import type { KorundPlan } from '@/lib/korund';
-import { quotaPercent } from '@/lib/korund-coupons';
+import { quotaPercent, korundMedalCopy, korundQuotaValueText, korundShortfallCopy, korundRationCutCopy } from '@/lib/korund-coupons';
 import { bureauText, outcomeNotice, reasonText, fillText } from '@/lib/labor-bureau-text';
 import { preferenceCount } from '@/lib/labor-bureau-rules';
-import { grayText, grayRefusal, ln, fc, rate, rumorLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
+import { grayText, grayRefusal, ln, fc, rate, rumorLine, walletStreetRateLine, noOffersLine, postedLine, acceptedLine, expiredLine } from '@/lib/gray-market-text';
 
 export type KorundPlanView = KorundPlan;
 export type KorundAction = 'korund-start-work' | 'korund-claim-work' | 'korund-redeem-ration' | 'korund-household-meal' | 'korund-join-ration-queue' | 'korund-cancel-ration-queue' | 'korund-redeem-coupon' | 'korund-set-preferences' | 'korund-request-assignment' | 'korund-gray-post-offer' | 'korund-gray-accept-offer';
@@ -41,14 +41,15 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
     <h3>{scene === 'workplace' ? (plan.bureau ? 'Labor Bureau assignment' : 'Brigade assignment') /* #453: the Bureau name only when HARIMU_LABOR_BUREAU_ENABLED sends plan.bureau */ : scene === 'market' ? 'State ration counter' : 'Korund household account'}</h3>
     <p>Bounded state planning · AI/SI roles follow deterministic rules. Labor Notes are non-convertible; Korund has no legal private market.</p>
     <p>Labor Note wages are recorded in a separate ledger. Labor Notes are spent only on weekly clothing and goods coupons at fixed prices; food comes from free food coupons.</p>
-    <dl><dt>Labor Notes</dt><dd>{(plan.walletMinor / 100).toFixed(2)} LN</dd><dt>Household food</dt><dd>{plan.foodQuantity}</dd>
+    <dl><dt>Labor Notes</dt><dd>{(plan.walletMinor / 100).toFixed(2)} LN{plan.streetRate && <><br /><small className="wallet-street-rate">{walletStreetRateLine(plan.streetRate.rumoredRate)}</small></>}</dd><dt>Household food</dt><dd>{plan.foodQuantity}</dd>
       <dt>Work capacity</dt><dd>{capacity} / 24 WC</dd><dt>Ration book</dt><dd>Game week {plan.gameWeek} · {plan.couponFoodRemaining} food coupons · <GameTimer endsAt={plan.couponExpiresAt} label="Ration coupons expire" /></dd></dl>
     {uncertain && <div role="alert"><p>Confirm the previous Korund action before starting another. Retry uses the same request.</p><ActionButton type="button" reason={pendingActionReason(pending)} onClick={onRetry}>Confirm previous action</ActionButton></div>}
     {error && <p role="alert">{error}</p>}
     <ActionButton type="button" reason={pendingActionReason(pending)} onClick={onRefresh}>Refresh assignment and ration book</ActionButton>
     {scene === 'workplace' ? <>
       <h4>{plan.assignment.name}</h4><p>{plan.assignment.capacityCost} WC · {formatDuration(plan.assignment.hours * 3600000)} real / {formatDuration(plan.assignment.hours * 3600000 * gameTimeCompression)} game · {(plan.assignment.wageMinor / 100).toFixed(2)} LN wages · {plan.assignment.foodOutput} food added to the state pool on collection.</p>
-      {plan.quota && <QuotaBar quota={plan.quota} />}
+      {plan.quota && <QuotaBar quota={plan.quota} medals={plan.medals} />}
+      {plan.shortfall && <section className="korund-shortfall" aria-label="Plan inspection"><p role="status">{korundShortfallCopy.notice(plan.shortfall.workUnit, plan.shortfall.percent)}</p><p>{korundShortfallCopy.ledger}</p><p><small>City feed: {plan.shortfall.press}</small></p></section>}
       {plan.bureau ? <LaborBureau bureau={plan.bureau} pending={pending} uncertain={uncertain} formatTime={formatTime} onCommand={onCommand} /> : null}
       <p>One assigned shift at a time. {plan.bureau ? 'Bureau placement is recorded; shift pay is unchanged.' : 'Job preferences, reassignment and production-drive progression are planned.'}</p>
       {active ? <><GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" /><p>{active.orderName} · {ready ? 'Complete · collect your Labor Notes' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remaining` : 'Checking timing…'}</p>
@@ -65,6 +66,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!couponsCurrent, 'Refresh for the current game week’s ration book.'], [plan.couponFoodRemaining <= 0, 'This game week’s food coupons have been used.'], [!queue,'Refresh to load the current queue.'], [Boolean(queue&&queue.waiting>0&&queue.position!==1),queue?.requestId?'Wait for earlier requests to collect or cancel. Your place is retained.':'Join the queue and wait for earlier requests to collect or cancel.'], [plan.publicFoodRemaining < plan.couponFoodRemaining, 'State food cannot cover this ration. Collected assignments replenish it.'])} onClick={() => onCommand('korund-redeem-ration')}>Redeem this week’s food coupons · {plan.couponFoodRemaining} food</ActionButton>
       <button type="button" onClick={() => onNavigate('household')}>Take rations to your household</button>
     </> : scene === 'household' ? <>
+      {plan.rationCut && <p className="korund-ration-cut" role="status" aria-label={korundRationCutCopy.label}>{korundRationCutCopy.notice}</p>}
       {plan.coupons && <CouponBook now={now} coupons={plan.coupons} walletMinor={plan.walletMinor} clothing={plan.clothingQuantity ?? 0} goods={plan.goodsQuantity ?? 0} reason={pendingActionReason(pending, uncertain)} onRedeem={(kind) => onCommand('korund-redeem-coupon', kind)} onFood={() => onNavigate('market')} />}
       <p>A household meal uses 2 food and restores up to 4 WC, capped at 24. Meals have a two-real-hour (one game day) cooldown; normal capacity recovery continues.</p>
       <p>{capacity >= 24 ? 'Capacity is full; save your rations.' : plan.foodQuantity < 2 ? 'Redeem your ration coupons for food.' : !mealReady ? `Next meal: ${plan.mealReadyAt ? formatTime(plan.mealReadyAt) : 'checking timing…'}` : 'Household meal available.'}</p>
@@ -97,15 +99,19 @@ export function PriorNationShift({ shift, currency, pending, uncertain, onClaim,
   </section>;
 }
 
-export function QuotaBar({ quota }: { quota: NonNullable<KorundPlanView['quota']> }) {
+export function QuotaBar({ quota, medals }: { quota: NonNullable<KorundPlanView['quota']>; medals?: KorundPlanView['medals'] }) {
+  // #737 (only with HARIMU_KORUND_MEDALS_ENABLED on): unclamped over-fulfilment percent, same formula as lib/korund-medals-rules overFulfilledPercent (inlined: the panel's test loaders map each import)
+  const over = medals && quota.targetFood > 0 && quota.unitFood > quota.targetFood ? Math.round(quota.unitFood * 100 / quota.targetFood) : 0;
   const unit = quotaPercent(quota.unitFood, quota.targetFood);
   const own = quotaPercent(quota.ownFood, quota.targetFood);
   return <section className="korund-quota" aria-label="Work-unit quota">
     <h4>{quota.workUnit} · weekly quota</h4>
-    <div className="korund-quota-track" role="progressbar" aria-label="Work-unit quota progress" aria-valuemin={0} aria-valuemax={quota.targetFood} aria-valuenow={Math.min(quota.unitFood, quota.targetFood)} aria-valuetext={`${quota.unitFood} of ${quota.targetFood} food; your contribution ${quota.ownFood}`}>
+    <div className="korund-quota-track" role="progressbar" aria-label="Work-unit quota progress" aria-valuemin={0} aria-valuemax={quota.targetFood} aria-valuenow={Math.min(quota.unitFood, quota.targetFood)} aria-valuetext={korundQuotaValueText(quota.unitFood, quota.targetFood, quota.ownFood, over)}>
       <span className="korund-quota-unit" style={{ width: `${unit}%` }} /><span className="korund-quota-own" style={{ width: `${own}%` }} />
     </div>
-    <p>Unit: {quota.unitFood} / {quota.targetFood} food ({unit}%) · Your contribution: {quota.ownFood} food. Quota resets with the coupon week.</p>
+    <p>Unit: {quota.unitFood} / {quota.targetFood} food ({over || unit}%) · Your contribution: {quota.ownFood} food. Quota resets with the coupon week.</p>
+    {over > 0 && <p className="korund-quota-over">{korundMedalCopy.over(over)}<br /><small>{korundMedalCopy.overSub}</small></p>}
+    {medals && <p title={korundMedalCopy.rule}>{korundMedalCopy.count(medals.total)} <small>{korundMedalCopy.rule}</small></p>}
   </section>;
 }
 
@@ -119,9 +125,9 @@ export function CouponBook({ now, coupons, walletMinor, clothing, goods, reason,
     {expiresAt && <GameTimer endsAt={expiresAt} label="Coupons expire at the weekly reset" />}
     <p>Coupons are issued in your name, cannot be traded or sent, and unused coupons disappear at the weekly reset.</p>
     <ul>{coupons.map((coupon) => <li key={coupon.kind}>
-      <strong>{coupon.label}</strong> · {coupon.quantity} {coupon.item} · {coupon.priceMinor === 0 ? 'no LN charge' : `${(coupon.priceMinor / 100).toFixed(2)} LN fixed price`} · {coupon.used ? 'used this week' : 'available'}
+      <strong>{coupon.label}</strong> · {coupon.quantity} {coupon.item} · {coupon.priceMinor === 0 ? 'no LN charge' : `${(coupon.priceMinor / 100).toFixed(2)} LN fixed price`} · {coupon.withdrawn ? korundRationCutCopy.withdrawn : coupon.used ? 'used this week' : 'available'}
       {coupon.kind === 'food' ? (!coupon.used && <button type="button" onClick={onFood}>Redeem at the ration counter</button>)
-        : <ActionButton type="button" reason={reason ?? firstActionReason([!now, 'Checking the coupon expiry…'], [now >= Date.parse(coupon.expiresAt), 'This coupon book expired at the weekly reset. Refresh for this week’s coupons.'], [coupon.used, 'This coupon was already used this week.'], [walletMinor < coupon.priceMinor, `You need ${(coupon.priceMinor / 100).toFixed(2)} LN. Complete an assigned shift first.`])} onClick={() => onRedeem(coupon.kind as 'clothing' | 'goods')}>Redeem {coupon.label.toLowerCase()}</ActionButton>}
+        : <ActionButton type="button" reason={reason ?? firstActionReason([!now, 'Checking the coupon expiry…'], [Boolean(coupon.withdrawn), korundRationCutCopy.notice], [now >= Date.parse(coupon.expiresAt), 'This coupon book expired at the weekly reset. Refresh for this week’s coupons.'], [coupon.used, 'This coupon was already used this week.'], [walletMinor < coupon.priceMinor, `You need ${(coupon.priceMinor / 100).toFixed(2)} LN. Complete an assigned shift first.`])} onClick={() => onRedeem(coupon.kind as 'clothing' | 'goods')}>Redeem {coupon.label.toLowerCase()}</ActionButton>}
     </li>)}</ul>
     <p>Household stores: {clothing} clothing · {goods} goods bundles.</p>
   </section>;
@@ -166,6 +172,7 @@ export function GrayMarket({ gray, pending, uncertain, onGray }: { gray: NonNull
     <dl><dt>{grayText.cashLabel}</dt><dd>{fc(gray.cashMinor)}{gray.grantPending ? ' (starting stash, yours when you first trade)' : ''}</dd></dl>
     <p><small>{grayText.cashHelp}</small></p>
     {gray.suspicion && <p title={gray.suspicion.tooltip.join(' ')}>{gray.suspicion.line} <small>({gray.suspicion.privateTag})</small></p>}
+    {gray.seizure && <p role="status">{gray.seizure}</p>}
     {gray.dailyRemainingMinor !== undefined && <p>Today&apos;s limit: {ln(gray.dailyRemainingMinor)} left</p>}
     <p aria-label={grayText.rumorLabel}>{gray.rumoredRate === null ? grayText.noRumor : rumorLine(gray.rumoredRate)}</p>
     <h4>{grayText.yourOffer}</h4>

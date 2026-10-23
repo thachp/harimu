@@ -12,6 +12,8 @@ export type OrderBookState = {
   goods: { good: MarketGood; label: string; unit: string; perishable: boolean; bestBidMinor: number | null; bestAskMinor: number | null;
     bids: { unitMinor: number; qty: number; npc: boolean }[]; asks: { unitMinor: number; qty: number; npc: boolean }[]; lastTradeMinor: number | null }[];
   myOrders: { id: string; side: 'buy' | 'sell'; good: MarketGood; qty: number; remaining: number; limitUnitMinor: number; createdAt: string }[];
+  /** #777: present only with HARIMU_MARKET_FEE_ENABLED on; the citizen's latest seller fees. */
+  myFees?: { tradeId: string; good: string; qty: number; unitMinor: number; feeMinor: number; filledAt: string }[];
 };
 const uuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 const int = (v: unknown, max: number) => Number.isSafeInteger(v) && (v as number) >= 1 && (v as number) <= max;
