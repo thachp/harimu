@@ -46,7 +46,7 @@ test('GET /api/citizen: openNations appears only when a flag-opened nation is pl
 
 test('wiring: strip badge, panel band, comparison table and Preview badge read openNations; /api/world stays public and flag-free', async () => {
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
-  assert.match(page, /setOpenNations\(snapshot\.openNations\)/);
+  assert.match(page, /setOpenNations\(snapshot\.openNations( \?\? \[\])?\)/);
   assert.match(page, /badge: nation\.populationBand && !\(nation\.populationBand === 'coming-soon' && openNations\?\.includes\(nation\.id\)\)/);
   assert.match(page, /selected\.populationBand && !\(selected\.populationBand === 'coming-soon' && openNations\?\.includes\(selected\.id\)\)/);
   assert.match(page, /<NationComparison nations=\{worldNations\} openNations=\{openNations\} \/>/); assert.match(page, /<GameShell visitorSession=\{isVisitorSession\([^\n]*openNations=\{openNations\}/);

@@ -1365,7 +1365,7 @@ export default function Home() {
         setEconomy((current) => current ? { ...current, inventory: [{ item: 'food', quantity: (current.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) + 2 }, ...current.inventory.filter((entry) => entry.item !== 'food')] } : current);
       }
     }
-    setOpenNations(snapshot.openNations); // #872
+    setOpenNations(snapshot.openNations ?? []); // #872; #875: [] marks "loaded, none flag-opened" so the Preview badge can show
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
       // #411: an existing citizen's own nation is the viewed nation unless the URL names one (once per citizen nation, so a later visit elsewhere is kept).
