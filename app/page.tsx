@@ -91,7 +91,7 @@ import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHe
 import { CityCoResidents } from './city-coresidents';
 import { CivicRankCard } from './civic-rank-card';
 import { PollCard } from './poll-card'; // #740
-import { KindleBudgetCard } from './kindle-budget-card';
+import { KindleBudgetCard, useKindleBudget } from './kindle-budget-card';
 import { ArmyCard } from './army-card'; // #738
 import { IVotedBadge } from './i-voted-badge'; // #782
 import type { CivicRank } from '@/lib/civic-rank-rules';
@@ -883,6 +883,7 @@ export default function Home() {
     [locationSearch, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
+  const kindleBudget = useKindleBudget(clerkConfigured && citizenNation?.id === 'kindle'); // #811: ledger treasury for the card and the Nation panel
   const identityHoldNow = identityHold(locationSearch, fallbackNationIds, sessionLoading, Boolean(citizenNation), signedHint, holdExpired);
   const weekStoreKey = citizenNationId && citizenshipStatus?.enrolledAt ? `${citizenNationId}:${citizenshipStatus.enrolledAt}` : '';
   // Load progress when the citizen key changes (adjust-state-during-render). Signed-in citizens use server progress (#135); the local demo keeps the browser stub.
@@ -1824,13 +1825,13 @@ export default function Home() {
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     {clerkConfigured && citizenNation?.id === 'kindle' && <CivicRankCard civicRank={civicRank} />}
-    {clerkConfigured && citizenNation?.id === 'kindle' && <KindleBudgetCard />}
+    {clerkConfigured && citizenNation?.id === 'kindle' && <KindleBudgetCard budget={kindleBudget} />}
     {clerkConfigured && citizenNation?.id === 'kindle' && <IVotedBadge />}
     {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
 
     {(!clerkConfigured || !citizenNationId) && <SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
-    <NationPanel onNationMap={() => changeView('country')} incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
+    <NationPanel onNationMap={() => changeView('country')} treasuryMinor={kindleBudget?.treasuryMinor ?? null} incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}

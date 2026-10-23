@@ -90,3 +90,14 @@ test('the world strip has no nation filter or sort rows: all ten nations show in
   const order=[...html.matchAll(/<strong>([^<]+?)(?:<small|<\/strong>)/g)].map(m=>m[1]);
   assert.deepEqual(order.slice(-nations.length),nations.map(n=>n.name),'strip cards keep the default (registry) order');
 });
+
+test('#811 Treasury row: Kindle shows the ledger balance; flag off, other nations and bad values say "Not published", never the seeded string',()=>{
+  const row=html=>html.match(/<dt>Treasury<\/dt><dd>([^<]*)<\/dd>/)?.[1];
+  const render=(nation,treasuryMinor)=>renderToStaticMarkup(React.createElement(NationInstitutions,{...props,nation,citizenNation:nations[0],...(treasuryMinor===undefined?{}:{treasuryMinor})}));
+  for (const [minor,text] of [[0,'0.00 SPK (ledger)'],[49,'0.49 SPK (ledger)'],[499,'4.99 SPK (ledger)'],[123456789012,'1234567890.12 SPK (ledger)']]) assert.equal(row(render(nations[0],minor)),text);
+  assert.equal(row(render(nations[0],null)),'Not published','flag off / no budget read');
+  assert.equal(row(render(nations[0])),'Not published','prop omitted');
+  assert.equal(row(render(nations[0],1.5)),'Not published','non-integer minor units');
+  for (const nation of nations.slice(1)) { const html=render(nation,499); assert.equal(row(html),'Not published',`${nation.id}: no published ledger`); assert.ok(!html.includes('Seeded 100m')); }
+  assert.ok(!render(nations[0],499).includes('Seeded 100m'));
+});
