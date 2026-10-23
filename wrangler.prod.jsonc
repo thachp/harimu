@@ -172,6 +172,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_CITY": "false",
+    // #243: filler wire stories (lib/press-templates.ts packs) in the National news edition under their in-world byline; they give way once a player paper publishes.
+    "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "false",
     "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
