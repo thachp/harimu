@@ -16,7 +16,7 @@ export const korundCouponSchemas=[
  `CREATE TABLE IF NOT EXISTS korund_coupon_redemptions (id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),game_week INTEGER NOT NULL CHECK(game_week>=1),coupon TEXT NOT NULL CHECK(coupon IN ('clothing','goods')),item TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity=1),price_minor INTEGER NOT NULL CHECK(price_minor>0),occurred_at INTEGER NOT NULL,UNIQUE(clerk_user_id,game_week,coupon))`,
 ] as const;
 
-export type KorundCoupon={kind:KorundCouponKind;label:string;item:string;quantity:number;priceMinor:number;used:boolean;expiresAt:string};
+export type KorundCoupon={kind:KorundCouponKind;label:string;item:string;quantity:number;priceMinor:number;used:boolean;expiresAt:string;/** #776: withdrawn by a ration cut this week (flag on only). */withdrawn?:true};
 export type KorundQuota={workUnit:string;targetFood:number;unitFood:number;ownFood:number;weekStartsAt:string;weekEndsAt:string};
 
 /** LN spent on coupon goods; subtract from wages for the LN balance. */
@@ -80,3 +80,21 @@ export function korundShortfall(week:number,unitFood:number,target=korundWeeklyQ
  const percent=shortfallPercent(unitFood,target);
  return week<1||percent===0?null:{week,workUnit:korundWorkUnit,unitFood,targetFood:target,percent,ledger:{bonusMinor:0,reason:'quota_shortfall'},press:korundShortfallCopy.press(korundWorkUnit)};
 }
+
+/** #776 ration cut after a plan shortfall (docs 12.11 step 4: "a shortfall cuts rations"), HARIMU_KORUND_RATION_CUT_ENABLED only.
+ *  Derived on read from the same closed-week unit food as #759: no table, no migration, no write in GET, idempotent by construction.
+ *  [ASSUMPTION] the food coupon (2 food) is the minimum ration and is never cut: korund_rations/korund_meals pin quantity=2 by CHECK, so a smaller
+ *  food ration would need a migration and new meal math. The cut instead withdraws coupons from the next week's book, goods first, then clothing.
+ *  [ASSUMPTION] step: one coupon withdrawn per started 50 points of shortfall (1-49% short: goods; 50%+ : goods and clothing). One config constant.
+ *  [ASSUMPTION] Korund has one city/work unit in the PoC, so "per city per week" is per game week. */
+export const korundRationCutStepPercent=50;
+export const korundRationCutOrder=['goods','clothing'] as const;
+export type KorundRationCut={week:number;percent:number;withdrawn:('goods'|'clothing')[]};
+/** The cut for current week `week` given the previous (closed) week's shortfall percent; null when there is none. */
+export function korundRationCut(week:number,shortfallPct:number,step=korundRationCutStepPercent):KorundRationCut|null{
+ if(week<2||shortfallPct<=0)return null;
+ return {week,percent:shortfallPct,withdrawn:korundRationCutOrder.slice(0,Math.min(korundRationCutOrder.length,1+Math.floor(shortfallPct/step)))};
+}
+export const applyRationCut=(coupons:KorundCoupon[],cut:KorundRationCut|null):KorundCoupon[]=>cut?coupons.map(c=>(cut.withdrawn as string[]).includes(c.kind)?{...c,withdrawn:true as const}:c):coupons;
+/** Content's rationCut (lib/ration-copy.ts, #336), mirrored here so the panel keeps its one copy import (a test pins them equal). */
+export const korundRationCutCopy={label:'Rations are reduced',notice:'Plan output fell short, so this week\'s rations are reduced.',withdrawn:'withdrawn this week (ration cut)'} as const;
