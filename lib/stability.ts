@@ -88,14 +88,14 @@ export const dormantAt = (at: number) => new Date((at - 30*86400)*1000).toISOStr
 const notDormant = " AND NOT (c.last_active_at IS NOT NULL AND length(c.last_active_at)=24 AND c.last_active_at<=?)";
 export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; excludeDormant?: boolean} = {}): Promise<StabilityInputs> {
  const since = at-signalWindowSeconds;
- // #739 slice 2 (ARC): with excludeDormant (flag on, live tick only), the citizens/fed/worked counts leave out citizens Dormant at `at`, so food and work shares exclude them.
+ // #739 slice 2 (ARC): with excludeDormant (flag on, live tick only), the citizens/fed/worked counts leave out citizens Dormant at `at`, so food and work shares exclude them. Flag off: the SQL text is unchanged (tests/world-repair-cap-679 matches it).
  const nd = options.excludeDormant ? notDormant : '', cut = options.excludeDormant ? [dormantAt(at)] : [];
  const meals = nationId === 'kindle' ? "SELECT clerk_user_id FROM citizen_economy_events WHERE kind='meal' AND occurred_at>? AND occurred_at<=?"
   : nationId === 'korund' ? 'SELECT clerk_user_id FROM korund_meals WHERE occurred_at>? AND occurred_at<=?'
   : 'SELECT clerk_user_id FROM aurelle_meals WHERE occurred_at>? AND occurred_at<=?';
  const row = await db.prepare(`SELECT
-  (SELECT COUNT(*) FROM citizens c WHERE c.nation_id=?${nd}) AS citizens,
-  (SELECT COUNT(*) FROM citizens c WHERE c.nation_id=?${nd} AND c.clerk_user_id IN (${meals})) AS fed,
+  (SELECT COUNT(*) FROM citizens${nd ? ` c WHERE c.nation_id=?${nd}` : ' WHERE nation_id=?'}) AS citizens,
+  (SELECT COUNT(*) FROM citizens${nd ? ` c WHERE c.nation_id=?${nd} AND c.` : ' WHERE nation_id=? AND '}clerk_user_id IN (${meals})) AS fed,
   (SELECT COUNT(*) FROM citizens c WHERE c.nation_id=?${nd} AND EXISTS(SELECT 1 FROM work_shifts s WHERE s.clerk_user_id=c.clerk_user_id AND s.started_at>? AND s.started_at<=?)) AS worked,
   (SELECT COUNT(*) FROM government_petition_resolutions r JOIN government_reviews v ON v.nation_id=r.nation_id AND v.period_start=r.period_start WHERE r.nation_id=? AND r.status='accepted' AND v.reviewed_at>? AND v.reviewed_at<=?) AS kept,
   (SELECT COUNT(*) FROM government_petition_resolutions r JOIN government_reviews v ON v.nation_id=r.nation_id AND v.period_start=r.period_start WHERE r.nation_id=? AND r.status='deferred' AND v.reviewed_at>? AND v.reviewed_at<=?) AS broken,
