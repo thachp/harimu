@@ -17,3 +17,4 @@ CREATE OR REPLACE VIEW citizen_wallet_balances AS
     - COALESCE((SELECT SUM(amount_minor) FROM party_donations WHERE clerk_user_id = c.clerk_user_id), 0)
     - COALESCE((SELECT SUM(remaining * limit_unit_minor) FROM market_open_orders WHERE citizen_id = c.clerk_user_id AND side = 'buy'), 0) AS balance
   FROM citizens c;
+INSERT INTO economy_migrations (id) VALUES ('kindle-sales-tax-v3') ON CONFLICT (id) DO NOTHING;

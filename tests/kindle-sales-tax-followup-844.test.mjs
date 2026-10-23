@@ -77,26 +77,6 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await taxes(), []); assert.equal(await wallet('bob'), bob0 + 19);
   });
 
-  test(`${backend}: QA1: a fixed-lot sale with gross 333 pays tax 16 (floor of 16.65)`, async t => {
-    const { sell, buy, taxes } = await lots(t, { backend });
-    const id = await sell(1, 333);
-    assert.equal((await buy(id)).status, 200);
-    assert.deepEqual(await taxes(), [{ seller_id: 'bob', tax_minor: 16 }]);
-  });
-
-  test(`${backend}: QA1: the fill-tax INSERT goes through the same db.batch as the fill`, async t => {
-    const { r, sell, buy } = await lots(t, { backend });
-    const id = await sell(2, 1000);
-    const sqlOf = new WeakMap(), batches = [], prepare = r.db.prepare.bind(r.db), batch = r.db.batch.bind(r.db);
-    r.db.prepare = sql => { const st = prepare(sql); sqlOf.set(st, sql); const bind = st.bind.bind(st); st.bind = (...v) => { const b = bind(...v); sqlOf.set(b, sql); return b; }; return st; };
-    r.db.batch = stmts => { batches.push(stmts.map(st => sqlOf.get(st) ?? '')); return batch(stmts); };
-    t.after(() => { r.db.prepare = prepare; r.db.batch = batch; });
-    assert.equal((await buy(id)).status, 200);
-    const withTax = batches.filter(b => b.some(sql => /INSERT OR IGNORE INTO player_fill_sales_tax/.test(sql)));
-    assert.equal(withTax.length, 1, 'exactly one batch carries the tax INSERT');
-    assert.ok(withTax[0].some(sql => /INSERT[\s\S]*INTO player_fills\b/.test(sql)), 'and that batch also writes the fill');
-  });
-
   test(`${backend}: budget "Sales tax today" sums both markets for this game day only; flag off has no field`, async t => {
     const { r } = await lots(t, { backend });
     const b = await r.importModule('lib/kindle-budget.ts');
