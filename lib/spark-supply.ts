@@ -1,6 +1,7 @@
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { kindleTreasuryBalanceSql } from './economy';
+import { parked } from './async-limits'; // #679
 import { charterMonthCap, charterYearCap, gameMonth, gameYearOfMonth, issuanceAmount, issuanceBpOk, priceIndex, reserveBoardPick, routeCapBp, sparkConfig, sparkRequestIdOk, type IssuanceRoute, type WeekSample } from './spark-supply-rules';
 export * from './spark-supply-rules';
 
@@ -69,15 +70,22 @@ async function ensureSeed(db: GameDatabase, month: number, now: number): Promise
 
 /** Read-only. Flag off: the caller does not call this. A database without migration 0043, or before the first scheduled run, shows the live supply and the base index. */
 export async function readReserveBoard(db: GameDatabase, now: number): Promise<ReserveBoard> {
+  // #679: the reads that only matter once the seed exists start alongside the seed read (parked, so a database without the seed or migration 0043 leaves no
+  // unhandled rejection; they are awaited only when the seed exists). Seeded: two round trips instead of four.
+  const reads = parked(Promise.all([latestRow(db),
+    db.prepare(`SELECT ${columns} FROM spark_issuances WHERE route <> 'seed' ORDER BY game_month DESC, supply_after_minor DESC, issued_at DESC, id DESC LIMIT 1`).first<Row>(), worldEpoch(db),
+    db.prepare(`SELECT ${columns} FROM spark_issuances ORDER BY issued_at, supply_after_minor, id`).all<Row>()]));
   const seed = await seedRow(db);
   if (!seed) return { moneySupplyMinor: await liveSupply(db), lastIssuance: null, priceIndex: sparkConfig.priceBase };
-  const [latest, last, epoch] = await Promise.all([latestRow(db),
-    db.prepare(`SELECT ${columns} FROM spark_issuances WHERE route <> 'seed' ORDER BY game_month DESC, supply_after_minor DESC, issued_at DESC, id DESC LIMIT 1`).first<Row>(), worldEpoch(db)]);
+  const [early, last, epoch, { results: earlyRows }] = await reads;
+  // The early reads may predate the seed (first write) or each other. Serially, the latest row was read after the seed and the full rows after it, so
+  // re-read in that order when the early latest is missing or the early rows lack it; rows are append-only, so the early ones are otherwise no older.
+  const latest = early ?? await latestRow(db);
+  const rows = latest && earlyRows.some(row => row.id === latest.id) ? earlyRows : (await db.prepare(`SELECT ${columns} FROM spark_issuances ORDER BY issued_at, supply_after_minor, id`).all<Row>()).results;
   const supply = Number(latest!.supply_after_minor);
   // Weekly samples for the window, ending now: the supply at each week's end (from the rows) and the shifts settled in it (Kindle's shift ledger).
   const weekSeconds = sparkConfig.gameWeekSeconds, nowWeek = Math.floor((now - epoch) / weekSeconds), seedWeek = Math.floor((Number(seed.issued_at) - epoch) / weekSeconds);
   const firstWeek = Math.max(seedWeek, nowWeek - sparkConfig.priceWindowWeeks + 1);
-  const rows = (await db.prepare(`SELECT ${columns} FROM spark_issuances ORDER BY issued_at, supply_after_minor, id`).all<Row>()).results;
   const settled = (await db.prepare('SELECT settled_at FROM shift_settlements WHERE settled_at >= ?').bind(new Date((epoch + firstWeek * weekSeconds) * 1000).toISOString()).all<{ settled_at: string }>()
     .catch(tolerate(isMissingRelation, { results: [] as { settled_at: string }[] }))).results;
   const output = new Map<number, number>();
