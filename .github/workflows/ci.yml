@@ -62,7 +62,8 @@ jobs:
 
   validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 35 min: playwright install can stall ~13 min on runners (run 39971034691) on top of ~8 min test:layout.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
