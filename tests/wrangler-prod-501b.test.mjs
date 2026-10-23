@@ -12,7 +12,7 @@ import { hyperdriveIdProblem, productionWorker, readProductionConfigRaw, runtime
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
 // Vars present in preview and deliberately absent in production.
-const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']; // #501c: no journal in production
+const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_KINDLE_CYCLE_START_AT']; // #501c; #878: the cycle start is preview-only (unset in production: calendars held): no journal in production
 // Top-level keys present in preview and deliberately absent in production (preview-only observability, Patrick approved via PM).
 const previewOnlyTopLevelKeys = ['d1_databases', 'observability'];
 // Vars production adds, with their required values.
