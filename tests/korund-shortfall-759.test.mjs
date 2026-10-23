@@ -13,8 +13,10 @@ test('rules: percent missed, none at or over target or before a closed week; cop
   assert.equal(korundShortfall(1, 40), null); assert.equal(korundShortfall(0, 10), null);
   assert.deepEqual(korundShortfall(2, 30).ledger, { bonusMinor: 0, reason: 'quota_shortfall' });
   assert.equal(korundShortfallCopy.notice(korundWorkUnit, 25), `Inspection: ${korundWorkUnit} finished last week 25% short of its quota.`);
+  assert.equal(korundShortfallCopy.ledger, 'No bonus withheld (work-unit bonus not yet active).', 'follow-up: natural bonus line');
+  assert.doesNotMatch(korundShortfallCopy.ledger, /0\.00 LN|Week \d/);
   assert.equal(korundShortfallCopy.press(korundWorkUnit), `Plan inspectors visit the ${korundWorkUnit} after a weekly shortfall.`);
-  for (const s of [korundShortfallCopy.notice('X', 5), korundShortfallCopy.ledger(3), korundShortfallCopy.press('X')]) assert.doesNotMatch(s, /punish|suspicion/i);
+  for (const s of [korundShortfallCopy.notice('X', 5), korundShortfallCopy.ledger, korundShortfallCopy.press('X')]) assert.doesNotMatch(s, /punish|suspicion/i);
 });
 
 async function setup(t, on = true, pglite = false) {
@@ -92,6 +94,6 @@ test('GET makes no writes and leaves no ledger row; no player Suspicion change',
 
 test('panel renders the shortfall only from korundShortfallCopy and only when present', async () => {
   const panel = await readFile(new URL('../app/korund-plan-panel.tsx', import.meta.url), 'utf8');
-  assert.match(panel, /\{plan\.shortfall && /); assert.match(panel, /korundShortfallCopy\.notice\(/); assert.match(panel, /korundShortfallCopy\.ledger\(/);
+  assert.match(panel, /\{plan\.shortfall && /); assert.match(panel, /korundShortfallCopy\.notice\(/); assert.match(panel, /korundShortfallCopy\.ledger\}/);
   assert.doesNotMatch(panel, /Inspection:|punish/i);
 });
