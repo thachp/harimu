@@ -4,6 +4,7 @@
  *  the selected nation stays pressed, keyboard focus reaches every chip, and the page never scrolls sideways (the strip itself scrolls, as today).
  *  With LAYOUT_SHOTS_DIR: the strip at each size. Used by hud-layout-check.mjs. Screenshots: LAYOUT_SHOTS_DIR=docs/screenshots/392-s5. */
 import { bundleShell, shellProps } from './hud-tooltip-check.mjs';
+import { isMain, runStandalone } from './layout-standalone.mjs';
 
 const names = { kindle: 'Kindle Republic', confluence: 'The Confluence', meridian: 'Meridian', korund: 'Korund', aurelle: 'Aurelle', ilmar: 'Ilmar', hoarvale: 'Hoarvale', varkand: 'Varkand', veldwood: 'Veldwood', fulmara: 'Fulmara' };
 const badges = { kindle: 'Growing', korund: 'Growing', aurelle: 'Needs citizens' };
@@ -53,3 +54,4 @@ export async function checkUiV2World({ browser, css, preflight, failures, rows }
     await context.close();
   }
 }
+if (isMain(import.meta.url)) await runStandalone('S5 world chips', checkUiV2World); // QA2 #761: running this file alone runs the check

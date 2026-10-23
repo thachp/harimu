@@ -5,6 +5,7 @@
  *  - the top tabs keep only Household, Work, Market, Civic; there is no breadcrumb; arrow keys move focus along the rail
  *  With LAYOUT_SHOTS_DIR: full-page shots per size, City view, plus World at 1280. Used by hud-layout-check.mjs. Screenshots: LAYOUT_SHOTS_DIR=docs/screenshots/392-s4. */
 import { bundleShell, shellProps } from './hud-tooltip-check.mjs';
+import { isMain, runStandalone } from './layout-standalone.mjs';
 
 const probe = () => {
   const issues = [], vw = document.documentElement.clientWidth, rect = s => document.querySelector(s)?.getBoundingClientRect();
@@ -52,3 +53,4 @@ export async function checkUiV2Rail({ browser, css, preflight, failures, rows })
     await context.close();
   }
 }
+if (isMain(import.meta.url)) await runStandalone('S4 zoom rail', checkUiV2Rail); // QA2 #761: running this file alone runs the check

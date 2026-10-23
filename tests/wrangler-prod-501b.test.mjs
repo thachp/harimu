@@ -13,12 +13,14 @@ const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
 // Vars present in preview and deliberately absent in production.
 const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']; // #501c: no journal in production
+// Top-level keys present in preview and deliberately absent in production (preview-only observability, Patrick approved via PM).
+const previewOnlyTopLevelKeys = ['d1_databases', 'observability'];
 // Vars production adds, with their required values.
 const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
 // Feature flags the preview turns on for QA (the preview-flags-on change). Production keeps every one "false". Adding a flag here is a deliberate preview-only decision.
 // Build-time UI flags (baked into the client bundle at build): on in preview, always "false" in production. Exactly these four.
-const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD'];
+const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION'];
 const previewOnFlags = [
   'HARIMU_TEST_FAUCET_ENABLED',
   'HARIMU_LABOR_BUREAU_ENABLED',
@@ -27,7 +29,9 @@ const previewOnFlags = [
   'HARIMU_GRAY_SUSPICION_ENABLED', // #749
   'HARIMU_KORUND_MEDALS_ENABLED', // #737
   'HARIMU_KORUND_SHORTFALL_ENABLED', // #759
+  'HARIMU_MARKET_FEE_ENABLED', // #777
   'HARIMU_WALLET_STREET_RATE_ENABLED', // #758
+  'HARIMU_KORUND_RATION_CUT_ENABLED', // #776
   'HARIMU_FAVOR_DECAY_ENABLED',
   'HARIMU_KINDLE_INCOME_TAX_ENABLED',
   'HARIMU_ORDER_BOOK_ENABLED',
@@ -41,6 +45,7 @@ const previewOnFlags = [
   'HARIMU_DIPLOMATIC_HALL_ENABLED',
   'HARIMU_MAP_OVERLAYS_ENABLED', // #82
   'HARIMU_CIVIC_RANK_ENABLED', // #741
+  'HARIMU_I_VOTED_BADGE_ENABLED', // #782
   'HARIMU_FOUNDING_PERIOD_ENABLED',
   'HARIMU_AURELLE_SUCCESSION_ENABLED',
   'HARIMU_WAR_ENABLED',
@@ -88,7 +93,14 @@ test('identity and bindings: own Worker, same account and runtime shape, no D1, 
   for (const key of ['main', 'compatibility_date', 'compatibility_flags', 'placement', 'triggers', 'ai', 'durable_objects', 'migrations']) assert.deepEqual(prod[key], preview[key], key);
   for (const key of ['d1_databases', 'routes', 'route', 'kv_namespaces', 'r2_buckets', 'services', 'queues', 'tail_consumers', 'env']) assert.equal(prod[key], undefined, `${key} must not exist on production yet`);
   assert.equal(prod.workers_dev, false); assert.equal(prod.preview_urls, false);
-  assert.deepEqual(Object.keys(prod).sort(), [...Object.keys(preview).filter(key => key !== 'd1_databases'), ].sort(), 'no top-level key beyond the preview set (minus D1)');
+  assert.deepEqual(Object.keys(prod).sort(), Object.keys(preview).filter(key => !previewOnlyTopLevelKeys.includes(key)).sort(), 'no top-level key beyond the preview set (minus the preview-only keys)');
+});
+
+test('observability: on in preview only; production carries no observability block', () => {
+  assert.deepEqual(preview.observability, { enabled: true, logs: { invocation_logs: false } }, 'invocation logs (which capture request headers, e.g. Cookie/Authorization) must stay off; console logs stay on');
+  assert.strictEqual(preview.observability.logs.invocation_logs, false);
+  assert.equal(prod.observability, undefined, 'production stays unchanged');
+  assert.equal(previewOnlyTopLevelKeys.every(key => key in preview), true, 'every listed preview-only key exists in preview');
 });
 
 test('vars: same names as preview except the listed differences; every flag false; no preview-only or secret-looking var', () => {

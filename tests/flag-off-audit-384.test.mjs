@@ -38,7 +38,9 @@ const flagOffPins = {
   HARIMU_GRAY_SUSPICION_ENABLED: 'gray-suspicion-749.test.mjs',
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
+  HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
   HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
+  HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',
   HARIMU_NATION_READINESS_ENABLED: 'nation-readiness-486.test.mjs',
   HARIMU_FAVOR_DECAY_ENABLED: 'favor-decay-529.test.mjs',
@@ -57,6 +59,7 @@ const flagOffPins = {
   HARIMU_DIPLOMATIC_HALL_ENABLED: 'diplomatic-hall-599.test.mjs',
   HARIMU_MAP_OVERLAYS_ENABLED: 'map-overlays-82.test.mjs',
   HARIMU_CIVIC_RANK_ENABLED: 'civic-rank-741.test.mjs',
+  HARIMU_I_VOTED_BADGE_ENABLED: 'i-voted-782.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
@@ -90,7 +93,7 @@ const switchOffPins = {
   HARIMU_STORAGE_MAINTENANCE: 'flag-off-audit-384.test.mjs',
 };
 const notSwitches = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_PRODUCTION_STORAGE', 'HARIMU_POSTGRES_CUTOVER_READY', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED',
-  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD'];
+  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION'];
 
 test('every boolean wrangler var that is not *_ENABLED is a registered switch (off in both configs) or a listed config value', () => {
   for (const [file, config] of Object.entries(configs)) {
