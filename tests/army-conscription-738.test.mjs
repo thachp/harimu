@@ -146,6 +146,8 @@ for (const backend of ['sqlite', 'postgres']) {
 
 test('stay-error follow-up (#738): a refused stay shows the placeholder refusal copy, marked for Content; never the generic failure note', () => {
   const card = readFileSync('app/army-card.tsx', 'utf8'), copy = readFileSync('lib/army-copy.ts', 'utf8');
-  assert.match(card, /setNote\(fill\(r\.ok \? unitMembership\.stayed\.text : unitMembership\.stayRefused\.text, unit\.name\)\)/);
+  // QA2 on #859: stayRefused only for 409 + not_conscripted; any other non-OK (401/403/404/500) and network errors keep the generic stance failure note.
+  assert.match(card, /setNote\(r\.ok \? fill\(unitMembership\.stayed\.text, unit\.name\) : r\.status === 409 && reason === 'not_conscripted' \? fill\(unitMembership\.stayRefused\.text, unit\.name\) : armyFailureNote\('stance', unit\.name, String\(r\.status\)\)\); \}\)\.catch\(\(\) => setNote\(armyFailureNote\('stance', unit\.name, 'network'\)\)\)/);
+  assert.match(card, /const reason = r\.ok \? '' : \(\(await r\.json\(\)\.catch\(\(\) => \(\{\}\)\)\) as \{ reason\?: string \}\)\.reason;/);
   assert.match(copy, /PLACEHOLDER copy, marked for Content[^\n]*refused stay[^\n]*\n stayRefused:L\('You cannot stay in \{unit\}: you are not serving a term right now\.'\)/);
 });
