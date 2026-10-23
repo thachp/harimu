@@ -34,6 +34,7 @@ const probe = ({ on, phone, view, scale }) => {
     const dock = box('.citizen-dock'), floor = dock ? dock.t : vh;
     if (Math.abs(rects.nav.b - floor) > 1) issues.push(`tab bar bottom at ${Math.round(rects.nav.b)}, not on the ${dock ? 'dock' : 'screen bottom'} (${Math.round(floor)})`);
     if (overlaps(rects.nav, rects.hud)) issues.push('tab bar covers the top bar');
+    if (rects.stage && Math.abs(rects.stage.t - rects.hud.b) > 1.5) issues.push(`${Math.round(rects.stage.t - rects.hud.b)}px gap between the top bar and the scene`);
     // A pinned bar overlays whatever scrolls under it; the page end is checked below (atEnd). At 100% text the City scene fits above the bar unscrolled (#377).
     if (view === 'square' && scale === 1 && overlaps(rects.nav, rects.stage)) issues.push('tab bar covers the City scene at 100% text');
     for (const b of controls) { const r = b.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);

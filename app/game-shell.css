@@ -435,13 +435,10 @@ body:has(.harimu-game){overflow:auto}
 /* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
 .game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}
 /* #392 S8 mobile pass (NEXT_PUBLIC_HARIMU_UI_V2_MOBILE; class .game-mobile-v2, only with the S4 rail). Phones only: the rail + place tabs row leaves the top
-   (its grid track collapses to 0) and becomes a bottom tab bar pinned to the screen bottom (sticky, above the fixed citizen dock); the panel reads as a bottom
+   (the top bar spans its text-scaled grid track) and becomes a bottom tab bar pinned to the screen bottom (sticky, above the fixed citizen dock); the panel reads as a bottom
    sheet (rounded top, raised edge, decorative grab bar). DOM order, copy and controls are unchanged; desktop is untouched. */
 @media(max-width:760px){
-  .harimu-game.game-mobile-v2{grid-template-rows:auto 0 minmax(260px,44dvh) minmax(calc(120px * var(--text-scale, 1)),auto) minmax(0,auto)}
-  .harimu-game.game-mobile-v2.game-mode-world{grid-template-rows:auto 0 minmax(260px,44dvh) minmax(calc(210px * var(--text-scale, 1)),auto) minmax(0,auto)}
-  .harimu-game.game-mobile-v2.game-mode-world.inspector-collapsed{grid-template-rows:auto 0 minmax(260px,54dvh) minmax(calc(210px * var(--text-scale, 1)),auto) auto}
-  .harimu-game.game-mobile-v2.game-city-v2{grid-template-rows:auto 0 minmax(260px,44dvh) 0 minmax(0,auto)}
+  .harimu-game.game-mobile-v2>.game-hud{grid-row:1 / span 2} /* the top bar fills the nav row's (text-scaled, #80) track, so the empty row leaves no gap */
   .game-mobile-v2.game-rail-on .game-nav-row{grid-row:8;position:sticky;bottom:0;z-index:8;border-top:1px solid #49616a;border-bottom:0;box-shadow:0 -4px 12px #0007}
   .game-mobile-v2.game-rail-on:has(.citizen-dock) .game-nav-row{bottom:45px}
   .game-mobile-v2 .game-inspector{border-top:1px solid #49616a;border-radius:14px 14px 0 0;box-shadow:0 -6px 16px #0006;padding-top:14px}
