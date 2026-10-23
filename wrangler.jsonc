@@ -109,6 +109,8 @@
     "HARIMU_ARMIES_ENABLED": "true",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
+    // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_KINDLE_POLLING_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).

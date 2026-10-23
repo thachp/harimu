@@ -90,6 +90,7 @@ import { Newspaper } from '@phosphor-icons/react';
 import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHeadline } from '@/lib/morning-brief';
 import { CityCoResidents } from './city-coresidents';
 import { CivicRankCard } from './civic-rank-card';
+import { PollCard } from './poll-card'; // #740
 import { KindleBudgetCard } from './kindle-budget-card';
 import { ArmyCard } from './army-card'; // #738
 import { IVotedBadge } from './i-voted-badge'; // #782
@@ -1768,6 +1769,7 @@ export default function Home() {
         {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<Canvassing key={`canvassing:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<TownHalls key={`town-hall:${citizenSessionKey}`}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<PollCard key={`poll:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<Debate key={`debate:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&simulation?.reserve&&<ReserveBoardLine reserve={simulation.reserve}/>}
         {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={`aurelle-rising:${citizenSessionKey}`}/>}
