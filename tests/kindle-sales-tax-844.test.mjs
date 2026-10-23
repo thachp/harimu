@@ -72,16 +72,36 @@ test('with the fee on too, both rows land per fill; tiny trades and an incoming 
   assert.equal((await reconcile()).mismatchCount, 0);
 });
 
-test('a non-Kindle seller pays no Kindle sales tax', async t => {
-  const { r, place, taxes } = await market(t);
-  await place('bob', 'sell', 4, 1000); await place('alice', 'buy', 4, 1000);
+// ARC ruling on #857: the market where the trade happens decides the tax, not the seller's nationality. Fixture orders and trades (the place route only
+// admits Kindle citizens to Kindle's book), then the exact SQL the fill batch runs.
+async function venueTrade(r, { seller, city }) {
+  const id = `t-${seller}-${city}`, so = `so-${id}`, bo = `bo-${id}`;
+  await r.db.batch([
+    r.db.prepare("INSERT INTO market_orders (id,city_id,citizen_id,npc_id,side,good,qty,limit_unit_minor,created_at) VALUES (?,?,?,NULL,'sell','fruit',4,1000,1)").bind(so, city, seller),
+    r.db.prepare("INSERT INTO market_orders (id,city_id,citizen_id,npc_id,side,good,qty,limit_unit_minor,created_at) VALUES (?,?,'alice',NULL,'buy','fruit',4,1000,1)").bind(bo, city),
+    r.db.prepare("INSERT INTO market_trades (id,buy_order_id,sell_order_id,good,qty,unit_minor,filled_at) VALUES (?,?,?,'fruit',4,1000,2)").bind(id, bo, so),
+  ]);
   const { kindleSalesTaxSql } = await r.importModule('lib/kindle-sales-tax.ts');
-  const id = (await r.db.prepare('SELECT trade_id FROM market_sales_tax').first()).trade_id;
-  await r.db.prepare('DELETE FROM market_sales_tax').run();
-  await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
   await r.db.prepare(kindleSalesTaxSql).bind(id).run();
-  assert.deepEqual(await taxes(), []);
+  return id;
+}
+test('venue id matches the order book', async () => {
+  const { kindleMarketCityId } = await import('../lib/kindle-sales-tax.ts'); const { orderBookCityId } = await import('../lib/order-book-rules.ts');
+  assert.equal(kindleMarketCityId, orderBookCityId);
 });
+for (const backend of ['sqlite', 'postgres']) {
+  test(`${backend}: venue rule: a foreign (Korund) seller on Kindle's market is taxed`, async t => {
+    const { r, taxes } = await market(t, { backend });
+    await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
+    await venueTrade(r, { seller: 'bob', city: 'kindle' });
+    assert.deepEqual(await taxes(), [{ seller_id: 'bob', tax_minor: 200 }]);
+  });
+  test(`${backend}: venue rule: a Kindle seller on another market is not taxed`, async t => {
+    const { r, taxes } = await market(t, { backend });
+    await venueTrade(r, { seller: 'bob', city: 'aurelle' });
+    assert.deepEqual(await taxes(), []);
+  });
+}
 
 test('migrations: both dialects add the table and net it in the wallet view', async () => {
   for (const f of ['../drizzle/0081_kindle_sales_tax.sql', '../db/postgres/0081_kindle_sales_tax.sql']) {
