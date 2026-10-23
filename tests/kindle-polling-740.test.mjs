@@ -36,7 +36,8 @@ async function setup(t, backend) {
   await r.db.prepare("INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) VALUES ('kindle-presidential-poc-1','kindle',?,?,?)").bind(JSON.stringify(slate), day0, day0 + 259200).run();
   const at = new Date(r.now).toISOString();
   const citizen = (id, nation = 'kindle') => r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,?,?,18,0,'Good standing',?,?)").bind(id, nation, id, at, at).run();
-  const answer = (id, cand, when) => r.db.prepare('INSERT INTO kindle_poll_answers (election_id,clerk_user_id,candidate_id,answered_at,first_answered_at,request_id) VALUES (?,?,?,?,?,?)').bind('kindle-presidential-poc-1', id, cand, when, when, `seed-${id}`).run();
+  const answer = (id, cand, when) => r.db.batch([r.db.prepare('INSERT INTO kindle_poll_answers (election_id,clerk_user_id,candidate_id,answered_at,request_id) VALUES (?,?,?,?,?)').bind('kindle-presidential-poc-1', id, cand, when, `seed-${id}`),
+    r.db.prepare('INSERT INTO kindle_poll_respondents (election_id,clerk_user_id,first_answered_at) VALUES (?,?,?) ON CONFLICT (election_id, clerk_user_id) DO NOTHING').bind('kindle-presidential-poc-1', id, when)]);
   r.setFixtureEnv('HARIMU_KINDLE_POLLING_ENABLED', 'true');
   return { r, day0, citizen, answer };
 }
@@ -148,9 +149,13 @@ for (const backend of ['sqlite', 'postgres']) {
     const { r } = await setup(t, backend);
     for (const [cand, id] of [['mara-quell', 'req-740-k1'], ['ines-varro', 'req-740-k2']]) assert.equal((await r.call('polling', 'alice', { action: 'answer', candidateId: cand, requestId: id })).status, 200);
     assert.equal((await r.call('polling', 'alice', { action: 'decline' })).status, 200);
+    const marker = await r.db.prepare("SELECT * FROM kindle_poll_respondents WHERE clerk_user_id='alice'").first();
+    assert.ok(marker, 'ARC: the choice-free has-answered marker survives the skip');
+    assert.deepEqual(Object.keys(marker).sort(), ['clerk_user_id', 'election_id', 'first_answered_at'], 'the marker holds no choice');
     for (const table of ['kindle_poll_answers', 'kindle_poll_requests']) assert.equal(Number((await r.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE clerk_user_id='alice'`).first()).n), 0, table);
     const cols = async table => (await r.db.prepare(`SELECT * FROM ${table}`).all()).results.flatMap(row => Object.values(row).map(String));
     for (const table of ['kindle_poll_answers', 'kindle_poll_requests', 'kindle_poll_snapshots']) assert.ok(!(await cols(table)).some(v => /alice|req-740-k/.test(v)), `${table} keeps nothing of alice`);
+    for (const table of ['kindle_poll_answers', 'kindle_poll_requests', 'kindle_poll_snapshots', 'kindle_poll_respondents']) assert.ok(!(await cols(table)).some(v => /mara-quell|ines-varro/.test(v)), `${table} holds no choice of alice`);
     const requestCols = (await r.db.prepare("INSERT INTO kindle_poll_requests (request_id,clerk_user_id,election_id,answered_at) VALUES ('req-740-probe','bob','kindle-presidential-poc-1',1) RETURNING *").first());
     assert.deepEqual(Object.keys(requestCols).sort(), ['answered_at', 'clerk_user_id', 'election_id', 'request_id'], 'the request log stores no candidate');
   });
@@ -162,6 +167,24 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(res.map(x => x.status), [200, 200, 200], JSON.stringify(res.map(x => x.data?.reason)));
     assert.deepEqual([await rows(r, 'kindle_poll_answers'), await rows(r, 'kindle_poll_requests')], [1, 1]);
     assert.equal((await r.call('polling', 'alice')).data.polling.myAnswer, 'mara-quell');
+  });
+
+  test(`/api/polling (${backend}): ARC: skip, re-answer, skip, re-answer never makes a new respondent and never republishes`, async t => {
+    const { r, day0, citizen, answer } = await setup(t, backend);
+    for (let i = 0; i < 19; i++) await citizen(`m${i}`);
+    for (let i = 0; i < 10; i++) await answer(`m${i}`, 'mara-quell', day0 + i);
+    assert.equal((await r.call('polling', 'alice', { action: 'answer', candidateId: 'mara-quell', requestId: 'req-740-s0' })).status, 200); // alice answers before the cut-off
+    const d1 = day0 + 86400; r.setNow((d1 + 60) * 1000);
+    const first = (await r.call('polling', 'bob')).data.polling.poll; assert.ok(first);
+    for (const [k, cand] of [[1, 'ines-varro'], [2, 'tobin-achterberg']]) {
+      assert.equal((await r.call('polling', 'alice', { action: 'decline' })).status, 200);
+      assert.equal((await r.call('polling', 'alice', { action: 'answer', candidateId: cand, requestId: `req-740-s${k}` })).status, 200);
+    }
+    for (let i = 10; i < 19; i++) await answer(`m${i}`, 'tobin-achterberg', d1 + 100 + i); // 9 genuinely new respondents
+    r.setNow((d1 + 86400 + 60) * 1000);
+    const again = (await r.call('polling', 'bob')).data.polling.poll;
+    assert.equal(again.day, first.day, '9 new + alice skipping and re-answering twice: alice is not new, no republish');
+    assert.equal(await rows(r, 'kindle_poll_snapshots'), 1);
   });
 
   test(`/api/polling (${backend}): two first reads of a day racing keep exactly one snapshot`, async t => {
