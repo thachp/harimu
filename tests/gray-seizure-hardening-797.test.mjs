@@ -60,17 +60,36 @@ test('courier only, server-side bundle: the seller is never seized and the amoun
   assert.equal(await m.rollSeizure(r.db, 'bob', id, now, hit), 50);
 });
 
-test('overspend race: a coupon redemption committed between the seizure insert and its re-check withdraws the seizure', async t => {
+/** Injects a coupon redemption of `price` LN for the courier between the seizure insert and its committed re-check (the Postgres race window). */
+async function raceWithCoupon(t, price) {
   const { r, m, now } = await setup(t);
-  const id = await seedTrade(r, 100, now);
+  const id = await seedTrade(r, 100, now); // courier holds 100; the seizure takes 50
   const prepare = r.db.prepare.bind(r.db);
   r.db.prepare = sql => {
     const stmt = prepare(sql);
     if (!/^\s*INSERT INTO gray_seizures/.test(sql)) return stmt;
     return { bind: (...a) => { const b = stmt.bind(...a); return { run: async () => { const out = await b.run();
-      await prepare("INSERT INTO korund_coupon_redemptions(id,clerk_user_id,game_week,coupon,item,quantity,price_minor,occurred_at) VALUES (?, 'bob', 1, 'goods', 'x', 1, 60, ?)").bind(randomUUID(), now).run();
+      await prepare("INSERT INTO korund_coupon_redemptions(id,clerk_user_id,game_week,coupon,item,quantity,price_minor,occurred_at) VALUES (?, 'bob', 1, 'goods', 'x', 1, ?, ?)").bind(randomUUID(), price, now).run();
       return out; } }; } };
   };
-  try { assert.equal(await m.rollSeizure(r.db, 'bob', id, now, hit), 0); } finally { r.db.prepare = prepare; }
-  assert.deepEqual((await r.db.prepare('SELECT * FROM gray_seizures').all()).results, [], 'seizure withdrawn (fail closed)');
+  let seized; try { seized = await m.rollSeizure(r.db, 'bob', id, now, hit); } finally { r.db.prepare = prepare; }
+  return { seized, rows: (await r.db.prepare('SELECT amount_minor FROM gray_seizures').all()).results.map(x => Number(x.amount_minor)), balance: await ln(r, 'bob') };
+}
+
+test('overspend race: a coupon committed between the seizure insert and its re-check withdraws the seizure', async t => {
+  assert.deepEqual((await raceWithCoupon(t, 60)).rows, [], 'seizure withdrawn (fail closed)');
+});
+
+test('overspend boundary (QA3): balance exactly -1 withdraws the seizure; exactly 0 keeps it', async t => {
+  const minus = await raceWithCoupon(t, 51);
+  assert.equal(minus.seized, 0); assert.deepEqual(minus.rows, []); assert.equal(minus.balance, 100 - 51, 'withdrawn: only the coupon remains');
+  const zero = await raceWithCoupon(t, 50);
+  assert.equal(zero.seized, 50); assert.deepEqual(zero.rows, [50]); assert.equal(zero.balance, 0);
+});
+
+test('offer filter (QA3): an earlier 5000 trade for the same courier never sizes a later 100 bundle', async t => {
+  const { r, m, now } = await setup(t);
+  await seedTrade(r, 5000, now - 60);
+  const later = await seedTrade(r, 100, now);
+  assert.equal(await m.rollSeizure(r.db, 'bob', later, now, hit), 50, 'half of the later 100 bundle, not the 1000 cap of the earlier 5000');
 });
