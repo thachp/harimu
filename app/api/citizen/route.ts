@@ -218,8 +218,8 @@ export async function GET(request: Request) {
   if (profile && capacity) profile.capacity = capacity.capacity;
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
   // #872 (ARC ruling): nations this account may play here beyond the live three (nationPlayable, never a flag alone). Absent when none: production and the public unchanged.
-  const flagPlayable = playableNationIds(env as never, userId).filter(id => !(liveNations as readonly string[]).includes(id));
-  return privateJson({ ...(flagPlayable.length ? { openNations: playableNationIds(env as never, userId) } : {}),
+  const playable = playableNationIds(env as never, userId), flagPlayable = playable.some(id => !(liveNations as readonly string[]).includes(id));
+  return privateJson({ ...(flagPlayable ? { openNations: playable } : {}),
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountElectionId}:{})}:null,
     collectivePetitions,

@@ -26,7 +26,7 @@ import { contextStripStatus } from '@/lib/context-strip-copy'; // #379: a visito
 
 type GameNation = { id: string; name: string; capital?: string; color?: string };
 export type GameShellProps = {
-  /** #872: nations opened in this environment by a per-nation flag (from /api/world); absent = the hardcoded live list. */
+  /** #872: nations opened in this environment by a per-nation flag (GET /api/citizen, only when nationPlayable opens one for this account); absent = the hardcoded live list. */
   openNations?: readonly string[];
   worldClock?: WorldClock;
   /** #280: name of today's public holiday (endorsed festival), when faith is on. */
