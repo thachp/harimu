@@ -20,11 +20,12 @@ const UnlockedDatabase = await load(adapterSource.replace(/if\s*\(transaction\)\
 const url = process.env.HARIMU_TEST_POSTGRES_URL;
 const real = url ? {} : { skip: 'set HARIMU_TEST_POSTGRES_URL to a Postgres admin URL to run the real multi-connection tests (see tests/war-limits-postgres.test.mjs)' };
 
-test('every pool-paid claim batch locks the pool row first (korund brigade, korund posts, aurelle food estate)', async () => {
+test('every pool-paid claim batch locks the pool row first (korund brigade, korund posts, aurelle food estate and charters)', async () => {
   const korund = await readFile(new URL('../lib/korund.ts', import.meta.url), 'utf8'), aurelle = await readFile(new URL('../lib/aurelle.ts', import.meta.url), 'utf8');
   assert.match(korund, /db\.batch\(\[db\.prepare\(korundPoolLockSql\),db\.prepare\(korundSettleSql\)/, 'brigade');
   assert.match(korund, /db\.batch\(\[db\.prepare\(korundPoolLockSql\),db\.prepare\(postSettleSql\)/, 'posts');
   assert.match(aurelle, /db\.batch\(\[\n? ?db\.prepare\(aurellePoolLockSql\),db\.prepare\(aurelleClaimReceiptSql\)/, 'food estate');
+  assert.match(aurelle, /db\.batch\(\[\n? ?db\.prepare\(aurellePoolLockSql\),db\.prepare\(aurelleCharterClaimReceiptSql\)/, 'charter jobs (#886 c)');
   assert.match(korund, /export const korundPoolLockSql="UPDATE korund_resources SET initial_minor=initial_minor WHERE id='state'"/);
   assert.match(aurelle, /export const aurellePoolLockSql="UPDATE aurelle_resources SET initial_minor=initial_minor WHERE id='estate'"/);
 });
@@ -48,6 +49,7 @@ async function scratch(t) {
 /** `racers` citizens, each with one finished shift of `order`, and a pool holding exactly one wage; then everyone claims at once. */
 async function race(raw, claim, { nation, order, racers, resources, id }) {
   await raw.query('DELETE FROM labor_note_issuances'); await raw.query('DELETE FROM korund_post_settlements');
+  await raw.query('DELETE FROM crown_issuances'); await raw.query('DELETE FROM aurelle_charter_settlements');
   for (const t of ['korund_settlements', 'aurelle_settlements', 'aurelle_receipts', 'korund_work_starts', 'work_shifts', 'citizens']) await raw.query(`DELETE FROM ${t}`);
   const cols = (await raw.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name='nations' AND is_nullable='NO' AND column_default IS NULL ORDER BY ordinal_position")).rows;
   await raw.query(`INSERT INTO nations (${cols.map(c => c.column_name).join(',')}) VALUES (${cols.map((c, i) => `$${i + 1}`).join(',')}) ON CONFLICT DO NOTHING`, cols.map(c => c.column_name === 'id' ? nation : /int|numeric|double/.test(c.data_type) ? 0 : nation));
@@ -68,13 +70,14 @@ async function race(raw, claim, { nation, order, racers, resources, id }) {
 const pool = async (raw, resources, id) => {
   const k = resources === 'korund_resources';
   const sql = k ? "SELECT initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0)-COALESCE((SELECT SUM(wage_minor) FROM korund_post_settlements),0) AS p FROM korund_resources WHERE id='state'"
-    : "SELECT initial_minor+COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements),0) AS p FROM aurelle_resources WHERE id='estate'";
+    : "SELECT initial_minor+COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements),0)-COALESCE((SELECT SUM(wage_minor) FROM aurelle_charter_settlements),0) AS p FROM aurelle_resources WHERE id='estate'";
   return Number((await raw.query(sql)).rows[0].p);
 };
 const cases = [
   ['korund food brigade', { nation: 'korund', order: 'korund-food-production', resources: 'korund_resources', id: 'state' }],
   ['korund Bureau post', { nation: 'korund', order: 'korund-quarry-gang', resources: 'korund_resources', id: 'state' }],
   ['aurelle food estate', { nation: 'aurelle', order: 'aurelle-food-estate', resources: 'aurelle_resources', id: 'estate' }],
+  ['aurelle charter job', { nation: 'aurelle', order: 'aurelle-quarry-charter', resources: 'aurelle_resources', id: 'estate' }],
 ];
 const claimer = async (db, nation) => {
   const rt = await localRuntime(); const k = await rt.importModule('lib/korund.ts'), a = await rt.importModule('lib/aurelle.ts'); const now = Math.floor(Date.parse('2026-01-02T00:00:00Z') / 1000);

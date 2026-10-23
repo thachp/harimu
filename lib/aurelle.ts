@@ -178,7 +178,7 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)").bind(id,userId,id,userId),
  ]);}
  else if(claimsCharter) await db.batch([
- db.prepare(aurelleCharterClaimReceiptSql).bind(id,now,shiftId,userId,iso,id),db.prepare(aurelleCharterSettleSql).bind(now,id,userId),db.prepare(crownIssuanceSql).bind(shiftId),
+ db.prepare(aurellePoolLockSql),db.prepare(aurelleCharterClaimReceiptSql).bind(id,now,shiftId,userId,iso,id),db.prepare(aurelleCharterSettleSql).bind(now,id,userId),db.prepare(crownIssuanceSql).bind(shiftId),
  db.prepare("UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM aurelle_charter_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)").bind(iso,shiftId,userId,userId),
  ]);
  else if(command.action==='aurelle-start-work') await db.batch([
