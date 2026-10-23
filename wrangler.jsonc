@@ -171,7 +171,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "true",
     "NEXT_PUBLIC_HARIMU_RARE_MARKER": "true",
-    // #790: square chat shadow-mute (docs 21.3). Operator list of citizen ids, comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.
+    // #790: square chat shadow-mute (docs 21.3), new messages only. Operator list of citizenId@ISO8601 entries (max 90), comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.
     "HARIMU_CHAT_SHADOW_MUTE": "",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"

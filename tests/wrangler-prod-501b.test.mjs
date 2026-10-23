@@ -203,15 +203,16 @@ test('#764: the per-persona mute HARIMU_AI_MUTED_PERSONAS is present and "" (off
   assert.equal(prod.vars.HARIMU_AI_MUTED_PERSONAS, '');
 });
 
-test('#790 (QA1): the production guard and the runtime parser share one HARIMU_CHAT_SHADOW_MUTE rule (cap 90, D1 bound-parameter limit)', async () => {
+test('#790: the production guard and the runtime parser share one HARIMU_CHAT_SHADOW_MUTE rule (id@ISO8601 entries, cap 90, D1 bound-parameter limit)', async () => {
   const { shadowMuteListProblem, parseShadowMute, SHADOW_MUTE_MAX_IDS } = await import('../lib/chat-shadow-mute.ts');
   assert.equal(SHADOW_MUTE_MAX_IDS, 90);
   assert.match(readFileSync('scripts/production-config.mjs', 'utf8'), /import \{ shadowMuteListProblem \} from '\.\.\/lib\/chat-shadow-mute\.ts'/);
-  const ids = n => Array.from({ length: n }, (_, i) => `user_${i}`).join(',');
-  for (const value of ['all', 'ALL', 'true', 'false', ids(91), '', 'alice', ids(90)]) {
-    const refused = shadowMuteListProblem(value) !== null;
-    assert.equal(refused, ['all', 'ALL', 'true', 'false', ids(91)].includes(value), String(value).slice(0, 12));
-    assert.equal(parseShadowMute(value, () => {}).size, refused ? 0 : value === '' ? 0 : value.split(',').length, 'runtime agrees');
+  const list = n => Array.from({ length: n }, (_, i) => `user_${i}@2026-10-23T07:00:00Z`).join(',');
+  const refused = ['all', 'ALL', 'true', 'false', 'alice', 'alice@bad', list(91)];
+  for (const value of [...refused, '', 'alice@2026-10-23T07:00:00Z', list(90)]) {
+    const isRefused = shadowMuteListProblem(value) !== null;
+    assert.equal(isRefused, refused.includes(value), String(value).slice(0, 12));
+    assert.equal(parseShadowMute(value, () => {}).size, isRefused || value === '' ? 0 : value.split(',').length, 'runtime agrees');
   }
   assert.equal(prod.vars.HARIMU_CHAT_SHADOW_MUTE, '', 'checked-in production value is empty');
 });

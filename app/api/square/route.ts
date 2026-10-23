@@ -5,8 +5,8 @@ import { travelBlock } from '@/lib/travel';
 import { env } from 'cloudflare:workers';
 import { postSquareSql, readSquare, uuidPattern, validSquareText } from '@/lib/square-chat';
 import { latchAfterWrite } from '@/lib/first-week-server';
-import { parseShadowMute, logShadowMuted } from '@/lib/chat-shadow-mute';
-// #790: operator shadow-mute list (comma-separated citizen ids, not a secret). Empty: no change.
+import { parseShadowMute, logShadowMuted, isShadowMuted } from '@/lib/chat-shadow-mute';
+// #790: operator shadow-mute list (comma-separated citizenId@ISO8601 entries, not a secret; new posts only). Empty: no change.
 const shadowMuted=()=>parseShadowMute((env as unknown as {HARIMU_CHAT_SHADOW_MUTE?:string}).HARIMU_CHAT_SHADOW_MUTE);
 export const dynamic='force-dynamic';
 // #743: the client shows the Report control only when intake is on.
@@ -63,7 +63,7 @@ async function handleSquarePost(request:Request) {
     } else {
       await db.prepare('INSERT OR IGNORE INTO square_handles(user_id,handle) VALUES (?,?)').bind(userId,`Citizen-${crypto.randomUUID().replaceAll('-','').slice(0,16)}`).run();
       const result=await db.prepare(postSquareSql).bind(id,text,now,userId,nationId,id,userId,now-10,userId,now-3600).run();
-      if(result.meta.changes&&muted.has(userId))logShadowMuted(userId,id); // #790: stored, shown only to the author
+      if(result.meta.changes&&isShadowMuted(muted,userId,now))logShadowMuted(userId,id); // #790: stored, shown only to the author
       if(!result.meta.changes) {
         const replay=await db.prepare('SELECT user_id,body,nation_id,deleted FROM square_messages WHERE id=?').bind(id).first<{user_id:string;body:string;nation_id:string;deleted:number}>();
         if(!replay||replay.user_id!==userId||replay.body!==text||replay.nation_id!==nationId||replay.deleted){

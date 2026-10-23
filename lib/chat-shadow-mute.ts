@@ -1,32 +1,49 @@
-/** #790 (docs Moderation & Safety §21.3 "shadow-mute"): square chat shadow-mute from the operator var HARIMU_CHAT_SHADOW_MUTE, a comma-separated list
- *  of citizen ids (not a secret; empty by default in preview and production). A muted citizen's messages are still stored and shown to themselves,
- *  and hidden from every other viewer. Read-time filter, no table: removing an id from the var makes that citizen's stored messages visible again.
- *  A malformed var fails safe: it mutes nobody and logs a warning. No mod console, bans or appeals (out of scope). */
+/** #790 (docs Moderation & Safety §21.3 "shadow-mute"; ARC: new messages only): square chat shadow-mute from the operator var HARIMU_CHAT_SHADOW_MUTE,
+ *  a comma-separated list of `citizenId@ISO8601` entries (not a secret; empty by default in preview and production). A post by a listed citizen made
+ *  at or after their mutedAt is still stored and shown to the author, and hidden from every other viewer; their earlier posts stay visible.
+ *  Read-time filter, no table: removing an entry (unmuting) makes the posts hidden during the mute visible again. Keeping them hidden after an
+ *  unmute needs a stored record, i.e. a table and a migration, which this PR deliberately does not add.
+ *  A malformed var fails safe: it mutes nobody and logs a warning. No mod console, bans or appeals (out of scope). No imports: the plain-node
+ *  production scripts load this file. */
 export const shadowMuteIdPattern = /^[A-Za-z0-9_-]{1,64}$/;
-/** D1 allows at most 100 bound parameters per query; the feed binds 4 of its own plus one per muted id, so the list is capped at 90. */
+const isoPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+/** At most 90 entries (D1 bound-parameter limit: 100 per query). The feed query binds 4 plus one per muted id (90 -> 94), and the pre-mute
+ *  lookups bind 4 plus two per entry in chunks of SHADOW_MUTE_CHUNK (45 -> 94). */
 export const SHADOW_MUTE_MAX_IDS = 90;
+export const SHADOW_MUTE_CHUNK = 45;
 export const shadowMuteReason = 'operator_shadow_mute';
 const reservedWords = new Set(['all', 'true', 'false']);
 
-/** The ONE rule for HARIMU_CHAT_SHADOW_MUTE, shared by parseShadowMute (runtime) and scripts/production-config.mjs (production guard):
- *  null when the value is usable ("" or a comma list of 1..90 citizen ids), otherwise the reason. "all", "true" and "false" (any case, whole value
- *  or as an id) are refused: they look like switches but would mute nobody. No imports, so the plain-node production scripts can load it. */
-export function shadowMuteListProblem(raw: unknown): string | null {
-  if (raw === undefined || raw === null) return null;
-  if (typeof raw !== 'string') return 'must be a string';
-  if (raw.trim() === '') return null;
-  const ids = raw.split(',').map(id => id.trim());
-  if (ids.some(id => reservedWords.has(id.toLowerCase()))) return 'must list citizen ids, not "all", "true" or "false"';
-  if (!ids.every(id => shadowMuteIdPattern.test(id))) return 'must be a comma list of citizen ids ([A-Za-z0-9_-], 1-64 characters)';
-  if (ids.length > SHADOW_MUTE_MAX_IDS) return `must list at most ${SHADOW_MUTE_MAX_IDS} ids (D1 bound-parameter limit)`;
-  return null;
+type Parsed = { problem: string | null; entries: Map<string, number> };
+function parse(raw: unknown): Parsed {
+  const entries = new Map<string, number>();
+  if (raw === undefined || raw === null) return { problem: null, entries };
+  if (typeof raw !== 'string') return { problem: 'must be a string', entries };
+  if (raw.trim() === '') return { problem: null, entries };
+  const parts = raw.split(',').map(part => part.trim());
+  if (parts.length > SHADOW_MUTE_MAX_IDS) return { problem: `must list at most ${SHADOW_MUTE_MAX_IDS} entries (D1 bound-parameter limit)`, entries };
+  for (const part of parts) {
+    if (reservedWords.has(part.toLowerCase())) return { problem: 'must list citizenId@ISO8601 entries, not "all", "true" or "false"', entries };
+    const at = part.lastIndexOf('@'), id = at < 0 ? part : part.slice(0, at), when = at < 0 ? '' : part.slice(at + 1);
+    if (at < 0) return { problem: 'must give every entry a mute time (citizenId@ISO8601); bare ids are refused', entries };
+    if (!shadowMuteIdPattern.test(id) || reservedWords.has(id.toLowerCase())) return { problem: 'must use citizen ids of [A-Za-z0-9_-], 1-64 characters', entries };
+    const ms = isoPattern.test(when) ? Date.parse(when) : NaN;
+    if (!Number.isFinite(ms)) return { problem: 'must use an ISO 8601 time with a zone (e.g. 2026-10-23T07:00:00Z)', entries };
+    if (entries.has(id)) return { problem: 'must list each citizen once', entries };
+    entries.set(id, Math.floor(ms / 1000));
+  }
+  return { problem: null, entries };
 }
-
-export function parseShadowMute(raw: unknown, warn: (message: string) => void = message => console.warn(message)): ReadonlySet<string> {
-  const problem = shadowMuteListProblem(raw);
-  if (problem) { warn(`HARIMU_CHAT_SHADOW_MUTE is malformed (${problem}); shadow-mute disabled (mutes nobody).`); return new Set(); }
-  return typeof raw === 'string' && raw.trim() ? new Set(raw.split(',').map(id => id.trim())) : new Set();
+/** The ONE rule, shared by parseShadowMute (runtime) and scripts/production-config.mjs (production guard): null when usable, otherwise the reason. */
+export function shadowMuteListProblem(raw: unknown): string | null { return parse(raw).problem; }
+/** citizenId -> mutedAt (epoch seconds). Malformed: empty map (mutes nobody) and one warning. */
+export function parseShadowMute(raw: unknown, warn: (message: string) => void = message => console.warn(message)): ReadonlyMap<string, number> {
+  const { problem, entries } = parse(raw);
+  if (problem) { warn(`HARIMU_CHAT_SHADOW_MUTE is malformed (${problem}); shadow-mute disabled (mutes nobody).`); return new Map(); }
+  return entries;
 }
+/** True when a post by `userId` at `postedAt` is shadow-muted. */
+export const isShadowMuted = (muted: ReadonlyMap<string, number>, userId: string, postedAt: number): boolean => { const at = muted.get(userId); return at !== undefined && postedAt >= at; };
 /** One structured log line per suppressed message, for staff review (citizen id, message id, reason code; never the message text). */
 export function logShadowMuted(userId: string, messageId: string, log: (line: string) => void = line => console.info(line)): void {
   log(JSON.stringify({ event: 'square_chat_shadow_muted', citizenId: userId, messageId, reason: shadowMuteReason }));
