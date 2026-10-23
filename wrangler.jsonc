@@ -103,6 +103,8 @@
     "HARIMU_MAP_OVERLAYS_ENABLED": "true",
     // #741: Kindle civic rank ladder (Resident → Leading Citizen; an honor, no office or vote weight). Off: GET /api/citizen/civic-rank is 404, /api/citizen sends no civicRank and kindle-7-rank is unavailable. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_CIVIC_RANK_ENABLED": "true",
+    // #738 slice 1: army units: volunteer for your nation's home-guard unit, leave it, pick a squad stance. Needs HARIMU_WAR_ENABLED too. Off: /api/army is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_ARMIES_ENABLED": "true",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
@@ -150,6 +152,8 @@
     "HARIMU_REPORTS_ENABLED": "true",
     // #753: staff AI review queue (docs §21.4): filter-failed Notable replies plus a ~1% sample of passing ones; admin list at /api/admin/ai-review-queue behind HARIMU_ADMIN_TOKEN.
     "HARIMU_AI_REVIEW_QUEUE_ENABLED": "true",
+    // #739: citizen dormancy slice 1 (docs §17.4): Away/Dormant/Archived status and the Welcome back briefing; flag off = no last_active_at read or write.
+    "HARIMU_DORMANCY_ENABLED": "true",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",
@@ -162,6 +166,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "true",
+    "NEXT_PUBLIC_HARIMU_RARE_MARKER": "true",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"
   },

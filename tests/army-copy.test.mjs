@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { unitCard as U, officerOrders as OO, unitMembership as M, squadStance as S, supplyNotices as N, battleRound as B, ARMY_NAME_MAX, ARMY_NUMBER_MAX, ARMY_LABEL_MAX, ARMY_LINE_MAX, ARMY_CAPTION_MAX, ARMY_PLACEHOLDERS, ARMY_NUMBER_PLACEHOLDERS, ARMY_ROUND_MINUTES, ARMY_NATIONS, SUPPLY_STATES, STANCES } from '../lib/army-copy.ts';
 
-const labels=()=>[U.title,U.strengthLabel,U.moraleLabel,U.supplyLabel,...SUPPLY_STATES.map(k=>U.supplyStates[k]),U.commanderLabel,M.joinButton,M.leaveButton,S.label,...STANCES.map(k=>S.labels[k])];
-const systemLines=()=>[M.joinConfirm,M.leaveConfirm,M.joined,M.left,M.drillsHelper,M.notEligible,...STANCES.map(k=>S.helpers[k]),S.oneInput,N.dailyLoss,B.summary,B.explainer];
+const labels=()=>[U.title,U.strengthLabel,U.moraleLabel,U.supplyLabel,...SUPPLY_STATES.map(k=>U.supplyStates[k]),U.commanderLabel,U.memberCountLabel,M.joinButton,M.leaveButton,S.label,...STANCES.map(k=>S.labels[k])];
+const systemLines=()=>[M.joinConfirm,M.leaveConfirm,M.joined,M.left,M.drillsHelper,M.notEligible,M.notOpenYet,M.actionFailed,...STANCES.map(k=>S.helpers[k]),S.oneInput,N.dailyLoss,B.summary,B.explainer];
 const captions=()=>[...ARMY_NATIONS.map(n=>N.cut[n]),...ARMY_NATIONS.map(n=>N.restored[n])];
 const lines=()=>systemLines().map(l=>l.text);
 const caps=()=>captions().map(l=>l.text);
@@ -31,7 +31,7 @@ test('placeholders: only the six documented ones, each used, in the lines they b
   const t=all().join(' ');
   for (const m of t.matchAll(/\{[^}]+\}/g)) assert.ok(ARMY_PLACEHOLDERS.includes(m[0]), m[0]);
   for (const p of ARMY_PLACEHOLDERS) assert.ok(t.includes(p), p);
-  assert.match(U.commanderLabel,/\{officer\}/); assert.match(M.notEligible.text,/\{reason\}/); assert.match(N.dailyLoss.text,/\{unit\}.*\{amount\}/); assert.match(B.summary.text,/\{round\}.*\{result\}/);
+  assert.match(U.commanderLabel,/\{officer\}/); assert.match(M.notEligible.text,/\{reason\}/); assert.match(M.actionFailed.text,/\{reason\}/); assert.doesNotMatch(M.actionFailed.text,/join/i,'neutral: not the join error'); assert.match(N.dailyLoss.text,/\{unit\}.*\{amount\}/); assert.match(B.summary.text,/\{round\}.*\{result\}/);
   for (const t2 of [...orders(),...caps(),S.oneInput.text,M.drillsHelper.text,B.explainer.text,...STANCES.map(k=>S.helpers[k].text),...labels().filter(l=>!l.includes('{'))]) assert.doesNotMatch(t2,/\{/,t2);
 });
 test('the only figure is the docs\' round length: 10 real minutes, in the explainer; no other digit or number word', () => {
@@ -72,9 +72,9 @@ test('no string here repeats a string from another lib module, and no on-chain, 
   for (const t of all()) assert.ok(!others.includes(`'${t}'`)&&!others.includes(`"${t}"`)&&!others.includes(`\`${t}\``), t);
   assert.doesNotMatch(all().join(' '),/\b(Earth|real world|therapy|Tessera|chain|NFT|token|wallet)\b/i);
 });
-test('unwired: nothing in app/, components/ or lib/ imports army-copy', () => {
+test('wired only by #738: the army card and army rules import army-copy; nothing else does', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('army-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/army-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('army-copy.ts')&&!['app/army-card.tsx','lib/army-rules.ts'].includes(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/army-copy/, f);
 });
 test('officer orders do not echo the Varkand starter line (QA3 note on #602)', () => {
   for (const l of OO) assert.doesNotMatch(l.text,/Hold the line/i,l.text);
