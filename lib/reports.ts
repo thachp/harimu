@@ -12,15 +12,18 @@ export type ReportResult={status:number;body:Record<string,unknown>};
 const kinds:readonly ReportKind[]=['citizen-message','notable-reply'];
 const err=(status:number,error:string,extra:Record<string,unknown>={}):ReportResult=>({status,body:{error,...extra}});
 
-/** Insert only when the reporter is under the real-day limit; request id and (reporter,target) are unique, so a race cannot double-count. */
-const insertSql=`INSERT INTO moderation_reports(id,request_id,reporter_id,target_kind,target_id,reason_id,note,created_at)
-SELECT ?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM moderation_reports WHERE reporter_id=? AND created_at>=?)<? ON CONFLICT DO NOTHING`;
+/** The daily cap is one conditional upsert on the reporter's day row: a row lock on Postgres and a single writer on D1, so parallel requests cannot pass it.
+ *  A slot taken by a report that then loses a uniqueness race is given back. */
+const takeSlotSql=`INSERT INTO moderation_report_days(reporter_id,day,reports) VALUES (?,?,1)
+ON CONFLICT(reporter_id,day) DO UPDATE SET reports=moderation_report_days.reports+1 WHERE moderation_report_days.reports<?`;
+const insertSql=`INSERT INTO moderation_reports(id,request_id,reporter_id,target_kind,target_id,reason_id,note,created_at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`;
 
 async function targetVisible(db:GameDatabase,userId:string,nationId:string,kind:ReportKind,targetId:string){
  // A chat message is reportable while it is live in the reporter's own nation's square, and not by its author.
  if(kind==='citizen-message')return Boolean(await db.prepare('SELECT 1 AS ok FROM square_messages WHERE id=? AND nation_id=? AND deleted=0 AND user_id<>?').bind(targetId,nationId,userId).first());
  // A Notable reply is only shown to the citizen who asked, so it must be one of their own Notable requests (the reservation row).
- return Boolean(await db.prepare('SELECT 1 AS ok FROM harimu_ai_reservations WHERE request_id=?').bind((await ownerPrefix(userId))+targetId).first());
+ // Only a finished request showed a reply. The reservation cannot tell a model reply from an authored fallback (both settle to 'finished').
+ return Boolean(await db.prepare("SELECT 1 AS ok FROM harimu_ai_reservations WHERE request_id=? AND status='finished'").bind((await ownerPrefix(userId))+targetId).first());
 }
 
 export async function submitReport(db:GameDatabase,userId:string,nationId:string,body:Record<string,unknown>,now:number):Promise<ReportResult>{
@@ -37,11 +40,13 @@ export async function submitReport(db:GameDatabase,userId:string,nationId:string
  const prior=await db.prepare('SELECT reporter_id,target_kind,target_id,reason_id FROM moderation_reports WHERE request_id=?').bind(request).first<{reporter_id:string;target_kind:string;target_id:string;reason_id:string}>();
  if(prior)return same(prior)?{status:201,body:{ok:true}}:err(409,'Request already used.');
  if(!await targetVisible(db,userId,nationId,kind,target))return err(404,'That item is not available to report.');
- const dayStart=now-now%86400;
- const result=await db.prepare(insertSql).bind(crypto.randomUUID(),request,userId,kind,target,reasonId as ReportReasonId,cleanNote,now,userId,dayStart,reportDailyLimit).run();
+ if(await db.prepare('SELECT 1 AS ok FROM moderation_reports WHERE reporter_id=? AND target_kind=? AND target_id=?').bind(userId,kind,target).first())return err(409,'You already reported this.',{duplicate:true});
+ const day=Math.floor(now/86400);
+ if(!(await db.prepare(takeSlotSql).bind(userId,day,reportDailyLimit).run()).meta.changes)return err(429,`You can send up to ${reportDailyLimit} reports a day.`);
+ const result=await db.prepare(insertSql).bind(crypto.randomUUID(),request,userId,kind,target,reasonId as ReportReasonId,cleanNote,now).run();
  if(result.meta.changes)return {status:201,body:{ok:true}};
+ await db.prepare('UPDATE moderation_report_days SET reports=reports-1 WHERE reporter_id=? AND day=? AND reports>0').bind(userId,day).run();
  const replay=await db.prepare('SELECT reporter_id,target_kind,target_id,reason_id FROM moderation_reports WHERE request_id=?').bind(request).first<{reporter_id:string;target_kind:string;target_id:string;reason_id:string}>();
  if(replay)return same(replay)?{status:201,body:{ok:true}}:err(409,'Request already used.');
- if(await db.prepare('SELECT 1 AS ok FROM moderation_reports WHERE reporter_id=? AND target_kind=? AND target_id=?').bind(userId,kind,target).first())return err(409,'You already reported this.',{duplicate:true});
- return err(429,`You can send up to ${reportDailyLimit} reports a day.`);
+ return err(409,'You already reported this.',{duplicate:true});
 }

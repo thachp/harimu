@@ -77,3 +77,24 @@ test('migration 0070 is additive and exists for D1 and Postgres; nothing creates
   }
   assert.doesNotMatch(readFileSync('lib/reports.ts', 'utf8'), /CREATE TABLE/i); assert.doesNotMatch(readFileSync('lib/db.ts', 'utf8'), /moderation_reports/);
 });
+
+test('a Notable request that never finished (no reply shown) is not reportable', quiet(async t => {
+  const {r, report} = await setup(t);
+  const {ownerPrefix} = await r.importModule('lib/notables.ts'); const requestId = randomUUID();
+  await r.db.prepare("INSERT INTO harimu_ai_reservations(request_id,utc_day,next_utc_day,model,reserved_micro,started_at,status) VALUES (?,'2026-10-22','2026-10-23','fixture',1,1,'uncertain')").bind((await ownerPrefix('alice')) + requestId).run();
+  assert.equal((await report('alice', {targetKind: 'notable-reply', targetId: requestId, reasonId: 'ai-inappropriate'})).status, 404);
+}));
+
+test('the daily cap is the per-reporter day counter: replays and duplicates do not use a slot, and the next UTC day resets it', quiet(async t => {
+  const {r, post, report} = await setup(t);
+  const ids = []; for (let i = 0; i < 10; i++) { r.setNow(r.now + 11000); ids.push(await post('bob', `message ${i}`)); }
+  const body = {requestId: randomUUID(), targetKind: 'citizen-message', targetId: ids[0], reasonId: 'spam-other'};
+  assert.equal((await r.call('reports', 'alice', body)).status, 201); assert.equal((await r.call('reports', 'alice', body)).status, 201);
+  assert.equal((await report('alice', {targetKind: 'citizen-message', targetId: ids[0], reasonId: 'hate-harassment'})).status, 409);
+  const slots = async () => (await r.db.prepare('SELECT reports FROM moderation_report_days WHERE reporter_id=?').bind('alice').first()).reports;
+  assert.equal(await slots(), 1);
+  for (const id of ids.slice(1, 10)) assert.equal((await report('alice', {targetKind: 'citizen-message', targetId: id, reasonId: 'spam-other'})).status, 201);
+  assert.equal(await slots(), 10);
+  r.setNow(r.now + 86400000); const fresh = await post('bob', 'next day');
+  assert.equal((await report('alice', {targetKind: 'citizen-message', targetId: fresh, reasonId: 'spam-other'})).status, 201);
+}));

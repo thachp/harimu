@@ -10,4 +10,11 @@ CREATE TABLE IF NOT EXISTS moderation_reports (
  created_at BIGINT NOT NULL,
  UNIQUE(reporter_id,target_kind,target_id)
 );
+-- Per-reporter UTC-day counter: the daily cap is enforced by one conditional upsert on this row, so concurrent connections cannot overshoot it.
+CREATE TABLE IF NOT EXISTS moderation_report_days (
+ reporter_id TEXT COLLATE "C" NOT NULL,
+ day BIGINT NOT NULL,
+ reports BIGINT NOT NULL CHECK(reports>=0),
+ PRIMARY KEY(reporter_id,day)
+);
 CREATE INDEX IF NOT EXISTS idx_moderation_reports_reporter ON moderation_reports(reporter_id,created_at);

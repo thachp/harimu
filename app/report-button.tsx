@@ -10,18 +10,19 @@ export function ReportButton({kind,targetId}:{kind:ReportKind;targetId:string}){
  const target=reportTargetFor(kind)!;const reasons=reasonsFor(kind);
  const [open,setOpen]=useState(false),[reason,setReason]=useState(''),[note,setNote]=useState(''),[status,setStatus]=useState<Status>('idle');
  // One request id per dialog, reused on retry so a lost response cannot file the report twice.
- const requestId=useRef<string|null>(null),first=useRef<HTMLInputElement|null>(null);
- useEffect(()=>{if(open)first.current?.focus();},[open]);
+ const requestId=useRef<string|null>(null),first=useRef<HTMLInputElement|null>(null),entry=useRef<HTMLButtonElement|null>(null),wasOpen=useRef(false);
+ // Focus the first reason on open; give focus back to the Report button on close.
+ useEffect(()=>{if(open)first.current?.focus();else if(wasOpen.current)entry.current?.focus();wasOpen.current=open;},[open]);
  const titleId=`report-${kind}-${targetId}-title`;
  if(status==='sent'||status==='duplicate')return <p role="status" className="report-state">{(status==='sent'?reportStates.sent:reportStates.duplicate).text}</p>;
  async function submit(){
   if(!reason)return;requestId.current??=crypto.randomUUID();setStatus('sending');
   try{const response=await fetch('/api/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestId:requestId.current,targetKind:kind,targetId,reasonId:reason,...(note.trim()?{note:note.trim()}:{})})});
-   const data=await response.json().catch(()=>({}));
+   const data=await response.json().catch(()=>({})) as {duplicate?:boolean};
    setStatus(response.status===201?'sent':response.status===409&&data?.duplicate===true?'duplicate':'failed');}
   catch{setStatus('failed');}
  }
- if(!open)return <button type="button" className="report-entry" aria-label={target.accessibleName} onClick={()=>setOpen(true)}>{target.entryLabel}</button>;
+ if(!open)return <button ref={entry} type="button" className="report-entry" aria-label={target.accessibleName} onClick={()=>setOpen(true)}>{target.entryLabel}</button>;
  return <div role="dialog" aria-modal="false" aria-labelledby={titleId} className="report-dialog" onKeyDown={event=>{if(event.key==='Escape'){setOpen(false);setStatus('idle');}}}>
   <h3 id={titleId}>{reportHeader.title}</h3><p>{reportHeader.line.text}</p>
   <fieldset><legend>Reason</legend>{reasons.map((r,i)=><label key={r.id}><input ref={i===0?first:undefined} type="radio" name={titleId} value={r.id} checked={reason===r.id} onChange={()=>setReason(r.id)}/> {r.label}</label>)}</fieldset>

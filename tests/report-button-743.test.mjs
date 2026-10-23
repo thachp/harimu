@@ -9,13 +9,13 @@ import * as copy from '../lib/report-copy.ts';
 const require = createRequire(import.meta.url);
 const compiled = ts.transpileModule(await readFile(new URL('../app/report-button.tsx', import.meta.url), 'utf8'), {compilerOptions: {jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS}}).outputText;
 function harness(kind, slots, respond) {
-  const refs = [{current: null}, {current: null}], requests = []; let cursor = 0, refCursor = 0;
-  const react = {useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], next => { slots[i] = next; }]; }, useRef(initial) { const i = refCursor++; return refs[i] ?? (refs[i] = {current: initial}); }, useEffect() {}};
+  const refs = [], requests = [], effects = []; let cursor = 0, refCursor = 0;
+  const react = {useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], next => { slots[i] = next; }]; }, useRef(initial) { const i = refCursor++; return refs[i] ?? (refs[i] = {current: initial}); }, useEffect(fn) { effects.push(fn); }};
   const exports = {};
   new Function('exports', 'require', 'fetch', 'crypto', compiled)(exports, name => name === 'react' ? react : name === '../lib/report-copy' ? copy : require(name), async (url, options) => { requests.push({url, ...options, body: JSON.parse(options.body)}); return respond(); }, {randomUUID: () => `00000000-0000-4000-8000-00000000000${requests.length}`});
-  const render = () => { cursor = 0; refCursor = 0; return exports.ReportButton({kind, targetId: '11111111-1111-4111-8111-111111111111'}); };
+  const render = () => { cursor = 0; refCursor = 0; effects.length = 0; return exports.ReportButton({kind, targetId: '11111111-1111-4111-8111-111111111111'}); };
   const all = node => [node, ...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child => typeof child === 'object' ? all(child) : [child])];
-  return {render, all, requests};
+  return {render, all, requests, refs, effects};
 }
 test('closed: one entry button with the accessible name; open: header, reasons (no AI-only reason for a chat message), note and buttons', () => {
   const closed = harness('citizen-message', []).render();
@@ -57,4 +57,16 @@ test('the Notable transcript offers Report only on model replies and only when r
   assert.match(source, /\{reports&&turn\.model===true&&<ReportButton kind="notable-reply" targetId=\{turn\.id\}\/>\}/);
   assert.match(source, /model:value\.source==='model'/);
   assert.match(await readFile(new URL('../app/square-chat.tsx', import.meta.url), 'utf8'), /\{!message\.mine&&state\.reportsEnabled===true&&<ReportButton kind="citizen-message" targetId=\{message\.id\}\/>\}/);
+});
+test('focus moves to the first reason on open and back to the Report button on close (Cancel or Escape)', () => {
+  for (const close of ['cancel', 'escape']) {
+    const slots = [false], focused = []; const h = harness('citizen-message', slots);
+    const el = name => ({focus: () => focused.push(name)});
+    h.render(); h.refs[1].current = el('reason'); h.refs[2].current = el('entry'); h.effects.forEach(fn => fn());
+    assert.deepEqual(focused, [], 'nothing moves before the first open');
+    slots[0] = true; const dialog = h.render(); h.effects.forEach(fn => fn()); assert.deepEqual(focused, ['reason']);
+    if (close === 'cancel') h.all(dialog).find(n => n?.type === 'button' && n.props.children === copy.reportActions.cancel).props.onClick();
+    else dialog.props.onKeyDown({key: 'Escape'});
+    assert.equal(slots[0], false); h.render(); h.effects.forEach(fn => fn()); assert.deepEqual(focused, ['reason', 'entry'], close);
+  }
 });
