@@ -1,6 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import {activeRationQueue,readRationQueue,executeRationQueue,queueIdentifierUsed,type RationQueue} from './korund-queue';
 import type { WorkShift } from './work-shifts';
+import { isKorundPost, korundPoolSql, korundPosts, laborNoteIssuanceSql, latestPostSql, postDebitSql, postReceiptSql, postSettleSql, postStartSql, postWorkOrderSql, korundPostTerms } from './korund-posts'; // #886 (b)
 import { readBureau, setPreferences, requestAssignment, type BureauView } from './labor-bureau';
 import { laborNoteSql, laborNoteBinds } from './korund-wallet';
 import { readGray, postOffer, acceptOffer, type GrayView } from './gray-market';
@@ -16,7 +17,7 @@ export const korundSchemas = [
  `CREATE TABLE korund_rations (id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), game_week INTEGER NOT NULL CHECK(game_week>=1), quantity INTEGER NOT NULL CHECK(quantity=2), occurred_at INTEGER NOT NULL, UNIQUE(clerk_user_id,game_week))`,
  `CREATE TABLE korund_meals (id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), quantity INTEGER NOT NULL CHECK(quantity=2), occurred_at INTEGER NOT NULL, capacity_applied INTEGER NOT NULL DEFAULT 0 CHECK(capacity_applied IN (0,1)))`,
 ] as const;
-export const korundPublicFoodSql = `SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) AS food, initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0) AS funds FROM korund_resources WHERE id='state'`;
+export const korundPublicFoodSql = `SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) AS food, ${korundPoolSql} AS funds FROM korund_resources WHERE id='state'`;
 export const korundStartSql = `INSERT OR IGNORE INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at)
  SELECT ?,clerk_user_id,'korund-food-production','State food-production brigade','4 food contributed to state ration supply',4,?,? FROM citizens
  WHERE clerk_user_id=? AND nation_id='korund' AND capacity>=4 AND NOT EXISTS(SELECT 1 FROM work_shifts WHERE clerk_user_id=? AND claimed_at IS NULL)
@@ -27,7 +28,7 @@ export const korundDebitSql = `UPDATE citizens SET capacity=capacity-4,updated_a
 export const korundSettleSql = `INSERT OR IGNORE INTO korund_settlements(shift_id,clerk_user_id,wage_minor,food_output,settled_at)
  SELECT s.id,s.clerk_user_id,800,4,? FROM work_shifts s JOIN korund_work_starts k ON k.id=s.id JOIN citizens c ON c.clerk_user_id=s.clerk_user_id
  WHERE s.id=? AND s.clerk_user_id=? AND k.capacity_applied=1 AND s.claimed_at IS NULL AND s.completes_at<=?
- AND 800<=(SELECT initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0) FROM korund_resources WHERE id='state')`;
+ AND 800<=(SELECT ${korundPoolSql} FROM korund_resources WHERE id='state')`;
 export const korundRationSql = `INSERT OR IGNORE INTO korund_rations(id,clerk_user_id,game_week,quantity,occurred_at)
  SELECT ?,clerk_user_id,?,2,? FROM citizens WHERE clerk_user_id=? AND nation_id='korund'
  AND 2<=(SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) FROM korund_resources WHERE id='state')
@@ -79,21 +80,21 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
  // Funds, public food, wallet, private food and food-coupon use share one read snapshot. Clothing/goods coupons and
  // the quota bar are read afterwards by readCouponsAndQuota (a separate round-trip; display only, never a guard).
  db.prepare(`SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) AS public_food,
- initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0) AS funds,
+ ${korundPoolSql} AS funds,
  ${laborNoteSql('?')} AS wallet,
  COALESCE((SELECT SUM(quantity) FROM korund_rations WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(quantity) FROM korund_meals WHERE clerk_user_id=?),0) AS food,
  EXISTS(SELECT 1 FROM korund_rations WHERE clerk_user_id=? AND game_week=?) AS coupon_used,
  (SELECT MAX(occurred_at) FROM korund_meals WHERE clerk_user_id=?) AS last_meal
  FROM korund_resources WHERE id='state'`).bind(...laborNoteBinds(userId),userId,userId,userId,w.number,userId)
  .first<{public_food:number;funds:number;wallet:number;food:number;coupon_used:number;last_meal:number|null}>(),
- db.prepare(`SELECT s.* FROM work_shifts s JOIN korund_work_starts k ON k.id=s.id WHERE s.clerk_user_id=? ORDER BY s.started_at DESC LIMIT 20`).bind(userId).all<{id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
+ db.prepare(`SELECT s.* FROM work_shifts s JOIN korund_work_starts k ON k.id=s.id WHERE s.clerk_user_id=? ORDER BY s.started_at DESC LIMIT 20`).bind(userId).all<{id:string;work_order_id:string;order_name:string;output:string;capacity_spent:number;started_at:string;completes_at:string;claimed_at:string|null}>(),
  ]);
  const extra=await readCouponsAndQuota(db,userId,w.number,Boolean(ledger?.coupon_used),w.start,w.end);
  const bureau=options.laborBureau&&citizen?.nation_id==='korund'?{bureau:await readBureau(db,userId,now)}:{};
@@ -112,9 +113,9 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  const streetRate=options.streetRate&&options.grayMarket&&citizen?.nation_id==='korund'?{streetRate:await readWalletStreetRate(db,userId,now)}:{};
  return {...extra,...bureau,...gray,...medals,...shortfall,...rationCut,...streetRate,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
- queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,rewardItem:'state food',rewardQuantity:4,startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
+ queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,...(isKorundPost(s.work_order_id)?{}:{rewardItem:'state food',rewardQuantity:4}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean}={}) {
+export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{mvpJobTypes?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean}={}) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  if(command.action==='korund-gray-post-offer'||command.action==='korund-gray-accept-offer'){
   // #43: the gray market ships off; with the flag off these actions are not found and change nothing.
@@ -144,7 +145,18 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  const conflicting=await db.prepare('SELECT id FROM korund_rations WHERE id=? UNION ALL SELECT id FROM korund_meals WHERE id=?').bind(id,id).first();
  if(conflicting) return {status:409,error:'Request identifier already used for another action.'};
  const existing=await db.prepare('SELECT clerk_user_id,work_order_id FROM work_shifts WHERE id=?').bind(id).first<{clerk_user_id:string;work_order_id:string}>();
- if(existing) return existing.clerk_user_id===userId&&existing.work_order_id===korundJob.id?{status:200,replayed:true}:{status:409,error:'Work identifier already used.'};
+ if(existing) return existing.clerk_user_id===userId&&(existing.work_order_id===korundJob.id||isKorundPost(existing.work_order_id))?{status:200,replayed:true}:{status:409,error:'Work identifier already used.'};
+ // #886 (b), flag on only: the citizen's latest Labor Bureau post, when it is a playable post, is the shift they work; otherwise the brigade below, unchanged.
+ const post=options.mvpJobTypes?(await db.prepare(latestPostSql).bind(userId).first<{job_id:string}>())?.job_id:undefined;
+ if(isKorundPost(post)){
+  const job=korundPosts[post];
+  await db.batch([db.prepare(postWorkOrderSql).bind(post,job.name,job.output),
+  db.prepare(postStartSql).bind(id,post,job.name,job.output,iso,new Date((now+korundPostTerms.hours*3600)*1000).toISOString(),userId,userId),
+  db.prepare(postReceiptSql).bind(id,userId,post),db.prepare(postDebitSql).bind(iso,userId,id),
+  db.prepare('UPDATE korund_work_starts SET capacity_applied=1 WHERE id=? AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)').bind(id,id,userId)]);
+  const started=await db.prepare('SELECT id FROM work_shifts WHERE id=? AND clerk_user_id=?').bind(id,userId).first();
+  return started?{status:200}:{status:409,error:'Finish your active shift or check your Work Capacity before starting the assigned job.'};
+ }
  await db.batch([
  db.prepare(korundStartSql).bind(id,iso,new Date((now+7200)*1000).toISOString(),userId,userId,id,id,id,id),
  db.prepare(korundStartReceiptSql).bind(id,userId),db.prepare(korundDebitSql).bind(iso,userId,id),
@@ -155,6 +167,14 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  }
  if(command.action==='korund-claim-work') {
  const shiftId=command.shiftId!.toLowerCase();
+ // #886 (b): a post shift settles into korund_post_settlements with its Labor Note issuance record, in one batch (keyed on the shift, not the flag).
+ const order=await db.prepare('SELECT work_order_id FROM work_shifts WHERE id=? AND clerk_user_id=?').bind(shiftId,userId).first<{work_order_id:string}>();
+ if(isKorundPost(order?.work_order_id)){
+  await db.batch([db.prepare(postSettleSql).bind(now,shiftId,userId,iso),db.prepare(laborNoteIssuanceSql).bind(shiftId),
+  db.prepare('UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM korund_post_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)').bind(iso,shiftId,userId,userId)]);
+  const paid=await db.prepare('SELECT shift_id FROM korund_post_settlements WHERE shift_id=? AND clerk_user_id=?').bind(shiftId,userId).first();
+  return paid?{status:200}:{status:409,error:'Assigned shift is unavailable, unfinished, or the finite Labor Note fund cannot pay it yet.'};
+ }
  await db.batch([db.prepare(korundSettleSql).bind(now,shiftId,userId,iso),
  db.prepare('UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM korund_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)').bind(iso,shiftId,userId,userId)]);
  const settled=await db.prepare('SELECT shift_id FROM korund_settlements WHERE shift_id=? AND clerk_user_id=?').bind(shiftId,userId).first();
