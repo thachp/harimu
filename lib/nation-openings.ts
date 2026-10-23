@@ -5,7 +5,7 @@
  *  The opening PR for a nation adds its capital here (map-zones keeps the three live capitals until #491 derives them).
  *  No behaviour changes: all ten nations answer exactly as the old three-id literals did. */
 import { isLiveNation, liveNations } from './nation-discovery';
-import { qaTestCitizenAllowed, type QaBindings } from './qa-tools';
+import type { QaBindings } from './qa-tools';
 import { WORLD_GRID } from './globe-mapping'; // the grid size, defined once
 
 export const nationIds = ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara'] as const;
@@ -97,15 +97,18 @@ const readinessAllows = (opening: NationOpening, bindings?: Readonly<Record<stri
   bindings?.HARIMU_NATION_READINESS_ENABLED !== 'true' || nationReadiness(opening.id)?.ready === true;
 type OpeningBindings = Readonly<Record<string, string | undefined>> & QaBindings;
 /** #489 (Stage 0c): may this account enroll in, switch to, or play this nation? Fails closed.
- *  A live nation: always. An unknown id, or a nation whose opening flag is not exactly "true": never. A flag-on nation: only a QA-allowlisted account (`qaTestCitizenAllowed`:
- *  HARIMU_QA_TEST_CITIZENS, NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW, HARIMU_QA_TEST_CITIZEN_IDS), so a mistaken flag on production still opens nothing for the public,
- *  and a call without a user id (userId omitted) never opens a flag-on nation. Public opening is a later release decision. The enroll route and the QA switch both call this. */
+ *  A live nation: always. An unknown id, or a nation whose opening flag is not exactly "true": never. A flag-on nation (#872): every signed-in account once ready; was only a QA-allowlisted account (`qaTestCitizenAllowed`:
+ *  HARIMU_QA_TEST_CITIZENS, NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW, HARIMU_QA_TEST_CITIZEN_IDS), until #872; production keeps every flag "false".
+ *  A call without a user id (userId omitted) never opens a flag-on nation. The enroll route and the QA switch both call this. */
 export const nationPlayable = (id: unknown, bindings?: OpeningBindings, userId?: string | null): boolean => {
   const opening = nationOpening(id);
   if (!opening) return false;
   if (opening.openingFlag === null) return true;
   if (typeof userId !== 'string' || !userId || bindings?.[opening.openingFlag] !== 'true') return false;
   if (!readinessAllows(opening, bindings)) return false; // #486
-  return qaTestCitizenAllowed(bindings, userId);
+  return true; // #872: a flag-on, ready nation is live for every signed-in account (was QA-allowlisted only, #489). Production flags are "false".
 };
+/** #872: the nations live in this environment, in catalog order: the hardcoded live list, plus any whose opening flag is exactly "true" and that passes readiness.
+ *  The badge, comparison table, population bands, enroll gate and QA switch all read this (server-side, then passed to the client as `openNations`). */
+export const liveNationIds = (bindings?: Readonly<Record<string, string | undefined>>): readonly NationId[] => openNationIds(bindings ?? {});
 export { liveNations };
