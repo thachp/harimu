@@ -167,4 +167,12 @@ export function warWearinessUnrest(nation: string, weeksAtWar: number, extra: { 
   return Math.min(Math.round(weeks * c.baseUnrestPerWeek * c.nationMultiplier[nation]) + squares + losses, c.totalCap);
 }
 /** The level name for an amount of added Unrest; null when the war has added none. Names only: the amounts are never shown with them. */
+/** #427 slice 3: Kindle's AI seats weigh war weariness (docs 13.5 "Kindle and Hoarvale need AI legislative votes that weigh war-weariness polls"; docs 15.3 "War weariness").
+ *  [ASSUMPTION, accepted by ARC as placeholder tuning; retune here only] Each party's tolerance, in Kindle's weariness Unrest points (the same scale as the public levels: high from 8, severe from 20). At or above it, a party
+ *  turns toward peace: it votes no on a war and yes on surrendering or ceding. Open Ledger tires first (at "high"); Steady Hand and Dockside Builders hold out until "severe". */
+export const KINDLE_WEARINESS_TOLERANCE: Readonly<Record<'steady-hand' | 'open-ledger' | 'dockside-builders', number>> = { 'steady-hand': 20, 'open-ledger': 8, 'dockside-builders': 20 };
+/** Is this Kindle party war-weary at `points`? A party with no tolerance (unknown) is never counted as weary; bad points read as zero. */
+export const kindlePartyWeary = (party: string, points: number): boolean => { const t = (KINDLE_WEARINESS_TOLERANCE as Record<string, number>)[party]; return t !== undefined && Number.isFinite(points) && points >= t; };
+/** The weary parties at `points`, for the recorded vote. */
+export const wearyKindleParties = (points: number): string[] => Object.keys(KINDLE_WEARINESS_TOLERANCE).filter(p => kindlePartyWeary(p, points));
 export const wearinessLevel = (points: number): WearinessLevelId | null => points >= wearinessConfig.severeAt ? 'severe' : points >= wearinessConfig.highAt ? 'high' : points > 0 ? 'rising' : null;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
-import { assertProductionConfig, productionConfigProblems, sharesPreviewHyperdrive, productionJournalProblems, readProductionConfigRaw, wranglerConfigPath } from '../scripts/production-config.mjs';
+import { aiTemplatesOnlyNations, assertProductionConfig, productionConfigProblems, sharesPreviewHyperdrive, productionJournalProblems, readProductionConfigRaw, wranglerConfigPath } from '../scripts/production-config.mjs';
 import { databaseUrlEnv, productionDeployArgs, productionDeployProblems, main as deployMain } from '../scripts/deploy-production.mjs';
 import { productionBuildEnv } from '../scripts/build-production.mjs';
 import ts from 'typescript';
@@ -51,7 +51,7 @@ test('deploy-production refuses without explicit production env and approval inp
   assert.match(found([sha], { ...ok, ...run, GITHUB_REF: 'refs/heads/dev' }), /only from refs\/heads\/main/); assert.match(found([sha], { ...ok, ...run, CLOUDFLARE_ACCOUNT_ID: 'x' }), /not the approved account/); assert.equal(found([sha], { ...ok, ...run }), '');
   await assert.rejects(deployMain([], { PATH: '' }), /Production deploy refused/);
   await assert.rejects(deployMain([sha, '--dry-run'], { ...ok, PATH: process.env.PATH }), /Production config refused[^]*placeholder/, 'even a dry run stops on the Hyperdrive placeholder');
-  assert.deepEqual(productionDeployArgs(false), ['deploy', '--config', 'dist/server/wrangler.json']); assert.ok(productionDeployArgs(true).includes('--dry-run')); assert.ok(!productionDeployArgs(false).includes('--keep-vars'));
+  assert.deepEqual(productionDeployArgs(false), ['deploy', '--config', 'dist/server/wrangler.json']); assert.deepEqual(productionDeployArgs(false, 'b'.repeat(40)).slice(-2), ['--tag', 'b'.repeat(40)], '#486: tagged with its commit'); assert.ok(productionDeployArgs(true).includes('--dry-run')); assert.ok(!productionDeployArgs(false).includes('--keep-vars'));
   for (const script of ['deploy-production.mjs', 'build-production.mjs']) { const r = spawnSync(process.execPath, [`scripts/${script}`], { env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 20000 }); assert.equal(r.status, 1, script); assert.match(r.stderr, /refused|required/); }
 });
 
@@ -85,4 +85,13 @@ test('journal optional: production writes keep no journal and need no retention 
   assert.match(productionJournalProblems(storage.replace('productionKeepsWriteJournal=false', 'productionKeepsWriteJournal=true'), db).join(), /unbounded write journal/, 'the gate refuses a production that keeps the journal');
   assert.match(productionJournalProblems(storage, db.replace("||productionKeepsWriteJournal)", ")")).join(), /no longer passes/);
   await assert.rejects(deployMain([`--qa2-go-sha=${head}`, '--dry-run'], { HARIMU_DEPLOY_ENVIRONMENT: 'production', PATH: process.env.PATH }), /Production config refused/, 'with the journal fixed, the remaining refusal is the placeholder');
+});
+
+test('#742: HARIMU_AI_TEMPLATES_ONLY is the one named operator exemption; other HARIMU_* vars must still be "false"', () => {
+  const withVars = extra => { const c = good(); return productionConfigProblems({ ...c, vars: { ...c.vars, ...extra } }); };
+  for (const v of ['', 'all', 'korund', 'korund,aurelle']) assert.deepEqual(withVars({ HARIMU_AI_TEMPLATES_ONLY: v }).filter(p => /TEMPLATES_ONLY/.test(p)), [], v);
+  const libNations = JSON.parse(readFileSync('lib/ai-kill-switch.ts', 'utf8').match(/aiTemplatesOnlyNations = (\[[^\]]*\])/)[1].replaceAll("'", '"'));
+  assert.deepEqual(aiTemplatesOnlyNations, libNations);
+  for (const v of ['true', 'false', 'ALL', 'korund,', ' all', 'atlantis', 'x;y']) assert.ok(withVars({ HARIMU_AI_TEMPLATES_ONLY: v }).some(p => /HARIMU_AI_TEMPLATES_ONLY must be/.test(p)), v);
+  for (const v of ['', 'all', 'true']) assert.ok(withVars({ HARIMU_AI_NEWS_ENABLED: v }).some(p => p === 'HARIMU_AI_NEWS_ENABLED must be "false" on production.'), v);
 });

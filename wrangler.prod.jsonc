@@ -34,6 +34,8 @@
     "HARIMU_NOTABLES_ENABLED": "false",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
+    // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
+    "HARIMU_AI_TEMPLATES_ONLY": "",
     "HARIMU_AI_DAILY_BUDGET_MICRO": "970000",
     "HARIMU_SQUARE_PURCHASE_ENABLED": "false",
     // #626 (Decision 111): the Spark-to-Tessera kiosk exchange, separate from square purchases. Off: buy-tessera is refused and the kiosk stays closed.
@@ -53,6 +55,10 @@
     // #486 (Stage 0 closeout): a flag-on nation opens only when its registry entry is complete (capital and biome, currency, wage fund, jobs). Off: unchanged.
     "HARIMU_NATION_READINESS_ENABLED": "false",
     "HARIMU_GRAY_MARKET_ENABLED": "false",
+    // #736: per-citizen daily gray-market volume cap (posted + accepted LN per UTC day). Off: no cap, exactly the #43 behaviour.
+    "HARIMU_GRAY_DAILY_CAP_ENABLED": "false",
+    // #749: each completed Korund gray-market trade adds private Suspicion (capped per day, never starts Correction Duty). Off: Suspicion from discoveries only.
+    "HARIMU_GRAY_SUSPICION_ENABLED": "false",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).
     // #487: "true" in preview only so the Confluence cooperative job runs for QA-allowlisted accounts; production "false".
     "HARIMU_NATION_WORK_ENABLED": "false",
@@ -61,6 +67,8 @@
     "HARIMU_KINDLE_INCOME_TAX_ENABLED": "false",
     // #197: city order book API (fruit/meat/wood). Off until the board UI (#200) and QA.
     "HARIMU_ORDER_BOOK_ENABLED": "false",
+    // #459: the market board re-reads GET /api/market/orders every 20 s while open and visible, with up/down markers. Off: no ticker key, no polling.
+    "HARIMU_MARKET_TICKER_ENABLED": "false",
     "HARIMU_AURELLE_RISING_ENABLED": "false",
     // #281: Aurelle AI palace coup (plot, Power Weight, Crisis Window). Off until QA.
     "HARIMU_AURELLE_COUP_ENABLED": "false",
@@ -78,6 +86,8 @@
     "HARIMU_FAITH_ENABLED": "false",
     // #599: Diplomatic Hall (Kindle + Aurelle citizens, closed to Korund). Off: the route returns 404 and the tab is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_DIPLOMATIC_HALL_ENABLED": "false",
+    // #82: map overlay toggles (Ownership, Resources, Unrest) next to the zoom cluster. Off: GET /api/citizen sends flags.mapOverlays false and nothing renders. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_MAP_OVERLAYS_ENABLED": "false",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
@@ -95,6 +105,8 @@
     "HARIMU_WAR_DECLARATION_LIMITS_ENABLED": "false",
     // #427: the Kindle Assembly votes on the President's war declaration (more than half of all seats, decided on the next tick). Needs HARIMU_WAR_ENABLED too.
     "HARIMU_WAR_ASSEMBLY_ENABLED": "false",
+    // #427 slice 2: war endings by surrender (the surrendering nation's own assembly) and concession of Frontier nation squares (both sides ratify), decided on the next tick. Needs HARIMU_WAR_ENABLED too.
+    "HARIMU_WAR_ENDINGS_ENABLED": "false",
     // #308: AI treaties PoC (non-aggression pact, trade agreement). Off until QA; treaties are proposed and ratified by server code only.
     "HARIMU_DIPLOMACY_ENABLED": "false",
     // #363: embargo PoC (bilateral trade cut). Off until QA; embargoes are proposed and ratified by server code only.
@@ -124,7 +136,9 @@
     "NEXT_PUBLIC_HARIMU_NATION_SYMBOLS": "false",
     "NEXT_PUBLIC_HARIMU_UI_V2_CREST": "false",
     "NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM": "false",
-    "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "false"
+    "NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_PANEL": "false",
+    "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]

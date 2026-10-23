@@ -12,7 +12,7 @@ import { bundleShell, shellProps } from './hud-tooltip-check.mjs';
 const entry = `
   import React from 'react'; import { createRoot } from 'react-dom/client'; import { GameShell } from './app/game-shell.tsx';
   window.mountShell = props => { window.__root?.unmount(); window.__root = createRoot(document.getElementById('root'));
-    window.__root.render(<GameShell {...props} onNavigate={() => {}} accountControls={<><button type="button" className="game-glossary" aria-label="Open morning brief"><svg width="17" height="17" /><span>Brief</span></button><button type="button" className="account-menu-trigger" aria-label="Account menu"></button></>} />);
+    window.__root.render(<GameShell {...props} onNavigate={() => {}} accountControls={<><button type="button" className="game-glossary" aria-label="Open morning brief"><svg width="17" height="17" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9v11h-9z M4.5 5.5h5 M4.5 8h5 M4.5 10.5h3" fill="none" stroke="currentColor" /></svg><span>Brief</span></button><button type="button" className="account-menu-trigger" aria-label="Account menu"></button></>} />);
   };`;
 
 const props = view => ({ ...shellProps, view, citizenNation: shellProps.nation, localDemo: false, contextTitle: view === 'country' ? 'Country travel' : 'City destinations',

@@ -149,10 +149,6 @@ export function createCityWorld(nationId: string, cityName?: string, options: { 
 }
 
 // Procedural fictional geography: no external map assets or real-country boundaries.
-export function globeNationCoordinates(index: number, count: number): { latitude: number; longitude: number } {
-  const rows = Math.ceil(count / 5);
-  return { latitude: rows === 1 ? 15 : 38 - Math.floor(index / 5) * 62, longitude: -145 + (index % 5) * 72 };
-}
 export function globePoint(latitude: number, longitude: number, radius = 7): THREE.Vector3 {
   const lat = THREE.MathUtils.degToRad(latitude), lon = THREE.MathUtils.degToRad(longitude);
   return new THREE.Vector3(radius * Math.cos(lat) * Math.sin(lon), radius * Math.sin(lat), radius * Math.cos(lat) * Math.cos(lon));
@@ -165,10 +161,11 @@ export function globeAnchorVisible(point: THREE.Vector3): boolean {
   // Hide the back hemisphere and the limb where labels would overlap the globe edge.
   return point.z / point.length() > .16;
 }
-export function createRegionWorld(nations: readonly { id: string; name?: string; color?: string }[] = []): WorldArt {
+/** Each nation's latitude/longitude comes from lib/globe-mapping.ts (nationGlobeCoordinates), the same mapping the Ownership overlay uses. */
+export function createRegionWorld(nations: readonly { id: string; name?: string; color?: string; latitude: number; longitude: number }[] = []): WorldArt {
   const group = new THREE.Group();
   const geometry = new THREE.SphereGeometry(7, 144, 96);
-  const landSeeds = nations.map((_, i) => globePoint(globeNationCoordinates(i, nations.length).latitude, globeNationCoordinates(i, nations.length).longitude, 1));
+  const landSeeds = nations.map(n => globePoint(n.latitude, n.longitude, 1));
   // Preserve the same fictional continental lobes, sampled independently of mesh vertices.
   [[60,-120],[22,-105],[-15,-80],[-48,-70],[52,8],[20,25],[-18,35],[48,70],[28,100],[-30,135]].forEach(([lat, lon]) => landSeeds.push(globePoint(lat, lon, 1)));
   const width = 2048, height = 1024;
@@ -211,10 +208,9 @@ export function createRegionWorld(nations: readonly { id: string; name?: string;
   const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(7.13, 64, 48), new THREE.MeshBasicMaterial({ color: '#78bfdc', transparent: true, opacity: .09, side: THREE.BackSide, depthWrite: false }));
   group.add(atmosphere);
   const selectables: THREE.Object3D[] = [];
-  nations.forEach((nation, index) => {
-    const coordinates = globeNationCoordinates(index, nations.length);
+  nations.forEach(nation => {
     const marker = new THREE.Mesh(new THREE.SphereGeometry(.19, 16, 12), new THREE.MeshStandardMaterial({ color: nation.color || '#f4cc79', emissive: '#665023', emissiveIntensity: .45, roughness: .45 }));
-    marker.position.copy(globePoint(coordinates.latitude, coordinates.longitude, 7.22));
+    marker.position.copy(globePoint(nation.latitude, nation.longitude, 7.22));
     marker.userData = { kind: 'nation', nationId: nation.id, label: nation.name || nation.id, detail: 'A fictional Harimu nation. Select it to explore its city and citizen life.' };
     group.add(marker); selectables.push(marker);
   });

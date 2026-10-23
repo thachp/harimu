@@ -367,6 +367,62 @@ body:has(.harimu-game){overflow:auto}
 /* QA2 #534 (CI fonts differ from local ones): the header never splits a word. With the crest, the title column cannot shrink below its longest word (min-content, and overflow-wrap:break-word so it does not count as breakable),
    and the row wraps: when crest + title + button do not fit side by side the crest takes its own row above. Flag off: no crest, so no :has match and nothing changes. */
 .game-inspector-title:has(>.nation-crest){flex-wrap:wrap;row-gap:10px}.game-inspector-title:has(>.nation-crest)>div{flex:1 1 0;min-width:min-content;overflow-wrap:break-word}.game-inspector-title:has(>.nation-crest) h1{overflow-wrap:break-word}.game-inspector-title:has(>.nation-crest)>button{margin-left:auto}
+
+/* #459: live market ticker. Markers are static text (symbol + words); the brief highlight animates only when motion is allowed (OS setting and the game's own Reduced motion). */
+.board-move{font-size:calc(11px * var(--text-scale, 1));color:#c8d7c4;white-space:nowrap}.board-updated{margin:6px 0 0;color:#a1bdc5;font-size:calc(11px * var(--text-scale, 1))}.board-tick-live{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(prefers-reduced-motion:no-preference){html:not([data-harimu-reduced-motion]) .board-changed{animation:board-tick 1.2s ease-out 1}}
+@keyframes board-tick{from{background:#e0b64c33}to{background:transparent}}
+/* #82 slice 1: Overlays group, bottom-right, directly left of the zoom cluster (teal panel, gold for the pressed state). */
+.map-overlays{position:relative;display:flex;align-items:center;flex:none}
+.map-overlays-trigger{display:none}
+.map-overlays-panel{display:flex;flex-direction:column;align-items:flex-end}
+.map-overlays-group{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding-right:6px;margin-right:2px;border-right:1px solid #365c69}
+.map-overlays-title{font-size:calc(11px * var(--text-scale, 1));color:#a9c8d0;padding:0 4px}
+.viewport-controls:has(.map-overlays) button{min-width:44px;min-height:44px}
+.viewport-controls .map-overlays button[aria-pressed="true"]{background:#2a3a2c;border-color:#d8b35a;color:#f2d88f}
+.viewport-controls .map-overlays button[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.map-overlays-unavailable{position:relative;display:inline-flex}
+.map-overlays-unavailable [role="tooltip"]{display:none;position:absolute;bottom:calc(100% + 6px);right:0;width:max-content;max-width:220px;padding:6px 8px;background:#0b2631;border:1px solid #d8b35a;border-radius:3px;color:#e6f0f0;font-size:calc(11px * var(--text-scale, 1));z-index:5}
+.map-overlays-unavailable:hover [role="tooltip"],.map-overlays-unavailable:focus-within [role="tooltip"]{display:block}
+.map-overlays-legend:focus-visible{outline:2px solid #d8b35a}.map-overlays-legend{position:absolute;bottom:calc(100% + 8px);right:0;display:flex;flex-direction:column;gap:6px;width:max-content;max-width:260px;padding:8px 10px;background:#0b2631e8;border:1px solid #365c69;border-radius:3px;color:#c9e3e5;font-size:calc(11px * var(--text-scale, 1))}
+.map-overlays-legend section{display:flex;flex-direction:column;gap:3px}.map-overlays-legend strong{color:#f2d88f}
+.map-overlays-scale{display:flex;gap:0;margin:0;padding:0;list-style:none}.map-overlays-scale li{flex:1;padding:2px 6px;text-align:center;border:1px solid #365c69}
+.map-overlays-scale li:nth-child(1){background:#1d4a3f}.map-overlays-scale li:nth-child(2){background:#6b5a25}.map-overlays-scale li:nth-child(3){background:#6e2a24}
+.map-overlays-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:390px){
+  .game-stage .viewport-controls:has(.map-overlays){position:relative;inset:auto}.map-overlays{position:static}
+  .map-overlays-trigger{display:inline-flex;align-items:center;justify-content:center}
+  .map-overlays-panel{display:none;position:absolute;bottom:calc(100% + 6px);right:8px;z-index:4;padding:6px;background:#0b2631f2;border:1px solid #365c69;border-radius:3px;width:max-content;max-width:calc(100vw - 24px);max-height:max(160px,calc(44dvh - 130px));overflow:hidden}
+  .map-overlays-panel[data-sheet]{width:auto}
+  .map-overlays[data-open="true"] .map-overlays-panel{display:flex;align-items:stretch}
+  .harimu-game .game-stage:has(.map-overlays-panel[data-sheet]){z-index:30}.map-overlays-panel[data-sheet]{z-index:30;box-shadow:0 -8px 24px #0009}
+  .map-overlays[data-open="true"] .map-overlays-trigger{border-color:#d8b35a;color:#f2d88f}
+  .map-overlays-panel{min-width:0}.map-overlays-group button{white-space:normal;overflow-wrap:normal}.map-overlays-scale li{min-width:0}
+  .map-overlays-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:none;border-right:0;padding-right:0;margin-right:0}.map-overlays-unavailable{display:grid}
+  .map-overlays-title{display:none}
+  .map-overlays-legend{position:static;order:2;width:auto;max-width:none;margin-top:6px;flex:1 1 auto;min-height:0;overflow-y:auto}
+  .map-overlays-unavailable [role="tooltip"]{right:auto;left:0;max-width:calc(100vw - 48px)}
+}
+/* #82 slice 2: Ownership grid over the map (decorative, under the controls). Low graphics: symbols only, no tint. */
+.map-ownership{position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none}
+.map-ownership>span[hidden]{display:none}
+.map-ownership>span{position:absolute;transform:translate(-50%,-50%);width:calc(14px * var(--text-scale, 1));height:calc(14px * var(--text-scale, 1));border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:calc(10px * var(--text-scale, 1));line-height:1;outline:1px solid #0b263155}
+.map-ownership[data-low-graphics]>span{outline:0}
+.map-resources{position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none}
+.map-resources>span[hidden]{display:none}
+.map-resources>span{position:absolute;transform:translate(15%,-115%);font-size:calc(11px * var(--text-scale, 1));line-height:1;color:#f3ecd6;text-shadow:0 0 2px #0b2631,0 0 2px #0b2631}
+.map-resources[data-low-graphics]>span{text-shadow:none}
+.map-resources>span[data-rare]{border:1px solid #d0ad54;border-radius:50%;padding:1px}
+.map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
+/* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
+.game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}
+/* #392 S4 zoom rail (flag NEXT_PUBLIC_HARIMU_UI_V2_RAIL; class .game-rail-on): World / Nation / City in a left rail beside the stage (never over it), the top tabs keep the places. On phones the rail is a row before the tabs, in the page flow, so it cannot cover canvas labels. */
+.game-rail-on{--rail-width:calc(78px * var(--text-scale, 1))}.game-rail-on .game-nav-row{display:contents}
+.game-zoom-rail{position:absolute;z-index:5;top:var(--hud-height);bottom:var(--context-height);left:0;width:var(--rail-width);display:flex;flex-direction:column;gap:6px;padding:10px 6px;background:#102934;border-right:1px solid #334650;overflow-y:auto}
+.game-zoom-rail button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;min-width:44px;padding:6px 4px;border:1px solid transparent;border-radius:4px;background:transparent;color:#b2d4da;font-size:calc(11px * var(--text-scale, 1));line-height:1.2;text-align:center;cursor:pointer}
+.game-zoom-rail button:hover{background:#173a44;color:#e6f6f3}.game-zoom-rail button[aria-current]{color:#f1d58a;border-color:#6d5f3b}.game-zoom-rail button[aria-current=page]{background:#1f4a55}.game-zoom-rail button:focus-visible{outline:2px solid #d6b45c;outline-offset:2px}
+.game-rail-on .game-stage{left:var(--rail-width)}.game-rail-on .game-stage-overlay{left:calc(var(--rail-width) + 18px)}
+@media(max-width:760px){.game-rail-on .game-nav-row{display:flex;flex-wrap:wrap;align-items:stretch;grid-row:2;grid-column:1;min-width:0;background:#102934;border-bottom:1px solid #334650}.game-rail-on .game-zoom-rail{position:relative;inset:auto;width:auto;flex-direction:row;gap:2px;padding:0 4px;overflow:visible;border-right:1px solid #334650;background:transparent}.game-rail-on .game-zoom-rail button{min-height:44px;min-width:48px;padding:4px 6px}.game-rail-on .game-nav-row>.game-dock{flex:1 1 auto;min-width:0;border-bottom:0}.game-rail-on .game-stage,.game-rail-on .game-stage-overlay{left:auto}}
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
    this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
 .game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}

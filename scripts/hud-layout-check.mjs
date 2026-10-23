@@ -9,6 +9,8 @@
  *  (#78) The nation emblem (flag on/off) and the notifications bell in the top bar (scripts/hud-emblem-check.mjs).
  *  (#346) The top bar, shift chip and collapsed-panel button at 320-1280px wide and 100-150% text (scripts/hud-zoom-check.mjs).
  *  (#79) The color-blind-safe nation symbol chips, flag on and off (scripts/nation-symbols-check.mjs).
+ *  (#392 S4) The zoom rail (scripts/ui-v2-rail-check.mjs).
+ *  (#392 S3) The UI v2 panel shape, World and City (scripts/ui-v2-panel-check.mjs).
  *  (#392 S1) The nation crest in the inspector header, flag on and off, all ten nations (scripts/nation-crests-check.mjs).
  *  (#682) The bell's unread badge, up to the capped "99+", fits inside the fixed 44px phone bell (scripts/bell-badge-check.mjs).
  *  (#392 S2) The UI v2 top bar restyle: flag off pin, emblem-only pin, v2 on (scripts/ui-v2-topbar-check.mjs).
@@ -26,6 +28,8 @@ import { checkHudZoom } from './hud-zoom-check.mjs';
 import { checkDevelopmentPreviewNote } from './hud-preview-note-check.mjs';
 import { checkNationSymbols } from './nation-symbols-check.mjs';
 import { checkNationCrests } from './nation-crests-check.mjs';
+import { checkUiV2Panel } from './ui-v2-panel-check.mjs';
+import { checkUiV2Rail } from './ui-v2-rail-check.mjs';
 import { checkUiV2Topbar } from './ui-v2-topbar-check.mjs';
 import { checkBellBadge } from './bell-badge-check.mjs';
 import { checkTopBarEmblem } from './hud-emblem-check.mjs';
@@ -36,6 +40,7 @@ import { checkPhoneTapTargets } from './phone-tap-targets-check.mjs';
 import { checkCityDestinations } from './city-destinations-check.mjs';
 import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { checkGlobeLabelPressed } from './globe-label-pressed-check.mjs';
+import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
@@ -185,6 +190,8 @@ try {
   await checkHudZoom({ browser, css, preflight, failures, rows }); // #346: top bar and overlays at big text and browser zoom
   await checkNationSymbols({ browser, css, preflight, failures, rows }); // #79: nation symbol chips on the strip, comparison table and globe labels
   await checkNationCrests({ browser, css, preflight, failures, rows }); // #392 S1: nation crest in the inspector header (flag on and off)
+  await checkUiV2Panel({ browser, css, preflight, failures, rows }); // #392 S3: panel shape in the World and City side panel
+  await checkUiV2Rail({ browser, css, preflight, failures, rows }); // #392 S4: zoom rail beside the stage, places-only top tabs
   await checkUiV2Topbar({ browser, css, preflight, failures, rows }); // #392 S2: UI v2 top bar restyle (flag off, emblem-only, v2 on)
   await checkBellBadge({ browser, css, preflight, failures, rows }); // #682: the bell's unread badge (99, 99+) stays inside the 44px phone bell
   await checkShiftQualityStep({ browser, css, preflight, failures, rows }); // #347: shift quality dialog is styled, spaced, reachable
@@ -195,6 +202,7 @@ try {
   await checkPhoneTapTargets({ browser, css, preflight, failures, rows }); // #528: phone controls are at least 44x44; the camera bar sits under the canvas
   await checkCityDestinations({ browser, css, preflight, failures, rows }); // #378: Korund cards say Assignment / State store like the tabs; country pins fit city names
   await checkGlobeLabelPressed({ browser, failures, rows }); // #618: the selected nation's globe label keeps aria-pressed after the scene rebuilds
+  await checkMapOverlays({ browser, css, preflight, failures, rows }); // #82: Overlays bar at 1280 (no overlap/clip, 44px, no mid-word breaks); phone popover never covers the World chip
   await checkVisitorWording({ browser, css, preflight, failures, rows }); // #379: visitor wording (VISITOR PREVIEW, Household) and guide/pin text fit
 } finally { await browser.close(); }
 console.log(rows.join('\n'));

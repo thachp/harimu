@@ -141,7 +141,7 @@ test('destructive migrations need the review marker; edited applied migrations f
 });
 test('deploy guard and migrate command are wired', async () => {
   const deploy = await readFile('scripts/deploy-cloudflare.mjs', 'utf8');
-  assert.match(deploy, /assertPostgresMigrationsApplied\(db\)[\s\S]*deployArgs\(false\)/);
+  assert.match(deploy, /assertDeployDatabase\(db\)[\s\S]*deployArgs\(false\)/); // #486: assertDeployDatabase runs #119 first (behavioural test in deploy-floor-486)
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
   assert.equal(pkg.scripts['db:postgres:migrate'], 'node scripts/apply-postgres-migrations.mjs');
 });
@@ -164,7 +164,7 @@ test('preview workflow deploys only release, checks then migrates first, secret 
   assert.doesNotMatch(wf.slice(wf.indexOf('id: migrate'), wf.indexOf('db:postgres:migrate')), /\bif:/, 'migrate step is unconditional');
   const deployStep = wf.slice(wf.indexOf('- name: Deploy'));
   assert.match(deployStep, /if: success\(\) && steps\.migrate\.outcome == 'success'/);
-  assert.match(await readFile('scripts/deploy-cloudflare.mjs', 'utf8'), /assertPostgresMigrationsApplied\(db\)[\s\S]*deployArgs\(false\)/);
+  assert.match(await readFile('scripts/deploy-cloudflare.mjs', 'utf8'), /assertDeployDatabase\(db\)[\s\S]*deployArgs\(false\)/); // #486: assertDeployDatabase runs #119 first (behavioural test in deploy-floor-486)
 });
 
 test('#236 migrations may not control their own transaction or use CONCURRENTLY; repo migrations are clean', async () => {

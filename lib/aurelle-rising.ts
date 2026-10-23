@@ -1,3 +1,4 @@
+import { parked } from './async-limits'; // #679
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { claimant, claimants, pledgeThreshold, risingConfig, risingReady, risingSucceeds, unrestSustainedSeconds, type ClaimantId } from './aurelle-rising-rules';
@@ -156,13 +157,21 @@ const gazette = (headline: string, detail: string) => `INSERT INTO world_events 
  * Each step is one batch whose row write and Court Gazette entry share a guard, so a retry or a racing request adds nothing.
  */
 export async function runAurelleRising(db: GameDatabase, now: number) {
-  const open = await db.prepare('SELECT id, claimant_id, closes_at FROM aurelle_risings WHERE resolved_at IS NULL ORDER BY opened_at LIMIT 1')
+  // #679: every read below is read-only and independent of the others, so they start together (one round trip instead of about six in a row).
+  // A read whose branch is not taken is never awaited, so its rejection is parked (no unhandled rejection); a branch that uses it still rethrows as before.
+  // While a Rising is open, only the open row, scores, counts and weekly reads are used: up to 3 reads (coup window, last resolution, crown) run unused.
+  // That is the cost of one round trip instead of about six; they are read-only.
+  const openRead = db.prepare('SELECT id, claimant_id, closes_at FROM aurelle_risings WHERE resolved_at IS NULL ORDER BY opened_at LIMIT 1')
     .first<{ id: string; claimant_id: ClaimantId; closes_at: number }>();
-  const scores = await aurelleScores(db);
+  const scoresRead = parked(aurelleScores(db)), countsRead = parked(counts(db)), weeklyRead = parked(weeklyAurelleHumans(db, now));
+  const coupRead = parked(db.prepare(coupWindowOpenSql).first().catch(tolerate(isMissingRelation, null)));
+  const lastRead = parked(db.prepare('SELECT MAX(resolved_at) AS t FROM aurelle_risings').first<{ t: number | null }>()), crownRead = parked(readCrown(db));
+  const open = await openRead;
+  const scores = await scoresRead;
   if (open) {
     if (now < Number(open.closes_at)) return;
     const c = claimant(open.claimant_id)!;
-    const [byClaimant, weekly] = await Promise.all([counts(db), weeklyAurelleHumans(db, now)]);
+    const [byClaimant, weekly] = await Promise.all([countsRead, weeklyRead]);
     const pledges = byClaimant.get(c.id) ?? 0, stability = scores[0]?.stability ?? 100;
     const outcome = risingSucceeds({ pledges, weeklyHumans: weekly, stability }) ? 'succeeded' : 'failed';
     const copy = stage(outcome === 'succeeded' ? 'rising-succeeded' : 'rising-failed', c);
@@ -177,10 +186,10 @@ export async function runAurelleRising(db: GameDatabase, now: number) {
     return;
   }
   // #281: a palace-coup Crisis Window and a Rising window are never open at once.
-  if (await db.prepare(coupWindowOpenSql).first().catch(tolerate(isMissingRelation, null))) return;
-  const last = await db.prepare('SELECT MAX(resolved_at) AS t FROM aurelle_risings').first<{ t: number | null }>();
+  if (await coupRead) return;
+  const last = await lastRead;
   if (last?.t != null && now < Number(last.t) + risingConfig.cooldownSeconds) return;
-  const [byClaimant, weekly, crown] = await Promise.all([counts(db), weeklyAurelleHumans(db, now), readCrown(db)]);
+  const [byClaimant, weekly, crown] = await Promise.all([countsRead, weeklyRead, crownRead]);
   const leader = claimants.filter(c => c.id !== crown?.claimantId).map(c => ({ c, n: byClaimant.get(c.id) ?? 0 })).sort((a, b) => b.n - a.n || a.c.id.localeCompare(b.c.id))[0];
   const sustained = unrestSustainedSeconds(scores, now);
   if (!leader || !risingReady({ pledges: leader.n, weeklyHumans: weekly, sustainedSeconds: sustained })) return;

@@ -131,13 +131,13 @@ test('#247 GET /api/petitions makes zero writes and zero inference calls even wi
  assert.equal((await read(r,id)).status,'awaiting-response');
 });
 
-test('#247 the cron is off by default, needs the AI binding, and wrangler ships the flag off with a cron trigger',async t=>{
+test('#247 the cron is off by default in code, needs the AI binding, and preview wrangler ships the flag on with a cron trigger',async t=>{
  const r=await localRuntime();t.after(()=>r.close());await reached(r);const ai=scripted(good());
  assert.equal((await cron(r)).status,'disabled');
  r.setFixtureAiFlags({cabinet:true,news:false});r.setFixtureAiBinding(undefined);assert.equal((await cron(r)).status,'disabled');
  r.setFixtureAiBinding(ai);r.setFixtureAiFlags({cabinet:false});assert.equal((await cron(r)).status,'disabled');assert.equal(ai.seen.length,0);
  const {readFile}=await import('node:fs/promises');const cfg=await readFile(new URL('../wrangler.jsonc',import.meta.url),'utf8');
- assert.deepEqual([...cfg.matchAll(/"HARIMU_AI_CABINET_RESPONSES_ENABLED"\s*:\s*"([^"]*)"/g)].map(m=>m[1]).filter(v=>v!=='false'),[]);
+ assert.deepEqual([...cfg.matchAll(/"HARIMU_AI_CABINET_RESPONSES_ENABLED"\s*:\s*"([^"]*)"/g)].map(m=>m[1]),['true']);
  assert.match(cfg,/"triggers"\s*:\s*\{\s*"crons"\s*:\s*\["[^"]+"\]/);
  const entry=await readFile(new URL('../worker/entry.ts',import.meta.url),'utf8');assert.match(entry,/async scheduled\(/);assert.match(entry,/runCabinetCron\(/);
 });

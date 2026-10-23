@@ -111,5 +111,5 @@ test('top bar and overlay CSS keep room for big text and zoom (#346)', async () 
   assert.match(shell, /\.inspector-collapsed \.game-stage-overlay\{right:calc\(36px \+ 290px \* var\(--text-scale, 1\)\)\}/, 'collapsed-panel button gets its own room');
   assert.match(shell, /\.game-context-heading\{flex:0 0 calc\(220px \* var\(--text-scale, 1\)\)/, 'context heading grows with text size');
   const gameShell = await read('game-shell.tsx');
-  assert.match(gameShell, /<div className="game-stage-overlay">\{breadcrumbs\}\{shiftChip\}<\/div>/, 'banner and shift chip stack in one wrapper');
+  assert.match(gameShell, /<div className="game-stage-overlay">\{railOn \? null : breadcrumbs\}\{shiftChip\}<\/div>/, 'banner and shift chip stack in one wrapper (#392 S4: the rail replaces the banner when its flag is on)');
 });

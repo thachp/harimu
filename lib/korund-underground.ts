@@ -10,7 +10,7 @@ import { isMissingRelation } from './db-errors';
 import { capitalCityForNation, cityForNation } from './cities';
 import { korundUndergroundCopy as copy } from './faith-copy';
 import { correctionDuty, dutyEnded, suspicionIndicator } from './korund-suspicion-copy';
-import { appealGranted, deriveDuties, dutyDays, isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionWord, pickIndex, raidDue, raidId, undergroundConfig as cfg, undergroundGameDay } from './underground-rules';
+import { appealGranted, deriveDuties, dutyDays, isRepeatDiscovery, suspicionBand, suspicionLevel, suspicionLevelWithGray, suspicionWord, pickIndex, raidDue, raidId, undergroundConfig as cfg, undergroundGameDay } from './underground-rules';
 
 export * from './underground-rules';
 
@@ -130,15 +130,39 @@ export async function dutyDevotionEvents(db: GameDatabase, userId: string): Prom
   } catch (error) { if (isMissingRelation(error)) return []; throw error; }
 }
 
+/** #749: the private Suspicion indicator for the Korund panel: discoveries plus this citizen's completed gray-market trades (either side). Read-only; null at 0. */
+export type SuspicionOptions = { graySuspicion?: boolean };
+/** #749/#752: the one source of the private Suspicion indicator for both panels (Korund plan and faith). Flag off: discoveries only, exactly #382.
+ *  Flag on: discoveries plus this citizen's completed gray-market trades (either side). Gray Suspicion feeds ONLY this band: raids, Correction Duty
+ *  and duty length stay discoveries-only (deriveDuties/dutyView never see trades). All of the citizen's trades are read (no window: see below). Read-only; null at 0. */
+export async function suspicionIndicatorFor(db: GameDatabase, userId: string, times: readonly number[], now: number, options: SuspicionOptions = {}): Promise<UndergroundView['suspicion']> {
+  let level = suspicionLevel(times, now);
+  if (options.graySuspicion) {
+    try {
+      // QA1 on #756: no time window. A trade's effect lasts as long as the level never returns to 0, so any cut-off can change the band; read the full history.
+      const trades = (await db.prepare('SELECT traded_at FROM gray_trades WHERE seller_id=? OR buyer_id=?').bind(userId, userId).all<{ traded_at: number }>()).results.map(r => Number(r.traded_at));
+      level = suspicionLevelWithGray(times, trades, now);
+    } catch (error) { if (!isMissingRelation(error)) throw error; }
+  }
+  const band = suspicionBand(level);
+  return band === 'none' ? null : { line: suspicionIndicator.levelLine.replace('{level}', suspicionWord[band]), privateTag: suspicionIndicator.privateTag, tooltip: suspicionIndicator.tooltip.map(t => t.text) };
+}
+/** #749: the Korund panel indicator (always combined; called only with HARIMU_GRAY_SUSPICION_ENABLED on). */
+export async function readGraySuspicion(db: GameDatabase, userId: string, now: number): Promise<UndergroundView['suspicion']> {
+  let times: number[] = [];
+  try { times = (await db.prepare('SELECT raided_at FROM korund_raid_hits WHERE user_id=? ORDER BY raided_at').bind(userId).all<{ raided_at: number }>()).results.map(r => Number(r.raided_at)); }
+  catch (error) { if (!isMissingRelation(error)) throw error; }
+  return suspicionIndicatorFor(db, userId, times, now, { graySuspicion: true });
+}
+
 /** What a hidden-faith holder sees (private, derived on read). A recent inspection of them shows the first or repeat "found a shrine" notice and the Devotion note;
  *  otherwise a quiet-week line when their city has had no inspection this week. Plus the private Suspicion band and any Correction Duty. */
-export async function readUndergroundView(db: GameDatabase, userId: string, cityId: string, since: number, now: number): Promise<UndergroundView> {
+export async function readUndergroundView(db: GameDatabase, userId: string, cityId: string, since: number, now: number, options: SuspicionOptions = {}): Promise<UndergroundView> {
   const recentFrom = now - cfg.recentSeconds, none = { lastRaid: null, quietWeek: null, suspicion: null, duty: null };
   try {
     // #382: every stored discovery of this citizen, whatever faith they chose at the time (re-choosing a faith resets nothing). Suspicion, the repeat flag and duties are derived from these on read.
     const { times, appeals, duties } = await loadDuties(db, userId);
-    const level = suspicionLevel(times, now), band = suspicionBand(level), duty = dutyView(duties, appeals, now);
-    const suspicion = band === 'none' ? null : { line: suspicionIndicator.levelLine.replace('{level}', suspicionWord[band]), privateTag: suspicionIndicator.privateTag, tooltip: suspicionIndicator.tooltip.map(t => t.text) };
+    const duty = dutyView(duties, appeals, now), suspicion = await suspicionIndicatorFor(db, userId, times, now, options); // #752: same band as the Korund panel
     let index = -1; times.forEach((at, i) => { if (at >= since && at >= recentFrom) index = i; });
     if (index >= 0) {
       // docs 14.6: a first discovery adds Suspicion only; a repeat (also found within the last 30 real days) is the one that starts Correction Duty.

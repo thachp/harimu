@@ -5,7 +5,7 @@ import {localRuntime} from './helpers/local-runtime.mjs';
 import {reserveAiCall,reserveAiSequence,aiModelReservations,aiDailyBudgetMicroUsd} from '../lib/ai-budget.ts';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
-const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace("'./ai-denylist'",JSON.stringify(new URL('../lib/ai-denylist.ts',import.meta.url).href)).replace('30000','5');
+const source=(await readFile(new URL('../lib/ai-news.ts',import.meta.url),'utf8')).replace("'./ai-budget'",JSON.stringify(new URL('../lib/ai-budget.ts',import.meta.url).href)).replace("'./ai-denylist'",JSON.stringify(new URL('../lib/ai-denylist.ts',import.meta.url).href)).replace("'./ai-kill-switch'",JSON.stringify(new URL('../lib/ai-kill-switch.ts',import.meta.url).href)).replace('30000','5');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const {prepareAiNews,publicNewsFacts,validatedNewsDraft,newsDraftText,aiNewsEnabled,inferenceText,supportedNewsDraft,validatedNewsIntroduction}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 const model='@cf/meta/llama-3.2-3b-instruct';

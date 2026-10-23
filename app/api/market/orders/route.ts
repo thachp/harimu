@@ -1,3 +1,4 @@
+import { marketTickerOn } from '@/lib/market-visibility';
 import { travelBlock } from '@/lib/travel';
 import { wearinessEnabled, wearinessLossesEnabled, type WearinessBindings } from '@/lib/war-weariness'; // #423
 import { env } from 'cloudflare:workers';
@@ -18,7 +19,8 @@ export async function GET(request: Request) {
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   if (!enabled()) return privateJson({ open: false });
   const db = await getDatabase();
-  return privateJson({ open: true, book: await readOrderBook(db, userId) });
+  const ticker = marketTickerOn(env); // #459: the board polls only when this key is present
+  return privateJson({ open: true, book: await readOrderBook(db, userId), ...(ticker ? { ticker: true } : {}) });
 }
 
 export async function POST(request: Request) {

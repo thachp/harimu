@@ -9,6 +9,8 @@ import { orderBookLimits, type OrderBookState } from '@/lib/order-book-rules';
 import { shelfLifeDays } from '@/lib/spoilage-rules';
 import { boardLabels, cancelConfirmation, emptyStates, escrowPreview, fillNotice, orderStateLines, rejectionFor, rejectionForReason, rejections, spoilageHints, type Line, type RejectionKey } from '@/lib/market-board-copy';
 import { ActionButton } from './action-button';
+import { freshLiveText, moveLabel, priceMoves, startTicker, tickAnnouncer, tickerCopy, type Moves } from '@/lib/market-ticker';
+import { useDisplayTimestamp } from './display-preferences';
 
 type Good = OrderBookState['goods'][number];
 type Order = OrderBookState['myOrders'][number];
@@ -40,6 +42,15 @@ export function placementNotice(before: OrderBookState | null, after: OrderBookS
 }
 
 /** One fetch for the board and the commands that change it. A retry of the same command reuses its requestId. */
+type BookResponse = { open?: boolean; book?: OrderBookState; ticker?: boolean };
+/** One fetch-and-parse path for the board's GET, shared by mount and ticks (QA1 nit 4 on #705). Null when signed out, unavailable or aborted. */
+async function fetchBook(signal?: AbortSignal): Promise<BookResponse | null> {
+  try {
+    const r = await fetch('/api/market/orders', { cache: 'no-store', signal });
+    return r.ok ? await r.json() as BookResponse : null;
+  } catch { return null; }
+}
+
 export function useOrderBook(active: boolean) {
   const [book, setBook] = useState<OrderBookState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,28 +58,36 @@ export function useOrderBook(active: boolean) {
   const [error, setError] = useState('');
   const intent = useRef<{ key: string; requestId: string } | null>(null);
   const latest = useRef<OrderBookState | null>(null);
+  const [ticker, setTicker] = useState(false); // #459: true only when the GET says so (HARIMU_MARKET_TICKER_ENABLED)
+  const [moves, setMoves] = useState<Moves>({});
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [tick, setTick] = useState('');
+  const [announcer] = useState(() => tickAnnouncer(text => setTick(prev => freshLiveText(prev, text)), { setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: id => clearTimeout(id as ReturnType<typeof setTimeout>) }));
+  useEffect(() => () => announcer.stop(), [announcer]);
+  const accept = useCallback((next: OrderBookState, live: boolean) => {
+    const found = priceMoves(latest.current?.goods ?? null, next.goods), now = Date.now();
+    setMoves(found); setUpdatedAt(now);
+    if (live && !document.hidden) announcer.offer(found, next.goods, now); // QA1 on #712: a poll that lands after the tab hid never queues an announcement
+    setBook(next);
+  }, [announcer]);
   useEffect(() => { latest.current = book; }, [book]);
-  const load = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const r = await fetch('/api/market/orders', { cache: 'no-store', signal });
-      if (!r.ok) return; // signed out or unavailable: no board
-      const data = await r.json() as { open?: boolean; book?: OrderBookState };
-      if (data.open && data.book) setBook(data.book);
-    } catch { /* hidden */ }
-  }, []);
+  const apply = useCallback((data: BookResponse | null, first: boolean) => {
+    if (data?.open && data.book) { setTicker(data.ticker === true); accept(data.book, !first && data.ticker === true); }
+  }, [accept]);
+  const load = useCallback(() => fetchBook().then(data => apply(data, false)), [apply]);
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    void (async () => {
-      try {
-        const r = await fetch('/api/market/orders', { cache: 'no-store', signal: controller.signal });
-        if (!r.ok) return; // signed out or unavailable: no board
-        const data = await r.json() as { open?: boolean; book?: OrderBookState };
-        if (data.open && data.book) setBook(data.book);
-      } catch { /* hidden */ }
-    })();
+    void fetchBook(controller.signal).then(data => apply(data, true)); // state is set in the callback, not the effect body
     return () => controller.abort();
-  }, [active]);
+  }, [active, apply]);
+  useEffect(() => { // #459: poll only while the board is open and the server turned the ticker on; paused while the tab is hidden
+    if (!active || !ticker) { announcer.stop(); return; } // flag off or board closed: cancel any deferred announcement
+    const stopTicker = startTicker(() => void load(), document, window);
+    const onVisibility = () => { if (document.hidden) announcer.stop(); }; // hidden tab: never announce later
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { stopTicker(); document.removeEventListener('visibilitychange', onVisibility); announcer.stop(); };
+  }, [active, ticker, load, announcer]);
   async function post(body: Record<string, unknown>, success: (after: OrderBookState, before: OrderBookState | null) => string) {
     if (busy) return;
     const key = JSON.stringify(body);
@@ -86,7 +105,7 @@ export function useOrderBook(active: boolean) {
     finally { setBusy(false); }
   }
   return {
-    book: active ? book : null, busy, message, error, refresh: () => load(),
+    book: active ? book : null, busy, message, error, refresh: () => load(), ticker, moves, updatedAt, tick,
     place: (p: Placement) => post({ action: 'market-order-place', ...p }, (after, before) => placementNotice(before, after, p)),
     cancel: (orderId: string) => post({ action: 'market-order-cancel', orderId }, () => fillLine(cancelConfirmation, {})),
   };
@@ -99,15 +118,19 @@ function Levels({ good, side, levels }: { good: Good; side: 'Bids' | 'Asks'; lev
     <tbody>{levels.map(l => <tr key={l.unitMinor}><td>{spark(l.unitMinor)}</td><td>{l.qty}{l.npc && <> <span className="board-npc">{boardLabels.npcTag}</span></>}</td></tr>)}</tbody></table>;
 }
 
-function GoodCard({ good, held }: { good: Good; held: number }) {
+function Stat({ label, minor, move }: { label: string; minor: number | null; move?: Moves[string]['lastTradeMinor'] }) {
+  return <div className={move ? 'board-changed' : undefined}><dt>{label}</dt><dd>{minor === null ? '—' : spark(minor)}{move && <> <span className={`board-move board-move-${move.direction}`}>{moveLabel(move)}</span></>}</dd></div>;
+}
+
+function GoodCard({ good, held, moves }: { good: Good; held: number; moves?: Moves[string] }) {
   const empty = !good.bids.length && !good.asks.length;
   const hint = good.perishable && held > 0 ? spoilageHints[good.good as 'fruit' | 'meat'] : null;
   return <article className="board-good" aria-labelledby={`board-${good.good}`}>
     <h4 id={`board-${good.good}`}>{good.label} <small>per {good.unit}</small></h4>
     <dl className="board-stats">
-      <div><dt>{boardLabels.bestBid}</dt><dd>{good.bestBidMinor === null ? '—' : spark(good.bestBidMinor)}</dd></div>
-      <div><dt>{boardLabels.bestAsk}</dt><dd>{good.bestAskMinor === null ? '—' : spark(good.bestAskMinor)}</dd></div>
-      <div><dt>{boardLabels.lastTrade}</dt><dd>{good.lastTradeMinor === null ? '—' : spark(good.lastTradeMinor)}</dd></div>
+      <Stat label={boardLabels.bestBid} minor={good.bestBidMinor} move={moves?.bestBidMinor} />
+      <Stat label={boardLabels.bestAsk} minor={good.bestAskMinor} move={moves?.bestAskMinor} />
+      <Stat label={boardLabels.lastTrade} minor={good.lastTradeMinor} move={moves?.lastTradeMinor} />
     </dl>
     {hint && <p className="board-spoil">{fillLine(hint, { days: `${shelfLifeDays[good.good as 'fruit' | 'meat']} game days` })}</p>}
     {empty ? <p className="board-note">{emptyStates.noOrdersOnGood.text}</p> : <>
@@ -129,6 +152,7 @@ function OrderRow({ order, goods, reason, onCancel }: { order: Order; goods: Goo
 
 export function MarketBoard({ api, economy }: { api: OrderBookApi; economy: Economy | null }) {
   const { book, busy, message, error } = api;
+  const stamp = useDisplayTimestamp();
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [good, setGood] = useState('fruit');
   const [qty, setQty] = useState('1');
@@ -150,7 +174,9 @@ export function MarketBoard({ api, economy }: { api: OrderBookApi; economy: Econ
     <div className="board-heading"><h3 id="market-board-heading">City market board</h3>
       <ActionButton type="button" reason={busy ? 'Saving…' : null} onClick={() => void api.refresh()}>Refresh board</ActionButton></div>
     <p className="board-note">Kindle · fruit, meat and wood. Prices are in Spark per {goods.map(g => g.unit).join(', ').replace(/, ([^,]*)$/, ' or $1')}. Buys hold Spark and sells hold goods until they trade or you cancel.</p>
-    <div className="board-goods">{goods.map(g => <GoodCard key={g.good} good={g} held={held(g.good)} />)}</div>
+    <div className="board-goods">{goods.map(g => <GoodCard key={g.good} good={g} held={held(g.good)} moves={api.moves?.[g.good]} />)}</div>
+    {api.ticker && api.updatedAt !== null && <p className="board-updated">{tickerCopy.updated.text.replace('{time}', stamp(api.updatedAt))}</p>}
+    {api.ticker && <div aria-live="polite" className="board-tick-live">{api.tick}</div>}
 
     <h4>{boardLabels.myOpenOrders}</h4>
     {book.myOrders.length ? <ul className="board-orders">{book.myOrders.map(o => <OrderRow key={o.id} order={o} goods={goods} reason={busy ? 'Saving…' : null} onCancel={() => void api.cancel(o.id)} />)}</ul>

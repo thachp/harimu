@@ -23,13 +23,13 @@ const entry = `
     window.__root.render(<><GameShell {...props} onNavigate={() => {}}
       panel={<><NationComparison nations={nations} /><details><summary>Rules and limits</summary><p>Each nation keeps its own rules.</p></details></>}
       socialDock={signedIn ? <nav className="citizen-dock" aria-label="Citizen communications"><button type="button">Chat</button><button type="button">News</button><button type="button">Civic inbox</button></nav> : null}
-      accountControls={signedIn ? <><button type="button" className="game-glossary" aria-label="Open morning brief"><svg width="17" height="17" /><span>Brief</span></button><div className="account-control"><AccountMenu /></div></> : <div className="account-control"><button className="account-sign-in" type="button">Sign in</button></div>} /><RealViewport mode={mode} /></>); };`;
+      accountControls={signedIn ? <><button type="button" className="game-glossary" aria-label="Open morning brief"><svg width="17" height="17" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h9v11h-9z M4.5 5.5h5 M4.5 8h5 M4.5 10.5h3" fill="none" stroke="currentColor" /></svg><span>Brief</span></button><div className="account-control"><AccountMenu /></div></> : <div className="account-control"><button className="account-sign-in" type="button">Sign in</button></div>} /><RealViewport mode={mode} /></>); };`;
 
 async function bundle() {
   const result = await build({
     stdin: { resolveDir: root, loader: 'tsx', contents: entry },
     bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', target: 'es2022', logLevel: 'silent',
-    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR': '"false"' }, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
+    define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR': '"false"' , 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_PANEL': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_RAIL': '\"false\"'}, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
     plugins: [{ name: 'stubs', setup(b) {
       const stubs = { './game-viewport': 'export default function V(){return null}', './game-timer': 'export function GameTimer(){return null}', './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useClerk=()=>({mountUserButton(){},unmountUserButton(){}})' };
       b.onResolve({ filter: /^(\.\/game-viewport|\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ }, a => ({ path: a.path, namespace: 'stub' }));

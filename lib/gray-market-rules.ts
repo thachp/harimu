@@ -14,6 +14,14 @@ export const GRAY_RUMOR_WINDOW_SECONDS = 7 * GAME_DAY_SECONDS; // ... within the
 export const GRAY_RUMOR_NOISE = 0.1;                // ... with +/-10% seeded noise [ASSUMPTION: no rumor until a trade exists]
 export const GRAY_STARTING_GRANT_MINOR = 1000;      // [ASSUMPTION] one small one-time grant of 10.00 FC per Korund citizen
 export const GRAY_RUMOR_NUDGE = 0.01;              // [ASSUMPTION] when the noisy figure equals the last trade's rate, move it by at least 1% of that rate (floor: 1 hundredth)
+/** #736 (docs economy §12.9-12.10): per-citizen daily illicit volume cap, behind HARIMU_GRAY_DAILY_CAP_ENABLED. Volume = LN in offers the citizen
+ *  POSTED today + LN in offers they ACCEPTED today, per real UTC day. [ASSUMPTION] 15,000 minor LN (three full offers); the docs give no number. */
+export const GRAY_DAILY_VOLUME_CAP_MINOR = 15000;
+export const GRAY_DAY_SECONDS = 86400;
+/** Start of the real UTC day holding `now` (epoch seconds). */
+export const grayDayStart = (now: number): number => Math.floor(now / GRAY_DAY_SECONDS) * GRAY_DAY_SECONDS;
+/** LN volume still allowed today, never below 0. */
+export const grayDailyRemaining = (usedMinor: number, cap: number = GRAY_DAILY_VOLUME_CAP_MINOR): number => Math.max(0, cap - Math.max(0, usedMinor));
 export const GRAY_RATE_MIN = 1;                     // validation bounds only (0.01 .. 100.00 FC per LN), not a market view
 export const GRAY_RATE_MAX = 10000;
 

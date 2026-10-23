@@ -33,8 +33,8 @@ test('advanceWorld runs the chains through runWorldChains and awaits them', () =
   assert.match(source, /\n  await runWorldChains\(worldRunnerChains\(db, now, options\)\);/);
 });
 
-const devOrder = ['spoilage', 'npcSupply', 'aurelleRising', 'aurelleCoup', 'primaries', 'kindleAssembly', 'korundPresidium', 'korundRaids', 'diplomacy', 'targetedSanctions', 'embargo', 'warAssembly', 'foundingDay30'];
-const allOn = { npcSupply: true, aurelleRising: true, aurelleCoup: true, primaries: {}, kindleAssembly: {}, korundPresidium: true, faithFestivals: true, diplomacy: true, targetedSanctions: true, embargo: true, war: true, warAssembly: true, foundingPeriod: true };
+const devOrder = ['spoilage', 'npcSupply', 'aurelleRising', 'aurelleCoup', 'primaries', 'kindleAssembly', 'korundPresidium', 'korundRaids', 'diplomacy', 'targetedSanctions', 'embargo', 'warAssembly', 'warEndings', 'foundingDay30'];
+const allOn = { npcSupply: true, aurelleRising: true, aurelleCoup: true, primaries: {}, kindleAssembly: {}, korundPresidium: true, faithFestivals: true, diplomacy: true, targetedSanctions: true, embargo: true, war: true, warAssembly: true, warEndings: true, foundingPeriod: true };
 const fakeDb = { prepare: () => ({ first: async () => null }) };
 
 test('order snapshot: the chains, flattened, are the sequential tick order, and each chain keeps that order when run in parallel', async () => {
@@ -43,7 +43,7 @@ test('order snapshot: the chains, flattened, are the sequential tick order, and 
   assert.ok(chains.flat().every(x => x.on), 'every runner is on with every flag on');
   // QA3 (#427): the war vote shares diplomacy's chain, after embargo, so a pact ratified this tick is written before the vote re-checks it. A chain of its own would run in parallel.
   const diplomacyChain = chains.find(chain => chain.some(x => x.name === 'diplomacy')).map(x => x.name);
-  assert.deepEqual(diplomacyChain, ['diplomacy', 'targetedSanctions', 'embargo', 'warAssembly'], 'warAssembly runs in the diplomacy chain, after embargo');
+  assert.deepEqual(diplomacyChain, ['diplomacy', 'targetedSanctions', 'embargo', 'warAssembly', 'warEndings'], 'warAssembly then warEndings run in the diplomacy chain, after embargo');
   const record = async (parallel) => {
     const seen = [], recorded = chains.map((chain, c) => chain.map(x => runner(x.name, async () => { await wait((chain.length - c) % 3); seen.push(`${c}:${x.name}`); })));
     if (parallel) await sim.runWorldChains(recorded); else for (const x of recorded.flat()) await x.run();

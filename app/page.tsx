@@ -18,6 +18,8 @@ import { NationComparison } from './nation-comparison';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
 import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
+import { countryWord } from '@/lib/ui-v2-rail';
+import { CitySummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
@@ -460,7 +462,7 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
-  flags?: { market?: boolean; diplomaticHall?: boolean };
+  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean };
   firstWeek?: { completed: string[] } | null;
   profile: {
     nationId: string | null;
@@ -638,6 +640,7 @@ export default function Home() {
   // #344: the server's market flag (HARIMU_ORDER_BOOK_ENABLED). Fails closed until the citizen snapshot says otherwise.
   const [marketFlag, setMarketFlag] = useState(false);
   const [hallFlag, setHallFlag] = useState(false); // #599
+  const [overlaysFlag, setOverlaysFlag] = useState(false); // #82
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -1323,7 +1326,7 @@ export default function Home() {
     if ('election' in snapshot)setElection(snapshot.election??null);
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
-    if (snapshot.flags) { setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); }
+    if (snapshot.flags) { setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); }
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
@@ -1748,34 +1751,36 @@ export default function Home() {
         <FoundingBanner founding={government?.founding} nationId={citizenNation.id} />
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
         {citizenNation.id==='kindle'&&clerkConfigured&&<PrimaryCard key={`primary:${citizenSessionKey}`}/>}
-        {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={citizenSessionKey} onSnapshot={setElection}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={`ranked:${citizenSessionKey}`} onSnapshot={setElection}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<Canvassing key={`canvassing:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<TownHalls key={`town-hall:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<Debate key={`debate:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&simulation?.reserve&&<ReserveBoardLine reserve={simulation.reserve}/>}
-        {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={citizenSessionKey}/>}
-        {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={citizenSessionKey} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
+        {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={`aurelle-rising:${citizenSessionKey}`}/>}
+        {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={`petitions:${citizenSessionKey}`} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
         <p>{citizenNation.id==='kindle'&&clerkConfigured?'Kindle’s preview ballot status is shown above. Protests and broader public-opinion systems are planned.':'This location has no counted ballot. Protests and broader public-opinion systems are planned under each nation’s rules.'}</p>
       </>}
     </>}
   </section>;
 
+  const populationFact = selected.populationBand ? <dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd> : null;
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
     {guestAllowed && (firstVisitGuideOpen
       ? tourOpen ? <GlobeTour onFocus={setTourFocusNation} onClose={finishTour} /> : <FirstVisitGuide stage={firstVisitStage} onStageChange={setFirstVisitStage} onShortlist={setShortlistIds} onStartTour={() => setTourOpen(true)} onTryGuest={startGuestDemo} onDismiss={() => { stopTour(); setFirstVisitGuideOpen(false); }} />
       : <button type="button" className="secondary-action" onClick={() => { setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); }}>Restart first-visit guide</button>)}
+    <WorldSummary nation={selected} population={populationFact} onView={changeView} />
     <p className="eyebrow">Exploring · {selected.shortName}</p>
     {guestEntry}
     <NationComparison nations={worldNations} />
-    <dl>{selected.populationBand && <><dt>Population</dt><dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd></>}<dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd><dt>Currency</dt><dd>{selected.currency}</dd><dt>Religion</dt><dd>{selected.religion}</dd></dl>
+    <WorldFacts nation={selected} population={populationFact} />
     {selected.populationBand === 'needs-citizens' && <details className="pioneer-note"><summary>Pioneer nation · bonuses planned</summary><p>{pioneerNote}</p></details>}
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>
     <details><summary>Rules and limits</summary><p>Each nation keeps its own rules. Computer-controlled leaders (AI/SI) follow fixed game rules: the same situation produces the same decision. No live AI model is connected. Petitions require a verified phone number to count, but phone verification has not been set up yet, so petition submission is unavailable. Territory ownership and foreign trade are not built yet.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus,formatTime)}</p>
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <ActionButton type="button" reason={firstActionReason([clerkConfigured && citizenSessionStatus === 'loading', 'Your citizen account is loading. Please wait before choosing citizenship.'], [clerkConfigured && citizenSessionStatus === 'error', 'Your citizen account could not load. Retry loading it before choosing citizenship.'])} onClick={()=>{if (!clerkConfigured || !['loading','error'].includes(citizenSessionStatus)) beginEnrollment(selected.id);}}>Choose citizenship · {selected.shortName}</ActionButton>}
-    <button type="button" onClick={()=>changeView('nation')}>Inspect national institutions</button>
+    <WorldInstitutionsButton onView={changeView} />
   </section>;
   const viewedNationParam = new URLSearchParams(locationSearch).get('nation');
   const foreignCivic = isForeignCivic(viewMode, viewedNationParam, selected.id, citizenNation?.id);
@@ -1796,8 +1801,9 @@ export default function Home() {
   const countryHomeId = countryOwnNation ? currentCityAccount?.homeCityId ?? null : clerkConfigured && citizenNation ? null : capitalCityForNation(countryNation.id)?.id ?? null;
   const canCityTravel = !clerkConfigured || citizenSessionStatus === 'anonymous' || Boolean(countryOwnNation && currentCityAccount && citizenSessionStatus === 'ready');
   const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} /></>;
-  const countryPanel = <section aria-label="Country travel"><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
+  const countryPanel = <section aria-label={`${countryWord()} travel`}><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
+    <CitySummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} city={activeCity} nation={citizenNation ?? selected} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} onView={changeView} />
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {firstLoopHint}{weekTracker}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
@@ -1878,10 +1884,10 @@ export default function Home() {
   const closeMorningBrief = () => { setMorningBriefOpen(false); if (briefStorageKey) try { window.localStorage.setItem(briefStorageKey, briefDayKey(Date.now())); } catch {} };
   const contextTitle = citizenNation?.id === 'korund' && viewMode === 'market' ? 'State rations' : citizenNation?.id === 'korund' && viewMode === 'workplace' ? 'Assigned work' : viewMode === 'household' ? 'Belongings' : viewMode === 'workplace' ? 'Available jobs'
     : viewMode === 'market' ? 'Goods and listings' : viewMode === 'government' ? 'Government offices'
-      : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? 'Country travel' : 'Household';
+      : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? `${countryWord()} travel` : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} />}
-    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}

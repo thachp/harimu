@@ -34,7 +34,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const path = join(directory, 'fixture.sqlite');
   const modules = [
     'lib/storage-selection.ts','lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
-    'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'lib/map-zones.ts', 'lib/map-zone-labels.ts', 'lib/city-founding.ts', 'app/api/world/found-city/route.ts', 'app/api/city/route.ts',
+    'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/city-location.ts', 'lib/map-zones.ts', 'lib/globe-mapping.ts', 'lib/map-zone-labels.ts', 'lib/city-founding.ts', 'app/api/world/found-city/route.ts', 'lib/map-ownership.ts', 'app/api/world/ownership/route.ts', 'lib/map-unrest.ts', 'app/api/world/unrest/route.ts', 'lib/map-resources.ts', 'app/api/world/resources/route.ts', 'app/api/city/route.ts',
     'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
     'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',
@@ -44,7 +44,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/world-simulation.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',
     'lib/qa-tools.ts','lib/nation-openings.ts','lib/onboarding-preferences.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
-    'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts','lib/war-authority.ts','lib/war-actions.ts','lib/war-assembly.ts','lib/war-weariness.ts','lib/war-weariness-copy.ts','lib/siege.ts','lib/siege-actions.ts','lib/siege-copy.ts', // #309, #350, #423, #419
+    'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts','lib/war-authority.ts','lib/war-actions.ts','lib/war-assembly.ts','lib/war-endings.ts','lib/war-weariness.ts','lib/war-weariness-copy.ts','lib/siege.ts','lib/siege-actions.ts','lib/siege-copy.ts', // #309, #350, #423, #419
     'lib/labor-bureau-rules.ts','lib/labor-bureau-text.ts','lib/labor-bureau-copy.ts','lib/labor-bureau.ts','lib/korund-wallet.ts','lib/gray-market.ts','lib/gray-market-rules.ts','lib/gray-market-text.ts','lib/gray-market-copy.ts','lib/nation-work.ts','lib/confluence-price-band.ts','lib/diplomacy.ts','lib/diplomacy-rules.ts','lib/diplomacy-copy.ts','lib/game-time.ts', // #308
     'lib/embargo.ts','lib/embargo-rules.ts','lib/embargo-copy.ts','lib/goods-sanction-rules.ts','lib/goods-sanctions.ts', // #363, #601
     'lib/crown-debasement.ts','lib/crown-debasement-rules.ts','lib/press-templates.ts', // #362
@@ -54,8 +54,8 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/debate.ts','lib/debate-rules.ts','lib/debate-ai.ts','lib/debate-copy.ts','lib/palace-coup-copy.ts','app/api/debate/route.ts', // #282
     'lib/spark-supply.ts','lib/spark-supply-rules.ts','lib/reserve-board-copy.ts','lib/reserve-board-view.ts', // #431
     'lib/ledger-reconciliation.ts','lib/ledger-reconciliation-rules.ts','app/api/admin/ledger-reconciliation/route.ts', // #432
-    'lib/ai-costs.ts','lib/ai-denylist.ts','app/api/admin/ai-costs/route.ts', // #614
-    'lib/world-registry.ts','lib/market-visibility.ts','lib/tessera-exchange.ts','lib/test-faucet.ts','app/api/test-faucet/route.ts','lib/aurelle-charter-rules.ts','lib/aurelle-charters.ts','app/api/aurelle/charters/route.ts','lib/tessera-rewards-rules.ts','lib/tessera-rewards.ts','lib/tessera-not-earned.ts','app/api/tessera/rewards/route.ts','lib/relocation-support-rules.ts','lib/relocation-support.ts','app/api/relocation/claim/route.ts','lib/clearing-house-copy.ts','lib/kiosk-text.ts','app/api/world/registry/route.ts','lib/order-book-rules.ts','lib/order-book.ts','lib/npc-supply-rules.ts','lib/npc-supply.ts','lib/spoilage-rules.ts','lib/spoilage.ts','lib/db-errors.ts','app/api/market/orders/route.ts','lib/travel.ts','app/api/travel/route.ts','lib/worship-copy.ts','lib/faith-copy.ts','lib/mvp-festival-copy.ts','lib/festivals.ts','lib/faith.ts','app/api/faith/route.ts','lib/congregations.ts','app/api/congregations/route.ts','lib/claimant-copy.ts','lib/aurelle-rising-rules.ts','lib/aurelle-rising.ts','app/api/aurelle/rising/route.ts','lib/korund-presidium-rules.ts','lib/korund-presidium.ts','lib/aurelle-coup-rules.ts','lib/aurelle-coup.ts','lib/palace-coup-copy.ts','lib/assembly-copy.ts','lib/kindle-parties.ts','lib/assembly-rules.ts','lib/assembly.ts','app/api/assembly/route.ts','lib/campaign-copy.ts','lib/primaries-rules.ts','lib/primaries.ts','app/api/primaries/route.ts',
+    'lib/ai-costs.ts','lib/ai-denylist.ts','lib/ai-kill-switch.ts','app/api/admin/ai-costs/route.ts', // #614
+    'lib/world-registry.ts','lib/async-limits.ts','lib/market-visibility.ts','lib/tessera-exchange.ts','lib/test-faucet.ts','app/api/test-faucet/route.ts','lib/aurelle-charter-rules.ts','lib/aurelle-charters.ts','app/api/aurelle/charters/route.ts','lib/tessera-rewards-rules.ts','lib/tessera-rewards.ts','lib/tessera-not-earned.ts','app/api/tessera/rewards/route.ts','lib/relocation-support-rules.ts','lib/relocation-support.ts','app/api/relocation/claim/route.ts','lib/clearing-house-copy.ts','lib/kiosk-text.ts','app/api/world/registry/route.ts','lib/order-book-rules.ts','lib/order-book.ts','lib/npc-supply-rules.ts','lib/npc-supply.ts','lib/spoilage-rules.ts','lib/spoilage.ts','lib/db-errors.ts','app/api/market/orders/route.ts','lib/travel.ts','app/api/travel/route.ts','lib/worship-copy.ts','lib/faith-copy.ts','lib/mvp-festival-copy.ts','lib/festivals.ts','lib/faith.ts','app/api/faith/route.ts','lib/congregations.ts','app/api/congregations/route.ts','lib/claimant-copy.ts','lib/aurelle-rising-rules.ts','lib/aurelle-rising.ts','app/api/aurelle/rising/route.ts','lib/korund-presidium-rules.ts','lib/korund-presidium.ts','lib/aurelle-coup-rules.ts','lib/aurelle-coup.ts','lib/palace-coup-copy.ts','lib/assembly-copy.ts','lib/kindle-parties.ts','lib/assembly-rules.ts','lib/assembly.ts','app/api/assembly/route.ts','lib/campaign-copy.ts','lib/primaries-rules.ts','lib/primaries.ts','app/api/primaries/route.ts',
     'lib/korund-underground.ts','lib/underground-rules.ts','lib/korund-suspicion-copy.ts', // #295, #382
     'lib/missionary-rules.ts','lib/missionaries.ts','lib/missionary-actions.ts','lib/missionary-copy.ts','lib/missionary-notice-copy.ts', // #225
     'lib/citizenship.ts',
@@ -132,6 +132,9 @@ export async function readVerification(userId) {
   const addresses = await import(pathToFileURL(join(directory,'app/api/addresses/route.mjs')).href);
   const world = await import(pathToFileURL(join(directory, 'app/api/world/route.mjs')).href);
   const foundCityRoute = await import(pathToFileURL(join(directory, 'app/api/world/found-city/route.mjs')).href);
+  const ownershipRoute = await import(pathToFileURL(join(directory, 'app/api/world/ownership/route.mjs')).href); // #82
+  const unrestRoute = await import(pathToFileURL(join(directory, 'app/api/world/unrest/route.mjs')).href); // #82 slice 4
+  const resourcesRoute = await import(pathToFileURL(join(directory, 'app/api/world/resources/route.mjs')).href); // #82 slice 3
   const registryRoute = await import(pathToFileURL(join(directory, 'app/api/world/registry/route.mjs')).href); // #122
   const faucetRoute = await import(pathToFileURL(join(directory, 'app/api/test-faucet/route.mjs')).href); // #631
   const ordersRoute = await import(pathToFileURL(join(directory, 'app/api/market/orders/route.mjs')).href); // #197
@@ -165,7 +168,7 @@ export async function readVerification(userId) {
     });
     if (user) identify(request, user);
     const handlers = endpoint === 'notables' ? notables : endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'world/found-city' ? foundCityRoute : endpoint === 'city' ? city : square;
-    const routed = endpoint === 'world/registry' ? registryRoute : endpoint === 'test-faucet' ? faucetRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'diplomatic-hall' ? hallRoute : endpoint === 'aurelle-succession' ? successionRoute : endpoint === 'aurelle/charters' ? chartersRoute : endpoint === 'tessera/rewards' ? rewardsRoute : endpoint === 'relocation/claim' ? reliefRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'canvassing' ? canvassingRoute : endpoint === 'town-hall' ? townHallRoute : endpoint === 'debate' ? debateRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
+    const routed = endpoint === 'world/ownership' ? ownershipRoute : endpoint === 'world/unrest' ? unrestRoute : endpoint === 'world/resources' ? resourcesRoute : endpoint === 'world/registry' ? registryRoute : endpoint === 'test-faucet' ? faucetRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'diplomatic-hall' ? hallRoute : endpoint === 'aurelle-succession' ? successionRoute : endpoint === 'aurelle/charters' ? chartersRoute : endpoint === 'tessera/rewards' ? rewardsRoute : endpoint === 'relocation/claim' ? reliefRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'canvassing' ? canvassingRoute : endpoint === 'town-hall' ? townHallRoute : endpoint === 'debate' ? debateRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
     const response = await routed[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };
@@ -178,6 +181,7 @@ export async function readVerification(userId) {
     setOrderBook:on=>{env.HARIMU_ORDER_BOOK_ENABLED=String(on);}, // #197
     setTravel:on=>{env.HARIMU_TRAVEL_ENABLED=String(on);}, // #123
     setDiplomaticHall:on=>{env.HARIMU_DIPLOMATIC_HALL_ENABLED=String(on);}, // #599
+    setMapOverlays:on=>{env.HARIMU_MAP_OVERLAYS_ENABLED=String(on);}, // #82
     setFaith:on=>{env.HARIMU_FAITH_ENABLED=String(on);}, // #67
     reopen() { if(postgres){postgres.reopen();return;}env.DB.close(); env.DB = new LocalD1(path); },
     async close() { if(postgres)await postgres.close();else env.DB.close(); await rm(directory, { recursive: true, force: true }); },

@@ -62,7 +62,7 @@ for (const backend of ['sqlite', 'postgres']) test(`GET /api/citizen: one new fl
   const at = new Date(r.now).toISOString();
   await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES ('kay','kindle','kay',18,0,'Good standing',?,?)").bind(at, at).run();
   const off = (await r.call('citizen', 'kay')).data;
-  assert.deepEqual(Object.keys(off.flags), ['market', 'diplomaticHall']); assert.equal(off.flags.diplomaticHall, false);
+  assert.deepEqual(Object.keys(off.flags), ['market', 'diplomaticHall', 'mapOverlays']); assert.equal(off.flags.diplomaticHall, false);
   r.setDiplomaticHall(true);
   const on = (await r.call('citizen', 'kay')).data;
   assert.equal(on.flags.diplomaticHall, true);
