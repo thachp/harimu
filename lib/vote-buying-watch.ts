@@ -27,9 +27,10 @@ const receipts = `SELECT 'civic:'||r.election_id AS ekey, r.clerk_user_id AS uid
  UNION ALL SELECT 'assembly:'||election_id, clerk_user_id, checked_at FROM assembly_voter_receipts WHERE checked_at>?
  UNION ALL SELECT 'primary:'||election_id, clerk_user_id, checked_at FROM primary_voter_receipts WHERE checked_at>?`;
 /** One idempotent statement: every matching (vote, transfer, reason) not yet recorded. Re-running it adds nothing (primary key + ON CONFLICT DO NOTHING). */
-export const voteBuyingSweepSql = `WITH r AS (${receipts}),
+// It starts with INSERT (the Postgres adapter only runs SELECT/INSERT/UPDATE/DELETE statements); the CTEs sit inside the INSERT's SELECT.
+export const voteBuyingSweepSql = `INSERT INTO vote_buying_events (election_key, voter_id, sender_id, transfer_id, reason, created_at)
+WITH r AS (${receipts}),
  hits AS (SELECT r.ekey, r.uid, r.at, f.buyer_id, f.request_id FROM r JOIN player_fills f ON f.seller_id=r.uid AND f.filled_at>=r.at-? AND f.filled_at<=r.at+?)
-INSERT INTO vote_buying_events (election_key, voter_id, sender_id, transfer_id, reason, created_at)
 SELECT h.ekey, h.uid, h.buyer_id, h.request_id, x.reason, ? FROM hits h
  JOIN (SELECT 'party-member' AS reason UNION ALL SELECT 'campaign' UNION ALL SELECT 'ring') x ON
   (x.reason='party-member' AND EXISTS(SELECT 1 FROM party_members p WHERE p.clerk_user_id=h.buyer_id))
