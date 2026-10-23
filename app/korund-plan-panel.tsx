@@ -172,6 +172,7 @@ export function GrayMarket({ gray, pending, uncertain, onGray }: { gray: NonNull
     <dl><dt>{grayText.cashLabel}</dt><dd>{fc(gray.cashMinor)}{gray.grantPending ? ' (starting stash, yours when you first trade)' : ''}</dd></dl>
     <p><small>{grayText.cashHelp}</small></p>
     {gray.suspicion && <p title={gray.suspicion.tooltip.join(' ')}>{gray.suspicion.line} <small>({gray.suspicion.privateTag})</small></p>}
+    {gray.seizure && <p role="status">{gray.seizure}</p>}
     {gray.dailyRemainingMinor !== undefined && <p>Today&apos;s limit: {ln(gray.dailyRemainingMinor)} left</p>}
     <p aria-label={grayText.rumorLabel}>{gray.rumoredRate === null ? grayText.noRumor : rumorLine(gray.rumoredRate)}</p>
     <h4>{grayText.yourOffer}</h4>

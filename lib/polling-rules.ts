@@ -18,12 +18,20 @@ export function drawSample<T>(items: readonly T[], size: number, seed: string): 
 }
 /** 95% margin in percentage points for a share near 50%: 1.96·√(0.25/n) ≈ 0.98/√n, to one decimal. */
 export const marginPoints = (n: number) => n > 0 ? Math.round(980 / Math.sqrt(n)) / 10 : null;
+/** ARC ruling (a): published shares are whole percents rounded to the nearest 5; raw counts and n are never published. */
+export const shareStep = 5;
+/** ARC ruling (b): after the first snapshot, a new one publishes only when at least this many answers were added since the last one. */
+export const minimumNewAnswers = 10;
+/** [ASSUMPTION] A margin from n would reveal n, so only a coarse band is published: the smallest of these bounds at or above the true margin. */
+export const marginBands = [5, 10, 20, 35] as const;
+export const marginBand = (n: number) => { const m = marginPoints(n); return m === null ? null : marginBands.find(b => m <= b) ?? marginBands[marginBands.length - 1]; };
+/** Internal: n is stored (never returned); margin is already the coarse band. */
 export type PollResult = { n: number; margin: number; shares: { candidateId: string; share: number }[] };
-/** Shares (percent, one decimal) for every slate candidate, slate order. null under the minimum sample. */
+/** Shares (nearest 5%) for every slate candidate, slate order. null under the minimum sample. */
 export function tallyPoll(sample: readonly string[], slate: readonly string[]): PollResult | null {
   const n = sample.length;
   if (n < minimumPublishedSample) return null;
-  return { n, margin: marginPoints(n)!, shares: slate.map(candidateId => ({ candidateId, share: Math.round(sample.filter(c => c === candidateId).length * 1000 / n) / 10 })) };
+  return { n, margin: marginBand(n)!, shares: slate.map(candidateId => ({ candidateId, share: Math.round(sample.filter(c => c === candidateId).length * 100 / n / shareStep) * shareStep })) };
 }
 /** One seed per election per real day, so each day's poll draws a fresh sample once the answers exceed the maximum sample. */
 export const pollSeed = (electionId: string, day: number) => `${electionId}:${day}`;

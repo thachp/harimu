@@ -16,6 +16,9 @@
     "id": "a1f662c88f3b485190c402d9548ae360"
   }],
   "ai": { "binding": "AI" },
+  // Preview only: Workers observability keeps Worker console logs (for example the [notables] rejection lines) searchable in the dashboard; wrangler.prod.jsonc stays unchanged.
+  // Invocation logs are off: Cloudflare documents that request metadata and headers are captured per invocation (changelog 2025-04-07) and documents no Cookie/Authorization redaction, so Clerk cookies or bearer tokens could be stored. Console logs stay on.
+  "observability": { "enabled": true, "logs": { "invocation_logs": false } },
   "workers_dev": true,
   "preview_urls": true,
   // Preview turns on every feature flag that is safe without an unset Worker secret (the Workers AI flags are on too, capped by HARIMU_AI_DAILY_BUDGET_MICRO; the QA2 smoke list is in the PR that did it). The "Off" in a flag comment below describes that flag's off behavior. wrangler.prod.jsonc keeps every flag "false".
@@ -59,10 +62,14 @@
     "HARIMU_GRAY_DAILY_CAP_ENABLED": "true",
     // #749: each completed Korund gray-market trade adds private Suspicion (capped per day, never starts Correction Duty). Off: Suspicion from discoveries only.
     "HARIMU_GRAY_SUSPICION_ENABLED": "true",
+    // #797: after an accepted gray-market trade a checkpoint may seize part of the buyer's LN bundle (chance rises with Suspicion, capped; one per game day); seized LN is destroyed. Off: no roll, no write.
+    "HARIMU_GRAY_SEIZURE_ENABLED": "true",
     // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
     "HARIMU_KORUND_MEDALS_ENABLED": "true",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
     "HARIMU_KORUND_SHORTFALL_ENABLED": "true",
+    // #777: goods-market seller fee (0.5%, rounded down) written as a sink row with each fill and netted from the wallet. Off: no fee written or read.
+    "HARIMU_MARKET_FEE_ENABLED": "true",
     // #758: Korund wallet shows the rumored LN street rate (from #43 trades, display only) to citizens who have traded on the gray market. Off: no read, wallet unchanged.
     "HARIMU_WALLET_STREET_RATE_ENABLED": "true",
     // #776: a closed-week plan shortfall withdraws goods (then clothing) coupons from the next week's book; the food ration is never cut (derived on read). Off: coupons unchanged.
@@ -98,6 +105,8 @@
     "HARIMU_MAP_OVERLAYS_ENABLED": "true",
     // #741: Kindle civic rank ladder (Resident → Leading Citizen; an honor, no office or vote weight). Off: GET /api/citizen/civic-rank is 404, /api/citizen sends no civicRank and kindle-7-rank is unavailable. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_CIVIC_RANK_ENABLED": "true",
+    // #738 slice 1: army units: volunteer for your nation's home-guard unit, leave it, pick a squad stance. Needs HARIMU_WAR_ENABLED too. Off: /api/army is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_ARMIES_ENABLED": "true",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
@@ -145,6 +154,8 @@
     "HARIMU_AI_COST_DASHBOARD_ENABLED": "false",
     // #753: staff AI review queue (docs §21.4): filter-failed Notable replies plus a ~1% sample of passing ones; admin list at /api/admin/ai-review-queue behind HARIMU_ADMIN_TOKEN.
     "HARIMU_AI_REVIEW_QUEUE_ENABLED": "true",
+    // #739: citizen dormancy slice 1 (docs §17.4): Away/Dormant/Archived status and the Welcome back briefing; flag off = no last_active_at read or write.
+    "HARIMU_DORMANCY_ENABLED": "true",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",
@@ -156,6 +167,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_PANEL": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_RAIL": "true",
     "NEXT_PUBLIC_HARIMU_UI_V2_WORLD": "true",
+    "NEXT_PUBLIC_HARIMU_UI_V2_NATION": "true",
+    "NEXT_PUBLIC_HARIMU_RARE_MARKER": "true",
     // QA tooling (#138): preview-only nation switch for allowlisted QA account ids (set ids in the dashboard; --keep-vars keeps them).
     "HARIMU_QA_TEST_CITIZENS": "false"
   },

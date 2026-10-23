@@ -18,7 +18,7 @@ export function PollCard() {
     <h3>{pollCard.title}</h3>
     {view.poll ? <>
       <ul>{view.poll.shares.map(s => <li key={s.candidateId}>{s.name}: {s.share}%</li>)}</ul>
-      <p>{pollCard.sampleSize.replace('{n}', String(view.poll.n))} · {pollCard.margin.replace('{margin}', `${view.poll.margin} pts`)}</p>
+      <p>{pollCard.margin.replace('{margin}', `${view.poll.marginBand} pts or less`)}</p>
       <p>{pollCard.marginExplainer.text} {pollCard.sampleExplainer.text}</p>
     </> : <p>{pollCard.empty.text}</p>}
     {view.open && eligible && <fieldset><legend>{P.title}</legend>

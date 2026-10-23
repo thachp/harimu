@@ -1,5 +1,6 @@
 import type { GameDatabase } from './database-contract';
 import { readGraySuspicion } from './korund-underground'; // #749
+import { rollSeizure, seizureNotice, latestSeizureNotice } from './gray-seizure'; // #797
 import { laborNoteSql, laborNoteBinds } from './korund-wallet';
 import { GRAY_AMOUNT_CAP_MINOR, GRAY_OFFER_LIFETIME_SECONDS, GRAY_STARTING_GRANT_MINOR, GRAY_RATE_MIN, GRAY_RATE_MAX, GRAY_RUMOR_TRADES, GRAY_RUMOR_WINDOW_SECONDS,
   GRAY_DAILY_VOLUME_CAP_MINOR, grayDayStart, grayDailyRemaining, grayCashFor, rumoredRate, validGrayOffer, type GrayOfferInput } from './gray-market-rules';
@@ -51,7 +52,7 @@ const grayVolumeSql = (user: string): string => `(COALESCE((SELECT SUM(amount_mi
 const grayVolumeBinds = (userId: string, now: number): (string | number)[] => [userId, grayDayStart(now), userId, grayDayStart(now)];
 const volume = async (db: GameDatabase, userId: string, now: number) => Number((await db.prepare(`SELECT ${grayVolumeSql('?')} AS n`).bind(...grayVolumeBinds(userId, now)).first<{ n: number }>())?.n ?? 0);
 const capError = (remaining: number): GrayResult => ({ status: 409, reason: 'daily_cap', error: `Today's limit: ${(remaining / 100).toFixed(2)} LN left.` });
-export type GrayOptions = { dailyCap?: boolean; suspicion?: boolean };
+export type GrayOptions = { dailyCap?: boolean; suspicion?: boolean; seizure?: boolean; seizureRng?: (offerId: string) => number };
 
 export type GrayOfferView = { id: string; amountMinor: number; askRate: number; cashMinor: number; createdAt: string; expiresAt: string };
 export type GrayView = {
@@ -67,8 +68,10 @@ export type GrayView = {
   dailyRemainingMinor?: number; dailyCapMinor?: number;
   /** #749: private Suspicion band (never the number); present only with HARIMU_GRAY_SUSPICION_ENABLED on, null at 0. */
   suspicion?: { line: string; privateTag: string; tooltip: string[] } | null;
+  /** #797: the latest checkpoint seizure notice (last game day); present only with HARIMU_GRAY_SEIZURE_ENABLED on, null when none. */
+  seizure?: string | null;
 };
-export type GrayResult = { status: number; error?: string; reason?: string; replayed?: boolean };
+export type GrayResult = { status: number; error?: string; reason?: string; replayed?: boolean; seizedMinor?: number; notice?: string };
 
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
 const openOffer = (alias: string) => `${alias}.expires_at>? AND NOT EXISTS(SELECT 1 FROM gray_trades t WHERE t.offer_id=${alias}.id)`;
@@ -77,7 +80,7 @@ const offerView = (r: OfferRow): GrayOfferView => ({ id: r.id, amountMinor: Numb
 
 /** The read model. Never writes: expired offers are simply not listed, and the starting grant is shown but not recorded until the first action. */
 export async function readGray(db: GameDatabase, userId: string, now: number, options: GrayOptions = {}): Promise<GrayView> {
-  const [grant, flows, mine, others, trades, used, suspicion] = await Promise.all([
+  const [grant, flows, mine, others, trades, used, suspicion, seizure] = await Promise.all([
     db.prepare('SELECT amount_minor FROM gray_cash_grants WHERE clerk_user_id=?').bind(userId).first<{ amount_minor: number }>(),
     db.prepare(`SELECT COALESCE((SELECT SUM(cash_minor) FROM gray_trades WHERE seller_id=?),0)-COALESCE((SELECT SUM(cash_minor) FROM gray_trades WHERE buyer_id=?),0) AS net`).bind(userId, userId).first<{ net: number }>(),
     db.prepare(`SELECT o.*, EXISTS(SELECT 1 FROM gray_trades t WHERE t.offer_id=o.id) AS traded FROM gray_offers o WHERE o.clerk_user_id=? ORDER BY o.created_at DESC, o.id DESC LIMIT 1`).bind(userId).first<OfferRow & { traded: number }>(),
@@ -85,6 +88,7 @@ export async function readGray(db: GameDatabase, userId: string, now: number, op
     db.prepare('SELECT offer_id, ask_rate, traded_at FROM gray_trades WHERE traded_at>=? ORDER BY traded_at DESC, offer_id DESC LIMIT ?').bind(now - GRAY_RUMOR_WINDOW_SECONDS, GRAY_RUMOR_TRADES).all<{ offer_id: string; ask_rate: number; traded_at: number }>(),
     options.dailyCap ? volume(db, userId, now) : Promise.resolve(0),
     options.suspicion ? readGraySuspicion(db, userId, now) : Promise.resolve(undefined),
+    options.seizure ? latestSeizureNotice(db, userId, now) : Promise.resolve(null),
   ]);
   const myStatus = mine ? (Number(mine.traded) ? 'accepted' : Number(mine.expires_at) > now ? 'open' : 'expired') as 'open' | 'accepted' | 'expired' : null;
   return {
@@ -95,6 +99,7 @@ export async function readGray(db: GameDatabase, userId: string, now: number, op
     offers: (others.results ?? []).map(offerView),
     limits: { amountCapMinor: GRAY_AMOUNT_CAP_MINOR, rateMin: GRAY_RATE_MIN, rateMax: GRAY_RATE_MAX, lifetimeSeconds: GRAY_OFFER_LIFETIME_SECONDS },
     ...(options.suspicion ? { suspicion } : {}),
+    ...(options.seizure ? { seizure } : {}),
     ...(options.dailyCap ? { dailyRemainingMinor: grayDailyRemaining(used), dailyCapMinor: GRAY_DAILY_VOLUME_CAP_MINOR } : {}),
   };
 }
@@ -183,5 +188,7 @@ export async function acceptOffer(db: GameDatabase, userId: string, offerId: str
     await db.prepare('DELETE FROM gray_trades WHERE offer_id=? AND request_id=?').bind(offerId, requestId).run();
     return { status: 409, reason: 'seller_short', error: 'The trade could not settle and was withdrawn.' };
   }
+  // #797: checkpoint roll on the bundle the buyer just received (only after the trade has settled). Flag off: no roll, no write.
+  if (options.seizure) { const seized = await rollSeizure(db, userId, offerId, Number(offer.amount_minor), now, options.seizureRng); if (seized > 0) return { status: 200, seizedMinor: seized, notice: seizureNotice(seized) }; }
   return { status: 200 };
 }
