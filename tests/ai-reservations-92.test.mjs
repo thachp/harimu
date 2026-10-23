@@ -61,7 +61,8 @@ test('#92 preview cleanup SQL releases only the unsent acceptance rows and is id
 });
 
 test('#92 a row marked sent before the gateway call never expires or gets released, even with no terminal update',async t=>{
- const r=await localRuntime();t.after(()=>r.close());const old=now-aiPendingExpirySeconds-10;
+ // #769: fixed midday clock so both times fall on one UTC day (a row only spills into the next day near 00:00Z).
+ const now=Date.parse('2026-10-22T12:00:00Z')/1000;const r=await localRuntime();t.after(()=>r.close());const old=now-aiPendingExpirySeconds-10;
  assert.equal(await reserveAiSequence(r.db,'sent-1',old,budget),true);assert.equal(await reserveAiSequence(r.db,'unsent-1',old,budget),true);
  await markAiReservationSent(r.db,'sent-1'); // Worker evicted mid binding.run: no catch/success update ever runs
  await expireStaleAiReservations(r.db,now);
