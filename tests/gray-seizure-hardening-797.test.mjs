@@ -18,7 +18,7 @@ async function seedTrade(r, amount, at) {
   await r.db.prepare('INSERT INTO gray_trades(offer_id,request_id,seller_id,buyer_id,amount_minor,cash_minor,ask_rate,traded_at) VALUES (?,?,?,?,?,?,?,?)').bind(id, randomUUID(), 'alice', 'bob', amount, amount, 100, at).run();
   return id;
 }
-const ln = async (r, user) => Number((await r.db.prepare(`SELECT ${(await r.importModule('lib/korund-wallet.ts')).laborNoteSql('?')} AS n`).bind(user, user, user, user, user).first()).n);
+const ln = async (r, user) => { const w = await r.importModule('lib/korund-wallet.ts'); return Number((await r.db.prepare(`SELECT ${w.laborNoteSql('?')} AS n`).bind(...w.laborNoteBinds(user)).first()).n); };
 const totalLn = async r => { let s = 0; for (const u of ['alice', 'bob']) s += await ln(r, u); return s; };
 
 test('cap: exactly half the bundle, at most exactly 10.00 LN', async t => {

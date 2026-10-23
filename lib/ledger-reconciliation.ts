@@ -43,6 +43,7 @@ const SPK: CurrencySpec = {
     UNION ALL SELECT o.citizen_id, t.qty * t.unit_minor FROM market_trades t JOIN market_orders o ON o.id = t.sell_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT o.citizen_id, -(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT seller_id, -fee_minor FROM market_trade_fees
+    UNION ALL SELECT clerk_user_id, -fee_minor FROM home_city_moves WHERE currency = 'SPK'
     UNION ALL SELECT citizen_id, -(remaining * limit_unit_minor) FROM market_open_orders WHERE side = 'buy' AND citizen_id IS NOT NULL`,
   appBalances: 'SELECT clerk_user_id AS acct, balance FROM citizen_wallet_balances',
   probes: [
@@ -55,6 +56,7 @@ const SPK: CurrencySpec = {
     ...integerAndSign('SPK', 'market_trades', 'id', 'unit_minor', true),
     ...integerAndSign('SPK', 'market_trades', 'id', 'qty', true),
     ...integerAndSign('SPK', 'market_trade_fees', 'trade_id', 'fee_minor', true), // #777 sink leg
+    ...integerAndSign('SPK', 'home_city_moves', 'request_id', 'fee_minor', true), // #781 move-fee sink leg
     { currency: 'SPK', check: 'fee_not_seller_or_over_gross', sql: 'SELECT f.trade_id AS acct FROM market_trade_fees f LEFT JOIN market_trades t ON t.id = f.trade_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE t.id IS NULL OR s.citizen_id IS NULL OR s.citizen_id <> f.seller_id OR f.fee_minor > t.qty * t.unit_minor' },
     // Transfers: the debit leg and the credit leg must agree with each other and with the counterpart's record.
     { currency: 'SPK', check: 'tax_over_gross', sql: 'SELECT clerk_user_id AS acct FROM shift_income_tax WHERE tax_minor > gross_minor' },
@@ -77,7 +79,8 @@ const LN: CurrencySpec = {
     UNION ALL SELECT clerk_user_id, -price_minor FROM korund_coupon_redemptions
     UNION ALL SELECT buyer_id, amount_minor FROM gray_trades
     UNION ALL SELECT seller_id, -amount_minor FROM gray_trades
-    UNION ALL SELECT clerk_user_id, -amount_minor FROM gray_seizures`, // #797 sink leg: destroyed, credited to no account
+    UNION ALL SELECT clerk_user_id, -amount_minor FROM gray_seizures
+    UNION ALL SELECT clerk_user_id, -fee_minor FROM home_city_moves WHERE currency = 'LN'`, // #781 move-fee sink leg; // #797 sink leg: destroyed, credited to no account
   appBalances: `SELECT c.clerk_user_id AS acct, ${laborNoteSql('c.clerk_user_id')} AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('LN', 'korund_settlements', 'clerk_user_id', 'wage_minor', true),
