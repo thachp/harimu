@@ -154,6 +154,8 @@
     "HARIMU_AI_REVIEW_QUEUE_ENABLED": "true",
     // #739: citizen dormancy slice 1 (docs §17.4): Away/Dormant/Archived status and the Welcome back briefing; flag off = no last_active_at read or write.
     "HARIMU_DORMANCY_ENABLED": "true",
+    // #789: read-only Kindle national budget card (docs §12.12): treasury balance and income-tax inflow from the ledger.
+    "HARIMU_KINDLE_BUDGET_VIEW_ENABLED": "true",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
     // Realtime presence spike (#76): server and client flags; both off until QA enables them.
     "HARIMU_REALTIME_PRESENCE": "false",
