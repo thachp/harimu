@@ -64,7 +64,12 @@ export async function checkUiV2Mobile({ browser, css, preflight, failures, rows 
       for (const view of ['square', 'country', 'world']) for (const dock of [false, true]) {
         const id = `${w}x${h} @${scale * 100}% S8 ${view}${dock ? ' signed in' : ''} (flag ${on ? 'on' : 'off'})`, key = `${w}x${h}@${scale}/${view}/${dock}`;
         await page.evaluate(([p, d]) => window.mount(p, d), [{ ...shellProps, view }, dock]); await page.waitForSelector('.game-nav-row', { state: 'attached', timeout: 5000 }).catch(() => {}); await page.waitForTimeout(200);
-        const r = await page.evaluate(probe, { on, phone, view, scale }), issues = [...r.issues, ...(on && phone ? await page.evaluate(atEnd) : [])];
+        if (phone) await page.waitForFunction(() => { const c = document.querySelector('.game-stage .viewport-canvas, .game-stage'); const h = Math.round(c?.getBoundingClientRect().height ?? 0); const same = h === window.__lastH; window.__lastH = h; return same; }, null, { polling: 100, timeout: 5000 }).catch(() => {}); // the canvas size has settled (deterministic shots)
+        const late = on && phone && view === 'square' && !dock ? await page.evaluate(async () => { // a dock that mounts after the shell (signing in on City) is measured too
+          const main = document.querySelector('.harimu-game'), d = document.createElement('nav'); d.className = 'citizen-dock'; d.style.height = '45px'; main.appendChild(d);
+          await new Promise(r => setTimeout(r, 120)); const v = main.style.getPropertyValue('--s8-dock'); d.remove(); await new Promise(r => setTimeout(r, 120));
+          return v === '45px' && main.style.getPropertyValue('--s8-dock') === '0px' ? '' : `late dock not measured (--s8-dock ${v})`; }) : '';
+        const r = await page.evaluate(probe, { on, phone, view, scale }), issues = [...(late ? [late] : []), ...r.issues, ...(on && phone ? await page.evaluate(atEnd) : [])];
         if (!on) base[key] = r; else if (base[key]) {
           if (base[key].names && r.names && base[key].names.join() !== r.names.join()) issues.push(`controls changed: ${r.names.join()} vs ${base[key].names.join()}`);
           if (!phone && JSON.stringify(base[key].rects) !== JSON.stringify(r.rects)) issues.push('desktop layout changed with the flag on');
