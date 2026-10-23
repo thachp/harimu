@@ -84,6 +84,7 @@ export const withholdIncomeTaxSql = `INSERT OR IGNORE INTO shift_income_tax
 export const kindleTreasuryBalanceSql = `SELECT COALESCE((SELECT initial_minor FROM economy_funds WHERE id = 'kindle-treasury'), 0)
   + COALESCE((SELECT SUM(tax_minor) FROM shift_income_tax), 0)
   + COALESCE((SELECT SUM(tax_minor) FROM market_sales_tax), 0)
+  + COALESCE((SELECT SUM(tax_minor) FROM player_fill_sales_tax), 0)
   - COALESCE((SELECT SUM(credit_minor) FROM savings_shield_credits WHERE status = 'paid'), 0) AS balance`; // #824 welfare line: Savings Shield credits; #844 market sales tax inflow
 export const settledContributionSql = `INSERT INTO work_contributions
   (clerk_user_id, work_order_id, capacity_spent, created_at)

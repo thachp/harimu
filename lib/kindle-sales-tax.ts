@@ -13,3 +13,13 @@ export const kindleSalesTaxSql = `INSERT OR IGNORE INTO market_sales_tax (trade_
   SELECT t.id, s.citizen_id, (t.qty * t.unit_minor * ${kindleSalesTaxBps}) / 10000, t.filled_at FROM market_trades t JOIN market_orders s ON s.id = t.sell_order_id
   JOIN citizens c ON c.clerk_user_id = s.citizen_id AND c.nation_id = 'kindle'
   WHERE t.id = ? AND (t.qty * t.unit_minor * ${kindleSalesTaxBps}) / 10000 > 0`;
+
+/** #844 follow-up (ARC on #845): fixed-lot listing sales are taxed the same way: seller-paid from the proceeds, Kindle seller, same rate and flag.
+ *  Bind (requestId). Nothing when the fill did not land or the tax rounds to 0; idempotent per fill. Table: player_fill_sales_tax (lib/market-orders.ts). */
+export const playerFillSalesTaxSql = `INSERT OR IGNORE INTO player_fill_sales_tax (request_id, seller_id, tax_minor, charged_at)
+  SELECT f.request_id, f.seller_id, (f.amount_minor * ${kindleSalesTaxBps}) / 10000, f.filled_at FROM player_fills f
+  JOIN citizens c ON c.clerk_user_id = f.seller_id AND c.nation_id = 'kindle'
+  WHERE f.request_id = ? AND (f.amount_minor * ${kindleSalesTaxBps}) / 10000 > 0`;
+/** Bind (since, since): sales tax charged since a unix time, both markets, for the budget card's "Sales tax today" line. */
+export const kindleSalesTaxSinceSql = `SELECT COALESCE((SELECT SUM(tax_minor) FROM market_sales_tax WHERE charged_at >= ?), 0)
+  + COALESCE((SELECT SUM(tax_minor) FROM player_fill_sales_tax WHERE charged_at >= ?), 0) AS total`;

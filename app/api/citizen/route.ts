@@ -13,6 +13,7 @@ import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
+import { kindleSalesTaxEnabled, playerFillSalesTaxSql } from '@/lib/kindle-sales-tax'; // #844 follow-up
 import { executePlayerCommand, validPlayerCommand, readPlayerMarket } from '@/lib/player-market';
 import { executeMarketCommand, validMarketCommand, readMarket } from '@/lib/market';
 import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, type QualityInput } from '@/lib/shift-quality';
@@ -366,7 +367,7 @@ async function handlePost(request: Request) {
   if (body.action === 'create-listing' || body.action === 'buy-listing' || body.action === 'cancel-listing') {
     if (!validPlayerCommand(body)) return privateJson({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: typeof body.listingId === 'string' ? body.listingId.toLowerCase() : undefined };
-    const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000));
+    const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), kindleSalesTaxEnabled(env as never) ? { salesTaxSql: playerFillSalesTaxSql } : {}); // #844 follow-up
     return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),
       playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
   }
