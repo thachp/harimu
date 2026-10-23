@@ -1,0 +1,2 @@
+-- Issue #831: Kindle platform plank up-votes (docs 9.4). One row per member, party and pledge; counted only while the voter is still a member of that party. Flag HARIMU_PLANK_VOTES_ENABLED (off in production). Additive only.
+CREATE TABLE IF NOT EXISTS party_plank_votes (clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, party_id TEXT NOT NULL, pledge_key TEXT NOT NULL, voted_at INTEGER NOT NULL, PRIMARY KEY (clerk_user_id, party_id, pledge_key));

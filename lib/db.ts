@@ -44,6 +44,7 @@ import { warEndingsSchemas } from './war-endings'; // #427 slice 2
 import { aiReviewQueueSchemas } from './ai-review-queue'; // #753
 import { homeCityMoveSchemas } from './home-move'; // #781
 import { pollingSchemas } from './polling'; // #740
+import { plankVoteSchemas } from './plank-votes'; // #831
 import { armySchemas } from './army'; // #738
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
@@ -247,6 +248,7 @@ async function initialize(database: GameDatabase) {
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...aiReviewQueueSchemas.map(sql=>database.prepare(sql)), // #753
     ...pollingSchemas.map(sql=>database.prepare(sql)), // #740
+    ...plankVoteSchemas.map(sql=>database.prepare(sql)), // #831
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),

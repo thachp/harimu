@@ -64,6 +64,7 @@ const flagOffPins = {
   HARIMU_ARMIES_ENABLED: 'army-units-738.test.mjs',
   HARIMU_I_VOTED_BADGE_ENABLED: 'i-voted-782.test.mjs',
   HARIMU_KINDLE_POLLING_ENABLED: 'kindle-polling-740.test.mjs',
+  HARIMU_PLANK_VOTES_ENABLED: 'plank-votes-831.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
