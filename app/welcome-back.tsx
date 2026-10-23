@@ -3,7 +3,9 @@
  *  Copy from lib/dormancy-copy.ts (#608). A nation without its own frame gets the neutral generic frame (ARC). The {headlineCount} news line stays hidden. */
 import { WELCOME_BACK_TITLE, welcomeBackFor, welcomeBackGeneric, dormancyStatusFor, DORMANCY_NAME_MAX, type DormancyNation } from '@/lib/dormancy-copy';
 
-export type WelcomeBackData = { status: 'away' | 'dormant' | 'archived'; since: string };
+export type WelcomeBackData = { status: 'away' | 'dormant' | 'archived'; since: string; shield?: { creditMinor: number } };
+/** #824: the Savings Shield line, present only when a credit was paid. */
+export const shieldLine = (creditMinor: number) => `Savings Shield: +${(creditMinor / 100).toFixed(2)} SPK from the national treasury, covering half of the price rise on your savings while you were away.`;
 
 /** POST /api/citizen/heartbeat once per load. Flag off (404), signed out or any failure: no briefing. */
 export async function sendHeartbeat(signal?: AbortSignal): Promise<WelcomeBackData | null> {
@@ -24,6 +26,7 @@ export function WelcomeBack({ nationId, data, now, onClose }: { nationId: string
     <strong>{WELCOME_BACK_TITLE}</strong>{' '}
     <span>{frame.greeting.text.replace('{daysAway}', daysAwayText(data.since, now))}</span>
     {status && <span> {status.label}: {status.paused.at(-1)?.text}</span>}{' '}
+    {data.shield && data.shield.creditMinor > 0 && <span className="welcome-back-shield">{shieldLine(data.shield.creditMinor)}</span>}{' '}
     <button type="button" onClick={onClose}>Dismiss</button>
   </section>;
 }

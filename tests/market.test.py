@@ -23,7 +23,7 @@ class MarketTests(unittest.TestCase):
           INSERT INTO citizens VALUES ('alice','kindle',18,''),('bob','kindle',18,''),('carl','korund',18,''),('visitor',NULL,18,'');
           INSERT INTO work_orders VALUES ('harvest');''')
         for name in ['worldClockSchema','worldTickSchema','worldSupplySchema','policyExecutionSchema','shiftSchema','activeShiftIndex','economySchema','recoverySchema','rewardSchema','fundSchema','incomeTaxSchema','tesseraExchangeSchema',
-                     'marketItemsSchema','starterSchema','marketEventsSchema','listingSchema','fillSchema','cancelSchema','playerReceiptView','openLotsView','marketGoodsSchema','marketOrdersSchema','marketCancellationsSchema','marketTradesSchema','marketSpoilageSchema','marketOpenOrdersView','marketTradeFeesSchema','marketTradeFeesIndex','homeCityMovesSchema','walletViewSql','inventoryViewSql','merchantViewSql','merchantCashSql']:
+                     'marketItemsSchema','starterSchema','marketEventsSchema','listingSchema','fillSchema','cancelSchema','playerReceiptView','openLotsView','marketGoodsSchema','marketOrdersSchema','marketCancellationsSchema','marketTradesSchema','marketSpoilageSchema','marketOpenOrdersView','marketTradeFeesSchema','marketTradeFeesIndex','homeCityMovesSchema','savingsShieldCreditsSchema','walletViewSql','inventoryViewSql','merchantViewSql','merchantCashSql']:
             self.db.execute(sql(name))
         self.db.execute("INSERT INTO economy_funds VALUES ('kindle-merchant',10000)")
         self.db.execute("INSERT INTO market_items VALUES ('food','Food',150,100,100)")
