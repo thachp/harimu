@@ -20,12 +20,13 @@ export function institutionSystems(nation: InspectedNation) {
     { id: 'works', label: 'Public works', title: 'Production and reserves', detail: `${nation.economy}. ${nation.id === 'kindle' ? 'Paid contribution shifts produce recorded output and agreed citizen rewards.' : nation.id === 'korund' ? 'Assigned food-production shifts pay Labor Notes and replenish the finite state ration pool.' : nation.id === 'aurelle' ? 'Chartered service pays Crowns and earns bounded Favor; food is sold from finite estate stock.' : 'This nation’s work and production ledger is planned.'}` },
   ];
 }
-/** #811: the Treasury row shows only a published ledger figure: Kindle's balance from GET /api/kindle/budget (#806). Every other case is "Not published", never a made-up number. */
-export const treasuryLabel = (nationId: string, treasuryMinor: number | null | undefined) =>
-  nationId === 'kindle' && typeof treasuryMinor === 'number' && Number.isSafeInteger(treasuryMinor) ? `${(treasuryMinor / 100).toFixed(2)} SPK (ledger)` : 'Not published';
-export function NationInstitutions({ incomeTaxPercent = 0, treasuryMinor = null, nation, citizenNation, capacity, workOrders, workPending,
+/** #811: with HARIMU_KINDLE_BUDGET_VIEW_ENABLED on (`published`), the Treasury row shows only a ledger figure: Kindle's balance from GET /api/kindle/budget (#806), else
+ *  "Not published", never a made-up number. Flag off: exactly the previous row (the nation's example treasury string). */
+export const treasuryLabel = (nation: { id: string; treasury: string }, published: boolean, treasuryMinor: number | null | undefined) => !published ? nation.treasury
+  : nation.id === 'kindle' && typeof treasuryMinor === 'number' && Number.isSafeInteger(treasuryMinor) ? `${(treasuryMinor / 100).toFixed(2)} SPK (ledger)` : 'Not published';
+export function NationInstitutions({ incomeTaxPercent = 0, treasuryPublished = false, treasuryMinor = null, nation, citizenNation, capacity, workOrders, workPending,
   onWorldView, onHousehold, onWorkplace, onCommitWork, systemId, systemPicker = true }: {
-  incomeTaxPercent?: number; treasuryMinor?: number | null; nation: InspectedNation; nations?: InspectedNation[]; citizenNation?: InspectedNation; capacity: number;
+  incomeTaxPercent?: number; treasuryPublished?: boolean; treasuryMinor?: number | null; nation: InspectedNation; nations?: InspectedNation[]; citizenNation?: InspectedNation; capacity: number;
   workOrders: InstitutionWork[]; workPending: boolean; onSelectNation?: (id: string) => void;
   onWorldView: () => void; onHousehold: () => void; onWorkplace: () => void;
   onCommitWork: (order: InstitutionWork) => void | Promise<void>;
@@ -40,7 +41,7 @@ export function NationInstitutions({ incomeTaxPercent = 0, treasuryMinor = null,
   return <section className="nation-inspector" aria-label={`${nation.name} institutions`}>
     <dl><dt>Government</dt><dd>{nation.government}</dd><dt>Economy</dt><dd>{nation.economy}</dd><dt>Official faith stance</dt><dd>{nation.religion}</dd></dl>
     <details><summary>Example nation profile</summary><p>Illustrative starting figures, not measured live conditions.</p>
-      <dl><dt>Population</dt><dd>{nation.population}</dd><dt>Treasury</dt><dd>{treasuryLabel(nation.id, treasuryMinor)}</dd><dt>Stability</dt><dd>{nation.stability} / 100</dd></dl>
+      <dl><dt>Population</dt><dd>{nation.population}</dd><dt>Treasury</dt><dd>{treasuryLabel(nation, treasuryPublished, treasuryMinor)}</dd><dt>Stability</dt><dd>{nation.stability} / 100</dd></dl>
     </details>
     {systemPicker && <div className="nation-inspector-systems" role="group" aria-label="Institution systems">
       {systems.map(item => <button key={item.id} type="button" aria-pressed={item.id === system.id} onClick={() => setSelectedSystemId(item.id)}>{item.label}</button>)}

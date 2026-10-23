@@ -469,7 +469,7 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
-  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; civicRank?: boolean };
+  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; civicRank?: boolean; kindleBudget?: boolean };
   civicRank?: CivicRank;
   firstWeek?: { completed: string[] } | null;
   profile: {
@@ -654,6 +654,7 @@ export default function Home() {
   const [hallFlag, setHallFlag] = useState(false); // #599
   const [overlaysFlag, setOverlaysFlag] = useState(false); // #82
   const [civicRank, setCivicRank] = useState<CivicRank | null>(null); // #741
+  const [budgetFlag, setBudgetFlag] = useState(false); // #811: HARIMU_KINDLE_BUDGET_VIEW_ENABLED, from the citizen snapshot
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -883,7 +884,7 @@ export default function Home() {
     [locationSearch, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
-  const kindleBudget = useKindleBudget(clerkConfigured && citizenNation?.id === 'kindle'); // #811: ledger treasury for the card and the Nation panel
+  const kindleBudget = useKindleBudget(clerkConfigured && budgetFlag && citizenNation?.id === 'kindle'); // #811: ledger treasury for the card and the Nation panel
   const identityHoldNow = identityHold(locationSearch, fallbackNationIds, sessionLoading, Boolean(citizenNation), signedHint, holdExpired);
   const weekStoreKey = citizenNationId && citizenshipStatus?.enrolledAt ? `${citizenNationId}:${citizenshipStatus.enrolledAt}` : '';
   // Load progress when the citizen key changes (adjust-state-during-render). Signed-in citizens use server progress (#135); the local demo keeps the browser stub.
@@ -1340,7 +1341,7 @@ export default function Home() {
     if ('election' in snapshot)setElection(snapshot.election??null);
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
-    if (snapshot.flags) { setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle
+    if (snapshot.flags) { setBudgetFlag(snapshot.flags.kindleBudget === true); setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
@@ -1831,7 +1832,7 @@ export default function Home() {
 
     {(!clerkConfigured || !citizenNationId) && <SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
-    <NationPanel onNationMap={() => changeView('country')} treasuryMinor={kindleBudget?.treasuryMinor ?? null} incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
+    <NationPanel onNationMap={() => changeView('country')} treasuryPublished={budgetFlag} treasuryMinor={kindleBudget?.treasuryMinor ?? null} incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
