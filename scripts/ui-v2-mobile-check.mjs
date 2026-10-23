@@ -16,7 +16,7 @@ const entry = `
   const nation = { id: 'kindle', name: 'Kindle Republic', capital: 'Forgehaven', currency: 'Spark', color: '#c7643a' };
   window.mount = (props, dock) => { window.__root?.unmount(); window.__root = createRoot(document.getElementById('root')); const city = props.view === 'square';
     window.__root.render(<GameShell {...props} nation={nation} citizenNation={nation} nations={[nation]} onNavigate={() => {}} onSelectNation={() => {}} onSelect={() => {}} accountControls={null}
-      socialDock={dock ? <nav className="citizen-dock" aria-label="Citizen communications"><button type="button">Chat</button><button type="button">News</button></nav> : null}
+      socialDock={dock ? <nav className="citizen-dock" aria-label="Citizen communications"><button type="button">Chat</button><button type="button">Diplomatic hall</button><button type="button">News</button><button type="button">Civic inbox<strong> · 1 unread</strong></button></nav> : null}
       contextTitle={city ? 'City destinations' : undefined} contextItems={city ? cityDestinations('kindle', true).map(c => ({ ...c, onSelect: () => {} })) : undefined}
       panel={<CitySummary cityName="Forgehaven" city={{ capital: true }} nation={nation} destinations={cityDestinations('kindle', true)} onView={() => {}} />} />); };`;
 
@@ -44,6 +44,9 @@ const probe = ({ on, phone, view, scale }) => {
     if (row.scrollWidth > row.clientWidth + 1) issues.push('tab bar scrolls sideways');
     for (const b of controls) { const r = b.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       if (r.height < 43.5) issues.push(`"${b.textContent.trim()}" is ${Math.round(r.height)}px tall`); if (t && !b.contains(t)) issues.push(`"${b.textContent.trim()}" is covered`); }
+    for (const b of document.querySelectorAll('.citizen-dock>button')) { const r = b.getBoundingClientRect(); // #838: dock labels wrap, never clip; the dock is never under the tab bar
+      if (b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1) issues.push(`dock "${b.textContent.trim()}" is truncated`); if (r.height < 43.5) issues.push(`dock "${b.textContent.trim()}" is ${Math.round(r.height)}px tall`);
+      const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (t && !b.contains(t)) issues.push(`dock "${b.textContent.trim()}" is covered`); }
     const p = q('.game-inspector'); if (p && parseFloat(getComputedStyle(p).borderTopLeftRadius) < 8) issues.push('panel is not a sheet');
   } else if (phone && rects.stage && rects.nav.t > rects.stage.t) issues.push('flag off: nav row is not above the scene');
   return { issues, names, rects };
