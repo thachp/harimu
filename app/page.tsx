@@ -46,7 +46,7 @@ import type {ElectionSnapshot} from '../lib/elections';
 import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
-import { householdWalletMinor } from '@/lib/ui-v2-household';
+import { householdStock, householdWalletMinor } from '@/lib/ui-v2-household';
 import { SceneNews } from './world-scene';
 import { noticeboardEvents } from '@/lib/noticeboard'; // #375
 import { firstLoopStep } from '@/lib/first-loop';
@@ -1704,7 +1704,7 @@ export default function Home() {
       {nationPlanPanelNation(citizenNation.id, viewMode) && dailyLoop}
       {(viewMode === 'household' || viewMode === 'workplace') && <HolidayBanner faith={faithApi.faith} busy={faithApi.busy} onJoin={faithApi.joinFestival} />}
       {viewMode === 'household' && <>
-        <HouseholdSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor, aurellePlan?.walletMinor, korundPlan?.walletMinor)} inventory={economy?.inventory} residence={(currentCityAccount?.homeCityId ? cityForNation(citizenNation.id, currentCityAccount.homeCityId) : capitalCityForNation(citizenNation.id))?.name} />
+        <HouseholdSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor, aurellePlan?.walletMinor, korundPlan?.walletMinor)} {...householdStock(citizenNation.id, economy?.inventory, aurellePlan?.foodQuantity, korundPlan?.foodQuantity)} residence={(currentCityAccount?.homeCityId ? cityForNation(citizenNation.id, currentCityAccount.homeCityId) : capitalCityForNation(citizenNation.id))?.name} />
         <FaithPanel api={faithApi} />
         {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
