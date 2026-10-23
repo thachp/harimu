@@ -4,7 +4,7 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { armiesEnabled, armyDrillsEnabled, parseArmyCommand } from '@/lib/army-rules';
 import { readArmy, runArmyCommand } from '@/lib/army';
-import { runDraft, serviceUntil } from '@/lib/army-conscription';
+import { serviceUntil } from '@/lib/army-conscription';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -16,9 +16,7 @@ export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   const db = await getDatabase(), now = Math.floor(Date.now() / 1000);
-  // #738 slice 3 (ARC: behind the army flags): reading the card runs this game week's Korund lottery or Aurelle levy once, lazily (no cron).
-  const nation = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>();
-  if (nation?.nation_id) await runDraft(db, nation.nation_id, now);
+  // ARC on #839: GET never writes; the draft and term-end release run on POST /api/army/draft (the card's open action).
   const until = await serviceUntil(db, userId, now);
   return privateJson({ army: { ...await readArmy(db, userId, now, armyDrillsEnabled(env)), ...(until ? { serveUntil: until } : {}) } });
 }
