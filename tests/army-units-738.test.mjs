@@ -40,7 +40,7 @@ for (const backend of ['sqlite', 'postgres']) {
     const r = await localRuntime({ backend }); t.after(() => r.close());
     await r.call('citizen', 'alice'); await r.call('citizen', 'bob');
     const at = new Date(r.now).toISOString(); // the fixture seeds only alice and bob (Kindle)
-    for (const [id, nation] of [['kim', 'korund'], ['cam', 'confluence']]) await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,?,?,18,0,'Good standing',?,?)").bind(id, nation, id, at, at).run();
+    for (const [id, nation] of [['kim', 'korund'], ['ava', 'aurelle'], ['cam', 'confluence']]) await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,?,?,18,0,'Good standing',?,?)").bind(id, nation, id, at, at).run();
     r.setFixtureEnv('HARIMU_ARMIES_ENABLED', 'true'); r.setFixtureEnv('HARIMU_WAR_ENABLED', 'true');
     const post = (u, body) => r.call('army', u, { requestId: rid(), ...body });
     assert.equal((await r.call('army', null)).status, 401); assert.equal((await post(null, { action: 'leave' })).status, 401);
@@ -62,9 +62,12 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await r.call('army', 'bob', { action: 'join', unitId: 'kindle-home-guard', requestId: joinId })).status, 409, 'same id, other citizen');
     assert.deepEqual([await rows(r, 'army_members'), await rows(r, 'army_requests')], before, 'replays wrote nothing');
     assert.equal((await post('bob', { action: 'join', unitId: 'kindle-home-guard' })).data.army.unit.memberCount, 2);
-    assert.equal((await post('kim', { action: 'join', unitId: 'korund-home-guard' })).data.army.unit.memberCount, 1, 'counts are per unit');
-    assert.equal((await post('kim', { action: 'join', unitId: 'kindle-home-guard' })).status, 403, 'korund citizen, kindle unit');
-    assert.equal((await post('kim', { action: 'join', unitId: 'korund-home-guard' })).data.reason, 'already_member');
+    // ARC on #793: only Kindle takes volunteers; Korund and Aurelle answer 403 not_open_yet until slice 3 (conscription), and write nothing.
+    const before2 = [await rows(r, 'army_members'), await rows(r, 'army_requests')];
+    for (const [u, unitId] of [['kim', 'korund-home-guard'], ['ava', 'aurelle-home-guard']]) { const x = await post(u, { action: 'join', unitId }); assert.deepEqual([x.status, x.data.reason], [403, 'not_open_yet'], u); }
+    assert.deepEqual([await rows(r, 'army_members'), await rows(r, 'army_requests')], before2, 'not_open_yet writes nothing');
+    assert.equal((await post('kim', { action: 'join', unitId: 'kindle-home-guard' })).data.reason, 'not_eligible', 'korund citizen, kindle unit');
+    assert.deepEqual([(await r.call('army', 'kim')).data.army.unit.id, (await r.call('army', 'kim')).data.army.unit.memberCount], ['korund-home-guard', 0], 'counts are per unit');
     const stanceId = rid();
     assert.equal((await r.call('army', 'alice', { action: 'stance', stance: 'advance', requestId: stanceId })).data.army.stance, 'advance');
     assert.equal((await r.call('army', 'alice', { action: 'stance', stance: 'fall_back', requestId: stanceId })).data.army.stance, 'advance', 'stance replay returns the stored state');
@@ -73,7 +76,7 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.ok(!/alice|kim/.test(JSON.stringify((await r.call('army', 'bob')).data)), 'only a count, never identities');
     const left = await post('alice', { action: 'leave' }); assert.deepEqual([left.data.army.member, left.data.army.stance, left.data.army.unit.memberCount], [false, null, 1]);
     assert.equal((await r.call('army', 'bob')).data.army.member, true, 'leave removes only the caller');
-    assert.equal((await r.call('army', 'kim')).data.army.unit.memberCount, 1);
+    assert.equal((await r.call('army', 'kim')).data.army.unit.memberCount, 0);
     assert.equal((await post('alice', { action: 'leave' })).data.reason, 'not_member');
     assert.equal((await post('alice', { action: 'join', unitId: 'kindle-home-guard' })).data.army.member, true, 'can rejoin after leaving');
   });

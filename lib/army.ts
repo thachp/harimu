@@ -1,6 +1,6 @@
 /** #738 slice 1: army membership reads and commands. Migration 0069 (drizzle/ + db/postgres/) mirrors armySchemas. */
 import type { GameDatabase } from './database-contract';
-import { defaultStance, unitById, unitForNation, type ArmyCommand } from './army-rules';
+import { volunteerNations, defaultStance, unitById, unitForNation, type ArmyCommand } from './army-rules';
 export const armySchemas = [
   `CREATE TABLE IF NOT EXISTS army_members (clerk_user_id TEXT PRIMARY KEY REFERENCES citizens(clerk_user_id), unit_id TEXT NOT NULL, stance TEXT NOT NULL CHECK(stance IN ('hold','advance','fall_back')), joined_at INTEGER NOT NULL, request_id TEXT NOT NULL UNIQUE)`,
   'CREATE INDEX IF NOT EXISTS idx_army_members_unit ON army_members(unit_id)',
@@ -26,6 +26,7 @@ export async function runArmyCommand(db: GameDatabase, userId: string, cmd: Army
   if (cmd.action === 'join') {
     const unit = unitById(cmd.unitId);
     if (!unit || unit.nationId !== me?.nation_id) return { ok: false, status: 403, error: 'You can only join your own nation\u2019s unit.', reason: 'not_eligible' };
+    if (!volunteerNations.includes(unit.nationId)) return { ok: false, status: 403, error: 'This unit does not take volunteers yet.', reason: 'not_open_yet' };
     if (me.unit_id) return { ok: false, status: 409, error: 'You are already in a unit.', reason: 'already_member' };
     write = db.prepare('INSERT INTO army_members (clerk_user_id, unit_id, stance, joined_at, request_id) VALUES (?,?,?,?,?)').bind(userId, unit.id, defaultStance, nowSec, cmd.requestId);
   } else {

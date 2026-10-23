@@ -8,6 +8,8 @@ export const armyUnits: readonly ArmyUnit[] = [
   { id: 'korund-home-guard', nationId: 'korund', name: 'Korund Home Brigade', officer: 'Colonel Veshko' },
   { id: 'aurelle-home-guard', nationId: 'aurelle', name: 'Aurelle Home Company', officer: 'Captain Lisandre' },
 ];
+/** ARC ruling on #793 (docs §11.3): only Kindle recruits volunteers. Korund (conscription lottery) and Aurelle (levies) open in slice 3. */
+export const volunteerNations: readonly ArmyNation[] = ['kindle'];
 export const armyStances: readonly Stance[] = ['hold', 'advance', 'fall_back'];
 /** [ASSUMPTION] A new member starts on Hold. */
 export const defaultStance: Stance = 'hold';
