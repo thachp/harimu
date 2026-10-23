@@ -56,6 +56,15 @@ export const stabilityBaseline = 50, unrestBaseline = 10;
 /** #291 [ASSUMPTION]: docs 14.4 says an endorsed festival gives "Stability +" but no size. Tuning value: +3 Stability on that game day only. */
 export const festivalHolidayStabilityPoints = 3;
 
+/** #842 (ARC rulings Oct 23): Religious Harmony → Stability mapping, as named config constants (no runtime import: this file loads directly in tests). */
+export const HARMONY_STABILITY_NEUTRAL = 50;          // the Harmony score that adds nothing
+export const HARMONY_STABILITY_POINTS_PER_STEP = 1;
+export const HARMONY_STABILITY_STEP = 10;             // Harmony points per Stability step
+export const HARMONY_STABILITY_CAP = 5;               // at most ± this many Stability points
+export function harmonyStabilityPoints(score: number) {
+ const p = Math.trunc((score-HARMONY_STABILITY_NEUTRAL)/HARMONY_STABILITY_STEP)*HARMONY_STABILITY_POINTS_PER_STEP;
+ return Math.max(-HARMONY_STABILITY_CAP, Math.min(HARMONY_STABILITY_CAP, p)) || 0; // no -0
+}
 /** Pure scoring. Same inputs always give the same score. */
 export function computeStability(raw: Partial<StabilityInputs>): StabilityScore {
  const i = {citizens: count(raw.citizens), fed: count(raw.fed), worked: count(raw.worked), promisesKept: count(raw.promisesKept), promisesBroken: count(raw.promisesBroken), petitionBacklog: count(raw.petitionBacklog)};
@@ -75,9 +84,9 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
   {input:'food',points:food.stability,detail:foodDetail},{input:'work',points:work.stability,detail:workDetail},
   {input:'promises',points:promise.stability,detail:promiseDetail},{input:'petitions',points:petitions.stability,detail:petitionDetail},
   ...(holiday?[{input:'festival' as const,points:festivalHolidayStabilityPoints,detail:'Endorsed festival: public holiday'}]:[])];
- // #842 [ASSUMPTION]: Harmony adds ±1 Stability per 10 points from 50 (capped ±5, lib/religious-harmony.ts), fitted so the score stays 0–100 and the breakdown still sums exactly.
+ // #842 (ARC rulings Oct 23): Harmony adds harmonyStabilityPoints, fitted so the score stays 0–100 and the breakdown still sums exactly.
  if (raw.harmony !== undefined) { const h = Math.max(0, Math.min(100, Math.round(Number(raw.harmony) || 0))), base = stability.reduce((t, x) => t+x.points, 0);
-  const pts = Math.max(-base, Math.min(100-base, Math.max(-5, Math.min(5, Math.trunc((h-50)/10)))));
+  const pts = Math.max(-base, Math.min(100-base, harmonyStabilityPoints(h)));
   stability.push({input:'harmony',points:pts,detail:`Religious Harmony ${h}/100`}); }
  const unrest: ScoreTerm[] = [
   {input:'baseline',points:unrestBaseline,detail:'Baseline'},

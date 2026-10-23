@@ -3,12 +3,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { religiousHarmony, harmonyStabilityPoints, harmonyBand, harmonyLine, harmonyEnabled, harmonyWeights } from '../lib/religious-harmony.ts';
-import { computeStability } from '../lib/stability.ts';
+import * as H from '../lib/religious-harmony.ts';
+import { religiousHarmony, harmonyBand, harmonyLine, harmonyEnabled } from '../lib/religious-harmony.ts';
+import { computeStability, harmonyStabilityPoints, HARMONY_STABILITY_NEUTRAL, HARMONY_STABILITY_STEP, HARMONY_STABILITY_CAP, HARMONY_STABILITY_POINTS_PER_STEP } from '../lib/stability.ts';
+import { readFileSync } from 'node:fs';
 
 const sum = terms => terms.reduce((t, x) => t + x.points, 0);
 test('pure: baseline 50; a festival raises it; raids and bans lower it; clamped at 0 and 100; capped terms', () => {
-  assert.equal(religiousHarmony('kindle', {}), 50); assert.equal(harmonyWeights.baseline, 50);
+  assert.equal(religiousHarmony('kindle', {}), 50); assert.equal(H.HARMONY_BASELINE, 50);
   assert.equal(religiousHarmony('aurelle', { festivalHoliday: 1 }), 60); assert.equal(religiousHarmony('kindle', { festivalJoins: 3 }), 56);
   assert.equal(religiousHarmony('kindle', { festivalJoins: 99 }), 70, 'join term capped at 20');
   assert.equal(religiousHarmony('korund', { raids: 1 }), 40); assert.equal(religiousHarmony('korund', { bannedFestivalJoins: 2 }), 44); assert.equal(religiousHarmony('korund', { raidHits: 5 }), 45);
@@ -20,6 +22,20 @@ test('pure: baseline 50; a festival raises it; raids and bans lower it; clamped 
   assert.deepEqual([34, 35, 49, 50, 64, 65].map(harmonyBand), ['strained', 'uneasy', 'uneasy', 'calm', 'calm', 'harmonious']);
   assert.equal(harmonyLine('korund', 40), 'Religious Harmony: Uneasy', 'Korund: band only, never the number'); assert.equal(harmonyLine('kindle', 72), 'Religious Harmony: Harmonious (72/100)');
   assert.equal(harmonyEnabled({ HARIMU_RELIGIOUS_HARMONY_ENABLED: 'true' }), true); for (const e of [{}, null, { HARIMU_RELIGIOUS_HARMONY_ENABLED: 'TRUE' }]) assert.equal(harmonyEnabled(e), false);
+});
+
+test('ARC (Oct 23): every number is a named exported constant with the approved value; no inline literals in the scoring', () => {
+  assert.deepEqual([H.HARMONY_MIN, H.HARMONY_MAX, H.HARMONY_BASELINE, H.HARMONY_WINDOW_SECONDS, H.HARMONY_HOLIDAY_POINTS, H.HARMONY_POINTS_PER_JOIN, H.HARMONY_JOIN_CAP, H.HARMONY_POINTS_PER_BANNED_JOIN, H.HARMONY_BANNED_CAP, H.HARMONY_POINTS_PER_RAID, H.HARMONY_RAID_CAP, H.HARMONY_POINTS_PER_HIT, H.HARMONY_HIT_CAP],
+    [0, 100, 50, 604800, 10, 2, 20, 3, 30, 10, 30, 1, 20]);
+  assert.deepEqual([H.HARMONY_BAND_UNEASY_FROM, H.HARMONY_BAND_CALM_FROM, H.HARMONY_BAND_HARMONIOUS_FROM], [35, 50, 65]);
+  assert.deepEqual([HARMONY_STABILITY_NEUTRAL, HARMONY_STABILITY_STEP, HARMONY_STABILITY_CAP, HARMONY_STABILITY_POINTS_PER_STEP], [50, 10, 5, 1]);
+  const src = readFileSync('lib/religious-harmony.ts', 'utf8');
+  const fnBody = (text, head) => text.slice(text.indexOf(head)).split('\n}')[0].split(/\n(?=export )/)[0];
+  const tuning = /[^\w.]([2-9]|\d{2,})\b/; // 0 and 1 are flag/identity values; every tuning number is a named constant
+  for (const head of ['export function religiousHarmony', 'export const harmonyBand =']) assert.doesNotMatch(fnBody(src, head), tuning, head);
+  const stab = readFileSync('lib/stability.ts', 'utf8'), mapping = stab.slice(stab.indexOf('export function harmonyStabilityPoints')).split('\n}')[0];
+  assert.doesNotMatch(mapping, tuning, 'Stability mapping has no inline numbers');
+  assert.match(src, /TODO\(#842 follow-up, ARC on #854\): read festival stances from the per-nation policy table/);
 });
 
 test('Stability: harmony term with its points and detail; totals still add up and stay 0–100; absent input = no term', () => {
