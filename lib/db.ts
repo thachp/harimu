@@ -41,6 +41,7 @@ import { goodsSanctionSchemas } from './goods-sanctions'; // #601
 import { warAssemblySchemas } from './war-assembly'; // #427
 import { warEndingsSchemas } from './war-endings'; // #427 slice 2
 import { aiReviewQueueSchemas } from './ai-review-queue'; // #753
+import { pollingSchemas } from './polling'; // #740
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
 import { townHallSchemas } from './town-hall'; // #441
@@ -241,6 +242,7 @@ async function initialize(database: GameDatabase) {
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...aiReviewQueueSchemas.map(sql=>database.prepare(sql)), // #753
+    ...pollingSchemas.map(sql=>database.prepare(sql)), // #740
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),
