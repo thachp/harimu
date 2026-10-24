@@ -4,9 +4,11 @@
  *  cessions (lib/war-endings) are ratified transfers, not war capture, and stay out of scope. Refused captures are written to war_capture_refusals (migration 0094). */
 import type { GameDatabase } from './database-contract';
 
+/** ARC on #921: the docs' "real week" is a rolling 168 hours back from now, not a calendar week. A loss at now − 7d + 1s counts; one at exactly now − 7d does not. */
+export const WAR_LOSS_WINDOW_MS = 168 * 60 * 60 * 1000;
 export const warLossCap = {
   weeklyFrontierLossBp: 1000,   // docs 15.3 [ASSUMPTION]: at most 10% of a nation's frontier squares per real week (basis points)
-  windowSeconds: 7 * 86400,     // docs 15.3: "per real week", a trailing seven real days
+  windowSeconds: WAR_LOSS_WINDOW_MS / 1000, // docs 15.3: "per real week" = rolling 168 hours (ARC on #921)
   minimumSquares: 1,            // issue #912: round down, minimum 1, so a small nation can still lose one square a week
 } as const;
 export const warLossCapEnabled = (env: { HARIMU_WAR_LOSS_CAP_ENABLED?: string } | null | undefined) => env?.HARIMU_WAR_LOSS_CAP_ENABLED === 'true';

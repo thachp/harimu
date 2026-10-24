@@ -43,6 +43,15 @@ test('the limit is 10% of frontier squares held at the window start, rounded dow
   assert.deepEqual(c.cap.decideCapture([sq('heartland'), sq('frontier')], 0, 20).heartland, [sq('heartland')]);
 });
 
+test('the window is a rolling 168 hours: 7d−1min and 7d−1s count, exactly 7d and 7d+1min do not', async t => {
+  const c0 = await setup(t, 'sqlite', true);
+  assert.equal(c0.cap.WAR_LOSS_WINDOW_MS, 168 * 3600 * 1000); assert.equal(c0.cap.warLossCap.windowSeconds, 7 * D);
+  for (const [ago, counts] of [[7 * D - 60, true], [7 * D - 1, true], [7 * D, false], [7 * D + 60, false]]) {
+    const c = await setup(t, 'sqlite', true); await frontier(c, 19, 1, ago);
+    assert.equal((await c.cap.frontierLedger(c.r.db, 'kindle', c.nowS())).lost, counts ? 1 : 0, `a loss ${ago}s ago ${counts ? 'counts' : 'does not count'}`);
+  }
+});
+
 for (const backend of ['sqlite', 'postgres']) {
   test(`20 frontier squares: the 2nd loss in a week lands, the 3rd is refused and logged, and works again after the window rolls (${backend})`, async t => {
     const c = await setup(t, backend, true); await frontier(c, 19, 1, 2 * D);
