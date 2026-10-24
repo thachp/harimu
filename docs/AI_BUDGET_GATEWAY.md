@@ -10,6 +10,17 @@ AI news, Notables and (with #46) Cabinet responses are gated by two guards. Neit
 Fail closed: a missing or invalid budget or gateway id, an exhausted budget, or an unpriced model means no inference;
 authored content is shown instead.
 
+## Second provider (#883)
+
+`lib/ai-failover.ts` is the only failover hook. News, Notables, Cabinet, and the town-hall answer pipeline (debate and rally speeches) call it instead of `binding.run`. It always tries Workers AI first, with the same `{gateway:{id}}` options as before.
+
+A secondary provider is attempted only when both are true:
+
+- `HARIMU_AI_SECONDARY_PROVIDER_ENABLED` is exactly `"true"` (preview `"true"`, production `"false"`; unset is off).
+- `HARIMU_AI_SECONDARY_PROVIDER_SECRET` is a non-empty Worker secret. It is not in either wrangler file, it is never logged, and this slice never puts it on a request.
+
+The shipped secondary is `unavailableSecondary`. It throws and does not open a network connection, so a set flag with no real client still fails closed to the caller's authored or template text. A timeout does not fail over: the Workers AI call may still be in flight. A paid provider is not implemented here. Patrick has to set the secret and say go, and that follow-up needs its own price-table row so a secondary answer is not metered as Workers AI.
+
 ## Price table
 `lib/ai-budget.ts` holds a versioned table (`aiPriceTableVersion`, `aiPricesVerifiedAt`) of per-call reservation upper bounds.
 When it is older than `aiPriceStaleAfterDays` (30), a warning is logged once per isolate and `/api/notables` reports

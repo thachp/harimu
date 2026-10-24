@@ -198,6 +198,8 @@
     // #879: integrity risk scores for staff review (docs §20). New accounts and dense counted civic acts raise a score. Human review only: never an automatic ban or block. GET /api/admin/risk-scores needs HARIMU_ADMIN_TOKEN.
     "HARIMU_RISK_SCORING_ENABLED": "true",
     "HARIMU_AI_GATEWAY_ID": "harimu-preview",
+    // #883: second LLM provider failover in the AI gateway. "true" in preview and "false" in production. Secondary runs only when this is "true" and the Worker secret HARIMU_AI_SECONDARY_PROVIDER_SECRET is non-empty; otherwise the call fails closed to authored content. The secret is not in this file, and this slice never calls a paid API.
+    "HARIMU_AI_SECONDARY_PROVIDER_ENABLED": "true",
     // Realtime presence spike (#76): server and client flags; on in preview (preview-flags-on), "false" in production.
     "HARIMU_REALTIME_PRESENCE": "true",
     "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "true",
