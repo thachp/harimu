@@ -125,6 +125,8 @@
     "HARIMU_ARMY_MAP_ENABLED": "true",
     // #738 slice 5: supply lines from depots (each nation's capital); a unit marching beyond supply range loses strength each game day, shown on the army card and the Army positions legend. Needs HARIMU_ARMY_MAP_ENABLED and its flags. Off: no supply reads and the slice-4 shapes. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMY_SUPPLY_ENABLED": "true",
+    // #738 battles: an attacking unit staged next to the defender's capital fights deterministic 10-minute rounds from current strength (with supply loss) and morale; the capital is never captured. Needs HARIMU_ARMY_SUPPLY_ENABLED and its flags. Off: GET /api/army/battles is 404 and the card has no battle line. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_ARMY_BATTLES_ENABLED": "true",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.

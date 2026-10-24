@@ -69,6 +69,7 @@ const flagOffPins = {
   HARIMU_ARMY_DRILLS_ENABLED: 'army-drills-738.test.mjs',
   HARIMU_ARMY_MAP_ENABLED: 'army-map-738.test.mjs',
   HARIMU_ARMY_SUPPLY_ENABLED: 'army-supply-738.test.mjs',
+  HARIMU_ARMY_BATTLES_ENABLED: 'army-battles-738.test.mjs',
   HARIMU_I_VOTED_BADGE_ENABLED: 'i-voted-782.test.mjs',
   HARIMU_KINDLE_POLLING_ENABLED: 'kindle-polling-740.test.mjs',
   HARIMU_PLANK_VOTES_ENABLED: 'plank-votes-831.test.mjs',
