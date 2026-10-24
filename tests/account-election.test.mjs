@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
-import {localRuntime} from './helpers/local-runtime.mjs';
+import { localRuntime as fixtureRuntime } from './helpers/local-runtime.mjs';
+const localRuntime = (options = {}) => fixtureRuntime({ presidentialCalendar: true, ...options }); // #918: the presidential vote opens only inside the calendar window
 import {replayJournalSqlite,replayJournalD1} from '../scripts/postgres-migration.mjs';
 import {DatabaseSync} from 'node:sqlite';
 const id='kindle-presidential-account-poc-1',ranking=['ines-varro','tobin-achterberg','mara-quell'];
