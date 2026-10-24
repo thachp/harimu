@@ -16,6 +16,10 @@ export const BATTLE_ROUND_SECONDS = 600;
 export const BATTLE_MAX_ROUNDS = 6;              // after this many rounds the side with more of its starting strength left wins
 export const BATTLE_DAMAGE_PCT = 20;             // each round a side hits for this share of its morale-weighted strength
 export const BATTLE_FORTIFICATION_BONUS_PCT = 25; // the defender fights from its fortified capital (terrain/fortification)
+/** #738 battle losses (ARC): a unit's last stored battle caps its strength at what it had left, recovering this share of its full strength per game
+ *  day after the battle ended, until the cap reaches full strength. */
+export const BATTLE_LOSS_RECOVERY_PCT_PER_GAME_DAY = 10;
+export const BATTLE_LOSS_GAME_DAY_SECONDS = 7200; // one game day (two real hours), as in army-supply
 export const BATTLE_RETREAT_BELOW_PCT = 50;      // an AI commander retreats when its unit falls below this share of its starting strength
 
 export type Side = { strength: number; morale: number };
@@ -78,9 +82,25 @@ export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], no
     const row = stored.get(s.key);
     if (row) return { ...base, stored: true, rounds: Number(row.rounds), status: row.status, retreated: row.retreated ?? null, attackerStrength: Number(row.attacker_strength), defenderStrength: Number(row.defender_strength) };
     const [att, def] = await Promise.all([readUnitReadiness(db, s.unit.id, now), readUnitReadiness(db, s.defender.id, now)]);
-    const attacker = { strength: applySupplyLoss(att.strength, unitSupply(s.unit.nationId, wars, now).strengthLossPct), morale: att.morale };
-    return { ...base, stored: false, ...resolveBattle(attacker, def, roundsAt(s.startedAt, now)) };
+    // #738 battle losses: both sides start from the strength their last stored battle left them (recovering per game day).
+    const [attFull, defFull] = await Promise.all([withBattleLosses(db, s.unit.id, att.strength, now), withBattleLosses(db, s.defender.id, def.strength, now)]);
+    const attacker = { strength: applySupplyLoss(attFull, unitSupply(s.unit.nationId, wars, now).strengthLossPct), morale: att.morale }, defender = { strength: defFull, morale: def.morale };
+    return { ...base, stored: false, ...resolveBattle(attacker, defender, roundsAt(s.startedAt, now)) };
   }));
+}
+/** Pure: strength after carried losses. `left` is what the unit had at the end of its last stored battle; it recovers by
+ *  BATTLE_LOSS_RECOVERY_PCT_PER_GAME_DAY of `full` per whole game day since `endedAt`, and never exceeds `full`. */
+export function carriedStrength(full: number, left: number, endedAt: number, now: number) {
+  const days = Math.max(0, Math.floor((now - endedAt) / BATTLE_LOSS_GAME_DAY_SECONDS));
+  return Math.min(full, left + Math.floor(full * BATTLE_LOSS_RECOVERY_PCT_PER_GAME_DAY * days / PERCENT));
+}
+/** The unit's strength with losses from its latest stored battle (as attacker or defender) carried in. One read, never writes. */
+export async function withBattleLosses(db: GameDatabase, unitId: string, full: number, now: number) {
+  const last = await db.prepare('SELECT attacker_unit, attacker_strength, defender_strength, started_at, rounds FROM army_battles WHERE (attacker_unit = ? OR defender_unit = ?) AND started_at <= ? ORDER BY started_at DESC LIMIT 1')
+    .bind(unitId, unitId, now).first<{ attacker_unit: string; attacker_strength: number; defender_strength: number; started_at: number; rounds: number }>();
+  if (!last) return full;
+  const left = Number(last.attacker_unit === unitId ? last.attacker_strength : last.defender_strength);
+  return carriedStrength(full, left, Number(last.started_at) + Number(last.rounds) * BATTLE_ROUND_SECONDS, now);
 }
 /** World tick (write path, behind the flag): store every finished, not yet stored battle once. INSERT ... ON CONFLICT DO NOTHING on the battle key, so
  *  concurrent ticks store exactly one row and a later strength change never alters it. */
