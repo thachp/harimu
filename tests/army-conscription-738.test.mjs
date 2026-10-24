@@ -20,7 +20,7 @@ test('rules: lottery size, one levy per home city, deterministic, Kindle never c
   assert.deepEqual(pickConscripts('aurelle', 9, E(6, i => `c${i % 3}`)), pickConscripts('aurelle', 9, E(6, i => `c${i % 3}`)), 'a retry of the same nation and week picks the same people');
   const copy = readFileSync('lib/army-copy.ts', 'utf8'); assert.match(copy, /PLACEHOLDER copy, marked for Content[^\n]*\n calledUp:L\(/, 'call-up line is placeholder copy marked for Content');
   const card = readFileSync('app/army-card.tsx', 'utf8'); assert.match(card, /army\.serveUntil \? <><p>\{fill\(unitMembership\.calledUp\.text[^\n]*\{unitMembership\.stayButton\}/); assert.match(card, /fetch\('\/api\/army\/draft'[^\n]*"action":"open"[^\n]*\.then\(\(\) => fetch\('\/api\/army'\)\)/, 'the card posts open before reading');
-  assert.match(readFileSync('app/page.tsx', 'utf8'), /<GovernmentPanel [^\n]*\/>\s*<ArmyCard \/>/, 'pin: ArmyCard after GovernmentPanel');
+  assert.match(readFileSync('app/page.tsx', 'utf8'), /<GovernmentPanel [^\n]*\/>\s*<ArmyCard key=\{`army:\$\{citizenSessionKey\}`\}\/>/, 'pin: ArmyCard after GovernmentPanel');
 });
 
 const D = 86400;

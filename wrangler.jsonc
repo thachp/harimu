@@ -139,6 +139,8 @@
     "HARIMU_KINDLE_RALLIES_ENABLED": "true",
     // #876: model-written Kindle rally speeches through the town hall AI pipeline (budget, platform-card check, safety model) on the rallies cron; templates-only or a muted kindle-rally persona keeps the #867 template speech. Needs HARIMU_KINDLE_RALLIES_ENABLED, the AI binding and budget. Off: no model call, the template speech is shown. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_AI_RALLY_SPEECHES_ENABLED": "true",
+    // #881: city chat channel (one per city, current city only, 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). Global and DMs follow.
+    "HARIMU_CITY_CHAT_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
