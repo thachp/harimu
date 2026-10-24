@@ -32,6 +32,7 @@ export function ArmyCard() {
     {unit.strength !== undefined && <p>{unitCard.strengthLabel}: {unit.strength} · {unitCard.moraleLabel}: {unit.morale}</p>}
     {unit.supply?.cut && <p>{supplyCutLine(unit.supply)}</p>}
     {unit.battle && <p>{battleLine(unit.battle)}</p>}
+    {army.woundedUntil && <p>{woundedLine(army.woundedUntil)}</p>}
     {army.member ? <>
       <fieldset><legend>{squadStance.label}</legend>
         {armyStances.map(s => <label key={s}><input type="radio" name="stance" checked={army.stance === s} onChange={() => void send({ action: 'stance', stance: s }, squadStance.helpers[s].text)} />{squadStance.labels[s]}</label>)}
@@ -52,3 +53,5 @@ export const battleLine = (b: { opponentNationId: string; attacking: boolean; ro
   const line = b.status === 'ongoing' ? unitMembership.battleOngoing : won ? unitMembership.battleWon : unitMembership.battleLost;
   return line.text.replace('{nation}', b.opponentNationId.charAt(0).toUpperCase() + b.opponentNationId.slice(1)).replace('{round}', String(b.rounds));
 };
+/** #911: the wounded line (placeholder copy from army-copy, marked for Content). */
+export const woundedLine = (until: number) => unitMembership.wounded.text.replace('{time}', new Date(until * 1000).toLocaleString());

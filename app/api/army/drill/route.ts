@@ -4,6 +4,8 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { armyDrillsEnabled, parseDrill } from '@/lib/army-rules';
 import { runDrill } from '@/lib/army';
+import { armyBattlesEnabled } from '@/lib/army-battle';
+import { readWoundedUntil, woundedRefusal } from '@/lib/army-wounds';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -18,6 +20,9 @@ export async function POST(request: Request) {
   try { body = await readCommandObject(request, 256); } catch { return privateJson({ error: 'Send a drill with a requestId.', reason: 'bad_request' }, 400); }
   const drill = parseDrill(body);
   if (!drill) return privateJson({ error: 'Send a drill with a requestId.', reason: 'bad_request' }, 400);
-  const result = await runDrill(await getDatabase(), userId, drill.requestId, Math.floor(Date.now() / 1000));
+  const db = await getDatabase(), now = Math.floor(Date.now() / 1000);
+  // #911: no drills while wounded (flag off: no extra read).
+  if (armyBattlesEnabled(env)) { const wounded = await readWoundedUntil(db, userId, now); if (wounded) return privateJson(woundedRefusal(wounded), 409); }
+  const result = await runDrill(db, userId, drill.requestId, now);
   return result.ok ? privateJson({ army: result.view, replayed: result.replayed }) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }
