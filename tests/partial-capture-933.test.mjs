@@ -94,7 +94,7 @@ for (const backend of ['sqlite', 'postgres']) {
 
 test('migration 0099, flag wiring, Heartland on UPDATE', async () => {
   const read = f => readFile(new URL(f, import.meta.url), 'utf8');
-  assert.match(await read('../drizzle/0099_partial_city_captures.sql'), /city_captures_933|RENAME TO city_captures/);
+  assert.match(await read('../drizzle/0099_partial_city_captures.sql'), /idx_city_captures_siege/);
   assert.match(await read('../db/postgres/0099_partial_city_captures.sql'), /DROP CONSTRAINT IF EXISTS city_captures_siege_id_key/);
   assert.match(await read('../lib/siege-actions.ts'), /zone<>'heartland'/);
   assert.match(await read('../lib/war-loss-cap.ts'), /orderCaptureSquares|#933/);
