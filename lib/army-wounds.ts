@@ -1,4 +1,4 @@
-/** #911 (docs §15.4 Citizen safety): soldiers are never killed. When a unit loses a stored battle (#910), every member at that moment is wounded:
+/** #911 (docs §15.4 Citizen safety): soldiers are never killed. When a unit retreats broken in a stored battle (#910; ARC on #944: that is "destroyed"), every member at that moment is wounded:
  *  out of action for 1–3 real days, deterministic from the battle key, so replays give the same times. No death and no gear loss: items are never
  *  touched. Behind HARIMU_ARMY_BATTLES_ENABLED (no new flag). Migration 0098 mirrors armyWoundSchemas. */
 import type { GameDatabase } from './database-contract';

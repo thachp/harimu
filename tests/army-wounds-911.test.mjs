@@ -17,6 +17,17 @@ test('rules: named 1–3 day window; deterministic per battle and citizen; never
   assert.doesNotMatch(readFileSync('lib/army-wounds.ts', 'utf8'), /DELETE|UPDATE/);
 });
 
+test('ARC on #944: only the side that retreated broken is destroyed; a round-limit loss (retreated null) wounds no one', async () => {
+  const b = await localRuntime({ backend: 'sqlite' }); const AB = await b.importModule('lib/army-battle.ts'); await b.close();
+  const base = { attackerUnit: 'kindle-home-guard', defenderUnit: 'korund-home-guard' };
+  assert.equal(AB.destroyedUnit({ ...base, retreated: 'attacker' }), 'kindle-home-guard');
+  assert.equal(AB.destroyedUnit({ ...base, retreated: 'defender' }), 'korund-home-guard');
+  assert.equal(AB.destroyedUnit({ ...base, retreated: null }), null);
+  const limit = AB.resolveBattle({ strength: 100, morale: 20 }, { strength: 100, morale: 20 }, AB.BATTLE_MAX_ROUNDS);
+  assert.notEqual(limit.status, 'ongoing'); assert.equal(limit.retreated, null, 'a round-limit decision');
+  assert.equal(AB.destroyedUnit({ ...base, ...limit }), null, 'so nobody is wounded');
+});
+
 const joinKorund = (r, requestId) => r.db.prepare("INSERT INTO army_members (clerk_user_id, unit_id, stance, joined_at, request_id) SELECT clerk_user_id, 'korund-home-guard', 'hold', 0, ? FROM citizens WHERE clerk_user_id NOT IN (SELECT clerk_user_id FROM army_members) LIMIT 1").bind(requestId).run();
 const call = (r, user, body, path = 'army') => r.call(path, user, body);
 
@@ -36,7 +47,7 @@ for (const backend of ['sqlite', 'postgres']) {
     const AB = await r.importModule('lib/army-battle.ts');
     await Promise.all([r.call('world', null), AB.recordFinishedBattles(r.db, now)]);
     const [battle] = (await r.db.prepare('SELECT * FROM army_battles').all()).results;
-    assert.equal(battle.status, 'defender_won', 'Kindle lost');
+    assert.deepEqual([battle.status, battle.retreated], ['defender_won', 'attacker'], 'Kindle retreated broken (destroyed)');
     const wounds = (await r.db.prepare('SELECT battle_key, clerk_user_id, wounded_until FROM army_wounds ORDER BY clerk_user_id').all()).results;
     const kindle = (await r.db.prepare("SELECT clerk_user_id FROM army_members WHERE unit_id = 'kindle-home-guard'").all()).results.map(x => x.clerk_user_id);
     assert.deepEqual(wounds.map(w => w.clerk_user_id), kindle, 'every member of the losing unit, and only them');
