@@ -1,7 +1,7 @@
 /** #738 battles slice (docs §15.3 Resolution: battles resolve server-side in rounds every 10 real minutes from strength, terrain/fortification,
  *  supply and morale, with AI commanders deciding retreat). ARC rulings: a battle starts when an attacking unit is staged next to the defender's
  *  capital; deterministic, from current strength (which includes the #897 supply loss); every number a named constant; the capital is never
- *  captured. ARC on #910: a finished battle is stored once by the world tick (migration 0092 mirrors armyBattleSchemas); GETs read the stored row and derive only a
+ *  captured. ARC on #910: a finished battle is stored once by the world tick (migration 0096 mirrors armyBattleSchemas); GETs read the stored row and derive only a
  *  running battle. Behind HARIMU_ARMY_BATTLES_ENABLED (needs HARIMU_ARMY_SUPPLY_ENABLED and its flags). */
 import type { GameDatabase } from './database-contract';
 import { armyUnits, unitForNation } from './army-rules';
