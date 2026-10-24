@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { localRuntime } from './helpers/local-runtime.mjs';
+import { localRuntime as fixtureRuntime } from './helpers/local-runtime.mjs';
+const localRuntime = (options = {}) => fixtureRuntime({ presidentialCalendar: true, ...options }); // #918: the presidential vote opens only inside the calendar window
 import { postgresMigrations, isDestructive, transactionProblem } from '../scripts/postgres-migrations.mjs';
 import { instantRunoffCounts } from '../lib/instant-runoff.ts';
 
@@ -178,6 +179,7 @@ test(`#307 ${backend}: the closed count is recorded once; each party gets one no
   const general = await r.call('election', 'alice'); assert.equal(general.status, 200); assert.equal(general.data.status, 'open');
   assert.deepEqual(general.data.candidates.map(x => x.id), electionCandidates.map(x => x.id));
   assert.equal(general.data.candidates[0].name, 'Yelena Brask'); assert.equal(general.data.candidates[1].name, by[O].nominee === 'tobin-achterberg' ? 'Tobin Achterberg' : hopefuls.find(h => h.id === by[O].nominee).name); assert.equal(general.data.candidates[2].name, 'Mara Quell');
+  r.setFixtureEnv('HARIMU_KINDLE_CYCLE_START_AT', String(Math.floor(r.now / 1000) - 30 * 86400)); // #918: this vote's calendar window opens now
   const voted = await r.call('election', 'alice', { action: 'vote', electionId: general.data.id, requestId: randomUUID(), ranking: general.data.candidates.map(x => x.id) });
   assert.equal(voted.status, 200, JSON.stringify(voted.data)); assert.equal(voted.data.candidates[0].name, 'Yelena Brask');
   assert.equal(JSON.parse((await r.db.prepare('SELECT candidates_json FROM poc_elections').first()).candidates_json)[0].name, 'Yelena Brask', 'the stored slate carries the nominee');

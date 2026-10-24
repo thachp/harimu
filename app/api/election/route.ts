@@ -10,6 +10,7 @@ import {validPetitionId} from '@/lib/collective-petitions';
 import {validRanking} from '@/lib/instant-runoff';
 import {trustedBallotPrivacyReady,ballotPrivacyReason} from '@/lib/ballot-privacy';
 import {generalElectionSlate,type PrimaryBindings} from '@/lib/primaries';
+import {presidentialWindow,type CalendarBindings} from '@/lib/election-calendars';
 import {candidateIds,electionId,openPreviewElection,readElection,voteReceiptSql,anonymousBallotSql,markBallotWrittenSql} from '@/lib/elections';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -22,7 +23,7 @@ export async function GET(request:Request){
  // #221: read-only. The election opens on POST (and citizen POSTs); a due close/count is recorded by POST and the world tick.
  // #307: with HARIMU_PRIMARIES_ENABLED off this reads nothing and returns today's candidates.
  const general=await generalElectionSlate(raw,env as unknown as PrimaryBindings,now);
- return json({...await readElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),accountLevel||verification.countedActionsEligible,true,general.slate,general.blocked),id:accountLevel?accountElectionId:electionId,electionEligibility:{eligible:accountLevel||verification.countedActionsEligible,scope:accountLevel?'preview-citizen':'tier1',reason:accountLevel?'Signed-in Kindle citizens may vote once in this preview PoC.':verification.reason},verification});
+ return json({...await readElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),accountLevel||verification.countedActionsEligible,true,general.slate,general.blocked,presidentialWindow(env as unknown as CalendarBindings,now)),id:accountLevel?accountElectionId:electionId,electionEligibility:{eligible:accountLevel||verification.countedActionsEligible,scope:accountLevel?'preview-citizen':'tier1',reason:accountLevel?'Signed-in Kindle citizens may vote once in this preview PoC.':verification.reason},verification});
 }
 // #194: a written ballot can complete a first-week goal; latch after a successful vote.
 export async function POST(request:Request){
@@ -47,7 +48,8 @@ async function handleVote(request:Request){
   if(prior.election_id!==(accountLevel?accountElectionId:electionId)||prior.clerk_user_id!==userId||prior.ballot_written!==1)return json({error:'Ballot receipt already used.'},409);
   return json({ok:true,alreadyRecorded:true,message:'Your original ballot remains recorded. This retry does not edit its ranking.',...await readElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),false,false,general.slate),id:accountLevel?accountElectionId:electionId,electionEligibility:{eligible:accountLevel||verification.countedActionsEligible,scope:accountLevel?'preview-citizen':'tier1',reason:accountLevel?'Signed-in Kindle citizens may vote once in this preview PoC.':verification.reason},verification});
  }
- await openPreviewElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),general.slate);
+ // #918: the vote opens only inside the calendar window (day 30 + k*120, 72 h); held when HARIMU_KINDLE_CYCLE_START_AT is unset or malformed.
+ await openPreviewElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),general.slate,presidentialWindow(env as unknown as CalendarBindings,now)?.opensAt??null);
  await db.batch([db.prepare(voteReceiptSql).bind(requestId,now,userId,electionId,now,now),db.prepare(anonymousBallotSql).bind(crypto.randomUUID(),JSON.stringify(body.ranking),requestId,userId,electionId),db.prepare(markBallotWrittenSql).bind(requestId,userId,electionId)]);
  const saved=await receipt();if(!saved||saved.clerk_user_id!==userId||saved.election_id!==(accountLevel?accountElectionId:electionId)||saved.ballot_written!==1)return json({error:'Already voted, voting closed, or citizenship changed. Refresh your ballot status.'},409);
  return json({ok:true,...await readElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),false,false,general.slate),id:accountLevel?accountElectionId:electionId,electionEligibility:{eligible:accountLevel||verification.countedActionsEligible,scope:accountLevel?'preview-citizen':'tier1',reason:accountLevel?'Signed-in Kindle citizens may vote once in this preview PoC.':verification.reason},verification});

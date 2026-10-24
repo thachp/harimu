@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { localRuntime } from './helpers/local-runtime.mjs';
+import { localRuntime as fixtureRuntime } from './helpers/local-runtime.mjs';
+const localRuntime = (options = {}) => fixtureRuntime({ presidentialCalendar: true, ...options }); // #918: the presidential vote opens only inside the calendar window
 
 const writePattern = /^\s*(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER)\b/i;
 function recordWrites(r) {
@@ -82,6 +83,7 @@ test('first-week latch hooks: square POST and election POST latch their goals', 
   assert.equal(post.status, 200, JSON.stringify(post.data));
   assert.ok((await goals()).includes('kindle-3-square:ledger'), 'square POST latched kindle-3-square');
   r.setNow(created + (4 * 86400 + 600) * 1000); // arc day 5
+  r.setFixtureEnv('HARIMU_KINDLE_CYCLE_START_AT', String(Math.floor(r.now / 1000) - 30 * 86400)); // #918: this vote's calendar window opens now
   const open = await r.call('election', 'alice'); assert.equal(open.status, 200, JSON.stringify(open.data));
   const vote = await r.call('election', 'alice', { action: 'vote', electionId: open.data.id, requestId: randomUUID(), ranking: ['ines-varro', 'tobin-achterberg', 'mara-quell'] });
   assert.equal(vote.status, 200, JSON.stringify(vote.data));

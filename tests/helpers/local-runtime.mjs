@@ -30,7 +30,7 @@ class LocalD1 {
   close() { this.sqlite.close(); }
 }
 
-export async function localRuntime({accountElection=false,accountElectionBindings,ballotPrivacyReady=false,backend=process.env.HARIMU_TEST_STORAGE??'sqlite'}={}) {
+export async function localRuntime({accountElection=false,accountElectionBindings,ballotPrivacyReady=false,presidentialCalendar=false,backend=process.env.HARIMU_TEST_STORAGE??'sqlite'}={}) {
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
   const path = join(directory, 'fixture.sqlite');
@@ -86,7 +86,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const envPath = join(directory, 'fixture-env.mjs');
   const authPath = join(directory, 'lib/auth.mjs');
   await mkdir(dirname(authPath), { recursive: true });
-  await writeFile(envPath, `export const env = ${JSON.stringify(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))};\nexport function waitUntil(promise){(globalThis.__harimuBackground??=[]).push(Promise.resolve(promise));}\n`);
+  await writeFile(envPath, `export const env = ${JSON.stringify({...(presidentialCalendar?{HARIMU_KINDLE_CYCLE_START_AT:String(Math.floor(epoch/1000)-30*86400)}:{}) /* #918: the presidential window opens at the fixture clock */,...(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))})};\nexport function waitUntil(promise){(globalThis.__harimuBackground??=[]).push(Promise.resolve(promise));}\n`);
   // Each fixture identity belongs to one Request. This substitution exists only
   // in temporary compiled test copies; production authentication is untouched.
   await writeFile(authPath, `const identities = new WeakMap();

@@ -122,4 +122,17 @@ for (const backend of ['sqlite', 'postgres']) {
     const next = await ai.runRallySpeechCron(r.db, tomorrow, env(gateway()));
     assert.ok(next.results.includes('recorded'), 'a new UTC day is a new attempt'); assert.ok(await count('rally_speeches') > 0);
   });
+
+  test(`#918 ${backend}: a rally whose speech is stored makes no AI call on a later UTC day (QA3's gap on #909)`, async t => {
+    const { r, ai, now, count } = await setup(t, backend);
+    const g = gateway(); assert.deepEqual((await ai.runRallySpeechCron(r.db, now, env(g))).results, ['recorded', 'recorded', 'recorded']);
+    const calls = g.seen.length, rows = (await r.db.prepare("SELECT request_id FROM harimu_ai_reservations WHERE request_id LIKE 'rally:%'").all()).results.length;
+    const tomorrow = now - now % 86400 + 86400 + 60, later = gateway();
+    const res = await ai.runRallySpeechCron(r.db, tomorrow, env(later));
+    for (const [i, x] of res.results.entries()) assert.equal(x, 'skipped', `rally ${i}`);
+    assert.equal(later.seen.length, 0, 'no AI call on the next UTC day'); assert.equal(g.seen.length, calls);
+    assert.equal((await r.db.prepare("SELECT request_id FROM harimu_ai_reservations WHERE request_id LIKE 'rally:%'").all()).results.length, rows, 'no new reservation');
+    assert.equal(await count('rally_speeches'), 3);
+  });
 }
+

@@ -38,6 +38,7 @@ import { mvpJobTypesEnabled } from '@/lib/mvp-job-types'; // #886 (b)
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
+import { presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918
 /** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true'; // #362
@@ -275,7 +276,7 @@ async function recordCivicPresence(database: Awaited<ReturnType<typeof getDataba
   if (citizen?.nation_id) await latchGovernmentReviews(database, citizen.nation_id, now);
   if (citizen?.nation_id !== 'kindle') return;
   const accountLevel = accountElectionEnabled(env as unknown as { NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?: string; HARIMU_ACCOUNT_ELECTION_POC_ENABLED?: string });
-  if (accountLevel) await openPreviewElection(accountElectionDatabase(database), userId, now, true);
+  if (accountLevel) await openPreviewElection(accountElectionDatabase(database), userId, now, true, undefined, presidentialWindow(env as unknown as CalendarBindings, now)?.opensAt ?? null); // #918: held unless the calendar window is open
   if ((await readVerification(userId)).countedActionsEligible) { await recordVerifiedHumanVisit(database, userId, now, { aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true' }); await openPreviewElection(database, userId, now); }
 }
 
