@@ -42,8 +42,9 @@ for (const accountElection of [false, true]) test(`GET /api/citizen makes no wri
     const preview = await r.importModule('lib/preview-election.ts');
     const sec = Math.floor(r.now / 1000);
     await world.advanceWorld(r.db, sec); await economy.recoverCapacity(r.db, user, new Date(r.now).toISOString(), economy.recoveryInterval(undefined)); await economy.readEconomy(r.db, user, economy.recoveryInterval(undefined));
-    if (accountElection) await elections.openPreviewElection(preview.accountElectionDatabase(r.db), user, sec, true);
-    if (first.data.verification.countedActionsEligible) { await petitions.recordVerifiedHumanVisit(r.db, user, sec); await elections.openPreviewElection(r.db, user, sec); }
+    const cal = await r.importModule('lib/election-calendars.ts'), { env } = await r.importModule('fixture-env.mjs'), win = [cal.presidentialWindow(env, sec)?.opensAt ?? null, elections.electionIdFor(cal.presidentialCycle(env, sec))]; // #936: the route gates both paths on the calendar
+    if (accountElection) await elections.openPreviewElection(preview.accountElectionDatabase(r.db), user, sec, true, undefined, ...win);
+    if (first.data.verification.countedActionsEligible) { await petitions.recordVerifiedHumanVisit(r.db, user, sec); await elections.openPreviewElection(r.db, user, sec, undefined, undefined, ...win); }
     const legacy = await r.call('citizen', user);
     if (user === 'alice' && !accountElection) assert.equal(first.data.verification.countedActionsEligible, true, 'the verified path is exercised');
     assert.deepEqual(visible(first.data), visible(legacy.data), `${user}: read-only GET shows what the write-on-read GET showed`);

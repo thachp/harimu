@@ -277,7 +277,7 @@ async function recordCivicPresence(database: Awaited<ReturnType<typeof getDataba
   if (citizen?.nation_id !== 'kindle') return;
   const accountLevel = accountElectionEnabled(env as unknown as { NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?: string; HARIMU_ACCOUNT_ELECTION_POC_ENABLED?: string });
   if (accountLevel) await openPreviewElection(accountElectionDatabase(database), userId, now, true, undefined, presidentialWindow(env as unknown as CalendarBindings, now)?.opensAt ?? null, electionIdFor(presidentialCycle(env as unknown as CalendarBindings, now))); // #918, #936: held unless the calendar window is open
-  if ((await readVerification(userId)).countedActionsEligible) { await recordVerifiedHumanVisit(database, userId, now, { aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true' }); await openPreviewElection(database, userId, now); }
+  if ((await readVerification(userId)).countedActionsEligible) { await recordVerifiedHumanVisit(database, userId, now, { aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true' }); await openPreviewElection(database, userId, now, undefined, undefined, presidentialWindow(env as unknown as CalendarBindings, now)?.opensAt ?? null, electionIdFor(presidentialCycle(env as unknown as CalendarBindings, now))); } // #936: Tier-1 is calendar-gated too
 }
 
 async function handlePost(request: Request) {

@@ -74,3 +74,34 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual((await c.rows()).map(x => x.id), [acct], 'no new row while held');
   });
 }
+
+for (const backend of ['sqlite', 'postgres']) test(`#936 ${backend}: civic path — a window-0 voter shows as not voted in window 1`, async t => {
+  const r = await localRuntime({ backend, ballotPrivacyReady: true }); t.after(() => r.close());
+  const s = Math.floor(r.now / 1000) - 30 * DAY - H; r.setFixtureEnv('HARIMU_KINDLE_CYCLE_START_AT', String(s));
+  const ok = () => ['alice', 'bob'].forEach(u => r.setVerification(u, { userId: u, emailVerified: true, phoneVerified: true, phoneUnique: true, revoked: false, checkedAt: r.now, expiresAt: r.now + 60000 })); ok();
+  const view = async () => (await r.call('election', 'alice')).data;
+  const v0 = await view(); assert.equal(v0.id, base); assert.equal(v0.status, 'open');
+  assert.equal((await r.call('election', 'alice', { action: 'vote', electionId: v0.id, requestId: randomUUID(), ranking: I0 })).status, 200);
+  assert.equal((await view()).voted, true, 'voted in window 0');
+  r.setNow((s + 150 * DAY + H) * 1000); ok();
+  assert.equal((await r.call('election', 'bob', { action: 'vote', electionId: `${base}-cycle-1`, requestId: randomUUID(), ranking: I0 })).status, 200, 'bob opens window 1');
+  const v1 = await view(); assert.equal(v1.id, `${base}-cycle-1`); assert.equal(v1.status, 'open'); assert.equal(v1.voted, false, 'window 1 starts unvoted');
+});
+const I0 = ['ines-varro', 'tobin-achterberg', 'mara-quell'];
+
+test('#936 ballot accepts each window id (QA2 on #937)', async () => {
+  const { isKindleElectionId } = await import('../lib/election-ids.ts');
+  for (const ok of [base, 'kindle-presidential-account-poc-1', `${base}-cycle-1`, 'kindle-presidential-account-poc-1-cycle-12']) assert.equal(isKindleElectionId(ok), true, ok);
+  for (const bad of ['', `${base}-cycle-0`, `${base}-cycle-`, `${base}-cycle-1x`, `x${base}`, 'kindle-presidential-poc-2', null]) assert.equal(isKindleElectionId(bad), false, String(bad));
+});
+
+for (const backend of ['sqlite', 'postgres']) test(`#936 ${backend}: polling follows the current window (QA2 on #937)`, async t => {
+  const r = await localRuntime({ backend }); t.after(() => r.close());
+  const { readPolling } = await r.importModule('lib/polling.ts');
+  const now = Math.floor(r.now / 1000), slate = JSON.stringify(I0.map(id => ({ id, name: id, platform: 'p' })));
+  const add = (id, o, c, closed) => r.db.prepare('INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at,closed_at) VALUES (?,?,?,?,?,?)').bind(id, 'kindle', slate, o, c, closed).run();
+  await add(base, now - 130 * DAY, now - 127 * DAY, now - 127 * DAY);
+  assert.equal((await readPolling(r.db, 'alice', now)).open, false, 'only the closed first window');
+  await add(`${base}-cycle-1`, now - H, now + 71 * H, null);
+  assert.equal((await readPolling(r.db, 'alice', now)).open, true, 'the open current window is polled');
+});
