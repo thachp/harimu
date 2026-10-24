@@ -195,6 +195,8 @@
     "HARIMU_KINDLE_BUDGET_VIEW_ENABLED": "false",
     // #825: Kindle vote-buying watch (docs §9.5): a player-market transfer within 48h of a Kindle vote, from a party member, campaign actor or 3+-voter payer, records an investigation event.
     "HARIMU_VOTE_BUYING_WATCH_ENABLED": "false",
+    // #879: integrity risk scores for staff review (docs §20). New accounts and dense counted civic acts raise a score. Human review only: never an automatic ban or block. GET /api/admin/risk-scores needs HARIMU_ADMIN_TOKEN.
+    "HARIMU_RISK_SCORING_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
     // Realtime presence spike (#76): server and client flags; on in preview (preview-flags-on), "false" in production.
     "HARIMU_REALTIME_PRESENCE": "false",
