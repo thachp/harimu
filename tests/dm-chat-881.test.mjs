@@ -41,10 +41,12 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await c.read('alice', 'nobody')).status, 404);
     const empty = await c.read('alice', 'bob'); assert.equal(empty.status, 200); assert.deepEqual(empty.data.messages, []);
     assert.equal((await c.post('alice', 'bob', 'hello bob')).status, 200);
+    c.r.setNow(c.r.now + 1000);
     assert.equal((await c.post('bob', 'alice', 'hello alice')).status, 200);
     const a = await c.read('alice', 'bob'), b = await c.read('bob', 'alice');
     assert.equal(a.data.messages.length, 2); assert.equal(b.data.messages.length, 2);
-    assert.equal(a.data.messages[0].mine, true); assert.equal(a.data.messages[1].mine, false);
+    assert.deepEqual(a.data.messages.map(m => [m.body, m.mine]), [['hello bob', true], ['hello alice', false]]);
+    assert.deepEqual(b.data.messages.map(m => [m.body, m.mine]), [['hello bob', false], ['hello alice', true]]);
     assert.equal((await c.post('alice', 'nomad', 'x')).status, 404, 'unenrolled peer');
     // carol (kindle) <-> dave (korund) cross-nation
     assert.equal((await c.post('carol', 'dave', 'across')).status, 200);

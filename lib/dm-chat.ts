@@ -12,7 +12,7 @@ export const dmChatSchemas = [
 export const dmChatFlagOn = (b: unknown) => (b as { HARIMU_DM_CHAT_ENABLED?: string })?.HARIMU_DM_CHAT_ENABLED === 'true';
 export const dmChatRetentionSeconds = 604800, dmChatGapSeconds = 10, dmChatHourlyLimit = 20, dmChatPageSize = 50;
 /** Stable thread key for a pair (order-independent). */
-export const dmConversationId = (a: string, b: string) => (a < b ? `${a}\0${b}` : `${b}\0${a}`);
+export const dmConversationId = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /** Inserts only when both citizens are enrolled; nation is never taken from the client. 0 changes: replay, limit, self, or unenrolled peer. */
 export const postDmChatSql = `INSERT INTO dm_chat_messages(id,conversation_id,sender_id,peer_id,body,posted_at)
