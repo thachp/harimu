@@ -7,6 +7,7 @@ import { readArmy, runArmyCommand } from '@/lib/army';
 import { serviceUntil } from '@/lib/army-conscription';
 import { readActiveWars } from '@/lib/army-map';
 import { applySupplyLoss, armySupplyEnabled, unitSupply } from '@/lib/army-supply';
+import { armyBattlesEnabled, readBattles } from '@/lib/army-battle';
 import { unitById } from '@/lib/army-rules';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,13 @@ export async function GET(request: Request) {
   if (unit && unit.strength !== undefined && armySupplyEnabled(env)) {
     const supply = unitSupply(unitById(unit.id)?.nationId ?? '', await readActiveWars(db), now);
     army.unit = { ...unit, strength: applySupplyLoss(unit.strength, supply.strengthLossPct), supply };
+  }  // #738 battles: your unit's battle (as attacker or defender), with the strength it has left, only while HARIMU_ARMY_BATTLES_ENABLED is on.
+  const nationId = army.unit ? unitById(army.unit.id)?.nationId : undefined;
+  if (army.unit && army.unit.strength !== undefined && nationId && armyBattlesEnabled(env)) {
+    const battle = (await readBattles(db, await readActiveWars(db), now)).find(b => b.attackerNationId === nationId || b.defenderNationId === nationId);
+    if (battle) army.unit = { ...army.unit, strength: battle.attackerNationId === nationId ? battle.attackerStrength : battle.defenderStrength, battle: { opponentNationId: battle.attackerNationId === nationId ? battle.defenderNationId : battle.attackerNationId, attacking: battle.attackerNationId === nationId, rounds: battle.rounds, status: battle.status } };
   }
+
   return privateJson({ army: { ...army, ...(until ? { serveUntil: until } : {}) } });
 }
 

@@ -86,6 +86,10 @@ export const unitMembership={
  // {pct} is the server's loss figure. Depot (the capital), range, daily rate and the half-strength cap were approved by ARC on #897 (lib/army-supply.ts); the card names only the cap.
  supplyCut:L('Supply line cut. Strength is down {pct}% and drops each game day the line stays cut, to at most half.'),
  supplyCutLegend:L('supply line cut, strength down {pct}%'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): #738 battles, the card line. The capital is never captured.
+ battleOngoing:L('Battle with {nation}: round {round}.'),
+ battleWon:L('Battle with {nation} won after {round} rounds. No capital changes hands.'),
+ battleLost:L('Battle with {nation} lost after {round} rounds. No capital changes hands.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),

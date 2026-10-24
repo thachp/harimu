@@ -15,7 +15,7 @@ const load = async (file, shims) => { const exports = {}; new Function('exports'
 const actions = await load('action-button.tsx', {}), tags = await load('ai-disclosure.tsx', {});
 const panel = (await load('assembly-ballot.tsx', {
   '../lib/assembly-copy': copy, './action-button': actions, './ai-disclosure': tags, './game-timer': { GameTimer: ({ label }) => React.createElement('span', null, label) },
-  './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
+  './session-retry': await load('session-retry.tsx', {}), './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
 })).AssemblyPanel;
 const base = () => ({ enabled: true, nationId: 'kindle', id: 'kindle-assembly-account-poc-1', scope: 'preview-citizen', status: 'open', opensAt: 1, closesAt: 2000000000, seats: { perDistrict: 6, up: 3 },
   districts: [], parties: parties.map(p => ({ id: p.id, name: p.name, ideology: p.ideology, color: p.color, blurb: p.blurb, ai: true })), yourDistrict: { id: 'forgehaven', name: 'Forgehaven' }, voted: false, privacyReady: true, privacyReason: '', result: null, headlines: [] });
