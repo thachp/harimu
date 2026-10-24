@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { runAiWithFailover, secondaryMayRun, unavailableSecondary, SecondaryUnavailable } from '../lib/ai-failover.ts';
+import { aiNewsSequenceReservation } from '../lib/ai-budget.ts';
 
 const secret = 'sk-test-not-a-real-key-883';
 const gateway = { gateway: { id: 'harimu-preview' } };
@@ -78,13 +79,15 @@ test('#883 prepareAiNews uses the hook: missing secret stays on Workers AI; a st
   const budget = { dailyBudgetMicro: 970000, gatewayId: 'harimu-test' };
   const news = { nationId: 'kindle', title: 'Kindle Press', style: 'press', fetchedAt: now * 1000, statistics: { citizens: 2, completedShifts: 3, food: 12 }, items: [] };
   const replies = [JSON.stringify(draft), JSON.stringify({ supported: true }), 'safe'];
-  const run = async (failover, secondary) => {
+  const run = async (failover, secondary, dailyBudgetMicro = budget.dailyBudgetMicro) => {
     const r = await localRuntime(); t.after(() => r.close());
     const primary = { calls: [], async run(_model, _input, options) { this.calls.push(options); throw Error('primary down'); } };
     const { prepareAiNews, readAiNews } = await r.importModule('lib/ai-news.ts');
-    await prepareAiNews(r.db, news, now, primary, { enabled: true, budget, failover, secondary });
-    return { primary, items: await readAiNews(r.db, 'kindle') };
+    await prepareAiNews(r.db, news, now, primary, { enabled: true, budget: { ...budget, dailyBudgetMicro }, failover, secondary });
+    const rows = (await r.db.prepare('SELECT reserved_micro, status FROM harimu_ai_reservations ORDER BY request_id').all()).results.map(row => ({ reserved_micro: row.reserved_micro, status: row.status }));
+    return { primary, items: await readAiNews(r.db, 'kindle'), rows };
   };
+  const answering = () => { const stub = spySecondary(); stub.complete = async function (body) { this.calls.push(body); return { response: replies[this.calls.length - 1] }; }; return stub; };
   await noFetch(t, async () => {
     const offStub = spySecondary();
     const off = await run({ HARIMU_AI_SECONDARY_PROVIDER_ENABLED: 'false', HARIMU_AI_SECONDARY_PROVIDER_SECRET: secret }, offStub);
@@ -92,11 +95,15 @@ test('#883 prepareAiNews uses the hook: missing secret stays on Workers AI; a st
     const missingStub = spySecondary();
     const missing = await run({ HARIMU_AI_SECONDARY_PROVIDER_ENABLED: 'true' }, missingStub);
     assert.equal(missing.primary.calls.length, 1); assert.equal(missingStub.calls.length, 0); assert.equal(missing.items.length, 0);
-    const stub = spySecondary();
-    stub.complete = async function (body) { this.calls.push(body); return { response: replies[this.calls.length - 1] }; };
+    const stub = answering();
     const failedOver = await run(on, stub);
     assert.equal(failedOver.primary.calls.length, 3); assert.equal(stub.calls.length, 3); assert.equal(failedOver.items.length, 1); assert.equal(failedOver.items[0].source, 'model');
     assert.equal(JSON.stringify(stub.calls).includes(secret), false);
+    // QA3: a second reserveAiSequence on the failover path would leave two ledger rows. One finished sequence charge only.
+    assert.deepEqual(failedOver.rows, [{ reserved_micro: aiNewsSequenceReservation, status: 'finished' }]);
+    const tight = await run(on, answering(), aiNewsSequenceReservation); // fits one sequence, not two
+    assert.equal(tight.items.length, 1); assert.equal(tight.primary.calls.length, 3);
+    assert.deepEqual(tight.rows, [{ reserved_micro: aiNewsSequenceReservation, status: 'finished' }]);
     const closed = await run(on, undefined);
     assert.equal(closed.primary.calls.length, 1); assert.equal(closed.items.length, 0);
   });
