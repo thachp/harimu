@@ -41,3 +41,25 @@ for (const beforeSeed of [true, false]) {
     assert.deepEqual(board, fresh, 'the stale early reads are not used');
   });
 }
+
+test(`#679 slice 4 ${backend}: a seeded readReserveBoard waits for one sequential round trip (two before the settled-shifts read moved up, #679 slice 4)`, async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  r.setFixtureEnv('HARIMU_SPARK_SUPPLY_ENABLED', 'true');
+  await r.call('world', null);
+  const s = await r.importModule('lib/spark-supply.ts');
+  const epoch = Number((await r.db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first()).epoch_seconds);
+  await r.db.prepare("INSERT INTO spark_issuances VALUES ('spark-seed','spark-seed',1,'seed',0,1000000,0,1000000,'Reserve Board',?,NULL)").bind(epoch + 1).run();
+  const now = epoch + 3 * sparkConfig.gameWeekSeconds, serial = await s.readReserveBoard(r.db, now);
+  const D = 60, real = r.db;
+  const slow = new Proxy(real, { get(target, key) {
+    if (key !== 'prepare') { const value = target[key]; return typeof value === 'function' ? value.bind(target) : value; }
+    const wrap = st => new Proxy(st, { get(x, k) { const v = x[k]; if (typeof v !== 'function') return v;
+      if (k === 'bind') return (...a) => wrap(v.apply(x, a));
+      if (['first', 'all', 'run', 'raw'].includes(k)) return async (...a) => { await new Promise(res => setTimeout(res, D)); return v.apply(x, a); };
+      return v.bind(x); } });
+    return sql => wrap(target.prepare(sql));
+  } });
+  const started = performance.now(), board = await s.readReserveBoard(slow, now), trips = (performance.now() - started) / D;
+  assert.deepEqual(board, serial);
+  assert.ok(trips < 1.9, `~${trips.toFixed(1)} round trips`);
+});

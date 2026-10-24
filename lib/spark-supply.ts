@@ -71,13 +71,17 @@ async function ensureSeed(db: GameDatabase, month: number, now: number): Promise
 /** Read-only. Flag off: the caller does not call this. A database without migration 0043, or before the first scheduled run, shows the live supply and the base index. */
 export async function readReserveBoard(db: GameDatabase, now: number): Promise<ReserveBoard> {
   // #679: the reads that only matter once the seed exists start alongside the seed read (parked, so a database without the seed or migration 0043 leaves no
-  // unhandled rejection; they are awaited only when the seed exists). Seeded: two round trips instead of four.
+  // unhandled rejection; they are awaited only when the seed exists). Seeded: one round trip instead of five.
   const reads = parked(Promise.all([latestRow(db),
     db.prepare(`SELECT ${columns} FROM spark_issuances WHERE route <> 'seed' ORDER BY game_month DESC, supply_after_minor DESC, issued_at DESC, id DESC LIMIT 1`).first<Row>(), worldEpoch(db),
-    db.prepare(`SELECT ${columns} FROM spark_issuances ORDER BY issued_at, supply_after_minor, id`).all<Row>()]));
+    db.prepare(`SELECT ${columns} FROM spark_issuances ORDER BY issued_at, supply_after_minor, id`).all<Row>(),
+    // #679 slice 4: the window's settled shifts, from a bound no later than the window's first week (that week starts after now minus the window), so this needs neither the
+    // seed nor the epoch; weeks before the window are ignored below. Shift settlements are append-only and this request writes none, so the early read is not stale.
+    db.prepare('SELECT settled_at FROM shift_settlements WHERE settled_at >= ?').bind(new Date((now - sparkConfig.priceWindowWeeks * sparkConfig.gameWeekSeconds) * 1000).toISOString())
+      .all<{ settled_at: string }>().catch(tolerate(isMissingRelation, { results: [] as { settled_at: string }[] }))]));
   const seed = await seedRow(db);
   if (!seed) return { moneySupplyMinor: await liveSupply(db), lastIssuance: null, priceIndex: sparkConfig.priceBase };
-  const [early, last, epoch, { results: earlyRows }] = await reads;
+  const [early, last, epoch, { results: earlyRows }, { results: settled }] = await reads;
   // The early reads may predate the seed (first write) or each other. Serially, the latest row was read after the seed and the full rows after it, so
   // re-read in that order when the early latest is missing or the early rows lack it; rows are append-only, so the early ones are otherwise no older.
   const latest = early ?? await latestRow(db);
@@ -86,8 +90,6 @@ export async function readReserveBoard(db: GameDatabase, now: number): Promise<R
   // Weekly samples for the window, ending now: the supply at each week's end (from the rows) and the shifts settled in it (Kindle's shift ledger).
   const weekSeconds = sparkConfig.gameWeekSeconds, nowWeek = Math.floor((now - epoch) / weekSeconds), seedWeek = Math.floor((Number(seed.issued_at) - epoch) / weekSeconds);
   const firstWeek = Math.max(seedWeek, nowWeek - sparkConfig.priceWindowWeeks + 1);
-  const settled = (await db.prepare('SELECT settled_at FROM shift_settlements WHERE settled_at >= ?').bind(new Date((epoch + firstWeek * weekSeconds) * 1000).toISOString()).all<{ settled_at: string }>()
-    .catch(tolerate(isMissingRelation, { results: [] as { settled_at: string }[] }))).results;
   const output = new Map<number, number>();
   for (const shift of settled) { const week = Math.floor((Date.parse(shift.settled_at) / 1000 - epoch) / weekSeconds); output.set(week, (output.get(week) ?? 0) + 1); }
   const weeks: WeekSample[] = [];
