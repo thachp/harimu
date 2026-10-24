@@ -20,7 +20,11 @@ const insertSql=`INSERT INTO moderation_reports(id,request_id,reporter_id,target
 
 async function targetVisible(db:GameDatabase,userId:string,nationId:string,kind:ReportKind,targetId:string){
  // A chat message is reportable while it is live in the reporter's own nation's square, and not by its author.
- if(kind==='citizen-message')return Boolean(await db.prepare('SELECT 1 AS ok FROM square_messages WHERE id=? AND nation_id=? AND deleted=0 AND user_id<>?').bind(targetId,nationId,userId).first());
+ // #881: or live in the city chat of the reporter's own nation and current city (citizen_city_locations, server-side), and not by its author.
+ if(kind==='citizen-message')return Boolean(await db.prepare('SELECT 1 AS ok FROM square_messages WHERE id=? AND nation_id=? AND deleted=0 AND user_id<>?').bind(targetId,nationId,userId).first())
+  ||Boolean(await db.prepare('SELECT 1 AS ok FROM city_chat_messages m JOIN citizen_city_locations l ON l.user_id=? AND l.nation_id=m.nation_id AND l.current_city_id=m.city_id WHERE m.id=? AND m.nation_id=? AND m.deleted=0 AND m.user_id<>?').bind(userId,targetId,nationId,userId).first())
+  // #881 part 2: or live in global chat (open to every enrolled citizen), and not by its author.
+  ||Boolean(await db.prepare('SELECT 1 AS ok FROM global_chat_messages WHERE id=? AND deleted=0 AND user_id<>?').bind(targetId,userId).first());
  // A Notable reply is only shown to the citizen who asked, so it must be one of their own Notable requests (the reservation row).
  // Only a finished request showed a reply. The reservation cannot tell a model reply from an authored fallback (both settle to 'finished').
  return Boolean(await db.prepare("SELECT 1 AS ok FROM harimu_ai_reservations WHERE request_id=? AND status='finished'").bind((await ownerPrefix(userId))+targetId).first());

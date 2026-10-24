@@ -51,6 +51,8 @@ import { pollingSchemas } from './polling'; // #740
 import { plankVoteSchemas } from './plank-votes'; // #831
 import { rallySchemas } from './rallies'; // #867
 import { rallySpeechSchemas } from './rally-speech-ai'; // #876
+import { cityChatSchemas } from './city-chat'; // #881
+import { globalChatSchemas } from './global-chat'; // #881 part 2
 import { armySchemas, armyDrillSchemas } from './army'; // #738
 import { conscriptionSchemas, conscriptStayColumn } from './army-conscription'; // #738 slice 3
 import { holySiteSchemas } from './holy-sites'; // #855
@@ -259,6 +261,8 @@ async function initialize(database: GameDatabase) {
     ...plankVoteSchemas.map(sql=>database.prepare(sql)), // #831
     ...rallySchemas.map(sql=>database.prepare(sql)), // #867
     ...rallySpeechSchemas.map(sql=>database.prepare(sql)), // #876
+    ...cityChatSchemas.map(sql=>database.prepare(sql)), // #881
+    ...globalChatSchemas.map(sql=>database.prepare(sql)), // #881 part 2
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...conscriptionSchemas.map(sql=>database.prepare(sql)), // #738 slice 3

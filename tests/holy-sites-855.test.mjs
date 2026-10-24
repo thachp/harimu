@@ -25,6 +25,7 @@ async function scene(t, backend, on = true) {
   r.setFixtureEnv('HARIMU_RELIGIOUS_HARMONY_ENABLED', on ? 'true' : undefined);
   for (const [id, nation] of [['kim', 'kindle'], ['kai', 'korund'], ['ava', 'aurelle']]) await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,?,?,18,0,'Good standing',?,?)").bind(id, nation, id, at(r), at(r)).run();
   await r.db.prepare("INSERT INTO congregation_officiants (congregation_id,user_id,since_day,seated_at) VALUES ('open-hand:kindle-capital','kim',1,1)").run();
+  await r.db.prepare("INSERT INTO citizen_faith (user_id,nation_id,faith_id,chosen_at,request_id) VALUES ('kim','kindle','open-hand',1,'req-855-kim-faith')").run();
   return r;
 }
 const scores = async r => H.readHarmonyScores(r.db, Math.floor(r.now / 1000) + 1, new Set(), (await r.importModule('lib/festivals.ts')).festivalStance);
@@ -34,7 +35,7 @@ test('#889: faith-panel buttons render and post pilgrimage and charity; the outc
   const { Window } = await import('happy-dom'), ts = (await import('typescript')).default, { createRequire } = await import('node:module'), { readFileSync } = await import('node:fs');
   const require = createRequire(import.meta.url), w = new Window({ url: 'http://localhost/' }); globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const React = require('react'), { createRoot } = require('react-dom/client'), { act } = React;
-  const src = readFileSync('app/faith-panel.tsx', 'utf8'); assert.match(src, /\{harmony && <HolySiteActions \/>\}/, 'shown only with the harmony line (flag on)');
+  const src = readFileSync('app/faith-panel.tsx', 'utf8'); assert.match(src, /\{harmony && <HolySiteActions affiliated=/, 'shown only with the harmony line (flag on)');
   const js = ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const mod = { exports: {} }; new Function('exports', 'require', 'module', js)(mod.exports, n => n.startsWith('../lib/') ? require(`${n}.ts`) : n.startsWith('./') ? {} : require(n), mod);
   const { holySiteCopy: C } = require('../lib/holy-sites.ts'), sent = [];
@@ -42,6 +43,11 @@ test('#889: faith-panel buttons render and post pilgrimage and charity; the outc
   globalThis.fetch = async (url, init) => { sent.push([url, JSON.parse(init.body)]); if (reply === 'throw') throw new Error('offline'); return { ok: reply.status < 400, status: reply.status, json: async () => reply.body }; };
   const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
   await act(async () => root.render(React.createElement(mod.exports.HolySiteActions)));
+  for (const b of el.querySelectorAll('button')) { // QA1 on #902: every button names its helper line, which comes first in its group
+    const help = el.querySelector(`[id="${b.getAttribute('aria-describedby')}"]`); assert.ok(help, b.textContent);
+    assert.equal(help.textContent, b.textContent === C.charity ? C.helper.charity : C.helper.pilgrimage, b.textContent);
+    assert.equal(help.parentElement, b.parentElement); assert.equal(b.parentElement.firstElementChild, help);
+  }
   const click = async label => act(async () => { [...el.querySelectorAll('button')].find(b => b.textContent === label).dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await new Promise(r => setTimeout(r, 0)); });
   await click(C.pilgrimage['high-retreat']); assert.ok(el.textContent.includes(C.outcome.denied));
   assert.deepEqual([sent[0][0], sent[0][1].action, sent[0][1].siteId, typeof sent[0][1].requestId], ['/api/faith/holy-sites', 'pilgrimage', 'high-retreat', 'string']);
@@ -49,6 +55,21 @@ test('#889: faith-panel buttons render and post pilgrimage and charity; the outc
   assert.equal(sent[1][1].action, 'charity'); assert.ok(el.textContent.includes('Only a seated officiant'));
   reply = 'throw'; await click(C.charity); assert.ok(el.textContent.includes(C.failed.replace('{reason}', 'network')));
   await act(async () => root.unmount());
+  // QA2 preview report: no faith affiliation, so the charity button is disabled with the placeholder reason and posts nothing.
+  assert.match(src, /<HolySiteActions affiliated=\{current !== 'unaffiliated'\} \/>/);
+  const el2 = document.createElement('div'); document.body.appendChild(el2); const root2 = createRoot(el2), posts = sent.length;
+  await act(async () => root2.render(React.createElement(mod.exports.HolySiteActions, { affiliated: false })));
+  const charity = [...el2.querySelectorAll('button')].find(b => b.textContent === C.charity);
+  assert.equal(charity.disabled, true); assert.ok(el2.textContent.includes(C.noAffiliation)); const ids = charity.getAttribute('aria-describedby').split(' '); assert.equal(ids.length, 2, 'helper line and the #920 reason'); assert.equal(ids[1], 'faith-charity-reason'); assert.equal(el2.querySelector(`[id="${ids[0]}"]`).textContent, C.helper.charity);
+  await act(async () => { charity.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await new Promise(r => setTimeout(r, 0)); }); assert.equal(sent.length, posts);
+  await act(async () => root2.unmount());
+  // A server rejection shows its error, never a blank line.
+  const el3 = document.createElement('div'); document.body.appendChild(el3); const root3 = createRoot(el3);
+  await act(async () => root3.render(React.createElement(mod.exports.HolySiteActions, { affiliated: true })));
+  reply = { status: 409, body: { error: 'Choose a faith before giving clergy charity.', reason: 'no_affiliation' } };
+  await act(async () => { [...el3.querySelectorAll('button')].find(b => b.textContent === C.charity).dispatchEvent(new w.MouseEvent('click', { bubbles: true })); await new Promise(r => setTimeout(r, 0)); });
+  assert.ok(el3.textContent.includes(C.failed.replace('{reason}', 'Choose a faith before giving clergy charity.')));
+  await act(async () => root3.unmount());
 });
 
 for (const backend of ['sqlite', 'postgres']) {
@@ -72,6 +93,20 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual([notClergy.status, notClergy.data.reason], [403, 'not_clergy']);
     const after = await scores(r);
     assert.deepEqual([after.aurelle - before.aurelle, after.korund - before.korund, after.kindle - before.kindle], [2, -3, 2]);
+  });
+
+  test(`${backend}: charity with no faith affiliation is 409 no_affiliation: no act row, wallet unchanged, Harmony unchanged`, async t => {
+    const r = await scene(t, backend);
+    const wallet = async u => r.db.prepare('SELECT capacity, influence, standing FROM citizens WHERE clerk_user_id = ?').bind(u).first();
+    const before = { kim: await wallet('kim'), kai: await wallet('kai'), scores: await scores(r) };
+    await r.db.prepare("UPDATE citizen_faith SET faith_id='unaffiliated' WHERE user_id='kim'").run();
+    for (const u of ['kim', 'kai']) { // kim (seated officiant) chose Unaffiliated; kai (Korund, no row) defaults to it; affiliation is checked first
+      const res = await r.call('faith/holy-sites', u, { action: 'charity', requestId: rid() });
+      assert.deepEqual([res.status, res.data.reason, typeof res.data.error], [409, 'no_affiliation', 'string'], u);
+      assert.deepEqual(await wallet(u), before[u], `${u} wallet unchanged`);
+    }
+    assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM faith_harmony_acts').first()).n), 0, 'no act row');
+    assert.deepEqual(await scores(r), before.scores);
   });
 
   test(`${backend}: concurrent pilgrimages by one citizen on one game day: exactly one row`, async t => {

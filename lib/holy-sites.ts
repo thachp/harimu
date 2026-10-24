@@ -33,6 +33,12 @@ export function parseHarmonyAct(body: Record<string, unknown>): HarmonyActComman
 }
 type Row = { user_id: string; act: string; outcome: string; site_id: string | null; nation_id: string };
 const result = (row: Row, replayed: boolean) => ({ ok: true as const, act: row.act, outcome: row.outcome, siteId: row.site_id, nationId: row.nation_id, replayed });
+/** The citizen's public faith (row, else the nation default as in readFaith) is not Unaffiliated. Korund hidden faiths do not count. */
+export async function hasFaithAffiliation(db: GameDatabase, userId: string) {
+  const row = await db.prepare('SELECT c.nation_id, f.faith_id FROM citizens c LEFT JOIN citizen_faith f ON f.user_id = c.clerk_user_id AND f.nation_id = c.nation_id WHERE c.clerk_user_id = ?').bind(userId).first<{ nation_id: string | null; faith_id: string | null }>();
+  if (!row?.nation_id) return false;
+  return (row.faith_id ?? (row.nation_id === 'aurelle' ? 'kinward-rite' : 'unaffiliated')) !== 'unaffiliated'; // mirrors lib/faith.ts defaultFaith (no runtime import here)
+}
 /** One pilgrimage and one charity act per citizen per game day. Race-safe: a single conditional INSERT ... SELECT ... ON CONFLICT DO NOTHING;
  *  the request id replays the stored outcome. Charity needs a seated officiant (clergy); the charity counts for the officiant's nation. */
 export async function runHarmonyAct(db: GameDatabase, userId: string, command: HarmonyActCommand, now: number) {
@@ -40,6 +46,9 @@ export async function runHarmonyAct(db: GameDatabase, userId: string, command: H
   const prior = await read();
   if (prior) return prior.user_id === userId ? result(prior, true) : { ok: false as const, status: 409, reason: 'request_reused', error: 'That request id was already used.' };
   const day = Math.floor(now / HOLY_SITE_GAME_DAY_SECONDS);
+  // ARC on QA2's preview report: charity needs a faith affiliation; without one it is a clear 409 before any write (no act row, no wallet change).
+  if (command.action === 'charity' && !(await hasFaithAffiliation(db, userId)))
+    return { ok: false as const, status: 409, reason: 'no_affiliation', error: 'Choose a faith before giving clergy charity.' };
   const insert = 'INSERT INTO faith_harmony_acts (user_id, act, game_day, nation_id, site_id, outcome, acted_at, request_id)';
   const changes = command.action === 'pilgrimage'
     ? (await db.prepare(`${insert} SELECT c.clerk_user_id, 'pilgrimage', ?, ?, ?, ?, ?, ? FROM citizens c WHERE c.clerk_user_id = ? ON CONFLICT DO NOTHING`)
@@ -64,6 +73,7 @@ export const holySiteCopy = {
     pilgrimage: 'One pilgrimage a game day. The nation that keeps the site decides who may enter.',
     charity: 'For seated officiants. One gift a game day, for your nation\'s Harmony.',
   },
+  noAffiliation: 'Choose a faith to give clergy charity.', // placeholder for Content (QA2 preview report)
   outcome: { granted: 'You were welcomed at the site. Harmony rises there.', denied: 'The way was closed to you. Harmony falls there.', given: 'Your charity was given. Harmony rises at home.' } as Record<string, string>,
   failed: 'That did not go through: {reason}',
 } as const;

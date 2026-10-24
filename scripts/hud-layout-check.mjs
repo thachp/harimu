@@ -42,7 +42,9 @@ import { checkUiV2World } from './ui-v2-world-check.mjs';
 import { checkUiV2City } from './ui-v2-city-check.mjs';
 import { checkUiV2Mobile } from './ui-v2-mobile-check.mjs';
 import { checkUiV2Household } from './ui-v2-household-check.mjs';
+import { checkModConsole } from './mod-console-check.mjs';
 import { checkUiV2WorkMarket } from './ui-v2-work-market-check.mjs';
+import { checkUiV2Government } from './ui-v2-government-check.mjs';
 import { checkWireBylines } from './wire-bylines-check.mjs';
 import { checkNationSkin } from './nation-skin-check.mjs';
 import { checkUiV2Nation } from './ui-v2-nation-check.mjs';
@@ -59,6 +61,7 @@ import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { checkGlobeLabelPressed } from './globe-label-pressed-check.mjs';
 import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
+import { fontsBeforeShots } from './layout-standalone.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
 const root = new URL('../', import.meta.url);
@@ -109,7 +112,7 @@ const preflight = '*,::before,::after{box-sizing:border-box;margin:0;padding:0;b
 const { GameShell } = await load('game-shell');
 const { FaithPanel, HolidayBanner } = await load('faith-panel');
 
-const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] });
+const browser = fontsBeforeShots(await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] })); // #905
 const failures = []; const rows = [];
 try {
   for (const v of variants) {
@@ -214,7 +217,9 @@ try {
   await checkUiV2Nation({ browser, css, preflight, failures, rows }); // #392 S6: Nation panel shape, institution rows, Explore {nation}
   await checkUiV2City({ browser, css, preflight, failures, rows }); // #392 S7: City hotspot pills, strip removed
   await checkUiV2Mobile({ browser, css, preflight, failures, rows });
+  await checkModConsole({ browser, css, preflight, failures, rows }); // #880: read-only mod console
   await checkUiV2WorkMarket({ browser, css, preflight, failures, rows }); // #392 S10 (#870): Work and Market panel heads
+  await checkUiV2Government({ browser, css, preflight, failures, rows }); // #392 S11 (#871): Government panel head
   await checkUiV2Household({ browser, css, preflight, failures, rows }); // #392 S9: Household panel // #392 S8: phone bottom tab bar and bottom-sheet panel
   await checkWireBylines({ browser, css, preflight, failures, rows }); // #243: wire story bylines
   await checkNationSkin({ browser, css, preflight, failures, rows }); // #85: nation skin on the top bar
