@@ -3,7 +3,7 @@
  *  All three ride HARIMU_FAITH_ENABLED: while the flag is off the API reports `enabled: false` and nothing renders.
  *  Copy comes from Content's lib/faith-copy.ts, lib/clergy-gate-copy.ts and the server state (worship copy, stance lines),
  *  so no doctrine is written here. Devotion is described as social standing only. */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { readFaith } from '../lib/faith';
 import type { readCongregations } from '../lib/congregations';
 import { faithCopy, korundFaithCopy, unaffiliatedCopy, type FaithId } from '../lib/faith-copy';
@@ -218,6 +218,7 @@ function CongregationBlock({ faith, state, api }: { faith: FaithState; state: Co
 
 /** #889: pilgrimage and clergy-charity buttons, shown only with the harmony line (HARIMU_RELIGIOUS_HARMONY_ENABLED on). POST /api/faith/holy-sites. */
 export function HolySiteActions({ affiliated = true }: { affiliated?: boolean }) {
+  const pilgrimageHelpId = useId(), charityHelpId = useId();
   const [note, setNote] = useState('');
   const act = async (body: Record<string, unknown>) => {
     try {
@@ -227,11 +228,17 @@ export function HolySiteActions({ affiliated = true }: { affiliated?: boolean })
     } catch { setNote(holySiteCopy.failed.replace('{reason}', 'network')); }
   };
   return <div className="faith-holy-sites"><h3>{holySiteCopy.heading}</h3>
-    {(Object.keys(holySites) as HolySiteId[]).map(id => <button key={id} type="button" onClick={() => void act({ action: 'pilgrimage', siteId: id })}>{holySiteCopy.pilgrimage[id]}</button>)}
-    <p className="faith-holy-help">{holySiteCopy.helper.pilgrimage}</p>
-    <button type="button" disabled={!affiliated} aria-describedby={affiliated ? undefined : 'faith-charity-reason'} onClick={() => void act({ action: 'charity' })}>{holySiteCopy.charity}</button>
-    {!affiliated && <small id="faith-charity-reason">{holySiteCopy.noAffiliation}</small>}
-    <p className="faith-holy-help">{holySiteCopy.helper.charity}</p>
+    {/* QA1 on #902: each helper sits first in its own group, so it is read before its buttons, and each button names it with aria-describedby.
+        #920: charity is disabled without a faith; the reason is added to the charity button's description. */}
+    <div className="faith-holy-group">
+      <p className="faith-holy-help" id={pilgrimageHelpId}>{holySiteCopy.helper.pilgrimage}</p>
+      {(Object.keys(holySites) as HolySiteId[]).map(id => <button key={id} type="button" aria-describedby={pilgrimageHelpId} onClick={() => void act({ action: 'pilgrimage', siteId: id })}>{holySiteCopy.pilgrimage[id]}</button>)}
+    </div>
+    <div className="faith-holy-group">
+      <p className="faith-holy-help" id={charityHelpId}>{holySiteCopy.helper.charity}</p>
+      <button type="button" disabled={!affiliated} aria-describedby={affiliated ? charityHelpId : `${charityHelpId} faith-charity-reason`} onClick={() => void act({ action: 'charity' })}>{holySiteCopy.charity}</button>
+      {!affiliated && <small id="faith-charity-reason">{holySiteCopy.noAffiliation}</small>}
+    </div>
     {note && <p role="status">{note}</p>}
   </div>;
 }

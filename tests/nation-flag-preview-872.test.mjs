@@ -46,10 +46,10 @@ test('GET /api/citizen: openNations appears only when a flag-opened nation is pl
 
 test('wiring: strip badge, panel band, comparison table and Preview badge read openNations; /api/world stays public and flag-free', async () => {
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
-  assert.match(page, /setOpenNations\(snapshot\.openNations\)/);
+  assert.match(page, /setOpenNations\(snapshot\.openNations( \?\? \[\])?\)/);
   assert.match(page, /badge: nation\.populationBand && !\(nation\.populationBand === 'coming-soon' && openNations\?\.includes\(nation\.id\)\)/);
   assert.match(page, /selected\.populationBand && !\(selected\.populationBand === 'coming-soon' && openNations\?\.includes\(selected\.id\)\)/);
-  assert.match(page, /<NationComparison nations=\{worldNations\} openNations=\{openNations\} \/>/); assert.match(page, /<GameShell visitorSession=\{isVisitorSession\([^\n]*openNations=\{openNations\}/);
+  assert.match(page, /<NationComparison nations=\{worldNations\} openNations=\{openNations\} \/>/); assert.match(page, /<GameShell visitorSession=\{isVisitorSession\([^\n]*openNations=\{(previewOpenNations\()?openNations[,}]/);
   assert.match(await readFile(new URL('../app/nation-comparison.tsx', import.meta.url), 'utf8'), /nationIsPreview\(nation\.id,openNations\)/);
   assert.match(await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8'), /nationIsPreview\(item\.id, openNations\)/);
   assert.doesNotMatch(await readFile(new URL('../app/api/world/route.ts', import.meta.url), 'utf8'), /openNations|playableNationIds/, 'the public, cached world response carries nothing per account');

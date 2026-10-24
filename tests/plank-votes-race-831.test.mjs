@@ -1,13 +1,13 @@
 /** #831 / QA1 review on #832: real-Postgres race for the plank cap. CI has no real PostgreSQL (the Postgres jobs use PGlite, one connection),
- *  so this runs only when HARIMU_TEST_PG_URL points at a disposable database; it works in its own temporary schema and drops it. */
+ *  so this runs only when HARIMU_TEST_POSTGRES_URL (or the older HARIMU_TEST_PG_URL) points at a disposable database; it works in its own temporary schema and drops it. */
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-const url = process.env.HARIMU_TEST_PG_URL;
-test('real PG: parallel up-votes from many connections never store more than 3 per member', { skip: !url && 'HARIMU_TEST_PG_URL not set' }, async t => {
+const url = process.env.HARIMU_TEST_POSTGRES_URL || process.env.HARIMU_TEST_PG_URL;
+test('real PG: parallel up-votes from many connections never store more than 3 per member', { skip: !url && 'HARIMU_TEST_POSTGRES_URL not set' }, async t => {
   const { default: pg } = await import('pg');
   const schema = `plank_race_${process.pid}`, pool = new pg.Pool({ connectionString: url, max: 12, options: `-c search_path=${schema}` });
   t.after(async () => { await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await pool.end(); });
