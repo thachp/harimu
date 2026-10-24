@@ -19,6 +19,9 @@ test('#918 pure: the window is day 30 + k*120 for 72 hours, and held otherwise',
   assert.deepEqual(w(at(150, 5)), { cycle: 1, opensAt: at(150), closesAt: at(153) }); assert.equal(w(at(149, 23)), null);
   for (const raw of [undefined, '', 'soon', '0', '-1', '1.5', ' 1792368000', '1234567890123']) assert.equal(win(raw)(at(30, 1)), null, String(raw));
   assert.equal(w(1.5), null, 'a bad clock is held');
+  assert.equal(w(at(-90, 1)), null, 'no window before the calendar starts (cycle -1 would be day -90)');
+  for (let t = 0; t <= 400 * DAY; t += 6 * H) for (const raw of [undefined, 'soon']) assert.equal(win(raw)(t), null, `held at ${t} (${raw})`);
+  for (let t = at(-200); t <= at(400); t += 6 * H) assert.equal(win(undefined)(t), null);
 });
 
 for (const backend of ['sqlite', 'postgres']) {
