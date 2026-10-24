@@ -1,6 +1,8 @@
 import type {GameDatabase,DatabaseStatement} from './database-contract';
 import {electionSchemas,electionId} from './elections';
 export const accountElectionId='kindle-presidential-account-poc-1';
+/** #936: per-window ids keep their cycle suffix in the account-level tables. */
+export const accountIdFor=(id:string)=>id===electionId||id.startsWith(`${electionId}-cycle-`)?accountElectionId+id.slice(electionId.length):id;
 export function accountElectionEnabled(bindings:{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string}){
  return bindings.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW==='true'&&bindings.HARIMU_ACCOUNT_ELECTION_POC_ENABLED==='true';
 }
@@ -10,11 +12,11 @@ export const accountElectionSql=(sql:string)=>sql.replace(/\bcivic_elections\b/g
 export const accountElectionSchemas=electionSchemas.map(accountElectionSql);
 export function accountElectionDatabase(database:GameDatabase):GameDatabase{
  const wrap=(statement:DatabaseStatement):DatabaseStatement=>({
-  bind:(...values)=>wrap(statement.bind(...values.map(value=>value===electionId?accountElectionId:value))),
+  bind:(...values)=>wrap(statement.bind(...values.map(value=>typeof value==='string'?accountIdFor(value):value))),
   first:()=>statement.first(),all:()=>statement.all(),run:()=>statement.run(),
  });
  // batch needs the underlying statements rather than wrappers.
  const originals=new WeakMap<DatabaseStatement,DatabaseStatement>();
- const tracked=(statement:DatabaseStatement):DatabaseStatement=>{const result=wrap(statement);result.bind=(...values)=>tracked(statement.bind(...values.map(value=>value===electionId?accountElectionId:value)));originals.set(result,statement);return result;};
+ const tracked=(statement:DatabaseStatement):DatabaseStatement=>{const result=wrap(statement);result.bind=(...values)=>tracked(statement.bind(...values.map(value=>typeof value==='string'?accountIdFor(value):value)));originals.set(result,statement);return result;};
  return {prepare:sql=>tracked(database.prepare(accountElectionSql(sql))),batch:statements=>database.batch(statements.map(statement=>{const original=originals.get(statement);if(!original)throw Error('Foreign election statement.');return original;}))};
 }
