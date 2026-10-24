@@ -62,11 +62,11 @@ export function claimSquares(kind: CityKind, centre: Point, bounds: { width: num
   return out;
 }
 /** What a capture moves and what it leaves. `privateKeys` are "x,y" of squares that have a world_square_purchases row. Only a square the defender holds nationally and nobody bought moves
- *  (to the attacker); a purchased square keeps its owner (Decision 109 stand-in, #468); a square the defender does not hold is not touched. */
+ *  (to the attacker); a Heartland square never moves (docs 15.3, #912); a purchased square keeps its owner (Decision 109 stand-in, #468); a square the defender does not hold is not touched. */
 export function planCapture(squares: readonly SquareFact[], privateKeys: ReadonlySet<string>, attacker: string, defender: string): { transfer: { x: number; y: number; from: string; to: string }[]; keptPrivate: Point[] } {
   const transfer: { x: number; y: number; from: string; to: string }[] = [], keptPrivate: Point[] = [];
   for (const s of squares) {
-    if (s.owner !== defender) continue;
+    if (s.owner !== defender || s.zone === 'heartland') continue; // #912: docs 15.3, Heartland is immune; a city block that reaches into Heartland leaves those squares
     if (privateKeys.has(`${s.x},${s.y}`)) keptPrivate.push({ x: s.x, y: s.y });
     else transfer.push({ x: s.x, y: s.y, from: defender, to: attacker });
   }
