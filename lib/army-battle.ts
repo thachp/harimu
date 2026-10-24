@@ -8,6 +8,7 @@ import { armyUnits, unitForNation } from './army-rules';
 import { marchArrivalAt, readActiveWars, unitMarch, type ArmyWar } from './army-map';
 import { applySupplyLoss, armySupplyEnabled, PERCENT, unitSupply } from './army-supply';
 import { readUnitReadiness } from './army';
+import { woundedUntil } from './army-wounds';
 
 export const armyBattlesEnabled = (env: unknown) => armySupplyEnabled(env) && (env as { HARIMU_ARMY_BATTLES_ENABLED?: string } | null)?.HARIMU_ARMY_BATTLES_ENABLED === 'true';
 /** Docs §15.3: a round every 10 real minutes. */
@@ -107,6 +108,11 @@ export async function withBattleLosses(db: GameDatabase, unitId: string, full: n
 export async function recordFinishedBattles(db: GameDatabase, now: number) {
   const done = (await readBattles(db, await readActiveWars(db), now)).filter(b => !b.stored && b.status !== 'ongoing');
   if (!done.length) return;
-  await db.batch(done.map(b => db.prepare(`INSERT INTO army_battles (battle_key, war_id, attacker_unit, defender_unit, started_at, rounds, status, retreated, attacker_strength, defender_strength, recorded_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (battle_key) DO NOTHING`).bind(b.key, b.warId, b.attackerUnit, b.defenderUnit, b.startedAt, b.rounds, b.status, b.retreated, b.attackerStrength, b.defenderStrength, now)));
+  // #911: every member of the losing unit is wounded (never killed), in the same batch; conditional too, so a replay keeps the first times.
+  const losers = done.map(b => b.status === 'attacker_won' ? b.defenderUnit : b.attackerUnit);
+  const members = (await db.prepare(`SELECT clerk_user_id, unit_id FROM army_members WHERE unit_id IN (${losers.map(() => '?').join(',')})`).bind(...losers).all<{ clerk_user_id: string; unit_id: string }>()).results ?? [];
+  const wounds = done.flatMap((b, i) => members.filter(m => m.unit_id === losers[i]).map(m => db.prepare('INSERT INTO army_wounds (battle_key, clerk_user_id, wounded_until) VALUES (?,?,?) ON CONFLICT (battle_key, clerk_user_id) DO NOTHING')
+    .bind(b.key, m.clerk_user_id, woundedUntil(b.key, m.clerk_user_id, b.startedAt + b.rounds * BATTLE_ROUND_SECONDS))));
+  await db.batch([...done.map(b => db.prepare(`INSERT INTO army_battles (battle_key, war_id, attacker_unit, defender_unit, started_at, rounds, status, retreated, attacker_strength, defender_strength, recorded_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (battle_key) DO NOTHING`).bind(b.key, b.warId, b.attackerUnit, b.defenderUnit, b.startedAt, b.rounds, b.status, b.retreated, b.attackerStrength, b.defenderStrength, now)), ...wounds]);
 }
