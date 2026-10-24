@@ -182,7 +182,7 @@
     "HARIMU_SPARK_SUPPLY_ENABLED": "false",
     // #432: daily ledger reconciliation job and its read-only admin report route. Off until QA. The route also needs the HARIMU_ADMIN_TOKEN Worker secret (set in the dashboard, never in this file); without it the route is a 404.
     "HARIMU_LEDGER_RECONCILIATION_ENABLED": "false",
-    // #614: read-only admin AI cost dashboard (GET /api/admin/ai-costs, JSON only). "false" in preview too (ARC exception): it needs the HARIMU_ADMIN_TOKEN Worker secret, set in the dashboard, never in this file.
+    // #614 / #880: read-only admin AI cost dashboard (GET /api/admin/ai-costs). Preview "true", production "false". HARIMU_ADMIN_TOKEN is a Worker secret, never a var.
     "HARIMU_AI_COST_DASHBOARD_ENABLED": "false",
     // #743: out-of-character Report intake for city chat messages and Notable replies (POST /api/reports, write-only; no mod console yet).
     "HARIMU_REPORTS_ENABLED": "false",

@@ -33,7 +33,10 @@ test('each loader sends the Bearer token and passes route errors through', async
   assert.deepEqual(await loadAiCosts('t'.repeat(16), fake('/api/admin/ai-costs', { days: [{ day: '2026-01-01' }], asOf: 1, windowDays: 7 })), { panel: 'ai-costs', ok: true, days: [{ day: '2026-01-01' }], asOf: 1, windowDays: 7 });
   assert.equal(calls.at(-1)[0], '/api/admin/ai-costs');
   assert.deepEqual(await loadLedger('t'.repeat(16), fake('/api/admin/ledger-reconciliation', { report: null })), { panel: 'ledger-reconciliation', ok: true, report: null });
+  assert.equal((await loadLedger('x', fake('/x', {}, 401))).status, 401);
   assert.deepEqual(await loadVoteBuying('t'.repeat(16), fake('/api/admin/vote-buying', { events: [] })), { panel: 'vote-buying', ok: true, events: [] });
+  assert.equal((await loadVoteBuying('x', fake('/x', {}, 401))).status, 401);
+  assert.equal((await loadAiCosts('x', fake('/x', {}, 401))).status, 401);
   assert.deepEqual(await loadAiCosts('x', async () => { throw new Error('offline'); }), { panel: 'ai-costs', ok: false, status: 0, error: 'Network error' });
   assert.equal(utc(0), '1970-01-01 00:00 UTC'); assert.equal(utc(null), '');
 });
@@ -92,5 +95,30 @@ test('QA2 on #923: the empty-result message follows the filters as submitted, no
   await setValue(reason, 'flagged'); assert.equal(status(), 'The queue is empty.', 'a menu change after the load does not change the message');
   await submit(); assert.equal(status(), 'No entries match these filters.');
   await setValue(reason, ''); assert.equal(status(), 'No entries match these filters.', 'clearing the menu after the load does not change it either');
+  await act(async () => root.unmount());
+});
+
+test('QA3: a loaded ai-costs row shows reservedMicro; a loaded vote-buying row shows voterId', async () => {
+  const { build } = await import('esbuild');
+  const out = await build({ entryPoints: [new URL('../app/admin/mod/mod-console.tsx', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
+    packages: 'external', loader: { '.css': 'empty', '.module.css': 'empty' }, logLevel: 'silent', alias: { '@': new URL('..', import.meta.url).pathname.replace(/\/$/, '') } });
+  const code = out.outputFiles[0].text.replace(/from "([^".][^"]*)"/g, (_, m) => `from "${import.meta.resolve(m)}"`);
+  const { Window } = await import('happy-dom'), w = new Window({ url: 'http://localhost/' });
+  globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const { ModConsole } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
+  const React = (await import('react')).default, { createRoot } = await import('react-dom/client'), { act } = React;
+  const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
+  const setValue = async (node, value) => act(async () => { const proto = Object.getPrototypeOf(node), set = Object.getOwnPropertyDescriptor(proto, 'value').set; set.call(node, value); node.dispatchEvent(new w.Event(node.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); });
+  const submit = async () => act(async () => { el.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await new Promise(r => setTimeout(r, 0)); });
+  await act(async () => root.render(React.createElement(ModConsole, {
+    loadCosts: async () => ({ panel: 'ai-costs', ok: true, days: [{ day: '2026-01-02', reservedMicro: 4242, settledMicro: 100, calls: 3, budgetMicro: null }], asOf: 1, windowDays: 7 }),
+    loadVotes: async () => ({ panel: 'vote-buying', ok: true, events: [{ electionKey: 'k1', voterId: 'voter-real-9', senderId: 's1', transferId: 't1', reason: 'direct_transfer', createdAt: 100 }] }),
+  })));
+  const panel = [...el.querySelectorAll('select')].find(s => s.closest('label')?.textContent?.startsWith('panel'));
+  await setValue(el.querySelector('input[type=password]'), 'a-staff-token-1234');
+  await setValue(panel, 'ai-costs'); await submit();
+  assert.match(el.textContent, /4242/, 'reservedMicro appears'); assert.match(el.querySelector('caption')?.textContent ?? '', /ai-costs/);
+  await setValue(panel, 'vote-buying'); await submit();
+  assert.match(el.textContent, /voter-real-9/, 'voterId appears'); assert.match(el.querySelector('caption')?.textContent ?? '', /vote-buying/);
   await act(async () => root.unmount());
 });
