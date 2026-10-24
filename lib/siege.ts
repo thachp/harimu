@@ -103,7 +103,7 @@ export const siegeSchemas = [
   // One row per capture (at most one per siege), the record #495 can count; the per-square child lists what moved.
   `CREATE TABLE IF NOT EXISTS city_captures (
  id TEXT PRIMARY KEY,
- siege_id TEXT NOT NULL UNIQUE REFERENCES city_sieges(id) ON DELETE CASCADE,
+ siege_id TEXT NOT NULL REFERENCES city_sieges(id) ON DELETE CASCADE,
  war_id TEXT NOT NULL REFERENCES wars(id) ON DELETE CASCADE,
  request_id TEXT NOT NULL UNIQUE,
  attacker_nation TEXT NOT NULL REFERENCES nations(id),
@@ -121,4 +121,5 @@ export const siegeSchemas = [
 )`,
   'CREATE INDEX IF NOT EXISTS idx_city_sieges_war ON city_sieges(war_id)',
   'CREATE INDEX IF NOT EXISTS idx_city_captures_war ON city_captures(war_id, defender_nation)',
+  'CREATE INDEX IF NOT EXISTS idx_city_captures_siege ON city_captures(siege_id)',
 ] as const;
