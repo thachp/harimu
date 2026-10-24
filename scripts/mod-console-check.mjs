@@ -9,7 +9,7 @@ const root = new URL('../', import.meta.url).pathname.replace(/\/$/, '');
 const entry = `import React from 'react'; import { createRoot } from 'react-dom/client'; import { ModConsole } from './app/admin/mod/mod-console.tsx';
   const items = [1, 2, 3].map(i => ({ id: 'q' + i, created_at: 1792800000 + i * 60, source: 'notable', nation_id: ['kindle', 'korund', 'aurelle'][i - 1], persona: 'Notable ' + i, output_text: 'A long reply that wraps across several lines in the output column so a reviewer can read it in full without a sideways scroll. '.repeat(i), filter_result: i === 1 ? 'flagged' : 'pass', filter_detail: i === 1 ? 'keyword' : null, reason: i === 1 ? 'flagged' : 'sample', reviewed_at: i === 3 ? 1792900000 : null, reviewer_note: i === 3 ? 'ok' : null }));
   window.__calls = 0; const deny = location.hash === '#deny';
-  createRoot(document.getElementById('root')).render(<ModConsole load={async () => { window.__calls++; return deny ? { ok: false, status: 401, error: 'A server credential is required.' } : { ok: true, items }; }} />);`;
+  createRoot(document.getElementById('root')).render(<ModConsole loadQueue={async () => { window.__calls++; return deny ? { panel: 'ai-review-queue', ok: false, status: 401, error: 'A server credential is required.' } : { panel: 'ai-review-queue', ok: true, items }; }} />);`;
 
 const lum = c => { const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 const probe = () => {
@@ -42,7 +42,7 @@ export async function checkModConsole({ browser, preflight, failures, rows }) {
     const issues = [], ring = async () => page.evaluate(() => { const el = document.activeElement, cs = getComputedStyle(el); return { tag: el.tagName, w: parseFloat(cs.outlineWidth), style: cs.outlineStyle, color: cs.outlineColor }; });
     await page.keyboard.press('Tab'); let r = await ring(); if (r.tag !== 'INPUT') issues.push(`first Tab lands on ${r.tag}`);
     await page.keyboard.type('a-staff-token-1234');
-    for (const want of ['SELECT', 'SELECT', 'BUTTON']) { await page.keyboard.press('Tab'); r = await ring();
+    for (const want of ['SELECT', 'SELECT', 'SELECT', 'BUTTON']) { await page.keyboard.press('Tab'); r = await ring();
       if (r.tag !== want) issues.push(`Tab order: ${r.tag}, expected ${want}`); if (r.w < 2 || r.style === 'none' || (lum(r.color) + 0.05) / (lum('rgb(11, 32, 41)') + 0.05) < 3) issues.push(`${r.tag} focus ring ${JSON.stringify(r)}`); }
     await page.keyboard.press('Enter'); await page.waitForSelector('table', { timeout: 5000 }).catch(() => {});
     const p = await page.evaluate(probe); issues.push(...p.issues);
