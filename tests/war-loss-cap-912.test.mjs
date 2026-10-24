@@ -70,7 +70,7 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(await d.owner(d.outpost.x, d.outpost.y), 'korund');
   });
 
-  test(`Heartland squares inside a captured city block never move and are logged; flag off is unchanged (${backend})`, async t => {
+  test(`Heartland squares inside a captured city block never move, with or without the loss-cap flag (${backend})`, async t => {
     for (const on of [true, false]) {
       const c = await setup(t, backend, on);
       await c.run("UPDATE world_squares SET zone='frontier', owner='kindle', feature=NULL WHERE x BETWEEN 10 AND 14 AND y BETWEEN 7 AND 11");
@@ -79,17 +79,33 @@ for (const backend of ['sqlite', 'postgres']) {
       await c.run("UPDATE world_squares SET owner=NULL WHERE x BETWEEN 10 AND 14 AND y BETWEEN 7 AND 11 AND NOT ((x=12 AND y=9) OR (x=14 AND y=11))"); // one frontier square and one Heartland square in the block
       const cmd = { cityKind: 'founded', cityId: 'city-f1' };
       { const a = await c.assault(cmd); assert.equal(a.ok, true, JSON.stringify(a)); } const done = await c.assault(cmd, DAY1 + D * 1000);
-      assert.deepEqual(done.captured, { moved: on ? 1 : 2, keptPrivate: 0 }, JSON.stringify(done));
-      assert.equal(await c.owner(14, 11), on ? 'kindle' : 'korund', on ? 'Heartland is immune' : 'flag off: unchanged siege behaviour');
-      assert.deepEqual(await refusals(c), on ? [{ reason: 'heartland', squares: 1, lost_in_window: 0, weekly_limit: 1 }] : []);
+      // #935: planCapture skips Heartland regardless of flag, so only the frontier square moves and the Heartland square stays.
+      assert.deepEqual(done.captured, { moved: 1, keptPrivate: 0 }, JSON.stringify(done));
+      assert.equal(await c.owner(14, 11), 'kindle', 'Heartland stays with the defender');
+      assert.deepEqual(await refusals(c), [], 'Heartland is filtered before the loss-cap log, so no refusal row');
     }
   });
 }
 
+test('a refused capture is logged once per request: the same request twice leaves one row', async t => {
+  const c = await setup(t, 'sqlite', true); await frontier(c, 18, 2, 2 * D);
+  assert.equal((await c.assault()).ok, true);
+  const first = await c.assault({ requestId: 'req-assault-replay-1' }, DAY1 + D * 1000);
+  assert.deepEqual([first.ok, first.reason], [false, 'weekly_loss_cap']);
+  const second = await c.assault({ requestId: 'req-assault-replay-1' }, DAY1 + D * 1000);
+  assert.deepEqual([second.ok, second.reason], [false, 'weekly_loss_cap']);
+  assert.deepEqual(await refusals(c), [{ reason: 'weekly_cap', squares: 1, lost_in_window: 2, weekly_limit: 2 }], 'one refusal row for the two identical requests');
+  // a different request against the same siege still gets its own row
+  const other = await c.assault({ requestId: 'req-assault-replay-2' }, DAY1 + 2 * D * 1000); // next window day; same siege still refuses
+  assert.deepEqual([other.ok, other.reason], [false, 'weekly_loss_cap']);
+  assert.equal((await refusals(c)).length, 2);
+});
+
 test('flag off: wrangler preview on, production off; migration 0094 matches the schema; the war route passes the flag', async () => {
   const read = f => readFile(new URL(f, import.meta.url), 'utf8');
   assert.match(await read('../wrangler.jsonc'), /"HARIMU_WAR_LOSS_CAP_ENABLED": "true"/); assert.match(await read('../wrangler.prod.jsonc'), /"HARIMU_WAR_LOSS_CAP_ENABLED": "false"/);
-  for (const f of ['../drizzle/0094_war_capture_refusals.sql', '../db/postgres/0094_war_capture_refusals.sql']) assert.match(await read(f), /CREATE TABLE IF NOT EXISTS war_capture_refusals[\s\S]*reason IN \('weekly_cap','heartland'\)/);
+  for (const f of ['../drizzle/0094_war_capture_refusals.sql', '../db/postgres/0094_war_capture_refusals.sql']) assert.match(await read(f), /CREATE TABLE IF NOT EXISTS war_capture_refusals[\s\S]*request_id TEXT[\s\S]*reason IN \('weekly_cap','heartland'\)[\s\S]*idx_war_capture_refusals_attempt/);
+  assert.match(await read('../lib/war-loss-cap.ts'), /INSERT OR IGNORE INTO war_capture_refusals/);
   assert.match(await read('../app/api/war/route.ts'), /lossCap: bindings\.HARIMU_WAR_LOSS_CAP_ENABLED === 'true'/);
   assert.match(await read('../lib/war-actions.ts'), /input\.lossCap === true \? \{ lossCap: true \} : \{\}/);
 });

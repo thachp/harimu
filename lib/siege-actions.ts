@@ -124,7 +124,7 @@ async function capture(db: GameDatabase, siege: SiegeRow, kind: CityKind, centre
   if (lossCap) { // #912: Heartland never moves; a capture that would take the defender past its weekly frontier-loss limit moves nothing and the city stays contested.
     const zones = await squareZones(db, plan.transfer), ledger = await frontierLedger(db, siege.defender_nation, now);
     const decision = decideCapture(plan.transfer.map(t => ({ ...t, zone: zones.get(`${t.x},${t.y}`) ?? 'frontier' })), ledger.lost, ledger.heldAtWindowStart);
-    const log = { siegeId: siege.id, warId: siege.war_id, attacker: siege.attacker_nation, defender: siege.defender_nation, lost: ledger.lost, now };
+    const log = { siegeId: siege.id, warId: siege.war_id, requestId, attacker: siege.attacker_nation, defender: siege.defender_nation, lost: ledger.lost, now };
     if (!decision.ok) { await refusalStatement(db, { ...log, reason: 'weekly_cap', squares: decision.transfer.length, limit: decision.limit }).run(); return { refused: 'weekly_cap' as const, lost: decision.lost, limit: decision.limit }; }
     if (decision.heartland.length) await refusalStatement(db, { ...log, reason: 'heartland', squares: decision.heartland.length, limit: 1 }).run();
     if (!decision.transfer.length) return null;

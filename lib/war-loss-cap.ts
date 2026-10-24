@@ -59,6 +59,7 @@ export const warCaptureRefusalSchemas = [
  id TEXT PRIMARY KEY,
  siege_id TEXT NOT NULL REFERENCES city_sieges(id) ON DELETE CASCADE,
  war_id TEXT NOT NULL REFERENCES wars(id) ON DELETE CASCADE,
+ request_id TEXT NOT NULL CHECK(length(request_id) BETWEEN 8 AND 64),
  attacker_nation TEXT NOT NULL,
  defender_nation TEXT NOT NULL,
  reason TEXT NOT NULL CHECK(reason IN ('weekly_cap','heartland')),
@@ -67,12 +68,14 @@ export const warCaptureRefusalSchemas = [
  weekly_limit INTEGER NOT NULL CHECK(weekly_limit >= 1),
  refused_at INTEGER NOT NULL
 )`,
+  // #921 QA1: one refusal per (siege, request, reason); a retry of the same request must not add another row.
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_war_capture_refusals_attempt ON war_capture_refusals(siege_id, request_id, reason)',
   'CREATE INDEX IF NOT EXISTS idx_war_capture_refusals_war ON war_capture_refusals(war_id, refused_at)',
 ];
-/** Write one war-log row for a refused capture (the visible reason a square did not flip). */
-export const refusalStatement = (db: GameDatabase, row: { siegeId: string; warId: string; attacker: string; defender: string; reason: 'weekly_cap' | 'heartland'; squares: number; lost: number; limit: number; now: number }) =>
-  db.prepare('INSERT INTO war_capture_refusals (id,siege_id,war_id,attacker_nation,defender_nation,reason,squares,lost_in_window,weekly_limit,refused_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
-    .bind(`wcr-${crypto.randomUUID()}`, row.siegeId, row.warId, row.attacker, row.defender, row.reason, row.squares, row.lost, row.limit, row.now);
+/** Write one war-log row for a refused capture. Idempotent per (siege, request, reason): INSERT OR IGNORE on SQLite/D1, ON CONFLICT DO NOTHING on Postgres (via lib/postgres/sql). */
+export const refusalStatement = (db: GameDatabase, row: { siegeId: string; warId: string; requestId: string; attacker: string; defender: string; reason: 'weekly_cap' | 'heartland'; squares: number; lost: number; limit: number; now: number }) =>
+  db.prepare('INSERT OR IGNORE INTO war_capture_refusals (id,siege_id,war_id,request_id,attacker_nation,defender_nation,reason,squares,lost_in_window,weekly_limit,refused_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(`wcr-${crypto.randomUUID()}`, row.siegeId, row.warId, row.requestId, row.attacker, row.defender, row.reason, row.squares, row.lost, row.limit, row.now);
 /** Read-only war log of refused captures, newest first. */
 export async function readCaptureRefusals(db: GameDatabase, warId: string) {
   return (await db.prepare('SELECT reason,squares,lost_in_window,weekly_limit,defender_nation,refused_at FROM war_capture_refusals WHERE war_id=? ORDER BY refused_at DESC,id LIMIT 50').bind(warId).all<{ reason: string; squares: number; lost_in_window: number; weekly_limit: number; defender_nation: string; refused_at: number }>()).results;
