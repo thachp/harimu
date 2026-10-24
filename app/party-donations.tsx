@@ -1,13 +1,15 @@
 'use client';
 // #863: Kindle campaign donations. Hidden unless GET /api/party-donations answers (HARIMU_PARTY_DONATIONS_ENABLED on). Every donation is listed publicly.
 import { useEffect, useState } from 'react';
+import { SessionRetry, okOr5xx, useLoadRetry } from './session-retry';
 import type { DonationView } from '@/lib/party-donations';
 
 const spk = (minor: number) => (minor / 100).toFixed(2);
 export function PartyDonations() {
   const [view, setView] = useState<DonationView | null>(null), [eligible, setEligible] = useState(false), [note, setNote] = useState(''), [amount, setAmount] = useState('10');
-  useEffect(() => { fetch('/api/party-donations').then(r => r.ok ? r.json() as Promise<{ donations?: DonationView; eligible?: boolean }> : null).then(d => { setView(d?.donations ?? null); setEligible(!!d?.eligible); }).catch(() => setView(null)); }, []);
-  if (!view) return null;
+  const load = useLoadRetry(), { fail: loadFail, attempt: loadAttempt } = load;
+  useEffect(() => { fetch('/api/party-donations').then(okOr5xx).then(r => r.ok ? r.json() as Promise<{ donations?: DonationView; eligible?: boolean }> : null).then(d => { setView(d?.donations ?? null); setEligible(!!d?.eligible); }).catch(() => { setView(null); loadFail(); }); }, [loadAttempt, loadFail]); // #928: a 5xx or offline load offers Retry
+  if (!view) return load.failed ? <SessionRetry name={'Campaign donations'} onRetry={load.retry} /> : null;
   const give = async (partyId: string) => {
     const amountMinor = Math.round(Number(amount) * 100);
     const res = await fetch('/api/party-donations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partyId, amountMinor, requestId: crypto.randomUUID() }) });

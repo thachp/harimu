@@ -15,7 +15,7 @@ const load = async (file, shims) => { const exports = {}; new Function('exports'
 const actions = await load('action-button.tsx', {}), tags = await load('ai-disclosure.tsx', {});
 const panel = (await load('primary-card.tsx', {
   '../lib/campaign-copy': copy, './action-button': actions, './ai-disclosure': tags, './game-timer': { GameTimer: ({ label }) => React.createElement('span', null, label) },
-  './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
+  './session-retry': await load('session-retry.tsx', {}), './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
 })).PrimaryPanel;
 const base = () => ({ enabled: true, nationId: 'kindle', id: 'kindle-primary-account-poc-1', scope: 'preview-citizen', status: 'open', opensAt: 1, closesAt: 2000000000,
   parties: parties.map(p => ({ id: p.id, name: p.name, ideology: p.ideology, color: p.color, members: 2 })), hopefuls: rules.hopefuls.map(h => ({ id: h.id, partyId: h.partyId, name: h.name, platform: h.platform, ai: true })),

@@ -149,7 +149,7 @@ test('stay-error (#738, #889 render test): a refused stay shows stayRefused only
   const require = createRequire(import.meta.url), w = new Window({ url: 'http://localhost/' }); globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const React = require('react'), { createRoot } = require('react-dom/client'), { act } = React;
   const js = ts.transpileModule(readFileSync('app/army-card.tsx', 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
-  const mod = { exports: {} }; new Function('exports', 'require', 'module', js)(mod.exports, n => n.startsWith('@/lib/') ? require(`../lib/${n.slice(6)}.ts`) : require(n), mod);
+  const mod = { exports: {} }; new Function('exports', 'require', 'module', js)(mod.exports, n => n === './session-retry' ? (() => { const m = { exports: {} }; new Function('exports', 'require', 'module', ts.transpileModule(readFileSync('app/session-retry.tsx', 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText)(m.exports, require, m); return m.exports; })() : n.startsWith('@/lib/') ? require(`../lib/${n.slice(6)}.ts`) : require(n), mod);
   const { unitMembership, armyFailureNote } = require('../lib/army-copy.ts');
   const army = { unit: { id: 'korund-home-guard', name: 'Korund Home Brigade', officer: 'Colonel Veshko', memberCount: 1, openToVolunteers: false }, member: true, stance: 'hold', serveUntil: 9e9 };
   const json = (status, body) => ({ ok: status < 400, status, json: async () => body });
