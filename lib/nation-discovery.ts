@@ -9,3 +9,9 @@ export const isLiveNation = (id: unknown): id is LiveNationId => typeof id === '
 /** #872: `open` is the server's list of nations open in this environment (`liveNationIds`, lib/nation-openings: a live nation, or one whose HARIMU_<ID>_ENABLED is "true"
  *  and that passes the readiness check). Omitted or empty: the hardcoded live list alone, exactly as before. */
 export function nationIsPreview(id:string,open?:readonly string[]){return !isLiveNation(id)&&!(Array.isArray(open)&&open.includes(id));} // Array.isArray: safe as a .filter callback
+/** #875 (QA3): the open list the nations-bar Preview badge reads. undefined (badge hidden) only while the citizen status is still settling; a signed-out
+ *  visitor, a failed citizen fetch, and a build without accounts all settle to [], so guests, the badge's main audience, still see Preview. */
+export function previewOpenNations(open: readonly string[] | undefined, accounts: boolean, status: 'loading' | 'anonymous' | 'ready' | 'error'): readonly string[] | undefined {
+  if (open) return open;
+  return !accounts || status === 'anonymous' || status === 'error' ? [] : undefined;
+}
