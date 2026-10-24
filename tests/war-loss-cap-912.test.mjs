@@ -104,7 +104,10 @@ test('a refused capture is logged once per request: the same request twice leave
 test('flag off: wrangler preview on, production off; migration 0094 matches the schema; the war route passes the flag', async () => {
   const read = f => readFile(new URL(f, import.meta.url), 'utf8');
   assert.match(await read('../wrangler.jsonc'), /"HARIMU_WAR_LOSS_CAP_ENABLED": "true"/); assert.match(await read('../wrangler.prod.jsonc'), /"HARIMU_WAR_LOSS_CAP_ENABLED": "false"/);
-  for (const f of ['../drizzle/0094_war_capture_refusals.sql', '../db/postgres/0094_war_capture_refusals.sql']) assert.match(await read(f), /CREATE TABLE IF NOT EXISTS war_capture_refusals[\s\S]*request_id TEXT[\s\S]*reason IN \('weekly_cap','heartland'\)[\s\S]*idx_war_capture_refusals_attempt/);
+  for (const f of ['../drizzle/0094_war_capture_refusals.sql', '../db/postgres/0094_war_capture_refusals.sql']) {
+    assert.match(await read(f), /CREATE TABLE IF NOT EXISTS war_capture_refusals[\s\S]*request_id TEXT[\s\S]*battle_key[\s\S]*idx_war_capture_refusals_siege/);
+    assert.match(await read(f), /CREATE TABLE IF NOT EXISTS war_frontier_transfers/);
+  }
   assert.match(await read('../lib/war-loss-cap.ts'), /INSERT OR IGNORE INTO war_capture_refusals/);
   assert.match(await read('../app/api/war/route.ts'), /lossCap: bindings\.HARIMU_WAR_LOSS_CAP_ENABLED === 'true'/);
   assert.match(await read('../lib/war-actions.ts'), /input\.lossCap === true \? \{ lossCap: true \} : \{\}/);
