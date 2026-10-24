@@ -18,15 +18,35 @@ export const weeklyLossLimit = (heldAtWindowStart: number) =>
   Math.max(warLossCap.minimumSquares, Math.floor(Math.max(0, heldAtWindowStart) * warLossCap.weeklyFrontierLossBp / 10000));
 
 export type CapSquare = { x: number; y: number; zone: string; from: string; to: string };
-export type CapDecision = { ok: true; transfer: CapSquare[]; heartland: CapSquare[] }
+export type CapDecision = { ok: true; transfer: CapSquare[]; heartland: CapSquare[]; remaining: number; flipped: boolean }
   | { ok: false; reason: 'weekly_cap'; transfer: CapSquare[]; heartland: CapSquare[]; lost: number; limit: number };
-/** Pure. Heartland squares never move (they are dropped and reported); the rest move only if the defender's frontier losses in the window, plus this capture,
- *  stay within the limit. A capture is all or nothing: over the limit, nothing moves and the city stays contested. */
-export function decideCapture(squares: readonly CapSquare[], lostInWindow: number, heldAtWindowStart: number): CapDecision {
-  const heartland = squares.filter(s => s.zone === 'heartland'), transfer = squares.filter(s => s.zone !== 'heartland');
-  const frontier = transfer.filter(s => s.zone === 'frontier').length, limit = weeklyLossLimit(heldAtWindowStart);
-  if (frontier > 0 && lostInWindow + frontier > limit) return { ok: false, reason: 'weekly_cap', transfer, heartland, lost: lostInWindow, limit };
-  return { ok: true, transfer, heartland };
+/** #933: Chebyshev-1 neighbour of any attacker-held square. */
+export const bordersAttacker = (sq: { x: number; y: number }, attackerKeys: ReadonlySet<string>) => {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && attackerKeys.has(`${sq.x + dx},${sq.y + dy}`)) return true;
+  return false;
+};
+/** #933 ARC: bordering the attacker first, then lowest square id (y, then x). */
+export function orderCaptureSquares(squares: readonly CapSquare[], attackerKeys: ReadonlySet<string>): CapSquare[] {
+  return [...squares].sort((a, b) => {
+    const ba = bordersAttacker(a, attackerKeys) ? 0 : 1, bb = bordersAttacker(b, attackerKeys) ? 0 : 1;
+    return ba - bb || a.y - b.y || a.x - b.x;
+  });
+}
+/** Pure. Heartland never moves. #933: take at most `remaining = limit − lost` frontier squares in fixed order; if remaining is 0, refuse. `flipped` means every non-Heartland square was taken. */
+export function decideCapture(squares: readonly CapSquare[], lostInWindow: number, heldAtWindowStart: number, attackerKeys: ReadonlySet<string> = new Set()): CapDecision {
+  const heartland = squares.filter(s => s.zone === 'heartland');
+  const ordered = orderCaptureSquares(squares.filter(s => s.zone !== 'heartland'), attackerKeys);
+  const limit = weeklyLossLimit(heldAtWindowStart), remaining = Math.max(0, limit - lostInWindow);
+  if (!ordered.length) return { ok: true, transfer: [], heartland, remaining, flipped: heartland.length === squares.length || !squares.length };
+  if (remaining === 0) return { ok: false, reason: 'weekly_cap', transfer: ordered, heartland, lost: lostInWindow, limit };
+  const frontierSlots = remaining;
+  const transfer: CapSquare[] = [];
+  let used = 0;
+  for (const s of ordered) {
+    if (s.zone === 'frontier') { if (used >= frontierSlots) continue; used++; }
+    transfer.push(s);
+  }
+  return { ok: true, transfer, heartland, remaining, flipped: transfer.length === ordered.length };
 }
 
 const siegeMovedSql = (side: 'from_nation' | 'to_nation') => `SELECT COUNT(*) AS n FROM city_capture_squares q JOIN city_captures c ON c.id=q.capture_id
