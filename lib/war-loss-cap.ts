@@ -38,6 +38,20 @@ export async function frontierLedger(db: GameDatabase, nation: string, now: numb
   return { lost, heldAtWindowStart: Math.max(0, held + lost - gained) };
 }
 
+/** #912 (ARC on #921): lock the defender's nations row first in the capture batch (Postgres: a row lock held to commit, the #914 pool-lock pattern;
+ *  SQLite/D1: the batch is one write transaction already), so two captures of the same defender serialize and the guard below sees the first one's losses. */
+export const defenderLockSql = 'UPDATE nations SET id=id WHERE id=?';
+const lit = (v: string) => `'${v.replace(/'/g, "''")}'`;
+/** SQL condition, re-checked inside the batch after the lock: this capture's `frontier` squares fit under the defender's weekly limit. Literals only (nation ids are
+ *  validated server constants, numbers are integers), so no binds shift. */
+export function capGuardSql(defender: string, frontier: number, now: number) {
+  if (!(frontier > 0)) return '1=1';
+  const since = Math.floor(now) - warLossCap.windowSeconds, d = lit(defender);
+  const moved = (side: string) => `(SELECT COUNT(*) FROM city_capture_squares q JOIN city_captures c ON c.id=q.capture_id JOIN world_squares w ON w.x=q.x AND w.y=q.y WHERE q.${side}=${d} AND w.zone='frontier' AND c.captured_at>${since})`;
+  const start = `((SELECT COUNT(*) FROM world_squares WHERE owner=${d} AND zone='frontier')+${moved('from_nation')}-${moved('to_nation')})*${warLossCap.weeklyFrontierLossBp}/10000`;
+  return `${moved('from_nation')}+${Math.floor(frontier)}<=CASE WHEN ${start}<${warLossCap.minimumSquares} THEN ${warLossCap.minimumSquares} ELSE ${start} END`;
+}
+
 export const warCaptureRefusalSchemas = [
   `CREATE TABLE IF NOT EXISTS war_capture_refusals (
  id TEXT PRIMARY KEY,
