@@ -160,6 +160,7 @@
     "HARIMU_WAR_DECLARATION_LIMITS_ENABLED": "false",
     // #427: the Kindle Assembly votes on the President's war declaration (more than half of all seats, decided on the next tick). Needs HARIMU_WAR_ENABLED too.
     "HARIMU_WAR_ASSEMBLY_ENABLED": "false",
+    "HARIMU_WAR_LOSS_CAP_ENABLED": "false",
     // #427 slice 2: war endings by surrender (the surrendering nation's own assembly) and concession of Frontier nation squares (both sides ratify), decided on the next tick. Needs HARIMU_WAR_ENABLED too.
     "HARIMU_WAR_ENDINGS_ENABLED": "false",
     // #308: AI treaties PoC (non-aggression pact, trade agreement). Off until QA; treaties are proposed and ratified by server code only.
@@ -194,6 +195,8 @@
     "HARIMU_KINDLE_BUDGET_VIEW_ENABLED": "false",
     // #825: Kindle vote-buying watch (docs §9.5): a player-market transfer within 48h of a Kindle vote, from a party member, campaign actor or 3+-voter payer, records an investigation event.
     "HARIMU_VOTE_BUYING_WATCH_ENABLED": "false",
+    // #879: integrity risk scores for staff review (docs §20). New accounts and dense counted civic acts raise a score. Human review only: never an automatic ban or block. GET /api/admin/risk-scores needs HARIMU_ADMIN_TOKEN.
+    "HARIMU_RISK_SCORING_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
     // Realtime presence spike (#76): server and client flags; on in preview (preview-flags-on), "false" in production.
     "HARIMU_REALTIME_PRESENCE": "false",

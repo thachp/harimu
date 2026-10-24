@@ -14,7 +14,7 @@ const snapshot=()=>({nationId:'kindle',id:'kindle-presidential-poc-1',candidates
 function harness(data,{failure=false}={}){
  let cursor=0,refCursor=0,fail=failure;const states=[data,[...ids],'',false,false,false],refs=[],requests=[],received=[];
  const react={useCallback:fn=>fn,useEffect(){},useRef(initial){const i=refCursor++;return refs[i]??(refs[i]={current:initial});},useState(initial){const i=cursor++;if(!(i in states))states[i]=initial;return[states[i],value=>states[i]=typeof value==='function'?value(states[i]):value];}};
- const exports={};new Function('exports','require','fetch',source)(exports,name=>name==='react'?react:name==='./nation-document'?nation:name==='./ai-disclosure'?tags:name==='./game-timer'?{GameTimer:()=>React.createElement('span',null,'Fixture ballot clock')}:name==='./action-button'?actions:name==='../lib/instant-runoff'?require('../lib/instant-runoff.ts'):require(name),async(url,options)=>{requests.push({url,body:options?.body});if(fail){fail=false;throw Error('Fixture connection interrupted.');}return{ok:true,status:200,json:async()=>({...data,voted:true})};});
+ const exports={};new Function('exports','require','fetch',source)(exports,name=>name==='react'?react:name==='./nation-document'?nation:name==='./ai-disclosure'?tags:name==='./game-timer'?{GameTimer:()=>React.createElement('span',null,'Fixture ballot clock')}:name==='./action-button'?actions:name==='../lib/instant-runoff'?require('../lib/instant-runoff.ts'):name==='../lib/election-ids'?require('../lib/election-ids.ts'):require(name),async(url,options)=>{requests.push({url,body:options?.body});if(fail){fail=false;throw Error('Fixture connection interrupted.');}return{ok:true,status:200,json:async()=>({...data,voted:true})};});
  const render=()=>{cursor=0;refCursor=0;return exports.RankedBallot({onSnapshot:value=>received.push(value)});};
  const all=node=>[node,...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child=>typeof child==='object'?all(child):[child])];
  const action=text=>all(render()).find(node=>node?.type===actions.ActionButton&&node.props.children===text);
@@ -36,6 +36,15 @@ test('only a closed snapshot renders aggregate counts and foreign namespace cann
  const data=snapshot();data.result={winner:ids[2],humanBallots:2,simulatedPublicUnits:2,weightScale:4,rounds:[{human:{[ids[0]]:0,[ids[1]]:0,[ids[2]]:2},simulatedUnits:{[ids[0]]:2,[ids[1]]:0,[ids[2]]:0},weightedUnits:{[ids[0]]:2,[ids[1]]:0,[ids[2]]:8},eliminated:null}]};
  assert.doesNotMatch(renderToStaticMarkup(harness(data).render()),/Count winner:|2 human ballots/);data.status='closed';const html=renderToStaticMarkup(harness(data).render());assert.match(html,/Count winner: Mara Quell/);assert.match(html,/2 human ballots/);assert.match(html,/0.50 human-vote equivalents/);
  const h=harness({...snapshot(),nationId:'foreign'});h.all(h.render()).find(node=>node?.type==='form').props.onSubmit({preventDefault(){}});await new Promise(setImmediate);assert.equal(h.received.length,0);assert.match(renderToStaticMarkup(h.render()),/Citizenship or election changed/);
+});
+
+test('#936 ranked ballot accepts a cycle-N election id (QA2)',async()=>{
+ const data={...snapshot(),id:'kindle-presidential-poc-1-cycle-1'};const h=harness(data);
+ h.all(h.render()).find(node=>node?.type==='form').props.onSubmit({preventDefault(){}});await new Promise(setImmediate);
+ assert.equal(h.requests.length,1);assert.equal(h.received.length,1);assert.equal(h.received[0].id,'kindle-presidential-poc-1-cycle-1');
+ const acct={...snapshot(),id:'kindle-presidential-account-poc-1-cycle-2'};const h2=harness(acct);
+ h2.all(h2.render()).find(node=>node?.type==='form').props.onSubmit({preventDefault(){}});await new Promise(setImmediate);
+ assert.equal(h2.received[0].id,'kindle-presidential-account-poc-1-cycle-2');
 });
 if(process.env.HARIMU_BALLOT_FIXTURE){
  const css=(await Promise.all(['globals.css','game-shell.css'].map(file=>readFile(new URL(`../app/${file}`,import.meta.url),'utf8')))).join('\n');const data={...snapshot(),privacyReady:false,status:'waiting',opensAt:null,closesAt:null};

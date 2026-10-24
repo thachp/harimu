@@ -87,6 +87,7 @@ const flagOffPins = {
   HARIMU_WAR_WEARINESS_LOSSES_ENABLED: 'war-weariness-losses-495.test.mjs',
   HARIMU_WAR_DECLARATION_LIMITS_ENABLED: 'war-limits.test.mjs',
   HARIMU_WAR_ASSEMBLY_ENABLED: 'war-assembly-427.test.mjs',
+  HARIMU_WAR_LOSS_CAP_ENABLED: 'war-loss-cap-912.test.mjs',
   HARIMU_WAR_ENDINGS_ENABLED: 'war-endings-427.test.mjs',
   HARIMU_DIPLOMACY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_EMBARGO_ENABLED: 'embargo.test.mjs',
@@ -103,6 +104,7 @@ const flagOffPins = {
   HARIMU_REPORTS_ENABLED: 'reports-743.test.mjs',
   HARIMU_DORMANCY_ENABLED: 'dormancy-739.test.mjs',
   HARIMU_VOTE_BUYING_WATCH_ENABLED: 'vote-buying-watch-825.test.mjs',
+  HARIMU_RISK_SCORING_ENABLED: 'risk-scoring-879.test.mjs',
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
 };
 

@@ -1,7 +1,7 @@
 import { confluencePriceBoard } from '@/lib/confluence-price-band'; // #487
 import { isFoundingNation, readFoundingState } from '@/lib/founding-period'; // #612
 import { publicSuccession, readSuccession } from '@/lib/aurelle-succession'; // #613
-import {accountElectionEnabled,accountElectionDatabase,accountElectionId} from '@/lib/preview-election';
+import {accountElectionEnabled,accountElectionDatabase,accountIdFor} from '@/lib/preview-election';
 import { wearinessEnabled, wearinessLossesEnabled, type WearinessBindings } from '@/lib/war-weariness'; // #423
 import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
@@ -21,7 +21,7 @@ import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket
 import { marketFlagOn } from '@/lib/market-visibility';
 import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
-import {readElection,openPreviewElection} from '@/lib/elections';
+import {readElection,openPreviewElection,electionIdFor} from '@/lib/elections';
 import {readCollectivePetitions,recordVerifiedHumanVisit} from '@/lib/collective-petitions';
 import { authenticatedUserId } from '@/lib/auth';
 import { readCivicRank } from '@/lib/civic-rank';
@@ -38,7 +38,7 @@ import { mvpJobTypesEnabled } from '@/lib/mvp-job-types'; // #886 (b)
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
-import { presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918
+import { presidentialCycle, presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918, #936
 /** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true'; // #362
@@ -213,7 +213,7 @@ export async function GET(request: Request) {
   const civicNow=Math.floor(Date.now()/1000);
   const civicRankOn = civicRankFlagOn(env); // #741
   const [election, collectivePetitions, firstWeek, governmentRead, civicRank] = await Promise.all([
-    profile?.nation_id==='kindle'?readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true):null,
+    profile?.nation_id==='kindle'?readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true,undefined,false,presidentialWindow(env as unknown as CalendarBindings,civicNow),electionIdFor(presidentialCycle(env as unknown as CalendarBindings,civicNow))):null,
     profile?.nation_id==='kindle'?readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
     profile ? readFirstWeekProgress(database,userId) : null,
     profile?.nation_id ? readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId, { readOnly: true, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' }) : null,
@@ -225,7 +225,7 @@ export async function GET(request: Request) {
   const playable = playableNationIds(env as never, userId), flagPlayable = playable.some(id => !(liveNations as readonly string[]).includes(id));
   return privateJson({ ...(flagPlayable ? { openNations: playable } : {}),
     aurellePlan,
-    election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountElectionId}:{})}:null,
+    election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountIdFor(election!.id)}:{})}:null,
     collectivePetitions,
     korundPlan,
     ...nationWork,
@@ -276,8 +276,8 @@ async function recordCivicPresence(database: Awaited<ReturnType<typeof getDataba
   if (citizen?.nation_id) await latchGovernmentReviews(database, citizen.nation_id, now);
   if (citizen?.nation_id !== 'kindle') return;
   const accountLevel = accountElectionEnabled(env as unknown as { NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?: string; HARIMU_ACCOUNT_ELECTION_POC_ENABLED?: string });
-  if (accountLevel) await openPreviewElection(accountElectionDatabase(database), userId, now, true, undefined, presidentialWindow(env as unknown as CalendarBindings, now)?.opensAt ?? null); // #918: held unless the calendar window is open
-  if ((await readVerification(userId)).countedActionsEligible) { await recordVerifiedHumanVisit(database, userId, now, { aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true' }); await openPreviewElection(database, userId, now); }
+  if (accountLevel) await openPreviewElection(accountElectionDatabase(database), userId, now, true, undefined, presidentialWindow(env as unknown as CalendarBindings, now)?.opensAt ?? null, electionIdFor(presidentialCycle(env as unknown as CalendarBindings, now))); // #918, #936: held unless the calendar window is open
+  if ((await readVerification(userId)).countedActionsEligible) { await recordVerifiedHumanVisit(database, userId, now, { aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true' }); await openPreviewElection(database, userId, now, undefined, undefined, presidentialWindow(env as unknown as CalendarBindings, now)?.opensAt ?? null, electionIdFor(presidentialCycle(env as unknown as CalendarBindings, now))); } // #936: Tier-1 is calendar-gated too
 }
 
 async function handlePost(request: Request) {
@@ -286,7 +286,7 @@ async function handlePost(request: Request) {
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
 
   const database = await getDatabase();
-  const simulation = await advanceWorld(database, undefined, { ...((env as unknown as { HARIMU_VOTE_BUYING_WATCH_ENABLED?: string }).HARIMU_VOTE_BUYING_WATCH_ENABLED === 'true' ? { voteBuyingWatch: true } : {}), dormancy: (env as unknown as { HARIMU_DORMANCY_ENABLED?: string }).HARIMU_DORMANCY_ENABLED === 'true', reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true', aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true', aurelleCoup: (env as unknown as { HARIMU_AURELLE_COUP_ENABLED?: string }).HARIMU_AURELLE_COUP_ENABLED === 'true', favorDecay: (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true', kindleAssembly: assemblyTickConfig(env as unknown as AssemblyBindings), primaries: primaryTickConfig(env as unknown as PrimaryBindings), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warLimits: (env as unknown as { HARIMU_WAR_DECLARATION_LIMITS_ENABLED?: string }).HARIMU_WAR_DECLARATION_LIMITS_ENABLED === 'true', warAssembly: (env as unknown as { HARIMU_WAR_ASSEMBLY_ENABLED?: string }).HARIMU_WAR_ASSEMBLY_ENABLED === 'true', warEndings: (env as unknown as { HARIMU_WAR_ENDINGS_ENABLED?: string }).HARIMU_WAR_ENDINGS_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true', targetedSanctions: (env as unknown as { HARIMU_TARGETED_SANCTIONS_ENABLED?: string }).HARIMU_TARGETED_SANCTIONS_ENABLED === 'true', foundingPeriod: (env as unknown as { HARIMU_FOUNDING_PERIOD_ENABLED?: string }).HARIMU_FOUNDING_PERIOD_ENABLED === 'true' , religiousHarmony: (env as unknown as { HARIMU_RELIGIOUS_HARMONY_ENABLED?: string }).HARIMU_RELIGIOUS_HARMONY_ENABLED === 'true' }); // #842 harmony after dormancy (dormancy-739 pin)
+  const simulation = await advanceWorld(database, undefined, { ...((env as unknown as { HARIMU_VOTE_BUYING_WATCH_ENABLED?: string }).HARIMU_VOTE_BUYING_WATCH_ENABLED === 'true' ? { voteBuyingWatch: true } : {}), ...((env as unknown as { HARIMU_RISK_SCORING_ENABLED?: string }).HARIMU_RISK_SCORING_ENABLED === 'true' ? { riskScoring: true } : {}), dormancy: (env as unknown as { HARIMU_DORMANCY_ENABLED?: string }).HARIMU_DORMANCY_ENABLED === 'true', reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true', aurelleRising: (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true', aurelleCoup: (env as unknown as { HARIMU_AURELLE_COUP_ENABLED?: string }).HARIMU_AURELLE_COUP_ENABLED === 'true', favorDecay: (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true', kindleAssembly: assemblyTickConfig(env as unknown as AssemblyBindings), primaries: primaryTickConfig(env as unknown as PrimaryBindings), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warLimits: (env as unknown as { HARIMU_WAR_DECLARATION_LIMITS_ENABLED?: string }).HARIMU_WAR_DECLARATION_LIMITS_ENABLED === 'true', warAssembly: (env as unknown as { HARIMU_WAR_ASSEMBLY_ENABLED?: string }).HARIMU_WAR_ASSEMBLY_ENABLED === 'true', warEndings: (env as unknown as { HARIMU_WAR_ENDINGS_ENABLED?: string }).HARIMU_WAR_ENDINGS_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true', targetedSanctions: (env as unknown as { HARIMU_TARGETED_SANCTIONS_ENABLED?: string }).HARIMU_TARGETED_SANCTIONS_ENABLED === 'true', foundingPeriod: (env as unknown as { HARIMU_FOUNDING_PERIOD_ENABLED?: string }).HARIMU_FOUNDING_PERIOD_ENABLED === 'true' , religiousHarmony: (env as unknown as { HARIMU_RELIGIOUS_HARMONY_ENABLED?: string }).HARIMU_RELIGIOUS_HARMONY_ENABLED === 'true' }); // #842 harmony after dormancy (dormancy-739 pin)
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
   await recoverCapacity(database, userId, new Date().toISOString(), interval);
   let body: Record<string, unknown>;
