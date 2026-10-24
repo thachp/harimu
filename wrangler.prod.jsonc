@@ -160,6 +160,7 @@
     "HARIMU_WAR_DECLARATION_LIMITS_ENABLED": "false",
     // #427: the Kindle Assembly votes on the President's war declaration (more than half of all seats, decided on the next tick). Needs HARIMU_WAR_ENABLED too.
     "HARIMU_WAR_ASSEMBLY_ENABLED": "false",
+    "HARIMU_WAR_LOSS_CAP_ENABLED": "false",
     // #427 slice 2: war endings by surrender (the surrendering nation's own assembly) and concession of Frontier nation squares (both sides ratify), decided on the next tick. Needs HARIMU_WAR_ENABLED too.
     "HARIMU_WAR_ENDINGS_ENABLED": "false",
     // #308: AI treaties PoC (non-aggression pact, trade agreement). Off until QA; treaties are proposed and ratified by server code only.
