@@ -125,6 +125,8 @@
     "HARIMU_ARMY_MAP_ENABLED": "true",
     // #738 slice 5: supply lines from depots (each nation's capital); a unit marching beyond supply range loses strength each game day, shown on the army card and the Army positions legend. Needs HARIMU_ARMY_MAP_ENABLED and its flags. Off: no supply reads and the slice-4 shapes. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_ARMY_SUPPLY_ENABLED": "true",
+    // #738 battles: an attacking unit staged next to the defender's capital fights deterministic 10-minute rounds from current strength (with supply loss) and morale; the capital is never captured. Needs HARIMU_ARMY_SUPPLY_ENABLED and its flags. Off: GET /api/army/battles is 404 and the card has no battle line. Full-line comment only: scripts/development-config.mjs strips full-line comments.
+    "HARIMU_ARMY_BATTLES_ENABLED": "true",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
@@ -139,6 +141,8 @@
     "HARIMU_AI_RALLY_SPEECHES_ENABLED": "true",
     // #881: city chat channel (one per city, current city only, 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). Global and DMs follow.
     "HARIMU_CITY_CHAT_ENABLED": "true",
+    // #881 part 2: global chat channel (every enrolled citizen, author nation shown, 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). DMs follow.
+    "HARIMU_GLOBAL_CHAT_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).

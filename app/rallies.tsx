@@ -1,12 +1,14 @@
 'use client';
 // #867: Kindle rallies. Hidden unless GET /api/rallies answers (HARIMU_KINDLE_RALLIES_ENABLED on). Speeches are labeled AI.
 import { useEffect, useState } from 'react';
+import { SessionRetry, okOr5xx, useLoadRetry } from './session-retry';
 import type { Rally } from '@/lib/rallies';
 
 export function Rallies() {
   const [rallies, setRallies] = useState<Rally[] | null>(null), [eligible, setEligible] = useState(false), [note, setNote] = useState('');
-  useEffect(() => { fetch('/api/rallies').then(r => r.ok ? r.json() as Promise<{ rallies?: Rally[]; eligible?: boolean }> : null).then(d => { setRallies(d?.rallies ?? null); setEligible(!!d?.eligible); }).catch(() => setRallies(null)); }, []);
-  if (!rallies) return null;
+  const load = useLoadRetry(), { fail: loadFail, attempt: loadAttempt } = load;
+  useEffect(() => { fetch('/api/rallies').then(okOr5xx).then(r => r.ok ? r.json() as Promise<{ rallies?: Rally[]; eligible?: boolean }> : null).then(d => { setRallies(d?.rallies ?? null); setEligible(!!d?.eligible); }).catch(() => { setRallies(null); loadFail(); }); }, [loadAttempt, loadFail]); // #928: a 5xx or offline load offers Retry
+  if (!rallies) return load.failed ? <SessionRetry name={'Campaign rallies'} onRetry={load.retry} /> : null;
   const attend = async (rallyId: string) => {
     const res = await fetch('/api/rallies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rallyId }) });
     const data = await (res.json() as Promise<{ rallies?: Rally[]; error?: string }>).catch(() => ({ error: String(res.status) }) as { rallies?: Rally[]; error?: string });

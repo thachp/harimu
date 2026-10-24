@@ -16,7 +16,7 @@ const probe = () => {
   const issues = [], vw = document.documentElement.clientWidth, bg = 'rgb(11, 32, 41)';
   if (document.documentElement.scrollWidth > vw + 1) issues.push(`page scrolls sideways by ${document.documentElement.scrollWidth - vw}px`);
   if (!document.querySelector('table caption')) issues.push('no captioned table after Load');
-  if (!/^3 items$/.test(document.querySelector('[role=status]')?.textContent ?? '')) issues.push(`status: "${document.querySelector('[role=status]')?.textContent}"`);
+  if (!/^3 entries$/.test(document.querySelector('[role=status]')?.textContent ?? '')) issues.push(`status: "${document.querySelector('[role=status]')?.textContent}"`);
   const texts = [...document.querySelectorAll('h1, label, th, td, caption, [role=status], button, input, select')].map(el => [el.textContent.trim().slice(0, 20) || el.tagName, getComputedStyle(el).color]);
   return { issues, texts, bg, controls: [...document.querySelectorAll('input, select, button, [role=region]')].map(el => { const r = el.getBoundingClientRect(); return [el.tagName, Math.round(r.height), Math.round(r.right)]; }) };
 };

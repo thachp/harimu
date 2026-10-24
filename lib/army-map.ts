@@ -37,7 +37,7 @@ export function positionAfter(from: Point, route: readonly Point[], elapsed: num
   return { ...at, arrived: true };
 }
 
-export type ArmyWar = { attacker_nation: string; defender_nation: string; mobilization_ends_at: number; declared_at: number };
+export type ArmyWar = { id?: string; attacker_nation: string; defender_nation: string; mobilization_ends_at: number; declared_at: number };
 export type ArmyPosition = { unitId: string; nationId: string; name: string; x: number; y: number; status: 'home' | 'marching' | 'staged'; towardNationId: string | null; supply?: { cut: boolean; cutDays: number; strengthLossPct: number } };
 /** Pure. AI officer orders, derived [ASSUMPTION]: a unit whose nation attacks in an active war marches from its capital toward the defender's capital once
  *  mobilization ends (the earliest-declared such war); every other unit holds at its own capital. When the war ends the unit is home again. */
@@ -48,6 +48,9 @@ export function unitMarch(nationId: string, wars: readonly ArmyWar[], now: numbe
   const target = war ? nationCapital(war.defender_nation) : null;
   return home && war && target ? { home, war, route: marchRoute(home, target) } : null;
 }
+/** #738 battles: when a march reaches its staging square (the end of the route), paying each square's terrain cost. */
+export const marchArrivalAt = (march: { war: ArmyWar; route: readonly Point[] }, terrain: ReadonlyMap<string, string> = terrainMap()) =>
+  march.war.mobilization_ends_at + march.route.reduce((sum, s) => sum + moveSeconds(terrain.get(`${s.x},${s.y}`)), 0);
 export function armyPositions(wars: readonly ArmyWar[], now: number, terrain: ReadonlyMap<string, string> = terrainMap()): ArmyPosition[] {
   return armyUnits.flatMap((unit): ArmyPosition[] => {
     const home = nationCapital(unit.nationId); if (!home) return [];
@@ -62,7 +65,7 @@ export const terrainMap = () => cached ??= new Map(seedWorldSquares(mappedNation
 
 /** One read: the active wars. GET only; it never writes. */
 export async function readActiveWars(db: GameDatabase): Promise<ArmyWar[]> {
-  const wars = (await db.prepare('SELECT attacker_nation, defender_nation, mobilization_ends_at, declared_at FROM wars WHERE ended_at IS NULL').all<ArmyWar>()).results ?? [];
+  const wars = (await db.prepare('SELECT id, attacker_nation, defender_nation, mobilization_ends_at, declared_at FROM wars WHERE ended_at IS NULL').all<ArmyWar>()).results ?? [];
   return wars.map(w => ({ ...w, mobilization_ends_at: Number(w.mobilization_ends_at), declared_at: Number(w.declared_at) }));
 }
 export async function readArmyPositions(db: GameDatabase, now: number, wars?: readonly ArmyWar[]) {

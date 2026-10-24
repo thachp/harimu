@@ -281,7 +281,7 @@ test(`#282: the panel renders the Content copy, the AI label, the fallback notic
   const tags = await load('ai-disclosure.tsx', {}), actions = await load('action-button.tsx', {});
   const { DebatePanel } = await load('debate.tsx', {
     '../lib/debate-copy': copyModule, './action-button': actions, './ai-disclosure': tags, './game-timer': { GameTimer: ({ label }) => React.createElement('span', null, label) },
-    './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
+    './session-retry': await load('session-retry.tsx', {}), './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
   });
   const base = debate => ({ enabled: true, electionId: 'e', debate: { id: 'd', stage: 'open', opensAt: 1, closesAt: 2, asked: false, questions: [], transcript: null, usingFallback: false, ...debate }, ai: { badge: true }, eligibility: { eligible: true, reason: '' } });
   const html = (snapshot, props = {}) => renderToStaticMarkup(React.createElement(DebatePanel, { snapshot, onAsk: () => {}, onVote: () => {}, busy: false, error: '', ...props }));

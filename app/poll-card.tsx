@@ -2,13 +2,15 @@
 // #740 slice 1: Kindle poll card. Hidden unless GET /api/polling answers (HARIMU_KINDLE_POLLING_ENABLED on). Strings from lib/kindle-polling-copy.ts.
 import { useEffect, useState } from 'react';
 import { pollCard, voterIntentPrompt as P } from '@/lib/kindle-polling-copy';
+import { SessionRetry, okOr5xx, useLoadRetry } from './session-retry';
 import type { PollView } from '@/lib/polling';
 
 export function PollCard() {
   const [view, setView] = useState<PollView | null>(null), [eligible, setEligible] = useState(false), [note, setNote] = useState('');
   const load = (d: { polling?: PollView | null; eligible?: boolean } | null) => { setView(d?.polling ?? null); if (d?.eligible !== undefined) setEligible(d.eligible); };
-  useEffect(() => { fetch('/api/polling').then(r => r.ok ? r.json() as Promise<{ polling?: PollView; eligible?: boolean }> : null).then(load).catch(() => setView(null)); }, []);
-  if (!view) return null;
+  const loadState = useLoadRetry(), { fail: loadFail, attempt: loadAttempt } = loadState;
+  useEffect(() => { fetch('/api/polling').then(okOr5xx).then(r => r.ok ? r.json() as Promise<{ polling?: PollView; eligible?: boolean }> : null).then(load).catch(() => { setView(null); loadFail(); }); }, [loadAttempt, loadFail]); // #928: a 5xx or offline load offers Retry
+  if (!view) return loadState.failed ? <SessionRetry name={pollCard.title} onRetry={loadState.retry} /> : null;
   const send = async (body: Record<string, unknown>) => {
     const res = await fetch('/api/polling', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await (res.json() as Promise<{ polling?: PollView; error?: string }>).catch(() => ({ error: String(res.status) }));

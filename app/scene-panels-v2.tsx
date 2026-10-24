@@ -81,3 +81,15 @@ export function MarketSummary({ nation, walletMinor, food, board, listings, onHo
       ...(board ? [{ id: 'board', label: 'City market board', onSelect: jump('.market-board') }] : []), ...(listings ? [{ id: 'listings', label: 'Kindle citizen listings', onSelect: jump('.player-market') }] : [])]}
     primary={{ label: 'Return to household', icon: cityPlaceIcon('household'), onSelect: onHousehold }} />;
 }
+/** #871 (#392 S11, NEXT_PUBLIC_HARIMU_UI_V2_PANEL): the Government (Civic) panel head, in the S3 shape. Existing copy and data only: the title, subtitle
+ *  and first row are the City destination card's; the lever rows are the headings of the civic sections this nation already shows, and each jumps there
+ *  (nothing is removed or moved). Levers a nation lacks are not shown. The primary is the open Kindle ballot when it is shown, else the petition section. */
+export function GovernmentSummary({ nation, account, enabled = uiV2PanelEnabled() }: { nation: Pick<Nation, 'id' | 'name' | 'government' | 'capital'>; account: boolean; enabled?: boolean }) {
+  if (!enabled) return null;
+  const ballot = nation.id === 'kindle' && account;
+  const voice = { id: 'voice', label: 'Policy and petitions', icon: cityPlaceIcon('government'), onSelect: jump('[aria-label="Government preview status"]') };
+  return <PanelV2 title="Government" subtitle={nation.name} rowsLabel="Government" stats={[{ label: 'Government', value: nation.government }, { label: 'Capital', value: nation.capital }]}
+    rows={[...(ballot ? [voice] : []), ...(nation.id === 'kindle' && account ? [{ id: 'petitions', label: 'Collective petitions', onSelect: jump('.collective-petitions') }] : []),
+      ...(nation.id === 'aurelle' && account ? [{ id: 'claimants', label: 'Claimants of the rival houses', onSelect: jump('[aria-label="Aurelle claimants and the Rising"]') }] : [])]}
+    primary={ballot ? { label: 'Presidential election · PoC', onSelect: jump('.ranked-ballot') } : voice} />;
+}
