@@ -59,4 +59,21 @@ for (const backend of ['sqlite', 'postgres']) {
     r.setFixtureEnv('HARIMU_ARMY_BATTLES_ENABLED', 'false');
     assert.equal((await r.call('army', 'alice')).data.army.unit.strength, 10, 'flag off: strength unchanged');
   });
+
+  test(`${backend}: QA2 on #940: with a cut supply line and a recent loss, the card and the next battle start from the same strength (carry, then supply)`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close()); await r.call('citizen', 'alice');
+    for (const [k, v] of Object.entries(ON)) r.setFixtureEnv(k, v);
+    assert.equal((await r.call('army', 'alice', { action: 'join', unitId: 'kindle-home-guard', requestId: 'loss-738-join3' })).status, 200);
+    const now = Math.floor(r.now / 1000), started = now - B.BATTLE_MAX_ROUNDS * B.BATTLE_ROUND_SECONDS - 60;
+    await r.db.prepare("INSERT INTO army_battles (battle_key, war_id, attacker_unit, defender_unit, started_at, rounds, status, retreated, attacker_strength, defender_strength, recorded_at) VALUES (?, 'old', 'kindle-home-guard', 'korund-home-guard', ?, ?, 'defender_won', 'attacker', 5, 9, ?)")
+      .bind(`old:kindle-home-guard:${started}`, started, B.BATTLE_MAX_ROUNDS, now).run();
+    await war(r, 'wn', now - 8 * 3600); // marching, supply cut 20%, staged an hour from now
+    const S = await r.importModule('lib/army-supply.ts'), M = await r.importModule('lib/army-map.ts'), wars = await M.readActiveWars(r.db);
+    assert.equal(S.unitSupply('kindle', wars, now).strengthLossPct, 20); assert.equal(S.unitSupply('kindle', wars, now + 3600).strengthLossPct, 20);
+    const card = (await r.call('army', 'alice')).data.army.unit;
+    assert.equal(card.battle, undefined, 'between battles');
+    assert.equal(card.strength, 4, 'carry (10 capped at 5), then supply (-20%): 4, not min(8, 5) = 5');
+    const [next] = await B.readBattles(r.db, wars, now + 3600);
+    assert.equal(next.rounds, 0); assert.equal(next.attackerStrength, card.strength, 'the next battle starts from the strength the card shows');
+  });
 }
