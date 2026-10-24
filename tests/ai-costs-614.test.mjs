@@ -1,5 +1,5 @@
 /** #614: read-only admin AI cost dashboard (GET /api/admin/ai-costs) over harimu_ai_reservations, on SQLite and PGlite (HARIMU_TEST_STORAGE=postgres).
- *  Flag HARIMU_AI_COST_DASHBOARD_ENABLED is "false" in both configs. Flag off or token unset = 404 with zero DB calls; wrong bearer = 401; GET never writes. */
+ *  Flag HARIMU_AI_COST_DASHBOARD_ENABLED is "true" in preview and "false" in production (#880). Flag off or token unset = 404 with zero DB calls; wrong bearer = 401; GET never writes. */
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
@@ -105,11 +105,11 @@ test('a failed read is an explicit 500 with an error field, never 200 with $0', 
   } finally { r.db.prepare = prepare; }
 });
 
-test('flag: "false" in preview and production with the same own-line comment; no route besides the admin GET reads the dashboard', () => {
+test('flag: preview on, production off; no route besides the admin GET reads the dashboard', () => {
+  assert.match(readFileSync('wrangler.jsonc', 'utf8'), /"HARIMU_AI_COST_DASHBOARD_ENABLED": "true"/);
+  assert.match(readFileSync('wrangler.prod.jsonc', 'utf8'), /"HARIMU_AI_COST_DASHBOARD_ENABLED": "false"/);
   for (const file of ['wrangler.jsonc', 'wrangler.prod.jsonc']) {
-    const text = readFileSync(file, 'utf8');
-    assert.match(text, /\n\s*\/\/ #614:[^\n]*\n\s*"HARIMU_AI_COST_DASHBOARD_ENABLED": "false",/, file);
-    assert.doesNotMatch(text, /HARIMU_ADMIN_TOKEN"\s*:/, `${file}: the admin token is a Worker secret, never a var`);
+    assert.doesNotMatch(readFileSync(file, 'utf8'), /HARIMU_ADMIN_TOKEN"\s*:/, `${file}: the admin token is a Worker secret, never a var`);
   }
   const route = readFileSync('app/api/admin/ai-costs/route.ts', 'utf8');
   assert.doesNotMatch(route, /export async function (POST|PUT|PATCH|DELETE)/); assert.doesNotMatch(route, /console\./, 'nothing is logged');
