@@ -139,6 +139,8 @@
     "HARIMU_AI_RALLY_SPEECHES_ENABLED": "false",
     // #881: city chat channel (one per city, current city only, 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). Global and DMs follow.
     "HARIMU_CITY_CHAT_ENABLED": "false",
+    // #881 part 2: global chat channel (every enrolled citizen, author nation shown, 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). DMs follow.
+    "HARIMU_GLOBAL_CHAT_ENABLED": "false",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "false",
     // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
