@@ -71,7 +71,7 @@ async function ensureSeed(db: GameDatabase, month: number, now: number): Promise
 /** Read-only. Flag off: the caller does not call this. A database without migration 0043, or before the first scheduled run, shows the live supply and the base index. */
 export async function readReserveBoard(db: GameDatabase, now: number): Promise<ReserveBoard> {
   // #679: the reads that only matter once the seed exists start alongside the seed read (parked, so a database without the seed or migration 0043 leaves no
-  // unhandled rejection; they are awaited only when the seed exists). Seeded: one round trip instead of five.
+  // unhandled rejection; they are awaited only when the seed exists). Seeded: one round trip instead of two.
   const reads = parked(Promise.all([latestRow(db),
     db.prepare(`SELECT ${columns} FROM spark_issuances WHERE route <> 'seed' ORDER BY game_month DESC, supply_after_minor DESC, issued_at DESC, id DESC LIMIT 1`).first<Row>(), worldEpoch(db),
     db.prepare(`SELECT ${columns} FROM spark_issuances ORDER BY issued_at, supply_after_minor, id`).all<Row>(),
