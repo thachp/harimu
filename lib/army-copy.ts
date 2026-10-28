@@ -90,6 +90,8 @@ export const unitMembership={
  battleOngoing:L('Battle with {nation}: round {round}.'),
  battleWon:L('Battle with {nation} won after {round} rounds. No capital changes hands.'),
  battleLost:L('Battle with {nation} lost after {round} rounds. No capital changes hands.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): #911, a wounded soldier (never killed, gear kept).
+ wounded:L('Wounded, back in action {time}.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),
