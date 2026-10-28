@@ -79,6 +79,8 @@ const flagOffPins = {
   HARIMU_AI_RALLY_SPEECHES_ENABLED: 'rally-speeches-876.test.mjs',
   HARIMU_CITY_CHAT_ENABLED: 'city-chat-881.test.mjs',
   HARIMU_GLOBAL_CHAT_ENABLED: 'global-chat-881.test.mjs',
+  HARIMU_DM_CHAT_ENABLED: 'dm-chat-881.test.mjs',
+  HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
