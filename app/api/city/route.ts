@@ -5,6 +5,7 @@ import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {cityForNation} from '@/lib/cities';
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
+import {cityTierUnlockFields} from '@/lib/city-tier'; // #979
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 async function context(request:Request){
@@ -12,10 +13,21 @@ async function context(request:Request){
  const db=await getDatabase();const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>();
  return {db,userId,nationId:citizen?.nation_id??null,now:Math.floor(Date.now()/1000)};
 }
+
+async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,cityId:string,body:Record<string,unknown>){
+ const vars=env as unknown as {HARIMU_CITY_TIER_UNLOCKS_ENABLED?:string;HARIMU_CITY_TIER_GROWTH_ENABLED?:string};
+ if(vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED!=='true')return body;
+ let tier=1;
+ if(vars.HARIMU_CITY_TIER_GROWTH_ENABLED==='true'){
+  const row=await db.prepare('SELECT tier FROM world_cities WHERE id=?').bind(cityId).first<{tier:number}>();
+  if(row)tier=Number(row.tier);
+ }
+ return {...body,...cityTierUnlockFields(tier)};
+}
 export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json({...location,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now)});
+ return json(await withTierUnlocks(ctx.db,location.currentCityId,{...location,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now)}));
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
@@ -36,5 +48,5 @@ export async function POST(request:Request){
  ]);
  if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json({...current,homeCityId:location.homeCityId,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now)});
+ return json(await withTierUnlocks(ctx.db,current.currentCityId,{...current,homeCityId:location.homeCityId,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now)}));
 }
