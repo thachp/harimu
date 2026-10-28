@@ -24,7 +24,11 @@ async function targetVisible(db:GameDatabase,userId:string,nationId:string,kind:
  if(kind==='citizen-message')return Boolean(await db.prepare('SELECT 1 AS ok FROM square_messages WHERE id=? AND nation_id=? AND deleted=0 AND user_id<>?').bind(targetId,nationId,userId).first())
   ||Boolean(await db.prepare('SELECT 1 AS ok FROM city_chat_messages m JOIN citizen_city_locations l ON l.user_id=? AND l.nation_id=m.nation_id AND l.current_city_id=m.city_id WHERE m.id=? AND m.nation_id=? AND m.deleted=0 AND m.user_id<>?').bind(userId,targetId,nationId,userId).first())
   // #881 part 2: or live in global chat (open to every enrolled citizen), and not by its author.
-  ||Boolean(await db.prepare('SELECT 1 AS ok FROM global_chat_messages WHERE id=? AND deleted=0 AND user_id<>?').bind(targetId,userId).first());
+  ||Boolean(await db.prepare('SELECT 1 AS ok FROM global_chat_messages WHERE id=? AND deleted=0 AND user_id<>?').bind(targetId,userId).first())
+  // #881 part 3: or a live DM the reporter is a party to (not their own).
+  ||Boolean(await db.prepare('SELECT 1 AS ok FROM dm_chat_messages WHERE id=? AND deleted=0 AND sender_id<>? AND (sender_id=? OR peer_id=?)').bind(targetId,userId,userId,userId).first())
+  // #882: or a live embassy message in a channel the reporter's nation belongs to (not their own).
+  ||Boolean(await db.prepare("SELECT 1 AS ok FROM embassy_chat_messages m JOIN citizens c ON c.clerk_user_id=? AND c.nation_id IS NOT NULL WHERE m.id=? AND m.deleted=0 AND m.user_id<>? AND (m.channel_id LIKE c.nation_id || '|%' OR m.channel_id LIKE '%|' || c.nation_id)").bind(userId,targetId,userId).first());
  // A Notable reply is only shown to the citizen who asked, so it must be one of their own Notable requests (the reservation row).
  // Only a finished request showed a reply. The reservation cannot tell a model reply from an authored fallback (both settle to 'finished').
  return Boolean(await db.prepare("SELECT 1 AS ok FROM harimu_ai_reservations WHERE request_id=? AND status='finished'").bind((await ownerPrefix(userId))+targetId).first());
