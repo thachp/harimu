@@ -2,9 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
-import { loadAiCosts, loadAiDecisions, loadLedger, loadReports, loadReviewQueue, loadRiskScores, loadVoteBuying, markReviewed, modConsoleEnabled, modPanels, utc } from '../lib/mod-console.ts';
+import { loadAiCosts, loadAiDecisions, loadKillSwitchEvents, loadLedger, loadReports, loadReviewQueue, loadRiskScores, loadVoteBuying, markReviewed, modConsoleEnabled, modPanels, utc } from '../lib/mod-console.ts';
 const read = f => readFile(new URL(`../${f}`, import.meta.url), 'utf8');
-const routes = ['/api/admin/ai-review-queue', '/api/admin/ai-costs', '/api/admin/ledger-reconciliation', '/api/admin/vote-buying', '/api/admin/risk-scores', '/api/admin/reports', '/api/admin/ai-decisions'];
+const routes = ['/api/admin/ai-review-queue', '/api/admin/ai-costs', '/api/admin/ledger-reconciliation', '/api/admin/vote-buying', '/api/admin/risk-scores', '/api/admin/reports', '/api/admin/ai-decisions', '/api/admin/kill-switch-events'];
 
 test('flag: preview on, production off, only the exact string "true" enables it; every harness that defines UI_V2_HOUSEHOLD defines it', async () => {
   assert.match(await read('wrangler.jsonc'), /"NEXT_PUBLIC_HARIMU_MOD_CONSOLE":\s*"true"/);
@@ -21,7 +21,7 @@ test('no new server logic or access: the page 404s with the flag off, only GETs 
   assert.match(page, /if \(!modConsoleEnabled\(\)\) notFound\(\);/); assert.match(page, /robots: \{ index: false, follow: false \}/);
   assert.doesNotMatch(ui + lib, /localStorage|sessionStorage|document\.cookie/); assert.match(lib, /method: 'POST'/); assert.match(lib, /markReviewed/);
   assert.deepEqual([...new Set([...lib.matchAll(/\/api\/[a-z/-]+/g)].map(m => m[0]))].sort(), [...routes].sort());
-  assert.deepEqual([...modPanels], ['ai-review-queue', 'ai-costs', 'ledger-reconciliation', 'vote-buying', 'risk-scores', 'reports', 'ai-decisions']);
+  assert.deepEqual([...modPanels], ['ai-review-queue', 'ai-costs', 'ledger-reconciliation', 'vote-buying', 'risk-scores', 'reports', 'ai-decisions', 'kill-switch-events']);
   await assert.rejects(readFile(new URL('../app/api/admin/mod-console', import.meta.url)), 'no new route');
 });
 
@@ -40,6 +40,9 @@ test('each loader sends the Bearer token and passes route errors through', async
   assert.deepEqual(await loadRiskScores('t'.repeat(16), fake('/api/admin/risk-scores', { reviewOnly: true, accounts: [{ userId: 'u1', score: 9, reasons: ['new_account'], civicActCount: 2, updatedAt: 10 }] })), { panel: 'risk-scores', ok: true, accounts: [{ userId: 'u1', score: 9, reasons: ['new_account'], civicActCount: 2, updatedAt: 10 }], reviewOnly: true });
   assert.equal(calls.at(-1)[0], '/api/admin/risk-scores');
   assert.equal((await loadRiskScores('x', fake('/x', {}, 401))).status, 401);
+  assert.deepEqual(await loadKillSwitchEvents('t'.repeat(16), fake('/api/admin/kill-switch-events', { events: [{ actor: 'operator', persona: 'kindle-journalist', state: 'on', reason: 'persona-mute', createdAt: 10 }] })), { panel: 'kill-switch-events', ok: true, events: [{ actor: 'operator', persona: 'kindle-journalist', state: 'on', reason: 'persona-mute', createdAt: 10 }] });
+  assert.equal(calls.at(-1)[0], '/api/admin/kill-switch-events');
+  assert.equal((await loadKillSwitchEvents('x', fake('/x', {}, 401))).status, 401);
   assert.deepEqual(await loadReports('t'.repeat(16), { limit: 1, offset: 1 }, fake('/api/admin/reports', { reports: [{ id: 'r2' }] })), { panel: 'reports', ok: true, reports: [{ id: 'r2' }] });
   assert.equal(calls.at(-1)[0], '/api/admin/reports?limit=1&offset=1');
   assert.deepEqual(await loadAiDecisions('t'.repeat(16), { limit: 50 }, fake('/api/admin/ai-decisions', { decisions: [{ id: 'd1' }] })), { panel: 'ai-decisions', ok: true, decisions: [{ id: 'd1' }] });
@@ -75,6 +78,7 @@ test('ARC: no data before the server accepts the token; the older-entries cue us
   assert.match(ui, /result\?\.ok && result\.panel === 'ledger-reconciliation' && result\.report/);
   assert.match(ui, /result\?\.ok && result\.panel === 'vote-buying' && result\.events\.length > 0/);
   assert.match(ui, /result\?\.ok && result\.panel === 'risk-scores' && result\.accounts\.length > 0/);
+  assert.match(ui, /result\?\.ok && result\.panel === 'kill-switch-events' && result\.events\.length > 0/);
   assert.match(ui, /result\?\.ok && result\.panel === 'reports' && result\.reports\.length > 0/);
   assert.match(ui, /result\?\.ok && result\.panel === 'ai-decisions' && result\.decisions\.length > 0/);
   assert.doesNotMatch(ui, /useEffect/, 'nothing loads before Load');
