@@ -75,6 +75,31 @@ test('advanceWorld: flag off does not sweep; flag on records one-way-trades', as
   assert.ok(listed.some(a => a.userId === 'sink' && a.reasons.includes('one-way-trades')));
 });
 
+
+for (const backend of ['sqlite', 'postgres']) {
+  test(`#958 multi-feeder sink (${backend}): DISTINCT one_way — two feeders each one-way to same sink does not duplicate INSERT / ON CONFLICT`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close());
+    const now = Math.floor(r.now / 1000), iso = sec => new Date(sec * 1000).toISOString();
+    const w = await r.importModule('lib/risk-scoring.ts');
+    await r.db.prepare("UPDATE citizens SET created_at=? WHERE clerk_user_id IN ('alice','bob')").bind(iso(now - 10 * DAY)).run();
+    const add = (id) => r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'kindle',?,18,0,'Good standing',?,?)").bind(id, id, iso(now - 10 * DAY), iso(now - 10 * DAY)).run();
+    for (const id of ['feed1', 'feed2', 'hub']) await add(id);
+    const fill = async (id, buyer, seller, at) => {
+      await r.db.prepare("INSERT INTO player_listings (id,seller_id,item,quantity,unit_minor,created_at) VALUES (?,?,'food',1,100,?)").bind(id, seller, at - 1).run();
+      await r.db.prepare("INSERT INTO player_fills (request_id,listing_id,buyer_id,seller_id,item,quantity,amount_minor,filled_at) VALUES (?,?,?,?,'food',1,100,?)").bind(id, id, buyer, seller, at).run();
+    };
+    for (let i = 0; i < 3; i++) { await fill(`f1${i}`, 'feed1', 'hub', now - H + i); await fill(`f2${i}`, 'feed2', 'hub', now - H + i); }
+    // Mutant without DISTINCT: LEFT JOIN one_way would emit hub twice → Postgres ON CONFLICT "cannot affect row a second time"
+    await assert.doesNotReject(() => w.runRiskScoring(r.db, now));
+    const rows = (await r.db.prepare("SELECT clerk_user_id, reasons, score FROM risk_scores WHERE clerk_user_id='hub'").all()).results;
+    assert.equal(rows.length, 1);
+    assert.match(String(rows[0].reasons), /one-way-trades/);
+    assert.equal(Number(rows[0].score), cfg.oneWayTradePoints);
+    // SQL itself must DISTINCT the sink uid (kills the mutant that only coincidentally works with one partner)
+    assert.match(w.riskSweepSql(w.countedActSources), /one_way AS \(SELECT DISTINCT f\.to_id AS uid/);
+  });
+}
+
 test('migration 0106 widens reasons CHECK and is reviewed', () => {
   const pg = readFileSync('db/postgres/0106_one_way_trades.sql', 'utf8');
   const d1 = readFileSync('drizzle/0106_one_way_trades.sql', 'utf8');

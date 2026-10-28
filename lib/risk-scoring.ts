@@ -84,7 +84,7 @@ WITH acts AS (${acts}),
  clerk AS (SELECT clerk_user_id AS uid FROM clerk_risk_signals WHERE disposable_email=1 OR sub_address=1),
  flows AS (${flows}),
  pair_fwd AS (SELECT from_id, to_id, COUNT(*) AS n FROM flows GROUP BY from_id, to_id),
- one_way AS (SELECT f.to_id AS uid FROM pair_fwd f LEFT JOIN pair_fwd r ON r.from_id=f.to_id AND r.to_id=f.from_id WHERE f.n>=${tradeFloor} AND COALESCE(r.n,0)=0),
+ one_way AS (SELECT DISTINCT f.to_id AS uid FROM pair_fwd f LEFT JOIN pair_fwd r ON r.from_id=f.to_id AND r.to_id=f.from_id WHERE f.n>=${tradeFloor} AND COALESCE(r.n,0)=0),
  candidates AS (SELECT uid FROM young UNION SELECT uid FROM counts WHERE n>=${floor} UNION SELECT uid FROM clerk UNION SELECT uid FROM one_way UNION SELECT clerk_user_id AS uid FROM risk_scores WHERE score>0)
 SELECT c.uid,
  (CASE WHEN y.uid IS NOT NULL THEN ${young} ELSE 0 END)+(CASE WHEN COALESCE(k.n,0)>=${floor} THEN ${base}+(COALESCE(k.n,0)-${floor})*${extra} ELSE 0 END)+(CASE WHEN cl.uid IS NOT NULL THEN ${clerkPts} ELSE 0 END)+(CASE WHEN ow.uid IS NOT NULL THEN ${oneWayPts} ELSE 0 END),
