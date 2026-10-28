@@ -58,3 +58,11 @@ export async function submitReport(db:GameDatabase,userId:string,nationId:string
  if(replay)return same(replay)?{status:201,body:{ok:true}}:err(409,'Request already used.');
  return err(409,'You already reported this.',{duplicate:true});
 }
+
+/** #959: staff list of player reports (docs §21.3). Newest first; limit/offset capped like the AI review queue. Flag HARIMU_REPORTS_ENABLED gates the admin route. */
+export type ModerationReportRow={id:string;request_id:string;reporter_id:string;target_kind:string;target_id:string;reason_id:string;note:string|null;created_at:number};
+export async function listModerationReports(db:GameDatabase,{limit=50,offset=0}:{limit?:number;offset?:number}={}):Promise<ModerationReportRow[]>{
+ const lim=Math.min(Math.max(1,limit|0||50),200),off=Math.max(0,offset|0);
+ const rows=await db.prepare('SELECT id,request_id,reporter_id,target_kind,target_id,reason_id,note,created_at FROM moderation_reports ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?').bind(lim,off).all<ModerationReportRow>();
+ return rows.results??[];
+}
