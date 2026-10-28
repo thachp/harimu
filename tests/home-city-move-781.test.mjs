@@ -117,7 +117,8 @@ for (const backend of ['sqlite', 'postgres']) {
     for (const id of ['kim', 'kip']) await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'korund',?,18,0,'Good standing',?,?)").bind(id, id, at, at).run();
     const settle = async (user, i) => { const id = randomUUID(), iso = new Date((1 + i) * 1000).toISOString();
       await r.db.prepare('INSERT INTO work_shifts VALUES (?,?,?,?,?,?,?,?,?)').bind(id, user, 'aurelle-food-estate', 'Korund fixture', '4 state food', 4, iso, iso, iso).run();
-      await r.db.prepare('INSERT INTO korund_settlements(shift_id,clerk_user_id,wage_minor,food_output,settled_at) VALUES (?,?,800,4,?)').bind(id, user, 1 + i).run(); };
+      await r.db.prepare('INSERT INTO korund_settlements(shift_id,clerk_user_id,wage_minor,food_output,settled_at) VALUES (?,?,800,4,?)').bind(id, user, 1 + i).run();
+      await r.db.prepare("INSERT INTO labor_note_issuances(id,shift_id,clerk_user_id,amount_minor,source,issued_at) VALUES (?,?,?,800,'korund-brigade-wage',?)").bind('ln-wage:' + id, id, user, 1 + i).run(); }; // #957
     await settle('kim', 0); await settle('kim', 1); await settle('kip', 2);
     const { laborNoteSql, laborNoteBinds } = await r.importModule('lib/korund-wallet.ts');
     const ln = async u => Number((await r.db.prepare(`SELECT ${laborNoteSql('?')} AS n`).bind(...laborNoteBinds(u)).first()).n);
