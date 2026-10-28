@@ -185,6 +185,8 @@
     "HARIMU_DEBATE_ENABLED": "false",
     // #282: the AI candidates' debate answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_DEBATE_ENABLED, the AI binding and a valid AI budget. Off, every answer is the candidate's fallback line.
     "HARIMU_AI_DEBATE_ANSWERS_ENABLED": "false",
+    // #885: Labor Note monthly and Crown yearly emission caps matching Spark's Charter Limit (15%/30%). Off: settle and decree paths stay byte-identical; no new writes.
+    "HARIMU_EMISSION_CAPS_ENABLED": "false",
     // #431: Kindle Spark money supply and Price Index PoC (Reserve Board issuance within the 3% cap and the Charter Limit). Off until QA; issuance is written only by the scheduled Worker.
     "HARIMU_SPARK_SUPPLY_ENABLED": "false",
     // #432: daily ledger reconciliation job and its read-only admin report route. Off until QA. The route also needs the HARIMU_ADMIN_TOKEN Worker secret (set in the dashboard, never in this file); without it the route is a 404.
@@ -203,6 +205,8 @@
     "HARIMU_VOTE_BUYING_WATCH_ENABLED": "false",
     // #879: integrity risk scores for staff review (docs §20). New accounts and dense counted civic acts raise a score. Human review only: never an automatic ban or block. GET /api/admin/risk-scores needs HARIMU_ADMIN_TOKEN.
     "HARIMU_RISK_SCORING_ENABLED": "false",
+    // #943: mirror Clerk email signals (disposable domain / plus-sub-address) into staff risk scores. Read-only users.getUser with the existing CLERK_SECRET_KEY; no dashboard change. Off: no Clerk call and no signal rows. Needs HARIMU_RISK_SCORING_ENABLED.
+    "HARIMU_CLERK_RISK_SIGNALS_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
     // Realtime presence spike (#76): server and client flags; on in preview (preview-flags-on), "false" in production.
     "HARIMU_REALTIME_PRESENCE": "false",

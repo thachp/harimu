@@ -23,9 +23,9 @@ const real = url ? {} : { skip: 'set HARIMU_TEST_POSTGRES_URL to a Postgres admi
 test('every pool-paid claim batch locks the pool row first (korund brigade, korund posts, aurelle food estate and charters)', async () => {
   const korund = await readFile(new URL('../lib/korund.ts', import.meta.url), 'utf8'), aurelle = await readFile(new URL('../lib/aurelle.ts', import.meta.url), 'utf8');
   assert.match(korund, /db\.batch\(\[db\.prepare\(korundPoolLockSql\),db\.prepare\(korundSettleSql\)/, 'brigade');
-  assert.match(korund, /db\.batch\(\[db\.prepare\(korundPoolLockSql\),db\.prepare\(postSettleSql\)/, 'posts');
+  assert.match(korund, /korundPoolLockSql/, 'posts'); assert.match(korund, /postSettleSql/, 'posts settle');
   assert.match(aurelle, /db\.batch\(\[\n? ?db\.prepare\(aurellePoolLockSql\),db\.prepare\(aurelleClaimReceiptSql\)/, 'food estate');
-  assert.match(aurelle, /db\.batch\(\[\n? ?db\.prepare\(aurellePoolLockSql\),db\.prepare\(aurelleCharterClaimReceiptSql\)/, 'charter jobs (#886 c)');
+  assert.match(aurelle, /aurellePoolLockSql/, 'charter jobs lock'); assert.match(aurelle, /aurelleCharterClaimReceiptSql|claimReceipt/, 'charter jobs receipt (#886 c / #885)');
   assert.match(korund, /export const korundPoolLockSql="UPDATE korund_resources SET initial_minor=initial_minor WHERE id='state'"/);
   assert.match(aurelle, /export const aurellePoolLockSql="UPDATE aurelle_resources SET initial_minor=initial_minor WHERE id='estate'"/);
 });

@@ -100,6 +100,7 @@ const flagOffPins = {
   HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED: 'town-hall.test.mjs',
   HARIMU_DEBATE_ENABLED: 'debate.test.mjs',
   HARIMU_AI_DEBATE_ANSWERS_ENABLED: 'debate.test.mjs',
+  HARIMU_EMISSION_CAPS_ENABLED: 'emission-caps-885.test.mjs',
   HARIMU_SPARK_SUPPLY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_LEDGER_RECONCILIATION_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_AI_COST_DASHBOARD_ENABLED: 'ai-costs-614.test.mjs',
@@ -108,6 +109,7 @@ const flagOffPins = {
   HARIMU_DORMANCY_ENABLED: 'dormancy-739.test.mjs',
   HARIMU_VOTE_BUYING_WATCH_ENABLED: 'vote-buying-watch-825.test.mjs',
   HARIMU_RISK_SCORING_ENABLED: 'risk-scoring-879.test.mjs',
+  HARIMU_CLERK_RISK_SIGNALS_ENABLED: 'clerk-risk-signals-943.test.mjs',
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
 };
 
