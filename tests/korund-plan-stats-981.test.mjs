@@ -5,14 +5,15 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { korundWeeklyQuotaFood } from '../lib/korund-coupons.ts';
+import { korundWeekSeconds, korundWeeklyQuotaFood } from '../lib/korund-coupons.ts';
 import { korundPlanStatLine, korundPlanWeekSeconds, korundPlanWindow, planFulfilmentPercent } from '../lib/korund-plan-stats.ts';
 
 const W = 50400;
 const digits = text => [...text.matchAll(/\d+/g)].map(match => Number(match[0]));
 
 test('percent math: half-up rounding, zero output, and no percent for a zero or negative target', () => {
-  assert.equal(korundPlanWeekSeconds, W);
+  assert.equal(korundWeekSeconds, W);
+  assert.equal(korundPlanWeekSeconds, korundWeekSeconds);
   assert.equal(planFulfilmentPercent(0, 40), 0);
   assert.equal(planFulfilmentPercent(40, 40), 100);
   assert.equal(planFulfilmentPercent(45, 40), 113, '112.5 rounds half up, not toward 112');
@@ -118,5 +119,5 @@ test('the edition shows the server line only, with no hard-coded percent', async
   assert.match(panel, /\{news\.planStat && <p className="news-plan-stat"/);
   assert.match(panel, /\{news\.planStat\.line\}/);
   assert.doesNotMatch(panel, /% of plan|planStat\.percent|planStat\.output/);
-  assert.match(await readFile(new URL('../lib/korund.ts', import.meta.url), 'utf8'), /export const gameWeekSeconds = 50400/);
+  assert.match(await readFile(new URL('../lib/korund.ts', import.meta.url), 'utf8'), /export const gameWeekSeconds = korundWeekSeconds/);
 });

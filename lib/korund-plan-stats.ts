@@ -1,8 +1,9 @@
 /** #981 Korund State Media plan stats (docs §18.2, §8.6). Pure rules, no imports.
  *  The integer percent is this week's food output over the weekly quota (korund_settlements.food_output in the open game week,
  *  target korundWeeklyQuotaFood — the same ledger as the quota bar). The ledger has food, not a separate iron (or other) output, so the line names food.
- *  Words may spin; the only number is that percent. A non-positive target returns null so no line invents one. No table, no migration, no write. */
-export const korundPlanWeekSeconds = 50400; // mirrors lib/korund.ts gameWeekSeconds; a test pins them equal
+ *  Words may spin; the only number is that percent. A non-positive target returns null so no line invents one. No table, no migration, no write.
+ *  Week length matches korundWeekSeconds (re-exported as gameWeekSeconds). A test pins the values equal. */
+export const korundPlanWeekSeconds = 50400;
 const tickSeconds = 7200;
 
 /** Open game week containing `nowSeconds`, half-open [start, end), week numbers starting at 1. A missing epoch uses the tick-aligned fallback from lib/korund.ts week(). */
