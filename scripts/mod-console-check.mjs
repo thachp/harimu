@@ -42,7 +42,7 @@ export async function checkModConsole({ browser, preflight, failures, rows }) {
     const issues = [], ring = async () => page.evaluate(() => { const el = document.activeElement, cs = getComputedStyle(el); return { tag: el.tagName, w: parseFloat(cs.outlineWidth), style: cs.outlineStyle, color: cs.outlineColor }; });
     await page.keyboard.press('Tab'); let r = await ring(); if (r.tag !== 'INPUT') issues.push(`first Tab lands on ${r.tag}`);
     await page.keyboard.type('a-staff-token-1234');
-    for (const want of ['SELECT', 'SELECT', 'SELECT', 'BUTTON']) { await page.keyboard.press('Tab'); r = await ring();
+    for (const want of ['SELECT', 'SELECT', 'SELECT', 'INPUT', 'BUTTON']) { await page.keyboard.press('Tab'); r = await ring();
       if (r.tag !== want) issues.push(`Tab order: ${r.tag}, expected ${want}`); if (r.w < 2 || r.style === 'none' || (lum(r.color) + 0.05) / (lum('rgb(11, 32, 41)') + 0.05) < 3) issues.push(`${r.tag} focus ring ${JSON.stringify(r)}`); }
     await page.keyboard.press('Enter'); await page.waitForSelector('table', { timeout: 5000 }).catch(() => {});
     const p = await page.evaluate(probe); issues.push(...p.issues);
