@@ -1,5 +1,6 @@
 import type { GameDatabase } from './database-contract';
 import { skipForMutedPersona, aiPathPersonas, skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
+import { recordKillSwitchChanges } from './kill-switch-events';
 import { electionCandidates } from './elections';
 import { kindleCandidatePlatforms, pledge } from './kindle-parties';
 import { aiBudgetConfig, aiGatewayOptions, markAiReservationSent, markAiReservationUncertain, meteredAiCost, releaseAiReservation, reserveAiCabinetSequence, settleAiReservation, type AiBudgetConfig, type AiMeteredCall, type AiModel } from './ai-budget';
@@ -74,6 +75,7 @@ export async function generateAnswer(db: GameDatabase, now: number, binding: New
 /** One town hall answer attempt: draft in character from the platform cards, check it stays inside them, then the safety model. */
 export async function prepareTownHallAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number; killSwitch?: AiTemplatesOnlyEnv | null; failover?: AiFailoverEnv | null; secondary?: SecondaryLlm } = {}) {
   if (!options.enabled || !binding || !options.budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
+  await recordKillSwitchChanges(db, options.killSwitch, now); // #764: flag off returns before any events query
   // #742: templates-only mode (the candidates are Kindle's) makes no model call and no reservation; the question stays unanswered.
   if (skipForTemplates('town-hall', options.killSwitch, 'kindle', now)) return { status: 'templates-only' as const };
   // #764: a muted persona makes no model call and no reservation either.

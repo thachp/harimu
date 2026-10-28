@@ -49,11 +49,11 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(rec.mismatchCount, 0, JSON.stringify(rec.mismatches));
   });
 
-  test(`${backend}: flag off, a post assignment still works the food brigade, no post table row, no issuance`, async t => {
+  test(`${backend}: flag off, a post assignment still works the food brigade, no post table row; #957 still writes a brigade issuance`, async t => {
     const { r, post, work, issuances, plan } = await korund(t, { on: false, backend });
     await post('korund-quarry-gang'); const w = await work();
     assert.equal(w.start.status, 200); assert.equal(w.claim.status, 200); assert.equal(w.order, 'korund-food-production');
-    assert.deepEqual(await issuances(), []);
+    assert.deepEqual((await issuances()).map(i => [i.clerk_user_id, i.amount_minor, i.source]), [['ana', 800, 'korund-brigade-wage']]);
     assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM korund_post_settlements').first()).n), 0);
     assert.equal((await plan()).shifts[0].rewardItem, 'state food');
   });
@@ -65,13 +65,14 @@ test('flag on: the brigade assignment (or none) is unchanged; a replayed claim i
   await post('korund-food-production'); assert.equal((await work()).order, 'korund-food-production');
   await post('korund-rail-crew'); const w = await work();
   assert.equal((await r.call('citizen', 'ana', { action: 'korund-claim-work', shiftId: w.id })).status, 200, 'a replayed claim answers as before (idempotent)');
-  assert.equal((await issuances()).length, 1);
+  // #957: two brigade wages + one post wage each write an issuance; replay adds none.
+  assert.deepEqual((await issuances()).map(i => i.source), ['korund-brigade-wage', 'korund-brigade-wage', 'korund-post-wage']);
   const early = randomUUID(); assert.equal((await r.call('citizen', 'ana', { action: 'korund-start-work', requestId: early })).status, 200);
   assert.equal((await r.call('citizen', 'ana', { action: 'korund-claim-work', shiftId: early })).status, 409, 'unfinished');
   r.setNow(r.now + 7200 * 1000);
   await r.db.prepare("UPDATE korund_resources SET initial_minor=0 WHERE id='state'").run();
   assert.equal((await r.call('citizen', 'ana', { action: 'korund-claim-work', shiftId: early })).status, 409, 'the pool cannot cover it');
-  assert.equal((await issuances()).length, 1, 'no issuance without a payment');
+  assert.equal((await issuances()).length, 3, 'no issuance without a payment');
 });
 
 test('migration 0089 (pg and drizzle) creates both tables; the issuance row rides in the settle batch', async () => {

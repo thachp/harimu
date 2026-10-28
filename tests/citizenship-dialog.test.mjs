@@ -52,6 +52,26 @@ test('anonymous oath keeps sign-in control and error state offers retry without 
   h.button(h.render(),'Retry loading citizen').props.onClick();assert.equal(retry,true);
 });
 
+test('home cities preselect the capital and confirm sends the chosen id; without the list confirm sends none',()=>{
+  const h=harness();
+  h.props.homeCities=[{id:'forgehaven',name:'Forgehaven',capital:true},{id:'tarrek-foundry',name:'Tarrek Foundry',capital:false}];
+  let sent='unset'; h.props.onConfirm=id=>{sent=id;};
+  let tree=h.render();
+  assert.ok(h.all(tree).includes('Home city')); assert.ok(h.all(tree).includes('Forgehaven')); assert.ok(h.all(tree).includes('Tarrek Foundry'));
+  const radios=h.all(tree).filter(node=>node?.type==='input'&&node.props.type==='radio');
+  assert.equal(radios[0].props.checked,true); assert.equal(radios[1].props.checked,false);
+  radios[1].props.onChange();
+  h.button(h.render(),'Continue to oath').props.onClick();
+  h.all(h.render()).find(node=>node?.type==='input'&&node.props.type==='checkbox').props.onChange({target:{checked:true}});
+  h.button(h.render(),'Confirm citizenship').props.onClick();
+  assert.equal(sent,'tarrek-foundry');
+  const plain=harness(); let plainSent='unset'; plain.props.onConfirm=id=>{plainSent=id;};
+  plain.button(plain.render(),'Continue to oath').props.onClick();
+  plain.all(plain.render()).find(node=>node?.type==='input').props.onChange({target:{checked:true}});
+  plain.button(plain.render(),'Confirm citizenship').props.onClick();
+  assert.equal(plainSent,undefined);
+});
+
 test('oath consent and pending actions explain disabled controls and reject direct invocation',()=>{
  const h=harness();let confirms=0,closed=0;h.props.onConfirm=()=>{confirms++;};h.props.onClose=()=>{closed++;};
  h.button(h.render(),'Continue to oath').props.onClick();let tree=h.render();

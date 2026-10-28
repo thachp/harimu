@@ -55,7 +55,7 @@ const worker = {
       .then(() => undefined, error => { console.warn('[cron] Rally clips failed', error instanceof Error ? error.name : 'unknown'); }));
     if (on.tesseraRewards) ctx.waitUntil((async () => runTesseraRewardCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_TESSERA_REWARDS_ENABLED?: string }, async userId => (await readVerification(userId)).countedActionsEligible))()
       .then(() => undefined, error => { console.warn('[cron] Tessera reward epoch close failed', error instanceof Error ? error.name : 'unknown'); }));
-    // #952: one tier up after 7 real days above the next population floor. No-op unless HARIMU_CITY_TIER_GROWTH_ENABLED="true".
+    // #952 / #966: one tier up after 7 real days above the next population floor, or one tier down after 7 real days short of food or housing. No-op unless HARIMU_CITY_TIER_GROWTH_ENABLED="true".
     if (on.cityTier) ctx.waitUntil((async () => runCityTierGrowth(await getDatabase(), Math.floor(controller.scheduledTime / 1000), true))()
       .then(() => undefined, error => { console.warn('[cron] City tier growth failed', error instanceof Error ? error.name : 'unknown'); }));
   },

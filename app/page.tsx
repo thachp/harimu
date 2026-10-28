@@ -13,7 +13,7 @@ import { ActionButton } from './action-button';
 import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import { CountryScene } from './country-scene';
 import { HomeMoveCard } from './home-move-card'; // #781
-import { capitalCityForNation, cityForNation } from '@/lib/cities';
+import { capitalCityForNation, citiesForNation, cityForNation } from '@/lib/cities';
 import type { CityLocation, CoResident } from '@/lib/city-location';
 import { NationComparison } from './nation-comparison';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
@@ -477,7 +477,7 @@ function ClerkAccountControl() {
 type CitizenSnapshot = {
   /** #872: present only when a flag-opened nation is playable for this account (nationPlayable). */
   openNations?: string[];
-  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; armyMap?: boolean; civicRank?: boolean; kindleBudget?: boolean };
+  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; armyMap?: boolean; civicRank?: boolean; kindleBudget?: boolean; enrollHomeCity?: boolean };
   civicRank?: CivicRank;
   firstWeek?: { completed: string[] } | null;
   profile: {
@@ -667,6 +667,7 @@ export default function Home() {
   const [armyMapFlag, setArmyMapFlag] = useState(false); // #738 slice 4: flags.armyMap
   const [civicRank, setCivicRank] = useState<CivicRank | null>(null); // #741
   const [budgetFlag, setBudgetFlag] = useState(false); // #811: HARIMU_KINDLE_BUDGET_VIEW_ENABLED, from the citizen snapshot
+  const [enrollHomeCity, setEnrollHomeCity] = useState(false); // #965: HARIMU_ENROLL_HOME_CITY_ENABLED, from the citizen snapshot
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -1355,7 +1356,7 @@ export default function Home() {
     if ('cycleStartAt' in snapshot) setCycleStartAt(typeof snapshot.cycleStartAt === 'number' ? snapshot.cycleStartAt : null); // #969
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
-    if (snapshot.flags) { setBudgetFlag(snapshot.flags.kindleBudget === true); setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setArmyMapFlag(snapshot.flags.armyMap === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle
+    if (snapshot.flags) { setBudgetFlag(snapshot.flags.kindleBudget === true); setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setArmyMapFlag(snapshot.flags.armyMap === true); setEnrollHomeCity(snapshot.flags.enrollHomeCity === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
@@ -1505,7 +1506,7 @@ export default function Home() {
     }
   }
 
-  async function confirmEnrollment(nation: Nation) {
+  async function confirmEnrollment(nation: Nation, homeCityId?: string) {
     if (enrollmentLock.current) return;
     if (clerkConfigured && citizenSessionStatus !== 'ready') return;
     if (workLock.current || marketIntent.current || playerIntent.current || korundIntent.current || aurelleIntent.current) { setEnrollmentError('Confirm your pending economic action before changing citizenship.'); return; }
@@ -1566,7 +1567,7 @@ export default function Home() {
       const response = await fetch('/api/citizen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'enroll', nationId: nation.id, expectedNationId: enrollmentExpectedNation }),
+        body: JSON.stringify({ action: 'enroll', nationId: nation.id, expectedNationId: enrollmentExpectedNation, ...(homeCityId ? { cityId: homeCityId } : {}) }),
       });
       const result = await response.json() as {
         error?: string;
@@ -1946,9 +1947,10 @@ export default function Home() {
           const quality: QualityInput | undefined = 'skip' in choice ? choice : ticket ? { answers: choice.answers, ticket } : undefined;
           void runWork('commit-work', order, undefined, quality); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
+        homeCities={enrollHomeCity ? citiesForNation(pendingNation.id) : undefined}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}
-        onConfirm={() => void confirmEnrollment(pendingNation)}
+        onConfirm={cityId => void confirmEnrollment(pendingNation, cityId)}
         signInControl={<><SignInButton mode="modal"><button type="button">Sign in to continue</button></SignInButton>{guestEntry}</>} />}
 
   </>;

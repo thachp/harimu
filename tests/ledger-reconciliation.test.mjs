@@ -75,9 +75,11 @@ async function seedClean(r) {
   await r.db.prepare("INSERT INTO player_fills (request_id,listing_id,buyer_id,seller_id,item,quantity,amount_minor,filled_at) VALUES ('f-1','l-1','alice','bob','food',2,200,?)").bind(sec).run();
   await shift('s-k', 'korund1', 'korund-food-production');
   await r.db.prepare('INSERT INTO korund_settlements (shift_id,clerk_user_id,wage_minor,food_output,settled_at) VALUES (?,?,800,4,?)').bind('s-k', 'korund1', sec).run();
+  await r.db.prepare("INSERT INTO labor_note_issuances(id,shift_id,clerk_user_id,amount_minor,source,issued_at) VALUES ('ln-wage:s-k','s-k','korund1',800,'korund-brigade-wage',?)").bind(sec).run(); // #957
   await r.db.prepare("INSERT INTO korund_coupon_redemptions(id,clerk_user_id,game_week,coupon,item,quantity,price_minor,occurred_at) VALUES ('c-1','korund1',1,'goods','soap',1,200,?)").bind(sec).run();
   await shift('s-a', 'aur1', 'aurelle-food-estate');
   await r.db.prepare('INSERT INTO aurelle_settlements VALUES (?,?,?,?,?,?)').bind('s-a', 'aur1', 800, 4, 2, sec).run();
+  await r.db.prepare("INSERT INTO crown_issuances(id,shift_id,clerk_user_id,amount_minor,source,issued_at) VALUES ('crn-wage:s-a','s-a','aur1',800,'aurelle-food-estate-wage',?)").bind(sec).run(); // #957
   await r.db.prepare("INSERT INTO aurelle_receipts(id,clerk_user_id,action,quantity,occurred_at) VALUES ('r-1','aur1','aurelle-buy-food',2,?)").bind(sec).run();
   await r.db.prepare('INSERT INTO aurelle_purchases VALUES (?,?,?,?)').bind('r-1', 'aur1', 2, 300).run();
   await r.db.prepare("INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at) VALUES ('g-1','alice',5000,'starter-grant',?)").bind(sec).run();

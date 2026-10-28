@@ -5,6 +5,7 @@ import {accountElectionEnabled,accountElectionDatabase,accountIdFor} from '@/lib
 import { wearinessEnabled, wearinessLossesEnabled, type WearinessBindings } from '@/lib/war-weariness'; // #423
 import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
+import { recordEnrollHome, resolveEnrollHomeCity } from '@/lib/city-location'; // #965
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
 import { charterMealSeconds } from '@/lib/aurelle-charters'; // #531
 import { readCrownMint } from '@/lib/crown-debasement';
@@ -81,6 +82,7 @@ const korundRationCutOn = () => (env as unknown as { HARIMU_KORUND_RATION_CUT_EN
 const graySeizureOn = () => (env as unknown as { HARIMU_GRAY_SEIZURE_ENABLED?: string }).HARIMU_GRAY_SEIZURE_ENABLED === 'true';
 const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
+const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
 
 export const dynamic = 'force-dynamic';
 const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
@@ -236,7 +238,7 @@ export async function GET(request: Request) {
     ...(() => { const board = confluencePriceBoard(profile?.nation_id, userId, env as never); return board ? { confluencePriceBoard: board } : {}; })(), // #487: pure, no query
     firstWeek,
     ...(civicRank ? { civicRank } : {}), // #741: Kindle only, flag on only
-    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true', mapOverlays: (env as unknown as { HARIMU_MAP_OVERLAYS_ENABLED?: string }).HARIMU_MAP_OVERLAYS_ENABLED === 'true', ...(armyMapEnabled(env) ? { armyMap: true } : {}), /* #738 slice 4: only when on, like civicRank */ ...(civicRankOn ? { civicRank: true } : {}), ...((env as unknown as { HARIMU_KINDLE_BUDGET_VIEW_ENABLED?: string }).HARIMU_KINDLE_BUDGET_VIEW_ENABLED === 'true' ? { kindleBudget: true } : {}) }, // #811: flag off adds nothing // #82: the Overlays group renders only while this is true; // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
+    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true', mapOverlays: (env as unknown as { HARIMU_MAP_OVERLAYS_ENABLED?: string }).HARIMU_MAP_OVERLAYS_ENABLED === 'true', ...(armyMapEnabled(env) ? { armyMap: true } : {}), /* #738 slice 4: only when on, like civicRank */ ...(civicRankOn ? { civicRank: true } : {}), ...((env as unknown as { HARIMU_KINDLE_BUDGET_VIEW_ENABLED?: string }).HARIMU_KINDLE_BUDGET_VIEW_ENABLED === 'true' ? { kindleBudget: true } : {}), ...(enrollHomeOn() ? { enrollHomeCity: true } : {}) }, // #965: absent while off // #811: flag off adds nothing // #82: the Overlays group renders only while this is true; // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
     simulation,
     verification,
     economy,
@@ -428,6 +430,13 @@ async function handlePost(request: Request) {
     // #489: the same helper as the QA switch; a flag-on nation is open only to a QA-allowlisted account.
     if (!nationPlayable(nationId, env as never, userId)) return privateJson({ error: 'That nation is not open yet.', reason: 'not_playable' }, { status: 403 });
     if ((current?.nation_id??null)!==body.expectedNationId) return response(current,false,'Citizenship changed since this form was opened. Refresh and review your current nation before confirming another choice.');
+    // #965: optional city. Flag off ignores cityId (home stays the capital). A city outside this nation is refused before any write.
+    let enrollHome: string | null = null;
+    if (enrollHomeOn()) {
+      const chosen = resolveEnrollHomeCity(nationId, Object.hasOwn(body, 'cityId') ? body.cityId : null);
+      if (!chosen.ok) return privateJson({ error: 'Choose a city in this nation.', reason: 'not_in_nation' }, { status: 403 });
+      enrollHome = chosen.cityId;
+    }
     if (!current?.nation_id) {
       await database.batch([
         database.prepare(enrollmentInitialSql).bind(userId,nationId,now,now),
@@ -437,7 +446,10 @@ async function handlePost(request: Request) {
       await database.prepare(enrollmentChangeSql).bind(nationId,now,userId,body.expectedNationId,nationId,now,now,userId,userId,userId,userId,userId).run();
     }
     const updated=await readCurrent();
-    if (updated?.nation_id===nationId) return response(updated,true);
+    if (updated?.nation_id===nationId) {
+      if (enrollHome) await recordEnrollHome(database, userId, nationId, enrollHome, Math.floor(Date.parse(now) / 1000)); // no home_city_moves row
+      return response(updated,true);
+    }
     const status=updated?serializeCitizenship(updated,await readPolitical()):null;
     const error=status?.lockedReason==='political-action'?'Citizenship locked when you took your first political action.'
       :status?.lockedReason==='change-used'?'Your one free citizenship change has already been used.'
