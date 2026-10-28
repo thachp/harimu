@@ -37,15 +37,23 @@ export async function enqueueAiReview(db:GameDatabase,enabled:boolean,entry:AiRe
  }catch{console.warn(`[ai-review-queue] enqueue failed source=${entry.source}`);return null;}
 }
 export type AiReviewRow={id:string;created_at:number;source:string;nation_id:string;persona:string;output_text:string;filter_result:string;filter_detail:string|null;reason:string;reviewed_at:number|null;reviewer_note:string|null};
-export async function listAiReviewQueue(db:GameDatabase,{reason,nation,limit=50}:{reason?:string|null;nation?:string|null;limit?:number}={}){
+export async function listAiReviewQueue(db:GameDatabase,{reason,nation,limit=50,offset=0,reviewed}:{reason?:string|null;nation?:string|null;limit?:number;offset?:number;reviewed?:boolean|null}={}){
  const where:string[]=[],args:unknown[]=[];
  if(reason){where.push('reason=?');args.push(reason);}
  if(nation){where.push('nation_id=?');args.push(nation);}
- const rows=await db.prepare(`SELECT id,created_at,source,nation_id,persona,output_text,filter_result,filter_detail,reason,reviewed_at,reviewer_note FROM ai_review_queue${where.length?' WHERE '+where.join(' AND '):''} ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...args,Math.min(Math.max(1,limit),200)).all<AiReviewRow>();
+ if(reviewed===true)where.push('reviewed_at IS NOT NULL');
+ else if(reviewed===false)where.push('reviewed_at IS NULL');
+ const lim=Math.min(Math.max(1,limit|0||50),200),off=Math.max(0,offset|0);
+ const rows=await db.prepare(`SELECT id,created_at,source,nation_id,persona,output_text,filter_result,filter_detail,reason,reviewed_at,reviewer_note FROM ai_review_queue${where.length?' WHERE '+where.join(' AND '):''} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`).bind(...args,lim,off).all<AiReviewRow>();
  return rows.results??[];
 }
-/** Mark one entry reviewed with a note. Returns false when the id is unknown or already reviewed (first review wins). */
+/** #959: staff read of reviewed AI outputs (decision history). Same columns as the queue; only rows with a review. */
+export async function listAiDecisions(db:GameDatabase,opts:{reason?:string|null;nation?:string|null;limit?:number;offset?:number}={}){
+ return listAiReviewQueue(db,{...opts,reviewed:true});
+}
+/** Mark one entry reviewed with a note. Idempotent (#959): a second mark on the same id succeeds without changing the first note; unknown id returns false. */
 export async function markAiReviewed(db:GameDatabase,id:string,note:string,now:number){
  const result=await db.prepare('UPDATE ai_review_queue SET reviewed_at=?,reviewer_note=? WHERE id=? AND reviewed_at IS NULL').bind(now,note,id).run();
- return Number((result as {meta?:{changes?:number}}).meta?.changes??0)>0;
+ if(Number((result as {meta?:{changes?:number}}).meta?.changes??0)>0)return true;
+ return Boolean(await db.prepare('SELECT 1 AS ok FROM ai_review_queue WHERE id=? AND reviewed_at IS NOT NULL').bind(id).first());
 }
