@@ -2,6 +2,7 @@ import type { GameDatabase } from './database-contract';
 import { skipForMutedPersona, aiPathPersonas, skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
 import { electionCandidates } from './elections';
 import { aiBudgetConfig, type AiBudgetConfig } from './ai-budget';
+import type { AiFailoverEnv, SecondaryLlm } from './ai-failover';
 import type { NewsAiBinding } from './ai-news';
 import { platformCards, generateAnswer } from './town-hall-ai';
 import { rankQuestions } from './town-hall-rules';
@@ -9,7 +10,7 @@ import { debateHallId, debateQuestionsAsked, debateTopQuestions } from './debate
 
 /** #282: the AI candidates' debate answers. Scheduled Worker only (`runDebateCron`), never a route and never a read. Off unless HARIMU_DEBATE_ENABLED and HARIMU_AI_DEBATE_ANSWERS_ENABLED are both
  *  "true" and the AI binding and a valid daily AI budget are present. It reuses the town hall answer pipeline (draft, support check, safety model, one budget reservation, no digits or links). */
-export type DebateCronBindings = { AI?: NewsAiBinding; HARIMU_DEBATE_ENABLED?: string; HARIMU_AI_DEBATE_ANSWERS_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string; HARIMU_AI_TEMPLATES_ONLY?: string };
+export type DebateCronBindings = AiFailoverEnv & { AI?: NewsAiBinding; HARIMU_DEBATE_ENABLED?: string; HARIMU_AI_DEBATE_ANSWERS_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string; HARIMU_AI_TEMPLATES_ONLY?: string };
 export const debateCronMaxAnswers = 3; // per run, bounds inference time and spend
 export const debateAnswersConfigured = (b: DebateCronBindings) => b.HARIMU_DEBATE_ENABLED === 'true' && b.HARIMU_AI_DEBATE_ANSWERS_ENABLED === 'true' && Boolean(b.AI) && aiBudgetConfig(b) !== null;
 type Pending = { questionId: string; body: string; candidateId: string };
@@ -33,7 +34,7 @@ const reservationFor = (questionId: string, candidateId: string, day: string) =>
 export const debateAnswerInsertSql = `INSERT INTO debate_answers (question_id,candidate_id,answer_text,answered_at) SELECT ?,?,?,? FROM town_halls h WHERE h.id=? AND h.closes_at<=?
  AND ? IN (SELECT t.id FROM (SELECT q.id AS id FROM town_hall_questions q WHERE q.hall_id=h.id ORDER BY (SELECT COUNT(*) FROM town_hall_votes v WHERE v.question_id=q.id) DESC, q.created_at ASC, q.id ASC LIMIT ${debateQuestionsAsked}) t)
  ON CONFLICT DO NOTHING`;
-export async function prepareDebateAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number; killSwitch?: AiTemplatesOnlyEnv | null } = {}) {
+export async function prepareDebateAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number; killSwitch?: AiTemplatesOnlyEnv | null; failover?: AiFailoverEnv | null; secondary?: SecondaryLlm } = {}) {
   if (!options.enabled || !binding || !options.budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
   // #742: templates-only mode (the candidates are Kindle's) makes no model call and no reservation; the question stays unanswered.
   if (skipForTemplates('debate', options.killSwitch, 'kindle', now)) return { status: 'templates-only' as const };
@@ -66,7 +67,7 @@ export async function runDebateCron(db: GameDatabase, now: number, bindings: Deb
   if (!debateAnswersConfigured(bindings)) return { status: 'disabled' as const, results: [] as string[] };
   const budget = aiBudgetConfig(bindings)!, results: string[] = [];
   for (let i = 0; i < debateCronMaxAnswers; i++) {
-    const result = await prepareDebateAnswer(db, now, bindings.AI, { enabled: true, budget, killSwitch: bindings });
+    const result = await prepareDebateAnswer(db, now, bindings.AI, { enabled: true, budget, killSwitch: bindings, failover: bindings });
     results.push(result.status);
     if (result.status === 'idle' || result.status === 'disabled' || result.status === 'budget-unavailable' || result.status === 'templates-only') break;
   }

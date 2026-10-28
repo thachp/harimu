@@ -37,6 +37,8 @@
     "HARIMU_NOTABLES_ENABLED": "false",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
+    // #952: a founded city promotes one tier after its home-city population stays at or above the next tier's floor for 7 real days. Off: the daily check does not run and readers still see T1.
+    "HARIMU_CITY_TIER_GROWTH_ENABLED": "false",
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
     // #764: per-persona AI mute (operator control, not a feature flag). "" = off; "all" or a comma list of persona ids (Notable ids, <nation>-news-desk, kindle-cabinet, kindle-town-hall, kindle-debate) skips that persona's model calls. Unknown values fail closed to "all".
@@ -206,6 +208,8 @@
     // #943: mirror Clerk email signals (disposable domain / plus-sub-address) into staff risk scores. Read-only users.getUser with the existing CLERK_SECRET_KEY; no dashboard change. Off: no Clerk call and no signal rows. Needs HARIMU_RISK_SCORING_ENABLED.
     "HARIMU_CLERK_RISK_SIGNALS_ENABLED": "false",
     "HARIMU_AI_GATEWAY_ID": "harimu-production",
+    // #883: second LLM provider failover in the AI gateway. "true" in preview and "false" in production. Secondary runs only when this is "true" and the Worker secret HARIMU_AI_SECONDARY_PROVIDER_SECRET is non-empty; otherwise the call fails closed to authored content. The secret is not in this file, and this slice never calls a paid API.
+    "HARIMU_AI_SECONDARY_PROVIDER_ENABLED": "false",
     // Realtime presence spike (#76): server and client flags; on in preview (preview-flags-on), "false" in production.
     "HARIMU_REALTIME_PRESENCE": "false",
     "NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE": "false",
