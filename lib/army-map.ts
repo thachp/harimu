@@ -3,10 +3,11 @@
  *  HARIMU_ARMY_MAP_ENABLED (needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED). */
 import type { GameDatabase } from './database-contract';
 import { armiesEnabled, armyUnits } from './army-rules';
+import { flagOn } from './flag-pack.mjs';
 import { mappedNations, seedWorldSquares } from './map-zones';
 import { WORLD_GRID } from './globe-mapping';
 
-export const armyMapEnabled = (env: unknown) => armiesEnabled(env) && (env as { HARIMU_ARMY_MAP_ENABLED?: string }).HARIMU_ARMY_MAP_ENABLED === 'true';
+export const armyMapEnabled = (env: unknown) => armiesEnabled(env) && flagOn(env, 'HARIMU_ARMY_MAP_ENABLED');
 /** [ASSUMPTION] Seconds to enter one square, by terrain, inside the docs' 20–60 real minutes. Tuning values; named so they can move. */
 export const ARMY_MOVE_SECONDS_FAST = 20 * 60;   // plains, city
 export const ARMY_MOVE_SECONDS_MEDIUM = 30 * 60; // river edge

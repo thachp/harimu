@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { assertDevelopmentConfig, readDevelopmentConfig } from './development-config.mjs';
 import { assertDeployDatabase, connectPostgres } from './postgres-migrations.mjs';
 import { redactSecrets } from './redact.mjs';
-import { assertPinnedWrangler, deployArgs, isDryRun, withoutDashboardVars, withoutLegacyEnv } from './wrangler-pin.mjs';
+import { assertPinnedWrangler, deployArgs, isDryRun, readLivePlainText, withLiveDashboardVars, withoutDashboardVars, withoutLegacyEnv, writePreviewSecretsKeepFile } from './wrangler-pin.mjs';
 
 // #89: newer wrangler (e.g. 4.151) rejects `legacy_env` in the vinext-built config.
 // Always use the project-local, pinned wrangler; never a global or npx copy.
@@ -11,9 +11,14 @@ assertPinnedWrangler(JSON.parse(readFileSync('node_modules/wrangler/package.json
   JSON.parse(readFileSync('package.json', 'utf8')).devDependencies.wrangler);
 const dryRun = isDryRun(process.argv, process.env);
 {
-  // #394: also leave the dashboard-managed QA vars out of the deploy config so --keep-vars preserves their current values.
+  // #394 / #988: drop the repo defaults for dashboard QA vars, then (on a real deploy) copy the live values back. Folded-away flags are not kept.
   const built = JSON.parse(readFileSync('dist/server/wrangler.json', 'utf8'));
-  writeFileSync('dist/server/wrangler.json', JSON.stringify(withoutDashboardVars(withoutLegacyEnv(built))));
+  let config = withoutDashboardVars(withoutLegacyEnv(built));
+  if (!dryRun) {
+    config = withLiveDashboardVars(config, await readLivePlainText(process.env));
+    writePreviewSecretsKeepFile();
+  }
+  writeFileSync('dist/server/wrangler.json', JSON.stringify(config));
 }
 
 // Branch flow (#177): preview (harimu-preview) deploys from `release`; production deploys only from `main`

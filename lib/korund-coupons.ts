@@ -1,4 +1,5 @@
 import type {GameDatabase} from './database-contract';
+import { flagOn } from './flag-pack.mjs';
 // Issue #41: weekly Korund ration coupons (food, clothing, goods) and the work-unit quota bar.
 // Food coupons keep the existing ration/queue flow (korund_rations). Clothing and goods
 // coupons are redeemed for one fixed-price item each, paid in Labor Notes.
@@ -108,7 +109,7 @@ export async function korundRationCutCities(db:GameDatabase,epoch:number,at:numb
  return korundRationCut(week,shortfallPercent(food))?1:0;
 }
 /** #967 applies only when #776 would cut. Either flag off leaves Stability unchanged. */
-export const korundRationStabilityEnabled=(env:{HARIMU_KORUND_RATION_CUT_ENABLED?:string;HARIMU_KORUND_RATION_STABILITY_ENABLED?:string}|null|undefined)=>env?.HARIMU_KORUND_RATION_CUT_ENABLED==='true'&&env?.HARIMU_KORUND_RATION_STABILITY_ENABLED==='true';
+export const korundRationStabilityEnabled=(env:unknown)=>flagOn(env,'HARIMU_KORUND_RATION_CUT_ENABLED')&&flagOn(env,'HARIMU_KORUND_RATION_STABILITY_ENABLED');
 export const applyRationCut=(coupons:KorundCoupon[],cut:KorundRationCut|null):KorundCoupon[]=>cut?coupons.map(c=>(cut.withdrawn as string[]).includes(c.kind)?{...c,withdrawn:true as const}:c):coupons;
 /** Content's rationCut (lib/ration-copy.ts, #336), mirrored here so the panel keeps its one copy import (a test pins them equal). */
 export const korundRationCutCopy={label:'Rations are reduced',notice:'Plan output fell short, so this week\'s rations are reduced.',stability:'Stability falls with the rations.',withdrawn:'withdrawn this week (ration cut)'} as const;

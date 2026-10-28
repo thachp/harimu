@@ -7,12 +7,13 @@ import type { GameDatabase } from './database-contract';
 import { armyUnits, unitForNation } from './army-rules';
 import { marchArrivalAt, readActiveWars, unitMarch, type ArmyWar } from './army-map';
 import { applySupplyLoss, armySupplyEnabled, PERCENT, unitSupply } from './army-supply';
+import { flagOn } from './flag-pack.mjs';
 import { readUnitReadiness } from './army';
 import { woundedUntil } from './army-wounds';
 /** #934: battle square transfers use the same weekly-cap guard as siege captures. #910 does not capture; call `transferBattleSquares` when a path gains transfers. */
 export { transferBattleSquares } from './war-loss-cap';
 
-export const armyBattlesEnabled = (env: unknown) => armySupplyEnabled(env) && (env as { HARIMU_ARMY_BATTLES_ENABLED?: string } | null)?.HARIMU_ARMY_BATTLES_ENABLED === 'true';
+export const armyBattlesEnabled = (env: unknown) => armySupplyEnabled(env) && flagOn(env, 'HARIMU_ARMY_BATTLES_ENABLED');
 /** Docs §15.3: a round every 10 real minutes. */
 export const BATTLE_ROUND_SECONDS = 600;
 /** [ASSUMPTION] Tuning values (the docs give none). */

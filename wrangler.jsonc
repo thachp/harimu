@@ -61,19 +61,19 @@
     "HARIMU_FULMARA_ENABLED": "false",
     // #486 (Stage 0 closeout): a flag-on nation opens only when its registry entry is complete (capital and biome, currency, wage fund, jobs). Off: unchanged.
     "HARIMU_NATION_READINESS_ENABLED": "true",
-    "HARIMU_GRAY_MARKET_ENABLED": "true",
-    // #736: per-citizen daily gray-market volume cap (posted + accepted LN per UTC day). Off: no cap, exactly the #43 behaviour.
-    "HARIMU_GRAY_DAILY_CAP_ENABLED": "true",
-    // #749: each completed Korund gray-market trade adds private Suspicion (capped per day, never starts Correction Duty). Off: Suspicion from discoveries only.
-    "HARIMU_GRAY_SUSPICION_ENABLED": "true",
-    // #797: after an accepted gray-market trade a checkpoint may seize part of the buyer's LN bundle (chance rises with Suspicion, capped; one per game day); seized LN is destroyed. Off: no roll, no write.
-    "HARIMU_GRAY_SEIZURE_ENABLED": "true",
-    // #968: a #776 ration cut adds one shortage line on the rumored street rate (display only; the daily cap and Suspicion stay). Off: no line.
-    "HARIMU_GRAY_RATION_RISE_ENABLED": "true",
-    // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
-    "HARIMU_KORUND_MEDALS_ENABLED": "true",
-    // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
-    "HARIMU_KORUND_SHORTFALL_ENABLED": "true",
+    // #988: one JSON binding for the gray-market and Korund plan flags (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    "HARIMU_GRAY_PACK": {
+      "HARIMU_GRAY_MARKET_ENABLED": "true",
+      "HARIMU_GRAY_DAILY_CAP_ENABLED": "true",
+      "HARIMU_GRAY_SUSPICION_ENABLED": "true",
+      "HARIMU_GRAY_SEIZURE_ENABLED": "true",
+      "HARIMU_GRAY_RATION_RISE_ENABLED": "true",
+      "HARIMU_KORUND_MEDALS_ENABLED": "true",
+      "HARIMU_KORUND_SHORTFALL_ENABLED": "true",
+      "HARIMU_WALLET_STREET_RATE_ENABLED": "true",
+      "HARIMU_KORUND_RATION_CUT_ENABLED": "true",
+      "HARIMU_KORUND_RATION_STABILITY_ENABLED": "true"
+    },
     // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
     "HARIMU_SAVINGS_SHIELD_ENABLED": "true",
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
@@ -86,12 +86,6 @@
     "HARIMU_ENROLL_HOME_CITY_ENABLED": "true",
     // #777: goods-market seller fee (0.5%, rounded down) written as a sink row with each fill and netted from the wallet. Off: no fee written or read.
     "HARIMU_MARKET_FEE_ENABLED": "true",
-    // #758: Korund wallet shows the rumored LN street rate (from #43 trades, display only) to citizens who have traded on the gray market. Off: no read, wallet unchanged.
-    "HARIMU_WALLET_STREET_RATE_ENABLED": "true",
-    // #776: a closed-week plan shortfall withdraws goods (then clothing) coupons from the next week's book; the food ration is never cut (derived on read). Off: coupons unchanged.
-    "HARIMU_KORUND_RATION_CUT_ENABLED": "true",
-    // #967: when a #776 ration cut applies, Korund national Stability falls one step for that city-week (existing Stability score, never below 0). Off: score and notice unchanged.
-    "HARIMU_KORUND_RATION_STABILITY_ENABLED": "true",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).
     // #487: "true" in preview only so the Confluence cooperative job runs for QA-allowlisted accounts; production "false".
     "HARIMU_NATION_WORK_ENABLED": "true",
@@ -125,18 +119,16 @@
     "HARIMU_MAP_OVERLAYS_ENABLED": "true",
     // #741: Kindle civic rank ladder (Resident → Leading Citizen; an honor, no office or vote weight). Off: GET /api/citizen/civic-rank is 404, /api/citizen sends no civicRank and kindle-7-rank is unavailable. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_CIVIC_RANK_ENABLED": "true",
-    // #738 slice 1: army units: volunteer for your nation's home-guard unit, leave it, pick a squad stance. Needs HARIMU_WAR_ENABLED too. Off: /api/army is 404 and the card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
-    "HARIMU_ARMIES_ENABLED": "true",
+    // #988: one JSON binding for the army flags (needs HARIMU_WAR_ENABLED too). Preview on, production off. A direct HARIMU_* var still wins.
+    "HARIMU_ARMY_PACK": {
+      "HARIMU_ARMIES_ENABLED": "true",
+      "HARIMU_ARMY_DRILLS_ENABLED": "true",
+      "HARIMU_ARMY_MAP_ENABLED": "true",
+      "HARIMU_ARMY_SUPPLY_ENABLED": "true",
+      "HARIMU_ARMY_BATTLES_ENABLED": "true"
+    },
     // #842: Religious Harmony (docs 14.5): a per-nation 0–100 score from festival holidays, festival joins, banned-festival joins and Korund raids, feeding Stability (±5) and shown on the faith panel (Korund: band only). Off: no Stability input, no panel line, no reads. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_RELIGIOUS_HARMONY_ENABLED": "true",
-    // #738 slice 2: army drills: one drill per member per game day; current members' drills and shifts raise unit strength and morale on the card. Needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED too. Off: POST /api/army/drill is 404 and /api/army has no strength or morale. Full-line comment only: scripts/development-config.mjs strips full-line comments.
-    "HARIMU_ARMY_DRILLS_ENABLED": "true",
-    // #738 slice 4: army units on the map: the "Army positions" overlay shows each unit at its capital, or marching toward the enemy capital in a war its nation declared. Needs HARIMU_ARMIES_ENABLED and HARIMU_WAR_ENABLED too. Off: GET /api/army/positions is 404 and the overlay stays "Not available yet". Full-line comment only: scripts/development-config.mjs strips full-line comments.
-    "HARIMU_ARMY_MAP_ENABLED": "true",
-    // #738 slice 5: supply lines from depots (each nation's capital); a unit marching beyond supply range loses strength each game day, shown on the army card and the Army positions legend. Needs HARIMU_ARMY_MAP_ENABLED and its flags. Off: no supply reads and the slice-4 shapes. Full-line comment only: scripts/development-config.mjs strips full-line comments.
-    "HARIMU_ARMY_SUPPLY_ENABLED": "true",
-    // #738 battles: an attacking unit staged next to the defender's capital fights deterministic 10-minute rounds from current strength (with supply loss) and morale; the capital is never captured. Needs HARIMU_ARMY_SUPPLY_ENABLED and its flags. Off: GET /api/army/battles is 404 and the card has no battle line. Full-line comment only: scripts/development-config.mjs strips full-line comments.
-    "HARIMU_ARMY_BATTLES_ENABLED": "true",
     // #782: Kindle cosmetic "I Voted" badge after a written ballot (civic, preview or primary; docs 9.3). Derived from receipts, no currency. Off: GET /api/citizen/i-voted is 404 and the badge is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_I_VOTED_BADGE_ENABLED": "true",
     // #740 slice 1: Kindle polling PoC: voluntary voter-intent answers and one published poll per real day (n >= 10, margin 0.98/sqrt(n)). Off: /api/polling is 404 and the poll card is hidden. Full-line comment only: scripts/development-config.mjs strips full-line comments.

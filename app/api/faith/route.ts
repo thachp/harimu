@@ -7,12 +7,13 @@ import { travelBlock } from '@/lib/travel';
 import { harmonyEnabled, harmonyLine, readHarmonySignals, religiousHarmony, type HarmonyNation } from '@/lib/religious-harmony';
 import { festivalStance, holidayNationsOn } from '@/lib/festivals';
 import { acceptMission, answerMission, requestMission, setMissionaryMute } from '@/lib/missionary-actions'; // #225
+import { flagOn } from '@/lib/flag-pack.mjs'; // #988
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const flags = () => env as unknown as { HARIMU_FAITH_ENABLED?: string; HARIMU_TRAVEL_ENABLED?: string; HARIMU_FAVOR_DECAY_ENABLED?: string; HARIMU_GRAY_SUSPICION_ENABLED?: string };
 /** #752: the faith panel's underground Suspicion band includes gray-market trades, the same band as the Korund panel. Off: discoveries only (#382). */
-const graySuspicionOn = () => flags().HARIMU_GRAY_SUSPICION_ENABLED === 'true';
+const graySuspicionOn = () => flagOn(env, 'HARIMU_GRAY_SUSPICION_ENABLED');
 const faithEnabled = () => flags().HARIMU_FAITH_ENABLED === 'true';
 /** #529: the time (seconds) Royal Favor decay is evaluated at, only while HARIMU_FAVOR_DECAY_ENABLED is on; undefined (the default) keeps the flat Favor rule. */
 const favorDecayAt = (now: number) => flags().HARIMU_FAVOR_DECAY_ENABLED === 'true' ? now : undefined;

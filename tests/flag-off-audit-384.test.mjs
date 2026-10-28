@@ -10,10 +10,11 @@ import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { cronJobFlags, cronJobsOn } from '../lib/cron-gates.ts';
 import { selectStorageBackend } from '../lib/storage-selection.ts';
+import { expandFlagPacks } from '../lib/flag-pack.mjs';
 
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const configs = { 'wrangler.jsonc': strip(readFileSync('wrangler.jsonc', 'utf8')), 'wrangler.prod.jsonc': strip(readFileSync('wrangler.prod.jsonc', 'utf8')) };
-const declared = config => Object.keys(config.vars).filter(name => /^HARIMU_[A-Z0-9_]+_ENABLED$/.test(name)).sort();
+const declared = config => Object.keys(expandFlagPacks(config.vars)).filter(name => /^HARIMU_[A-Z0-9_]+_ENABLED$/.test(name)).sort();
 
 // Flag -> the test file that pins its flag-off path (no writes / inert). Register every new flag here.
 const flagOffPins = {
