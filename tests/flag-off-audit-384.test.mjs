@@ -49,6 +49,7 @@ const flagOffPins = {
   HARIMU_MVP_JOB_TYPES_ENABLED: 'mvp-job-types-886.test.mjs',
   HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
   HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
+  HARIMU_KORUND_RATION_STABILITY_ENABLED: 'korund-ration-stability-967.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',
   HARIMU_NATION_READINESS_ENABLED: 'nation-readiness-486.test.mjs',
   HARIMU_FAVOR_DECAY_ENABLED: 'favor-decay-529.test.mjs',

@@ -73,10 +73,12 @@ export const queueCopy={
  proposal:true,
 } as const;
 
-/** Ration cut when plan output falls short (§12.11): a plain notice, one State Media framing line, one quiet citizen-voice line. */
+/** Ration cut when plan output falls short (§12.11): a plain notice, one State Media framing line, one quiet citizen-voice line.
+ *  #967: `stability` is appended to that notice when the Stability step applies. */
 export const rationCut={
  label:'Rations are reduced',
  notice:L('Plan output fell short, so this week\'s rations are reduced.'),
+ stability:L('Stability falls with the rations.'),
  stateMedia:L('Korund State Media: the plan adjusts rations. The brigades work on.'),
  citizen:L('The portions are smaller. Nobody says much about it.'),
  proposal:true,
