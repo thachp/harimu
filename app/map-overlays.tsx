@@ -1,5 +1,5 @@
 'use client';
-// #82: the Overlays toggle group next to the zoom cluster. Slice 2 draws Ownership; Resources and Unrest are still placeholders.
+// #82: the Overlays toggle group next to the zoom cluster. Ownership, Resources and Unrest draw on the globe; Army positions joins when flags.armyMap is on; Fog stays unavailable.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { nationMark } from '../lib/nation-themes';

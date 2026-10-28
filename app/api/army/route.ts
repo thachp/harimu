@@ -9,6 +9,7 @@ import { readActiveWars } from '@/lib/army-map';
 import { applySupplyLoss, armySupplyEnabled, unitSupply } from '@/lib/army-supply';
 import { armyBattlesEnabled, readBattles, withBattleLosses } from '@/lib/army-battle';
 import { unitById } from '@/lib/army-rules';
+import { readWoundedUntil, woundedRefusal } from '@/lib/army-wounds';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -37,7 +38,9 @@ export async function GET(request: Request) {
     if (battle) army.unit = { ...army.unit, strength: battle.attackerNationId === nationId ? battle.attackerStrength : battle.defenderStrength, battle: { opponentNationId: battle.attackerNationId === nationId ? battle.defenderNationId : battle.attackerNationId, attacking: battle.attackerNationId === nationId, rounds: battle.rounds, status: battle.status } };
   }
 
-  return privateJson({ army: { ...army, ...(until ? { serveUntil: until } : {}) } });
+  // #911: a wounded citizen sees when they are back in action (flag off: no extra read).
+  const wounded = armyBattlesEnabled(env) ? await readWoundedUntil(db, userId, now) : null;
+  return privateJson({ army: { ...army, ...(until ? { serveUntil: until } : {}), ...(wounded ? { woundedUntil: wounded } : {}) } });
 }
 
 /** POST {action:'join', unitId} | {action:'leave'} | {action:'stance', stance}, each with a requestId (replay returns the current state, writes nothing). */
@@ -50,6 +53,9 @@ export async function POST(request: Request) {
   try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send an army command.', reason: 'bad_request' }, 400); }
   const command = parseArmyCommand(body);
   if (!command) return privateJson({ error: 'Send action join (unitId), leave or stance (hold, advance, fall_back) with a requestId.', reason: 'bad_request' }, 400);
-  const result = await runArmyCommand(await getDatabase(), userId, command, Math.floor(Date.now() / 1000));
+  const db = await getDatabase(), now = Math.floor(Date.now() / 1000);
+  // #911: wounded citizens cannot join or take a stance until they recover; leaving is always allowed (flag off: no extra read).
+  if (command.action !== 'leave' && armyBattlesEnabled(env)) { const wounded = await readWoundedUntil(db, userId, now); if (wounded) return privateJson(woundedRefusal(wounded), 409); }
+  const result = await runArmyCommand(db, userId, command, now);
   return result.ok ? privateJson({ army: { unit: result.unit, member: result.member, stance: result.stance }, replayed: result.replayed }) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }

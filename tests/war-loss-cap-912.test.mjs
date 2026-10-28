@@ -37,10 +37,13 @@ const refusals = c => c.r.db.prepare('SELECT reason,squares,lost_in_window,weekl
 test('the limit is 10% of frontier squares held at the window start, rounded down, minimum 1; Heartland is dropped', async t => {
   const c = await setup(t, 'sqlite', true);
   assert.deepEqual([20, 19, 5, 0].map(c.cap.weeklyLossLimit), [2, 1, 1, 1]);
-  const sq = zone => ({ x: 1, y: 1, zone, from: 'kindle', to: 'korund' });
-  assert.deepEqual(c.cap.decideCapture([sq('frontier')], 1, 20).ok, true);
-  assert.deepEqual(c.cap.decideCapture([sq('frontier')], 2, 20), { ok: false, reason: 'weekly_cap', transfer: [sq('frontier')], heartland: [], lost: 2, limit: 2 });
-  assert.deepEqual(c.cap.decideCapture([sq('heartland'), sq('frontier')], 0, 20).heartland, [sq('heartland')]);
+  const sq = (x, zone) => ({ x, y: 1, zone, from: 'kindle', to: 'korund' });
+  assert.equal(c.cap.decideCapture([sq(1, 'frontier')], 1, 20).ok, true);
+  assert.deepEqual(c.cap.decideCapture([sq(1, 'frontier')], 2, 20), { ok: false, reason: 'weekly_cap', transfer: [sq(1, 'frontier')], heartland: [], lost: 2, limit: 2 });
+  // #933: over the limit, take remaining slots in order (not all-or-nothing)
+  const partial = c.cap.decideCapture([sq(3, 'frontier'), sq(1, 'frontier'), sq(2, 'frontier')], 0, 20, new Set(['0,1'])); // (0,1) borders x=1
+  assert.equal(partial.ok, true); assert.deepEqual(partial.transfer.map(t => t.x), [1, 2]); assert.equal(partial.flipped, false);
+  assert.deepEqual(c.cap.decideCapture([sq(1, 'heartland'), sq(2, 'frontier')], 0, 20).heartland, [sq(1, 'heartland')]);
 });
 
 test('the window is a rolling 168 hours: 7d−1min and 7d−1s count, exactly 7d and 7d+1min do not', async t => {
@@ -56,7 +59,7 @@ for (const backend of ['sqlite', 'postgres']) {
   test(`20 frontier squares: the 2nd loss in a week lands, the 3rd is refused and logged, and works again after the window rolls (${backend})`, async t => {
     const c = await setup(t, backend, true); await frontier(c, 19, 1, 2 * D);
     { const a = await c.assault(); assert.equal(a.ok, true, JSON.stringify(a)); } const second = await c.assault({}, DAY1 + D * 1000);
-    assert.deepEqual(second.captured, { moved: 1, keptPrivate: 0 }, 'one prior loss + this one = 2 of 2');
+    assert.equal(second.captured.moved, 1); assert.equal(second.captured.keptPrivate, 0);
     assert.equal(await c.owner(c.outpost.x, c.outpost.y), 'korund');
 
     const d = await setup(t, backend, true); await frontier(d, 18, 2, 2 * D);
@@ -66,7 +69,7 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await d.one("SELECT captured_at FROM city_sieges WHERE city_key='outpost:kindle'")).captured_at, null, 'the city stays contested');
     assert.deepEqual(await refusals(d), [{ reason: 'weekly_cap', squares: 1, lost_in_window: 2, weekly_limit: 2 }], 'the refusal is in the war log');
     const later = await d.assault({}, DAY1 + 6 * D * 1000);
-    assert.deepEqual(later.captured, { moved: 1, keptPrivate: 0 }, 'after the past losses leave the 7-day window the capture lands');
+    assert.equal(later.captured.moved, 1); assert.equal(later.captured.keptPrivate, 0);
     assert.equal(await d.owner(d.outpost.x, d.outpost.y), 'korund');
   });
 
@@ -80,7 +83,7 @@ for (const backend of ['sqlite', 'postgres']) {
       const cmd = { cityKind: 'founded', cityId: 'city-f1' };
       { const a = await c.assault(cmd); assert.equal(a.ok, true, JSON.stringify(a)); } const done = await c.assault(cmd, DAY1 + D * 1000);
       // #935: planCapture skips Heartland regardless of flag, so only the frontier square moves and the Heartland square stays.
-      assert.deepEqual(done.captured, { moved: 1, keptPrivate: 0 }, JSON.stringify(done));
+      assert.equal(done.captured.moved, 1); assert.equal(done.captured.keptPrivate, 0);
       assert.equal(await c.owner(14, 11), 'kindle', 'Heartland stays with the defender');
       assert.deepEqual(await refusals(c), [], 'Heartland is filtered before the loss-cap log, so no refusal row');
     }
