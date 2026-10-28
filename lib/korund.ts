@@ -17,6 +17,7 @@ export const korundSchemas = [
  `CREATE TABLE korund_rations (id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), game_week INTEGER NOT NULL CHECK(game_week>=1), quantity INTEGER NOT NULL CHECK(quantity=2), occurred_at INTEGER NOT NULL, UNIQUE(clerk_user_id,game_week))`,
  `CREATE TABLE korund_meals (id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), quantity INTEGER NOT NULL CHECK(quantity=2), occurred_at INTEGER NOT NULL, capacity_applied INTEGER NOT NULL DEFAULT 0 CHECK(capacity_applied IN (0,1)))`,
 ] as const;
+import { streetShortageLine } from './wallet-street-rate'; // #968: shortage line on the rumored street rate (display only)
 export const korundPublicFoodSql = `SELECT initial_food+COALESCE((SELECT SUM(food_output) FROM korund_settlements),0)-COALESCE((SELECT SUM(quantity) FROM korund_rations),0) AS food, initial_minor-COALESCE((SELECT SUM(wage_minor) FROM korund_settlements),0)-COALESCE((SELECT SUM(wage_minor) FROM korund_post_settlements),0) AS funds FROM korund_resources WHERE id='state'`; // #886 (b): literal = korund-posts korundPoolSql (tests/korund.test.py reads this text)
 export const korundStartSql = `INSERT OR IGNORE INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at)
  SELECT ?,clerk_user_id,'korund-food-production','State food-production brigade','4 food contributed to state ration supply',4,?,? FROM citizens
@@ -84,7 +85,7 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;rationStability?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;rationStability?:boolean;streetRate?:boolean;grayRationRise?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -116,6 +117,8 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  // #758: rumored street rate under the wallet, Korund only, flag on only; null = not heard of the gray market (hidden).
  // QA1 on #775: the rumor needs the gray market itself on (HARIMU_GRAY_MARKET_ENABLED) as well as the street-rate flag.
  const streetRate=options.streetRate&&options.grayMarket&&citizen?.nation_id==='korund'?{streetRate:await readWalletStreetRate(db,userId,now)}:{};
+ // #968: a current #776 cut adds one shortage line on the rumored street rate. Display only; post and accept are unchanged.
+ if(options.grayRationRise&&cut){const line=streetShortageLine();const board=(gray as {gray?:GrayView}).gray;if(board)board.shortage=line;const heard=(streetRate as {streetRate?:WalletStreetRate|null}).streetRate;if(heard)heard.shortage=line;}
  return {...extra,...bureau,...gray,...medals,...shortfall,...rationCut,...streetRate,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,...(isKorundPost(s.work_order_id)?{}:{rewardItem:'state food',rewardQuantity:4}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};

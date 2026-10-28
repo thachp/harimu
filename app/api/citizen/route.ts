@@ -42,7 +42,7 @@ import { emissionCapsEnabled } from '@/lib/emission-caps-rules'; // #885
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
-import { presidentialCycle, presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918, #936
+import { kindleCycleStartAt, presidentialCycle, presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918, #936, #969
 /** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true'; // #362
@@ -65,6 +65,8 @@ async function nationWorkPlanPart(database: Awaited<ReturnType<typeof getDatabas
 const laborBureauOn = () => (env as unknown as { HARIMU_LABOR_BUREAU_ENABLED?: string }).HARIMU_LABOR_BUREAU_ENABLED === 'true';
 // #43: the Korund gray market ships off (HARIMU_GRAY_MARKET_ENABLED).
 const grayMarketOn = () => (env as unknown as { HARIMU_GRAY_MARKET_ENABLED?: string }).HARIMU_GRAY_MARKET_ENABLED === 'true';
+// #968: a #776 ration cut adds one shortage line on the rumored street rate (HARIMU_GRAY_RATION_RISE_ENABLED). Off: no line. Read model only.
+const grayRationRiseOn = () => (env as unknown as { HARIMU_GRAY_RATION_RISE_ENABLED?: string }).HARIMU_GRAY_RATION_RISE_ENABLED === 'true';
 // #490: the generic per-nation wage ledger and work commands ship off (HARIMU_NATION_WORK_ENABLED).
 const nationWorkOptions = () => ({ enabled: (env as unknown as { HARIMU_NATION_WORK_ENABLED?: string }).HARIMU_NATION_WORK_ENABLED === 'true', bindings: env as never });
 // #736: per-citizen daily gray-market volume cap (HARIMU_GRAY_DAILY_CAP_ENABLED); off = today's behaviour.
@@ -86,6 +88,7 @@ const graySeizureOn = () => (env as unknown as { HARIMU_GRAY_SEIZURE_ENABLED?: s
 const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
+const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged.
 
 export const dynamic = 'force-dynamic';
 const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
@@ -209,7 +212,7 @@ export async function GET(request: Request) {
     readVerification(userId),
     readMarket(database, userId, interval),
     readAurelleView(database,userId),
-    readKorund(database,userId,Math.floor(Date.now()/1000),korundOptions()),
+    readKorund(database,userId,Math.floor(Date.now()/1000),korundReadOptions()),
     nationWorkPlanPart(database,userId),
     readEconomy(database, userId, interval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
     readPlayerMarket(database, userId),
@@ -218,6 +221,8 @@ export async function GET(request: Request) {
     successionOn ? readSuccession(database) : null, // #613: read-only, flag off: not read
   ]);
   const civicNow=Math.floor(Date.now()/1000);
+  // #969: one additive field, and only while the top-bar countdown flag is on. Unset cycle start stays omitted (calendars held, no invented date).
+  const cycleStartAt = (env as unknown as { NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN?: string }).NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN === 'true' ? kindleCycleStartAt(env as unknown as CalendarBindings) : null;
   const civicRankOn = civicRankFlagOn(env); // #741
   const [election, collectivePetitions, firstWeek, governmentRead, civicRank] = await Promise.all([
     profile?.nation_id==='kindle'?readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true,undefined,false,presidentialWindow(env as unknown as CalendarBindings,civicNow),electionIdFor(presidentialCycle(env as unknown as CalendarBindings,civicNow))):null,
@@ -230,7 +235,7 @@ export async function GET(request: Request) {
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
   // #872 (ARC ruling): nations this account may play here beyond the live three (nationPlayable, never a flag alone). Absent when none: production and the public unchanged.
   const playable = playableNationIds(env as never, userId), flagPlayable = playable.some(id => !(liveNations as readonly string[]).includes(id));
-  return privateJson({ ...(flagPlayable ? { openNations: playable } : {}),
+  return privateJson({ ...(flagPlayable ? { openNations: playable } : {}), ...(cycleStartAt != null ? { cycleStartAt } : {}),
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountIdFor(election!.id)}:{})}:null,
     collectivePetitions,
@@ -330,7 +335,7 @@ async function handlePost(request: Request) {
     if (!validAurelleCommand(body)) return privateJson({error:'Use a valid request identifier, shift identifier and food quantity of 1 or 2.'},{status:400});
     const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000),await charterMealSeconds(database,userId,Math.floor(Date.parse(now)/1000),chartersOn()),{mvpJobTypes:mvpJobTypesEnabled(env as never),emissionCaps:emissionCapsEnabled(env as never)}); // #531, #886 (c), #885
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundOptions()),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (body.action === 'nation-start-work' || body.action === 'nation-claim-work') {
@@ -348,7 +353,7 @@ async function handlePost(request: Request) {
     const seconds=Math.floor(Date.parse(now)/1000);
     const result=await executeKorund(database,userId,body,seconds,korundOptions());
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,seconds,korundOptions()),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,seconds,korundReadOptions()),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (body.action === 'government-petition') {
@@ -421,7 +426,7 @@ async function handlePost(request: Request) {
       simulation,verification:await readVerification(userId),
       government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null,
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
-      aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundOptions()),
+      aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),
       economy:await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
     },{status:ok?200:409});
     const current=await readCurrent();

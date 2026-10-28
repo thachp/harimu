@@ -68,6 +68,8 @@
     "HARIMU_GRAY_SUSPICION_ENABLED": "false",
     // #797: after an accepted gray-market trade a checkpoint may seize part of the buyer's LN bundle (chance rises with Suspicion, capped; one per game day); seized LN is destroyed. Off: no roll, no write.
     "HARIMU_GRAY_SEIZURE_ENABLED": "false",
+    // #968: a #776 ration cut adds one shortage line on the rumored street rate (display only; the daily cap and Suspicion stay). Off: no line.
+    "HARIMU_GRAY_RATION_RISE_ENABLED": "false",
     // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
     "HARIMU_KORUND_MEDALS_ENABLED": "false",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
@@ -239,7 +241,9 @@
     "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "false",
     // #85: nation skin PoC on the top bar (Kindle / Korund / Aurelle colors + one CSS motif each); guests and pre-citizens keep the neutral bar.
     "NEXT_PUBLIC_HARIMU_NATION_SKIN": "false",
-    "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false"
+    "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false",
+    // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]
