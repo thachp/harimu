@@ -100,7 +100,7 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-test('migration 0106 widens reasons CHECK and is reviewed', () => {
+test('migration 0106 widens reasons CHECK and is reviewed', () => { // inventory accepts CHECK-only
   const pg = readFileSync('db/postgres/0106_one_way_trades.sql', 'utf8');
   const d1 = readFileSync('drizzle/0106_one_way_trades.sql', 'utf8');
   assert.match(pg, /harimu:destructive-reviewed/); assert.match(pg, /one-way-trades/);
