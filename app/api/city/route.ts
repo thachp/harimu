@@ -5,7 +5,7 @@ import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {cityForNation} from '@/lib/cities';
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
-import {cityTierUnlockFields} from '@/lib/city-tier'; // #979
+import {cityTierUnlockFields,cityTierFestivalNote} from '@/lib/city-tier'; // #979 / #984
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 async function context(request:Request){
@@ -15,14 +15,19 @@ async function context(request:Request){
 }
 
 async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,cityId:string,body:Record<string,unknown>){
- const vars=env as unknown as {HARIMU_CITY_TIER_UNLOCKS_ENABLED?:string;HARIMU_CITY_TIER_GROWTH_ENABLED?:string};
- if(vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED!=='true')return body;
+ const vars=env as unknown as {HARIMU_CITY_TIER_UNLOCKS_ENABLED?:string;HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?:string;HARIMU_CITY_TIER_GROWTH_ENABLED?:string};
+ const unlocksOn=vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED==='true';
+ const noteOn=vars.HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED==='true';
+ if(!unlocksOn&&!noteOn)return body;
  let tier=1;
  if(vars.HARIMU_CITY_TIER_GROWTH_ENABLED==='true'){
   const row=await db.prepare('SELECT tier FROM world_cities WHERE id=?').bind(cityId).first<{tier:number}>();
   if(row)tier=Number(row.tier);
  }
- return {...body,...cityTierUnlockFields(tier)};
+ let out:Record<string,unknown>={...body};
+ if(unlocksOn)out={...out,...cityTierUnlockFields(tier)};
+ if(noteOn)out={...out,festivalNote:cityTierFestivalNote(tier)}; // #984 read-only
+ return out;
 }
 export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
