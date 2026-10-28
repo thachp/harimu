@@ -43,8 +43,8 @@ test('destructive SQL is detected, comments ignored', () => {
   assert.ok(!isDestructive('/* DROP TABLE x */ CREATE INDEX IF NOT EXISTS i ON x(a);'));
   assert.ok(hasReviewMarker(`${destructiveReviewedMarker}\nDROP TABLE x;`));
   assert.ok(!hasReviewMarker(`CREATE TABLE a(x int); -- ${destructiveReviewedMarker}`), 'marker must be on its own line');
-  // #490: 0049 swaps the citizen_faith nation CHECK for a foreign key (a DROP CONSTRAINT); #531: 0054 widens the aurelle_favor_spends reason CHECK the same way; #933: 0099 drops city_captures UNIQUE(siege_id) so partial capture can record multiple steps; #943: 0102 widens risk_scores.reasons CHECK for clerk-email. Each is reviewed and marked; every other migration stays additive.
-  for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql) || (['0049_nation_wage_ledger.sql', '0054_aurelle_charters.sql', '0099_partial_city_captures.sql', '0102_clerk_risk_signals.sql'].includes(m.file) && hasReviewMarker(m.sql)), `${m.file} must stay additive`);
+  // #490: 0049 swaps the citizen_faith nation CHECK for a foreign key (a DROP CONSTRAINT); #531: 0054 widens the aurelle_favor_spends reason CHECK the same way; #933: 0099 drops city_captures UNIQUE(siege_id) so partial capture can record multiple steps; #943: 0102 widens risk_scores.reasons CHECK for clerk-email; #958: 0106 widens it for one-way-trades. Each is reviewed and marked; every other migration stays additive.
+  for (const m of postgresMigrations()) assert.ok(!isDestructive(m.sql) || (['0049_nation_wage_ledger.sql', '0054_aurelle_charters.sql', '0099_partial_city_captures.sql', '0102_clerk_risk_signals.sql', '0106_one_way_trades.sql'].includes(m.file) && hasReviewMarker(m.sql)), `${m.file} must stay additive`);
   assert.deepEqual(createdObjects('CREATE TABLE t(a int, "b" text, PRIMARY KEY(a), UNIQUE(a,b), CHECK(a>0)); ALTER TABLE t ADD COLUMN IF NOT EXISTS c int; CREATE UNIQUE INDEX IF NOT EXISTS i_t ON t(a);'),
     { columns: [['t', 'a'], ['t', 'b'], ['t', 'c']], indexes: ['i_t'], checks: [['t', 1]] });
 });
