@@ -88,7 +88,7 @@ test('admin route: flag off or token unset is 404, a wrong bearer is 401, for bo
   for (const auth of [null, 'Bearer wrong-token-0000000000000', TOKEN]) { assert.equal((await send('GET', '', undefined, auth)).status, 401); assert.equal((await send('POST', '', { id: 'x', note: 'n' }, auth)).status, 401); }
 });
 
-test('admin route: lists newest first with reason and nation filters, and marks one entry reviewed once', async t => {
+test('admin route: lists newest first with reason and nation filters, and marks one entry reviewed (idempotent)', async t => {
   const { r, send } = await admin(t);
   await insert(r.db, 'a', 'kindle', 'flagged', 100); await insert(r.db, 'b', 'korund', 'sample', 200); await insert(r.db, 'c', 'kindle', 'sample', 300);
   assert.deepEqual((await send('GET')).data.items.map(i => i.id), ['c', 'b', 'a']);
@@ -97,7 +97,7 @@ test('admin route: lists newest first with reason and nation filters, and marks 
   assert.equal((await send('GET', '?nation=atlantis')).status, 400);
   assert.equal((await send('POST', '', { id: 'a', note: '' })).status, 400);
   assert.deepEqual((await send('POST', '', { id: 'a', note: 'Fine, on-topic.' })).data, { id: 'a', reviewed: true });
-  assert.equal((await send('POST', '', { id: 'a', note: 'again' })).status, 409); assert.equal((await send('POST', '', { id: 'zz', note: 'x' })).status, 409);
+  assert.deepEqual((await send('POST', '', { id: 'a', note: 'again' })).data, { id: 'a', reviewed: true }); assert.equal((await send('POST', '', { id: 'zz', note: 'x' })).status, 409);
   const a = (await send('GET', '?reason=flagged')).data.items[0]; assert.equal(a.reviewer_note, 'Fine, on-topic.'); assert.ok(a.reviewed_at > 0);
 });
 

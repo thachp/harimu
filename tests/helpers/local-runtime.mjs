@@ -59,7 +59,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/spark-supply.ts','lib/spark-supply-rules.ts','lib/reserve-board-copy.ts','lib/reserve-board-view.ts', // #431
     'lib/ledger-reconciliation.ts','lib/ledger-reconciliation-rules.ts','app/api/admin/ledger-reconciliation/route.ts', // #432
     'lib/ai-costs.ts','lib/ai-denylist.ts','lib/ai-kill-switch.ts','lib/kill-switch-copy.ts','app/api/admin/ai-costs/route.ts', // #614
-    'lib/ai-review-queue.ts','app/api/admin/ai-review-queue/route.ts', // #753
+    'lib/ai-review-queue.ts','app/api/admin/ai-review-queue/route.ts','app/api/admin/ai-decisions/route.ts','app/api/admin/reports/route.ts', // #753 + #959
     'lib/vote-buying-watch.ts','app/api/admin/vote-buying/route.ts', // #825
     'lib/risk-scoring.ts','app/api/admin/risk-scores/route.ts','lib/clerk-risk-signals.ts', // #879 + #943
     'lib/polling-rules.ts','lib/polling.ts','app/api/polling/route.ts', // #740
