@@ -1,15 +1,15 @@
 'use client';
 import { useState, type FormEvent } from 'react';
-import { loadAiCosts, loadLedger, loadReviewQueue, loadVoteBuying, modConsoleCopy as C, modPanels, queueStatus, utc, type ModPanel, type PanelResult } from '@/lib/mod-console';
+import { loadAiCosts, loadLedger, loadReviewQueue, loadRiskScores, loadVoteBuying, modConsoleCopy as C, modPanels, queueStatus, utc, type ModPanel, type PanelResult } from '@/lib/mod-console';
 import styles from './mod-console.module.css';
 
-/** #880: read-only staff console over existing admin GETs (ai-review-queue, ai-costs, ledger-reconciliation, vote-buying). Column labels are the route field names. */
+/** #880: read-only staff console over existing admin GETs (ai-review-queue, ai-costs, ledger-reconciliation, vote-buying, risk-scores). Column labels are the route field names. */
 /** The queue route returns the newest 50 (lib/ai-review-queue.ts; ARC: 50 a page, 200 at most once the route pages). */
 const PAGE = 50;
 /** ARC (#880): no data shows before the server accepts the token: tables render only from an accepted (2xx) response, and nothing loads before Load. */
 export function ModConsole({
-  loadQueue = loadReviewQueue, loadCosts = loadAiCosts, loadReport = loadLedger, loadVotes = loadVoteBuying,
-}: { loadQueue?: typeof loadReviewQueue; loadCosts?: typeof loadAiCosts; loadReport?: typeof loadLedger; loadVotes?: typeof loadVoteBuying }) {
+  loadQueue = loadReviewQueue, loadCosts = loadAiCosts, loadReport = loadLedger, loadVotes = loadVoteBuying, loadRisk = loadRiskScores,
+}: { loadQueue?: typeof loadReviewQueue; loadCosts?: typeof loadAiCosts; loadReport?: typeof loadLedger; loadVotes?: typeof loadVoteBuying; loadRisk?: typeof loadRiskScores }) {
   const [token, setToken] = useState(''), [panel, setPanel] = useState<ModPanel>('ai-review-queue');
   const [reason, setReason] = useState(''), [nation, setNation] = useState('');
   const [busy, setBusy] = useState(false), [result, setResult] = useState<PanelResult | null>(null);
@@ -20,13 +20,15 @@ export function ModConsole({
     setResult(panel === 'ai-review-queue' ? await loadQueue(token, { reason, nation })
       : panel === 'ai-costs' ? await loadCosts(token)
       : panel === 'ledger-reconciliation' ? await loadReport(token)
-      : await loadVotes(token));
+      : panel === 'vote-buying' ? await loadVotes(token)
+      : await loadRisk(token));
     setBusy(false);
   };
   const status = !result ? '' : !result.ok ? `${result.status || 'Error'}: ${result.error}`
     : result.panel === 'ai-review-queue' ? queueStatus(result.items.length, loadedFiltered, PAGE)
     : result.panel === 'ai-costs' ? (result.days.length ? C.count(result.days.length) : C.emptyPanel)
     : result.panel === 'vote-buying' ? (result.events.length ? C.count(result.events.length) : C.emptyPanel)
+    : result.panel === 'risk-scores' ? (result.accounts.length ? C.count(result.accounts.length) : C.emptyPanel)
     : result.report ? C.count(1) : C.noReport;
   return <main className={styles.console}>
     <h1>{C.title}</h1>
@@ -63,6 +65,13 @@ export function ModConsole({
       <table className={styles.table}><caption>vote-buying</caption>
         <thead><tr>{['createdAt', 'electionKey', 'reason', 'voterId', 'senderId', 'transferId'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
         <tbody>{result.events.map(e => <tr key={e.transferId}><td>{utc(e.createdAt)}</td><td>{e.electionKey}</td><td>{e.reason}</td><td>{e.voterId}</td><td>{e.senderId}</td><td>{e.transferId}</td></tr>)}</tbody>
+      </table>
+    </div>}
+
+    {result?.ok && result.panel === 'risk-scores' && result.accounts.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="risk-scores">
+      <table className={styles.table}><caption>risk-scores</caption>
+        <thead><tr>{['updatedAt', 'score', 'civicActCount', 'reasons', 'userId'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
+        <tbody>{result.accounts.map(a => <tr key={a.userId}><td>{utc(a.updatedAt)}</td><td>{a.score}</td><td>{a.civicActCount}</td><td>{a.reasons.join(', ')}</td><td>{a.userId}</td></tr>)}</tbody>
       </table>
     </div>}
   </main>;
