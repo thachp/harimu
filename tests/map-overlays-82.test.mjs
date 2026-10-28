@@ -386,3 +386,25 @@ for (const backend of ['sqlite', 'postgres']) test(`#747 GET /api/world/unrest: 
   const gone = await r.call('world/unrest');
   assert.equal(gone.status, 200); assert.deepEqual([gone.data.nations, gone.data.cells, gone.data.unpublished], [[], [], []]);
 });
+
+test('#82 acceptance: Ownership, Resources and Unrest are the MVP toggles; Fog (and Army when the army map flag is off) stay disabled with a reason; session memory and low-graphics hooks stay wired', async () => {
+  const { UNAVAILABLE_OVERLAYS, ARMY_OVERLAY, OVERLAYS_SESSION_KEY, readSessionOverlays, writeSessionOverlays } = await import('../lib/map-overlays.ts');
+  assert.deepEqual(MAP_OVERLAYS.map(o => o.id), ['ownership', 'resources', 'unrest']);
+  assert.deepEqual(MAP_OVERLAYS.map(o => o.label), ['Ownership', 'Resources', 'Unrest']);
+  assert.ok(UNAVAILABLE_OVERLAYS.some(o => o.id === 'fog' && o.reason));
+  assert.ok(UNAVAILABLE_OVERLAYS.some(o => o.id === 'armies' && o.label === ARMY_OVERLAY.label && o.reason));
+  const store = { data: {}, getItem(k) { return this.data[k] ?? null; }, setItem(k, v) { this.data[k] = String(v); } };
+  writeSessionOverlays(store, ['resources', 'ownership']);
+  assert.deepEqual(readSessionOverlays(store), ['ownership', 'resources']);
+  assert.equal(OVERLAYS_SESSION_KEY, 'harimu.mapOverlays');
+  const ui = await readFile(new URL('../app/map-overlays.tsx', import.meta.url), 'utf8');
+  assert.match(ui, /aria-pressed=\{active\.includes\(id\)\}/);
+  assert.match(ui, /aria-live="polite"/);
+  assert.match(ui, /lowGraphics/);
+  assert.match(ui, /OwnershipLayer|ResourcesLayer|UnrestLayer/);
+  assert.doesNotMatch(ui, /still placeholders/);
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /mapOverlays/);
+  assert.match(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'), /"HARIMU_MAP_OVERLAYS_ENABLED": "true"/);
+  assert.match(await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'), /"HARIMU_MAP_OVERLAYS_ENABLED": "false"/);
+});

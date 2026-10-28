@@ -1,5 +1,4 @@
-/** #82 slice 1: the map overlay toggles. Pure rules for the toggle UI only; nothing is drawn on the map yet.
- *  HARIMU_MAP_OVERLAYS_ENABLED ("true" preview, "false" prod) reaches the client as GET /api/citizen flags.mapOverlays. */
+/** #82: map overlay toggles (Ownership, Resources, Unrest). HARIMU_MAP_OVERLAYS_ENABLED ("true" preview, "false" prod) reaches the client as GET /api/citizen flags.mapOverlays. */
 export type OverlayId = 'ownership' | 'resources' | 'unrest' | 'armies';
 export const MAP_OVERLAYS: readonly { id: OverlayId; label: string }[] = [
   { id: 'ownership', label: 'Ownership' },
