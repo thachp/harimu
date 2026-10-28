@@ -77,6 +77,12 @@ test('#688 intro: a Kindle edition with no model-written item reads "Free press 
  const a=render(on);assert.match(a,/Free press · system records and AI articles\./);assert.match(a,/AI-generated/);
  for(const nationId of ['korund','aurelle'])assert.doesNotMatch(render(edition(nationId)),/AI articles/,nationId);
 });
+test('#764: a muted news desk shows the persona-muted notice; a normal edition does not',()=>{
+ const notice=require('../lib/kill-switch-copy.ts').personaMuted.notice.text;
+ assert.equal(renderToStaticMarkup(React.createElement(real.NewsEdition,{news:edition('kindle')})).includes(notice),false);
+ const html=renderToStaticMarkup(React.createElement(real.NewsEdition,{news:{...edition('kindle'),personaMuted:true}}));
+ assert.match(html,/data-persona-muted="true"/);assert.equal(html.includes(notice),true);
+});
 test('#742: an edition in templates-only mode shows the template-mode footer; a normal edition does not',()=>{
  const footer=require('../lib/kill-switch-copy.ts').templateMode.footer.text;
  assert.doesNotMatch(renderToStaticMarkup(React.createElement(real.NewsEdition,{news:edition('korund')})),new RegExp(footer));

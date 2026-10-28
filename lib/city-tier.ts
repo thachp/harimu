@@ -1,7 +1,9 @@
-/** #952: city tier growth (docs Cities of Harimu). Population is humans whose home city is the city
- *  (`citizen_city_locations.home_city_id` = `world_cities.id`). No AI resident rows are stored (the co-resident
- *  AI list is a display sample), so AI adds nothing. A city promotes one tier after staying at or above the next
- *  tier's floor for 7 real days. Flag off: this module is not called, and readers still report tier 1. */
+/** #952 / #966: city tier growth and shrink (docs Cities of Harimu). Population and housing are humans whose
+ *  home city is the city (`citizen_city_locations.home_city_id` = `world_cities.id`). No AI resident rows are
+ *  stored, so AI adds nothing. A city promotes one tier after staying at or above the next tier's floor for
+ *  7 real days. It drops one tier after food or housing stays under the current tier's need for 7 real days,
+ *  never below T1, and a capital never below its starting tier. Flag HARIMU_CITY_TIER_GROWTH_ENABLED off:
+ *  this module is not called, and readers still report tier 1. */
 import type { GameDatabase } from './database-contract';
 
 export const CITY_TIER_HOLD_SECONDS = 7 * 86400;
@@ -27,6 +29,12 @@ export function nextTierFloor(tier: number): number | null {
   if (!Number.isInteger(tier) || tier < 1 || tier >= 4) return null;
   return floors[tier - 1];
 }
+/** [ASSUMPTION] Docs give no food or housing figures. The current tier needs the count it was entered at:
+ *  T1 0, T2 500, T3 2000, T4 8000. Food and housing each have to meet that count. */
+export function tierStayFloor(tier: number): number {
+  if (!Number.isInteger(tier) || tier <= 1) return 0;
+  return floors[Math.min(tier, 4) - 2] ?? 0;
+}
 
 export type CityTierClock = { tier: number; aboveSince: number | null };
 /** One check. Below the next floor clears the clock. Holding the floor for 7 real days promotes exactly one tier
@@ -41,32 +49,98 @@ export function cityTierStep(input: CityTierClock & { population: number; now: n
   return { tier, aboveSince: next != null && input.population >= next ? input.now : null };
 }
 
-type CityRow = { id: string; tier: number; since: number | null; population: number };
-const populationSql = `SELECT c.id, c.tier, c.above_next_tier_since AS since,
- (SELECT COUNT(*) FROM citizens p JOIN citizen_city_locations l ON l.user_id=p.clerk_user_id WHERE l.home_city_id=c.id) AS population
+export type CityShrinkClock = { tier: number; belowSince: number | null };
+/** One check. Food and housing both at the current tier's need clears the clock. Short of either for 7 real days
+ *  drops exactly one tier, never below `floor` (T1, or a capital's starting tier). Same `now` twice does not drop twice. */
+export function cityTierShrinkStep(input: CityShrinkClock & { food: number; housing: number; floor: number; now: number }): CityShrinkClock {
+  const floor = Math.min(4, Math.max(1, Number.isInteger(input.floor) ? input.floor : 1));
+  const food = Number.isFinite(input.food) ? input.food : 0;
+  const housing = Number.isFinite(input.housing) ? input.housing : 0;
+  if (food >= tierStayFloor(input.tier) && housing >= tierStayFloor(input.tier)) return { tier: input.tier, belowSince: null };
+  if (input.tier <= floor) return { tier: input.tier, belowSince: input.belowSince };
+  const since = input.belowSince ?? input.now;
+  if (input.now - since < CITY_TIER_HOLD_SECONDS) return { tier: input.tier, belowSince: since };
+  const tier = input.tier - 1;
+  const still = food < tierStayFloor(tier) || housing < tierStayFloor(tier);
+  return { tier, belowSince: tier > floor && still ? input.now : null };
+}
+
+type CityRow = { id: string; nation_id: string; name: string; tier: number; floor: number | null; since: number | null; below: number | null; population: number; food: number | null; feature: string | null };
+// [ASSUMPTION] Food stock is the sum of resident `citizen_inventory_balances` food (the only city-scoped stock;
+// merchant, Korund and Aurelle food are nation pools). Housing is that same resident count: each home-city row
+// is one dwelling, and no housing table is stored. A capital is the row whose center square feature is 'capital';
+// its starting tier is tier_floor (default 1). Founded cities are not capitals.
+const populationSql = `SELECT c.id, c.nation_id, c.name, c.tier, c.tier_floor AS floor, c.above_next_tier_since AS since, c.below_need_since AS below,
+ (SELECT COUNT(*) FROM citizens p JOIN citizen_city_locations l ON l.user_id=p.clerk_user_id WHERE l.home_city_id=c.id) AS population,
+ (SELECT COALESCE(SUM(b.quantity),0) FROM citizen_inventory_balances b JOIN citizen_city_locations l ON l.user_id=b.clerk_user_id WHERE l.home_city_id=c.id AND b.item='food') AS food,
+ (SELECT s.feature FROM world_squares s WHERE s.x=c.center_x AND s.y=c.center_y) AS feature
  FROM world_cities c`;
 
-/** Daily check. `enabled` must be exactly true (HARIMU_CITY_TIER_GROWTH_ENABLED). Flag off: no read and no write. */
-export async function runCityTierGrowth(db: GameDatabase, now: number, enabled: boolean): Promise<{ promoted: string[] }> {
-  if (enabled !== true) return { promoted: [] };
+const num = (value: number | null) => value == null ? null : Number(value);
+
+function cityUpdate(db: GameDatabase, id: string, prev: { tier: number; since: number | null; below: number | null }, next: { tier: number; aboveSince: number | null; belowSince: number | null }) {
+  const setAbove = next.aboveSince == null ? 'above_next_tier_since=NULL' : 'above_next_tier_since=?';
+  const setBelow = next.belowSince == null ? 'below_need_since=NULL' : 'below_need_since=?';
+  const whereAbove = prev.since == null ? 'above_next_tier_since IS NULL' : 'above_next_tier_since=?';
+  const whereBelow = prev.below == null ? 'below_need_since IS NULL' : 'below_need_since=?';
+  const binds: unknown[] = [next.tier];
+  if (next.aboveSince != null) binds.push(next.aboveSince);
+  if (next.belowSince != null) binds.push(next.belowSince);
+  binds.push(id, prev.tier);
+  if (prev.since != null) binds.push(prev.since);
+  if (prev.below != null) binds.push(prev.below);
+  return db.prepare(`UPDATE world_cities SET tier=?, ${setAbove}, ${setBelow} WHERE id=? AND tier=? AND ${whereAbove} AND ${whereBelow}`).bind(...binds);
+}
+
+/** Daily check. `enabled` must be exactly true (HARIMU_CITY_TIER_GROWTH_ENABLED). Flag off: no read and no write.
+ *  Shortage blocks promotion. A drop clears the growth clock. One tier per hold; the same `now` does not move twice. */
+export async function runCityTierGrowth(db: GameDatabase, now: number, enabled: boolean): Promise<{ promoted: string[]; shrunk: string[] }> {
+  if (enabled !== true) return { promoted: [], shrunk: [] };
   const { results } = await db.prepare(populationSql).all<CityRow>();
   const writes = [];
   const promoted: string[] = [];
+  const shrunk: string[] = [];
   for (const row of results ?? []) {
     const tier = Number(row.tier);
-    const since = row.since == null ? null : Number(row.since);
-    const next = cityTierStep({ tier, population: Number(row.population), aboveSince: since, now });
-    if (next.tier === tier && next.aboveSince === since) continue;
-    if (next.tier !== tier) promoted.push(row.id);
-    // Null is written as SQL NULL. A bound NULL has no type on Postgres (42P18).
-    const setSince = next.aboveSince == null ? 'above_next_tier_since=NULL' : 'above_next_tier_since=?';
-    const whereSince = since == null ? 'above_next_tier_since IS NULL' : 'above_next_tier_since=?';
-    const binds: unknown[] = [next.tier];
-    if (next.aboveSince != null) binds.push(next.aboveSince);
-    binds.push(row.id, tier);
-    if (since != null) binds.push(since);
-    writes.push(db.prepare(`UPDATE world_cities SET tier=?, ${setSince} WHERE id=? AND tier=? AND ${whereSince}`).bind(...binds));
+    const since = num(row.since);
+    const below = num(row.below);
+    const population = Number(row.population);
+    const food = Number(row.food ?? 0);
+    const housing = population; // [ASSUMPTION] housing stock is the home-city resident count
+    const storedFloor = Number(row.floor);
+    const floor = row.feature === 'capital' ? Math.min(4, Math.max(1, Number.isFinite(storedFloor) ? Math.floor(storedFloor) : 1)) : 1;
+    const short = food < tierStayFloor(tier) || housing < tierStayFloor(tier);
+    let nextTier = tier;
+    let aboveSince = since;
+    let belowSince = below;
+    if (short && tier > floor) {
+      const step = cityTierShrinkStep({ tier, food, housing, belowSince: below, floor, now });
+      nextTier = step.tier;
+      belowSince = step.belowSince;
+      if (step.tier !== tier) aboveSince = null;
+    } else {
+      if (!short) belowSince = null;
+      const step = cityTierStep({ tier, population, aboveSince: since, now });
+      nextTier = step.tier;
+      aboveSince = step.aboveSince;
+    }
+    if (nextTier === tier && aboveSince === since && belowSince === below) continue;
+    if (nextTier > tier) promoted.push(row.id);
+    if (nextTier < tier) shrunk.push(row.id);
+    writes.push(cityUpdate(db, row.id, { tier, since, below }, { tier: nextTier, aboveSince, belowSince }));
+    if (nextTier < tier && (row.nation_id === 'kindle' || row.nation_id === 'korund' || row.nation_id === 'aurelle')) {
+      const kind = `city-tier-${row.nation_id}`;
+      const why = food < tierStayFloor(tier) && housing < tierStayFloor(tier) ? 'food and housing' : food < tierStayFloor(tier) ? 'food' : 'housing';
+      const headline = `${row.name} shrinks to a ${cityTierName(nextTier)}`;
+      const detail = `${row.name} was a ${cityTierName(tier)} for 7 real days short of ${why}.`;
+      const occurred = new Date(now * 1000).toISOString();
+      // The tier update above has to have landed, and this city/window is written once.
+      writes.push(db.prepare(`INSERT INTO world_events (kind, headline, detail, location, occurred_at, sort_order)
+        SELECT ?,?,?,?,?,? WHERE (SELECT tier FROM world_cities WHERE id=?)=?
+        AND NOT EXISTS (SELECT 1 FROM world_events WHERE kind=? AND location=? AND occurred_at=?)`)
+        .bind(kind, headline, detail, row.name, occurred, -now, row.id, nextTier, kind, row.name, occurred));
+    }
   }
   if (writes.length) await db.batch(writes);
-  return { promoted };
+  return { promoted, shrunk };
 }

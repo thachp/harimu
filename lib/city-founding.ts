@@ -28,6 +28,8 @@ export const worldCitiesSchema = `CREATE TABLE IF NOT EXISTS world_cities (
  request_id TEXT NOT NULL UNIQUE,
  founded_at INTEGER NOT NULL,
  above_next_tier_since INTEGER,
+ below_need_since INTEGER, -- #966 shortage clock
+ tier_floor INTEGER NOT NULL DEFAULT 1, -- #966 capital starting tier; founded cities stay 1
  UNIQUE(center_x, center_y)
 )`;
 

@@ -48,6 +48,7 @@ import { homeCityMoveSchemas } from './home-move'; // #781
 import { voteBuyingEventsSchema } from './vote-buying-watch'; // #825
 import { riskScoresSchema } from './risk-scoring'; // #879
 import { clerkRiskSignalsSchema } from './clerk-risk-signals'; // #943
+import { killSwitchEventSchemas } from './kill-switch-events'; // #764
 import { savingsShieldCreditsSchema, marketSalesTaxSchema, playerFillSalesTaxSchema, partyDonationsSchema, partyDonationsIndex, partyDonationsPartyIndex } from './market-orders'; // #824, #844, #863
 import { pollingSchemas } from './polling'; // #740
 import { plankVoteSchemas } from './plank-votes'; // #831
@@ -293,7 +294,7 @@ async function initialize(database: GameDatabase) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
-    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), ...homeCityMoveSchemas.map(sql => database.prepare(sql)), database.prepare(voteBuyingEventsSchema), database.prepare(riskScoresSchema), database.prepare(clerkRiskSignalsSchema) /* #943 */, /* #825 (migration 0079), #879 (migration 0097) */ database.prepare(savingsShieldCreditsSchema), database.prepare(marketSalesTaxSchema), /* #844 (migration 0081) */ database.prepare(playerFillSalesTaxSchema), database.prepare(partyDonationsSchema), database.prepare(partyDonationsIndex), database.prepare(partyDonationsPartyIndex), /* #844 follow-up, #863 (migration 0085) */ /* #824 */ /* #781 move-fee sink (always created; written only with the flag on) */ /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...korundPostSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...graySeizureSchemas.map(sql => database.prepare(sql)), /* #797 seizure sink (always created; written only with the flag on) */ ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
+    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), ...homeCityMoveSchemas.map(sql => database.prepare(sql)), database.prepare(voteBuyingEventsSchema), database.prepare(riskScoresSchema), database.prepare(clerkRiskSignalsSchema), ...killSwitchEventSchemas.map(sql => database.prepare(sql)), /* #943, #764 */ /* #825 (migration 0079), #879 (migration 0097) */ database.prepare(savingsShieldCreditsSchema), database.prepare(marketSalesTaxSchema), /* #844 (migration 0081) */ database.prepare(playerFillSalesTaxSchema), database.prepare(partyDonationsSchema), database.prepare(partyDonationsIndex), database.prepare(partyDonationsPartyIndex), /* #844 follow-up, #863 (migration 0085) */ /* #824 */ /* #781 move-fee sink (always created; written only with the flag on) */ /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...korundPostSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...graySeizureSchemas.map(sql => database.prepare(sql)), /* #797 seizure sink (always created; written only with the flag on) */ ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
@@ -447,6 +448,14 @@ async function initialize(database: GameDatabase) {
         SELECT id,nation_id,name,tier,center_x,center_y,authority,founded_by,request_id,founded_at FROM world_cities_tier_old`),
       database.prepare('DROP TABLE world_cities_tier_old'),
     ]);
+  }
+  // #966 (migration 0107): shortage clock and the capital starting tier. A table just created from worldCitiesSchema already has both.
+  if (cityCols.results.length > 0) {
+    const names = new Set((await database.prepare('PRAGMA table_info(world_cities)').all<{ name: string }>()).results.map(column => column.name));
+    const add = [];
+    if (!names.has('below_need_since')) add.push(database.prepare('ALTER TABLE world_cities ADD COLUMN below_need_since INTEGER'));
+    if (!names.has('tier_floor')) add.push(database.prepare('ALTER TABLE world_cities ADD COLUMN tier_floor INTEGER NOT NULL DEFAULT 1'));
+    if (add.length) await database.batch(add);
   }
 
   // #738 (migration 0082): army_conscripts gained stayed_at; a local database created before it gets the column once.

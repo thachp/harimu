@@ -1,17 +1,17 @@
 'use client';
 import { useState, type FormEvent } from 'react';
-import { loadAiCosts, loadAiDecisions, loadLedger, loadReports, loadReviewQueue, loadRiskScores, loadVoteBuying, markReviewed, modConsoleCopy as C, modPanels, queueStatus, utc, type ModPanel, type PanelResult } from '@/lib/mod-console';
+import { loadAiCosts, loadAiDecisions, loadKillSwitchEvents, loadLedger, loadReports, loadReviewQueue, loadRiskScores, loadVoteBuying, markReviewed, modConsoleCopy as C, modPanels, queueStatus, utc, type ModPanel, type PanelResult } from '@/lib/mod-console';
 import styles from './mod-console.module.css';
 
-/** #880: staff console over admin GETs + queue mark-reviewed POST (#959 contract). Column labels are the route field names. */
+/** #880: staff console over admin GETs + queue mark-reviewed POST (#959 contract), plus the read-only kill-switch event log (#764). Column labels are the route field names. */
 /** Queue/reports/decisions page at 50 (route default; max 200). */
 const PAGE = 50;
 /** ARC (#880): no data shows before the server accepts the token: tables render only from an accepted (2xx) response, and nothing loads before Load. */
 export function ModConsole({
-  loadQueue = loadReviewQueue, loadCosts = loadAiCosts, loadReport = loadLedger, loadVotes = loadVoteBuying, loadRisk = loadRiskScores,
+  loadQueue = loadReviewQueue, loadCosts = loadAiCosts, loadReport = loadLedger, loadVotes = loadVoteBuying, loadRisk = loadRiskScores, loadSwitches = loadKillSwitchEvents,
   loadReportsList = loadReports, loadDecisions = loadAiDecisions, markItem = markReviewed,
 }: {
-  loadQueue?: typeof loadReviewQueue; loadCosts?: typeof loadAiCosts; loadReport?: typeof loadLedger; loadVotes?: typeof loadVoteBuying; loadRisk?: typeof loadRiskScores;
+  loadQueue?: typeof loadReviewQueue; loadCosts?: typeof loadAiCosts; loadReport?: typeof loadLedger; loadVotes?: typeof loadVoteBuying; loadRisk?: typeof loadRiskScores; loadSwitches?: typeof loadKillSwitchEvents;
   loadReportsList?: typeof loadReports; loadDecisions?: typeof loadAiDecisions; markItem?: typeof markReviewed;
 }) {
   const [token, setToken] = useState(''), [panel, setPanel] = useState<ModPanel>('ai-review-queue');
@@ -28,6 +28,7 @@ export function ModConsole({
       : panel === 'ledger-reconciliation' ? await loadReport(token)
       : panel === 'vote-buying' ? await loadVotes(token)
       : panel === 'risk-scores' ? await loadRisk(token)
+      : panel === 'kill-switch-events' ? await loadSwitches(token)
       : panel === 'reports' ? await loadReportsList(token, { limit: PAGE, offset })
       : await loadDecisions(token, page));
     setBusy(false);
@@ -44,6 +45,7 @@ export function ModConsole({
     : result.panel === 'ai-costs' ? (result.days.length ? C.count(result.days.length) : C.emptyPanel)
     : result.panel === 'vote-buying' ? (result.events.length ? C.count(result.events.length) : C.emptyPanel)
     : result.panel === 'risk-scores' ? (result.accounts.length ? C.count(result.accounts.length) : C.emptyPanel)
+    : result.panel === 'kill-switch-events' ? (result.events.length ? C.count(result.events.length) : C.emptyPanel)
     : result.panel === 'reports' ? (result.reports.length ? C.count(result.reports.length) : C.emptyPanel)
     : result.panel === 'ai-decisions' ? (result.decisions.length ? C.count(result.decisions.length) : C.emptyPanel)
     : result.report ? C.count(1) : C.noReport;
@@ -85,6 +87,12 @@ export function ModConsole({
       <table className={styles.table}><caption>vote-buying</caption>
         <thead><tr>{['createdAt', 'electionKey', 'reason', 'voterId', 'senderId', 'transferId'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
         <tbody>{result.events.map(e => <tr key={e.transferId}><td>{utc(e.createdAt)}</td><td>{e.electionKey}</td><td>{e.reason}</td><td>{e.voterId}</td><td>{e.senderId}</td><td>{e.transferId}</td></tr>)}</tbody>
+      </table>
+    </div>}
+    {result?.ok && result.panel === 'kill-switch-events' && result.events.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="kill-switch-events">
+      <table className={styles.table}><caption>kill-switch-events</caption>
+        <thead><tr>{['createdAt', 'actor', 'persona', 'state', 'reason'].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
+        <tbody>{result.events.map(e => <tr key={`${e.createdAt}:${e.reason}:${e.persona}:${e.state}`}><td>{utc(e.createdAt)}</td><td>{e.actor}</td><td>{e.persona}</td><td>{e.state}</td><td>{e.reason}</td></tr>)}</tbody>
       </table>
     </div>}
     {result?.ok && result.panel === 'risk-scores' && result.accounts.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="risk-scores">
