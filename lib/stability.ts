@@ -30,8 +30,10 @@ export type StabilityInputs = {
  warWeariness?: number;
  /** #739/#822: 1 when Dormant citizens were excluded (dormancy flag on, live tick). Absent otherwise, so flag-off inputs_json is unchanged. */
  activeOnly?: 1;
+ /** #967: Korund cities whose rations are cut this game week. Absent unless that step applies, so flag-off inputs_json is unchanged. */
+ rationCuts?: number;
 };
-export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war'|'harmony';
+export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war'|'harmony'|'ration';
 export type ScoreTerm = {input: StabilityInputId; points: number; detail: string};
 export type StabilityScore = {stability: number; unrest: number; breakdown: {stability: ScoreTerm[]; unrest: ScoreTerm[]}};
 export type StabilityRecord = StabilityScore & {nationId: StabilityNation; tick: number; scheduledAt: number; inputs: StabilityInputs};
@@ -55,6 +57,8 @@ export function petitionTerms(backlog: number, citizens: number) { const s = cit
 export const stabilityBaseline = 50, unrestBaseline = 10;
 /** #291 [ASSUMPTION]: docs 14.4 says an endorsed festival gives "Stability +" but no size. Tuning value: +3 Stability on that game day only. */
 export const festivalHolidayStabilityPoints = 3;
+/** #967 [ASSUMPTION]: docs 12.11 step 4 says a plan shortfall cuts Stability but gives no size. Tuning value: this many points per Korund city with a ration cut that game week. */
+export const korundRationStabilityStep = 3;
 
 /** #842 (ARC rulings Oct 23): Religious Harmony → Stability mapping, as named config constants (no runtime import: this file loads directly in tests). */
 export const HARMONY_STABILITY_NEUTRAL = 50;          // the Harmony score that adds nothing
@@ -88,6 +92,10 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
  if (raw.harmony !== undefined) { const h = Math.max(0, Math.min(100, Math.round(Number(raw.harmony) || 0))), base = stability.reduce((t, x) => t+x.points, 0);
   const pts = Math.max(-base, Math.min(100-base, harmonyStabilityPoints(h)));
   stability.push({input:'harmony',points:pts,detail:`Religious Harmony ${h}/100`}); }
+ // #967: one step per city whose rations are cut this week. Fitted under the terms already counted so Stability stays at or above 0 (the existing floor).
+ const cities = count(raw.rationCuts);
+ if (cities > 0) { const base = stability.reduce((t, x) => t+x.points, 0), pts = -Math.min(base, cities*korundRationStabilityStep) || 0;
+  stability.push({input:'ration',points:pts,detail:'Plan shortfall ration cut'}); }
  const unrest: ScoreTerm[] = [
   {input:'baseline',points:unrestBaseline,detail:'Baseline'},
   {input:'food',points:food.unrest,detail:foodDetail},{input:'work',points:work.unrest,detail:workDetail},
@@ -128,8 +136,8 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
 }
 
 /** Statements that record one game day's scores. INSERT OR IGNORE makes retries no-ops. */
-export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string; harmony?: Readonly<Record<string, number>>} = {}) {
- return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); const score = computeStability(inputs);
+export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string; harmony?: Readonly<Record<string, number>>; rationCuts?: number} = {}) {
+ return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); if (nationId === 'korund' && options.rationCuts) inputs.rationCuts = options.rationCuts; const score = computeStability(inputs);
   return db.prepare('INSERT OR IGNORE INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)')
    .bind(nationId, tick, scheduledAt, now, score.stability, score.unrest, JSON.stringify(inputs), JSON.stringify(score.breakdown)); }));
 }
