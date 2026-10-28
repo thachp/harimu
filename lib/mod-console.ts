@@ -4,7 +4,7 @@
 export function modConsoleEnabled(value: string | undefined = process.env.NEXT_PUBLIC_HARIMU_MOD_CONSOLE): boolean { return value === 'true'; }
 
 /** The admin GETs this console reads; labels are the route path segments (no new marketing copy). */
-export const modPanels = ['ai-review-queue', 'ai-costs', 'ledger-reconciliation', 'vote-buying', 'risk-scores'] as const;
+export const modPanels = ['ai-review-queue', 'ai-costs', 'ledger-reconciliation', 'vote-buying', 'risk-scores', 'kill-switch-events'] as const;
 export type ModPanel = (typeof modPanels)[number];
 
 export type ReviewItem = { id: string; created_at: number; source: string; nation_id: string; persona: string; output_text: string; filter_result: string; filter_detail: string | null; reason: string; reviewed_at: number | null; reviewer_note: string | null };
@@ -12,12 +12,14 @@ export type CostDay = { day: string; reservedMicro: number; settledMicro: number
 export type LedgerReport = { gameDay: number; reconciledAt: number; mismatchCount: number } | null;
 export type VoteEvent = { electionKey: string; voterId: string; senderId: string; transferId: string; reason: string; createdAt: number };
 export type RiskAccount = { userId: string; score: number; reasons: string[]; civicActCount: number; updatedAt: number };
+export type SwitchEvent = { actor: string; persona: string; state: string; reason: string; createdAt: number };
 export type PanelResult =
   | { panel: 'ai-review-queue'; ok: true; items: ReviewItem[] }
   | { panel: 'ai-costs'; ok: true; days: CostDay[]; asOf: number; windowDays: number }
   | { panel: 'ledger-reconciliation'; ok: true; report: LedgerReport }
   | { panel: 'vote-buying'; ok: true; events: VoteEvent[] }
   | { panel: 'risk-scores'; ok: true; accounts: RiskAccount[]; reviewOnly: boolean }
+  | { panel: 'kill-switch-events'; ok: true; events: SwitchEvent[] }
   | { panel: ModPanel; ok: false; status: number; error: string };
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` } as const);
@@ -59,6 +61,14 @@ export async function loadVoteBuying(token: string, fetchImpl: typeof fetch = fe
   if (!response) return { panel: 'vote-buying', ok: false, status: 0, error: body.error ?? 'Network error' };
   return response.ok && Array.isArray(body.events) ? { panel: 'vote-buying', ok: true, events: body.events as VoteEvent[] }
     : { panel: 'vote-buying', ok: false, status: response.status, error: body.error ?? `HTTP ${response.status}` };
+}
+
+/** GET /api/admin/kill-switch-events (#764). Read-only. */
+export async function loadKillSwitchEvents(token: string, fetchImpl: typeof fetch = fetch): Promise<PanelResult> {
+  const { response, body } = await getJson('/api/admin/kill-switch-events', token, fetchImpl);
+  if (!response) return { panel: 'kill-switch-events', ok: false, status: 0, error: body.error ?? 'Network error' };
+  return response.ok && Array.isArray(body.events) ? { panel: 'kill-switch-events', ok: true, events: body.events as SwitchEvent[] }
+    : { panel: 'kill-switch-events', ok: false, status: response.status, error: body.error ?? `HTTP ${response.status}` };
 }
 
 /** GET /api/admin/risk-scores (#879). Human review only; the score is a sort key, never a penalty. */

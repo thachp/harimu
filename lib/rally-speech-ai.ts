@@ -5,6 +5,7 @@
  *  At most one stored speech per rally (rally_speeches PRIMARY KEY rally_id); any failure leaves the template speech. Speeches are always shown labeled AI. */
 import type { GameDatabase } from './database-contract';
 import { aiPathPersonas, skipForMutedPersona, skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
+import { recordKillSwitchChanges } from './kill-switch-events';
 import { aiBudgetConfig } from './ai-budget';
 import type { NewsAiBinding } from './ai-news';
 import { generateAnswer, platformCards } from './town-hall-ai';
@@ -22,6 +23,7 @@ export const rallySpeechesConfigured = (b: RallySpeechBindings) =>
 /** One pass over each candidate's upcoming rally that has no stored speech, at most one attempt per rally per UTC day (the reservation id is the lease). */
 export async function runRallySpeechCron(db: GameDatabase, now: number, b: RallySpeechBindings) {
   if (!rallySpeechesConfigured(b)) return { status: 'disabled' as const, results: [] as string[] };
+  await recordKillSwitchChanges(db, b, now); // #764: flag off returns before any events query
   if (skipForTemplates('rally', b, 'kindle', now)) return { status: 'templates-only' as const, results: [] as string[] };
   if (skipForMutedPersona('rally', b, aiPathPersonas.rally(), now)) return { status: 'persona-muted' as const, results: [] as string[] };
   const budget = aiBudgetConfig(b)!, day = new Date(now * 1000).toISOString().slice(0, 10), results: string[] = [];

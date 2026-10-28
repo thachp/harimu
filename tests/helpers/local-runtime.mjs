@@ -61,7 +61,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/ai-costs.ts','lib/ai-denylist.ts','lib/ai-kill-switch.ts','lib/kill-switch-copy.ts','app/api/admin/ai-costs/route.ts', // #614
     'lib/ai-review-queue.ts','app/api/admin/ai-review-queue/route.ts', // #753
     'lib/vote-buying-watch.ts','app/api/admin/vote-buying/route.ts', // #825
-    'lib/risk-scoring.ts','app/api/admin/risk-scores/route.ts','lib/clerk-risk-signals.ts', // #879 + #943
+    'lib/risk-scoring.ts','app/api/admin/risk-scores/route.ts','lib/clerk-risk-signals.ts','lib/kill-switch-events.ts','app/api/admin/kill-switch-events/route.ts', // #879 + #943 + #764
     'lib/polling-rules.ts','lib/polling.ts','app/api/polling/route.ts', // #740
     'lib/plank-votes-rules.ts','lib/plank-votes.ts','app/api/planks/route.ts', // #831
     'lib/party-donations-rules.ts','lib/party-donations.ts','app/api/party-donations/route.ts', // #863

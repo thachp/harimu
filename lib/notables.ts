@@ -5,6 +5,7 @@ import {readNationalNews} from './national-news';
 import {notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 import {nationNotables} from './notable-choice';
 import {skipForMutedPersona,skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
+import {recordKillSwitchChanges} from './kill-switch-events';
 import {personaMuted} from './kill-switch-copy';
 import {enqueueAiReview} from './ai-review-queue';
 export {notableFor,nationNotables} from './notable-choice';
@@ -22,6 +23,7 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
  const profile=nationNotables(nation).find(p=>p.id===command.notableId)??null;
  if(!profile)return fail(403,'Only your nation’s Notable is available.');
  if(!enabled||!binding||!budget)return fail(503,'AI conversations are disabled. Authored topic examples remain available.');
+ await recordKillSwitchChanges(db,killSwitch,now); // #764: flag off returns before any events query
  // #742: templates-only mode answers with the authored topic example: no model call, no reservation, nothing charged.
  if(skipForTemplates('notables',killSwitch,nation!,now))return {status:200,reply:notableTopics[command.topic].authored,source:'authored' as const,templatesOnly:true};
  // #764: a muted Notable answers with the "persona muted" notice: no model call, no reservation, nothing charged.

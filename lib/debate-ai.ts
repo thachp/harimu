@@ -1,5 +1,6 @@
 import type { GameDatabase } from './database-contract';
 import { skipForMutedPersona, aiPathPersonas, skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
+import { recordKillSwitchChanges } from './kill-switch-events';
 import { electionCandidates } from './elections';
 import { aiBudgetConfig, type AiBudgetConfig } from './ai-budget';
 import type { NewsAiBinding } from './ai-news';
@@ -35,6 +36,7 @@ export const debateAnswerInsertSql = `INSERT INTO debate_answers (question_id,ca
  ON CONFLICT DO NOTHING`;
 export async function prepareDebateAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number; killSwitch?: AiTemplatesOnlyEnv | null } = {}) {
   if (!options.enabled || !binding || !options.budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
+  await recordKillSwitchChanges(db, options.killSwitch, now); // #764: flag off returns before any events query
   // #742: templates-only mode (the candidates are Kindle's) makes no model call and no reservation; the question stays unanswered.
   if (skipForTemplates('debate', options.killSwitch, 'kindle', now)) return { status: 'templates-only' as const };
   // #764: a muted persona makes no model call and no reservation either.

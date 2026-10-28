@@ -4,6 +4,7 @@ import {inferenceText,supportedNewsDraft,newsVerificationResponseFormat,type New
 import {validPetitionText} from './collective-petitions';
 import {deniedAiText} from './ai-denylist';
 import {skipForMutedPersona,aiPathPersonas,skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
+import {recordKillSwitchChanges} from './kill-switch-events';
 /** Issue #20: the mandatory public Cabinet response to a petition that reached 3%.
  * Follows the ai-news pattern: off unless the runtime flag, binding and a valid
  * aiBudgetConfig are present; one reservation (own ledger operation) covers draft, check and guard,
@@ -21,6 +22,7 @@ export function validatedCabinetResponse(value:unknown){
 type Awaiting={id:string;title:string;demand:string;reached_at:number};
 export async function prepareAiCabinetResponse(db:GameDatabase,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,timeoutMs=30000,maxInputBytes=12000,killSwitch=null as AiTemplatesOnlyEnv|null}={}){
  if(!enabled||!binding||!budget||!Number.isSafeInteger(now))return {status:'disabled' as const};
+ await recordKillSwitchChanges(db,killSwitch,now); // #764: flag off returns before any events query
  // #742: templates-only mode makes no model call and no reservation; the petition keeps its existing "awaiting response" state.
  if(skipForTemplates('cabinet-response',killSwitch,'kindle',now))return {status:'templates-only' as const};
  // #764: a muted persona makes no model call and no reservation either.
