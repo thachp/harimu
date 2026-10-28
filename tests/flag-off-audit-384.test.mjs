@@ -107,6 +107,7 @@ const flagOffPins = {
   HARIMU_DORMANCY_ENABLED: 'dormancy-739.test.mjs',
   HARIMU_VOTE_BUYING_WATCH_ENABLED: 'vote-buying-watch-825.test.mjs',
   HARIMU_RISK_SCORING_ENABLED: 'risk-scoring-879.test.mjs',
+  HARIMU_CLERK_RISK_SIGNALS_ENABLED: 'clerk-risk-signals-943.test.mjs',
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
 };
 
