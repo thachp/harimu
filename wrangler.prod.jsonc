@@ -78,6 +78,8 @@
     "HARIMU_KORUND_MEDALS_ENABLED": "false",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.
     "HARIMU_KORUND_SHORTFALL_ENABLED": "false",
+    // #981: State Media plan-stat line from this week's food quota (derived on read, no table). Off: the news edition is unchanged.
+    "HARIMU_KORUND_PLAN_STATS_ENABLED": "false",
     // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
     "HARIMU_SAVINGS_SHIELD_ENABLED": "false",
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
