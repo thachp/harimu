@@ -1,6 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import {publicNewsFacts,validatedNewsDraft,newsDraftText,inferenceText,newsDraftResponseFormat,newsVerificationResponseFormat,supportedNewsDraft,type NewsAiBinding} from './ai-news';
 import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiGatewayOptions,type AiModel,type AiMeteredCall,type AiBudgetConfig} from './ai-budget';
+import {runAiWithFailover,type AiFailoverEnv,type SecondaryLlm} from './ai-failover';
 import {readNationalNews} from './national-news';
 import {notableTopics,notableDailyLimit,validNotableCommand,type NotableCommand} from './notable-profiles';
 import {nationNotables} from './notable-choice';
@@ -13,7 +14,7 @@ export const notablesEnabled=true; // Explicit preview approval; independent run
 export async function ownerPrefix(userId:string){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(userId));return 'notable:'+Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')+':';}
 
 /** No conversation history, household drafts, account IDs or private chat enter a model prompt. */
-export async function answerNotable(db:GameDatabase,userId:string,command:NotableCommand,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,killSwitch=null as AiTemplatesOnlyEnv|null,reviewQueue=false}={}){
+export async function answerNotable(db:GameDatabase,userId:string,command:NotableCommand,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,killSwitch=null as AiTemplatesOnlyEnv|null,reviewQueue=false,failover=null as AiFailoverEnv|null,secondary=undefined as SecondaryLlm|undefined}={}){
  const fail=(status:number,error:string)=>({status,error});
  if(!validNotableCommand(command))return fail(400,'Choose a listed public topic and a valid request.');
  const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();const nation=citizen?.nation_id??null;
@@ -33,10 +34,9 @@ export async function answerNotable(db:GameDatabase,userId:string,command:Notabl
  const answered:AiMeteredCall[]=[];let draftText='';let uncertain=false,reached=false,failureCode='validation',stage:'input'|'output'|'nation'='input',rejectedAt='input-unsafe'; // #92: reached = a request was handed to the gateway
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>12000){rejectedAt='input-too-long';throw Error();}
-  let timer:ReturnType<typeof setTimeout>|undefined;let result:unknown;if(!reached){reached=true;await markAiReservationSent(db,id);}
-  try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},aiGatewayOptions(budget)),new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error()),30000);})]);}
+  let result:unknown;if(!reached){reached=true;await markAiReservationSent(db,id);}
+  try{result=await runAiWithFailover({runPrimary:(m,i,o)=>binding.run(m,i,o),model,input:{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},gateway:aiGatewayOptions(budget),env:failover,secondary,timeoutMs:30000});}
   catch(error){uncertain=true;failureCode=error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain';throw Error();}
-  finally{if(timer!==undefined)clearTimeout(timer);}
   answered.push({model,usage:result&&typeof result==='object'?(result as {usage?:unknown}).usage:undefined}); // #141/#170: the gateway answered; metered from its usage when valid
   // A fulfilled provider call is terminal even when its content is invalid.
   // Validation failure publishes nothing and settles to the metered cost of the answered calls (#141).

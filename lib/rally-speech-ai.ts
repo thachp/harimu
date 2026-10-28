@@ -6,6 +6,7 @@
 import type { GameDatabase } from './database-contract';
 import { aiPathPersonas, skipForMutedPersona, skipForTemplates, type AiTemplatesOnlyEnv } from './ai-kill-switch';
 import { aiBudgetConfig } from './ai-budget';
+import type { AiFailoverEnv } from './ai-failover';
 import type { NewsAiBinding } from './ai-news';
 import { generateAnswer, platformCards } from './town-hall-ai';
 import { electionCandidates } from './elections';
@@ -15,7 +16,7 @@ import { upcomingRallyWeek } from './rallies-rules';
 export const rallySpeechSchemas = [
   `CREATE TABLE IF NOT EXISTS rally_speeches (rally_id TEXT PRIMARY KEY, speech TEXT NOT NULL CHECK(length(speech) BETWEEN 1 AND 600), created_at INTEGER NOT NULL)`,
 ];
-export type RallySpeechBindings = AiTemplatesOnlyEnv & { AI?: NewsAiBinding; HARIMU_KINDLE_RALLIES_ENABLED?: string; HARIMU_AI_RALLY_SPEECHES_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string };
+export type RallySpeechBindings = AiTemplatesOnlyEnv & AiFailoverEnv & { AI?: NewsAiBinding; HARIMU_KINDLE_RALLIES_ENABLED?: string; HARIMU_AI_RALLY_SPEECHES_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string };
 export const rallySpeechesConfigured = (b: RallySpeechBindings) =>
   b.HARIMU_KINDLE_RALLIES_ENABLED === 'true' && b.HARIMU_AI_RALLY_SPEECHES_ENABLED === 'true' && Boolean(b.AI) && aiBudgetConfig(b) !== null;
 
@@ -30,7 +31,7 @@ export async function runRallySpeechCron(db: GameDatabase, now: number, b: Rally
     const done = await db.prepare(`SELECT (SELECT COUNT(*) FROM rally_speeches WHERE rally_id=?) AS saved, (SELECT COUNT(*) FROM harimu_ai_reservations WHERE request_id=?) AS tried`).bind(r.id, reservation).first<{ saved: number; tried: number }>();
     if (Number(done?.saved) > 0 || Number(done?.tried) > 0) { results.push('skipped'); continue; }
     const card = platformCards(r.candidate.id), input = { candidate: card.name, platform: card.platform, platformCards: card.cards, city: r.city.name };
-    const made = await generateAnswer(db, now, b.AI, { enabled: true, budget }, {
+    const made = await generateAnswer(db, now, b.AI, { enabled: true, budget, failover: b }, {
       reservation, input, guardQuestion: `Give a short public campaign rally speech in ${r.city.name}.`,
       draft: `You are ${card.name}, an AI candidate in the Kindle presidential campaign, giving a short speech at a rally in a city square. Speak in the first person, in two to four plain sentences, using only the candidate's platform and platform cards given below. Do not announce any new promise, policy, spending or appointment, and never ask anyone how to vote or offer anything for a vote. Use no numbers or links. Return JSON with a response string.`,
       check: 'Check this rally speech. Return JSON with supported true only when every claim in it is on the candidate platform or platform cards given, and it announces no new promise, policy, spending, appointment or quantity.',

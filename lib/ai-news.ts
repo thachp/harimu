@@ -3,6 +3,7 @@ import {deniedAiText} from './ai-denylist';
 import type {NationalNews,NewsItem} from './national-news';
 import {skipForMutedPersona,aiPathPersonas,skipForTemplates,type AiTemplatesOnlyEnv} from './ai-kill-switch';
 import {reserveAiSequence,releaseAiReservation,markAiReservationSent,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiBudgetSchema,aiGatewayOptions,type AiModel,type AiMeteredCall,type AiBudgetConfig} from './ai-budget';
+import {runAiWithFailover,type AiFailoverEnv,type SecondaryLlm} from './ai-failover';
 export const aiNewsEnabled=true; // Preview activation approved 2026-10-14; runtime flags and pricing expiry still gate inference.
 export const aiNewsSchemas=[aiBudgetSchema,
  `CREATE TABLE IF NOT EXISTS ai_news_jobs(id TEXT PRIMARY KEY,nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),utc_day TEXT NOT NULL,started_at INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('running','published','failed')),failure_code TEXT)`,
@@ -49,7 +50,7 @@ export const aiNewsRetrySeconds=300;
 /** #769: a job whose draft the checks rejected ('validation') gets one retry: at most this many attempts reach the gateway per nation per UTC day.
  * Attempts are counted from this job's non-pending reservations, so each retry reserves budget normally and nothing is reserved twice. */
 export const aiNewsMaxGatewayAttempts=2;
-export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,killSwitch=null as AiTemplatesOnlyEnv|null}={}){
+export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,killSwitch=null as AiTemplatesOnlyEnv|null,failover=null as AiFailoverEnv|null,secondary=undefined as SecondaryLlm|undefined}={}){
  if(!enabled||!Number.isSafeInteger(now))return;
  // #742: templates-only mode skips the model call and the reservation; the edition keeps its deterministic items.
  if(skipForTemplates('ai-news',killSwitch,news.nationId,now))return;
@@ -75,8 +76,8 @@ export async function prepareAiNews(db:GameDatabase,news:NationalNews,now:number
  let reached=false;const answered:AiMeteredCall[]=[]; // #92: true once any request is handed to the gateway
  const call=async(model:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],json:'draft'|'verification'|false=false)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>12000)throw Error('Inference input exceeded the public-facts bound.');
-  let timeout:ReturnType<typeof setTimeout>|undefined;let result:unknown;if(!reached){reached=true;await markAiReservationSent(db,reservation);}
-  try{result=await Promise.race([binding.run(model,{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},aiGatewayOptions(budget)),new Promise<never>((_resolve,reject)=>{timeout=setTimeout(()=>reject(Error('Inference timed out.')),30000);})]);}catch(error){throw new AiNewsFailure(error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain');}finally{if(timeout!==undefined)clearTimeout(timeout);}
+  let result:unknown;if(!reached){reached=true;await markAiReservationSent(db,reservation);}
+  try{result=await runAiWithFailover({runPrimary:(m,i,o)=>binding.run(m,i,o),model,input:{messages,max_tokens:256,temperature:0,stream:false,...(json?{response_format:json==='verification'?newsVerificationResponseFormat:newsDraftResponseFormat}:{})},gateway:aiGatewayOptions(budget),env:failover,secondary,timeoutMs:30000});}catch(error){throw new AiNewsFailure(error&&typeof error==='object'&&(('code' in error&&String(error.code)==='5016')||('message' in error&&typeof error.message==='string'&&/\b5016\b/.test(error.message)))?`model-terms-5016:${model}`:'inference-uncertain');}
   answered.push({model,usage:result&&typeof result==='object'?(result as {usage?:unknown}).usage:undefined}); // #141/#170: the gateway answered; metered from its usage when valid
   // The provider has returned: malformed content is a known rejected attempt,
   // not an unresolved transport. It settles to the metered cost of the answered calls (#141).
