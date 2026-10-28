@@ -8,6 +8,7 @@ import { armyUnits, unitForNation } from './army-rules';
 import { marchArrivalAt, readActiveWars, unitMarch, type ArmyWar } from './army-map';
 import { applySupplyLoss, armySupplyEnabled, PERCENT, unitSupply } from './army-supply';
 import { readUnitReadiness } from './army';
+import { woundedUntil } from './army-wounds';
 /** #934: battle square transfers use the same weekly-cap guard as siege captures. #910 does not capture; call `transferBattleSquares` when a path gains transfers. */
 export { transferBattleSquares } from './war-loss-cap';
 
@@ -104,11 +105,20 @@ export async function withBattleLosses(db: GameDatabase, unitId: string, full: n
   const left = Number(last.attacker_unit === unitId ? last.attacker_strength : last.defender_strength);
   return carriedStrength(full, left, Number(last.started_at) + Number(last.rounds) * BATTLE_ROUND_SECONDS, now);
 }
+/** #911 (ARC on #944): the unit destroyed in a finished battle is the side that retreated broken; none after a round-limit decision. */
+export const destroyedUnit = (b: { retreated: 'attacker' | 'defender' | null; attackerUnit: string; defenderUnit: string }) =>
+  b.retreated === 'attacker' ? b.attackerUnit : b.retreated === 'defender' ? b.defenderUnit : null;
 /** World tick (write path, behind the flag): store every finished, not yet stored battle once. INSERT ... ON CONFLICT DO NOTHING on the battle key, so
  *  concurrent ticks store exactly one row and a later strength change never alters it. */
 export async function recordFinishedBattles(db: GameDatabase, now: number) {
   const done = (await readBattles(db, await readActiveWars(db), now)).filter(b => !b.stored && b.status !== 'ongoing');
   if (!done.length) return;
-  await db.batch(done.map(b => db.prepare(`INSERT INTO army_battles (battle_key, war_id, attacker_unit, defender_unit, started_at, rounds, status, retreated, attacker_strength, defender_strength, recorded_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (battle_key) DO NOTHING`).bind(b.key, b.warId, b.attackerUnit, b.defenderUnit, b.startedAt, b.rounds, b.status, b.retreated, b.attackerStrength, b.defenderStrength, now)));
+  // #911 (ARC on #944): only a unit that retreated broken is destroyed; its members are wounded (never killed), in the same batch; conditional too,
+  // so a replay keeps the first times. A round-limit loss (retreated null) wounds no one.
+  const losers = done.map(destroyedUnit), hit = losers.filter((u): u is string => !!u);
+  const members = hit.length ? (await db.prepare(`SELECT clerk_user_id, unit_id FROM army_members WHERE unit_id IN (${hit.map(() => '?').join(',')})`).bind(...hit).all<{ clerk_user_id: string; unit_id: string }>()).results ?? [] : [];
+  const wounds = done.flatMap((b, i) => members.filter(m => losers[i] && m.unit_id === losers[i]).map(m => db.prepare('INSERT INTO army_wounds (battle_key, clerk_user_id, wounded_until) VALUES (?,?,?) ON CONFLICT (battle_key, clerk_user_id) DO NOTHING')
+    .bind(b.key, m.clerk_user_id, woundedUntil(b.key, m.clerk_user_id, b.startedAt + b.rounds * BATTLE_ROUND_SECONDS))));
+  await db.batch([...done.map(b => db.prepare(`INSERT INTO army_battles (battle_key, war_id, attacker_unit, defender_unit, started_at, rounds, status, retreated, attacker_strength, defender_strength, recorded_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (battle_key) DO NOTHING`).bind(b.key, b.warId, b.attackerUnit, b.defenderUnit, b.startedAt, b.rounds, b.status, b.retreated, b.attackerStrength, b.defenderStrength, now)), ...wounds]);
 }

@@ -117,12 +117,14 @@ for (const backend of ['sqlite', 'postgres']) test(`the siege tables enforce the
   await assault('a4', 20_001);
   const capture = (id, req, over = {}) => run('INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) VALUES (?,?,?,?,?,?,?,?,?)', id, over.siege ?? 's1', 'w1', req, 'korund', 'kindle', over.moved ?? 1, 0, T);
   await capture('c1', 'a4');
-  await rejects('INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) VALUES (?,?,?,?,?,?,?,?,?)', 'c2', 's1', 'w1', 'a5', 'korund', 'kindle', 1, 0, T);
-  await rejects('INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) VALUES (?,?,?,?,?,?,?,?,?)', 'c3', 's1', 'w1', 'a6', 'korund', 'kindle', -1, 0, T);
+  // #933: UNIQUE(siege_id) is gone so a second partial-capture step on the same siege is allowed; request_id stays unique.
+  await capture('c2', 'a5');
+  await rejects('INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) VALUES (?,?,?,?,?,?,?,?,?)', 'c3', 's1', 'w1', 'a4', 'korund', 'kindle', 1, 0, T);
+  await rejects('INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) VALUES (?,?,?,?,?,?,?,?,?)', 'c4', 's1', 'w1', 'a6', 'korund', 'kindle', -1, 0, T);
   await run('INSERT INTO city_capture_squares (capture_id,x,y,from_nation,to_nation) VALUES (?,?,?,?,?)', 'c1', 3, 4, 'kindle', 'korund');
   await rejects('INSERT INTO city_capture_squares (capture_id,x,y,from_nation,to_nation) VALUES (?,?,?,?,?)', 'c1', 3, 4, 'kindle', 'korund');
   await rejects('INSERT INTO city_capture_squares (capture_id,x,y,from_nation,to_nation) VALUES (?,?,?,?,?)', 'no-capture', 5, 5, 'kindle', 'korund');
-  assert.deepEqual([await count('city_sieges'), await count('siege_assaults'), await count('city_captures'), await count('city_capture_squares')], [1, 2, 1, 1]);
+  assert.deepEqual([await count('city_sieges'), await count('siege_assaults'), await count('city_captures'), await count('city_capture_squares')], [1, 2, 2, 1]);
   await run('DELETE FROM wars WHERE id=?', 'w1');
   assert.deepEqual([await count('city_sieges'), await count('siege_assaults'), await count('city_captures'), await count('city_capture_squares')], [0, 0, 0, 0], 'ending a war record cascades the siege rows');
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM world_squares').first()).n > 0, true, 'the map is untouched');

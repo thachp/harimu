@@ -117,35 +117,42 @@ async function capturePlan(db: GameDatabase, kind: CityKind, centre: { x: number
 export const captureSiegeForTest = (...a: Parameters<typeof capture>) => capture(...a);
 /** Moves national control for the claim squares nobody bought; one batch with the capture record, so it lands whole or not at all. A retry after a crash finds the capture and changes nothing. */
 async function capture(db: GameDatabase, siege: SiegeRow, kind: CityKind, centre: { x: number; y: number }, requestId: string, now: number, lossCap = false) {
-  const done = await db.prepare('SELECT id,squares_transferred,squares_kept_private FROM city_captures WHERE siege_id=?').bind(siege.id).first<{ id: string; squares_transferred: number; squares_kept_private: number }>();
-  if (done) return { moved: Number(done.squares_transferred), keptPrivate: Number(done.squares_kept_private), replay: true as const };
+  const prior = await db.prepare('SELECT id,squares_transferred,squares_kept_private FROM city_captures WHERE request_id=?').bind(requestId).first<{ id: string; squares_transferred: number; squares_kept_private: number }>();
+  if (prior) return { moved: Number(prior.squares_transferred), keptPrivate: Number(prior.squares_kept_private), replay: true as const };
+  if (!lossCap) {
+    const done = await db.prepare('SELECT id,squares_transferred,squares_kept_private FROM city_captures WHERE siege_id=?').bind(siege.id).first<{ id: string; squares_transferred: number; squares_kept_private: number }>();
+    if (done) return { moved: Number(done.squares_transferred), keptPrivate: Number(done.squares_kept_private), replay: true as const };
+  }
   const plan = await capturePlan(db, kind, centre, siege.attacker_nation, siege.defender_nation), id = `cap-${crypto.randomUUID()}`;
   if (!plan.transfer.length) return null; // everything was bought since the pre-check: nothing moves, and no capture is recorded
-  if (lossCap) { // #912: Heartland never moves; a capture that would take the defender past its weekly frontier-loss limit moves nothing and the city stays contested.
+  if (lossCap) { // #912/#933: Heartland never moves; take up to the remaining weekly frontier slots; city flips only when the last capturable square moves.
     const zones = await squareZones(db, plan.transfer), ledger = await frontierLedger(db, siege.defender_nation, now);
-    const decision = decideCapture(plan.transfer.map(t => ({ ...t, zone: zones.get(`${t.x},${t.y}`) ?? 'frontier' })), ledger.lost, ledger.heldAtWindowStart);
+    const attackerKeys = new Set((await db.prepare("SELECT x,y FROM world_squares WHERE owner=?").bind(siege.attacker_nation).all<{ x: number; y: number }>()).results.map(r => `${Number(r.x)},${Number(r.y)}`));
+    const decision = decideCapture(plan.transfer.map(t => ({ ...t, zone: zones.get(`${t.x},${t.y}`) ?? 'frontier' })), ledger.lost, ledger.heldAtWindowStart, attackerKeys);
     const log = { siegeId: siege.id, warId: siege.war_id, requestId, attacker: siege.attacker_nation, defender: siege.defender_nation, lost: ledger.lost, now };
-    if (!decision.ok) { await refusalStatement(db, { ...log, reason: 'weekly_cap', squares: decision.transfer.length, limit: decision.limit }).run(); return { refused: 'weekly_cap' as const, lost: decision.lost, limit: decision.limit }; }
+    if (!decision.ok) { await refusalStatement(db, { ...log, reason: 'weekly_cap', squares: Math.max(1, decision.transfer.length), limit: decision.limit }).run(); return { refused: 'weekly_cap' as const, lost: decision.lost, limit: decision.limit }; }
     if (decision.heartland.length) await refusalStatement(db, { ...log, reason: 'heartland', squares: decision.heartland.length, limit: 1 }).run();
     if (!decision.transfer.length) return null;
     plan.transfer = decision.transfer.map(({ x, y, from, to }) => ({ x, y, from, to }));
-    const guard = capGuardSql(siege.defender_nation, decision.transfer.filter(s => s.zone === 'frontier').length, now), landed = 'EXISTS (SELECT 1 FROM city_captures WHERE id=?)';
-    try { await db.batch([db.prepare(defenderLockSql).bind(siege.defender_nation), // lock first, then re-check the cap inside the same transaction
+    const frontierN = decision.transfer.filter(s => s.zone === 'frontier').length;
+    const guard = capGuardSql(siege.defender_nation, frontierN, now), landed = 'EXISTS (SELECT 1 FROM city_captures WHERE id=?)';
+    const flip = decision.flipped; // #933: city / siege complete only when every capturable square moved
+    try { await db.batch([db.prepare(defenderLockSql).bind(siege.defender_nation),
       db.prepare(`INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) SELECT ?,?,?,?,?,?,?,?,? WHERE ${guard}`)
         .bind(id, siege.id, siege.war_id, requestId, siege.attacker_nation, siege.defender_nation, plan.transfer.length, plan.keptPrivate.length, now),
       ...plan.transfer.flatMap(t => [
-        db.prepare(`UPDATE world_squares SET owner=? WHERE x=? AND y=? AND owner=? AND NOT EXISTS (SELECT 1 FROM world_square_purchases WHERE x=? AND y=?) AND ${landed}`).bind(t.to, t.x, t.y, t.from, t.x, t.y, id),
+        db.prepare(`UPDATE world_squares SET owner=? WHERE x=? AND y=? AND owner=? AND zone<>'heartland' AND NOT EXISTS (SELECT 1 FROM world_square_purchases WHERE x=? AND y=?) AND ${landed}`).bind(t.to, t.x, t.y, t.from, t.x, t.y, id),
         db.prepare(`INSERT INTO city_capture_squares (capture_id,x,y,from_nation,to_nation) SELECT ?,?,?,?,? WHERE ${landed}`).bind(id, t.x, t.y, t.from, t.to, id),
       ]),
-      ...(kind === 'founded' ? [db.prepare(`UPDATE world_cities SET nation_id=? WHERE id=? AND nation_id=? AND ${landed}`).bind(siege.attacker_nation, siege.city_key.slice('city:'.length), siege.defender_nation, id)] : []),
-      db.prepare(`UPDATE city_sieges SET captured_at=? WHERE id=? AND captured_at IS NULL AND ${landed}`).bind(now, siege.id, id),
+      ...(flip && kind === 'founded' ? [db.prepare(`UPDATE world_cities SET nation_id=? WHERE id=? AND nation_id=? AND ${landed}`).bind(siege.attacker_nation, siege.city_key.slice('city:'.length), siege.defender_nation, id)] : []),
+      ...(flip ? [db.prepare(`UPDATE city_sieges SET captured_at=? WHERE id=? AND captured_at IS NULL AND ${landed}`).bind(now, siege.id, id)] : []),
     ]); } catch (error) {
-      const raced = await db.prepare('SELECT squares_transferred,squares_kept_private FROM city_captures WHERE siege_id=?').bind(siege.id).first<{ squares_transferred: number; squares_kept_private: number }>();
+      const raced = await db.prepare('SELECT squares_transferred,squares_kept_private FROM city_captures WHERE request_id=?').bind(requestId).first<{ squares_transferred: number; squares_kept_private: number }>();
       if (!raced) throw error; return { moved: Number(raced.squares_transferred), keptPrivate: Number(raced.squares_kept_private), replay: true as const };
     }
-    if (await db.prepare('SELECT 1 AS found FROM city_captures WHERE id=?').bind(id).first()) return { moved: plan.transfer.length, keptPrivate: plan.keptPrivate.length };
-    const after = await frontierLedger(db, siege.defender_nation, now), limit = weeklyLossLimitOf(after.heldAtWindowStart); // a concurrent capture took the room
-    await refusalStatement(db, { ...log, lost: after.lost, reason: 'weekly_cap', squares: plan.transfer.length, limit }).run();
+    if (await db.prepare('SELECT 1 AS found FROM city_captures WHERE id=?').bind(id).first()) return { moved: plan.transfer.length, keptPrivate: plan.keptPrivate.length, partial: !flip };
+    const after = await frontierLedger(db, siege.defender_nation, now), limit = weeklyLossLimitOf(after.heldAtWindowStart);
+    await refusalStatement(db, { ...log, lost: after.lost, reason: 'weekly_cap', squares: Math.max(1, plan.transfer.length), limit }).run();
     return { refused: 'weekly_cap' as const, lost: after.lost, limit };
   }
   const statements = [
