@@ -37,7 +37,7 @@
     "HARIMU_NOTABLES_ENABLED": "false",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
-    // #952: a founded city promotes one tier after its home-city population stays at or above the next tier's floor for 7 real days. Off: the daily check does not run and readers still see T1.
+    // #952 / #966: a founded city promotes one tier after 7 real days above the next population floor, and drops one tier after 7 real days short of food or housing (never below T1; a capital never below its starting tier). Off: the daily check does not run and readers still see T1.
     "HARIMU_CITY_TIER_GROWTH_ENABLED": "false",
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",

@@ -79,7 +79,7 @@ test('a city above the T2 floor for 6 days stays T1, promotes on day 7, and a da
   const row = async () => { const x = await r.db.prepare('SELECT tier, above_next_tier_since AS since FROM world_cities WHERE id=?').bind(id).first(); return { tier: Number(x.tier), since: x.since == null ? null : Number(x.since) }; };
   const t0 = 1_700_000_000;
   await r.db.prepare(`UPDATE citizen_city_locations SET home_city_id='forgehaven' WHERE user_id='c952-0'`).run(); // 499 homes
-  assert.deepEqual(await runCityTierGrowth(r.db, t0, true), { promoted: [] });
+  assert.deepEqual(await runCityTierGrowth(r.db, t0, true), { promoted: [], shrunk: [] });
   assert.deepEqual(await row(), { tier: 1, since: null });
   await r.db.prepare(`UPDATE citizen_city_locations SET home_city_id=? WHERE user_id='c952-0'`).bind(id).run();
   await runCityTierGrowth(r.db, t0, true);
@@ -94,9 +94,9 @@ test('a city above the T2 floor for 6 days stays T1, promotes on day 7, and a da
   assert.deepEqual(await row(), { tier: 1, since: t0 + 3 * DAY });
   await runCityTierGrowth(r.db, t0 + 9 * DAY, true);
   assert.equal((await row()).tier, 1); // 6 days after the reset
-  assert.deepEqual(await runCityTierGrowth(r.db, t0 + 10 * DAY, true), { promoted: [id] });
+  assert.deepEqual(await runCityTierGrowth(r.db, t0 + 10 * DAY, true), { promoted: [id], shrunk: [] });
   assert.equal((await row()).tier, 2);
-  assert.deepEqual(await runCityTierGrowth(r.db, t0 + 10 * DAY, true), { promoted: [] }); // idempotent
+  assert.deepEqual(await runCityTierGrowth(r.db, t0 + 10 * DAY, true), { promoted: [], shrunk: [] }); // idempotent
   assert.equal((await row()).tier, 2);
 });
 
@@ -112,7 +112,7 @@ test('flag off: HARIMU_CITY_TIER_GROWTH_ENABLED does not read or write, and the 
   const { runCityTierGrowth } = await r.importModule('lib/city-tier.ts');
   const prepare = r.db.prepare.bind(r.db); let calls = 0;
   r.db.prepare = sql => { calls++; return prepare(sql); };
-  assert.deepEqual(await runCityTierGrowth(r.db, 1 + 8 * DAY, false), { promoted: [] });
+  assert.deepEqual(await runCityTierGrowth(r.db, 1 + 8 * DAY, false), { promoted: [], shrunk: [] });
   assert.equal(calls, 0, 'flag off opens no statement');
   r.db.prepare = prepare;
   const stored = await r.db.prepare(`SELECT tier, above_next_tier_since AS since FROM world_cities`).first();
