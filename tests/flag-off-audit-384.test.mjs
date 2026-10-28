@@ -19,6 +19,7 @@ const declared = config => Object.keys(config.vars).filter(name => /^HARIMU_[A-Z
 const flagOffPins = {
   HARIMU_ACCOUNT_ELECTION_POC_ENABLED: 'account-election.test.mjs',
   HARIMU_AI_NEWS_ENABLED: 'ai-news-gateway-140.test.mjs',
+  HARIMU_AI_SECONDARY_PROVIDER_ENABLED: 'ai-failover-883.test.mjs', // #883 flag off: secondary is never called
   HARIMU_NOTABLES_ENABLED: 'ai-captured-drafts.test.mjs',
   HARIMU_AI_CABINET_RESPONSES_ENABLED: 'cabinet-response-ai.test.mjs',
   HARIMU_CITY_FOUNDING_ENABLED: 'flag-off-audit-384.test.mjs',
