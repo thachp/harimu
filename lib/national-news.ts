@@ -9,15 +9,19 @@ import { embargoNewsItems, readEmbargoes } from './embargo'; // #363
 import { goodsSanctionNewsItems, readGoodsSanctions } from './goods-sanctions'; // #601
 import { undergroundNewsItems } from './korund-underground'; // #295
 import { rallyNewsItems } from './rallies'; // #867
+import { korundWeeklyQuotaFood } from './korund-coupons'; // #981 target, same constant as the quota bar
+import { korundPlanStatLine, korundPlanWindow, planFulfilmentPercent } from './korund-plan-stats'; // #981
 
 export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model';kind?:NewsItemKind};
 /** record: system ledger fact; template: Korund State Media template built only from ledger figures; decree: Aurelle court gazette entry; article: model-written article. */
 export type NewsItemKind='record'|'template'|'decree'|'article';
-export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'court';fetchedAt:number;statistics:{citizens:number;completedShifts:number;food:number};items:NewsItem[];templatesOnly?:boolean;personaMuted?:boolean};
+/** #981: one State Media line for the open week's food quota. Absent when the flag is off. `line` is the only text a citizen is shown. */
+export type KorundPlanStat = { resource: 'food'; output: number; target: number; percent: number; line: string };
+export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'court';fetchedAt:number;statistics:{citizens:number;completedShifts:number;food:number};items:NewsItem[];templatesOnly?:boolean;personaMuted?:boolean;planStat?:KorundPlanStat};
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean}={}):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean}={}):Promise<NationalNews|null> {
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
  if(!edition)return null;
@@ -51,7 +55,19 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
   const snapshot=publicGovernmentSnapshot(proposals.find(proposal=>proposal?.nationId===nationId)??null);
   if(snapshot){const disclosure=governmentDisclosure(snapshot);items.push({id:`${nationId}:policy:${tick.tick}`,title:nationId==='aurelle'?`By order of the Crown: ${disclosure.title}`:disclosure.title,text:nationId==='aurelle'?`The Herald proclaims: ${disclosure.text}`:disclosure.text,occurredAt:tick.processed_at*1000,source:'deterministic',kind:nationId==='aurelle'?'decree':'record'});}
  }
- return {nationId,...edition,fetchedAt:now,statistics:{citizens:register?.citizens??0,completedShifts:totals?.shifts??0,food:totals?.food??0},items:items.sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12)};
+ const planStat = nationId === 'korund' && options.planStats ? await readKorundPlanStat(db, now) : undefined;
+ return {nationId,...edition,fetchedAt:now,statistics:{citizens:register?.citizens??0,completedShifts:totals?.shifts??0,food:totals?.food??0},...(planStat ? {planStat} : {}),items:items.sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12)};
+}
+
+/** #981: open-week food summed from korund_settlements, percent against the weekly quota. Read-only; flag off never calls it. */
+async function readKorundPlanStat(db:GameDatabase,nowMs:number):Promise<KorundPlanStat|undefined> {
+ const now = Math.floor(nowMs / 1000);
+ const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
+ const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now / 7200) * 7200;
+ const span = korundPlanWindow(epoch, now);
+ const row = await db.prepare('SELECT COALESCE(SUM(food_output),0) AS plan_food FROM korund_settlements WHERE settled_at>=? AND settled_at<?').bind(span.start, span.end).first<{plan_food:number}>();
+ const output = Number(row?.plan_food ?? 0), target = korundWeeklyQuotaFood, percent = planFulfilmentPercent(output, target), line = korundPlanStatLine(output, target);
+ return line && percent !== null ? { resource: 'food', output, target, percent, line } : undefined;
 }
 
 /** State Media spin lives only in the words; numbers always come from the ledger row. */
