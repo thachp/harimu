@@ -10,8 +10,9 @@ export async function readCityLocation(db:GameDatabase,userId:string,nationId:st
  const capital=capitalCityForNation(nationId);if(!capital)throw new Error('Unknown nation city.');
  const ids=citiesForNation(nationId).map(city=>city.id);
  const placeholders=ids.map(()=>'?').join(',');
- // #781: a home recorded by a home_city_moves row for this nation and still a city of it is kept; otherwise (no move, nation changed, unknown city) home resets to the capital as before.
- const kept=`(citizen_city_locations.nation_id=excluded.nation_id AND citizen_city_locations.home_city_id IN (${placeholders}) AND EXISTS(SELECT 1 FROM home_city_moves m WHERE m.clerk_user_id=citizen_city_locations.user_id AND m.nation_id=excluded.nation_id AND m.to_city_id=citizen_city_locations.home_city_id))`;
+ // #781: a move in this nation keeps its city. #965: with no move in this nation, a catalog home is kept (signup choice; no cooldown row).
+ // A home that disagrees with a move in this nation, a nation change, or an unknown city still resets to the capital.
+ const kept=`(citizen_city_locations.nation_id=excluded.nation_id AND citizen_city_locations.home_city_id IN (${placeholders}) AND (EXISTS(SELECT 1 FROM home_city_moves m WHERE m.clerk_user_id=citizen_city_locations.user_id AND m.nation_id=excluded.nation_id AND m.to_city_id=citizen_city_locations.home_city_id) OR NOT EXISTS(SELECT 1 FROM home_city_moves m WHERE m.clerk_user_id=citizen_city_locations.user_id AND m.nation_id=excluded.nation_id)))`;
  await db.prepare(`INSERT INTO citizen_city_locations(user_id,nation_id,home_city_id,current_city_id,updated_at)
  SELECT clerk_user_id,nation_id,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?
  ON CONFLICT(user_id) DO UPDATE SET home_city_id=CASE WHEN ${kept} THEN citizen_city_locations.home_city_id ELSE excluded.home_city_id END,
@@ -21,6 +22,20 @@ export async function readCityLocation(db:GameDatabase,userId:string,nationId:st
  .bind(capital.id,capital.id,now,userId,nationId,...ids,...ids,...ids,...ids,...ids).run();
  const row=await db.prepare('SELECT nation_id,home_city_id,current_city_id FROM citizen_city_locations WHERE user_id=? AND nation_id=?').bind(userId,nationId).first<{nation_id:string;home_city_id:string;current_city_id:string}>();
  return {nationId,homeCityId:row?.home_city_id??capital.id,currentCityId:row?.current_city_id??capital.id};
+}
+/** #965: omitted or the capital → null (today's capital home, no write). Any other catalog city in the nation is recorded. Anything else is refused. */
+export function resolveEnrollHomeCity(nationId:string,cityId:unknown):{ok:true;cityId:string|null}|{ok:false;reason:'not_in_nation'}{
+ if(cityId==null)return {ok:true,cityId:null};
+ const city=typeof cityId==='string'?cityForNation(nationId,cityId):undefined;
+ if(!city)return {ok:false,reason:'not_in_nation'};
+ return {ok:true,cityId:city.capital?null:city.id};
+}
+/** Signup home only. No home_city_moves row, so #781's fee and 7-day cooldown do not start. */
+export async function recordEnrollHome(db:GameDatabase,userId:string,nationId:string,cityId:string,now:number){
+ await db.prepare(`INSERT INTO citizen_city_locations(user_id,nation_id,home_city_id,current_city_id,updated_at)
+ SELECT clerk_user_id,nation_id,?,?,? FROM citizens WHERE clerk_user_id=? AND nation_id=?
+ ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,home_city_id=excluded.home_city_id,current_city_id=excluded.current_city_id,updated_at=excluded.updated_at`)
+ .bind(cityId,cityId,now,userId,nationId).run();
 }
 export async function cityPresence(db:GameDatabase,nationId:string,now:number){
  const cities=citiesForNation(nationId),capital=capitalCityForNation(nationId);
