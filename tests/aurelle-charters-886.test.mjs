@@ -45,11 +45,12 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(rec.mismatchCount, 0, JSON.stringify(rec.mismatches));
   });
 
-  test(`${backend}: flag off, a jobId is ignored: the food estate runs, no charter row, no issuance`, async t => {
+  test(`${backend}: flag off, a jobId is ignored: the food estate runs, no charter row; #957 still writes a food-estate issuance`, async t => {
     const { r, work, issuances, plan } = await aurelle(t, { on: false, backend });
     const w = await work('aurelle-quarry-charter');
     assert.equal(w.start.status, 200); assert.equal(w.claim.status, 200); assert.equal(w.order, 'aurelle-food-estate');
-    assert.deepEqual(await issuances(), []); assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM aurelle_charter_settlements').first()).n), 0);
+    assert.deepEqual(await issuances(), [['ana', 800, 'aurelle-food-estate-wage']]);
+    assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM aurelle_charter_settlements').first()).n), 0);
     assert.equal((await plan()).shifts[0].rewardItem, 'estate food');
   });
 }
@@ -57,11 +58,13 @@ for (const backend of ['sqlite', 'postgres']) {
 test('flag on: no jobId or an unknown one is the food estate; an unfinished charter pays nothing; an empty treasury refuses; no issuance without a payment', async t => {
   const { r, work, issuances } = await aurelle(t);
   assert.equal((await work()).order, 'aurelle-food-estate'); assert.equal((await work('constructor')).order, 'aurelle-food-estate');
+  // #957: the two food-estate wages each write an issuance; the refused charter adds none.
+  assert.deepEqual(await issuances(), Array(2).fill(['ana', 800, 'aurelle-food-estate-wage']));
   const id = randomUUID(); assert.equal((await r.call('citizen', 'ana', { action: 'aurelle-start-work', requestId: id, jobId: 'aurelle-foundry-charter' })).status, 200);
   assert.equal((await r.call('citizen', 'ana', { action: 'aurelle-claim-work', requestId: randomUUID(), shiftId: id })).status, 409, 'unfinished');
   r.setNow(r.now + 7200 * 1000); await r.db.prepare("UPDATE aurelle_resources SET initial_minor=0 WHERE id='estate'").run();
   assert.equal((await r.call('citizen', 'ana', { action: 'aurelle-claim-work', requestId: randomUUID(), shiftId: id })).status, 409, 'the treasury cannot cover it');
-  assert.deepEqual(await issuances(), []);
+  assert.deepEqual(await issuances(), Array(2).fill(['ana', 800, 'aurelle-food-estate-wage']), 'no issuance without a payment');
 });
 
 test('migration 0091 (pg and drizzle) creates both tables; the Crown issuance rides in the settle batch', async () => {

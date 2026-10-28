@@ -4,7 +4,8 @@
  *  `korund-start-work` starts the citizen's latest Labor Bureau post when it is one of these four, otherwise the food brigade exactly as before.
  *  Off: no post shift can start, so both tables stay empty and every read (wallet, pool, reconciliation) sums to what it did before.
  *  A shift already started settles even if the flag is later turned off (its claim is keyed on the shift's work order, not the flag).
- *  Migration 0089. #885: laborNoteMonthCapSql is appended to postSettleSql only while HARIMU_EMISSION_CAPS_ENABLED is on (lib/emission-caps-rules).
+ *  Migration 0089; #957 (migration 0104) widens labor_note_issuances so brigade wages can mint rows too (FK → work_shifts; source korund-brigade-wage).
+ *  #885: laborNoteMonthCapSql is appended to postSettleSql (and #957: korundSettleSql) only while HARIMU_EMISSION_CAPS_ENABLED is on (lib/emission-caps-rules).
  *  No runtime imports; tests load this file directly. */
 /** [ASSUMPTION] (ARC: copy the existing Korund shift values): the food brigade's WC cost, length and LN wage (lib/korund korundJob). */
 export const korundPostTerms = { capacityCost: 4, hours: 2, wageMinor: 800 } as const;
@@ -20,8 +21,8 @@ const postList = Object.keys(korundPosts).map(id => `'${id}'`).join(','); // cod
 export const korundPostSchemas = [
   `CREATE TABLE IF NOT EXISTS korund_post_settlements (shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id), clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),
  job_id TEXT NOT NULL, wage_minor INTEGER NOT NULL CHECK(wage_minor > 0), settled_at INTEGER NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS labor_note_issuances (id TEXT PRIMARY KEY, shift_id TEXT NOT NULL UNIQUE REFERENCES korund_post_settlements(shift_id), clerk_user_id TEXT NOT NULL,
- amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), source TEXT NOT NULL CHECK(source IN ('korund-post-wage')), issued_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS labor_note_issuances (id TEXT PRIMARY KEY, shift_id TEXT NOT NULL UNIQUE REFERENCES work_shifts(id), clerk_user_id TEXT NOT NULL,
+ amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), source TEXT NOT NULL CHECK(source IN ('korund-post-wage','korund-brigade-wage')), issued_at INTEGER NOT NULL)`,
   'CREATE INDEX IF NOT EXISTS idx_labor_note_issuances_issued ON labor_note_issuances(issued_at)',
 ] as const;
 /** The state pool's spendable Labor Notes: both wage tables come out of korund_resources 'state'. */
@@ -43,8 +44,11 @@ export const postSettleSql = `INSERT OR IGNORE INTO korund_post_settlements(shif
  SELECT s.id,s.clerk_user_id,s.work_order_id,${korundPostTerms.wageMinor},? FROM work_shifts s JOIN korund_work_starts k ON k.id=s.id
  WHERE s.id=? AND s.clerk_user_id=? AND s.work_order_id IN (${postList}) AND k.capacity_applied=1 AND s.claimed_at IS NULL AND s.completes_at<=?
  AND ${korundPostTerms.wageMinor}<=(SELECT ${korundPoolSql} FROM korund_resources WHERE id='state')`;
-/** Bind (shiftId): one issuance record per payment, same batch as the settlement; nothing when it did not land. */
+/** Bind (shiftId): one issuance record per post payment, same batch as the settlement; nothing when it did not land. */
 export const laborNoteIssuanceSql = `INSERT OR IGNORE INTO labor_note_issuances(id,shift_id,clerk_user_id,amount_minor,source,issued_at)
  SELECT 'ln-wage:'||shift_id,shift_id,clerk_user_id,wage_minor,'korund-post-wage',settled_at FROM korund_post_settlements WHERE shift_id=?`;
-/** Bind (monthStart, monthEnd) after postSettleSql's four binds. #885: refuse when this wage plus LN issuances in the game month would pass the monthly Charter Limit. */
+/** Bind (shiftId): #957 brigade wage issuance from korund_settlements (always written when the settle lands; cap enforcement stays flag-gated). */
+export const laborNoteBrigadeIssuanceSql = `INSERT OR IGNORE INTO labor_note_issuances(id,shift_id,clerk_user_id,amount_minor,source,issued_at)
+ SELECT 'ln-wage:'||shift_id,shift_id,clerk_user_id,wage_minor,'korund-brigade-wage',settled_at FROM korund_settlements WHERE shift_id=?`;
+/** Bind (monthStart, monthEnd) after postSettleSql / korundSettleSql's four binds. #885/#957: refuse when this wage plus LN issuances in the game month would pass the monthly Charter Limit. */
 export const laborNoteMonthCapSql = ` AND ${korundPostTerms.wageMinor}+COALESCE((SELECT SUM(amount_minor) FROM labor_note_issuances WHERE issued_at>=? AND issued_at<?),0)<=(SELECT (initial_minor*1500)/10000 FROM korund_resources WHERE id='state')`;
