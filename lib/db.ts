@@ -448,6 +448,14 @@ async function initialize(database: GameDatabase) {
       database.prepare('DROP TABLE world_cities_tier_old'),
     ]);
   }
+  // #966 (migration 0107): shortage clock and the capital starting tier. A table just created from worldCitiesSchema already has both.
+  if (cityCols.results.length > 0) {
+    const names = new Set((await database.prepare('PRAGMA table_info(world_cities)').all<{ name: string }>()).results.map(column => column.name));
+    const add = [];
+    if (!names.has('below_need_since')) add.push(database.prepare('ALTER TABLE world_cities ADD COLUMN below_need_since INTEGER'));
+    if (!names.has('tier_floor')) add.push(database.prepare('ALTER TABLE world_cities ADD COLUMN tier_floor INTEGER NOT NULL DEFAULT 1'));
+    if (add.length) await database.batch(add);
+  }
 
   // #738 (migration 0082): army_conscripts gained stayed_at; a local database created before it gets the column once.
   const conscriptColumns = await database.prepare('PRAGMA table_info(army_conscripts)').all<{ name: string }>();
