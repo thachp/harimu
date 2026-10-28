@@ -2,9 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
-import { loadAiCosts, loadLedger, loadReviewQueue, loadVoteBuying, modConsoleEnabled, modPanels, utc } from '../lib/mod-console.ts';
+import { loadAiCosts, loadLedger, loadReviewQueue, loadRiskScores, loadVoteBuying, modConsoleEnabled, modPanels, utc } from '../lib/mod-console.ts';
 const read = f => readFile(new URL(`../${f}`, import.meta.url), 'utf8');
-const routes = ['/api/admin/ai-review-queue', '/api/admin/ai-costs', '/api/admin/ledger-reconciliation', '/api/admin/vote-buying'];
+const routes = ['/api/admin/ai-review-queue', '/api/admin/ai-costs', '/api/admin/ledger-reconciliation', '/api/admin/vote-buying', '/api/admin/risk-scores'];
 
 test('flag: preview on, production off, only the exact string "true" enables it; every harness that defines UI_V2_HOUSEHOLD defines it', async () => {
   assert.match(await read('wrangler.jsonc'), /"NEXT_PUBLIC_HARIMU_MOD_CONSOLE":\s*"true"/);
@@ -21,7 +21,7 @@ test('no new server logic or access: the page 404s with the flag off, only GETs 
   assert.match(page, /if \(!modConsoleEnabled\(\)\) notFound\(\);/); assert.match(page, /robots: \{ index: false, follow: false \}/);
   assert.doesNotMatch(ui + lib, /localStorage|sessionStorage|document\.cookie|method:\s*'POST'/);
   assert.deepEqual([...new Set([...lib.matchAll(/\/api\/[a-z/-]+/g)].map(m => m[0]))].sort(), [...routes].sort());
-  assert.deepEqual([...modPanels], ['ai-review-queue', 'ai-costs', 'ledger-reconciliation', 'vote-buying']);
+  assert.deepEqual([...modPanels], ['ai-review-queue', 'ai-costs', 'ledger-reconciliation', 'vote-buying', 'risk-scores']);
   await assert.rejects(readFile(new URL('../app/api/admin/mod-console', import.meta.url)), 'no new route');
 });
 
@@ -37,6 +37,9 @@ test('each loader sends the Bearer token and passes route errors through', async
   assert.deepEqual(await loadVoteBuying('t'.repeat(16), fake('/api/admin/vote-buying', { events: [] })), { panel: 'vote-buying', ok: true, events: [] });
   assert.equal((await loadVoteBuying('x', fake('/x', {}, 401))).status, 401);
   assert.equal((await loadAiCosts('x', fake('/x', {}, 401))).status, 401);
+  assert.deepEqual(await loadRiskScores('t'.repeat(16), fake('/api/admin/risk-scores', { reviewOnly: true, accounts: [{ userId: 'u1', score: 9, reasons: ['new_account'], civicActCount: 2, updatedAt: 10 }] })), { panel: 'risk-scores', ok: true, accounts: [{ userId: 'u1', score: 9, reasons: ['new_account'], civicActCount: 2, updatedAt: 10 }], reviewOnly: true });
+  assert.equal(calls.at(-1)[0], '/api/admin/risk-scores');
+  assert.equal((await loadRiskScores('x', fake('/x', {}, 401))).status, 401);
   assert.deepEqual(await loadAiCosts('x', async () => { throw new Error('offline'); }), { panel: 'ai-costs', ok: false, status: 0, error: 'Network error' });
   assert.equal(utc(0), '1970-01-01 00:00 UTC'); assert.equal(utc(null), '');
 });
@@ -60,6 +63,7 @@ test('ARC: no data before the server accepts the token; the older-entries cue us
   assert.match(ui, /result\?\.ok && result\.panel === 'ai-costs' && result\.days\.length > 0/);
   assert.match(ui, /result\?\.ok && result\.panel === 'ledger-reconciliation' && result\.report/);
   assert.match(ui, /result\?\.ok && result\.panel === 'vote-buying' && result\.events\.length > 0/);
+  assert.match(ui, /result\?\.ok && result\.panel === 'risk-scores' && result\.accounts\.length > 0/);
   assert.doesNotMatch(ui, /useEffect/, 'nothing loads before Load');
   assert.match(ui, /setResult\(null\);/, 'a new load clears the previous data first');
   assert.match(ui, /const PAGE = 50;/); assert.match(await read('lib/mod-console.ts'), /older entries not shown/);
@@ -122,3 +126,29 @@ test('QA3: a loaded ai-costs row shows reservedMicro; a loaded vote-buying row s
   assert.match(el.textContent, /voter-real-9/, 'voterId appears'); assert.match(el.querySelector('caption')?.textContent ?? '', /vote-buying/);
   await act(async () => root.unmount());
 });
+
+test('#880 risk-scores: no data before accept; a loaded row shows score and userId', async () => {
+  const { build } = await import('esbuild');
+  const out = await build({ entryPoints: [new URL('../app/admin/mod/mod-console.tsx', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
+    packages: 'external', loader: { '.css': 'empty', '.module.css': 'empty' }, logLevel: 'silent', alias: { '@': new URL('..', import.meta.url).pathname.replace(/\/$/, '') } });
+  const code = out.outputFiles[0].text.replace(/from "([^".][^"]*)"/g, (_, m) => `from "${import.meta.resolve(m)}"`);
+  const { Window } = await import('happy-dom'), w = new Window({ url: 'http://localhost/' });
+  globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const { ModConsole } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
+  const React = (await import('react')).default, { createRoot } = await import('react-dom/client'), { act } = React;
+  const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
+  let calls = 0;
+  const setValue = async (node, value) => act(async () => { const proto = Object.getPrototypeOf(node), set = Object.getOwnPropertyDescriptor(proto, 'value').set; set.call(node, value); node.dispatchEvent(new w.Event(node.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); });
+  const submit = async () => act(async () => { el.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await new Promise(r => setTimeout(r, 0)); });
+  await act(async () => root.render(React.createElement(ModConsole, {
+    loadRisk: async () => { calls++; return { panel: 'risk-scores', ok: true, reviewOnly: true, accounts: [{ userId: 'user-risk-7', score: 42, reasons: ['new_account'], civicActCount: 3, updatedAt: 100 }] }; },
+  })));
+  assert.equal(calls, 0, 'nothing fetched before Load'); assert.equal(el.querySelector('table'), null);
+  const panel = [...el.querySelectorAll('select')].find(s => s.closest('label')?.textContent?.startsWith('panel'));
+  await setValue(el.querySelector('input[type=password]'), 'a-staff-token-1234');
+  await setValue(panel, 'risk-scores'); await submit();
+  assert.equal(calls, 1); assert.match(el.textContent, /42/); assert.match(el.textContent, /user-risk-7/);
+  assert.match(el.querySelector('caption')?.textContent ?? '', /risk-scores/);
+  await act(async () => root.unmount());
+});
+
