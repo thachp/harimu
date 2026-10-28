@@ -3,13 +3,14 @@ import { skipForMutedPersona, aiPathPersonas, skipForTemplates, type AiTemplates
 import { electionCandidates } from './elections';
 import { kindleCandidatePlatforms, pledge } from './kindle-parties';
 import { aiBudgetConfig, aiGatewayOptions, markAiReservationSent, markAiReservationUncertain, meteredAiCost, releaseAiReservation, reserveAiCabinetSequence, settleAiReservation, type AiBudgetConfig, type AiMeteredCall, type AiModel } from './ai-budget';
+import { runAiWithFailover, type AiFailoverEnv, type SecondaryLlm } from './ai-failover';
 import { inferenceText, newsVerificationResponseFormat, supportedNewsDraft, type NewsAiBinding } from './ai-news';
 import { cabinetResponseFormat, validatedCabinetResponse } from './cabinet-response-ai';
 import { debateHallCandidateId, topQuestions } from './town-hall-rules';
 
 /** #441: the AI candidates' town hall answers. Scheduled Worker only (`runTownHallCron`), never a route and never a read. Off unless HARIMU_TOWN_HALLS_ENABLED and
  *  HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED are both "true" and the AI binding and a valid daily AI budget are present. */
-export type TownHallCronBindings = { AI?: NewsAiBinding; HARIMU_TOWN_HALLS_ENABLED?: string; HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string; HARIMU_AI_TEMPLATES_ONLY?: string };
+export type TownHallCronBindings = AiFailoverEnv & { AI?: NewsAiBinding; HARIMU_TOWN_HALLS_ENABLED?: string; HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED?: string; HARIMU_AI_DAILY_BUDGET_MICRO?: string; HARIMU_AI_GATEWAY_ID?: string; HARIMU_AI_TEMPLATES_ONLY?: string };
 export const townHallCronMaxAnswers = 3; // per run, bounds inference time and spend
 const model: AiModel = '@cf/meta/llama-3.2-3b-instruct';
 export function townHallAnswersConfigured(b: TownHallCronBindings) {
@@ -40,7 +41,7 @@ async function nextPending(db: GameDatabase, now: number, day: string): Promise<
  *  `validatedCabinetResponse` (no digits, no links). Returns the text with the reservation still open: the caller saves it and marks the reservation finished in the SAME batch.
  *  Fails closed: no flag, binding or budget, no reservation, or any rejected call returns without text. Never called from a read. */
 export type AnswerPrompts = { reservation: string; draft: string; check: string; input: unknown; guardQuestion: string };
-export async function generateAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, { enabled = false, budget = null as AiBudgetConfig | null, timeoutMs = 30000, maxInputBytes = 12000 } = {}, prompts: AnswerPrompts) {
+export async function generateAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, { enabled = false, budget = null as AiBudgetConfig | null, timeoutMs = 30000, maxInputBytes = 12000, failover = null as AiFailoverEnv | null, secondary = undefined as SecondaryLlm | undefined } = {}, prompts: AnswerPrompts) {
   if (!enabled || !binding || !budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
   const reservation = prompts.reservation;
   if (!await reserveAiCabinetSequence(db, reservation, now, budget)) return { status: 'budget-unavailable' as const };
@@ -48,12 +49,10 @@ export async function generateAnswer(db: GameDatabase, now: number, binding: New
   let reached = false;
   const call = async (target: AiModel, messages: { role: 'system' | 'user' | 'assistant'; content: string }[], format?: typeof cabinetResponseFormat | typeof newsVerificationResponseFormat) => {
     if (new TextEncoder().encode(JSON.stringify(messages)).length > maxInputBytes) throw Error('Inference input exceeded the bound.');
-    let timeout: ReturnType<typeof setTimeout> | undefined;
     if (!reached) { reached = true; await markAiReservationSent(db, reservation); }
     let result: unknown;
-    try { result = await Promise.race([binding.run(target, { messages, max_tokens: 256, temperature: 0, stream: false, ...(format ? { response_format: format as never } : {}) }, aiGatewayOptions(budget)), new Promise<never>((_r, reject) => { timeout = setTimeout(() => reject(Error('Inference timed out.')), timeoutMs); })]); }
+    try { result = await runAiWithFailover({ runPrimary: (m, i, o) => binding.run(m, i, o), model: target, input: { messages, max_tokens: 256, temperature: 0, stream: false, ...(format ? { response_format: format as never } : {}) }, gateway: aiGatewayOptions(budget), env: failover, secondary, timeoutMs }); }
     catch { throw Object.assign(Error('uncertain'), { uncertain: true }); }
-    finally { if (timeout !== undefined) clearTimeout(timeout); }
     answered.push({ model: target, usage: result && typeof result === 'object' ? (result as { usage?: unknown }).usage : undefined });
     try { return inferenceText(result, Boolean(format)); } catch { throw Object.assign(Error('rejected'), { uncertain: false }); }
   };
@@ -73,7 +72,7 @@ export async function generateAnswer(db: GameDatabase, now: number, binding: New
   }
 }
 /** One town hall answer attempt: draft in character from the platform cards, check it stays inside them, then the safety model. */
-export async function prepareTownHallAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number; killSwitch?: AiTemplatesOnlyEnv | null } = {}) {
+export async function prepareTownHallAnswer(db: GameDatabase, now: number, binding: NewsAiBinding | undefined, options: { enabled?: boolean; budget?: AiBudgetConfig | null; timeoutMs?: number; maxInputBytes?: number; killSwitch?: AiTemplatesOnlyEnv | null; failover?: AiFailoverEnv | null; secondary?: SecondaryLlm } = {}) {
   if (!options.enabled || !binding || !options.budget || !Number.isSafeInteger(now)) return { status: 'disabled' as const };
   // #742: templates-only mode (the candidates are Kindle's) makes no model call and no reservation; the question stays unanswered.
   if (skipForTemplates('town-hall', options.killSwitch, 'kindle', now)) return { status: 'templates-only' as const };
@@ -103,7 +102,7 @@ export async function runTownHallCron(db: GameDatabase, now: number, bindings: T
   if (!townHallAnswersConfigured(bindings)) return { status: 'disabled' as const, results: [] as string[] };
   const budget = aiBudgetConfig(bindings)!, results: string[] = [];
   for (let i = 0; i < townHallCronMaxAnswers; i++) {
-    const result = await prepareTownHallAnswer(db, now, bindings.AI, { enabled: true, budget, killSwitch: bindings });
+    const result = await prepareTownHallAnswer(db, now, bindings.AI, { enabled: true, budget, killSwitch: bindings, failover: bindings });
     results.push(result.status);
     if (result.status === 'idle' || result.status === 'disabled' || result.status === 'budget-unavailable' || result.status === 'templates-only') break;
   }

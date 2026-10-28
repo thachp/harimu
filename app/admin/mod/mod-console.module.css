@@ -8,7 +8,10 @@
 .filters button:disabled{opacity:.7;cursor:progress}
 .console :focus-visible{outline:2px solid #80d8ce;outline-offset:2px}
 .status{min-height:1.45em;margin:12px 0}
-.scroll{max-width:100%;overflow-x:auto}
+.scroll{max-width:100%;overflow-x:auto;container-type:inline-size}
+/* Queue note column: same control styles as .filters, stuck to the visible edge so the field stays on screen while the table scrolls. */
+.mark{position:sticky;right:0;z-index:1;max-width:100cqi;background:#0b2029;box-shadow:-1px 0 0 #49616a}
+.mark input{width:100%;min-width:0}
 .table{border-collapse:collapse;min-width:100%}
 .table caption{text-align:left;font-weight:600;padding:4px 0 8px}
 .table th,.table td{padding:8px;border-bottom:1px solid #49616a;text-align:left;vertical-align:top}

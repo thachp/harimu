@@ -100,6 +100,7 @@ const previewOnFlags = [
   'HARIMU_AI_CABINET_RESPONSES_ENABLED',
   'HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED',
   'HARIMU_AI_DEBATE_ANSWERS_ENABLED',
+  'HARIMU_AI_SECONDARY_PROVIDER_ENABLED', // #883
   ...previewOnUiFlags,
 ];
 // Flags that stay "false" in preview on purpose: Decision 111 exchange, QA1's square-purchase objection, the unset-secret (fail-closed) flags, and the PoCs or scaffolding listed in the PR.
