@@ -24,6 +24,7 @@ const flagOffPins = {
   HARIMU_AI_CABINET_RESPONSES_ENABLED: 'cabinet-response-ai.test.mjs',
   HARIMU_CITY_FOUNDING_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
+  HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',

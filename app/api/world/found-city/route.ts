@@ -4,7 +4,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { foundCity, parseFoundingCommand } from '@/lib/city-founding';
-import { cityTierName } from '@/lib/city-tier'; // #952
+import { cityTierName, cityTierUnlockFields } from '@/lib/city-tier'; // #952 / #979
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -30,8 +30,12 @@ export async function POST(request: Request) {
   const result = await foundCity(db, userId, citizen?.nation_id ?? null, command, Math.floor(Date.now() / 1000), enabled);
   if (!result.ok) return privateJson({ error: result.error, reason: result.reason }, result.status);
   // #952: flag off keeps the founding body (tier 1, no tier name). Flag on names the stored tier.
-  const growth = (env as unknown as { HARIMU_CITY_TIER_GROWTH_ENABLED?: string }).HARIMU_CITY_TIER_GROWTH_ENABLED === 'true';
+  // #979: unlocks flag adds districtSlots + unlocks (and tierName) from the doc table; flag off leaves the body unchanged.
+  const vars = env as unknown as { HARIMU_CITY_TIER_GROWTH_ENABLED?: string; HARIMU_CITY_TIER_UNLOCKS_ENABLED?: string };
+  const growth = vars.HARIMU_CITY_TIER_GROWTH_ENABLED === 'true';
+  const unlocksOn = vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED === 'true';
   const tier = growth ? result.city.tier : 1;
-  const city = growth ? { ...result.city, tier, tierName: cityTierName(tier) } : { ...result.city, tier };
+  let city: Record<string, unknown> = growth ? { ...result.city, tier, tierName: cityTierName(tier) } : { ...result.city, tier };
+  if (unlocksOn) city = { ...city, ...cityTierUnlockFields(tier) };
   return privateJson({ ...result, city });
 }

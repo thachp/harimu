@@ -24,6 +24,24 @@ export function cityTierName(tier: number): CityTierName {
   const i = Math.min(4, Math.max(1, Math.floor(Number.isFinite(tier) ? tier : 1))) - 1;
   return names[i];
 }
+
+/** #979: docs Cities tier table (district slots + unlocks). Read-only lookup; does not gate jobs or markets. T4 uses 8 (doc "8+"). */
+export type CityTierUnlocks = { name: CityTierName; districtSlots: number; unlocks: readonly string[] };
+const unlockTable: Record<CityTier, CityTierUnlocks> = {
+  1: { name: 'Village', districtSlots: 2, unlocks: ['Basic jobs', 'a market stall', 'a small square'] },
+  2: { name: 'Town', districtSlots: 4, unlocks: ['Full market', 'festivals', 'a local governor'] },
+  3: { name: 'City', districtSlots: 6, unlocks: ['Specialist buildings', 'a port or industry complex'] },
+  4: { name: 'Metropolis', districtSlots: 8, unlocks: ['Capital-class landmarks', 'national institutions'] },
+};
+export function cityTierUnlocks(tier: number): CityTierUnlocks {
+  const t = Math.min(4, Math.max(1, Math.floor(Number.isFinite(tier) ? tier : 1))) as CityTier;
+  return unlockTable[t];
+}
+/** Fields the city APIs add when HARIMU_CITY_TIER_UNLOCKS_ENABLED is on. Districts are not built yet, so only M (districtSlots) is returned. */
+export function cityTierUnlockFields(tier: number): { tierName: CityTierName; districtSlots: number; unlocks: string[] } {
+  const info = cityTierUnlocks(tier);
+  return { tierName: info.name, districtSlots: info.districtSlots, unlocks: [...info.unlocks] };
+}
 /** Population floor of the next tier, or null at T4. */
 export function nextTierFloor(tier: number): number | null {
   if (!Number.isInteger(tier) || tier < 1 || tier >= 4) return null;
