@@ -15,6 +15,7 @@
  *  (#85) Nation skin on the top bar: same layout and text, AA text, visible focus (scripts/nation-skin-check.mjs).
  *  (#392 S6) The Nation panel (scripts/ui-v2-nation-check.mjs).
  *  (#800) Rare resource node marker on the Resources overlay, flag off and on (scripts/rare-marker-check.mjs).
+ *  (#969) Top-bar countdown to the next scheduled event, flag off and on (scripts/topbar-countdown-check.mjs).
  *  (#779) Nation fact-list labels never split mid-word (scripts/nation-fact-label-check.mjs).
  *  (#392 S5) World crest chips (scripts/ui-v2-world-check.mjs).
  *  (#392 S3) The UI v2 panel shape, World and City (scripts/ui-v2-panel-check.mjs).
@@ -60,6 +61,7 @@ import { checkPhoneTapTargets } from './phone-tap-targets-check.mjs';
 import { checkCityDestinations } from './city-destinations-check.mjs';
 import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { checkGlobeLabelPressed } from './globe-label-pressed-check.mjs';
+import { checkTopbarCountdown } from './topbar-countdown-check.mjs';
 import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 import { fontsBeforeShots } from './layout-standalone.mjs';
@@ -238,6 +240,7 @@ try {
   await checkGlobeLabelPressed({ browser, failures, rows }); // #618: the selected nation's globe label keeps aria-pressed after the scene rebuilds
   await checkMapOverlays({ browser, css, preflight, failures, rows }); // #82: Overlays bar at 1280 (no overlap/clip, 44px, no mid-word breaks); phone popover never covers the World chip
   await checkVisitorWording({ browser, css, preflight, failures, rows }); // #379: visitor wording (VISITOR PREVIEW, Household) and guide/pin text fit
+  await checkTopbarCountdown({ browser, css, preflight, failures, rows }); // #969: countdown beside the world clock
 } finally { await browser.close(); }
 console.log(rows.join('\n'));
 if (failures.length) { console.error(`\nHUD layout check FAILED:\n${failures.join('\n')}`); process.exit(1); }

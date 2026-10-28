@@ -41,7 +41,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
     <h3>{scene === 'workplace' ? (plan.bureau ? 'Labor Bureau assignment' : 'Brigade assignment') /* #453: the Bureau name only when HARIMU_LABOR_BUREAU_ENABLED sends plan.bureau */ : scene === 'market' ? 'State ration counter' : 'Korund household account'}</h3>
     <p>Bounded state planning · AI/SI roles follow deterministic rules. Labor Notes are non-convertible; Korund has no legal private market.</p>
     <p>Labor Note wages are recorded in a separate ledger. Labor Notes are spent only on weekly clothing and goods coupons at fixed prices; food comes from free food coupons.</p>
-    <dl><dt>Labor Notes</dt><dd>{(plan.walletMinor / 100).toFixed(2)} LN{plan.streetRate && <><br /><small className="wallet-street-rate">{walletStreetRateLine(plan.streetRate.rumoredRate)}</small></>}</dd><dt>Household food</dt><dd>{plan.foodQuantity}</dd>
+    <dl><dt>Labor Notes</dt><dd>{(plan.walletMinor / 100).toFixed(2)} LN{plan.streetRate && <><br /><small className="wallet-street-rate">{walletStreetRateLine(plan.streetRate.rumoredRate)}{plan.streetRate.shortage ? <><br />{plan.streetRate.shortage}</> : null}</small></>}</dd><dt>Household food</dt><dd>{plan.foodQuantity}</dd>
       <dt>Work capacity</dt><dd>{capacity} / 24 WC</dd><dt>Ration book</dt><dd>Game week {plan.gameWeek} · {plan.couponFoodRemaining} food coupons · <GameTimer endsAt={plan.couponExpiresAt} label="Ration coupons expire" /></dd></dl>
     {uncertain && <div role="alert"><p>Confirm the previous Korund action before starting another. Retry uses the same request.</p><ActionButton type="button" reason={pendingActionReason(pending)} onClick={onRetry}>Confirm previous action</ActionButton></div>}
     {error && <p role="alert">{error}</p>}
@@ -176,6 +176,7 @@ export function GrayMarket({ gray, pending, uncertain, onGray }: { gray: NonNull
     {gray.seizure && <p role="status">{gray.seizure}</p>}
     {gray.dailyRemainingMinor !== undefined && <p>Today&apos;s limit: {ln(gray.dailyRemainingMinor)} left</p>}
     <p aria-label={grayText.rumorLabel}>{gray.rumoredRate === null ? grayText.noRumor : rumorLine(gray.rumoredRate)}</p>
+    {gray.shortage ? <p className="gray-ration-shortage">{gray.shortage}</p> : null}
     <h4>{grayText.yourOffer}</h4>
     {mine ? <div className="gray-offer-card" data-status={mine.status}>
       <dl><dt>Amount</dt><dd>{ln(mine.amountMinor)}</dd><dt>Asking rate</dt><dd>{rate(mine.askRate)}</dd><dt>For</dt><dd>{fc(mine.cashMinor)}</dd></dl>
