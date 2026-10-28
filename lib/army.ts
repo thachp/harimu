@@ -54,15 +54,18 @@ export const armyDrillSchemas = [
 export async function readUnitReadiness(db: GameDatabase, unitId: string, nowSec: number) {
   const fromDay = Math.floor(nowSec / ARMY_GAME_DAY_SECONDS) - armyParticipation.windowDays + 1;
   const fromIso = new Date(fromDay * ARMY_GAME_DAY_SECONDS * 1000).toISOString();
-  const row = await db.prepare(`SELECT
+  // #679: the member/drill counts and the shift rows do not depend on each other (the join filter runs in JS after both return).
+  const [row, settled] = await Promise.all([
+    db.prepare(`SELECT
       (SELECT COUNT(*) FROM army_members WHERE unit_id = ?) AS members,
       (SELECT COUNT(*) FROM army_drills d JOIN army_members m ON m.clerk_user_id = d.clerk_user_id AND m.unit_id = d.unit_id WHERE d.unit_id = ? AND d.game_day >= ? AND d.drilled_at >= m.joined_at) AS drills,
       (SELECT COUNT(DISTINCT d.clerk_user_id) FROM army_drills d JOIN army_members m ON m.clerk_user_id = d.clerk_user_id AND m.unit_id = d.unit_id WHERE d.unit_id = ? AND d.game_day >= ? AND d.drilled_at >= m.joined_at) AS drilled`)
-    .bind(unitId, unitId, fromDay, unitId, fromDay).first<{ members: number; drills: number; drilled: number }>();
-  // ARC on #836: only shifts settled after the member joined count, so recruiting veterans cannot inflate strength. settled_at is ISO text and
-  // joined_at epoch seconds, so the per-member comparison runs here (at most 7 game days of shifts).
-  const settled = await db.prepare('SELECT s.settled_at, m.joined_at FROM shift_settlements s JOIN army_members m ON m.clerk_user_id = s.clerk_user_id WHERE m.unit_id = ? AND s.settled_at >= ?')
-    .bind(unitId, fromIso).all<{ settled_at: string; joined_at: number }>();
+      .bind(unitId, unitId, fromDay, unitId, fromDay).first<{ members: number; drills: number; drilled: number }>(),
+    // ARC on #836: only shifts settled after the member joined count, so recruiting veterans cannot inflate strength. settled_at is ISO text and
+    // joined_at epoch seconds, so the per-member comparison runs here (at most 7 game days of shifts).
+    db.prepare('SELECT s.settled_at, m.joined_at FROM shift_settlements s JOIN army_members m ON m.clerk_user_id = s.clerk_user_id WHERE m.unit_id = ? AND s.settled_at >= ?')
+      .bind(unitId, fromIso).all<{ settled_at: string; joined_at: number }>(),
+  ]);
   const shifts = (settled.results ?? []).filter(x => Date.parse(x.settled_at) / 1000 >= Number(x.joined_at)).length;
   const [members, drills, drilled] = [row?.members, row?.drills, row?.drilled].map(n => Number(n ?? 0));
   return { strength: unitStrength(members, drills, shifts), morale: unitMorale(members, drilled) };
