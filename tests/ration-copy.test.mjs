@@ -18,7 +18,7 @@ const R = await import(pathToFileURL(out).href);
 const { couponIssue:CI, couponCard:CC, quotaBar:QB, queueCopy:Q, rationCut:RC, COUPON_KINDS, QUOTA_STATES, QUEUE_STATES, RATION_PLACEHOLDERS, RATION_NAME_MAX, RATION_LABEL_MAX, RATION_LINE_MAX, RATION_BYLINE } = R;
 
 const labels=()=>[CI.label,...Object.values(CC.labels),...Object.values(CC.states),QB.label,Q.joinButton,Q.leaveButton,RC.label];
-const lines=()=>[CI.notice,CC.notTransferable,QB.progress,...QUOTA_STATES.map(s=>QB.captions[s]),...QUEUE_STATES.map(s=>Q.states[s]),Q.queueSize,Q.shortage,RC.notice,RC.stateMedia,RC.citizen].map(l=>l.text);
+const lines=()=>[CI.notice,CC.notTransferable,QB.progress,...QUOTA_STATES.map(s=>QB.captions[s]),...QUEUE_STATES.map(s=>Q.states[s]),Q.queueSize,Q.shortage,RC.notice,RC.stability,RC.stateMedia,RC.citizen].map(l=>l.text);
 const all=()=>[...labels(),...lines()];
 const fill=t=>RATION_PLACEHOLDERS.reduce((a,p)=>a.replaceAll(p,'W'.repeat(RATION_NAME_MAX)),t);
 
@@ -31,7 +31,7 @@ test('every key is present: coupons, quota states, queue states, ration cut; eve
   assert.deepEqual(Object.keys(CC.states).sort(),['expired','expiresIn','used']);
   assert.deepEqual([...QUOTA_STATES],['under','on','over']); assert.deepEqual(Object.keys(QB.captions).sort(),[...QUOTA_STATES].sort());
   assert.deepEqual([...QUEUE_STATES],['joined','waiting','served','left','shelf-empty']); assert.deepEqual(Object.keys(Q.states).sort(),[...QUEUE_STATES].sort());
-  for (const l of [CI.notice,CC.notTransferable,QB.progress,...QUOTA_STATES.map(s=>QB.captions[s]),...QUEUE_STATES.map(s=>Q.states[s]),Q.queueSize,Q.shortage,RC.notice,RC.stateMedia,RC.citizen]) assert.equal(l.proposal,true);
+  for (const l of [CI.notice,CC.notTransferable,QB.progress,...QUOTA_STATES.map(s=>QB.captions[s]),...QUEUE_STATES.map(s=>Q.states[s]),Q.queueSize,Q.shortage,RC.notice,RC.stability,RC.stateMedia,RC.citizen]) assert.equal(l.proposal,true);
   for (const o of [CI,CC,QB,Q,RC]) assert.equal(o.proposal,true);
   assert.match(Q.states['shelf-empty'].text,/The shelf is empty\. Come back after the next plan delivery\./);
 });
@@ -47,7 +47,7 @@ test('only known placeholders, in the right lines', () => {
   for (const t of all()) for (const m of t.match(/\{[^}]*\}/g)??[]) assert.ok(RATION_PLACEHOLDERS.includes(m),`${m} in ${t}`);
   assert.deepEqual(CC.states.expiresIn.match(/\{[^}]*\}/g),['{days}']); assert.match(Q.states.waiting.text,/\{position\}/); assert.match(Q.queueSize.text,/\{waiting\}/);
   assert.match(QB.progress.text,/\{output\}/); assert.match(QB.progress.text,/\{target\}/);
-  for (const t of [CI.notice.text,CC.notTransferable.text,...QUOTA_STATES.map(s=>QB.captions[s].text),Q.states.joined.text,Q.states.served.text,Q.states.left.text,Q.states['shelf-empty'].text,Q.shortage.text,RC.notice.text,RC.stateMedia.text,RC.citizen.text]) assert.doesNotMatch(t,/\{/,t);
+  for (const t of [CI.notice.text,CC.notTransferable.text,...QUOTA_STATES.map(s=>QB.captions[s].text),Q.states.joined.text,Q.states.served.text,Q.states.left.text,Q.states['shelf-empty'].text,Q.shortage.text,RC.notice.text,RC.stability.text,RC.stateMedia.text,RC.citizen.text]) assert.doesNotMatch(t,/\{/,t);
 });
 test('no digits or invented figures; counts and days only through placeholders', () => {
   for (const t of all()) assert.doesNotMatch(t.replace(/\{[^}]*\}/g,''),/\d|%|percent|\b(one|two|three|four|five|ten|twice|once|days?|hours?|minutes?)\b/i,t);
