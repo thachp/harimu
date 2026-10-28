@@ -10,6 +10,8 @@ export const korundCouponGoods={
 export const korundFoodCoupon={label:'Food coupon',item:'state food',quantity:2,priceMinor:0} as const;
 /** Weekly brigade quota in food units (10 assigned shifts × 4 food). PoC placeholder. */
 export const korundWeeklyQuotaFood=40;
+/** 7 game days. lib/korund.ts re-exports this as gameWeekSeconds. */
+export const korundWeekSeconds=50400;
 export const korundWorkUnit='Stonehearth food-production brigade';
 
 export const korundCouponSchemas=[
@@ -90,12 +92,23 @@ export function korundShortfall(week:number,unitFood:number,target=korundWeeklyQ
  *  [ASSUMPTION] Korund has one city/work unit in the PoC, so "per city per week" is per game week. */
 export const korundRationCutStepPercent=50;
 export const korundRationCutOrder=['goods','clothing'] as const;
-export type KorundRationCut={week:number;percent:number;withdrawn:('goods'|'clothing')[]};
+export type KorundRationCut={week:number;percent:number;withdrawn:('goods'|'clothing')[];/** #967: the Stability step applies with this cut. */stability?:true};
 /** The cut for current week `week` given the previous (closed) week's shortfall percent; null when there is none. */
 export function korundRationCut(week:number,shortfallPct:number,step=korundRationCutStepPercent):KorundRationCut|null{
  if(week<2||shortfallPct<=0)return null;
  return {week,percent:shortfallPct,withdrawn:korundRationCutOrder.slice(0,Math.min(korundRationCutOrder.length,1+Math.floor(shortfallPct/step)))};
 }
+/** #967: Korund cities with a #776 ration cut in the game week that contains `at`.
+ *  [ASSUMPTION] the PoC has one work unit, so a cut counts as one city and a met plan as zero. The count is the closed week's food, so a replay of the same week cannot add a second step. */
+export async function korundRationCutCities(db:GameDatabase,epoch:number,at:number):Promise<number>{
+ const week=Math.floor(Math.max(0,at-epoch)/korundWeekSeconds)+1;
+ if(week<2)return 0;
+ const start=epoch+(week-1)*korundWeekSeconds;
+ const food=Number((await db.prepare('SELECT COALESCE(SUM(food_output),0) AS n FROM korund_settlements WHERE settled_at>=? AND settled_at<?').bind(start-korundWeekSeconds,start).first<{n:number}>())?.n??0);
+ return korundRationCut(week,shortfallPercent(food))?1:0;
+}
+/** #967 applies only when #776 would cut. Either flag off leaves Stability unchanged. */
+export const korundRationStabilityEnabled=(env:{HARIMU_KORUND_RATION_CUT_ENABLED?:string;HARIMU_KORUND_RATION_STABILITY_ENABLED?:string}|null|undefined)=>env?.HARIMU_KORUND_RATION_CUT_ENABLED==='true'&&env?.HARIMU_KORUND_RATION_STABILITY_ENABLED==='true';
 export const applyRationCut=(coupons:KorundCoupon[],cut:KorundRationCut|null):KorundCoupon[]=>cut?coupons.map(c=>(cut.withdrawn as string[]).includes(c.kind)?{...c,withdrawn:true as const}:c):coupons;
 /** Content's rationCut (lib/ration-copy.ts, #336), mirrored here so the panel keeps its one copy import (a test pins them equal). */
-export const korundRationCutCopy={label:'Rations are reduced',notice:'Plan output fell short, so this week\'s rations are reduced.',withdrawn:'withdrawn this week (ration cut)'} as const;
+export const korundRationCutCopy={label:'Rations are reduced',notice:'Plan output fell short, so this week\'s rations are reduced.',stability:'Stability falls with the rations.',withdrawn:'withdrawn this week (ration cut)'} as const;

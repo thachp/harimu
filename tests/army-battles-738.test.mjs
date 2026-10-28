@@ -87,3 +87,36 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual([read.result.data.battles[0].status, read.result.data.battles[0].attackerStrength, read.result.data.battles[0].stored], ['attacker_won', 5, true]);
   });
 }
+
+/** #679: an unresolved battle used to read readiness (two statements) and then the carried-loss row. Those reads do not depend on each other. */
+test('an ongoing battle reads readiness and carried losses together, and the result matches the serial read (#679)', async t => {
+  const r = await localRuntime({ backend: 'sqlite' }); t.after(() => r.close());
+  await r.call('citizen', 'alice');
+  for (const [k, v] of Object.entries({ ...ON, HARIMU_ARMY_DRILLS_ENABLED: 'true' })) r.setFixtureEnv(k, v);
+  assert.equal((await r.call('army', 'alice', { action: 'join', unitId: 'kindle-home-guard', requestId: 'battle-679-join' })).status, 200);
+  await r.call('citizen', 'bob');
+  await r.db.prepare("INSERT INTO army_members (clerk_user_id, unit_id, stance, joined_at, request_id) SELECT clerk_user_id, 'korund-home-guard', 'hold', 0, ? FROM citizens WHERE clerk_user_id NOT IN (SELECT clerk_user_id FROM army_members) LIMIT 1").bind('battle-679-k').run();
+  const now = Math.floor(r.now / 1000);
+  const march = M.unitMarch('kindle', [{ id: 'w679', attacker_nation: 'kindle', defender_nation: 'korund', mobilization_ends_at: 0, declared_at: 0 }], 1);
+  assert.ok(march, 'the probe march exists');
+  const mob = now - M.marchArrivalAt(march);
+  await r.db.prepare("INSERT INTO wars (id,request_id,pair_key,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at) VALUES ('w679','r-679','kindle:korund','kindle','korund','','AI',?,?)").bind(mob - 172800, mob).run();
+  const AB = await r.importModule('lib/army-battle.ts'), Map = await r.importModule('lib/army-map.ts');
+  const wars = await Map.readActiveWars(r.db);
+  const serial = await AB.readBattles(r.db, wars, now);
+  assert.equal(serial.length, 1); assert.equal(serial[0].stored, false); assert.equal(serial[0].status, 'ongoing', 'both sides still standing at 0 rounds');
+  await AB.recordFinishedBattles(r.db, now);
+  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM army_battles').first()).n), 0, 'an ongoing battle is not stored');
+  const D = 60, real = r.db;
+  const slow = new Proxy(real, { get(target, key) {
+    if (key !== 'prepare') { const value = target[key]; return typeof value === 'function' ? value.bind(target) : value; }
+    const wrap = st => new Proxy(st, { get(x, k) { const v = x[k]; if (typeof v !== 'function') return v;
+      if (k === 'bind') return (...a) => wrap(v.apply(x, a));
+      if (['first', 'all', 'run', 'raw'].includes(k)) return async (...a) => { await new Promise(res => setTimeout(res, D)); return v.apply(x, a); };
+      return v.bind(x); } });
+    return sql => wrap(target.prepare(sql));
+  } });
+  const started = performance.now(), board = await AB.readBattles(slow, wars, now), trips = (performance.now() - started) / D;
+  assert.deepEqual(board, serial, 'the parallel reads produce the same battle');
+  assert.ok(trips < 2.9, `~${trips.toFixed(1)} round trips; the stored-row read, then readiness and the loss row together (about 4 when those waited in turn)`);
+});

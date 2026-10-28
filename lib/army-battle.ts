@@ -84,9 +84,13 @@ export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], no
     const base = { attackerNationId: s.unit.nationId, defenderNationId: s.defender.nationId, startedAt: s.startedAt, key: s.key, attackerUnit: s.unit.id, defenderUnit: s.defender.id, warId: s.warId };
     const row = stored.get(s.key);
     if (row) return { ...base, stored: true, rounds: Number(row.rounds), status: row.status, retreated: row.retreated ?? null, attackerStrength: Number(row.attacker_strength), defenderStrength: Number(row.defender_strength) };
-    const [att, def] = await Promise.all([readUnitReadiness(db, s.unit.id, now), readUnitReadiness(db, s.defender.id, now)]);
+    // #679: readiness and the carried-loss row are independent reads (the loss query does not use the readiness result).
+    // They share one round trip; strength is applied after both return. A stored battle never starts these reads.
+    const [att, def, attLoss, defLoss] = await Promise.all([
+      readUnitReadiness(db, s.unit.id, now), readUnitReadiness(db, s.defender.id, now),
+      lossRow(db, s.unit.id, now), lossRow(db, s.defender.id, now)]);
     // #738 battle losses: both sides start from the strength their last stored battle left them (recovering per game day).
-    const [attFull, defFull] = await Promise.all([withBattleLosses(db, s.unit.id, att.strength, now), withBattleLosses(db, s.defender.id, def.strength, now)]);
+    const attFull = applyCarriedLoss(s.unit.id, att.strength, attLoss, now), defFull = applyCarriedLoss(s.defender.id, def.strength, defLoss, now);
     const attacker = { strength: applySupplyLoss(attFull, unitSupply(s.unit.nationId, wars, now).strengthLossPct), morale: att.morale }, defender = { strength: defFull, morale: def.morale };
     return { ...base, stored: false, ...resolveBattle(attacker, defender, roundsAt(s.startedAt, now)) };
   }));
@@ -97,13 +101,18 @@ export function carriedStrength(full: number, left: number, endedAt: number, now
   const days = Math.max(0, Math.floor((now - endedAt) / BATTLE_LOSS_GAME_DAY_SECONDS));
   return Math.min(full, left + Math.floor(full * BATTLE_LOSS_RECOVERY_PCT_PER_GAME_DAY * days / PERCENT));
 }
-/** The unit's strength with losses from its latest stored battle (as attacker or defender) carried in. One read, never writes. */
-export async function withBattleLosses(db: GameDatabase, unitId: string, full: number, now: number) {
-  const last = await db.prepare('SELECT attacker_unit, attacker_strength, defender_strength, started_at, rounds FROM army_battles WHERE (attacker_unit = ? OR defender_unit = ?) AND started_at <= ? ORDER BY started_at DESC LIMIT 1')
-    .bind(unitId, unitId, now).first<{ attacker_unit: string; attacker_strength: number; defender_strength: number; started_at: number; rounds: number }>();
+type LossRow = { attacker_unit: string; attacker_strength: number; defender_strength: number; started_at: number; rounds: number };
+const lossRow = (db: GameDatabase, unitId: string, now: number) => db.prepare('SELECT attacker_unit, attacker_strength, defender_strength, started_at, rounds FROM army_battles WHERE (attacker_unit = ? OR defender_unit = ?) AND started_at <= ? ORDER BY started_at DESC LIMIT 1')
+  .bind(unitId, unitId, now).first<LossRow>();
+/** Pure: `full` after the latest stored battle, or `full` when that battle is missing. */
+function applyCarriedLoss(unitId: string, full: number, last: LossRow | null, now: number) {
   if (!last) return full;
   const left = Number(last.attacker_unit === unitId ? last.attacker_strength : last.defender_strength);
   return carriedStrength(full, left, Number(last.started_at) + Number(last.rounds) * BATTLE_ROUND_SECONDS, now);
+}
+/** The unit's strength with losses from its latest stored battle (as attacker or defender) carried in. One read, never writes. */
+export async function withBattleLosses(db: GameDatabase, unitId: string, full: number, now: number) {
+  return applyCarriedLoss(unitId, full, await lossRow(db, unitId, now), now);
 }
 /** #911 (ARC on #944): the unit destroyed in a finished battle is the side that retreated broken; none after a round-limit decision. */
 export const destroyedUnit = (b: { retreated: 'attacker' | 'defender' | null; attackerUnit: string; defenderUnit: string }) =>
