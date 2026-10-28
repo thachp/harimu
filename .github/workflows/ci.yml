@@ -20,7 +20,12 @@ jobs:
   node-tests:
     name: Node tests (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30 min (#949). The 20 min cap was cancelling a shard that had already
+    # passed. Run 40686733431 (PR #947, f27b5a9) Node shard 2/2 printed
+    # "pass 1616 / fail 0" after 19.6 min of tests and was killed in teardown
+    # at 20m20s. On dev 82cf4eb (run 40066838432) shard 2 finished in 19m40s.
+    # Same-day node shards range ~13–20m, so 20m has no margin for setup.
+    timeout-minutes: 30
     strategy:
       # Finish both shards even if one fails, so every file is exercised.
       fail-fast: false
@@ -44,7 +49,13 @@ jobs:
   postgres-tests:
     name: Postgres tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45 min (#949). Not a hang: dev run 40066838432 shard 2/4 was still
+    # passing tests when the 30 min cap hit (755 oks, largest gap 27s) while
+    # the other shards finished at 768–848 oks in 21–26m. Run 40686733431
+    # shard 1/4 died the same way at 735 oks vs 783–836 on shards that passed.
+    # The slow shard is a few minutes past 30, and the runner spread is
+    # ~15–30m, so 45 leaves room without dropping tests.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
