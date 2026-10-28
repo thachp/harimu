@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
-import {localRuntime} from './helpers/local-runtime.mjs';
+import { localRuntime as fixtureRuntime } from './helpers/local-runtime.mjs';
+const localRuntime = (options = {}) => fixtureRuntime({ presidentialCalendar: true, ...options }); // #918: the presidential vote opens only inside the calendar window
 import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import ts from 'typescript';

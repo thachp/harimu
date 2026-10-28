@@ -78,6 +78,8 @@ const flagOffPins = {
   HARIMU_AI_RALLY_SPEECHES_ENABLED: 'rally-speeches-876.test.mjs',
   HARIMU_CITY_CHAT_ENABLED: 'city-chat-881.test.mjs',
   HARIMU_GLOBAL_CHAT_ENABLED: 'global-chat-881.test.mjs',
+  HARIMU_DM_CHAT_ENABLED: 'dm-chat-881.test.mjs',
+  HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
@@ -87,6 +89,7 @@ const flagOffPins = {
   HARIMU_WAR_WEARINESS_LOSSES_ENABLED: 'war-weariness-losses-495.test.mjs',
   HARIMU_WAR_DECLARATION_LIMITS_ENABLED: 'war-limits.test.mjs',
   HARIMU_WAR_ASSEMBLY_ENABLED: 'war-assembly-427.test.mjs',
+  HARIMU_WAR_LOSS_CAP_ENABLED: 'war-loss-cap-912.test.mjs',
   HARIMU_WAR_ENDINGS_ENABLED: 'war-endings-427.test.mjs',
   HARIMU_DIPLOMACY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_EMBARGO_ENABLED: 'embargo.test.mjs',
@@ -103,6 +106,7 @@ const flagOffPins = {
   HARIMU_REPORTS_ENABLED: 'reports-743.test.mjs',
   HARIMU_DORMANCY_ENABLED: 'dormancy-739.test.mjs',
   HARIMU_VOTE_BUYING_WATCH_ENABLED: 'vote-buying-watch-825.test.mjs',
+  HARIMU_RISK_SCORING_ENABLED: 'risk-scoring-879.test.mjs',
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
 };
 

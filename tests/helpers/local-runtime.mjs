@@ -30,7 +30,7 @@ class LocalD1 {
   close() { this.sqlite.close(); }
 }
 
-export async function localRuntime({accountElection=false,accountElectionBindings,ballotPrivacyReady=false,backend=process.env.HARIMU_TEST_STORAGE??'sqlite'}={}) {
+export async function localRuntime({accountElection=false,accountElectionBindings,ballotPrivacyReady=false,presidentialCalendar=false,backend=process.env.HARIMU_TEST_STORAGE??'sqlite'}={}) {
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
   const path = join(directory, 'fixture.sqlite');
@@ -46,7 +46,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/religious-harmony.ts','lib/holy-sites.ts','app/api/faith/holy-sites/route.ts','lib/world-simulation.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',
     'lib/qa-tools.ts','lib/nation-openings.ts','lib/onboarding-preferences.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund-posts.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts',
     'lib/aurelle.ts',
-    'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts','lib/war-authority.ts','lib/war-actions.ts','lib/war-assembly.ts','lib/war-endings.ts','lib/war-weariness.ts','lib/war-weariness-copy.ts','lib/siege.ts','lib/siege-actions.ts','lib/siege-copy.ts', // #309, #350, #423, #419
+    'lib/war.ts','lib/war-rules.ts','lib/war-copy.ts','lib/war-authority.ts','lib/war-actions.ts','lib/war-assembly.ts','lib/war-endings.ts','lib/war-loss-cap.ts','lib/war-weariness.ts','lib/war-weariness-copy.ts','lib/siege.ts','lib/siege-actions.ts','lib/siege-copy.ts', // #309, #350, #423, #419
     'lib/labor-bureau-rules.ts','lib/labor-bureau-text.ts','lib/labor-bureau-copy.ts','lib/labor-bureau.ts','lib/korund-wallet.ts','lib/gray-market.ts','lib/gray-seizure.ts','lib/gray-market-rules.ts','lib/korund-medals-rules.ts','lib/market-fee.ts','lib/wallet-street-rate.ts','lib/gray-market-text.ts','lib/gray-market-copy.ts','lib/nation-work.ts','lib/confluence-price-band.ts','lib/diplomacy.ts','lib/diplomacy-rules.ts','lib/diplomacy-copy.ts','lib/game-time.ts', // #308
     'lib/embargo.ts','lib/embargo-rules.ts','lib/embargo-copy.ts','lib/goods-sanction-rules.ts','lib/goods-sanctions.ts', // #363, #601
     'lib/crown-debasement.ts','lib/crown-debasement-rules.ts','lib/press-templates.ts', // #362
@@ -60,11 +60,12 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/ai-costs.ts','lib/ai-denylist.ts','lib/ai-kill-switch.ts','lib/kill-switch-copy.ts','app/api/admin/ai-costs/route.ts', // #614
     'lib/ai-review-queue.ts','app/api/admin/ai-review-queue/route.ts', // #753
     'lib/vote-buying-watch.ts','app/api/admin/vote-buying/route.ts', // #825
+    'lib/risk-scoring.ts','app/api/admin/risk-scores/route.ts', // #879
     'lib/polling-rules.ts','lib/polling.ts','app/api/polling/route.ts', // #740
     'lib/plank-votes-rules.ts','lib/plank-votes.ts','app/api/planks/route.ts', // #831
     'lib/party-donations-rules.ts','lib/party-donations.ts','app/api/party-donations/route.ts', // #863
     'lib/rallies-rules.ts','lib/rallies.ts','lib/rally-speech-ai.ts','app/api/rallies/route.ts', // #867, #876
-    'lib/city-chat.ts','app/api/city-chat/route.ts','lib/global-chat.ts','app/api/global-chat/route.ts', // #881
+    'lib/city-chat.ts','app/api/city-chat/route.ts','lib/global-chat.ts','app/api/global-chat/route.ts','lib/dm-chat.ts','app/api/dm-chat/route.ts','lib/embassy-chat.ts','app/api/embassy-chat/route.ts', // #881 + #882
     'lib/reports.ts','lib/report-copy.ts','app/api/reports/route.ts', // #743
     'lib/dormancy-rules.ts','lib/dormancy-copy.ts','lib/savings-shield.ts','lib/kindle-sales-tax.ts', 'app/api/citizen/heartbeat/route.ts', // #739
     'lib/army-copy.ts','lib/army-rules.ts','lib/army-conscription.ts','lib/army.ts','app/api/army/route.ts','app/api/army/drill/route.ts','app/api/army/draft/route.ts','lib/army-map.ts','lib/army-supply.ts','lib/army-battle.ts','app/api/army/battles/route.ts','app/api/army/positions/route.ts', // #738
@@ -86,7 +87,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const envPath = join(directory, 'fixture-env.mjs');
   const authPath = join(directory, 'lib/auth.mjs');
   await mkdir(dirname(authPath), { recursive: true });
-  await writeFile(envPath, `export const env = ${JSON.stringify(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))};\nexport function waitUntil(promise){(globalThis.__harimuBackground??=[]).push(Promise.resolve(promise));}\n`);
+  await writeFile(envPath, `export const env = ${JSON.stringify({...(presidentialCalendar?{HARIMU_KINDLE_CYCLE_START_AT:String(Math.floor(epoch/1000)-30*86400)}:{}) /* #918: the presidential window opens at the fixture clock */,...(accountElectionBindings??(accountElection?{NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW:'true',HARIMU_ACCOUNT_ELECTION_POC_ENABLED:'true'}:{}))})};\nexport function waitUntil(promise){(globalThis.__harimuBackground??=[]).push(Promise.resolve(promise));}\n`);
   // Each fixture identity belongs to one Request. This substitution exists only
   // in temporary compiled test copies; production authentication is untouched.
   await writeFile(authPath, `const identities = new WeakMap();
@@ -156,6 +157,8 @@ export async function readVerification(userId) {
   const donationsRoute = await import(pathToFileURL(join(directory, 'app/api/party-donations/route.mjs')).href); // #863
   const ralliesRoute = await import(pathToFileURL(join(directory, 'app/api/rallies/route.mjs')).href); // #867
   const cityChatRoute = await import(pathToFileURL(join(directory, 'app/api/city-chat/route.mjs')).href); // #881
+  const dmChatRoute = await import(pathToFileURL(join(directory, 'app/api/dm-chat/route.mjs')).href); // #881 part 3
+  const embassyChatRoute = await import(pathToFileURL(join(directory, 'app/api/embassy-chat/route.mjs')).href); // #882
   const globalChatRoute = await import(pathToFileURL(join(directory, 'app/api/global-chat/route.mjs')).href); // #881 part 2
   const armyRoute = await import(pathToFileURL(join(directory, 'app/api/army/route.mjs')).href); // #738
   const holySitesRoute = await import(pathToFileURL(join(directory, 'app/api/faith/holy-sites/route.mjs')).href); // #855
@@ -202,7 +205,7 @@ export async function readVerification(userId) {
     });
     if (user) identify(request, user);
     const handlers = endpoint === 'notables' ? notables : endpoint === 'addresses' ? addresses : endpoint === 'election' ? election : endpoint === 'petitions' ? petitions : endpoint === 'news' ? news : endpoint === 'citizen' ? citizen : endpoint === 'world' ? world : endpoint === 'world/found-city' ? foundCityRoute : endpoint === 'city' ? city : endpoint === 'city-home' ? cityHome : square;
-    const routed = endpoint === 'global-chat' ? globalChatRoute : endpoint === 'city-chat' ? cityChatRoute : endpoint === 'rallies' ? ralliesRoute : endpoint === 'party-donations' ? donationsRoute : endpoint === 'planks' ? planksRoute : endpoint === 'polling' ? pollingRoute : endpoint === 'jobs/types' ? jobTypesRoute : endpoint === 'kindle/budget' ? kindleBudgetRoute : endpoint === 'citizen/heartbeat' ? heartbeatRoute : endpoint === 'army/battles' ? armyBattlesRoute : endpoint === 'army' ? armyRoute : endpoint === 'army/drill' ? armyDrillRoute : endpoint === 'army/draft' ? armyDraftRoute : endpoint === 'army/positions' ? armyPositionsRoute : endpoint === 'faith/holy-sites' ? holySitesRoute : endpoint === 'citizen/i-voted' ? iVotedRoute : endpoint === 'citizen/civic-rank' ? civicRankRoute : endpoint === 'world/ownership' ? ownershipRoute : endpoint === 'world/unrest' ? unrestRoute : endpoint === 'world/resources' ? resourcesRoute : endpoint === 'world/registry' ? registryRoute : endpoint === 'test-faucet' ? faucetRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'diplomatic-hall' ? hallRoute : endpoint === 'aurelle-succession' ? successionRoute : endpoint === 'aurelle/charters' ? chartersRoute : endpoint === 'tessera/rewards' ? rewardsRoute : endpoint === 'relocation/claim' ? reliefRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'canvassing' ? canvassingRoute : endpoint === 'town-hall' ? townHallRoute : endpoint === 'reports' ? reportsRoute : endpoint === 'debate' ? debateRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
+    const routed = endpoint === 'embassy-chat' ? embassyChatRoute : endpoint === 'dm-chat' ? dmChatRoute : endpoint === 'global-chat' ? globalChatRoute : endpoint === 'city-chat' ? cityChatRoute : endpoint === 'rallies' ? ralliesRoute : endpoint === 'party-donations' ? donationsRoute : endpoint === 'planks' ? planksRoute : endpoint === 'polling' ? pollingRoute : endpoint === 'jobs/types' ? jobTypesRoute : endpoint === 'kindle/budget' ? kindleBudgetRoute : endpoint === 'citizen/heartbeat' ? heartbeatRoute : endpoint === 'army/battles' ? armyBattlesRoute : endpoint === 'army' ? armyRoute : endpoint === 'army/drill' ? armyDrillRoute : endpoint === 'army/draft' ? armyDraftRoute : endpoint === 'army/positions' ? armyPositionsRoute : endpoint === 'faith/holy-sites' ? holySitesRoute : endpoint === 'citizen/i-voted' ? iVotedRoute : endpoint === 'citizen/civic-rank' ? civicRankRoute : endpoint === 'world/ownership' ? ownershipRoute : endpoint === 'world/unrest' ? unrestRoute : endpoint === 'world/resources' ? resourcesRoute : endpoint === 'world/registry' ? registryRoute : endpoint === 'test-faucet' ? faucetRoute : endpoint === 'market/orders' ? ordersRoute : endpoint === 'travel' ? travelRoute : endpoint === 'faith' ? faithRoute : endpoint === 'diplomatic-hall' ? hallRoute : endpoint === 'aurelle-succession' ? successionRoute : endpoint === 'aurelle/charters' ? chartersRoute : endpoint === 'tessera/rewards' ? rewardsRoute : endpoint === 'relocation/claim' ? reliefRoute : endpoint === 'aurelle/rising' ? risingRoute : endpoint === 'congregations' ? congregationsRoute : endpoint === 'assembly' ? assemblyRoute : endpoint === 'canvassing' ? canvassingRoute : endpoint === 'town-hall' ? townHallRoute : endpoint === 'reports' ? reportsRoute : endpoint === 'debate' ? debateRoute : endpoint === 'primaries' ? primariesRoute : handlers; // #307, #283, #71, #122, #197, #123
     const response = await routed[body === undefined ? 'GET' : 'POST'](request);
     return { status: response.status, cache: response.headers.get('Cache-Control'), data: await response.json() };
   };

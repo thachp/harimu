@@ -34,6 +34,7 @@ import { relocationSupportSchemas } from './relocation-support'; // #470
 import { aurelleFavorIndexes, aurelleSchemas, royalFavorSchemas } from './aurelle';
 import { warSchemas } from './war'; // #309
 import { siegeSchemas } from './siege'; // #419
+import { warCaptureRefusalSchemas } from './war-loss-cap'; // #912
 import { foundingSchema } from './founding-period'; // #612
 import { aurelleSuccessionSchemas } from './aurelle-succession'; // #613
 import { hallSchema } from './diplomatic-hall'; // #599
@@ -45,6 +46,7 @@ import { warEndingsSchemas } from './war-endings'; // #427 slice 2
 import { aiReviewQueueSchemas } from './ai-review-queue'; // #753
 import { homeCityMoveSchemas } from './home-move'; // #781
 import { voteBuyingEventsSchema } from './vote-buying-watch'; // #825
+import { riskScoresSchema } from './risk-scoring'; // #879
 import { savingsShieldCreditsSchema, marketSalesTaxSchema, playerFillSalesTaxSchema, partyDonationsSchema, partyDonationsIndex, partyDonationsPartyIndex } from './market-orders'; // #824, #844, #863
 import { pollingSchemas } from './polling'; // #740
 import { plankVoteSchemas } from './plank-votes'; // #831
@@ -52,6 +54,8 @@ import { rallySchemas } from './rallies'; // #867
 import { rallySpeechSchemas } from './rally-speech-ai'; // #876
 import { cityChatSchemas } from './city-chat'; // #881
 import { globalChatSchemas } from './global-chat'; // #881 part 2
+import { dmChatSchemas } from './dm-chat'; // #881 part 3
+import { embassyChatSchemas } from './embassy-chat'; // #882
 import { armySchemas, armyDrillSchemas } from './army'; // #738
 import { conscriptionSchemas, conscriptStayColumn } from './army-conscription'; // #738 slice 3
 import { holySiteSchemas } from './holy-sites'; // #855
@@ -252,7 +256,7 @@ async function initialize(database: GameDatabase) {
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
     ...aurelleCharterSchemas.map(sql=>database.prepare(sql)), // #531
     ...tesseraRewardSchemas.map(sql=>database.prepare(sql)), // #465
-    ...warSchemas.map(sql=>database.prepare(sql)), ...warAssemblySchemas.map(sql=>database.prepare(sql)), ...warEndingsSchemas.map(sql=>database.prepare(sql)), ...siegeSchemas.map(sql=>database.prepare(sql)), ...relocationSupportSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...goodsSanctionSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), ...sparkIssuanceSchemas.map(sql=>database.prepare(sql)), ...reconciliationSchemas.map(sql=>database.prepare(sql)), ...townHallSchemas.map(sql=>database.prepare(sql)), ...debateSchemas.map(sql=>database.prepare(sql)), ...canvassSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362, #431, #432, #441, #442
+    ...warSchemas.map(sql=>database.prepare(sql)), ...warAssemblySchemas.map(sql=>database.prepare(sql)), ...warEndingsSchemas.map(sql=>database.prepare(sql)), ...siegeSchemas.map(sql=>database.prepare(sql)), ...warCaptureRefusalSchemas.map(sql=>database.prepare(sql)), ...relocationSupportSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...goodsSanctionSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), ...sparkIssuanceSchemas.map(sql=>database.prepare(sql)), ...reconciliationSchemas.map(sql=>database.prepare(sql)), ...townHallSchemas.map(sql=>database.prepare(sql)), ...debateSchemas.map(sql=>database.prepare(sql)), ...canvassSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362, #431, #432, #441, #442
     ...congregationSchemas.map(sql=>database.prepare(sql)),
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
@@ -263,6 +267,8 @@ async function initialize(database: GameDatabase) {
     ...rallySpeechSchemas.map(sql=>database.prepare(sql)), // #876
     ...cityChatSchemas.map(sql=>database.prepare(sql)), // #881
     ...globalChatSchemas.map(sql=>database.prepare(sql)), // #881 part 2
+    ...dmChatSchemas.map(sql=>database.prepare(sql)), // #881 part 3
+    ...embassyChatSchemas.map(sql=>database.prepare(sql)), // #882
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...conscriptionSchemas.map(sql=>database.prepare(sql)), // #738 slice 3
@@ -284,7 +290,7 @@ async function initialize(database: GameDatabase) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_player_listings_seller ON player_listings(seller_id, created_at)'),
     database.prepare(playerReceiptView), database.prepare(openLotsView),
     database.prepare('CREATE TABLE IF NOT EXISTS economy_migrations (id TEXT PRIMARY KEY)'),
-    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), ...homeCityMoveSchemas.map(sql => database.prepare(sql)), database.prepare(voteBuyingEventsSchema), /* #825 (migration 0079) */ database.prepare(savingsShieldCreditsSchema), database.prepare(marketSalesTaxSchema), /* #844 (migration 0081) */ database.prepare(playerFillSalesTaxSchema), database.prepare(partyDonationsSchema), database.prepare(partyDonationsIndex), database.prepare(partyDonationsPartyIndex), /* #844 follow-up, #863 (migration 0085) */ /* #824 */ /* #781 move-fee sink (always created; written only with the flag on) */ /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...korundPostSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...graySeizureSchemas.map(sql => database.prepare(sql)), /* #797 seizure sink (always created; written only with the flag on) */ ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
+    ...marketSchemas.map(sql => database.prepare(sql)), database.prepare(marketTradeFeesSchema), database.prepare(marketTradeFeesIndex), ...homeCityMoveSchemas.map(sql => database.prepare(sql)), database.prepare(voteBuyingEventsSchema), database.prepare(riskScoresSchema), /* #825 (migration 0079), #879 (migration 0097) */ database.prepare(savingsShieldCreditsSchema), database.prepare(marketSalesTaxSchema), /* #844 (migration 0081) */ database.prepare(playerFillSalesTaxSchema), database.prepare(partyDonationsSchema), database.prepare(partyDonationsIndex), database.prepare(partyDonationsPartyIndex), /* #844 follow-up, #863 (migration 0085) */ /* #824 */ /* #781 move-fee sink (always created; written only with the flag on) */ /* #777 fee sink (always created; written only with the flag on) */ ...aurelleRisingSchemas.map(sql => database.prepare(sql)), ...aurelleCoupSchemas.map(sql => database.prepare(sql)), ...laborBureauSchemas.map(sql => database.prepare(sql)), ...korundPostSchemas.map(sql => database.prepare(sql)), ...grayMarketSchemas.map(sql => database.prepare(sql)), ...graySeizureSchemas.map(sql => database.prepare(sql)), /* #797 seizure sink (always created; written only with the flag on) */ ...nationWorkSchemas.map(sql => database.prepare(sql)), ...assemblySchemas.map(sql => database.prepare(sql)), ...primarySchemas.map(sql => database.prepare(sql)), ...presidiumSchemas.map(sql => database.prepare(sql)), ...marketGoodsSeedSql.map(sql => database.prepare(sql)),
   ]);
   await database.batch([
     database.prepare(marketItemsSchema), database.prepare(starterSchema), database.prepare(marketEventsSchema),
