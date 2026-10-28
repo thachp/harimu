@@ -62,11 +62,11 @@ export function claimSquares(kind: CityKind, centre: Point, bounds: { width: num
   return out;
 }
 /** What a capture moves and what it leaves. `privateKeys` are "x,y" of squares that have a world_square_purchases row. Only a square the defender holds nationally and nobody bought moves
- *  (to the attacker); a purchased square keeps its owner (Decision 109 stand-in, #468); a square the defender does not hold is not touched. */
+ *  (to the attacker); a Heartland square never moves (docs 15.3, #912); a purchased square keeps its owner (Decision 109 stand-in, #468); a square the defender does not hold is not touched. */
 export function planCapture(squares: readonly SquareFact[], privateKeys: ReadonlySet<string>, attacker: string, defender: string): { transfer: { x: number; y: number; from: string; to: string }[]; keptPrivate: Point[] } {
   const transfer: { x: number; y: number; from: string; to: string }[] = [], keptPrivate: Point[] = [];
   for (const s of squares) {
-    if (s.owner !== defender) continue;
+    if (s.owner !== defender || s.zone === 'heartland') continue; // #912: docs 15.3, Heartland is immune; a city block that reaches into Heartland leaves those squares
     if (privateKeys.has(`${s.x},${s.y}`)) keptPrivate.push({ x: s.x, y: s.y });
     else transfer.push({ x: s.x, y: s.y, from: defender, to: attacker });
   }
@@ -100,10 +100,10 @@ export const siegeSchemas = [
  assaulted_at INTEGER NOT NULL,
  UNIQUE(siege_id, assault_day)
 )`,
-  // One row per capture (at most one per siege), the record #495 can count; the per-square child lists what moved.
+  // One row per capture step (#933: multiple per siege when the weekly frontier-loss cap forces partial capture); request_id stays unique. The per-square child lists what moved.
   `CREATE TABLE IF NOT EXISTS city_captures (
  id TEXT PRIMARY KEY,
- siege_id TEXT NOT NULL UNIQUE REFERENCES city_sieges(id) ON DELETE CASCADE,
+ siege_id TEXT NOT NULL REFERENCES city_sieges(id) ON DELETE CASCADE,
  war_id TEXT NOT NULL REFERENCES wars(id) ON DELETE CASCADE,
  request_id TEXT NOT NULL UNIQUE,
  attacker_nation TEXT NOT NULL REFERENCES nations(id),
@@ -121,4 +121,5 @@ export const siegeSchemas = [
 )`,
   'CREATE INDEX IF NOT EXISTS idx_city_sieges_war ON city_sieges(war_id)',
   'CREATE INDEX IF NOT EXISTS idx_city_captures_war ON city_captures(war_id, defender_nation)',
+  'CREATE INDEX IF NOT EXISTS idx_city_captures_siege ON city_captures(siege_id)',
 ] as const;

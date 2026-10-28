@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { developmentTarget } from './development-config.mjs';
+import { shadowMuteListProblem } from '../lib/chat-shadow-mute.ts'; // #790: the same rule the runtime parser uses
 
 /** #501 slice b: helpers for wrangler.prod.jsonc. Slice c's assertProductionConfig builds on these; nothing deploys from here. */
 export const productionWorker = 'harimu-production';
@@ -87,7 +88,8 @@ export function productionConfigProblems(config) {
   for (const name of forbiddenVars) if (name in vars) problems.push(`${name} must not exist on production.`);
   for (const [name, expected] of Object.entries(requiredVars)) if (typeof vars[name] !== 'string' || (expected instanceof RegExp ? !expected.test(vars[name]) : vars[name] !== expected)) problems.push(`${name} is missing or has the wrong value.`);
   for (const [name, value] of Object.entries(vars)) {
-    if (name in operatorVars) { if (typeof value !== 'string' || !operatorVars[name].test(value)) problems.push(`${name} must be "", "all" or a comma list of ${name === 'HARIMU_AI_MUTED_PERSONAS' ? 'persona' : 'nation'} ids on production.`); }
+    if (name === 'HARIMU_CHAT_SHADOW_MUTE') { const problem = shadowMuteListProblem(value); if (problem) problems.push(`${name} ${problem} on production.`); }
+    else if (name in operatorVars) { if (typeof value !== 'string' || !operatorVars[name].test(value)) problems.push(`${name} must be "", "all" or a comma list of ${name === 'HARIMU_AI_MUTED_PERSONAS' ? 'persona' : 'nation'} ids on production.`); }
     else if (!(name in requiredVars) && value !== 'false') problems.push(`${name} must be "false" on production.`);
     if (/SECRET|TOKEN|PASSWORD|ADMIN_URL|PRIVATE/.test(name) || /^(sk_|postgres(ql)?:\/\/)/.test(String(value))) problems.push(`${name} looks like a secret and must not be in the config.`);
   }

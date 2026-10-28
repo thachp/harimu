@@ -63,9 +63,9 @@ test('AI badge (#381, ui-ux 23.2): the Reserve Board\'s own statements are badge
   for (const o of [LN,PX]) assert.equal('aiBadge' in o,false); for (const l of [LN.caption,...PX.lines]) assert.equal('aiBadge' in l,false);
   for (const x of notices().filter(y=>y.kind==='statement')) assert.equal(x.n.headline,'Reserve Board statement');
 });
-test('byline: reports carry the Republic Wire Service byline from lib/press-templates.ts; statements name the Board and no outlet', () => {
+test('byline: reports carry the Kindle Press byline from lib/press-templates.ts; statements name the Board and no outlet', () => {
   assert.deepEqual(RESERVE_BYLINE,kindlePress.byline);
-  for (const x of notices()) { if (x.kind==='report') assert.match(x.n.body,/^Republic Wire Service: /); else assert.doesNotMatch(x.n.body,/Republic Wire Service|Court Gazette|State Media/); }
+  for (const x of notices()) { if (x.kind==='report') assert.match(x.n.body,/^Kindle Press: /); else assert.doesNotMatch(x.n.body,/Kindle Press|Court Gazette|State Media/); }
 });
 test('scope: Kindle and Spark only; no Korund or Aurelle money, banks, loans, stimulus, redenomination or exchange rates; no Notable', () => {
   const t=all().join(' ');

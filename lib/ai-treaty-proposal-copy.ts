@@ -4,7 +4,7 @@
  * declarations between the signatories; a trade agreement brings tariff reductions, quotas and supply contracts), ai-leadership and the
  * §13.1 table of AI negotiators (Kindle's President and Secretary of State, Korund's Chairman and Aurelle's Crown; the server's
  * `treatyAiLeaders` labels Kindle's leader "AI Cabinet", but the docs titles are used here) and the three press
- * voices (Republic Wire Service, Korund State Media, Court Gazette; bylines are checked against lib/press-templates.ts). Wording differs from
+ * voices (Kindle Press, Korund State Media, Court Gazette; bylines are checked against lib/press-templates.ts). Wording differs from
  * the status lines in lib/diplomacy-copy.ts, which this does not replace.
  *
  * Each nation has an announcement for both treaty kinds (non-aggression pact, trade agreement) in two roles. `proposer`: our AI leader
@@ -48,13 +48,13 @@ export const proposedBy={
 const p=(id:string,headline:string,body:string,aiBadge=false):ProposalNotice=>({id,headline,body,aiBadge,proposal:true});
 /** Proposal announcements. `proposer`: our leader proposes to {other} (badged). `recipient`: {proposer} proposes to us (reported, not badged). */
 export const aiProposalNews:readonly ProposalNationNews[]=[
- {nationId:'kindle',byline:{name:'Republic Wire Service',proposal:true},proposal:true,notices:{
+ {nationId:'kindle',byline:{name:'Kindle Press',proposal:false},proposal:true,notices:{
   proposer:{
    'non-aggression':p('kindle-proposer-non-aggression','The President proposes a pact','President and Secretary of State: we propose a {treaty} to {other}. It awaits ratification.',true),
    trade:p('kindle-proposer-trade','The President proposes a trade deal','President and Secretary of State: we propose a {treaty} to {other}. It awaits ratification.',true)},
   recipient:{
-   'non-aggression':p('kindle-recipient-non-aggression','A pact is offered to the Republic','Republic Wire Service: {proposer} proposes a {treaty} to the Republic. It awaits ratification.'),
-   trade:p('kindle-recipient-trade','A trade deal is offered','Republic Wire Service: {proposer} proposes a {treaty} to the Republic. It awaits ratification.')}}},
+   'non-aggression':p('kindle-recipient-non-aggression','A pact is offered to the Republic','Kindle Press: {proposer} proposes a {treaty} to the Republic. It awaits ratification.'),
+   trade:p('kindle-recipient-trade','A trade deal is offered','Kindle Press: {proposer} proposes a {treaty} to the Republic. It awaits ratification.')}}},
  {nationId:'korund',byline:{name:'Korund State Media',proposal:false},proposal:true,notices:{
   proposer:{
    'non-aggression':p('korund-proposer-non-aggression','The Chairman offers a pact','Korund State Media reports: the Chairman offers {other} a {treaty}. It would bar war between them.',true),

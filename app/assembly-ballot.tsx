@@ -5,6 +5,7 @@ import { ballotExplainer, resultsCaption } from '../lib/assembly-copy';
 import { NationDocument } from './nation-document';
 import { AiBadge } from './ai-disclosure';
 import { ActionButton } from './action-button';
+import { SessionRetry, useLoadRetry } from './session-retry';
 import { GameTimer } from './game-timer';
 
 type Snapshot = AssemblySnapshot & { eligibility?: { eligible: boolean; reason: string }; error?: string };
@@ -36,7 +37,7 @@ export function AssemblyPanel({ snapshot, selected, onSelect, onVote, reason, er
           <tbody>{snapshot.parties.map(p => <tr key={p.id}><td>{name(p.id)}</td><td>{d.human[p.id]}</td><td>{d.seatsWon[p.id]}</td><td>{d.seatsAfter[p.id]}</td></tr>)}</tbody></table>
         {!d.contested && <p>{d.belowMinimum ? 'Too few ballots were cast here to count, so they are published but the seats up stay as they were.' : 'No ballots were cast here, so the seats up stay as they were.'}</p>}
       </div>)}
-      <h4>Republic Wire Service</h4>
+      <h4>Kindle Press</h4>
       <ul>{snapshot.headlines.map(h => <li key={`${h.districtId}:${h.partyId}`}><strong>{h.headline}</strong> {h.body}</li>)}</ul>
     </section>}
     {snapshot.status === 'closed' && !result && <p>The count is not available yet.</p>}
@@ -46,11 +47,12 @@ export function AssemblyPanel({ snapshot, selected, onSelect, onVote, reason, er
 /** Renders nothing while the flag is off (GET /api/assembly answers 404). */
 export function AssemblyBallot() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null), [selected, setSelected] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const load = useLoadRetry(), { fail: loadFail, attempt: loadAttempt } = load;
   const refresh = useCallback(async (signal?: AbortSignal) => {
-    try { const response = await fetch('/api/assembly', { cache: 'no-store', signal }); if (!response.ok) { setSnapshot(null); return; } setSnapshot(await response.json() as Snapshot); } catch { /* the panel simply stays as it was */ }
-  }, []);
-  useEffect(() => { const controller = new AbortController(); const timer = setTimeout(() => void refresh(controller.signal), 0); return () => { clearTimeout(timer); controller.abort(); }; }, [refresh]);
-  if (!snapshot) return null;
+    try { const response = await fetch('/api/assembly', { cache: 'no-store', signal }); if (!response.ok) { if (response.status >= 500) loadFail(); setSnapshot(null); return; } setSnapshot(await response.json() as Snapshot); } catch { if (!signal?.aborted) loadFail(); /* the panel simply stays as it was; #928: Retry when there is nothing to show */ }
+  }, [loadFail]);
+  useEffect(() => { const controller = new AbortController(); const timer = setTimeout(() => void refresh(controller.signal), 0); return () => { clearTimeout(timer); controller.abort(); }; }, [refresh, loadAttempt]);
+  if (!snapshot) return load.failed ? <SessionRetry name={'Kindle mid-term Assembly'} onRetry={load.retry} /> : null;
   const reason = busy ? 'Saving your ballot.' : !snapshot.privacyReady ? snapshot.privacyReason : snapshot.eligibility && !snapshot.eligibility.eligible ? snapshot.eligibility.reason : null;
   const vote = async () => {
     setBusy(true); setError('');

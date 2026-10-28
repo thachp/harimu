@@ -39,7 +39,8 @@ test('#442 rules: gain is base 10 in an untouched district and diminishes, never
 
 test('#442: the flag defaults to "false", migration 0046 only adds a table, and no ballot, count or AI-share module can read visibility', async () => {
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
-  assert.deepEqual([...cfg.matchAll(/"HARIMU_CANVASSING_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['false']);
+  assert.deepEqual([...cfg.matchAll(/"HARIMU_CANVASSING_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), ['true']);
+  assert.match(await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'), /"HARIMU_CANVASSING_ENABLED": "false"/);
   for (const file of ['../drizzle/0046_canvass_quests.sql', '../db/postgres/0046_canvass_quests.sql']) {
     const sql = await readFile(new URL(file, import.meta.url), 'utf8');
     assert.equal(isDestructive(sql), false, file); assert.doesNotMatch(sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, file); assert.match(sql, /CREATE TABLE IF NOT EXISTS canvass_quests/);
@@ -198,6 +199,7 @@ async function scenario(kind, visibility) {
       for (const [i, u] of ['alice', 'bob', 'carol'].entries()) assert.equal((await r.call('primaries', u, { action: 'vote', electionId: 'kindle-primary-account-poc-1', requestId: randomUUID(), ranking: rankings[i] })).status, 200);
       r.setNow((now + 3600 + W + 5) * 1000); await tick(r); const got = await r.call('primaries', 'alice'); assert.equal(got.data.status, 'closed'); return got.data.result;
     }
+    r.setFixtureEnv('HARIMU_KINDLE_CYCLE_START_AT', String(now - 30 * 86400)); // #918: the presidential vote is calendar-gated; open its window now
     const ranks = [[INES, TOBIN, MARA], [MARA, TOBIN, INES], [TOBIN, MARA, INES]];
     for (const [i, u] of ['alice', 'bob', 'carol'].entries()) assert.equal((await r.call('election', u, { action: 'vote', electionId: 'kindle-presidential-account-poc-1', requestId: randomUUID(), ranking: ranks[i] })).status, 200);
     r.setNow((now + W + 5) * 1000); await tick(r); const got = await r.call('election', 'alice'); assert.equal(got.data.status, 'closed'); return got.data.result;
@@ -221,7 +223,7 @@ test(`#442: the panel renders the Content copy, the quest states and the display
   const tags = await load('ai-disclosure.tsx', {}), actions = await load('action-button.tsx', {});
   const { CanvassingPanel } = await load('canvassing.tsx', {
     '../lib/campaign-copy': copyModule, './action-button': actions, './ai-disclosure': tags, './game-timer': { GameTimer: ({ label }) => React.createElement('span', null, label) },
-    './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
+    './session-retry': await load('session-retry.tsx', {}), './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
   });
   const base = (today, extra = {}) => ({ enabled: true, member: true, partyId: S, partyName: 'Steady Hand Party', candidate: { id: INES, name: 'Ines Varro' }, district: { id: 'forgehaven', name: 'Forgehaven' }, cost: 2, capacity: 18, durationSeconds: HOUR, today,
     visibility: [{ candidateId: INES, candidateName: 'Ines Varro', districts: [{ districtId: 'forgehaven', districtName: 'Forgehaven', points: 27 }, { districtId: 'tarrek-foundry', districtName: 'Tarrek Foundry', points: 0 }] }], eligibility: { eligible: true, reason: '' }, ...extra });

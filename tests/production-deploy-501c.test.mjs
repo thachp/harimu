@@ -11,6 +11,9 @@ import ts from 'typescript';
 const checkedIn = readProductionConfigRaw(), realId = '0123456789abcdef0123456789abcdef';
 const good = (change = c => c) => { const c = structuredClone(checkedIn); c.hyperdrive[0].id = realId; change(c); return c; };
 const problems = change => productionConfigProblems(good(change));
+const [nodeMaj, nodeMin] = process.versions.node.split('.').map(Number);
+// Node < 22.18 needs --experimental-strip-types for the scripts' .ts imports.
+const childNodeArgs = [...process.execArgv, ...(nodeMaj < 22 || (nodeMaj === 22 && nodeMin < 18)) && !process.execArgv.includes('--experimental-strip-types') ? ['--experimental-strip-types'] : []];
 const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
 
 test('the checked-in production config fails only on the Hyperdrive placeholder; with a real id it is clean', () => {
@@ -52,7 +55,7 @@ test('deploy-production refuses without explicit production env and approval inp
   await assert.rejects(deployMain([], { PATH: '' }), /Production deploy refused/);
   await assert.rejects(deployMain([sha, '--dry-run'], { ...ok, PATH: process.env.PATH }), /Production config refused[^]*placeholder/, 'even a dry run stops on the Hyperdrive placeholder');
   assert.deepEqual(productionDeployArgs(false), ['deploy', '--config', 'dist/server/wrangler.json']); assert.deepEqual(productionDeployArgs(false, 'b'.repeat(40)).slice(-2), ['--tag', 'b'.repeat(40)], '#486: tagged with its commit'); assert.ok(productionDeployArgs(true).includes('--dry-run')); assert.ok(!productionDeployArgs(false).includes('--keep-vars'));
-  for (const script of ['deploy-production.mjs', 'build-production.mjs']) { const r = spawnSync(process.execPath, [`scripts/${script}`], { env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 20000 }); assert.equal(r.status, 1, script); assert.match(r.stderr, /refused|required/); }
+  for (const script of ['deploy-production.mjs', 'build-production.mjs']) { const r = spawnSync(process.execPath, [...childNodeArgs, `scripts/${script}`], { env: { PATH: process.env.PATH }, encoding: 'utf8', timeout: 20000 }); assert.equal(r.status, 1, script); assert.match(r.stderr, /refused|required/); }
 });
 
 test('build config path: preview is the default and unchanged, production is explicit, anything else is refused', () => {
@@ -100,4 +103,16 @@ test('#764: HARIMU_AI_MUTED_PERSONAS is the second operator exemption: "", "all"
   const withVars = extra => { const c = good(); return productionConfigProblems({ ...c, vars: { ...c.vars, ...extra } }); };
   for (const v of ['', 'all', 'kindle-journalist', 'kindle-journalist,kindle-cabinet']) assert.deepEqual(withVars({ HARIMU_AI_MUTED_PERSONAS: v }).filter(p => /MUTED_PERSONAS/.test(p)), [], v);
   for (const v of ['true ', 'ALL', 'kindle-journalist,', ' all', 'x;y']) assert.ok(withVars({ HARIMU_AI_MUTED_PERSONAS: v }).some(p => p === 'HARIMU_AI_MUTED_PERSONAS must be "", "all" or a comma list of persona ids on production.'), v);
+});
+
+test('#790: HARIMU_CHAT_SHADOW_MUTE takes id@mute or id@mute..unmute entries; refuses bare ids, switch words, bad, inverted or overlapping windows and over 90; "" and up to 90 pass', () => {
+  const list = n => Array.from({ length: n }, (_, i) => `user_${i}@2026-10-23T07:00:00Z`).join(',');
+  const set = value => problems(c => { c.vars.HARIMU_CHAT_SHADOW_MUTE = value; });
+  const A = '2026-10-23T07:00:00Z', B = '2026-10-23T08:00:00Z', C = '2026-10-23T09:00:00Z';
+  for (const bad of ['all', 'ALL', 'All', 'true', 'TRUE', 'false', 'False', 'alice', 'alice,bob', `alice@${A},all`, 'alice@not-a-time', 'alice@2026-10-23', list(91),
+    `a b@${A}`, `alice@${B}..${A}`, `alice@${A}..${A}`, `alice@${A}..${C},alice@${B}`, `alice@${A},alice@${B}..${C}`, `alice@${A}..`])
+    assert.match(set(bad).join('\n'), /HARIMU_CHAT_SHADOW_MUTE .* on production/, String(bad).slice(0, 24));
+  for (const ok of ['', ',', `alice@${A}`, `alice@${A},`, `alice@${A}..${B},alice@${B}..${C},alice@2026-10-24T00:00:00Z`, `alice@${A},user_2X-y@2026-10-23T09:00:00+02:00`, list(90)])
+    assert.deepEqual(set(ok), [], String(ok).slice(0, 24));
+  assert.match(set(list(91)).join('\n'), /at most 90 entries \(D1 bound-parameter limit\)/);
 });

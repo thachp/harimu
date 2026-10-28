@@ -129,6 +129,18 @@ body:has(.harimu-game){overflow:auto}
 .national-news.nation-document[data-nation-theme] :is(.news-statistics,.national-news-items article,.news-source){border-color:var(--nation-edge);background:transparent;color:var(--nation-ink)}
 .national-news.nation-document[data-nation-theme] time { color:var(--nation-ink); }
 .national-news.nation-document[data-nation-theme] .national-news-items article { border-left:3px solid var(--nation-accent); }
+/* #243: filler wire stories (NEXT_PUBLIC_HARIMU_WIRE_BYLINES; app/wire-stories.tsx). Text keeps the document ink (inherited), so contrast is the edition's own;
+   each outlet differs by the shape of its byline rule (free-press top rule, State Media dashed stamp, Court Gazette double rule and italic), not by color alone. */
+.wire-stories{margin-top:16px;padding-top:12px;border-top:1px solid var(--nation-edge,#34535d)}
+.wire-stories>h3{margin:0;font-size:calc(13px * var(--text-scale, 1));letter-spacing:.05em;text-transform:uppercase}
+.wire-stories>ol{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:10px}
+.wire-stories article{padding:10px 12px;border:1px solid var(--nation-edge,#34535d);border-radius:3px}
+.wire-stories article>h4{margin:0;font-size:calc(14px * var(--text-scale, 1));overflow-wrap:normal}
+.wire-stories article>p{margin:6px 0 0;line-height:1.5;overflow-wrap:break-word}
+.wire-stories .wire-byline{display:inline-block;margin:4px 0 2px;font-size:calc(12px * var(--text-scale, 1));font-weight:700;letter-spacing:.02em;overflow-wrap:normal}
+.wire-free-press .wire-byline{padding-top:2px;border-top:1px solid currentColor}
+.wire-state-media .wire-byline{padding:1px 6px;border:2px dashed var(--nation-accent,currentColor);transform:rotate(-1.5deg)}
+.wire-court-gazette .wire-byline{padding-bottom:2px;border-bottom:3px double var(--nation-accent,currentColor);font-style:italic}
 
 .notable-conversation form { display: grid; gap: 10px; }
 .notable-conversation textarea { width: 100%; max-width: 100%; min-height: 96px; box-sizing: border-box; resize: vertical; }
@@ -420,6 +432,48 @@ body:has(.harimu-game){overflow:auto}
 .map-ownership-key{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
 /* #78: with a crest the emblem is the shield itself, so the square frame goes (a framed glyph read as an empty square in QA3's screenshots). */
 .game-identity .nation-emblem:has(>.nation-crest){width:auto;height:auto;border:0;border-radius:0}.nation-emblem>.nation-crest{display:block}.nation-emblem>.nation-crest~.nation-emblem-glyph{display:none}
+/* #392 S8 mobile pass (NEXT_PUBLIC_HARIMU_UI_V2_MOBILE; class .game-mobile-v2, only with the S4 rail). Phones only: the rail + place tabs row leaves the top
+   (the top bar spans its text-scaled grid track) and becomes a bottom tab bar pinned to the screen bottom (sticky, above the fixed citizen dock); the panel reads as a bottom
+   sheet (rounded top, raised edge, decorative grab bar). DOM order, copy and controls are unchanged; desktop is untouched. */
+@media(max-width:760px){
+  .harimu-game.game-mobile-v2>.game-hud{grid-row:1 / span 2} /* the top bar fills the nav row's (text-scaled, #80) track, so the empty row leaves no gap */
+  .game-mobile-v2.game-rail-on .game-nav-row{grid-row:8;position:sticky;bottom:0;z-index:8;border-top:1px solid #49616a;border-bottom:0;box-shadow:0 -4px 12px #0007}
+  .game-mobile-v2.game-rail-on:has(.citizen-dock) .game-nav-row{bottom:max(45px,var(--s8-dock,45px))}
+  /* #838 follow-up: dock labels ("Civic inbox · 1 unread") wrap instead of clipping at 320px; the dock grows with them (45px minimum) and the tab bar and page end follow its measured height (--s8-dock, app/game-shell.tsx). */
+  .harimu-game.game-mobile-v2 .citizen-dock{height:auto;min-height:45px}.harimu-game.game-mobile-v2:has(.citizen-dock){padding-bottom:max(45px,var(--s8-dock,45px))}
+  .harimu-game.game-mobile-v2 .citizen-dock{flex-wrap:wrap}.harimu-game.game-mobile-v2 .citizen-dock>button{flex:1 1 0;min-width:min-content;padding:4px 6px;white-space:normal;overflow-wrap:normal;word-break:normal;line-height:1.2}
+  .game-mobile-v2 .game-inspector{border-top:1px solid #49616a;border-radius:14px 14px 0 0;box-shadow:0 -6px 16px #0006;padding-top:14px}
+  /* S8 follow-up (#377, ARC): the City scene is the screen minus the bars (heights from app/game-shell.tsx); 44dvh / 260px stay as the fallback */
+  .harimu-game.game-mobile-v2.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) auto var(--s8-sheet,0px) minmax(0,auto)} /* #847: the 4th track reserves the fixed sheet's height so no free space inflates the top bar */
+  .game-mobile-v2.game-city-v2 .game-stage{min-height:0;height:max(130px,calc(100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px) - var(--s8-sheet,0px)))}
+  .game-mobile-v2.game-city-v2:not([style*="--s8-top"]) .game-stage{height:44dvh}
+  /* #847 (ARC): a fixed bottom sheet above the tab bar and dock, opened and closed by one button (the existing Collapse details / Show … details toggle,
+     aria-expanded, Escape closes); no drag, no snap points. Open, it is at most 45dvh and half the room between the bars (#874: the map keeps the other half), and its body scrolls. */
+  .game-mobile-v2.game-rail-on .game-inspector,.game-mobile-v2.game-rail-on .game-reopen-panel{position:fixed;z-index:8;left:0;right:0;top:auto;bottom:calc(var(--s8-tabs,0px) + var(--s8-dock,0px));width:auto;margin:0}
+  .game-mobile-v2.game-rail-on .game-inspector{display:flex;flex-direction:column;max-height:max(96px,min(45dvh,calc((100dvh - var(--s8-top,0px) - var(--s8-tabs,0px) - var(--s8-dock,0px)) / 2)))}
+  .game-mobile-v2.game-rail-on .game-inspector-body{flex:1 1 auto;min-height:0;overflow-y:auto}
+  .game-mobile-v2.game-rail-on .game-reopen-panel{justify-content:center;min-height:44px;padding:4px 14px;border-radius:14px 14px 0 0;border-width:1px 0 0}
+  .game-mobile-v2.game-rail-on .game-reopen-panel:focus-visible{outline-offset:-4px} /* #890 (QA1): the full-width bar keeps its focus ring on screen */
+  .game-mobile-v2.game-rail-on .game-inspector-title button svg{transform:rotate(90deg)}.game-mobile-v2.game-rail-on .game-reopen-panel>svg:last-child{transform:rotate(-90deg)}
+  .game-mobile-v2 .game-inspector::before{content:"";display:block;width:36px;height:4px;margin:0 auto 6px;border-radius:2px;background:#6f8a92}
+}
+/* #85: nation skin PoC on the top bar (NEXT_PUBLIC_HARIMU_NATION_SKIN; app/game-shell.tsx sets data-nation-skin only for a signed-in Kindle, Korund or Aurelle citizen).
+   Colors come from each nation's crest palette (lib/nation-crests.ts) on dark grounds, so every existing top bar text color keeps AA contrast; each nation also gets
+   one motif drawn with inset shadows or a background image (no borders, padding or size change, so layout is identical). The header type selector keeps these rules above the later S2 chip rules. The nation name stays in text, so no meaning is carried by color alone. */
+header.game-hud[data-nation-skin]{--skin-ground:#071820;--skin-chip:#0d2530;--skin-edge:#2f4d57;--skin-accent:#d0ad54;background:var(--skin-ground);border-bottom-color:var(--skin-edge)}
+header.game-hud[data-nation-skin] .game-resources>div,header.game-hud[data-nation-skin] .game-resources>.game-hud-help,header.game-hud[data-nation-skin] .game-resources>.game-wallet-button{background:var(--skin-chip);border-color:var(--skin-edge)}
+header.game-hud[data-nation-skin] .game-crest{border-color:var(--skin-accent)}
+/* QA1 on #819: a focused control gets a halo of the solid ground just past its ring, so the ring never sits next to a motif strip or chip edge. The ring sits
+   1px off the control edge and the halo is 4px, so it stays clear of neighbouring text such as the S2 clock line (scripts/nation-skin-check.mjs) */
+header.game-hud[data-nation-skin] :focus-visible{outline-offset:1px;box-shadow:0 0 0 4px var(--skin-ground)}
+/* ARC on #819: resource chip hover and open use the nation accent (each accent measures >=3:1 against its own ground; pinned in tests/nation-skin-85.test.mjs) on the nation chip ground */
+header.game-hud[data-nation-skin] .game-resources>.game-hud-help:hover,header.game-hud[data-nation-skin] .game-resources>.game-wallet-button:hover,header.game-hud[data-nation-skin] .game-resources>.game-hud-help[open]{border-color:var(--skin-accent);background:var(--skin-chip)}
+/* Kindle, a modern civic form: basalt ground, ember header rule, brass base line */
+header.game-hud[data-nation-skin=kindle]{--skin-ground:#1a110c;--skin-chip:#26180f;--skin-edge:#6b4426;--skin-accent:#d9692b;box-shadow:inset 0 3px 0 #d9692b,inset 0 -1px 0 #b08a4a}
+/* Korund, a stamped ration booklet: slate ground, ochre perforated edge */
+header.game-hud[data-nation-skin=korund]{--skin-ground:#1b1a17;--skin-chip:#26231c;--skin-edge:#5f5238;--skin-accent:#c08a2e;background-image:repeating-linear-gradient(90deg,#c08a2e 0 7px,transparent 7px 12px);background-size:100% 2px;background-position:left bottom;background-repeat:no-repeat}
+/* Aurelle, a sealed scroll: sky-blue night ground, double gilt rules top and bottom */
+header.game-hud[data-nation-skin=aurelle]{--skin-ground:#0d1c2b;--skin-chip:#14283c;--skin-edge:#3c6488;--skin-accent:#d0ad54;box-shadow:inset 0 2px 0 #d0ad54,inset 0 4px 0 #0d1c2b,inset 0 5px 0 #d0ad5499,inset 0 -2px 0 #d0ad54,inset 0 -4px 0 #0d1c2b,inset 0 -5px 0 #d0ad5499}
 /* #392 S4 zoom rail (flag NEXT_PUBLIC_HARIMU_UI_V2_RAIL; class .game-rail-on): World / Nation / City in a left rail beside the stage (never over it), the top tabs keep the places. On phones the rail is a row before the tabs, in the page flow, so it cannot cover canvas labels. */
 .game-rail-on{--rail-width:calc(78px * var(--text-scale, 1))}.game-rail-on .game-nav-row{display:contents}
 .game-zoom-rail{position:absolute;z-index:5;top:var(--hud-height);bottom:var(--context-height);left:0;width:var(--rail-width);display:flex;flex-direction:column;gap:6px;padding:10px 6px;background:#102934;border-right:1px solid #334650;overflow-y:auto}
@@ -445,6 +499,8 @@ body:has(.harimu-game){overflow:auto}
 @media(max-width:760px){.harimu-game.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,44dvh) 0 minmax(0,auto)}}
 @media(max-width:760px){.viewport-world-label.viewport-city-pill{min-height:44px;gap:4px;padding:6px 10px 6px 8px;font-size:calc(11px * var(--text-scale, 1));transform:translate(-50%,-100%)!important}.viewport-city-pill-dot{display:none}}
 @media(max-width:360px){.viewport-world-label.viewport-city-pill{padding:6px 10px}.viewport-city-pill-icon{display:none}} /* the 320 canvas has no room for icons: pills keep the label's own size so #377 placement still fits them */
+/* #874: on a map too short for every full pill (app/game-viewport.tsx sets data-compact-pills), each pill is its 44px icon only; text and "Select …" name stay. */
+@media(max-width:760px){.viewport-world-label.viewport-city-pill:where([data-compact-pills] *){width:44px;min-width:44px;padding:0;gap:0;justify-content:center;font-size:0;border-radius:50%}.viewport-city-pill-icon:where([data-compact-pills] *){display:inline-flex}}
 /* #392 S2: UI v2 top bar (NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR). Every rule below is scoped to .game-hud-v2, so the flag-off top bar is untouched. The emblem, "Visiting" label and live-count bell are #78's (same flag path);
    this block only restyles: gold-edged crest, resource chips, round controls and an avatar-style Account button (avatar glyph, no caret: the width is needed at big text). No new copy: the concept screens' wording ("Citizen", in-world date) is not shipped. */
 .game-hud-v2{background:linear-gradient(180deg,#0b222c,#071820);border-bottom-color:#4b5b52;box-shadow:inset 0 -1px 0 #d0ad5426}

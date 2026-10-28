@@ -40,6 +40,10 @@ const flagOffPins = {
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
   HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
+  HARIMU_HOME_CITY_MOVE_ENABLED: 'home-city-move-781.test.mjs',
+  HARIMU_SAVINGS_SHIELD_ENABLED: 'savings-shield-824.test.mjs',
+  HARIMU_KINDLE_SALES_TAX_ENABLED: 'kindle-sales-tax-844.test.mjs',
+  HARIMU_MVP_JOB_TYPES_ENABLED: 'mvp-job-types-886.test.mjs',
   HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
   HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',
@@ -61,8 +65,21 @@ const flagOffPins = {
   HARIMU_MAP_OVERLAYS_ENABLED: 'map-overlays-82.test.mjs',
   HARIMU_CIVIC_RANK_ENABLED: 'civic-rank-741.test.mjs',
   HARIMU_ARMIES_ENABLED: 'army-units-738.test.mjs',
+  HARIMU_RELIGIOUS_HARMONY_ENABLED: 'religious-harmony-842.test.mjs',
+  HARIMU_ARMY_DRILLS_ENABLED: 'army-drills-738.test.mjs',
+  HARIMU_ARMY_MAP_ENABLED: 'army-map-738.test.mjs',
+  HARIMU_ARMY_SUPPLY_ENABLED: 'army-supply-738.test.mjs',
+  HARIMU_ARMY_BATTLES_ENABLED: 'army-battles-738.test.mjs',
   HARIMU_I_VOTED_BADGE_ENABLED: 'i-voted-782.test.mjs',
   HARIMU_KINDLE_POLLING_ENABLED: 'kindle-polling-740.test.mjs',
+  HARIMU_PLANK_VOTES_ENABLED: 'plank-votes-831.test.mjs',
+  HARIMU_PARTY_DONATIONS_ENABLED: 'party-donations-863.test.mjs',
+  HARIMU_KINDLE_RALLIES_ENABLED: 'rallies-867.test.mjs',
+  HARIMU_AI_RALLY_SPEECHES_ENABLED: 'rally-speeches-876.test.mjs',
+  HARIMU_CITY_CHAT_ENABLED: 'city-chat-881.test.mjs',
+  HARIMU_GLOBAL_CHAT_ENABLED: 'global-chat-881.test.mjs',
+  HARIMU_DM_CHAT_ENABLED: 'dm-chat-881.test.mjs',
+  HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
@@ -72,6 +89,7 @@ const flagOffPins = {
   HARIMU_WAR_WEARINESS_LOSSES_ENABLED: 'war-weariness-losses-495.test.mjs',
   HARIMU_WAR_DECLARATION_LIMITS_ENABLED: 'war-limits.test.mjs',
   HARIMU_WAR_ASSEMBLY_ENABLED: 'war-assembly-427.test.mjs',
+  HARIMU_WAR_LOSS_CAP_ENABLED: 'war-loss-cap-912.test.mjs',
   HARIMU_WAR_ENDINGS_ENABLED: 'war-endings-427.test.mjs',
   HARIMU_DIPLOMACY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_EMBARGO_ENABLED: 'embargo.test.mjs',
@@ -87,6 +105,8 @@ const flagOffPins = {
   HARIMU_AI_REVIEW_QUEUE_ENABLED: 'ai-review-queue-753.test.mjs',
   HARIMU_REPORTS_ENABLED: 'reports-743.test.mjs',
   HARIMU_DORMANCY_ENABLED: 'dormancy-739.test.mjs',
+  HARIMU_VOTE_BUYING_WATCH_ENABLED: 'vote-buying-watch-825.test.mjs',
+  HARIMU_RISK_SCORING_ENABLED: 'risk-scoring-879.test.mjs',
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
 };
 
@@ -97,15 +117,17 @@ const switchOffPins = {
   HARIMU_QA_TEST_CITIZENS: 'flag-off-audit-384.test.mjs',
   HARIMU_STORAGE_MAINTENANCE: 'flag-off-audit-384.test.mjs',
 };
+// preview-flags-on: switches turned on in preview only (production keeps them "false", pinned by wrangler-prod-501b). Their off path is still pinned above.
+const previewOnSwitches = ['HARIMU_REALTIME_PRESENCE', 'NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE'];
 const notSwitches = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_PRODUCTION_STORAGE', 'HARIMU_POSTGRES_CUTOVER_READY', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED',
-  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
+  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_UI_V2_MOBILE', 'NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD', 'NEXT_PUBLIC_HARIMU_MOD_CONSOLE', 'NEXT_PUBLIC_HARIMU_NATION_SKIN', 'NEXT_PUBLIC_HARIMU_WIRE_BYLINES', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
 
 test('every boolean wrangler var that is not *_ENABLED is a registered switch (off in both configs) or a listed config value', () => {
   for (const [file, config] of Object.entries(configs)) {
     const booleans = Object.entries(config.vars).filter(([name, value]) => !/_ENABLED$/.test(name) && /^(true|false)$/.test(value)).map(([name]) => name);
     const unknown = booleans.filter(name => !(name in switchOffPins) && !notSwitches.includes(name));
     assert.deepEqual(unknown, [], `${file}: register each new boolean switch in switchOffPins (or notSwitches)`);
-    for (const name of Object.keys(switchOffPins)) if (name in config.vars) assert.equal(config.vars[name], 'false', `${file}: ${name} ships "false"`);
+    for (const name of Object.keys(switchOffPins)) if (name in config.vars) assert.equal(config.vars[name], file === 'wrangler.jsonc' && previewOnSwitches.includes(name) ? 'true' : 'false', `${file}: ${name} ships its pinned value`);
   }
   for (const [name, file] of Object.entries(switchOffPins)) assert.ok(readFileSync(join('tests', file), 'utf8').includes(name), `${name}: ${file} never names it`);
 });
@@ -160,6 +182,7 @@ const expectedCronJobFlags = {
   spark: ['HARIMU_SPARK_SUPPLY_ENABLED'],
   ledger: ['HARIMU_LEDGER_RECONCILIATION_ENABLED'],
   tesseraRewards: ['HARIMU_TESSERA_REWARDS_ENABLED'],
+  rallies: ['HARIMU_KINDLE_RALLIES_ENABLED'],
 };
 test('cron gates: lib/cron-gates.ts matches the pinned job-to-flags map, and each job turns on only with every pinned flag', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(cronJobFlags)), expectedCronJobFlags);

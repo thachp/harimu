@@ -12,7 +12,7 @@ import { hyperdriveIdProblem, productionWorker, readProductionConfigRaw, runtime
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
 // Vars present in preview and deliberately absent in production.
-const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']; // #501c: no journal in production
+const previewOnlyVars = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_KINDLE_CYCLE_START_AT']; // #501c; #878: the cycle start is preview-only (unset in production: calendars held): no journal in production
 // Top-level keys present in preview and deliberately absent in production (preview-only observability, Patrick approved via PM).
 const previewOnlyTopLevelKeys = ['d1_databases', 'observability'];
 // Vars production adds, with their required values.
@@ -20,8 +20,9 @@ const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Vars present in both whose value intentionally differs.
 // Feature flags the preview turns on for QA (the preview-flags-on change). Production keeps every one "false". Adding a flag here is a deliberate preview-only decision.
 // Build-time UI flags (baked into the client bundle at build): on in preview, always "false" in production. Exactly these four.
-const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
+const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE', 'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_UI_V2_MOBILE', 'NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD', 'NEXT_PUBLIC_HARIMU_MOD_CONSOLE', 'NEXT_PUBLIC_HARIMU_NATION_SKIN', 'NEXT_PUBLIC_HARIMU_WIRE_BYLINES', 'NEXT_PUBLIC_HARIMU_RARE_MARKER'];
 const previewOnFlags = [
+  'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_REALTIME_PRESENCE', // preview-flags-on (politics, founding, presence)
   'HARIMU_TEST_FAUCET_ENABLED',
   'HARIMU_LABOR_BUREAU_ENABLED',
   'HARIMU_GRAY_MARKET_ENABLED',
@@ -31,6 +32,10 @@ const previewOnFlags = [
   'HARIMU_KORUND_MEDALS_ENABLED', // #737
   'HARIMU_KORUND_SHORTFALL_ENABLED', // #759
   'HARIMU_MARKET_FEE_ENABLED', // #777
+  'HARIMU_HOME_CITY_MOVE_ENABLED', // #781
+  'HARIMU_SAVINGS_SHIELD_ENABLED', // #824
+  'HARIMU_KINDLE_SALES_TAX_ENABLED', // #844
+  'HARIMU_MVP_JOB_TYPES_ENABLED', // #886
   'HARIMU_WALLET_STREET_RATE_ENABLED', // #758
   'HARIMU_KORUND_RATION_CUT_ENABLED', // #776
   'HARIMU_FAVOR_DECAY_ENABLED',
@@ -47,8 +52,21 @@ const previewOnFlags = [
   'HARIMU_MAP_OVERLAYS_ENABLED', // #82
   'HARIMU_CIVIC_RANK_ENABLED', // #741
   'HARIMU_ARMIES_ENABLED', // #738
+  'HARIMU_RELIGIOUS_HARMONY_ENABLED', // #842
+  'HARIMU_ARMY_DRILLS_ENABLED', // #738 slice 2
+  'HARIMU_ARMY_MAP_ENABLED', // #738 slice 4
+  'HARIMU_ARMY_SUPPLY_ENABLED', // #738 slice 5
+  'HARIMU_ARMY_BATTLES_ENABLED', // #738 battles
   'HARIMU_I_VOTED_BADGE_ENABLED', // #782
   'HARIMU_KINDLE_POLLING_ENABLED', // #740
+  'HARIMU_PLANK_VOTES_ENABLED', // #831
+  'HARIMU_PARTY_DONATIONS_ENABLED', // #863
+  'HARIMU_KINDLE_RALLIES_ENABLED', // #867
+  'HARIMU_AI_RALLY_SPEECHES_ENABLED', // #876
+  'HARIMU_CITY_CHAT_ENABLED', // #881
+  'HARIMU_GLOBAL_CHAT_ENABLED', // #881 part 2
+  'HARIMU_DM_CHAT_ENABLED', // #881 part 3
+  'HARIMU_EMBASSY_CHAT_ENABLED', // #882
   'HARIMU_FOUNDING_PERIOD_ENABLED',
   'HARIMU_AURELLE_SUCCESSION_ENABLED',
   'HARIMU_WAR_ENABLED',
@@ -57,17 +75,20 @@ const previewOnFlags = [
   'HARIMU_WAR_WEARINESS_LOSSES_ENABLED',
   'HARIMU_WAR_DECLARATION_LIMITS_ENABLED',
   'HARIMU_WAR_ASSEMBLY_ENABLED',
+  'HARIMU_WAR_LOSS_CAP_ENABLED', // #912
   'HARIMU_WAR_ENDINGS_ENABLED',
   'HARIMU_AI_REVIEW_QUEUE_ENABLED', // #753
   'HARIMU_REPORTS_ENABLED', // #743
   'HARIMU_DORMANCY_ENABLED', // #739
+  'HARIMU_VOTE_BUYING_WATCH_ENABLED', // #825
+  'HARIMU_RISK_SCORING_ENABLED', // #879
   'HARIMU_KINDLE_BUDGET_VIEW_ENABLED', // #789
   'HARIMU_DIPLOMACY_ENABLED',
   'HARIMU_EMBARGO_ENABLED',
   'HARIMU_TARGETED_SANCTIONS_ENABLED',
   'HARIMU_CROWN_DEBASEMENT_ENABLED',
   'HARIMU_SPARK_SUPPLY_ENABLED',
-  'HARIMU_LEDGER_RECONCILIATION_ENABLED',
+  'HARIMU_LEDGER_RECONCILIATION_ENABLED', 'HARIMU_AI_COST_DASHBOARD_ENABLED',
   'HARIMU_NATION_WORK_ENABLED', // #487
   'HARIMU_CONFLUENCE_ENABLED', // #487 (QA allowlist only)
   'HARIMU_NATION_READINESS_ENABLED', // #486
@@ -80,10 +101,10 @@ const previewOnFlags = [
   ...previewOnUiFlags,
 ];
 // Flags that stay "false" in preview on purpose: Decision 111 exchange, QA1's square-purchase objection, the unset-secret (fail-closed) flags, and the PoCs or scaffolding listed in the PR.
-const previewOffFlags = ['HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_REWARDS_ENABLED', 'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_MERIDIAN_ENABLED', 'HARIMU_ILMAR_ENABLED', 'HARIMU_HOARVALE_ENABLED', 'HARIMU_VARKAND_ENABLED', 'HARIMU_VELDWOOD_ENABLED', 'HARIMU_FULMARA_ENABLED', 'HARIMU_AI_COST_DASHBOARD_ENABLED'];
+const previewOffFlags = ['HARIMU_TESSERA_EXCHANGE_ENABLED', 'HARIMU_SQUARE_PURCHASE_ENABLED', 'HARIMU_TESSERA_REWARDS_ENABLED', 'HARIMU_MERIDIAN_ENABLED', 'HARIMU_ILMAR_ENABLED', 'HARIMU_HOARVALE_ENABLED', 'HARIMU_VARKAND_ENABLED', 'HARIMU_VELDWOOD_ENABLED', 'HARIMU_FULMARA_ENABLED'];
 const differingVars = { HARIMU_ACCOUNT_ELECTION_POC_ENABLED: ['true', 'false'], HARIMU_AI_GATEWAY_ID: ['harimu-preview', 'harimu-production'], ...Object.fromEntries(previewOnFlags.map(name => [name, ['true', 'false']])) };
 // The only non-"false" values production may carry.
-const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, HARIMU_AI_TEMPLATES_ONLY: '', HARIMU_AI_MUTED_PERSONAS: '', NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
+const nonFalse = { HARIMU_STORAGE_BACKEND: 'postgres', HARIMU_AI_GATEWAY_ID: 'harimu-production', HARIMU_POSTGRES_CUTOVER_READY: 'true', HARIMU_AI_DAILY_BUDGET_MICRO: preview.vars.HARIMU_AI_DAILY_BUDGET_MICRO, HARIMU_AI_TEMPLATES_ONLY: '', HARIMU_AI_MUTED_PERSONAS: '', HARIMU_CHAT_SHADOW_MUTE: '' /* #790 operator list, empty */, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: preview.vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, ...productionOnlyVars };
 
 test('wrangler.prod.jsonc has only full-line // comments (the #633 rule) and parses', () => {
   const offenders = readFileSync('wrangler.prod.jsonc', 'utf8').split('\n').map((line, index) => ({ line, number: index + 1 }))
@@ -129,7 +150,7 @@ test('vars: same names as preview except the listed differences; every flag fals
 });
 
 test('preview flags: exactly the previewOnFlags are "true", the deliberate exceptions stay "false", and production is "false" for every one', () => {
-  const flags = config => Object.keys(config.vars).filter(n => /_ENABLED$/.test(n) || previewOnUiFlags.includes(n));
+  const flags = config => Object.keys(config.vars).filter(n => /_ENABLED$/.test(n) || previewOnUiFlags.includes(n) || previewOnFlags.includes(n));
   const previewTrue = flags(preview).filter(n => preview.vars[n] === 'true').sort();
   assert.deepEqual(previewTrue, [...previewOnFlags, 'HARIMU_ACCOUNT_ELECTION_POC_ENABLED'].sort(), 'a new "true" preview flag must be added to previewOnFlags on purpose');
   for (const name of previewOffFlags) assert.equal(preview.vars[name], 'false', `${name} must stay "false" in preview`);
@@ -202,4 +223,19 @@ test('#742: the AI kill switch HARIMU_AI_TEMPLATES_ONLY is present and "" (off) 
 test('#764: the per-persona mute HARIMU_AI_MUTED_PERSONAS is present and "" (off) in both files', () => {
   assert.equal(preview.vars.HARIMU_AI_MUTED_PERSONAS, '');
   assert.equal(prod.vars.HARIMU_AI_MUTED_PERSONAS, '');
+});
+
+test('#790: the production guard and the runtime parser share one HARIMU_CHAT_SHADOW_MUTE rule (id@mute[..unmute] entries, cap 90, D1 bound-parameter limit)', async () => {
+  const { shadowMuteListProblem, parseShadowMute, SHADOW_MUTE_MAX_IDS } = await import('../lib/chat-shadow-mute.ts');
+  assert.equal(SHADOW_MUTE_MAX_IDS, 90);
+  assert.match(readFileSync('scripts/production-config.mjs', 'utf8'), /import \{ shadowMuteListProblem \} from '\.\.\/lib\/chat-shadow-mute\.ts'/);
+  const list = n => Array.from({ length: n }, (_, i) => `user_${i}@2026-10-23T07:00:00Z`).join(',');
+  const refused = ['all', 'ALL', 'true', 'false', 'alice', 'alice@bad', list(91), 'alice@2026-10-23T08:00:00Z..2026-10-23T07:00:00Z', 'alice@2026-10-23T07:00:00Z,alice@2026-10-23T08:00:00Z'];
+  for (const value of [...refused, '', 'alice@2026-10-23T07:00:00Z', 'alice@2026-10-23T07:00:00Z..2026-10-23T08:00:00Z,alice@2026-10-23T09:00:00Z', list(90)]) {
+    const isRefused = shadowMuteListProblem(value) !== null;
+    assert.equal(isRefused, refused.includes(value), String(value).slice(0, 12));
+    assert.equal(parseShadowMute(value, () => {}).size, isRefused || value === '' ? 0 : new Set(value.split(',').map(e => e.split('@')[0])).size, 'runtime agrees');
+  }
+  assert.equal(prod.vars.HARIMU_CHAT_SHADOW_MUTE, '', 'checked-in production value is empty');
+  assert.equal(JSON.parse(readFileSync('package.json', 'utf8')).engines.node, '>=22.18.0', 'scripts import lib .ts: Node with type stripping on by default');
 });

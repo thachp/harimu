@@ -8,6 +8,7 @@ import ts from 'typescript';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { bookState, economyFixture } from './market-board-fixtures.mjs';
+import { fontsBeforeShots } from './layout-standalone.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
 const root = new URL('../', import.meta.url);
@@ -65,7 +66,7 @@ const scenes = [
   { name: 'Fill notice and rejection', slug: 'notices', book: bookState({ orders: [{ side: 'sell', good: 'fruit', qty: 3, limit: 120 }] }), economy: economyFixture(),
     extra: { message: 'Your order traded 3 of 5 Fruit.', error: 'That order is no longer open. Refresh your open orders.' } },
 ];
-const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] });
+const browser = fontsBeforeShots(await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] })); // #905
 const failures = []; const rows = [];
 try {
   for (const sc of scenes) {

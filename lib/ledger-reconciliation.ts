@@ -1,3 +1,4 @@
+import { kindleTreasuryBalanceSql } from './economy';
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
 import { tesseraBalanceSql } from './tessera-exchange';
@@ -43,6 +44,11 @@ const SPK: CurrencySpec = {
     UNION ALL SELECT o.citizen_id, t.qty * t.unit_minor FROM market_trades t JOIN market_orders o ON o.id = t.sell_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT o.citizen_id, -(t.qty * t.unit_minor) FROM market_trades t JOIN market_orders o ON o.id = t.buy_order_id WHERE o.citizen_id IS NOT NULL
     UNION ALL SELECT seller_id, -fee_minor FROM market_trade_fees
+    UNION ALL SELECT seller_id, -tax_minor FROM market_sales_tax
+    UNION ALL SELECT seller_id, -tax_minor FROM player_fill_sales_tax
+    UNION ALL SELECT clerk_user_id, -fee_minor FROM home_city_moves WHERE currency = 'SPK'
+    UNION ALL SELECT clerk_user_id, credit_minor FROM savings_shield_credits WHERE status = 'paid'
+    UNION ALL SELECT clerk_user_id, -amount_minor FROM party_donations
     UNION ALL SELECT citizen_id, -(remaining * limit_unit_minor) FROM market_open_orders WHERE side = 'buy' AND citizen_id IS NOT NULL`,
   appBalances: 'SELECT clerk_user_id AS acct, balance FROM citizen_wallet_balances',
   probes: [
@@ -55,6 +61,14 @@ const SPK: CurrencySpec = {
     ...integerAndSign('SPK', 'market_trades', 'id', 'unit_minor', true),
     ...integerAndSign('SPK', 'market_trades', 'id', 'qty', true),
     ...integerAndSign('SPK', 'market_trade_fees', 'trade_id', 'fee_minor', true), // #777 sink leg
+    ...integerAndSign('SPK', 'market_sales_tax', 'trade_id', 'tax_minor', true), // #844 sales-tax leg (credited to kindle-treasury)
+    { currency: 'SPK', check: 'sales_tax_not_seller_or_over_gross', sql: 'SELECT x.trade_id AS acct FROM market_sales_tax x LEFT JOIN market_trades t ON t.id = x.trade_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE t.id IS NULL OR s.citizen_id IS NULL OR s.citizen_id <> x.seller_id OR x.tax_minor > t.qty * t.unit_minor' },
+    ...integerAndSign('SPK', 'player_fill_sales_tax', 'request_id', 'tax_minor', true), // #844 follow-up: fixed-lot sales tax
+    { currency: 'SPK', check: 'fill_tax_not_seller_or_over_gross', sql: 'SELECT x.request_id AS acct FROM player_fill_sales_tax x LEFT JOIN player_fills f ON f.request_id = x.request_id WHERE f.request_id IS NULL OR f.seller_id <> x.seller_id OR x.tax_minor > f.amount_minor' },
+    ...integerAndSign('SPK', 'home_city_moves', 'request_id', 'fee_minor', true), // #781 move-fee sink leg
+    ...integerAndSign('SPK', 'savings_shield_credits', 'absence_key', 'credit_minor', true), // #824 welfare-line credit
+    ...integerAndSign('SPK', 'party_donations', 'request_id', 'amount_minor', true), // #863 donation: citizen debit, party-account credit
+    { currency: 'SPK', check: 'fund_negative:kindle-treasury', sql: `SELECT 'kindle-treasury' AS acct FROM (${kindleTreasuryBalanceSql}) t WHERE t.balance < 0` },
     { currency: 'SPK', check: 'fee_not_seller_or_over_gross', sql: 'SELECT f.trade_id AS acct FROM market_trade_fees f LEFT JOIN market_trades t ON t.id = f.trade_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE t.id IS NULL OR s.citizen_id IS NULL OR s.citizen_id <> f.seller_id OR f.fee_minor > t.qty * t.unit_minor' },
     // Transfers: the debit leg and the credit leg must agree with each other and with the counterpart's record.
     { currency: 'SPK', check: 'tax_over_gross', sql: 'SELECT clerk_user_id AS acct FROM shift_income_tax WHERE tax_minor > gross_minor' },
@@ -74,31 +88,39 @@ const SPK: CurrencySpec = {
 const LN: CurrencySpec = {
   currency: 'LN',
   legs: `SELECT clerk_user_id AS acct, wage_minor AS delta FROM korund_settlements
+    UNION ALL SELECT clerk_user_id, wage_minor FROM korund_post_settlements
     UNION ALL SELECT clerk_user_id, -price_minor FROM korund_coupon_redemptions
     UNION ALL SELECT buyer_id, amount_minor FROM gray_trades
     UNION ALL SELECT seller_id, -amount_minor FROM gray_trades
-    UNION ALL SELECT clerk_user_id, -amount_minor FROM gray_seizures`, // #797 sink leg: destroyed, credited to no account
+    UNION ALL SELECT clerk_user_id, -amount_minor FROM gray_seizures
+    UNION ALL SELECT clerk_user_id, -fee_minor FROM home_city_moves WHERE currency = 'LN'`, // #781 move-fee sink leg; // #797 sink leg: destroyed, credited to no account
   appBalances: `SELECT c.clerk_user_id AS acct, ${laborNoteSql('c.clerk_user_id')} AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('LN', 'korund_settlements', 'clerk_user_id', 'wage_minor', true),
+    ...integerAndSign('LN', 'korund_post_settlements', 'clerk_user_id', 'wage_minor', true), // #886 (b)
+    { currency: 'LN', check: 'post_wage_without_issuance', sql: 'SELECT p.shift_id AS acct FROM korund_post_settlements p LEFT JOIN labor_note_issuances i ON i.shift_id = p.shift_id WHERE i.shift_id IS NULL OR i.amount_minor <> p.wage_minor' },
     ...integerAndSign('LN', 'korund_coupon_redemptions', 'clerk_user_id', 'price_minor', true),
     ...integerAndSign('LN', 'gray_trades', 'buyer_id', 'amount_minor', true),
     ...integerAndSign('LN', 'gray_seizures', 'offer_id', 'amount_minor', true), // #797
     { currency: 'LN', check: 'seizure_not_buyer_or_over_bundle', sql: 'SELECT z.offer_id AS acct FROM gray_seizures z LEFT JOIN gray_trades t ON t.offer_id = z.offer_id WHERE t.offer_id IS NULL OR t.buyer_id <> z.clerk_user_id OR z.amount_minor > t.amount_minor' },
-    { currency: 'LN', check: 'fund_negative:korund-state', sql: `SELECT r.id AS acct FROM korund_resources r WHERE r.id = 'state' AND r.initial_minor - COALESCE((SELECT SUM(wage_minor) FROM korund_settlements), 0) < 0` },
+    { currency: 'LN', check: 'fund_negative:korund-state', sql: `SELECT r.id AS acct FROM korund_resources r WHERE r.id = 'state' AND r.initial_minor - COALESCE((SELECT SUM(wage_minor) FROM korund_settlements), 0) - COALESCE((SELECT SUM(wage_minor) FROM korund_post_settlements), 0) < 0` },
   ],
 };
 const CRN: CurrencySpec = {
   currency: 'CRN',
   legs: `SELECT clerk_user_id AS acct, wage_minor AS delta FROM aurelle_settlements
+    UNION ALL SELECT clerk_user_id, wage_minor FROM aurelle_charter_settlements
     UNION ALL SELECT clerk_user_id, -spend_minor FROM aurelle_purchases`,
   appBalances: `SELECT c.clerk_user_id AS acct, COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements WHERE clerk_user_id = c.clerk_user_id), 0)
+    + COALESCE((SELECT SUM(wage_minor) FROM aurelle_charter_settlements WHERE clerk_user_id = c.clerk_user_id), 0)
     - COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases WHERE clerk_user_id = c.clerk_user_id), 0) AS balance FROM citizens c`,
   probes: [
     ...integerAndSign('CRN', 'aurelle_settlements', 'clerk_user_id', 'wage_minor', true),
+    ...integerAndSign('CRN', 'aurelle_charter_settlements', 'clerk_user_id', 'wage_minor', true), // #886 (c)
+    { currency: 'CRN', check: 'charter_wage_without_issuance', sql: 'SELECT p.shift_id AS acct FROM aurelle_charter_settlements p LEFT JOIN crown_issuances i ON i.shift_id = p.shift_id WHERE i.shift_id IS NULL OR i.amount_minor <> p.wage_minor' },
     ...integerAndSign('CRN', 'aurelle_purchases', 'clerk_user_id', 'spend_minor', true),
     { currency: 'CRN', check: 'purchase_not_quantity_times_price', sql: 'SELECT clerk_user_id AS acct FROM aurelle_purchases WHERE spend_minor <> quantity * 150' },
-    { currency: 'CRN', check: 'fund_negative:aurelle-estate', sql: `SELECT r.id AS acct FROM aurelle_resources r WHERE r.id = 'estate' AND r.initial_minor + COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases), 0) - COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements), 0) < 0` },
+    { currency: 'CRN', check: 'fund_negative:aurelle-estate', sql: `SELECT r.id AS acct FROM aurelle_resources r WHERE r.id = 'estate' AND r.initial_minor + COALESCE((SELECT SUM(spend_minor) FROM aurelle_purchases), 0) - COALESCE((SELECT SUM(wage_minor) FROM aurelle_settlements), 0) - COALESCE((SELECT SUM(wage_minor) FROM aurelle_charter_settlements), 0) < 0` },
   ],
 };
 // The app's own Tessera balance (lib/tessera-exchange.ts tesseraBalanceSql), correlated to each citizen row.

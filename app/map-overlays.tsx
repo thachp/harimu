@@ -6,18 +6,21 @@ import { nationMark } from '../lib/nation-themes';
 import type { OwnershipMap } from '../lib/map-ownership';
 import { bandMark, NO_DATA, unpublishedLabel, type UnrestMap } from '../lib/map-unrest';
 import { resourceIcon, resourceName, type ResourceMap } from '../lib/map-resources';
-import { MAP_OVERLAYS, UNAVAILABLE_OVERLAYS, UNREST_SCALE, LEGEND_TEXT, toggleOverlay, overlayLabel, phonePopoverPlacement, readSessionOverlays, writeSessionOverlays, type OverlayId } from '../lib/map-overlays';
+import type { ArmyPosition } from '../lib/army-map';
+import { WORLD_GRID } from '../lib/globe-mapping';
+import { ARMY_OVERLAY, MAP_OVERLAYS, UNAVAILABLE_OVERLAYS, UNREST_SCALE, LEGEND_TEXT, toggleOverlay, overlayLabel, phonePopoverPlacement, readSessionOverlays, writeSessionOverlays, type OverlayId } from '../lib/map-overlays';
 
 /** Renders nothing unless the server sent flags.mapOverlays === true. */
 /** mapLayer: the view draws world squares (the globe); false in the city view, where the Ownership layer is hidden. */
-export function MapOverlaysControl({ enabled, lowGraphics = false, mapLayer = true }: { enabled: boolean; lowGraphics?: boolean; mapLayer?: boolean }) {
-  return enabled ? <MapOverlays lowGraphics={lowGraphics} mapLayer={mapLayer} /> : null;
+export function MapOverlaysControl({ enabled, armies = false, lowGraphics = false, mapLayer = true }: { enabled: boolean; armies?: boolean; lowGraphics?: boolean; mapLayer?: boolean }) {
+  return enabled ? <MapOverlays lowGraphics={lowGraphics} mapLayer={mapLayer} armies={armies} /> : null;
 }
 const session = () => { try { return window.sessionStorage; } catch { return undefined; } };
 
 /** #800: rareMarker (NEXT_PUBLIC_HARIMU_RARE_MARKER) draws rare resource nodes as a filled, gold-rimmed badge (shape and fill, not color alone), the same badge in the legend. */
-export function MapOverlays({ lowGraphics = false, mapLayer = true, rareMarker = process.env.NEXT_PUBLIC_HARIMU_RARE_MARKER === 'true' }: { lowGraphics?: boolean; mapLayer?: boolean; rareMarker?: boolean }) {
-  const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session())); // ARC: remembered for the browser session, off in a new one
+export function MapOverlays({ lowGraphics = false, mapLayer = true, armies = false, rareMarker = process.env.NEXT_PUBLIC_HARIMU_RARE_MARKER === 'true' }: { lowGraphics?: boolean; mapLayer?: boolean; armies?: boolean; rareMarker?: boolean }) {
+  const [active, setActive] = useState<OverlayId[]>(() => readSessionOverlays(session()).filter(id => armies || id !== 'armies')); // ARC: remembered for the browser session, off in a new one; #738 slice 4: a remembered Army toggle is dropped while the flag is off
+  const [units, setUnits] = useState<ArmyPosition[] | null>(null);
   const [ownership, setOwnership] = useState<OwnershipMap | null>(null);
   const [unrest, setUnrest] = useState<UnrestMap | null>(null);
   const [resources, setResources] = useState<ResourceMap | null>(null);
@@ -59,6 +62,13 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true, rareMarker =
     fetch('/api/world/resources').then(r => (r.ok ? r.json() : null) as Promise<ResourceMap | null>).then(data => { if (live && data?.cells) setResources(data); }).catch(() => {});
     return () => { live = false; };
   }, [resourcesOn, resources]);
+  const armiesOn = armies && active.includes('armies');
+  useEffect(() => { // #738 slice 4: same rule: read only while Army positions is on, once per mount; never while the flag is off
+    if (!armiesOn || units) return;
+    let live = true;
+    fetch('/api/army/positions').then(r => (r.ok ? r.json() : null) as Promise<{ units?: ArmyPosition[] } | null>).then(data => { if (live && data?.units) setUnits(data.units); }).catch(() => {});
+    return () => { live = false; };
+  }, [armiesOn, units]);
   const [viewport, setViewport] = useState<Element | null>(null); // the layer's portal target, found after mount
   useEffect(() => { setViewport(rootRef.current?.closest('.game-viewport') ?? null); }, []);
   useEffect(() => {
@@ -74,17 +84,18 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true, rareMarker =
         {active.map(id => <section key={id}>
           <strong>{overlayLabel(id)}</strong>
           {id === 'unrest' ? <ol className="map-overlays-scale">{UNREST_SCALE.map(step => <li key={step}><span aria-hidden="true">{bandMark(step).symbol}</span> {step}</li>)}</ol> : null}
+          {id === 'armies' && units ? <ul className="map-ownership-key">{units.map(u => <li key={u.unitId}><span aria-hidden="true">{ARMY_MARK}</span> {armyLegendLine(u)}{u.supply?.cut ? ` · supply line cut, strength down ${u.supply.strengthLossPct}%` : ''}</li>)}</ul> : null}
           {id === 'unrest' && unrest ? <ul className="map-ownership-key">{unrest.nations.map(({ nationId, unrest: score, band }) => <li key={nationId}><span aria-hidden="true">{bandMark(band).symbol}</span> {nationMark(nationId)?.name ?? nationId}: {band} ({score})</li>)}
             {unrest.unpublished.map(id => <li key={id}>{unpublishedLabel(nationMark(id)?.name ?? id)}</li>)}<li>{NO_DATA}</li></ul> : null}
           {id === 'resources' && resources ? <ul className="map-ownership-key">{resources.totals.map(({ resource, squares }) => <li key={resource}><span aria-hidden="true" className={rareMarker && resourceIcon(resource).rare ? 'map-rare-key' : undefined}>{resourceIcon(resource).symbol}</span> {resourceName(resource)}{resourceIcon(resource).rare ? ' (rare)' : ''}: {squares} {squares === 1 ? 'square' : 'squares'}</li>)}</ul>
             : id === 'ownership' && ownership ? <ul className="map-ownership-key">{ownership.totals.map(({ nationId, squares }) => { const mark = nationMark(nationId); return <li key={nationId}><span aria-hidden="true" style={{ color: mark?.accent }}>{mark?.symbol ?? '■'}</span> {mark?.name ?? nationId}: {squares} {squares === 1 ? 'square' : 'squares'}</li>; })}</ul>
-            : <span>{id === 'ownership' ? 'Loading owners.' : id === 'resources' ? 'Loading resources.' : id === 'unrest' && !unrest ? 'Loading unrest.' : LEGEND_TEXT[id]}</span>}
+            : id === 'armies' && units ? null : <span>{id === 'armies' ? 'Loading army positions.' : id === 'ownership' ? 'Loading owners.' : id === 'resources' ? 'Loading resources.' : id === 'unrest' && !unrest ? 'Loading unrest.' : LEGEND_TEXT[id]}</span>}
         </section>)}
       </div>}
       <div role="group" aria-label="Overlays" className="map-overlays-group">
         <span className="map-overlays-title" aria-hidden="true">Overlays</span>
-        {MAP_OVERLAYS.map(({ id, label }) => <button key={id} type="button" aria-pressed={active.includes(id)} onClick={() => toggle(id)}>{label}</button>)}
-        {UNAVAILABLE_OVERLAYS.map(({ id, label, reason }) => <span key={id} className="map-overlays-unavailable">
+        {[...MAP_OVERLAYS, ...(armies ? [ARMY_OVERLAY] : [])].map(({ id, label }) => <button key={id} type="button" aria-pressed={active.includes(id)} onClick={() => toggle(id)}>{label}</button>)}
+        {UNAVAILABLE_OVERLAYS.filter(o => !armies || o.id !== 'armies').map(({ id, label, reason }) => <span key={id} className="map-overlays-unavailable">
           <button type="button" aria-disabled="true" aria-describedby={`map-overlay-${id}-reason`} onClick={event => event.preventDefault()}>{label}</button>
           <span role="tooltip" id={`map-overlay-${id}-reason`}>{reason}</span>
         </span>)}
@@ -93,6 +104,7 @@ export function MapOverlays({ lowGraphics = false, mapLayer = true, rareMarker =
     <span className="map-overlays-status" aria-live="polite">{announcement}</span>
     {ownershipOn && mapLayer && ownership && viewport ? createPortal(<OwnershipLayer map={ownership} lowGraphics={lowGraphics} />, viewport) : null}
     {resourcesOn && mapLayer && resources && viewport ? createPortal(<ResourcesLayer map={resources} lowGraphics={lowGraphics} rareMarker={rareMarker} />, viewport) : null}
+    {armiesOn && mapLayer && units && viewport ? createPortal(<ArmiesLayer units={units} />, viewport) : null}
     {unrestOn && mapLayer && unrest && viewport ? createPortal(<UnrestLayer map={unrest} lowGraphics={lowGraphics} />, viewport) : null}
   </div>;
 }
@@ -117,5 +129,14 @@ function ResourcesLayer({ map, lowGraphics, rareMarker }: { map: ResourceMap; lo
 function UnrestLayer({ map, lowGraphics }: { map: UnrestMap; lowGraphics: boolean }) {
   return <div className="map-ownership map-unrest" data-low-graphics={lowGraphics ? 'true' : undefined} data-width={map.width} data-height={map.height} aria-hidden="true">
     {map.cells.map(([x, y, band]) => { const mark = bandMark(band); return <span key={`${x},${y}`} hidden data-band={band} data-x={x} data-y={y} style={{ color: '#f3ecd6', ...(lowGraphics ? {} : { backgroundColor: `${mark.color}cc` }) }}>{mark.symbol}</span>; })}
+  </div>;
+}
+
+/** #738 slice 4 (placeholder copy, marked for Content): one marker per unit (a symbol, not color alone); the legend carries the text. GameViewport places them like Ownership. */
+const ARMY_MARK = '⚑';
+const armyLegendLine = (u: ArmyPosition) => `${u.name}: ${u.status === 'home' ? 'at home' : u.status === 'marching' ? `marching toward ${nationMark(u.towardNationId ?? '')?.name ?? u.towardNationId}` : `staged near ${nationMark(u.towardNationId ?? '')?.name ?? u.towardNationId}`}`;
+function ArmiesLayer({ units }: { units: readonly ArmyPosition[] }) {
+  return <div className="map-resources map-armies" data-width={WORLD_GRID.width} data-height={WORLD_GRID.height} aria-hidden="true">
+    {units.map(u => <span key={u.unitId} hidden data-nation={u.nationId} data-status={u.status} data-x={u.x} data-y={u.y} style={{ color: nationMark(u.nationId)?.accent }}>{ARMY_MARK}</span>)}
   </div>;
 }

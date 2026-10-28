@@ -12,7 +12,7 @@ export const pollingSchemas = [
 ];
 type Election = { id: string; slate: string[]; names: Record<string, string>; open: boolean };
 async function readOpenElection(db: GameDatabase, now: number): Promise<Election | null> {
-  const row = await db.prepare('SELECT id, candidates_json, opens_at, closes_at, closed_at FROM civic_elections WHERE id=?').bind(electionId).first<{ id: string; candidates_json: string; opens_at: number; closes_at: number; closed_at: number | null }>();
+  const row = await db.prepare('SELECT id, candidates_json, opens_at, closes_at, closed_at FROM civic_elections WHERE id=? OR id LIKE ? ORDER BY opens_at DESC LIMIT 1').bind(electionId, `${electionId}-cycle-%`) /* #936: the current (latest-opened) window */.first<{ id: string; candidates_json: string; opens_at: number; closes_at: number; closed_at: number | null }>();
   if (!row) return null;
   const candidates = JSON.parse(row.candidates_json) as { id: string; name: string }[];
   return { id: row.id, slate: candidates.map(c => c.id), names: Object.fromEntries(candidates.map(c => [c.id, c.name])), open: row.closed_at == null && Number(row.opens_at) <= now && now < Number(row.closes_at) };

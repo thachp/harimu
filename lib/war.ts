@@ -148,7 +148,7 @@ export async function declareWar(db: GameDatabase, command: DeclareWarCommand, n
   // safe here because this statement goes through the database adapter, whose every write transaction takes `pg_advisory_xact_lock(<writer lock>)` right after BEGIN
   // (lib/postgres/database.ts), before this INSERT takes its snapshot, and holds it to COMMIT; SQLite/D1 has one writer. That lock is global, so it also covers a per-nation
   // key. Do NOT run this INSERT on a raw connection, and do not remove that lock without a per-nation replacement: tests/war-limits-postgres.test.mjs pins the lock order
-  // (always runs) and proves exactly-once on real multi-connection Postgres (needs HARIMU_TEST_POSTGRES_URL; CI has no Postgres service, so only the pin runs there).
+  // (always runs) and proves exactly-once on real multi-connection Postgres (needs HARIMU_TEST_POSTGRES_URL; CI runs both against its postgres:17 service).
   await db.prepare(`INSERT INTO wars (id,request_id,pair_key,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at)
     SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM wars WHERE pair_key=? AND ended_at IS NULL)${options.limits
       ? ' AND NOT EXISTS (SELECT 1 FROM wars WHERE attacker_nation=? AND declared_at>?) AND (SELECT COUNT(*) FROM wars WHERE attacker_nation=? AND ended_at IS NULL)<?' : ''} ON CONFLICT DO NOTHING`)
@@ -171,9 +171,11 @@ export async function endWar(db: GameDatabase, warId: string, kind: WarEndKind, 
 
 /** Read-only. With the flag off the caller does not call this; a database without migration 0031 reads as no wars. */
 export async function readWars(db: GameDatabase, now: number): Promise<WarState> {
-  const rows = (await db.prepare(`SELECT ${columns} FROM wars ORDER BY declared_at DESC, id LIMIT 20`).all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] }))).results;
-  const started = await shardStartedAt(db);
-  return { wars: rows.map(row => publicWar(row, now)), foundingPeriodEndsAt: started === null ? null : foundingPeriodEnd(started), defenseWindows: await readDefenseWindows(db) };
+  // #679: the three reads are independent and read-only, so they share one round trip instead of three in a row.
+  const [{ results: rows }, started, defenseWindows] = await Promise.all([
+    db.prepare(`SELECT ${columns} FROM wars ORDER BY declared_at DESC, id LIMIT 20`).all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] })),
+    shardStartedAt(db), readDefenseWindows(db)]);
+  return { wars: rows.map(row => publicWar(row, now)), foundingPeriodEndsAt: started === null ? null : foundingPeriodEnd(started), defenseWindows };
 }
 
 type WindowRow = { nation_id: WarNationId; start_hour_utc: number; changed_at: number };

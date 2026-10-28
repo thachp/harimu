@@ -12,6 +12,7 @@ import { GameTimer } from './game-timer';
 import { ActionButton } from './action-button';
 import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import { CountryScene } from './country-scene';
+import { HomeMoveCard } from './home-move-card'; // #781
 import { capitalCityForNation, cityForNation } from '@/lib/cities';
 import type { CityLocation, CoResident } from '@/lib/city-location';
 import { NationComparison } from './nation-comparison';
@@ -20,7 +21,8 @@ import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { countryWord } from '@/lib/ui-v2-rail';
 import { NationPanel } from './nation-panel-v2';
-import { CitySummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
+import { CitySummary, GovernmentSummary, HouseholdSummary, MarketSummary, WorkSummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
+import { previewOpenNations } from '@/lib/nation-discovery';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
 import { FirstWeekTracker } from './first-week-tracker';
@@ -45,6 +47,7 @@ import type {ElectionSnapshot} from '../lib/elections';
 import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
+import { householdStock, householdWalletMinor, itemCount } from '@/lib/ui-v2-household';
 import { SceneNews } from './world-scene';
 import { noticeboardEvents } from '@/lib/noticeboard'; // #375
 import { firstLoopStep } from '@/lib/first-loop';
@@ -91,7 +94,10 @@ import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHe
 import { CityCoResidents } from './city-coresidents';
 import { CivicRankCard } from './civic-rank-card';
 import { PollCard } from './poll-card'; // #740
-import { KindleBudgetCard } from './kindle-budget-card';
+import { PlankVotes } from './plank-votes'; // #831
+import { PartyDonations } from './party-donations'; // #863
+import { Rallies } from './rallies'; // #867
+import { KindleBudgetCard, useKindleBudget } from './kindle-budget-card';
 import { ArmyCard } from './army-card'; // #738
 import { IVotedBadge } from './i-voted-badge'; // #782
 import type { CivicRank } from '@/lib/civic-rank-rules';
@@ -469,7 +475,9 @@ function ClerkAccountControl() {
 }
 
 type CitizenSnapshot = {
-  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; civicRank?: boolean };
+  /** #872: present only when a flag-opened nation is playable for this account (nationPlayable). */
+  openNations?: string[];
+  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; armyMap?: boolean; civicRank?: boolean; kindleBudget?: boolean };
   civicRank?: CivicRank;
   firstWeek?: { completed: string[] } | null;
   profile: {
@@ -596,6 +604,7 @@ export default function Home() {
   const [korundCommand, setKorundCommand] = useState<KorundCommand | null>(null);
   const korundIntent = useRef<KorundCommand | null>(null);
   const [worldNations, setWorldNations] = useState<Nation[]>(fallbackNations);
+  const [openNations, setOpenNations] = useState<readonly string[] | undefined>(); // #872: from GET /api/citizen, only when a flag-opened nation is playable for this account
   const [availableWorkOrders, setAvailableWorkOrders] = useState<WorkOrder[]>(fallbackWorkOrders);
   const [availablePlanningItems, setAvailablePlanningItems] = useState<PlanningTask[]>(fallbackPlanningItems);
   const [worldEvents, setWorldEvents] = useState<WorldEvent[]>(fallbackWorldEvents);
@@ -653,7 +662,9 @@ export default function Home() {
   const [marketFlag, setMarketFlag] = useState(false);
   const [hallFlag, setHallFlag] = useState(false); // #599
   const [overlaysFlag, setOverlaysFlag] = useState(false); // #82
+  const [armyMapFlag, setArmyMapFlag] = useState(false); // #738 slice 4: flags.armyMap
   const [civicRank, setCivicRank] = useState<CivicRank | null>(null); // #741
+  const [budgetFlag, setBudgetFlag] = useState(false); // #811: HARIMU_KINDLE_BUDGET_VIEW_ENABLED, from the citizen snapshot
   const [pendingEnrollment, setPendingEnrollment] = useState<string | null>(null);
   const [enrollmentPending, setEnrollmentPending] = useState(false);
   const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
@@ -883,6 +894,7 @@ export default function Home() {
     [locationSearch, selectedId, worldNations],
   );
   const citizenNation = worldNations.find((nation) => nation.id === citizenNationId);
+  const kindleBudget = useKindleBudget(clerkConfigured && budgetFlag && citizenNation?.id === 'kindle'); // #811: ledger treasury for the card and the Nation panel
   const identityHoldNow = identityHold(locationSearch, fallbackNationIds, sessionLoading, Boolean(citizenNation), signedHint, holdExpired);
   const weekStoreKey = citizenNationId && citizenshipStatus?.enrolledAt ? `${citizenNationId}:${citizenshipStatus.enrolledAt}` : '';
   // Load progress when the citizen key changes (adjust-state-during-render). Signed-in citizens use server progress (#135); the local demo keeps the browser stub.
@@ -1339,7 +1351,7 @@ export default function Home() {
     if ('election' in snapshot)setElection(snapshot.election??null);
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
-    if (snapshot.flags) { setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle
+    if (snapshot.flags) { setBudgetFlag(snapshot.flags.kindleBudget === true); setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setArmyMapFlag(snapshot.flags.armyMap === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
@@ -1354,6 +1366,7 @@ export default function Home() {
         setEconomy((current) => current ? { ...current, inventory: [{ item: 'food', quantity: (current.inventory.find((entry) => entry.item === 'food')?.quantity ?? 0) + 2 }, ...current.inventory.filter((entry) => entry.item !== 'food')] } : current);
       }
     }
+    setOpenNations(snapshot.openNations ?? []); // #872; #875: [] marks "loaded, none flag-opened" so the Preview badge can show
     if (snapshot.profile) {
       setCitizenNationId(snapshot.profile.nationId);
       // #411: an existing citizen's own nation is the viewed nation unless the URL names one (once per citizen nation, so a later visit elsewhere is kept).
@@ -1699,6 +1712,7 @@ export default function Home() {
       {nationPlanPanelNation(citizenNation.id, viewMode) && dailyLoop}
       {(viewMode === 'household' || viewMode === 'workplace') && <HolidayBanner faith={faithApi.faith} busy={faithApi.busy} onJoin={faithApi.joinFestival} />}
       {viewMode === 'household' && <>
+        <HouseholdSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor, aurellePlan?.walletMinor, korundPlan?.walletMinor)} {...householdStock(citizenNation.id, economy?.inventory, aurellePlan?.foodQuantity, korundPlan?.foodQuantity)} residence={(currentCityAccount?.homeCityId ? cityForNation(citizenNation.id, currentCityAccount.homeCityId) : capitalCityForNation(citizenNation.id))?.name} />
         <FaithPanel api={faithApi} />
         {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
@@ -1736,6 +1750,7 @@ export default function Home() {
         </details>
       </>}
       {viewMode === 'workplace' && !['korund','aurelle'].includes(citizenNation.id) && <>
+        <WorkSummary capacity={capacity} contributions={availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length} onMarket={marketShown ? () => changeView('market') : undefined} />
         <WorkShiftBoard onNavigate={changeView} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
           onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
         <section className="scene-work-orders"><h2>Available contributions</h2>
@@ -1747,6 +1762,8 @@ export default function Home() {
       </>}
       {viewMode === 'market' && !marketShown && <section className="scene-market-closed"><h2>Market</h2><p>The market is not open yet. Work a shift and check back soon.</p></section>}
       {viewMode === 'market' && marketShown && !['korund','aurelle'].includes(citizenNation.id) && <>
+        <MarketSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor)} food={citizenNation.id === 'kindle' && economy ? itemCount(economy.inventory, 'food') : null} board={Boolean(orderBookApi.book)}
+          listings={citizenNation.id !== 'confluence' && (!orderBookApi.book || Boolean(playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')))} onHousehold={() => changeView('household')} />
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
@@ -1758,18 +1775,22 @@ export default function Home() {
         <button type="button" onClick={() => changeView('household')}>Return to household</button>
       </>}
       {viewMode === 'government' && <>
+        <GovernmentSummary nation={citizenNation} account={clerkConfigured} />{/* #871 S11 */}
         <h2>{citizenNation.government}</h2><p>{citizenNation.name} follows its own institutions. Computer-controlled leaders hold every government office in this release. AI/SI means artificial or simulated intelligence; today, fixed game rules choose their actions, with no live AI model connected.</p>
         {citizenNation.id === 'confluence' && <ConfluencePillars />}{/* #487: read-only Four Pillars */}
         {simulation?.sieges && <SiegePanel sieges={simulation.sieges} nationId={citizenNation.id} />}
         <FoundingBanner founding={government?.founding} nationId={citizenNation.id} />
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
-        <ArmyCard />
+        <ArmyCard key={`army:${citizenSessionKey}`}/>{/* QA2 preview report: remount after sign-in like the other session cards; mounted once with no key it kept the signed-out null forever */}
         {citizenNation.id==='kindle'&&clerkConfigured&&<PrimaryCard key={`primary:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={`ranked:${citizenSessionKey}`} onSnapshot={setElection}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<AssemblyBallot key={`assembly:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<Canvassing key={`canvassing:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<TownHalls key={`town-hall:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<PollCard key={`poll:${citizenSessionKey}`}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<PlankVotes key={`planks:${citizenSessionKey}`}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<PartyDonations key={`donations:${citizenSessionKey}`}/>}
+        {citizenNation.id==='kindle'&&clerkConfigured&&<Rallies key={`rallies:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<Debate key={`debate:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&simulation?.reserve&&<ReserveBoardLine reserve={simulation.reserve}/>}
         {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={`aurelle-rising:${citizenSessionKey}`}/>}
@@ -1779,7 +1800,7 @@ export default function Home() {
     </>}
   </section>;
 
-  const populationFact = selected.populationBand ? <dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd> : null;
+  const populationFact = selected.populationBand && !(selected.populationBand === 'coming-soon' && openNations?.includes(selected.id)) ? <dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd> : null;
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
     {guestAllowed && (firstVisitGuideOpen
       ? tourOpen ? <GlobeTour onFocus={setTourFocusNation} onClose={finishTour} /> : <FirstVisitGuide stage={firstVisitStage} onStageChange={setFirstVisitStage} onShortlist={setShortlistIds} onStartTour={() => setTourOpen(true)} onTryGuest={startGuestDemo} onDismiss={() => { stopTour(); setFirstVisitGuideOpen(false); }} />
@@ -1787,7 +1808,7 @@ export default function Home() {
     <WorldSummary nation={selected} population={populationFact} onView={changeView} />
     <p className="eyebrow">Exploring · {selected.shortName}</p>
     {guestEntry}
-    <NationComparison nations={worldNations} />
+    <NationComparison nations={worldNations} openNations={openNations} />
     <WorldFacts nation={selected} population={populationFact} />
     {selected.populationBand === 'needs-citizens' && <details className="pioneer-note"><summary>Pioneer nation · bonuses planned</summary><p>{pioneerNote}</p></details>}
     {citizenSessionStatus==='error' && <p role="alert">Citizen record unavailable. <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button></p>}
@@ -1815,7 +1836,7 @@ export default function Home() {
   const countryCityId = countryOwnNation ? currentCityAccount?.currentCityId ?? null : clerkConfigured && citizenNation ? null : previewCity?.id ?? capitalCityForNation(countryNation.id)?.id ?? null;
   const countryHomeId = countryOwnNation ? currentCityAccount?.homeCityId ?? null : clerkConfigured && citizenNation ? null : capitalCityForNation(countryNation.id)?.id ?? null;
   const canCityTravel = !clerkConfigured || citizenSessionStatus === 'anonymous' || Boolean(countryOwnNation && currentCityAccount && citizenSessionStatus === 'ready');
-  const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} /></>;
+  const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} />{countryOwnNation ? <HomeMoveCard nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} /> : null}</>;
   const countryPanel = <section aria-label={`${countryWord()} travel`}><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
     <CitySummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} city={activeCity} nation={citizenNation ?? selected} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} onView={changeView} />
@@ -1824,13 +1845,13 @@ export default function Home() {
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     {clerkConfigured && citizenNation?.id === 'kindle' && <CivicRankCard civicRank={civicRank} />}
-    {clerkConfigured && citizenNation?.id === 'kindle' && <KindleBudgetCard />}
+    {clerkConfigured && citizenNation?.id === 'kindle' && <KindleBudgetCard budget={kindleBudget} />}
     {clerkConfigured && citizenNation?.id === 'kindle' && <IVotedBadge />}
     {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
 
     {(!clerkConfigured || !citizenNationId) && <SceneNews events={noticeboardEvents(worldEvents, selected.id)} title="City noticeboard" />}
   </> : ['household','workplace','market','government'].includes(viewMode) ? citizenScene : viewMode==='nation' ?
-    <NationPanel onNationMap={() => changeView('country')} incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
+    <NationPanel onNationMap={() => changeView('country')} treasuryPublished={budgetFlag} treasuryMinor={kindleBudget?.treasuryMinor ?? null} incomeTaxPercent={economy?.incomeTaxPercent ?? 0} nation={selected} nations={worldNations} citizenNation={citizenNation} capacity={capacity}
       workPending={workPending || hasActiveShift || Boolean(korundCommand || aurelleCommand || marketCommand || playerCommand)}
       onSelectNation={selectNation} onWorldView={() => changeView('world')} onHousehold={() => changeView('household')}
       onWorkplace={() => changeView('workplace')} onCommitWork={commitWork}
@@ -1880,7 +1901,7 @@ export default function Home() {
       ] : viewMode === 'government' ? (government?.roles ?? []).map(role => ({
         id: role.name, label: role.name, detail: role.controller,
       })) : viewMode === 'world' || viewMode === 'nation' ? worldNations.map(nation => ({
-        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, badge: nation.populationBand && populationBandLabel[nation.populationBand], detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
+        id: nation.id, label: nation.shortName, selected: nation.id === selected.id, badge: nation.populationBand && !(nation.populationBand === 'coming-soon' && openNations?.includes(nation.id)) ? populationBandLabel[nation.populationBand] : undefined /* #872 */, detail: `${nation.capital} · Stability ${nation.stability}`, onSelect: () => selectNation(nation.id),
       })) : viewMode === 'square' ? cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown)).map(card => ({ ...card, onSelect: () => changeView(card.id) })) : [];
   const briefInventory = citizenNation?.id === 'aurelle' ? aurellePlan?.foodQuantity : citizenNation?.id === 'korund' ? korundPlan?.foodQuantity : economy ? goods('food') : undefined;
   const briefStorageKey = citizenNation ? `harimu:morning-brief:${citizenNation.id}` : null;
@@ -1905,7 +1926,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? `${countryWord()} travel` : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} onWelcomeBack={setWelcomeBack} />}
-    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} openNations={previewOpenNations(openNations, clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} armyMap={armyMapFlag} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}

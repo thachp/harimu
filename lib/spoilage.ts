@@ -17,8 +17,9 @@ export * from './spoilage-rules';
 export async function runSpoilage(db: GameDatabase, tick: number, now: number, tickStartedAt = now) {
   if (!(tick > 0)) return;
   const run = `spoil:${tick}:${crypto.randomUUID()}:`;
-  for (const good of Object.keys(shelfLifeDays) as PerishableGood[]) {
-    const [held, escrow, fresh] = await Promise.all([
+  // #679 slice 3: each good's reads and writes touch only that good's rows (and every write is guarded against the live view), so all goods' reads share one round trip.
+  const goods = Object.keys(shelfLifeDays) as PerishableGood[];
+  const snapshots = await Promise.all(goods.map(good => Promise.all([
       db.prepare('SELECT clerk_user_id, quantity FROM citizen_inventory_balances WHERE item = ? AND quantity > 0').bind(good).all<{ clerk_user_id: string; quantity: number }>(),
       db.prepare(`SELECT id, citizen_id, remaining FROM market_open_orders WHERE side = 'sell' AND good = ? AND citizen_id IS NOT NULL
         ORDER BY created_at DESC, id DESC`).bind(good).all<{ id: string; citizen_id: string; remaining: number }>(),
@@ -27,7 +28,9 @@ export async function runSpoilage(db: GameDatabase, tick: number, now: number, t
             WHERE t.good = ? AND o.citizen_id IS NOT NULL AND t.filled_at >= ?
           UNION ALL SELECT clerk_user_id, quantity_delta AS qty FROM citizen_economy_events WHERE item = ? AND quantity_delta > 0 AND occurred_at >= ?
         ) GROUP BY clerk_user_id`).bind(good, tickStartedAt, good, tickStartedAt).all<{ clerk_user_id: string; qty: number }>(),
-    ]);
+    ])));
+  for (const [index, good] of goods.entries()) {
+    const [held, escrow, fresh] = snapshots[index];
     const freshBy = new Map(fresh.results.map(r => [r.clerk_user_id, Number(r.qty)]));
     const citizens = new Map<string, { free: number; orders: { id: string; remaining: number }[] }>();
     for (const r of held.results) citizens.set(r.clerk_user_id, { free: Number(r.quantity), orders: [] });

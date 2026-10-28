@@ -1,6 +1,7 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import type {ElectionSnapshot} from '../lib/elections';
+import {isKindleElectionId} from '../lib/election-ids';
 import type {VerificationState} from '../lib/verification';
 import {validRanking} from '../lib/instant-runoff';
 import {NationDocument} from './nation-document';
@@ -13,7 +14,7 @@ export function RankedBallot({onSnapshot}:{onSnapshot?:(snapshot:ElectionSnapsho
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null),[ranking,setRanking]=useState(['','','']),[error,setError]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[uncertain,setUncertain]=useState(false);
  const intent=useRef<Ballot|null>(null),generation=useRef(0),readVersion=useRef(0),commandActive=useRef(false),callback=useRef(onSnapshot);
  useEffect(()=>{callback.current=onSnapshot;},[onSnapshot]);
- const accept=useCallback((data:Snapshot)=>{if(data.nationId!=='kindle'||!['kindle-presidential-poc-1','kindle-presidential-account-poc-1'].includes(data.id))throw Error('Citizenship or election changed. Refresh before reopening the ballot.');setSnapshot(data);callback.current?.(data);},[]);
+ const accept=useCallback((data:Snapshot)=>{if(data.nationId!=='kindle'||!isKindleElectionId(data.id))throw Error('Citizenship or election changed. Refresh before reopening the ballot.');setSnapshot(data);callback.current?.(data);},[]);
  const refresh=useCallback(async(signal?:AbortSignal)=>{if(commandActive.current)return;const epoch=generation.current,version=++readVersion.current;setLoading(true);try{const response=await fetch('/api/election',{cache:'no-store',signal});const data=await response.json() as Snapshot;if(epoch!==generation.current||version!==readVersion.current)return;if(!response.ok)throw Error(data.error??'Election unavailable.');accept(data);setError('');}catch(e){if(epoch===generation.current&&version===readVersion.current&&!(e instanceof Error&&e.name==='AbortError'))setError(e instanceof Error?e.message:'Election unavailable.');}finally{if(epoch===generation.current&&version===readVersion.current)setLoading(false);}},[accept]);
  useEffect(()=>{const controller=new AbortController(),epoch=++generation.current;const timer=setTimeout(()=>void refresh(controller.signal),0);return()=>{generation.current=epoch+1;clearTimeout(timer);controller.abort();};},[refresh]);
  const eligible=snapshot?.electionEligibility?.eligible??snapshot?.verification.countedActionsEligible;

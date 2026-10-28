@@ -5,6 +5,7 @@ import { canvassingCopy } from '../lib/campaign-copy';
 import { NationDocument } from './nation-document';
 import { AiBadge } from './ai-disclosure';
 import { ActionButton } from './action-button';
+import { SessionRetry, useLoadRetry } from './session-retry';
 import { GameTimer } from './game-timer';
 
 type Snapshot = CanvassingSnapshot & { eligibility?: { eligible: boolean; reason: string } };
@@ -39,11 +40,12 @@ export function CanvassingPanel({ snapshot, onStart, onComplete, busy, error }: 
 /** Renders nothing while the flag is off (GET /api/canvassing answers 404). */
 export function Canvassing() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const load = useLoadRetry(), { fail: loadFail, attempt: loadAttempt } = load;
   const refresh = useCallback(async (signal?: AbortSignal) => {
-    try { const response = await fetch('/api/canvassing', { cache: 'no-store', signal }); if (!response.ok) { setSnapshot(null); return; } setSnapshot(await response.json() as Snapshot); } catch { /* the panel simply stays as it was */ }
-  }, []);
-  useEffect(() => { const controller = new AbortController(); const timer = setTimeout(() => void refresh(controller.signal), 0); return () => { clearTimeout(timer); controller.abort(); }; }, [refresh]);
-  if (!snapshot) return null;
+    try { const response = await fetch('/api/canvassing', { cache: 'no-store', signal }); if (!response.ok) { if (response.status >= 500) loadFail(); setSnapshot(null); return; } setSnapshot(await response.json() as Snapshot); } catch { if (!signal?.aborted) loadFail(); /* the panel simply stays as it was; #928: Retry when there is nothing to show */ }
+  }, [loadFail]);
+  useEffect(() => { const controller = new AbortController(); const timer = setTimeout(() => void refresh(controller.signal), 0); return () => { clearTimeout(timer); controller.abort(); }; }, [refresh, loadAttempt]);
+  if (!snapshot) return load.failed ? <SessionRetry name={'Kindle canvassing'} onRetry={load.retry} /> : null;
   const send = async (command: Record<string, unknown>) => {
     setBusy(true); setError('');
     try {

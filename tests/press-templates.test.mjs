@@ -19,7 +19,7 @@ test('every pack: nation id, outlet, 8-12 templates, unique ids, proposal', () =
 test('every pack has an in-world wire byline', () => {
   for (const p of packs) { assert.ok(p.byline && p.byline.name.trim().length>0 && p.byline.name.length<=PRESS_HEADLINE_MAX, p.nationId);
     assert.equal(typeof p.byline.proposal,'boolean'); assert.doesNotMatch(p.byline.name,/sample|template|filler|demo/i); }
-  assert.deepEqual(kindlePress.byline,{name:'Republic Wire Service',proposal:true});
+  assert.deepEqual(kindlePress.byline,{name:'Kindle Press',proposal:false});
 });
 test('length limits', () => {
   for (const p of packs) for (const x of p.templates) { assert.ok(x.headline.length<=PRESS_HEADLINE_MAX, `${x.headline.length}: ${x.headline}`);

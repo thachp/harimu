@@ -8,6 +8,9 @@ import type { NationalNews } from '../lib/national-news';
 import { openNewsEvent } from '../lib/morning-brief';
 import { AiTextTag } from './ai-disclosure';
 import { templateMode } from '../lib/kill-switch-copy'; // #742: footer for editions in templates-only mode
+import { WireStories } from './wire-stories'; // #243
+import { wireFiller } from '../lib/wire-bylines';
+import { pressPacks } from '../lib/press-templates';
 import { newsIntroFor } from '../lib/news-intro-copy'; // #688: AI wording only when this edition holds a model-written item (the server never writes one with HARIMU_AI_NEWS_ENABLED off)
 
 export function NewsEdition({news}:{news:NationalNews}) {
@@ -18,6 +21,7 @@ export function NewsEdition({news}:{news:NationalNews}) {
   {news.templatesOnly&&<p className="news-template-mode" data-template-mode="true">{templateMode.footer.text}</p>}
   {!news.items.length && <p>No recorded national articles yet. Your statistics above are current; sample city noticeboard stories are separate.</p>}
   <ol className="national-news-items">{news.items.map(item=><li key={item.id} data-news-id={item.id} tabIndex={-1}><article><h3>{item.title}</h3><time className="news-dateline" dateTime={new Date(item.occurredAt).toISOString()}>{formatTime(item.occurredAt)}</time>{item.source==='system'?<small className="news-source">System record</small>:<AiTextTag provenance={item.source==='model'?'model':'deterministic'}/>}{item.kind==='template'&&<small className="news-source">State Media template</small>}{item.kind==='decree'&&<small className="news-source">Court gazette · decree</small>}<p>{item.text}</p>{news.templatesOnly&&item.source!=='system'&&<small className="news-source news-template-mode">{templateMode.footer.text}</small>}</article></li>)}</ol>
+  {(()=>{const pack=wireFiller(news.nationId,pressPacks);return pack&&<WireStories pack={pack} />;})()}
  </NationDocument>;
 }
 

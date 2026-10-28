@@ -333,3 +333,17 @@ export const aurelleMeals = sqliteTable('aurelle_meals', {
 },t=>[check('aurelle_meal_quantity',sql`${t.quantity}=2`)]);
 
 export const citizenCityLocations = sqliteTable('citizen_city_locations', {userId:text('user_id').primaryKey().references(()=>citizens.clerkUserId,{onDelete:'cascade'}),nationId:text('nation_id').notNull(),homeCityId:text('home_city_id').notNull(),currentCityId:text('current_city_id').notNull(),updatedAt:integer('updated_at').notNull()});
+
+// #879 (0097): current staff-review score for a new account or dense counted civic acts. Human review only.
+export const riskScores = sqliteTable('risk_scores', {
+  clerkUserId: text('clerk_user_id').primaryKey().references(() => citizens.clerkUserId, { onDelete: 'cascade' }),
+  score: integer('score').notNull(),
+  reasons: text('reasons').notNull(),
+  civicActCount: integer('civic_act_count').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, t => [
+  check('risk_score_nonnegative', sql`${t.score} >= 0`),
+  check('risk_act_count_nonnegative', sql`${t.civicActCount} >= 0`),
+  check('risk_reasons', sql`${t.reasons} IN ('new-account','dense-civic-acts','new-account,dense-civic-acts','')`),
+  check('risk_score_reasons', sql`(${t.score} = 0 AND ${t.reasons} = '') OR (${t.score} > 0 AND ${t.reasons} <> '')`),
+]);

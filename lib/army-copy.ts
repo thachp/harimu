@@ -71,6 +71,25 @@ export const unitMembership={
  joined:L('You joined {unit}.'),
  left:L('You left {unit}.'),
  drillsHelper:L('Your drills raise the unit\'s strength and morale.'),
+ // #738 slice 2 (proposal, for Content): the drill button and its two outcomes.
+ drillButton:'Drill with your unit',
+ drilled:L('You drilled with {unit}.'),
+ drilledToday:L('You already drilled this game day.'),
+ // #738 slice 3: PLACEHOLDER copy, marked for Content (proposal: true), not final wording. A conscript's call-up note; Leave is hidden until the term ends.
+ calledUp:L('You were called up to serve in {unit}. You can leave when your term ends.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): staying in the unit after the term (ARC on #839).
+ stayButton:'Stay after my term',
+ stayed:L('You will stay in {unit} after your term.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): a refused stay (not a conscript, or the term already ended) (#738 stay-error follow-up).
+ stayRefused:L('You cannot stay in {unit}: you are not serving a term right now.'),
+ // Content (#887 follow-up), docs §15.3 Logistics: units need supply lines from depots; a cut line lowers strength each game day.
+ // {pct} is the server's loss figure. Depot (the capital), range, daily rate and the half-strength cap were approved by ARC on #897 (lib/army-supply.ts); the card names only the cap.
+ supplyCut:L('Supply line cut. Strength is down {pct}% and drops each game day the line stays cut, to at most half.'),
+ supplyCutLegend:L('supply line cut, strength down {pct}%'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): #738 battles, the card line. The capital is never captured.
+ battleOngoing:L('Battle with {nation}: round {round}.'),
+ battleWon:L('Battle with {nation} won after {round} rounds. No capital changes hands.'),
+ battleLost:L('Battle with {nation} lost after {round} rounds. No capital changes hands.'),
  notEligible:L('You cannot join this unit: {reason}'),
  notOpenYet:L('This unit is not taking volunteers yet.'),
  actionFailed:L('Your unit change did not go through: {reason}'),

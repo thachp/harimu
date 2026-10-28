@@ -27,7 +27,7 @@ const t=(id:string,topic:string,headline:string,...body:string[]):PressTemplate=
 const tb=(id:string,topic:string,headline:string,...body:string[]):PressTemplate=>({...t(id,topic,headline,...body),aiBadge:true});
 
 export const kindlePress:PressPack={nationId:'kindle',outlet:'free-press',
- byline:{name:'Republic Wire Service',proposal:true},
+ byline:{name:'Kindle Press',proposal:false}, // canon edition name (culture bible; harimu-docs#31), replaces Republic Wire Service (#826 review)
  voice:'Independent, plain and argumentative: many voices on one plaza. Prices out loud; officials questioned, not quoted on faith.',
  templates:[
   t('kindle-assembly-vote','assembly','Assembly splits on the new tax bill',

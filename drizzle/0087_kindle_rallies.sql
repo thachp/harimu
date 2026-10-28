@@ -1,0 +1,3 @@
+-- Issue #867: Kindle rallies PoC (docs 9.4). Attendance (one row per citizen and rally) and published news clips (one per rally). Flag HARIMU_KINDLE_RALLIES_ENABLED (off in production). Additive only; no wallet or ballot table is touched.
+CREATE TABLE IF NOT EXISTS rally_attendance (rally_id TEXT NOT NULL, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, attended_at INTEGER NOT NULL, PRIMARY KEY (rally_id, clerk_user_id));
+CREATE TABLE IF NOT EXISTS rally_clips (rally_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL, city_id TEXT NOT NULL, humans INTEGER NOT NULL CHECK(humans >= 0), ai_crowd INTEGER NOT NULL CHECK(ai_crowd >= 0), speech TEXT NOT NULL, published_at INTEGER NOT NULL);

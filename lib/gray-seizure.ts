@@ -50,22 +50,15 @@ export async function rollSeizure(db: GameDatabase, courierId: string, offerId: 
   const trade = await db.prepare('SELECT amount_minor FROM gray_trades WHERE offer_id=? AND buyer_id=?').bind(offerId, courierId).first<{ amount_minor: number }>();
   const amount = seizedAmount(Number(trade?.amount_minor ?? 0));
   if (amount < 1 || rng(offerId) * 10000 >= seizureChanceBps(await suspicionNow(db, courierId, now))) return 0;
-  // ON CONFLICT covers the trade key and the one-per-game-day key. The LN guard keeps the wallet from going negative.
-  await db.prepare(`INSERT INTO gray_seizures(offer_id, clerk_user_id, game_day, amount_minor, seized_at)
-    SELECT t.offer_id, t.buyer_id, ?, ?, ? FROM gray_trades t WHERE t.offer_id=? AND t.buyer_id=? AND ?<=t.amount_minor AND ?<=${laborNoteSql('?')}
-    ON CONFLICT DO NOTHING`).bind(Math.floor(now / GAME_DAY_SECONDS), amount, now, offerId, courierId, amount, amount, ...laborNoteBinds(courierId)).run();
-  const row = await db.prepare('SELECT amount_minor FROM gray_seizures WHERE offer_id=? AND clerk_user_id=?').bind(offerId, courierId).first<{ amount_minor: number }>();
-  if (!row) return 0;
-  // ARC on #801: committed re-check, the conditional-delete pattern of the coupon guard (#47). Under Postgres READ COMMITTED a concurrent coupon
-  // redemption can pass its own guard against the pre-seizure balance. After commit, whichever re-check runs later sees both rows; if the LN
-  // balance is negative the seizure is withdrawn (fail closed: the checkpoint never overdraws a wallet), and the coupon's own re-check does the same.
-  if (await laborNoteBalance(db, courierId) < 0) {
-    await db.prepare('DELETE FROM gray_seizures WHERE offer_id=? AND clerk_user_id=?').bind(offerId, courierId).run();
-    return 0;
-  }
-  return Number(row.amount_minor);
+  // ARC on #797 (atomic seizure): ONE conditional INSERT ... SELECT, no transaction and no re-check. The row is written only when the courier's
+  // computed LN balance (the shared lib/korund-wallet formula) covers the amount at that statement, so a seizure never takes a wallet below 0.
+  // ON CONFLICT covers the trade key and the one-per-game-day key. A coupon redemption racing it keeps its own guard and committed re-check (#47).
+  const result = await db.prepare(`INSERT INTO gray_seizures(offer_id, clerk_user_id, game_day, amount_minor, seized_at)
+    SELECT t.offer_id, t.buyer_id, ?, ?, ? FROM gray_trades t WHERE t.offer_id=? AND t.buyer_id=? AND ?<=t.amount_minor AND ${laborNoteSql('?')}>=?
+    ON CONFLICT DO NOTHING`).bind(Math.floor(now / GAME_DAY_SECONDS), amount, now, offerId, courierId, amount, ...laborNoteBinds(courierId), amount).run();
+  if (!result.meta.changes) return 0;
+  return amount;
 }
-const laborNoteBalance = async (db: GameDatabase, userId: string) => Number((await db.prepare(`SELECT ${laborNoteSql('?')} AS n`).bind(...laborNoteBinds(userId)).first<{ n: number }>())?.n ?? 0);
 
 /** The notice for the latest seizure within the last game day, or null. Read-only. */
 export async function latestSeizureNotice(db: GameDatabase, userId: string, now: number): Promise<string | null> {

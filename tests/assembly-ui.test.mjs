@@ -15,7 +15,7 @@ const load = async (file, shims) => { const exports = {}; new Function('exports'
 const actions = await load('action-button.tsx', {}), tags = await load('ai-disclosure.tsx', {});
 const panel = (await load('assembly-ballot.tsx', {
   '../lib/assembly-copy': copy, './action-button': actions, './ai-disclosure': tags, './game-timer': { GameTimer: ({ label }) => React.createElement('span', null, label) },
-  './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
+  './session-retry': await load('session-retry.tsx', {}), './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
 })).AssemblyPanel;
 const base = () => ({ enabled: true, nationId: 'kindle', id: 'kindle-assembly-account-poc-1', scope: 'preview-citizen', status: 'open', opensAt: 1, closesAt: 2000000000, seats: { perDistrict: 6, up: 3 },
   districts: [], parties: parties.map(p => ({ id: p.id, name: p.name, ideology: p.ideology, color: p.color, blurb: p.blurb, ai: true })), yourDistrict: { id: 'forgehaven', name: 'Forgehaven' }, voted: false, privacyReady: true, privacyReason: '', result: null, headlines: [] });
@@ -35,7 +35,7 @@ test('voted: badge shown and no ballot form', () => {
 test('closed: per-district count of human votes only (no AI bloc column), and the wire headlines', () => {
   const result = rules.assemblyResult({ forgehaven: { 'steady-hand': 3, 'open-ledger': 1, 'dockside-builders': 2 } });
   const out = html({ snapshot: { ...base(), status: 'closed', result, headlines: rules.assemblyHeadlines(result) } });
-  assert.ok(out.includes('<th>Human votes</th><th>Seats won</th>')); assert.equal(out.includes('AI bloc'), false); assert.ok(out.includes(copy.resultsCaption.humanVotesOnly.text)); assert.ok(out.includes('Republic Wire Service'));
+  assert.ok(out.includes('<th>Human votes</th><th>Seats won</th>')); assert.equal(out.includes('AI bloc'), false); assert.ok(out.includes(copy.resultsCaption.humanVotesOnly.text)); assert.ok(out.includes('Kindle Press'));
   assert.ok(out.includes('<td>Steady Hand Party</td><td>3</td><td>2</td><td>3</td>'), 'S: 3 human, 2 won, 3 seats now');
   assert.ok(out.includes('No ballots were cast here'), 'uncontested districts say so'); assert.equal(out.includes('Cast ballot'), false);
 });

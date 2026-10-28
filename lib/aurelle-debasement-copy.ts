@@ -4,7 +4,7 @@
  * then hoarded and trade at a premium), §12.4 (the Monarch may re-coin within a small band or debase by decree; those limits live in
  * #362, not here), §12.9 (debasement is a source of black-market premium for full-weight coins), ui-ux (Aurelle's coins show the
  * current mint parity), culture-bible Aurelle (full-weight old Crowns are kept as heirlooms) and ai-leadership (the AI Monarch's
- * decrees). Bylines come from lib/press-templates.ts (Court Gazette, Republic Wire Service, Korund State Media).
+ * decrees). Bylines come from lib/press-templates.ts (Court Gazette, Kindle Press, Korund State Media).
  *
  * Voice: the Court Gazette is ornate and deferential. Decrees ("Be it known") speak for the AI Monarch, so they are AI-badged (#381,
  * ui-ux §23.2); a Gazette report, the commoner rumors and the Kindle and Korund reports about the Monarch's act are not. The Clearing
@@ -34,10 +34,10 @@ const L=(text:string):Line=>({text,proposal:true});
 export const DECREE_KEYS:readonly DecreeKey[]=['debasement','recoinage'];
 export const CONFIDENCE_BANDS:readonly ConfidenceBand[]=['high','middle','low'];
 
-/** Bylines (lib/press-templates.ts): Court Gazette is canon; Republic Wire Service is a proposal; Korund State Media is canon. */
+/** Bylines (lib/press-templates.ts): Court Gazette is canon; Kindle Press is canon (culture-bible edition name); Korund State Media is canon. */
 export const DEBASEMENT_BYLINES={
  gazette:{name:'Court Gazette',proposal:false},
- kindle:{name:'Republic Wire Service',proposal:true},
+ kindle:{name:'Kindle Press',proposal:false},
  korund:{name:'Korund State Media',proposal:false},
 } as const;
 
@@ -75,7 +75,7 @@ export const fullWeightRumors:readonly Rumor[]=[
 /** One Kindle and one Korund report on an Aurelle debasement. Reports about the Monarch's act, not the Monarch speaking: no badge. */
 const p=(outlet:'kindle'|'korund',text:string):PressReport=>({outlet,text,aiBadge:false,proposal:true});
 export const pressReports:readonly PressReport[]=[
- p('kindle','Republic Wire Service: Aurelle reissues the Crown. Traders ask what it is worth.'),
+ p('kindle','Kindle Press: Aurelle reissues the Crown. Traders ask what it is worth.'),
  p('korund','Korund State Media: The Aurelle Crown is debased. The Monarch spends trust.'),
 ];
 export const pressReportFor=(outlet:'kindle'|'korund')=>pressReports.find(x=>x.outlet===outlet);

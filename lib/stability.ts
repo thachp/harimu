@@ -24,10 +24,14 @@ export type StabilityInputs = {
  promisesKept: number; promisesBroken: number; petitionBacklog: number;
  /** #291: 1 on a game day that is an endorsed festival public holiday in this nation (docs 14.4). Absent otherwise. */
  festivalHoliday?: 1;
+ /** #842: the nation's Religious Harmony score (0–100), only while HARIMU_RELIGIOUS_HARMONY_ENABLED is on. Absent otherwise, so flag-off inputs_json is unchanged. */
+ harmony?: number;
  /** #423: Unrest points the nation's active wars have added (war weariness, lib/war-rules.ts), only while HARIMU_WAR_WEARINESS_ENABLED is on. Absent when zero. */
  warWeariness?: number;
+ /** #739/#822: 1 when Dormant citizens were excluded (dormancy flag on, live tick). Absent otherwise, so flag-off inputs_json is unchanged. */
+ activeOnly?: 1;
 };
-export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war';
+export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war'|'harmony';
 export type ScoreTerm = {input: StabilityInputId; points: number; detail: string};
 export type StabilityScore = {stability: number; unrest: number; breakdown: {stability: ScoreTerm[]; unrest: ScoreTerm[]}};
 export type StabilityRecord = StabilityScore & {nationId: StabilityNation; tick: number; scheduledAt: number; inputs: StabilityInputs};
@@ -52,6 +56,15 @@ export const stabilityBaseline = 50, unrestBaseline = 10;
 /** #291 [ASSUMPTION]: docs 14.4 says an endorsed festival gives "Stability +" but no size. Tuning value: +3 Stability on that game day only. */
 export const festivalHolidayStabilityPoints = 3;
 
+/** #842 (ARC rulings Oct 23): Religious Harmony → Stability mapping, as named config constants (no runtime import: this file loads directly in tests). */
+export const HARMONY_STABILITY_NEUTRAL = 50;          // the Harmony score that adds nothing
+export const HARMONY_STABILITY_POINTS_PER_STEP = 1;
+export const HARMONY_STABILITY_STEP = 10;             // Harmony points per Stability step
+export const HARMONY_STABILITY_CAP = 5;               // at most ± this many Stability points
+export function harmonyStabilityPoints(score: number) {
+ const p = Math.trunc((score-HARMONY_STABILITY_NEUTRAL)/HARMONY_STABILITY_STEP)*HARMONY_STABILITY_POINTS_PER_STEP;
+ return Math.max(-HARMONY_STABILITY_CAP, Math.min(HARMONY_STABILITY_CAP, p)) || 0; // no -0
+}
 /** Pure scoring. Same inputs always give the same score. */
 export function computeStability(raw: Partial<StabilityInputs>): StabilityScore {
  const i = {citizens: count(raw.citizens), fed: count(raw.fed), worked: count(raw.worked), promisesKept: count(raw.promisesKept), promisesBroken: count(raw.promisesBroken), petitionBacklog: count(raw.petitionBacklog)};
@@ -60,7 +73,10 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
  // term, so on a holiday it cannot count against the nation: a turnout shortfall adds no Unrest and no negative Stability.
  const rawWork = workTerms(i.worked, i.citizens);
  const food = foodTerms(i.fed, i.citizens), work = holiday ? {...rawWork, stability: Math.max(0, rawWork.stability), unrest: 0} : rawWork, promise = promiseTerms(i.promisesKept, i.promisesBroken), petitions = petitionTerms(i.petitionBacklog, i.citizens);
- const foodDetail = `${food.coverage}% of citizens ate in the last 24 real hours`, workDetail = `${work.share}% worked a shift in the last 24 real hours`+(holiday?' (public holiday: one fewer shift expected, a shortfall is not counted)':'');
+ // #815 (QA1 nit): with no counted citizens (none at all, or every one Dormant, #739) the shares are the neutral 50, so the copy says so instead of a made-up 50%.
+ // #822 (QA1): only on the live dormancy path; flag off keeps the exact previous copy (and breakdown_json) even for a nation with zero citizens.
+ const none = raw.activeOnly === 1 && i.citizens === 0, noneDetail = 'No active citizens: neutral score';
+ const foodDetail = none ? noneDetail : `${food.coverage}% of citizens ate in the last 24 real hours`, workDetail = (none ? noneDetail : `${work.share}% worked a shift in the last 24 real hours`)+(holiday?' (public holiday: one fewer shift expected, a shortfall is not counted)':'');
  const promiseDetail = promise.rate === null ? 'No petition reviews in the last 7 real days' : `${promise.rate}% of reviewed petitions were accepted in the last 7 real days`;
  const petitionDetail = `${i.petitionBacklog} petitions awaiting review (${petitions.share} per 100 citizens)`;
  const stability: ScoreTerm[] = [
@@ -68,6 +84,10 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
   {input:'food',points:food.stability,detail:foodDetail},{input:'work',points:work.stability,detail:workDetail},
   {input:'promises',points:promise.stability,detail:promiseDetail},{input:'petitions',points:petitions.stability,detail:petitionDetail},
   ...(holiday?[{input:'festival' as const,points:festivalHolidayStabilityPoints,detail:'Endorsed festival: public holiday'}]:[])];
+ // #842 (ARC rulings Oct 23): Harmony adds harmonyStabilityPoints, fitted so the score stays 0–100 and the breakdown still sums exactly.
+ if (raw.harmony !== undefined) { const h = Math.max(0, Math.min(100, Math.round(Number(raw.harmony) || 0))), base = stability.reduce((t, x) => t+x.points, 0);
+  const pts = Math.max(-base, Math.min(100-base, harmonyStabilityPoints(h)));
+  stability.push({input:'harmony',points:pts,detail:`Religious Harmony ${h}/100`}); }
  const unrest: ScoreTerm[] = [
   {input:'baseline',points:unrestBaseline,detail:'Baseline'},
   {input:'food',points:food.unrest,detail:foodDetail},{input:'work',points:work.unrest,detail:workDetail},
@@ -82,14 +102,13 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
 const iso = (seconds: number) => new Date(seconds*1000).toISOString();
 /** Reads the inputs for one nation as of `at` (unix seconds). Every input is windowed on `at`, so a catch-up tick
  * reads that game day's records: a petition resolved after `at` still counts as backlog for that tick (#142). */
-/** #739 slice 2 (ARC): Dormant = no activity for DORMANCY_DAYS.dormant (30) real days. Only a well-formed ISO last_active_at (24 chars, as written by the heartbeat and 0069)
- *  can make a citizen Dormant; NULL or malformed counts as active (never excluded on bad data). */
-export const dormantAt = (at: number) => new Date((at - 30*86400)*1000).toISOString();
+/** #739 slice 2 (ARC): `dormantBefore` is the ISO cutoff from lib/dormancy-rules.ts dormantAt (DORMANCY_DAYS.dormant). Only a well-formed ISO last_active_at (24 chars, as written
+ *  by the heartbeat and 0069) at or before it makes a citizen Dormant; NULL or malformed counts as active. This file keeps no runtime imports (tests load it directly). */
 const notDormant = " AND NOT (c.last_active_at IS NOT NULL AND length(c.last_active_at)=24 AND c.last_active_at<=?)";
-export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; excludeDormant?: boolean} = {}): Promise<StabilityInputs> {
+export async function readStabilityInputs(db: GameDatabase, nationId: StabilityNation, at: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string; harmony?: Readonly<Record<string, number>>} = {}): Promise<StabilityInputs> {
  const since = at-signalWindowSeconds;
- // #739 slice 2 (ARC): with excludeDormant (flag on, live tick only), the citizens/fed/worked counts leave out citizens Dormant at `at`, so food and work shares exclude them. Flag off: the SQL text is unchanged (tests/world-repair-cap-679 matches it).
- const nd = options.excludeDormant ? notDormant : '', cut = options.excludeDormant ? [dormantAt(at)] : [];
+ // #739 slice 2 (ARC): with dormantBefore (flag on, live tick only), the citizens/fed/worked counts leave out citizens Dormant at `at`, so food and work shares exclude them. Flag off: the SQL text is unchanged (tests/world-repair-cap-679 matches it).
+ const nd = options.dormantBefore ? notDormant : '', cut = options.dormantBefore ? [options.dormantBefore] : [];
  const meals = nationId === 'kindle' ? "SELECT clerk_user_id FROM citizen_economy_events WHERE kind='meal' AND occurred_at>? AND occurred_at<=?"
   : nationId === 'korund' ? 'SELECT clerk_user_id FROM korund_meals WHERE occurred_at>? AND occurred_at<=?'
   : 'SELECT clerk_user_id FROM aurelle_meals WHERE occurred_at>? AND occurred_at<=?';
@@ -105,11 +124,11 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
  // #291: the caller (world tick, only while HARIMU_FAITH_ENABLED is on) names the nations whose game day is an endorsed festival holiday (lib/festivals.ts).
  const holiday = options.holidayNations?.has(nationId) ?? false;
  const war = Math.floor(Number(options.warWeariness?.[nationId] ?? 0)); // #423: precomputed by the world tick from the wars table (lib/war-weariness.ts)
- return {citizens: Number(row?.citizens ?? 0), fed: Number(row?.fed ?? 0), worked: Number(row?.worked ?? 0), promisesKept: Number(row?.kept ?? 0), promisesBroken: Number(row?.broken ?? 0), petitionBacklog: Number(row?.backlog ?? 0), ...(holiday ? {festivalHoliday: 1 as const} : {}), ...(war > 0 ? {warWeariness: war} : {})};
+ return {citizens: Number(row?.citizens ?? 0), fed: Number(row?.fed ?? 0), worked: Number(row?.worked ?? 0), promisesKept: Number(row?.kept ?? 0), promisesBroken: Number(row?.broken ?? 0), petitionBacklog: Number(row?.backlog ?? 0), ...(holiday ? {festivalHoliday: 1 as const} : {}), ...(war > 0 ? {warWeariness: war} : {}), ...(options.dormantBefore ? {activeOnly: 1 as const} : {}), ...(options.harmony && options.harmony[nationId] !== undefined ? {harmony: options.harmony[nationId]} : {})};
 }
 
 /** Statements that record one game day's scores. INSERT OR IGNORE makes retries no-ops. */
-export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; excludeDormant?: boolean} = {}) {
+export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string; harmony?: Readonly<Record<string, number>>} = {}) {
  return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); const score = computeStability(inputs);
   return db.prepare('INSERT OR IGNORE INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)')
    .bind(nationId, tick, scheduledAt, now, score.stability, score.unrest, JSON.stringify(inputs), JSON.stringify(score.breakdown)); }));

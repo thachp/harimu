@@ -105,9 +105,9 @@ export async function runAurelleCoup(db: GameDatabase, now: number, favorDecay =
     ]);
     return;
   }
-  const last = await db.prepare('SELECT MAX(resolved_at) AS t FROM aurelle_coups').first<{ t: number | null }>();
+  // #679 slice 3: the cooldown and the Aurelle scores are independent reads (no plot is active either way), so they share one round trip; in cooldown the scores go unused.
+  const [last, scores] = await Promise.all([db.prepare('SELECT MAX(resolved_at) AS t FROM aurelle_coups').first<{ t: number | null }>(), aurelleScores(db)]);
   if (last?.t != null && now < Number(last.t) + coupConfig.cooldownSeconds) return;
-  const scores = await aurelleScores(db);
   if (!scores.length) return;
   const favor = await readFavorAverage(db, favorDecay ? now : undefined); // #585: decayed only while HARIMU_FAVOR_DECAY_ENABLED is on
   const odds = formationOdds({ unrest: scores[0].unrest, stability: scores[0].stability, favor, sustainedSeconds: pressureSeconds(scores, now) });

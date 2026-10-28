@@ -11,6 +11,8 @@
  *  (#79) The color-blind-safe nation symbol chips, flag on and off (scripts/nation-symbols-check.mjs).
  *  (#392 S4) The zoom rail (scripts/ui-v2-rail-check.mjs).
  *  (#392 S7) City hotspot pills and no bottom strip (scripts/ui-v2-city-check.mjs).
+ *  (#243) Filler wire stories under their byline in the National news dialog (scripts/wire-bylines-check.mjs).
+ *  (#85) Nation skin on the top bar: same layout and text, AA text, visible focus (scripts/nation-skin-check.mjs).
  *  (#392 S6) The Nation panel (scripts/ui-v2-nation-check.mjs).
  *  (#800) Rare resource node marker on the Resources overlay, flag off and on (scripts/rare-marker-check.mjs).
  *  (#779) Nation fact-list labels never split mid-word (scripts/nation-fact-label-check.mjs).
@@ -38,6 +40,14 @@ import { checkRareMarker } from './rare-marker-check.mjs';
 import { checkNationFactLabels } from './nation-fact-label-check.mjs';
 import { checkUiV2World } from './ui-v2-world-check.mjs';
 import { checkUiV2City } from './ui-v2-city-check.mjs';
+import { checkUiV2Mobile } from './ui-v2-mobile-check.mjs';
+import { checkUiV2Household } from './ui-v2-household-check.mjs';
+import { checkModConsole } from './mod-console-check.mjs';
+import { checkUiV2WorkMarket } from './ui-v2-work-market-check.mjs';
+import { checkSessionRetry } from './session-retry-check.mjs';
+import { checkUiV2Government } from './ui-v2-government-check.mjs';
+import { checkWireBylines } from './wire-bylines-check.mjs';
+import { checkNationSkin } from './nation-skin-check.mjs';
 import { checkUiV2Nation } from './ui-v2-nation-check.mjs';
 import { checkUiV2Rail } from './ui-v2-rail-check.mjs';
 import { checkUiV2Topbar } from './ui-v2-topbar-check.mjs';
@@ -52,6 +62,7 @@ import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { checkGlobeLabelPressed } from './globe-label-pressed-check.mjs';
 import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
+import { fontsBeforeShots } from './layout-standalone.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
 const root = new URL('../', import.meta.url);
@@ -102,7 +113,7 @@ const preflight = '*,::before,::after{box-sizing:border-box;margin:0;padding:0;b
 const { GameShell } = await load('game-shell');
 const { FaithPanel, HolidayBanner } = await load('faith-panel');
 
-const browser = await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] });
+const browser = fontsBeforeShots(await chromium.launch({ args: ['--disable-gpu', '--disable-dev-shm-usage'] })); // #905
 const failures = []; const rows = [];
 try {
   for (const v of variants) {
@@ -206,6 +217,14 @@ try {
   await checkUiV2World({ browser, css, preflight, failures, rows }); // #392 S5: crest chips in the World nation strip
   await checkUiV2Nation({ browser, css, preflight, failures, rows }); // #392 S6: Nation panel shape, institution rows, Explore {nation}
   await checkUiV2City({ browser, css, preflight, failures, rows }); // #392 S7: City hotspot pills, strip removed
+  await checkUiV2Mobile({ browser, css, preflight, failures, rows });
+  await checkModConsole({ browser, css, preflight, failures, rows }); // #880: read-only mod console
+  await checkUiV2WorkMarket({ browser, css, preflight, failures, rows }); // #392 S10 (#870): Work and Market panel heads
+  await checkSessionRetry({ browser, css, preflight, failures, rows }); // #928: session-card Retry state
+  await checkUiV2Government({ browser, css, preflight, failures, rows }); // #392 S11 (#871): Government panel head
+  await checkUiV2Household({ browser, css, preflight, failures, rows }); // #392 S9: Household panel // #392 S8: phone bottom tab bar and bottom-sheet panel
+  await checkWireBylines({ browser, css, preflight, failures, rows }); // #243: wire story bylines
+  await checkNationSkin({ browser, css, preflight, failures, rows }); // #85: nation skin on the top bar
   await checkUiV2Rail({ browser, css, preflight, failures, rows }); // #392 S4: zoom rail beside the stage, places-only top tabs
   await checkUiV2Topbar({ browser, css, preflight, failures, rows }); // #392 S2: UI v2 top bar restyle (flag off, emblem-only, v2 on)
   await checkBellBadge({ browser, css, preflight, failures, rows }); // #682: the bell's unread badge (99, 99+) stays inside the 44px phone bell

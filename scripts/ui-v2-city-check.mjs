@@ -42,7 +42,9 @@ const probe = ({ on, phone }) => {
   for (const b of pills) {
     const cs = getComputedStyle(b), name = b.textContent.trim(), icon = b.querySelector('.viewport-city-pill-icon');
     if (!icon || icon.getAttribute('aria-hidden') !== 'true' || !icon.querySelector('svg')) issues.push(`${name}: no decorative icon`);
-    if (icon && (getComputedStyle(icon).display === 'none') !== (vw <= 360)) issues.push(`${name}: icon ${vw <= 360 ? 'shown at 320' : 'hidden'}`);
+    const compact = !!b.closest('[data-compact-pills]'); // #874: on a map too short for full pills each is its 44px icon only (then the icon shows at 320 too)
+    if (icon && (getComputedStyle(icon).display === 'none') !== (vw <= 360 && !compact)) issues.push(`${name}: icon ${vw <= 360 && !compact ? 'shown at 320' : 'hidden'}`);
+    if (compact && (Math.round(b.getBoundingClientRect().width) < 44 || Math.round(b.getBoundingClientRect().height) < 44)) issues.push(`${name}: compact pill under 44px`);
     if (b.getAttribute('aria-label') !== `Select ${name}`) issues.push(`${name}: named "${b.getAttribute('aria-label')}"`);
     const t = contrast(cs.color, cs.backgroundColor), rim = contrast(cs.borderTopColor, cs.backgroundColor); minText = Math.min(minText, t); minRim = Math.min(minRim, rim);
     if (t < 4.5) issues.push(`${name}: text contrast ${t.toFixed(2)}:1`); if (rim < 3) issues.push(`${name}: rim contrast ${rim.toFixed(2)}:1`);
@@ -68,6 +70,8 @@ const probe = ({ on, phone }) => {
   const primary = panel?.querySelector('.panel-v2-primary')?.textContent ?? '';
   for (const d of ['Workplace', 'Market', 'Government']) if (!rows.some(t => t.startsWith(d))) issues.push(`panel has no "${d}" row`);
   if (!primary.includes('Household')) issues.push('panel has no Household primary');
+  const iconless = [...(panel?.querySelectorAll('.panel-v2-rows button, .panel-v2-primary') ?? [])].filter(b => !b.querySelector('.panel-v2-icon[aria-hidden="true"] svg')).length; // rows match the pills' icons
+  if (on ? iconless : panel?.querySelector('.panel-v2-icon')) issues.push(on ? `${iconless} panel rows without the pill icon` : 'panel row icons with the flag off');
   const covered = labels.filter(b => !b.hidden).filter(b => { const r = b.getBoundingClientRect(), t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return t && !b.contains(t); }).map(b => b.textContent.trim());
   return { issues, names, minText, minRim, pills: pills.length, covered };
 };
