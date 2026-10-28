@@ -61,3 +61,12 @@ export function presidentialWindow(b: CalendarBindings, now: number): { cycle: n
   const cycle = Math.floor((now - first) / every), opensAt = first + cycle * every, closesAt = opensAt + KINDLE_CALENDAR.voteHours * 3600;
   return now < closesAt ? { cycle, opensAt, closesAt } : null;
 }
+
+/** #936: the latest presidential cycle whose window has opened (its vote may since have closed), or null when held or before day 30.
+ *  Each cycle has its own election row, so a closed result stays readable until the next window opens. */
+export function presidentialCycle(b: CalendarBindings, now: number): number | null {
+  const start = kindleCycleStartAt(b);
+  if (start === null || !Number.isSafeInteger(now)) return null;
+  const first = start + KINDLE_CALENDAR.foundingElectionDay * daySeconds;
+  return now < first ? null : Math.floor((now - first) / (KINDLE_CALENDAR.cycleDays * daySeconds));
+}

@@ -2,6 +2,8 @@ import type {GameDatabase} from './database-contract';
 import {instantRunoffCounts,type RunoffResult} from './instant-runoff';
 import {trustedBallotPrivacyReady,ballotPrivacyReason} from './ballot-privacy';
 export const electionId='kindle-presidential-poc-1';
+/** #936: one election row per voting window. Cycle 0 (and a held calendar) keeps the original id, so the first window and its existing rows are unchanged. */
+export const electionIdFor=(cycle:number|null)=>cycle?`${electionId}-cycle-${cycle}`:electionId;
 export const ballotWindowSeconds=72*3600;
 export const electionCandidates=[
  {id:'ines-varro',name:'Ines Varro',platform:'Full employment and cautious trade.'},
@@ -20,11 +22,11 @@ export type ElectionSnapshot={nationId:'kindle';id:string;candidates:readonly {i
 export type Slate=readonly {id:string;name:string;platform:string}[];
 /** #307: `slate` is today's three candidates unless a closed party primary supplies one nominee per party (same slot ids). */
 /** #918: `opensAt` is the calendar window's open (lib/election-calendars presidentialWindow); routes pass null while the calendar is held, and nothing opens. */
-export async function openPreviewElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),slate:Slate=electionCandidates,opensAt:number|null=now){
+export async function openPreviewElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),slate:Slate=electionCandidates,opensAt:number|null=now,id:string=electionId){
  if(!privacyReady||opensAt===null)return;
  // The caller must validate the applicable trusted policy: certified Tier1 or
  // the separately namespaced, approved account-level preview exception.
- await db.prepare(`INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) SELECT ?,'kindle',?,?,?+259200 FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(id) DO NOTHING`).bind(electionId,JSON.stringify(slate),opensAt,opensAt,userId).run();
+ await db.prepare(`INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) SELECT ?,'kindle',?,?,?+259200 FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(id) DO NOTHING`).bind(id,JSON.stringify(slate),opensAt,opensAt,userId).run();
 }
 export const voteReceiptSql=`INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,policy)
  SELECT e.id,c.clerk_user_id,?,?,'tier1-human-v1' FROM civic_elections e JOIN citizens c ON c.clerk_user_id=?
@@ -33,32 +35,33 @@ export const voteReceiptSql=`INSERT INTO civic_voter_receipts (election_id,clerk
 export const anonymousBallotSql=`INSERT INTO civic_anonymous_ballots (id,election_id,ranking_json,policy)
  SELECT ?,r.election_id,?,'tier1-human-v1' FROM civic_voter_receipts r WHERE r.request_id=? AND r.clerk_user_id=? AND r.election_id=? AND r.ballot_written=0`;
 export const markBallotWrittenSql=`UPDATE civic_voter_receipts SET ballot_written=1 WHERE request_id=? AND clerk_user_id=? AND election_id=? AND ballot_written=0`;
-async function countedResult(db:GameDatabase){
- const rows=await db.prepare("SELECT ranking_json,COUNT(*) AS count FROM civic_anonymous_ballots WHERE election_id=? AND policy='tier1-human-v1' GROUP BY ranking_json").bind(electionId).all<{ranking_json:string;count:number}>();
+async function countedResult(db:GameDatabase,id:string){
+ const rows=await db.prepare("SELECT ranking_json,COUNT(*) AS count FROM civic_anonymous_ballots WHERE election_id=? AND policy='tier1-human-v1' GROUP BY ranking_json").bind(id).all<{ranking_json:string;count:number}>();
   const groups=rows.results.map(row=>({ranking:JSON.parse(row.ranking_json) as string[],count:row.count}));const result=instantRunoffCounts(candidateIds,groups,candidateIds);
-  const receipts=await db.prepare("SELECT COUNT(*) AS count FROM civic_voter_receipts WHERE election_id=? AND ballot_written=1 AND policy='tier1-human-v1'").bind(electionId).first<{count:number}>();
+  const receipts=await db.prepare("SELECT COUNT(*) AS count FROM civic_voter_receipts WHERE election_id=? AND ballot_written=1 AND policy='tier1-human-v1'").bind(id).first<{count:number}>();
   if(receipts?.count!==result.humanBallots)throw Error('Election count could not be confirmed. No result published.');
  return result;
 }
 /** Closes a due election and records its count. Write paths only: POST /api/election and the world tick (#221). */
 export async function finalizeDueElection(db:GameDatabase,now:number){
- await db.prepare('UPDATE civic_elections SET closed_at=? WHERE id=? AND closed_at IS NULL AND closes_at<=?').bind(now,electionId,now).run();
- const election=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(electionId).first<{result_json:string|null}>();
- if(election&&!election.result_json){
-  const result=await countedResult(db);
-  await db.prepare('UPDATE civic_elections SET result_json=? WHERE id=? AND closed_at IS NOT NULL AND result_json IS NULL').bind(JSON.stringify(result),electionId).run();
+ // #936: every due window's election closes and records its own count.
+ const due=await db.prepare('SELECT id FROM civic_elections WHERE closes_at<=? AND (closed_at IS NULL OR result_json IS NULL) ORDER BY id').bind(now).all<{id:string}>();
+ for(const {id} of due.results){
+  await db.prepare('UPDATE civic_elections SET closed_at=? WHERE id=? AND closed_at IS NULL AND closes_at<=?').bind(now,id,now).run();
+  const election=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(id).first<{result_json:string|null}>();
+  if(election&&!election.result_json)await db.prepare('UPDATE civic_elections SET result_json=? WHERE id=? AND closed_at IS NOT NULL AND result_json IS NULL').bind(JSON.stringify(await countedResult(db,id)),id).run();
  }
 }
-async function finalizedResult(db:GameDatabase,now:number,readOnly=false){
+async function finalizedResult(db:GameDatabase,now:number,readOnly:boolean,id:string){
  let saved:{result_json:string}|null;
  if(readOnly){
   // #221: the same close + count the write path records, computed without writing. Ballots are frozen once closes_at passes.
-  const row=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND (closed_at IS NOT NULL OR closes_at<=?)').bind(electionId,now).first<{result_json:string|null}>();
+  const row=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND (closed_at IS NOT NULL OR closes_at<=?)').bind(id,now).first<{result_json:string|null}>();
   if(!row)return null;
-  saved={result_json:row.result_json??JSON.stringify(await countedResult(db))};
+  saved={result_json:row.result_json??JSON.stringify(await countedResult(db,id))};
  }else{
   await finalizeDueElection(db,now);
-  saved=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(electionId).first<{result_json:string}>();
+  saved=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(id).first<{result_json:string}>();
  }
  if(!saved?.result_json)return null;
  const result=JSON.parse(saved.result_json) as RunoffResult;
@@ -69,21 +72,21 @@ async function finalizedResult(db:GameDatabase,now:number,readOnly=false){
  const projected={winner:result.winner,humanBallots:result.humanBallots,simulatedPublicUnits:result.simulatedPublicUnits,weightScale:4 as const,rounds:result.rounds.map(round=>({human:counts(round.human),simulatedUnits:counts(round.simulatedUnits),weightedUnits:counts(round.weightedUnits),eliminated:round.eliminated}))};
  // Closing freezes writes; these grouped rankings are bounded to the six
  // permutations. Verify the stored aggregate against that authoritative count.
- const expected=await countedResult(db);
+ const expected=await countedResult(db,id);
  if(JSON.stringify(projected)!==JSON.stringify(expected))throw Error('Saved election aggregate does not match the confirmed count.');
  return projected;
 }
 
-export async function readElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),projectOpen=false,readOnly=false,ballotSlate:Slate=electionCandidates,primaryPending=false,window:{opensAt:number;closesAt:number}|null={opensAt:now,closesAt:now+259200}):Promise<ElectionSnapshot>{
- const election=await db.prepare('SELECT candidates_json,opens_at,closes_at,closed_at FROM civic_elections WHERE id=?').bind(electionId).first<{candidates_json:string;opens_at:number;closes_at:number;closed_at:number|null}>();
- const base={nationId:'kindle' as const,id:electionId,candidates:ballotSlate,voted:false,result:null,privacyReady,privacyReason:privacyReady?'Account-level preview privacy: operators may correlate submissions.':ballotPrivacyReason};
+export async function readElection(db:GameDatabase,userId:string,now:number,privacyReady=trustedBallotPrivacyReady(),projectOpen=false,readOnly=false,ballotSlate:Slate=electionCandidates,primaryPending=false,window:{opensAt:number;closesAt:number}|null={opensAt:now,closesAt:now+259200},id:string=electionId):Promise<ElectionSnapshot>{
+ const election=await db.prepare('SELECT candidates_json,opens_at,closes_at,closed_at FROM civic_elections WHERE id=?').bind(id).first<{candidates_json:string;opens_at:number;closes_at:number;closed_at:number|null}>();
+ const base={nationId:'kindle' as const,id,candidates:ballotSlate,voted:false,result:null,privacyReady,privacyReason:privacyReady?'Account-level preview privacy: operators may correlate submissions.':ballotPrivacyReason};
  // #205: a read-only caller that would have opened the election shows it as openPreviewElection would create it.
  // #918: `window` is the calendar window (null while held), so a held calendar never projects an open vote.
  if(!election)return projectOpen&&window&&privacyReady&&!primaryPending?{...base,status:'open',opensAt:window.opensAt,closesAt:window.closesAt}:{...base,status:'waiting',opensAt:null,closesAt:null};
  const slate=JSON.parse(election.candidates_json) as {id:string;name:string;platform:string}[];
  if(!Array.isArray(slate)||slate.length!==candidateIds.length||slate.some((candidate,index)=>candidate.id!==candidateIds[index]||typeof candidate.name!=='string'||typeof candidate.platform!=='string'))throw Error('Saved candidate slate could not be confirmed.');
  const candidates=slate.map(({id,name,platform})=>({id,name,platform}));
- const own=await db.prepare('SELECT ballot_written FROM civic_voter_receipts WHERE election_id=? AND clerk_user_id=?').bind(electionId,userId).first<{ballot_written:number}>();
+ const own=await db.prepare('SELECT ballot_written FROM civic_voter_receipts WHERE election_id=? AND clerk_user_id=?').bind(id,userId).first<{ballot_written:number}>();
  const closed=election.closed_at!==null||now>=election.closes_at;
- return {...base,candidates,status:closed?'closed':'open',opensAt:election.opens_at,closesAt:election.closes_at,voted:own?.ballot_written===1,result:closed?await finalizedResult(db,now,readOnly):null};
+ return {...base,candidates,status:closed?'closed':'open',opensAt:election.opens_at,closesAt:election.closes_at,voted:own?.ballot_written===1,result:closed?await finalizedResult(db,now,readOnly,id):null};
 }
