@@ -7,9 +7,9 @@ import { laborNoteSql, laborNoteBinds } from './korund-wallet';
 import { readGray, postOffer, acceptOffer, type GrayView } from './gray-market';
 import {readWalletStreetRate,type WalletStreetRate} from './wallet-street-rate'; // #758 (display only)
 import {planMedals,korundMedalOwnFood} from './korund-medals-rules'; // #737
-import {korundRationCut,applyRationCut,shortfallPercent,type KorundRationCut,korundShortfall,type KorundShortfall,korundWeeklyQuotaFood,readCouponsAndQuota,korundCouponGoods,korundCouponRedeemSql,type KorundCoupon,type KorundQuota} from './korund-coupons';
+import {korundRationCut,applyRationCut,shortfallPercent,type KorundRationCut,korundShortfall,type KorundShortfall,korundWeeklyQuotaFood,korundWeekSeconds,readCouponsAndQuota,korundCouponGoods,korundCouponRedeemSql,type KorundCoupon,type KorundQuota} from './korund-coupons';
 export const korundJob = {id:'korund-food-production',name:'State food-production brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4} as const;
-export const gameWeekSeconds = 50400;
+export const gameWeekSeconds = korundWeekSeconds;
 export const korundSchemas = [
  `CREATE TABLE korund_resources (id TEXT PRIMARY KEY, initial_food INTEGER NOT NULL CHECK(initial_food>=0), initial_minor INTEGER NOT NULL CHECK(initial_minor>=0))`,
  `CREATE TABLE korund_work_starts (id TEXT PRIMARY KEY REFERENCES work_shifts(id), capacity_applied INTEGER NOT NULL DEFAULT 0 CHECK(capacity_applied IN (0,1)))`,
@@ -84,7 +84,7 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;rationStability?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -111,7 +111,8 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  // #776: a closed-week shortfall withdraws coupons from this week's book (read-only; redeem refuses them in executeKorund).
  const cut=options.rationCut&&korund?korundRationCut(w.number,prevFood===null?0:shortfallPercent(prevFood)):null;
  if(cut&&extra.coupons)extra.coupons=applyRationCut(extra.coupons,cut);
- const rationCut=options.rationCut&&korund?{rationCut:cut}:{};
+ // #967: the same cut names the Stability step on the notice. The score itself is written on the world tick, not here.
+ const rationCut=options.rationCut&&korund?{rationCut:cut&&options.rationStability?{...cut,stability:true as const}:cut}:{};
  // #758: rumored street rate under the wallet, Korund only, flag on only; null = not heard of the gray market (hidden).
  // QA1 on #775: the rumor needs the gray market itself on (HARIMU_GRAY_MARKET_ENABLED) as well as the street-rate flag.
  const streetRate=options.streetRate&&options.grayMarket&&citizen?.nation_id==='korund'?{streetRate:await readWalletStreetRate(db,userId,now)}:{};

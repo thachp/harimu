@@ -86,6 +86,8 @@
     "HARIMU_WALLET_STREET_RATE_ENABLED": "false",
     // #776: a closed-week plan shortfall withdraws goods (then clothing) coupons from the next week's book; the food ration is never cut (derived on read). Off: coupons unchanged.
     "HARIMU_KORUND_RATION_CUT_ENABLED": "false",
+    // #967: when a #776 ration cut applies, Korund national Stability falls one step for that city-week (existing Stability score, never below 0). Off: score and notice unchanged.
+    "HARIMU_KORUND_RATION_STABILITY_ENABLED": "false",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).
     // #487: "true" in preview only so the Confluence cooperative job runs for QA-allowlisted accounts; production "false".
     "HARIMU_NATION_WORK_ENABLED": "false",

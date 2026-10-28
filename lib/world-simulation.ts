@@ -7,6 +7,7 @@ import { finalizeDueElection } from './elections';
 import { runKindleAssembly, type AssemblyTickConfig } from './assembly';
 import { runPrimaries, type PrimaryScope } from './primaries';
 import { accountElectionDatabase } from './preview-election';
+import { env } from 'cloudflare:workers';
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
 import { runSpoilage } from './spoilage';
@@ -28,6 +29,7 @@ import { decideWarEndings, readWarEndings } from './war-endings'; // #427 slice 
 import { readReserveBoard, type ReserveBoard } from './spark-supply'; // #431
 import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
+import { korundRationCutCities, korundRationStabilityEnabled } from './korund-coupons'; // #967
 
 export const tickSeconds = 7200;
 export const maximumCatchupTicks = 3;
@@ -148,6 +150,8 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   // can't abort a tick. Each pass (re)writes scores for every recent tick that lacks them, so a transient
   // failure is repaired on the next request instead of leaving a permanent gap. INSERT OR IGNORE keeps it idempotent.
   try {
+    // #967: both flags. Off: no ration-cut read below, and Korund's score inputs stay unchanged.
+    const rationStability = korundRationStabilityEnabled(env as { HARIMU_KORUND_RATION_CUT_ENABLED?: string; HARIMU_KORUND_RATION_STABILITY_ENABLED?: string });
     const missing = await db.prepare(`SELECT t.tick,t.scheduled_at FROM world_ticks t WHERE t.tick>(SELECT COALESCE(MAX(tick),0) FROM world_ticks)-?
       AND (SELECT COUNT(*) FROM nation_stability_scores s WHERE s.tick=t.tick)<${stabilityNations.length} ORDER BY t.tick`)
       .bind(maximumCatchupTicks+scoreRepairTicks).all<{tick:number;scheduled_at:number}>();
@@ -162,9 +166,10 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
       // #842: Religious Harmony as of the tick's own time, only while HARIMU_RELIGIOUS_HARMONY_ENABLED is on (flag off: no reads, inputs unchanged).
       const holidays = options.faithFestivals ? holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds) : undefined;
       // QA3 on #854: Harmony (one query for all nations) is read alongside war weariness, so it adds no sequential round trip when both are on.
-      const [weariness, harmony] = await Promise.all([options.warWeariness ? readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined,
-        options.religiousHarmony ? readHarmonyScores(db,Number(row.scheduled_at),holidays,festivalStance) : undefined]);
-      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(harmony?{harmony}:{}),...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
+      const [weariness, harmony, rationCuts] = await Promise.all([options.warWeariness ? readWarWeariness(db,Number(row.scheduled_at),{ losses: options.warWearinessLosses }) : undefined,
+        options.religiousHarmony ? readHarmonyScores(db,Number(row.scheduled_at),holidays,festivalStance) : undefined,
+        rationStability ? korundRationCutCities(db, epoch, Number(row.scheduled_at)) : undefined]);
+      return stabilityStatements(db,Number(row.tick),Number(row.scheduled_at),now,{...(harmony?{harmony}:{}),...(rationCuts?{rationCuts}:{}),...(live?{dormantBefore:dormantAt(Number(row.scheduled_at))}:{}),...(options.faithFestivals?{holidayNations:holidayNationsOn(Math.floor(Number(row.scheduled_at)/tickSeconds),tickSeconds)}:{}),...(weariness?{warWeariness:weariness}:{})});
     });
     if (statements.length) await db.batch(statements.flat());
   } catch (error) { if (!isMissingStabilityTable(error)) throw error; console.warn('[stability] nation_stability_scores missing; apply migration 0012. Ticks recorded without scores.'); }
