@@ -11,6 +11,7 @@ export const cronJobFlags = {
   ledger: ['HARIMU_LEDGER_RECONCILIATION_ENABLED'],
   tesseraRewards: ['HARIMU_TESSERA_REWARDS_ENABLED'],
   rallies: ['HARIMU_KINDLE_RALLIES_ENABLED'],
+  cityTier: ['HARIMU_CITY_TIER_GROWTH_ENABLED'], // #952
 } as const;
 export type CronJob = keyof typeof cronJobFlags;
 
