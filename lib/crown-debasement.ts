@@ -3,6 +3,7 @@ import { isMissingRelation, tolerate } from './db-errors';
 import { leaderPersonas } from './leader-personas';
 import { pressPack } from './press-templates';
 import { confidenceAfter, crownConfig, crownDecreeIdOk, debasedParity, debasementBpOk, gameYear, monarchPlan, officialTesseraMilli, rumoredPremiumBp } from './crown-debasement-rules';
+import { crownYearWindow, emissionCapsConfig } from './emission-caps-rules'; // #885
 export * from './crown-debasement-rules';
 
 /** #362: Aurelle Crown debasement PoC behind HARIMU_CROWN_DEBASEMENT_ENABLED (default "false"). Canon and numbers: lib/crown-debasement-rules.ts.
@@ -59,7 +60,7 @@ export type DecreeCommand = { requestId: string; percentBp: number; decreedBy?: 
 const sqlText = (value: string) => `'${value.replace(/'/g, "''")}'`;
 /** Server-side only. The Monarch's debasement decree: parity rises by `percentBp` (1-1500, the docs' 15% cap), Currency Confidence falls by a fixed amount and one
  *  Court Gazette line is posted, in one batch. A second decree inside the same game year is refused (409); a repeated request id replays the first receipt. */
-export async function decreeDebasement(db: GameDatabase, command: DecreeCommand, now: number, options: { enabled: boolean }) {
+export async function decreeDebasement(db: GameDatabase, command: DecreeCommand, now: number, options: { enabled: boolean; emissionCaps?: boolean }) {
   if (!options.enabled) return fail(403, 'disabled', 'Crown debasement is not open yet.');
   if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid authoritative world time.');
   if (!crownDecreeIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
@@ -81,9 +82,23 @@ export async function decreeDebasement(db: GameDatabase, command: DecreeCommand,
   const iso = new Date(now * 1000).toISOString();
   // The unique game-year index and request id make concurrent decrees safe: only one insert lands. The gazette line is guarded by `decreed_at = now`, so a run whose insert
   // did nothing (a concurrent run of the same request wrote the row at its own `now`) adds no second line.
+  // #885: with emission caps on, the insert also refuses when this decree's contribution plus Crown issuances and prior decrees would pass the yearly Charter Limit.
+  let insert = db.prepare(`INSERT INTO crown_decrees (${columns}) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`)
+    .bind(id, command.requestId, year, command.percentBp, parityBefore, parityAfter, confBefore, confidenceAfter(confBefore), decreedBy, now);
+  if (options.emissionCaps) {
+    const win = crownYearWindow(now, await worldEpoch(db));
+    insert = db.prepare(`INSERT INTO crown_decrees (${columns})
+      SELECT ?,?,?,?,?,?,?,?,?,?
+      WHERE COALESCE((SELECT SUM(amount_minor) FROM crown_issuances WHERE issued_at>=? AND issued_at<?),0)
+        +COALESCE((SELECT SUM((percent_bp*(SELECT initial_minor FROM aurelle_resources WHERE id='estate'))/10000) FROM crown_decrees WHERE game_year=?),0)
+        +(SELECT (initial_minor*?)/10000 FROM aurelle_resources WHERE id='estate')
+        <=(SELECT (initial_minor*${emissionCapsConfig.crownYearBp})/10000 FROM aurelle_resources WHERE id='estate')
+      ON CONFLICT DO NOTHING`).bind(
+      id, command.requestId, year, command.percentBp, parityBefore, parityAfter, confBefore, confidenceAfter(confBefore), decreedBy, now,
+      win.start, win.end, win.year, command.percentBp);
+  }
   await db.batch([
-    db.prepare(`INSERT INTO crown_decrees (${columns}) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`)
-      .bind(id, command.requestId, year, command.percentBp, parityBefore, parityAfter, confBefore, confidenceAfter(confBefore), decreedBy, now),
+    insert,
     db.prepare(`INSERT INTO world_events (kind, headline, detail, location, occurred_at, sort_order)
       SELECT 'court-gazette', ${sqlText(headline)}, ${sqlText(detail)}, 'Aurelle', ?, ?
       WHERE EXISTS (SELECT 1 FROM crown_decrees WHERE id = ? AND decreed_at = ?) AND NOT EXISTS (SELECT 1 FROM world_events WHERE kind = 'court-gazette' AND headline = ${sqlText(headline)} AND occurred_at = ?)`)
@@ -92,16 +107,18 @@ export async function decreeDebasement(db: GameDatabase, command: DecreeCommand,
   const saved = await db.prepare(`SELECT ${columns} FROM crown_decrees WHERE request_id=?`).bind(command.requestId).first<Row>();
   if (saved && Number(saved.percent_bp) !== command.percentBp) return fail(409, 'request_reused', 'That request id was already used for a different decree.'); // a concurrent run with another amount won the insert
   if (saved) return { ok: true as const, decree: publicDecree(saved) };
+  if (options.emissionCaps && !(await db.prepare('SELECT 1 AS found FROM crown_decrees WHERE game_year=?').bind(year).first()))
+    return fail(409, 'charter_limit', 'That debasement would pass the Crown yearly Charter Limit. No decree was written.');
   return fail(409, 'already_debased_this_year', 'The Crown has already been debased this game year.');
 }
 
 /** The scheduled Worker's AI Monarch (never a read): once a game year the fixed rule in `monarchPlan` may decree a debasement on its seeded day. Idempotent: the request
  *  id is derived from the game year, so repeated or overlapping cron runs decree at most once. Flag off: nothing happens. */
-export async function runCrownCron(db: GameDatabase, now: number, options: { enabled: boolean }) {
+export async function runCrownCron(db: GameDatabase, now: number, options: { enabled: boolean; emissionCaps?: boolean }) {
   if (!options.enabled) return { status: 'disabled' as const };
   const epoch = await worldEpoch(db), year = gameYear(now, epoch), plan = monarchPlan(year);
   if (!plan.debases) return { status: 'idle' as const };
   if (now < epoch + (year - 1) * crownConfig.gameYearSeconds + plan.offsetSeconds) return { status: 'idle' as const };
-  const result = await decreeDebasement(db, { requestId: `monarch-year-${year}`, percentBp: plan.percentBp }, now, { enabled: true });
+  const result = await decreeDebasement(db, { requestId: `monarch-year-${year}`, percentBp: plan.percentBp }, now, { enabled: true, emissionCaps: options.emissionCaps });
   return result.ok && !('replay' in result) ? { status: 'decreed' as const, decree: result.decree } : { status: 'idle' as const };
 }

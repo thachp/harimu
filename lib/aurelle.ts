@@ -127,6 +127,8 @@ export const aurelleCharterSettleSql=`INSERT OR IGNORE INTO aurelle_charter_sett
 /** Bind (shiftId): one Crown issuance record per payment, same batch as the settlement; nothing when it did not land. */
 export const crownIssuanceSql=`INSERT OR IGNORE INTO crown_issuances(id,shift_id,clerk_user_id,amount_minor,source,issued_at)
  SELECT 'crn-wage:'||shift_id,shift_id,clerk_user_id,wage_minor,'aurelle-charter-wage',settled_at FROM aurelle_charter_settlements WHERE shift_id=?`;
+/** Bind (yearStart, yearEnd, gameYear) after aurelleCharterSettleSql's three binds. #885: refuse when this wage plus Crown issuances and debasement contributions in the game year would pass the yearly Charter Limit. */
+export const crownYearCapSql=` AND ${aurelleCharterTerms.wageMinor}+COALESCE((SELECT SUM(amount_minor) FROM crown_issuances WHERE issued_at>=? AND issued_at<?),0)+COALESCE((SELECT SUM((percent_bp*(SELECT initial_minor FROM aurelle_resources WHERE id='estate'))/10000) FROM crown_decrees WHERE game_year=?),0)<=(SELECT (initial_minor*3000)/10000 FROM aurelle_resources WHERE id='estate')`;
 export type AurellePlan={available:boolean;mode:'bounded charter economy';charter:{id:string;name:string;active:boolean};job:typeof aurelleJob;
  walletMinor:number;foodQuantity:number;favor:number;publicFoodRemaining:number;publicFundMinor:number;mealReadyAt:string|null;shifts:WorkShift[];
  /** #362: read-only mint parity, Currency Confidence and official rate strip; present only while HARIMU_CROWN_DEBASEMENT_ENABLED is on. */
@@ -158,7 +160,7 @@ export async function readAurelle(db:GameDatabase,userId:string,options:{favorDe
  shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,...(isAurelleCharter(s.work_order_id)?{}:{rewardItem:'estate food',rewardQuantity:4}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
 /** #531: mealSeconds is the household-meal cooldown; only a chartered citizen (flag on) passes a shorter one. The SQL keeps its literal 7200, so the shorter window is a shifted reference time. */
-export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds,options:{mvpJobTypes?:boolean}={}){
+export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds,options:{mvpJobTypes?:boolean;emissionCaps?:boolean}={}){
  const id=command.requestId.toLowerCase(),shiftId=command.shiftId?.toLowerCase()??null;
  const quantity=command.action==='aurelle-buy-food'?command.quantity!:command.action==='aurelle-household-meal'?2:0;
  const receipt=()=>db.prepare('SELECT clerk_user_id,action,quantity,shift_id FROM aurelle_receipts WHERE id=?').bind(id).first<{clerk_user_id:string;action:string;quantity:number;shift_id:string|null}>();
@@ -177,10 +179,23 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  db.prepare(aurelleCharterDebitSql).bind(iso,userId,id),
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)").bind(id,userId,id,userId),
  ]);}
- else if(claimsCharter) await db.batch([
- db.prepare(aurellePoolLockSql),db.prepare(aurelleCharterClaimReceiptSql).bind(id,now,shiftId,userId,iso,id),db.prepare(aurelleCharterSettleSql).bind(now,id,userId),db.prepare(crownIssuanceSql).bind(shiftId),
- db.prepare("UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM aurelle_charter_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)").bind(iso,shiftId,userId,userId),
- ]);
+ else if(claimsCharter){
+  // #885: when emission caps are on, append the yearly Charter Limit guard to both the claim receipt and the settle (so a refused claim stays 409); flag off keeps the original binds byte-identical.
+  let claimReceipt=db.prepare(aurelleCharterClaimReceiptSql).bind(id,now,shiftId,userId,iso,id);
+  let charterSettle=db.prepare(aurelleCharterSettleSql).bind(now,id,userId);
+  if(options.emissionCaps){
+   const epoch=Number((await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>())?.epoch_seconds??0);
+   const yearSeconds=30*86400; // emissionCapsConfig.gameYearSeconds
+   const year=Math.floor(Math.max(0,now-epoch)/yearSeconds)+1;
+   const start=epoch+(year-1)*yearSeconds, end=start+yearSeconds;
+   claimReceipt=db.prepare(aurelleCharterClaimReceiptSql+crownYearCapSql).bind(id,now,shiftId,userId,iso,id,start,end,year);
+   charterSettle=db.prepare(aurelleCharterSettleSql+crownYearCapSql).bind(now,id,userId,start,end,year);
+  }
+  await db.batch([
+  db.prepare(aurellePoolLockSql),claimReceipt,charterSettle,db.prepare(crownIssuanceSql).bind(shiftId),
+  db.prepare("UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM aurelle_charter_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)").bind(iso,shiftId,userId,userId),
+  ]);
+ }
  else if(command.action==='aurelle-start-work') await db.batch([
  db.prepare(aurelleStartReceiptSql).bind(id,now,userId,id),db.prepare(aurelleStartSql).bind(iso,new Date((now+7200)*1000).toISOString(),id,userId),
  db.prepare(aurelleStartDebitSql).bind(iso,userId,id),

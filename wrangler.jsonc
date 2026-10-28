@@ -183,6 +183,8 @@
     "HARIMU_DEBATE_ENABLED": "true",
     // #282: the AI candidates' debate answers, written only by the scheduled Worker. Off until QA; also needs HARIMU_DEBATE_ENABLED, the AI binding and a valid AI budget. Off, every answer is the candidate's fallback line.
     "HARIMU_AI_DEBATE_ANSWERS_ENABLED": "true",
+    // #885: Labor Note monthly and Crown yearly emission caps matching Spark's Charter Limit (15%/30%). Off: settle and decree paths stay byte-identical; no new writes.
+    "HARIMU_EMISSION_CAPS_ENABLED": "true",
     // #431: Kindle Spark money supply and Price Index PoC (Reserve Board issuance within the 3% cap and the Charter Limit). Off until QA; issuance is written only by the scheduled Worker.
     "HARIMU_SPARK_SUPPLY_ENABLED": "true",
     // #432: daily ledger reconciliation job and its read-only admin report route. Off until QA. The route also needs the HARIMU_ADMIN_TOKEN Worker secret (set in the dashboard, never in this file); without it the route is a 404.
