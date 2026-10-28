@@ -112,3 +112,7 @@ export const korundRationStabilityEnabled=(env:{HARIMU_KORUND_RATION_CUT_ENABLED
 export const applyRationCut=(coupons:KorundCoupon[],cut:KorundRationCut|null):KorundCoupon[]=>cut?coupons.map(c=>(cut.withdrawn as string[]).includes(c.kind)?{...c,withdrawn:true as const}:c):coupons;
 /** Content's rationCut (lib/ration-copy.ts, #336), mirrored here so the panel keeps its one copy import (a test pins them equal). */
 export const korundRationCutCopy={label:'Rations are reduced',notice:'Plan output fell short, so this week\'s rations are reduced.',stability:'Stability falls with the rations.',withdrawn:'withdrawn this week (ration cut)'} as const;
+
+/** #970: Korund ration card as a stamped booklet (docs §23.2). Build flag NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET
+ *  ("true" in preview, "false" in production). Only the exact string "true" enables it. No new ration data. */
+export function korundRationBookletEnabled(value: string | undefined = process.env.NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET): boolean { return value === 'true'; }
