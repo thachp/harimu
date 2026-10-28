@@ -63,10 +63,10 @@ export function ModConsole({
     <p role="status" className={styles.status}>{busy ? C.loading : (markStatus || status)}</p>
     {result?.ok && result.panel === 'ai-review-queue' && result.items.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="ai-review-queue">
       <table className={styles.table}><caption>ai-review-queue</caption>
-        <thead><tr>{['created_at', 'nation_id', 'persona', 'source', 'reason', 'filter_result', 'output_text', 'reviewed_at', 'reviewer_note', C.note].map(h => <th key={h} scope="col">{h}</th>)}</tr></thead>
+        <thead><tr>{['created_at', 'nation_id', 'persona', 'source', 'reason', 'filter_result', 'output_text', 'reviewed_at', 'reviewer_note', C.note].map(h => <th key={h} scope="col" className={h === C.note ? styles.mark : undefined}>{h}</th>)}</tr></thead>
         <tbody>{result.items.map(item => <tr key={item.id}><td>{utc(item.created_at)}</td><td>{item.nation_id}</td><td>{item.persona}</td><td>{item.source}</td><td>{item.reason}</td>
           <td>{item.filter_result}{item.filter_detail ? ` (${item.filter_detail})` : ''}</td><td className={styles.text}>{item.output_text}</td><td>{utc(item.reviewed_at)}</td><td>{item.reviewer_note ?? ''}</td>
-          <td>{item.reviewed_at == null ? <><input aria-label={C.note} value={note} onChange={e => setNote(e.target.value)} /><button type="button" disabled={busy || !note.trim()} onClick={() => mark(item.id)}>{C.mark}</button></> : C.marked}</td></tr>)}</tbody>
+          <td className={styles.mark}>{item.reviewed_at == null ? <div className={styles.filters}><input aria-label={C.note} value={note} onChange={e => setNote(e.target.value)} /><button type="button" disabled={busy || !note.trim()} onClick={() => mark(item.id)}>{C.mark}</button></div> : C.marked}</td></tr>)}</tbody>
       </table>
     </div>}
     {result?.ok && result.panel === 'ai-costs' && result.days.length > 0 && <div className={styles.scroll} tabIndex={0} role="region" aria-label="ai-costs">
