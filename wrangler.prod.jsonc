@@ -90,6 +90,8 @@
     "HARIMU_KORUND_RATION_CUT_ENABLED": "false",
     // #967: when a #776 ration cut applies, Korund national Stability falls one step for that city-week (existing Stability score, never below 0). Off: score and notice unchanged.
     "HARIMU_KORUND_RATION_STABILITY_ENABLED": "false",
+    // #983: the week a met plan follows a #967 ration-cut hit, Korund Stability climbs one step of the same size (never above 100). Needs the #967 flags. Off: score, notice and the recovery read stay unchanged.
+    "HARIMU_KORUND_STABILITY_RECOVERY_ENABLED": "false",
     // #490 (Stage 0d): generic per-nation wage ledger and work commands. Off: the commands are 404 and nothing is written. Also needs a nation that is playable for the account (#489) with jobs in lib/nation-openings.ts (only Confluence, #487).
     // #487: "true" in preview only so the Confluence cooperative job runs for QA-allowlisted accounts; production "false".
     "HARIMU_NATION_WORK_ENABLED": "false",

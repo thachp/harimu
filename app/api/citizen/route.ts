@@ -10,7 +10,7 @@ import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle'
 import { charterMealSeconds } from '@/lib/aurelle-charters'; // #531
 import { readCrownMint } from '@/lib/crown-debasement';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
-import { korundRationStabilityEnabled } from '@/lib/korund-coupons'; // #967
+import { korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from '@/lib/korund-coupons'; // #967, #983
 import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
@@ -81,9 +81,11 @@ const walletStreetRateOn = () => (env as unknown as { HARIMU_WALLET_STREET_RATE_
 const korundRationCutOn = () => (env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string }).HARIMU_KORUND_RATION_CUT_ENABLED === 'true';
 // #967: a #776 ration cut also lowers Korund Stability. Needs the cut flag too; off leaves the score and the notice unchanged.
 const korundRationStabilityOn = () => korundRationStabilityEnabled(env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string; HARIMU_KORUND_RATION_STABILITY_ENABLED?: string });
+// #983: one Stability step back up the met week after that cut. Needs the #967 flags too; off leaves the score, the notice and the read unchanged.
+const korundStabilityRecoveryOn = () => korundStabilityRecoveryEnabled(env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string; HARIMU_KORUND_RATION_STABILITY_ENABLED?: string; HARIMU_KORUND_STABILITY_RECOVERY_ENABLED?: string });
 // #797: gray-market checkpoint seizure of cash bundles, destroyed as a sink (HARIMU_GRAY_SEIZURE_ENABLED); off = no roll, no write, no read.
 const graySeizureOn = () => (env as unknown as { HARIMU_GRAY_SEIZURE_ENABLED?: string }).HARIMU_GRAY_SEIZURE_ENABLED === 'true';
-const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn() });
+const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn(), rationRecovery: korundStabilityRecoveryOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
 
