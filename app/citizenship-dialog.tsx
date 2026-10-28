@@ -15,16 +15,19 @@ export type CitizenshipDialogProps = {
   error: string | null;
   signInControl: ReactNode;
   onRetrySession: () => void;
-  onConfirm: () => void;
+  onConfirm: (homeCityId?: string) => void;
   onClose: () => void;
+  /** #965: catalog cities for the nation, capital first in the list's preselection. Omitted while the flag is off. */
+  homeCities?: readonly { id: string; name: string; capital: boolean }[];
 };
 
 const buttonStyle = { minHeight: 44, whiteSpace: 'normal' } as const;
 const focusableSelector = 'button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])';
 
-export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName, expectedNationId, session, pending, error, signInControl, onRetrySession, onConfirm, onClose }: CitizenshipDialogProps) {
+export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName, expectedNationId, session, pending, error, signInControl, onRetrySession, onConfirm, onClose, homeCities }: CitizenshipDialogProps) {
   const dialog = useRef<HTMLElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
+  const [homeCityId, setHomeCityId] = useState<string | null>(null);
   const [acceptedFor, setAcceptedFor] = useState<string | null>(null);
   const oathKey = `${expectedNationId ?? 'new'}:${nation.id}`;
   const [reviewedFor, setReviewedFor] = useState<string | null>(null);
@@ -65,6 +68,7 @@ export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName,
     backToReview(); onClose();
   }, [pending, backToReview, onClose]);
   const changing = expectedNationId !== null && expectedNationId !== nation.id;
+  const chosenHome = homeCityId ?? homeCities?.find(city => city.capital)?.id;
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     title.current?.focus();
@@ -103,6 +107,7 @@ export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName,
         : 'You may change nation once within your first 48 real hours, before any political action.'} After {changing ? 'this change' : 'the grace period or your first political action'}, your citizenship is locked. Further immigration is not implemented.</p>
       <p className="enrollment-disclosure">Computer-controlled leaders hold all government offices. AI/SI means artificial or simulated intelligence. In this preview, fixed game rules choose their actions; no live AI model is connected.</p>
       <dl><div><dt>Government</dt><dd>{nation.government}</dd></div><div><dt>Economy</dt><dd>{nation.economy}</dd></div><div><dt>Currency</dt><dd>{nation.currency}</dd></div></dl>
+      {homeCities && homeCities.length > 0 && !atOath && <fieldset className="enrollment-home-city"><legend>Home city</legend>{homeCities.map(city => <label key={city.id} style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44 }}><input type="radio" name="enroll-home-city" value={city.id} checked={chosenHome === city.id} disabled={pending} onChange={() => { if (!pending) setHomeCityId(city.id); }} />{city.name}{city.capital ? ' (capital)' : ''}</label>)}</fieldset>}
       {atOath && (session === 'anonymous' ? <div className={`enrollment-session ${styles.session}`}><p>Sign in to record your citizenship. Your nation choice stays here for review.</p>{signInControl}</div>
         : session === 'loading' ? <p role="status">Loading your citizen account…</p>
           : session === 'error' ? <div className="enrollment-session"><p role="alert">Your citizen account could not be loaded.</p><button type="button" style={buttonStyle} onClick={onRetrySession}>Retry loading citizen</button></div>
@@ -114,7 +119,7 @@ export function CitizenshipDialog({ nation, reviewStorageKey, currentNationName,
         <button className="secondary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending} aria-describedby={pending ? "oath-pending-reason" : undefined} onClick={cancelReview}>Keep exploring</button>
         {!atOath && <button className="primary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending} aria-describedby={pending ? "oath-pending-reason" : undefined} onClick={reviewNation}>Continue to oath</button>}
         {atOath && <button className="secondary-action" type="button" style={buttonStyle} disabled={pending} aria-describedby={pending ? "oath-pending-reason" : undefined} onClick={backToReview}>Back to review</button>}
-        {atOath && session === 'ready' && <button className="primary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending || !accepted} aria-describedby={pending ? "oath-pending-reason" : !accepted ? "oath-confirm-reason" : undefined} onClick={() => { if (!pending && accepted && session === 'ready') onConfirm(); }}>{pending ? 'Recording citizenship…' : changing ? 'Use my one change' : 'Confirm citizenship'}</button>}
+        {atOath && session === 'ready' && <button className="primary-action" type="button" style={{ ...buttonStyle, flex: '1 1 140px' }} disabled={pending || !accepted} aria-describedby={pending ? "oath-pending-reason" : !accepted ? "oath-confirm-reason" : undefined} onClick={() => { if (!pending && accepted && session === 'ready') onConfirm(homeCities?.length ? chosenHome : undefined); }}>{pending ? 'Recording citizenship…' : changing ? 'Use my one change' : 'Confirm citizenship'}</button>}
       </div>
     </section>
   </div>;
