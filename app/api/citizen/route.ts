@@ -40,7 +40,7 @@ import { emissionCapsEnabled } from '@/lib/emission-caps-rules'; // #885
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
-import { presidentialCycle, presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918, #936
+import { kindleCycleStartAt, presidentialCycle, presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918, #936, #969
 /** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true'; // #362
@@ -213,6 +213,8 @@ export async function GET(request: Request) {
     successionOn ? readSuccession(database) : null, // #613: read-only, flag off: not read
   ]);
   const civicNow=Math.floor(Date.now()/1000);
+  // #969: one additive field, and only while the top-bar countdown flag is on. Unset cycle start stays omitted (calendars held, no invented date).
+  const cycleStartAt = (env as unknown as { NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN?: string }).NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN === 'true' ? kindleCycleStartAt(env as unknown as CalendarBindings) : null;
   const civicRankOn = civicRankFlagOn(env); // #741
   const [election, collectivePetitions, firstWeek, governmentRead, civicRank] = await Promise.all([
     profile?.nation_id==='kindle'?readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true,undefined,false,presidentialWindow(env as unknown as CalendarBindings,civicNow),electionIdFor(presidentialCycle(env as unknown as CalendarBindings,civicNow))):null,
@@ -225,7 +227,7 @@ export async function GET(request: Request) {
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
   // #872 (ARC ruling): nations this account may play here beyond the live three (nationPlayable, never a flag alone). Absent when none: production and the public unchanged.
   const playable = playableNationIds(env as never, userId), flagPlayable = playable.some(id => !(liveNations as readonly string[]).includes(id));
-  return privateJson({ ...(flagPlayable ? { openNations: playable } : {}),
+  return privateJson({ ...(flagPlayable ? { openNations: playable } : {}), ...(cycleStartAt != null ? { cycleStartAt } : {}),
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountIdFor(election!.id)}:{})}:null,
     collectivePetitions,
