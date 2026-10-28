@@ -61,7 +61,6 @@ export async function loadVoteBuying(token: string, fetchImpl: typeof fetch = fe
     : { panel: 'vote-buying', ok: false, status: response.status, error: body.error ?? `HTTP ${response.status}` };
 }
 
-
 /** GET /api/admin/risk-scores (#879). Human review only; the score is a sort key, never a penalty. */
 export async function loadRiskScores(token: string, fetchImpl: typeof fetch = fetch): Promise<PanelResult> {
   const { response, body } = await getJson('/api/admin/risk-scores', token, fetchImpl);

@@ -1,4 +1,4 @@
-/** #880: mod console (read-only), flag NEXT_PUBLIC_HARIMU_MOD_CONSOLE. First slice: ai-review-queue. Second: ai-costs, ledger-reconciliation, vote-buying. */
+/** #880: mod console (read-only), flag NEXT_PUBLIC_HARIMU_MOD_CONSOLE. First slice: ai-review-queue. Second: ai-costs, ledger-reconciliation, vote-buying. Third: risk-scores. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
