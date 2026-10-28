@@ -21,18 +21,19 @@ export const worldCitiesSchema = `CREATE TABLE IF NOT EXISTS world_cities (
  id TEXT PRIMARY KEY,
  nation_id TEXT NOT NULL CHECK(nation_id IN ('kindle','korund','aurelle')),
  name TEXT NOT NULL CHECK(length(name) BETWEEN 2 AND 40),
- tier INTEGER NOT NULL DEFAULT 1 CHECK(tier = 1),
+ tier INTEGER NOT NULL DEFAULT 1 CHECK(tier BETWEEN 1 AND 4),
  center_x INTEGER NOT NULL, center_y INTEGER NOT NULL,
  authority TEXT NOT NULL CHECK(authority IN ('kindle-charter','korund-chairman-order','aurelle-royal-charter')),
  founded_by TEXT NOT NULL,
  request_id TEXT NOT NULL UNIQUE,
  founded_at INTEGER NOT NULL,
+ above_next_tier_since INTEGER,
  UNIQUE(center_x, center_y)
 )`;
 
 export type FoundingCommand = { action: FoundingAction; x: number; y: number; name: string; requestId: string };
 export type FoundingResult =
-  | { ok: true; city: { id: string; nationId: string; name: string; tier: 1; x: number; y: number }; claimed: number; replay?: true }
+  | { ok: true; city: { id: string; nationId: string; name: string; tier: number; x: number; y: number }; claimed: number; replay?: true }
   | { ok: false; status: 400 | 403 | 409; reason: string; error: string };
 
 const fail = (status: 400 | 403 | 409, reason: string, error: string): FoundingResult => ({ ok: false, status, reason, error });
@@ -89,11 +90,11 @@ const box = `center_x BETWEEN ? AND ? AND center_y BETWEEN ? AND ?`;
 export async function foundCity(db: GameDatabase, userId: string, nationId: string | null, command: FoundingCommand, now: number, enabled: boolean): Promise<FoundingResult> {
   const denied = foundingAuthority(nationId, command.action, enabled); if (denied) return denied;
   const nation = nationOf(command.action);
-  const prior = await db.prepare('SELECT id,nation_id,name,center_x,center_y,founded_by FROM world_cities WHERE request_id=?').bind(command.requestId)
-    .first<{ id: string; nation_id: string; name: string; center_x: number; center_y: number; founded_by: string }>();
+  const prior = await db.prepare('SELECT id,nation_id,name,tier,center_x,center_y,founded_by FROM world_cities WHERE request_id=?').bind(command.requestId)
+    .first<{ id: string; nation_id: string; name: string; tier: number; center_x: number; center_y: number; founded_by: string }>();
   if (prior) {
     if (prior.founded_by !== userId || Number(prior.center_x) !== command.x || Number(prior.center_y) !== command.y) return fail(409, 'request_reused', 'That request id was already used for a different founding.');
-    return { ok: true, city: { id: prior.id, nationId: prior.nation_id, name: prior.name, tier: 1, x: Number(prior.center_x), y: Number(prior.center_y) }, claimed: (2 * claimRadius + 1) ** 2, replay: true };
+    return { ok: true, city: { id: prior.id, nationId: prior.nation_id, name: prior.name, tier: Number(prior.tier), x: Number(prior.center_x), y: Number(prior.center_y) }, claimed: (2 * claimRadius + 1) ** 2, replay: true };
   }
   const { results } = await db.prepare('SELECT x,y,zone,owner,feature FROM world_squares').all<Square>();
   const squares = onGrid(results ?? []).map(s => ({ ...s, x: Number(s.x), y: Number(s.y) })); // #486: rows beyond the grid are ignored

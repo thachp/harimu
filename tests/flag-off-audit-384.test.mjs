@@ -22,6 +22,7 @@ const flagOffPins = {
   HARIMU_NOTABLES_ENABLED: 'ai-captured-drafts.test.mjs',
   HARIMU_AI_CABINET_RESPONSES_ENABLED: 'cabinet-response-ai.test.mjs',
   HARIMU_CITY_FOUNDING_ENABLED: 'flag-off-audit-384.test.mjs',
+  HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
@@ -183,6 +184,7 @@ const expectedCronJobFlags = {
   ledger: ['HARIMU_LEDGER_RECONCILIATION_ENABLED'],
   tesseraRewards: ['HARIMU_TESSERA_REWARDS_ENABLED'],
   rallies: ['HARIMU_KINDLE_RALLIES_ENABLED'],
+  cityTier: ['HARIMU_CITY_TIER_GROWTH_ENABLED'],
 };
 test('cron gates: lib/cron-gates.ts matches the pinned job-to-flags map, and each job turns on only with every pinned flag', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(cronJobFlags)), expectedCronJobFlags);

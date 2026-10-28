@@ -434,6 +434,18 @@ async function initialize(database: GameDatabase) {
     await database.batch([database.prepare('ALTER TABLE citizens ADD COLUMN last_active_at TEXT'), database.prepare("UPDATE citizens SET last_active_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE last_active_at IS NULL")]);
   }
 
+  // #952 (migration 0103): tier may be 1–4. SQLite cannot alter a CHECK, so an older world_cities (no above_next_tier_since) is rebuilt once; existing rows stay tier 1.
+  const cityCols = await database.prepare('PRAGMA table_info(world_cities)').all<{ name: string }>();
+  if (cityCols.results.length > 0 && !cityCols.results.some(column => column.name === 'above_next_tier_since')) {
+    await database.batch([
+      database.prepare('ALTER TABLE world_cities RENAME TO world_cities_tier_old'),
+      database.prepare(worldCitiesSchema),
+      database.prepare(`INSERT INTO world_cities (id,nation_id,name,tier,center_x,center_y,authority,founded_by,request_id,founded_at)
+        SELECT id,nation_id,name,tier,center_x,center_y,authority,founded_by,request_id,founded_at FROM world_cities_tier_old`),
+      database.prepare('DROP TABLE world_cities_tier_old'),
+    ]);
+  }
+
   // #738 (migration 0082): army_conscripts gained stayed_at; a local database created before it gets the column once.
   const conscriptColumns = await database.prepare('PRAGMA table_info(army_conscripts)').all<{ name: string }>();
   if (!conscriptColumns.results.some(column => column.name === 'stayed_at')) await database.prepare(conscriptStayColumn).run();
