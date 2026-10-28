@@ -1,5 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import {reserveAiCabinetSequence,markAiReservationSent,releaseAiReservation,settleAiReservation,markAiReservationUncertain,meteredAiCost,aiGatewayOptions,type AiBudgetConfig,type AiModel,type AiMeteredCall} from './ai-budget';
+import {runAiWithFailover,type AiFailoverEnv,type SecondaryLlm} from './ai-failover';
 import {inferenceText,supportedNewsDraft,newsVerificationResponseFormat,type NewsAiBinding} from './ai-news';
 import {validPetitionText} from './collective-petitions';
 import {deniedAiText} from './ai-denylist';
@@ -20,7 +21,7 @@ export function validatedCabinetResponse(value:unknown){
  return text;
 }
 type Awaiting={id:string;title:string;demand:string;reached_at:number};
-export async function prepareAiCabinetResponse(db:GameDatabase,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,timeoutMs=30000,maxInputBytes=12000,killSwitch=null as AiTemplatesOnlyEnv|null}={}){
+export async function prepareAiCabinetResponse(db:GameDatabase,now:number,binding:NewsAiBinding|undefined,{enabled=false,budget=null as AiBudgetConfig|null,timeoutMs=30000,maxInputBytes=12000,killSwitch=null as AiTemplatesOnlyEnv|null,failover=null as AiFailoverEnv|null,secondary=undefined as SecondaryLlm|undefined}={}){
  if(!enabled||!binding||!budget||!Number.isSafeInteger(now))return {status:'disabled' as const};
  await recordKillSwitchChanges(db,killSwitch,now); // #764: flag off returns before any events query
  // #742: templates-only mode makes no model call and no reservation; the petition keeps its existing "awaiting response" state.
@@ -39,12 +40,10 @@ export async function prepareAiCabinetResponse(db:GameDatabase,now:number,bindin
  let reached=false; // #92: true once a request is handed to the gateway (persisted as 'uncertain' first)
  const call=async(target:AiModel,messages:{role:'system'|'user'|'assistant';content:string}[],format?:typeof cabinetResponseFormat|typeof newsVerificationResponseFormat)=>{
   if(new TextEncoder().encode(JSON.stringify(messages)).length>maxInputBytes)throw Error('Inference input exceeded the public-petition bound.');
-  let timeout:ReturnType<typeof setTimeout>|undefined;
   if(!reached){reached=true;await markAiReservationSent(db,reservation);}
   let result:unknown;
-  try{result=await Promise.race([binding.run(target,{messages,max_tokens:256,temperature:0,stream:false,...(format?{response_format:format as never}:{})},aiGatewayOptions(budget)),new Promise<never>((_r,reject)=>{timeout=setTimeout(()=>reject(Error('Inference timed out.')),timeoutMs);})]);}
+  try{result=await runAiWithFailover({runPrimary:(m,i,o)=>binding.run(m,i,o),model:target,input:{messages,max_tokens:256,temperature:0,stream:false,...(format?{response_format:format as never}:{})},gateway:aiGatewayOptions(budget),env:failover,secondary,timeoutMs});}
   catch{throw Object.assign(Error('uncertain'),{uncertain:true});}
-  finally{if(timeout!==undefined)clearTimeout(timeout);}
   answered.push({model:target,usage:result&&typeof result==='object'?(result as {usage?:unknown}).usage:undefined}); // the provider returned: metered (per token when usage is valid, #170) even if its content is rejected below
   try{return inferenceText(result,Boolean(format));}catch{throw Object.assign(Error('rejected'),{uncertain:false});}
  };

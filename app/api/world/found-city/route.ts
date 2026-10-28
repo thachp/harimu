@@ -4,6 +4,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { foundCity, parseFoundingCommand } from '@/lib/city-founding';
+import { cityTierName } from '@/lib/city-tier'; // #952
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -27,5 +28,10 @@ export async function POST(request: Request) {
   const db = await getDatabase();
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string }>();
   const result = await foundCity(db, userId, citizen?.nation_id ?? null, command, Math.floor(Date.now() / 1000), enabled);
-  return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
+  if (!result.ok) return privateJson({ error: result.error, reason: result.reason }, result.status);
+  // #952: flag off keeps the founding body (tier 1, no tier name). Flag on names the stored tier.
+  const growth = (env as unknown as { HARIMU_CITY_TIER_GROWTH_ENABLED?: string }).HARIMU_CITY_TIER_GROWTH_ENABLED === 'true';
+  const tier = growth ? result.city.tier : 1;
+  const city = growth ? { ...result.city, tier, tierName: cityTierName(tier) } : { ...result.city, tier };
+  return privateJson({ ...result, city });
 }

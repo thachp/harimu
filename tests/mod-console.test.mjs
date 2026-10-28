@@ -1,10 +1,10 @@
-/** #880: mod console (read-only), flag NEXT_PUBLIC_HARIMU_MOD_CONSOLE. First slice: ai-review-queue. Second: ai-costs, ledger-reconciliation, vote-buying. Third: risk-scores. */
+/** #880: mod console, flag NEXT_PUBLIC_HARIMU_MOD_CONSOLE. Panels over admin GETs; queue mark-reviewed POST (#959). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
-import { loadAiCosts, loadKillSwitchEvents, loadLedger, loadReviewQueue, loadRiskScores, loadVoteBuying, modConsoleEnabled, modPanels, utc } from '../lib/mod-console.ts';
+import { loadAiCosts, loadAiDecisions, loadKillSwitchEvents, loadLedger, loadReports, loadReviewQueue, loadRiskScores, loadVoteBuying, markReviewed, modConsoleEnabled, modPanels, utc } from '../lib/mod-console.ts';
 const read = f => readFile(new URL(`../${f}`, import.meta.url), 'utf8');
-const routes = ['/api/admin/ai-review-queue', '/api/admin/ai-costs', '/api/admin/ledger-reconciliation', '/api/admin/vote-buying', '/api/admin/risk-scores', '/api/admin/kill-switch-events'];
+const routes = ['/api/admin/ai-review-queue', '/api/admin/ai-costs', '/api/admin/ledger-reconciliation', '/api/admin/vote-buying', '/api/admin/risk-scores', '/api/admin/reports', '/api/admin/ai-decisions', '/api/admin/kill-switch-events'];
 
 test('flag: preview on, production off, only the exact string "true" enables it; every harness that defines UI_V2_HOUSEHOLD defines it', async () => {
   assert.match(await read('wrangler.jsonc'), /"NEXT_PUBLIC_HARIMU_MOD_CONSOLE":\s*"true"/);
@@ -19,9 +19,9 @@ test('flag: preview on, production off, only the exact string "true" enables it;
 test('no new server logic or access: the page 404s with the flag off, only GETs existing admin routes, and keeps the token in memory', async () => {
   const page = await read('app/admin/mod/page.tsx'), ui = await read('app/admin/mod/mod-console.tsx'), lib = await read('lib/mod-console.ts');
   assert.match(page, /if \(!modConsoleEnabled\(\)\) notFound\(\);/); assert.match(page, /robots: \{ index: false, follow: false \}/);
-  assert.doesNotMatch(ui + lib, /localStorage|sessionStorage|document\.cookie|method:\s*'POST'/);
+  assert.doesNotMatch(ui + lib, /localStorage|sessionStorage|document\.cookie/); assert.match(lib, /method: 'POST'/); assert.match(lib, /markReviewed/);
   assert.deepEqual([...new Set([...lib.matchAll(/\/api\/[a-z/-]+/g)].map(m => m[0]))].sort(), [...routes].sort());
-  assert.deepEqual([...modPanels], ['ai-review-queue', 'ai-costs', 'ledger-reconciliation', 'vote-buying', 'risk-scores', 'kill-switch-events']);
+  assert.deepEqual([...modPanels], ['ai-review-queue', 'ai-costs', 'ledger-reconciliation', 'vote-buying', 'risk-scores', 'reports', 'ai-decisions', 'kill-switch-events']);
   await assert.rejects(readFile(new URL('../app/api/admin/mod-console', import.meta.url)), 'no new route');
 });
 
@@ -43,6 +43,17 @@ test('each loader sends the Bearer token and passes route errors through', async
   assert.deepEqual(await loadKillSwitchEvents('t'.repeat(16), fake('/api/admin/kill-switch-events', { events: [{ actor: 'operator', persona: 'kindle-journalist', state: 'on', reason: 'persona-mute', createdAt: 10 }] })), { panel: 'kill-switch-events', ok: true, events: [{ actor: 'operator', persona: 'kindle-journalist', state: 'on', reason: 'persona-mute', createdAt: 10 }] });
   assert.equal(calls.at(-1)[0], '/api/admin/kill-switch-events');
   assert.equal((await loadKillSwitchEvents('x', fake('/x', {}, 401))).status, 401);
+  assert.deepEqual(await loadReports('t'.repeat(16), { limit: 1, offset: 1 }, fake('/api/admin/reports', { reports: [{ id: 'r2' }] })), { panel: 'reports', ok: true, reports: [{ id: 'r2' }] });
+  assert.equal(calls.at(-1)[0], '/api/admin/reports?limit=1&offset=1');
+  assert.deepEqual(await loadAiDecisions('t'.repeat(16), { limit: 50 }, fake('/api/admin/ai-decisions', { decisions: [{ id: 'd1' }] })), { panel: 'ai-decisions', ok: true, decisions: [{ id: 'd1' }] });
+  assert.equal(calls.at(-1)[0], '/api/admin/ai-decisions?limit=50');
+  assert.deepEqual(await loadReviewQueue('t'.repeat(16), { limit: 50, offset: 50 }, fake('/api/admin/ai-review-queue', { items: [] })), { panel: 'ai-review-queue', ok: true, items: [] });
+  assert.equal(calls.at(-1)[0], '/api/admin/ai-review-queue?limit=50&offset=50');
+  const posts = [];
+  const postFake = async (url, init) => { posts.push([url, init.method, init.headers.Authorization, init.body]); return new Response(JSON.stringify({ id: 'a', reviewed: true }), { status: 200 }); };
+  assert.deepEqual(await markReviewed('t'.repeat(16), 'a', 'ok', postFake), { ok: true, id: 'a', reviewed: true });
+  assert.deepEqual(posts[0], ['/api/admin/ai-review-queue', 'POST', `Bearer ${'t'.repeat(16)}`, JSON.stringify({ id: 'a', note: 'ok' })]);
+  assert.equal((await markReviewed('x', 'z', 'n', async () => new Response(JSON.stringify({ error: 'Unknown review queue entry.' }), { status: 409 }))).status, 409);
   assert.deepEqual(await loadAiCosts('x', async () => { throw new Error('offline'); }), { panel: 'ai-costs', ok: false, status: 0, error: 'Network error' });
   assert.equal(utc(0), '1970-01-01 00:00 UTC'); assert.equal(utc(null), '');
 });
@@ -68,6 +79,8 @@ test('ARC: no data before the server accepts the token; the older-entries cue us
   assert.match(ui, /result\?\.ok && result\.panel === 'vote-buying' && result\.events\.length > 0/);
   assert.match(ui, /result\?\.ok && result\.panel === 'risk-scores' && result\.accounts\.length > 0/);
   assert.match(ui, /result\?\.ok && result\.panel === 'kill-switch-events' && result\.events\.length > 0/);
+  assert.match(ui, /result\?\.ok && result\.panel === 'reports' && result\.reports\.length > 0/);
+  assert.match(ui, /result\?\.ok && result\.panel === 'ai-decisions' && result\.decisions\.length > 0/);
   assert.doesNotMatch(ui, /useEffect/, 'nothing loads before Load');
   assert.match(ui, /setResult\(null\);/, 'a new load clears the previous data first');
   assert.match(ui, /const PAGE = 50;/); assert.match(await read('lib/mod-console.ts'), /older entries not shown/);
@@ -153,6 +166,40 @@ test('#880 risk-scores: no data before accept; a loaded row shows score and user
   await setValue(panel, 'risk-scores'); await submit();
   assert.equal(calls, 1); assert.match(el.textContent, /42/); assert.match(el.textContent, /user-risk-7/);
   assert.match(el.querySelector('caption')?.textContent ?? '', /risk-scores/);
+  await act(async () => root.unmount());
+});
+
+test('#880 reports + ai-decisions: no data before accept; mark-reviewed POSTs then reloads queue', async () => {
+  const { build } = await import('esbuild');
+  const out = await build({ entryPoints: [new URL('../app/admin/mod/mod-console.tsx', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
+    packages: 'external', loader: { '.css': 'empty', '.module.css': 'empty' }, logLevel: 'silent', alias: { '@': new URL('..', import.meta.url).pathname.replace(/\/$/, '') } });
+  const code = out.outputFiles[0].text.replace(/from "([^".][^"]*)"/g, (_, m) => `from "${import.meta.resolve(m)}"`);
+  const { Window } = await import('happy-dom'), w = new Window({ url: 'http://localhost/' });
+  globalThis.window = w; globalThis.document = w.document; globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const { ModConsole } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
+  const React = (await import('react')).default, { createRoot } = await import('react-dom/client'), { act } = React;
+  const el = document.createElement('div'); document.body.appendChild(el); const root = createRoot(el);
+  let loads = 0, marks = 0;
+  const setValue = async (node, value) => act(async () => { const proto = Object.getPrototypeOf(node), set = Object.getOwnPropertyDescriptor(proto, 'value').set; set.call(node, value); node.dispatchEvent(new w.Event(node.tagName === 'SELECT' || node.tagName === 'INPUT' ? (node.tagName === 'SELECT' ? 'change' : 'input') : 'input', { bubbles: true })); });
+  const submit = async () => act(async () => { el.querySelector('form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await new Promise(r => setTimeout(r, 0)); });
+  await act(async () => root.render(React.createElement(ModConsole, {
+    loadReportsList: async () => { loads++; return { panel: 'reports', ok: true, reports: [{ id: 'r1', request_id: 'q', reporter_id: 'u', target_kind: 'citizen-message', target_id: 't', reason_id: 'harassment', note: null, created_at: 100 }] }; },
+    loadDecisions: async () => { loads++; return { panel: 'ai-decisions', ok: true, decisions: [{ id: 'd1', created_at: 1, source: 'notables', nation_id: 'kindle', persona: 'p', output_text: 'out', filter_result: 'passed', filter_detail: null, reason: 'sample', reviewed_at: 2, reviewer_note: 'ok' }] }; },
+    loadQueue: async () => { loads++; return { panel: 'ai-review-queue', ok: true, items: [{ id: 'q1', created_at: 1, source: 'notables', nation_id: 'kindle', persona: 'p', output_text: 'out', filter_result: 'replaced', filter_detail: 'keyword', reason: 'flagged', reviewed_at: null, reviewer_note: null }] }; },
+    markItem: async (_t, id, note) => { marks++; assert.equal(id, 'q1'); assert.equal(note, 'looks fine'); return { ok: true, id, reviewed: true }; },
+  })));
+  assert.equal(loads, 0); assert.equal(el.querySelector('table'), null);
+  const panel = [...el.querySelectorAll('select')].find(s => s.closest('label')?.textContent?.startsWith('panel'));
+  await setValue(el.querySelector('input[type=password]'), 'a-staff-token-1234');
+  await setValue(panel, 'reports'); await submit();
+  assert.match(el.textContent, /r1/); assert.match(el.querySelector('caption')?.textContent ?? '', /reports/);
+  await setValue(panel, 'ai-decisions'); await submit();
+  assert.match(el.textContent, /d1/); assert.match(el.querySelector('caption')?.textContent ?? '', /ai-decisions/);
+  await setValue(panel, 'ai-review-queue'); await submit();
+  const note = el.querySelector('input[aria-label=note]'); assert.ok(note);
+  await setValue(note, 'looks fine');
+  await act(async () => { el.querySelector('button[type=button]').dispatchEvent(new w.Event('click', { bubbles: true })); await new Promise(r => setTimeout(r, 0)); });
+  assert.equal(marks, 1); assert.match(el.textContent, /reviewed/);
   await act(async () => root.unmount());
 });
 
