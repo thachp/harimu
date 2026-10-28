@@ -7,6 +7,7 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import ts from 'typescript';
 import {firstActionReason,pendingActionReason} from '../lib/action-reasons.ts';
+import {resolveLocalModule} from './helpers/component-module.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 async function load(path,clock){
  let output=ts.transpileModule((await readFile(path,'utf8')).replace('useState(0)',clock?`useState(${clock})`:'useState(0)').replace(/import\s+['"][^'"]+\.css['"];?/g,''),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
@@ -15,8 +16,9 @@ async function load(path,clock){
   if(specifier.endsWith('.css'))url='data:text/javascript,export default {}';
   else if(specifier.startsWith('@/')||specifier.startsWith('.')){
    const base=specifier.startsWith('@/')?resolve(root,specifier.slice(2)):resolve(dirname(path),specifier);
-   for(const ext of ['.ts','.tsx']){try{await readFile(base+ext);url=await load(base+ext);break;}catch{/* Try source extension. */}}
-   assert.ok(url,`Resolve ${specifier}`);
+   const child=await resolveLocalModule(base);
+   assert.ok(child,`Resolve ${specifier}`);
+   url=await load(child);
   }else url=import.meta.resolve(specifier);
   output=output.replace(match[0],`from ${JSON.stringify(url)}`);
  }

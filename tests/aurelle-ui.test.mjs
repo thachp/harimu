@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
+import { resolveLocalModule } from './helpers/component-module.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const viewportStub=`data:text/javascript;base64,${Buffer.from(`import React from ${JSON.stringify(import.meta.resolve('react'))};export default function Viewport(props){return React.createElement('div',{'data-rendered-nation':props.nationId,'data-rendered-mode':props.mode});}`).toString('base64')}`;
@@ -20,8 +21,7 @@ async function componentModule(path) {
     else if (specifier==='./game-viewport') url=viewportStub;
     else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
       const base=specifier.startsWith('@/')?resolve(root,specifier.slice(2)):resolve(dirname(path),specifier);
-      let child;
-      for (const extension of ['.ts','.tsx']) {try{await readFile(base+extension);child=base+extension;break;}catch{/* Try the other source extension. */}}
+      const child=await resolveLocalModule(base);
       assert.ok(child,`Resolve actual component dependency ${specifier}`);
       url=await componentModule(child);
     } else url=import.meta.resolve(specifier);
