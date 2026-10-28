@@ -4,7 +4,8 @@
  *  `korund-start-work` starts the citizen's latest Labor Bureau post when it is one of these four, otherwise the food brigade exactly as before.
  *  Off: no post shift can start, so both tables stay empty and every read (wallet, pool, reconciliation) sums to what it did before.
  *  A shift already started settles even if the flag is later turned off (its claim is keyed on the shift's work order, not the flag).
- *  Migration 0089. No runtime imports beyond types, so tests load it directly. */
+ *  Migration 0089. #885: laborNoteMonthCapSql is appended to postSettleSql only while HARIMU_EMISSION_CAPS_ENABLED is on (lib/emission-caps-rules).
+ *  No runtime imports; tests load this file directly. */
 /** [ASSUMPTION] (ARC: copy the existing Korund shift values): the food brigade's WC cost, length and LN wage (lib/korund korundJob). */
 export const korundPostTerms = { capacityCost: 4, hours: 2, wageMinor: 800 } as const;
 export const korundPosts: Readonly<Record<string, { name: string; output: string }>> = {
@@ -45,3 +46,5 @@ export const postSettleSql = `INSERT OR IGNORE INTO korund_post_settlements(shif
 /** Bind (shiftId): one issuance record per payment, same batch as the settlement; nothing when it did not land. */
 export const laborNoteIssuanceSql = `INSERT OR IGNORE INTO labor_note_issuances(id,shift_id,clerk_user_id,amount_minor,source,issued_at)
  SELECT 'ln-wage:'||shift_id,shift_id,clerk_user_id,wage_minor,'korund-post-wage',settled_at FROM korund_post_settlements WHERE shift_id=?`;
+/** Bind (monthStart, monthEnd) after postSettleSql's four binds. #885: refuse when this wage plus LN issuances in the game month would pass the monthly Charter Limit. */
+export const laborNoteMonthCapSql = ` AND ${korundPostTerms.wageMinor}+COALESCE((SELECT SUM(amount_minor) FROM labor_note_issuances WHERE issued_at>=? AND issued_at<?),0)<=(SELECT (initial_minor*1500)/10000 FROM korund_resources WHERE id='state')`;

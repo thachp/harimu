@@ -1,7 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import {activeRationQueue,readRationQueue,executeRationQueue,queueIdentifierUsed,type RationQueue} from './korund-queue';
 import type { WorkShift } from './work-shifts';
-import { isKorundPost, korundPoolSql, korundPosts, laborNoteIssuanceSql, latestPostSql, postDebitSql, postReceiptSql, postSettleSql, postStartSql, postWorkOrderSql, korundPostTerms } from './korund-posts'; // #886 (b)
+import { isKorundPost, korundPoolSql, korundPosts, laborNoteIssuanceSql, laborNoteMonthCapSql, latestPostSql, postDebitSql, postReceiptSql, postSettleSql, postStartSql, postWorkOrderSql, korundPostTerms } from './korund-posts'; // #886 (b), #885
 import { readBureau, setPreferences, requestAssignment, type BureauView } from './labor-bureau';
 import { laborNoteSql, laborNoteBinds } from './korund-wallet';
 import { readGray, postOffer, acceptOffer, type GrayView } from './gray-market';
@@ -84,7 +84,7 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;streetRate?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -119,7 +119,7 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,...(isKorundPost(s.work_order_id)?{}:{rewardItem:'state food',rewardQuantity:4}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{mvpJobTypes?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean}={}) {
+export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean}={}) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  if(command.action==='korund-gray-post-offer'||command.action==='korund-gray-accept-offer'){
   // #43: the gray market ships off; with the flag off these actions are not found and change nothing.
@@ -174,7 +174,16 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  // #886 (b): a post shift settles into korund_post_settlements with its Labor Note issuance record, in one batch (keyed on the shift, not the flag).
  const order=await db.prepare('SELECT work_order_id FROM work_shifts WHERE id=? AND clerk_user_id=?').bind(shiftId,userId).first<{work_order_id:string}>();
  if(isKorundPost(order?.work_order_id)){
-  await db.batch([db.prepare(korundPoolLockSql),db.prepare(postSettleSql).bind(now,shiftId,userId,iso),db.prepare(laborNoteIssuanceSql).bind(shiftId),
+  // #885: when emission caps are on, append the monthly Charter Limit guard; flag off keeps the original postSettleSql binds byte-identical.
+  let postSettle=db.prepare(postSettleSql).bind(now,shiftId,userId,iso);
+  if(options.emissionCaps){
+   const epoch=Number((await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>())?.epoch_seconds??0);
+   const monthSeconds=216000; // emissionCapsConfig.gameMonthSeconds
+   const month=Math.floor(Math.max(0,now-epoch)/monthSeconds)+1;
+   const start=epoch+(month-1)*monthSeconds, end=start+monthSeconds;
+   postSettle=db.prepare(postSettleSql+laborNoteMonthCapSql).bind(now,shiftId,userId,iso,start,end);
+  }
+  await db.batch([db.prepare(korundPoolLockSql),postSettle,db.prepare(laborNoteIssuanceSql).bind(shiftId),
   db.prepare('UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM korund_post_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)').bind(iso,shiftId,userId,userId)]);
   const paid=await db.prepare('SELECT shift_id FROM korund_post_settlements WHERE shift_id=? AND clerk_user_id=?').bind(shiftId,userId).first();
   return paid?{status:200}:{status:409,error:'Assigned shift is unavailable, unfinished, or the finite Labor Note fund cannot pay it yet.'};
