@@ -83,16 +83,16 @@ test('a muted news desk shows personaMuted on the edition; another desk does not
   assert.equal((await r.call('news', 'alice')).data.personaMuted, undefined);
 });
 
-test('0103 is additive, is not 0086, and the D1 bootstrap uses the same statements', () => {
+test('0105 is additive, is not 0086, and the D1 bootstrap uses the same statements', () => {
   const lib = readFileSync('lib/kill-switch-events.ts', 'utf8');
-  const lite = readFileSync('drizzle/0103_ai_kill_switch_events.sql', 'utf8').split('\n').filter(line => !line.startsWith('--')).join('\n').trim();
+  const lite = readFileSync('drizzle/0105_ai_kill_switch_events.sql', 'utf8').split('\n').filter(line => !line.startsWith('--')).join('\n').trim();
   for (const statement of lite.split(';').map(part => part.trim()).filter(Boolean)) assert.ok(lib.includes(statement), statement.slice(0, 60));
-  for (const file of ['drizzle/0103_ai_kill_switch_events.sql', 'db/postgres/0103_ai_kill_switch_events.sql']) {
+  for (const file of ['drizzle/0105_ai_kill_switch_events.sql', 'db/postgres/0105_ai_kill_switch_events.sql']) {
     const sql = readFileSync(file, 'utf8');
     assert.match(sql, /CREATE TABLE IF NOT EXISTS ai_kill_switch_events/);
     assert.match(sql, /actor IN \('operator'\)/);
     assert.doesNotMatch(sql, /\b(DROP\s+[A-Z]|RENAME\b|TRUNCATE\b|DELETE\s+FROM\b|UPDATE\b)/i, file);
-    assert.doesNotMatch(file, /0086/);
+    assert.doesNotMatch(file, /0086|0103|0104/);
   }
   assert.match(readFileSync('lib/db.ts', 'utf8'), /killSwitchEventSchemas/);
 });
