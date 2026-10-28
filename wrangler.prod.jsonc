@@ -68,6 +68,8 @@
     "HARIMU_GRAY_SUSPICION_ENABLED": "false",
     // #797: after an accepted gray-market trade a checkpoint may seize part of the buyer's LN bundle (chance rises with Suspicion, capped; one per game day); seized LN is destroyed. Off: no roll, no write.
     "HARIMU_GRAY_SEIZURE_ENABLED": "false",
+    // #968: a #776 ration cut adds one shortage line on the rumored street rate (display only; the daily cap and Suspicion stay). Off: no line.
+    "HARIMU_GRAY_RATION_RISE_ENABLED": "false",
     // #737: Plan medals for weekly quota over-fulfilment (derived on read, no table). Off: no medal read, quota bar unchanged.
     "HARIMU_KORUND_MEDALS_ENABLED": "false",
     // #759: weekly quota shortfall shows an Inspection notice and a zero-bonus ledger line (derived on read, no table). Off: no shortfall read, panel unchanged.

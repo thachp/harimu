@@ -70,6 +70,8 @@ export type GrayView = {
   suspicion?: { line: string; privateTag: string; tooltip: string[] } | null;
   /** #797: the latest checkpoint seizure notice (last game day); present only with HARIMU_GRAY_SEIZURE_ENABLED on, null when none. */
   seizure?: string | null;
+  /** #968: one shortage line on the rumored street rate while a #776 ration cut is current. Absent unless HARIMU_GRAY_RATION_RISE_ENABLED is on. */
+  shortage?: string;
 };
 export type GrayResult = { status: number; error?: string; reason?: string; replayed?: boolean; seizedMinor?: number; notice?: string };
 
