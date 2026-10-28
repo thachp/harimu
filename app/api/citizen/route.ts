@@ -11,6 +11,7 @@ import { charterMealSeconds } from '@/lib/aurelle-charters'; // #531
 import { readCrownMint } from '@/lib/crown-debasement';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { korundRationStabilityEnabled } from '@/lib/korund-coupons'; // #967
+import { korundStandingEnabled } from '@/lib/korund-standing-rules'; // #994
 import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
@@ -75,6 +76,8 @@ const grayDailyCapOn = () => (env as unknown as { HARIMU_GRAY_DAILY_CAP_ENABLED?
 const graySuspicionOn = () => (env as unknown as { HARIMU_GRAY_SUSPICION_ENABLED?: string }).HARIMU_GRAY_SUSPICION_ENABLED === 'true';
 // #737: Plan medals for weekly quota over-fulfilment (HARIMU_KORUND_MEDALS_ENABLED); off = no medal read, panel unchanged.
 const korundMedalsOn = () => (env as unknown as { HARIMU_KORUND_MEDALS_ENABLED?: string }).HARIMU_KORUND_MEDALS_ENABLED === 'true';
+// #994: displayed Standing from the #737 medal total (HARIMU_KORUND_STANDING_ENABLED). Also needs the medals flag. Off: no planStanding. citizens.standing is not written.
+const korundStandingOn = () => korundStandingEnabled(env as unknown as { HARIMU_KORUND_MEDALS_ENABLED?: string; HARIMU_KORUND_STANDING_ENABLED?: string });
 // #759: weekly quota shortfall inspection notice and zero-bonus ledger line (HARIMU_KORUND_SHORTFALL_ENABLED); off = no shortfall read, panel unchanged.
 const korundShortfallOn = () => (env as unknown as { HARIMU_KORUND_SHORTFALL_ENABLED?: string }).HARIMU_KORUND_SHORTFALL_ENABLED === 'true';
 // #758: rumored LN street rate in the Korund wallet (HARIMU_WALLET_STREET_RATE_ENABLED); off = no read, wallet unchanged.
@@ -88,7 +91,7 @@ const graySeizureOn = () => (env as unknown as { HARIMU_GRAY_SEIZURE_ENABLED?: s
 const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
-const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged.
+const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn(), standing: korundStandingOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged. #994 standing is read-only too.
 
 export const dynamic = 'force-dynamic';
 const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
