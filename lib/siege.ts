@@ -100,7 +100,7 @@ export const siegeSchemas = [
  assaulted_at INTEGER NOT NULL,
  UNIQUE(siege_id, assault_day)
 )`,
-  // One row per capture (at most one per siege), the record #495 can count; the per-square child lists what moved.
+  // One row per capture step (#933: multiple per siege when the weekly frontier-loss cap forces partial capture); request_id stays unique. The per-square child lists what moved.
   `CREATE TABLE IF NOT EXISTS city_captures (
  id TEXT PRIMARY KEY,
  siege_id TEXT NOT NULL REFERENCES city_sieges(id) ON DELETE CASCADE,
