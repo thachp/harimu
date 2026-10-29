@@ -15,7 +15,7 @@ export const quartermasterExtra = (shifts: number) => Math.min(QUARTERMASTER_MAX
 /** A shift counts while now - shiftedAt < one game day (a shift exactly one game day old has expired). */
 export const quartermasterWindowStart = (nowSec: number) => nowSec - ARMY_GAME_DAY_SECONDS + 1;
 
-/** Mirrored by drizzle/0110_army_quartermaster_shifts.sql. */
+/** Mirrored by drizzle/0111_army_quartermaster_shifts.sql. */
 export const armyQuartermasterSchemas = [
   `CREATE TABLE IF NOT EXISTS army_quartermaster_shifts (request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id) ON DELETE CASCADE, unit_id TEXT NOT NULL, game_day INTEGER NOT NULL, shifted_at INTEGER NOT NULL, UNIQUE(clerk_user_id, game_day))`,
   'CREATE INDEX IF NOT EXISTS idx_army_qm_unit_at ON army_quartermaster_shifts(unit_id, shifted_at)',
