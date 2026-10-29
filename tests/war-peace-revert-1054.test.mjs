@@ -1,7 +1,7 @@
 /** #1054: a treaty returns squares captured in that war unless a concession ceded them. Surrender and flag off leave owners as they are. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { FLAG_PACKS } from '../lib/flag-pack.mjs';
 import { localRuntime } from './helpers/local-runtime.mjs';
@@ -21,6 +21,9 @@ test('flag: packed, preview on, production off, and it needs HARIMU_WAR_ENABLED'
   for (const file of ['app/api/war/route.ts', 'app/api/news/route.ts', 'app/api/citizen/route.ts']) assert.match(read(file), /peaceRevertEnabled/);
   assert.match(read('lib/world-simulation.ts'), /peaceRevert: options\.peaceRevert === true/);
   assert.match(read('tests/helpers/local-runtime.mjs'), /lib\/war-peace-revert\.ts/);
+  assert.equal(existsSync('db/postgres/0112_war_peace_reverts.sql'), true);
+  assert.equal(existsSync('drizzle/0112_war_peace_reverts.sql'), true);
+  assert.equal(existsSync('db/postgres/0111_war_peace_reverts.sql'), false, '0111 is #1056 and #1059');
 });
 
 async function setup(t) {
@@ -119,6 +122,33 @@ test('concession: a ceded square stays and an unceded capture reverts; surrender
   assert.equal(await s.owner(s.squares.siege), 'korund', 'surrender leaves the capture');
   assert.equal((await s.r.db.prepare('SELECT end_kind FROM wars WHERE id=?').bind(war.id).first()).end_kind, 'treaty');
   assert.equal(await s.r.db.prepare('SELECT 1 AS n FROM war_peace_reverts WHERE war_id=?').bind(war.id).first(), null);
+  assert.equal(await s.endings.decideWarEndings(s.r.db, when + 120, { peaceRevert: true }), 0);
+  assert.equal(await s.owner(s.squares.siege), 'korund', 'a later tick still does not return a surrendered square');
+});
+
+test('a treaty that ended before the return still gives the squares back on the next tick', async t => {
+  const c = await setup(t), at = c.nowS();
+  const war = (await c.command({ action: 'declare', nation: 'korund', role: 'Chairman', defender: 'kindle' })).war;
+  await seize(c, { warId: war.id, id: 'cap-crash', square: c.squares.siege, from: 'kindle', to: 'korund', at });
+  const wars = await c.r.importModule('lib/war.ts');
+  assert.equal((await wars.endWar(c.r.db, war.id, 'treaty', at, true, false)).ok, true);
+  assert.equal(await c.owner(c.squares.siege), 'korund', 'the end committed and the return did not');
+  assert.equal(await c.endings.decideWarEndings(c.r.db, at + 60, { peaceRevert: true }), 0);
+  assert.equal(await c.owner(c.squares.siege), 'kindle', 'the next tick returns it');
+  assert.equal(await c.endings.decideWarEndings(c.r.db, at + 120, { peaceRevert: true }), 0);
+  assert.equal(await c.owner(c.squares.siege), 'kindle');
+  assert.equal(Number((await c.r.db.prepare('SELECT COUNT(*) AS n FROM war_peace_reverts').first()).n), 1);
+  const d = await setup(t), when = d.nowS();
+  const war2 = (await d.command({ action: 'declare', nation: 'korund', role: 'Chairman', defender: 'kindle' })).war;
+  await seize(d, { warId: war2.id, id: 'cap-crash-2', square: d.squares.other, from: 'korund', to: 'kindle', at: when, city: 'kolt-savanna' });
+  await seize(d, { warId: war2.id, id: 'cap-crash-cede', square: d.squares.ceded, from: 'aurelle', to: 'kindle', at: when, city: 'lumen-harbor' });
+  assert.equal((await d.command({ action: 'concede', nation: 'kindle', role: 'President', warId: war2.id, squares: [d.squares.ceded] }, { endings: true })).status, 'proposed');
+  assert.equal(await d.endings.decideWarEndings(d.r.db, when + 60), 1);
+  assert.equal(await d.owner(d.squares.other), 'kindle', 'the concession ended and the unceded capture stayed');
+  assert.equal(await d.owner(d.squares.ceded), 'korund');
+  assert.equal(await d.endings.decideWarEndings(d.r.db, when + 120, { peaceRevert: true }), 0);
+  assert.equal(await d.owner(d.squares.other), 'korund', 'the next tick returns the unceded capture');
+  assert.equal(await d.owner(d.squares.ceded), 'korund', 'the ceded square stays');
 });
 
 test('flag off: a treaty and a concession leave captured squares where they are', async t => {

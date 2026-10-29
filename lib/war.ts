@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
-import { revertPeaceCaptures } from './war-peace-revert'; // #1054
+import { peaceRevertStatements } from './war-peace-revert'; // #1054
 import { activeNonAggressionPact } from './diplomacy'; // #402
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
 import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, declarationNextDay, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
@@ -166,11 +166,14 @@ export async function declareWar(db: GameDatabase, command: DeclareWarCommand, n
  *  #1054: `peaceRevert` (HARIMU_WAR_PEACE_REVERT_ENABLED and HARIMU_WAR_ENABLED) returns unceded captures. Off, this is the same write as before. */
 export async function endWar(db: GameDatabase, warId: string, kind: WarEndKind, now: number, enabled: boolean, peaceRevert = false) {
   if (!enabled) return fail(403, 'disabled', 'War is not open yet.');
-  await db.prepare('UPDATE wars SET ended_at=?,end_kind=? WHERE id=? AND ended_at IS NULL').bind(now, kind, warId).run();
+  const end = db.prepare('UPDATE wars SET ended_at=?,end_kind=? WHERE id=? AND ended_at IS NULL').bind(now, kind, warId);
+  // #1054: the return rides in the same batch as the end, and only if this statement made the war a treaty. A retry of an end that already committed still returns the squares.
+  if (peaceRevert && kind === 'treaty') {
+    const revert = await peaceRevertStatements(db, warId, now, { gate: "EXISTS (SELECT 1 FROM wars WHERE id=? AND end_kind='treaty')", gateBinds: [warId] });
+    await db.batch([end, ...revert]);
+  } else await end.run();
   const row = await db.prepare(`SELECT ${columns} FROM wars WHERE id=?`).bind(warId).first<Row>();
-  if (!row) return fail(409, 'not_found', 'No such war.');
-  if (peaceRevert && kind === 'treaty' && row.end_kind === 'treaty') await revertPeaceCaptures(db, warId, now);
-  return { ok: true as const, war: publicWar(row, now) };
+  return row ? { ok: true as const, war: publicWar(row, now) } : fail(409, 'not_found', 'No such war.');
 }
 
 /** Read-only. With the flag off the caller does not call this; a database without migration 0031 reads as no wars. */
