@@ -106,7 +106,7 @@ test('leader panel: the succession line, the acceded ruler, and nothing when the
 
 test('the succession fields are attached in the citizen route only behind the flag, and the lib stays read-only', async () => {
   const route = await readFile(new URL('../app/api/citizen/route.ts', import.meta.url), 'utf8');
-  assert.match(route, /successionOn \? readSuccession\(database\) : null/); assert.match(route, /succession && profile\?\.nation_id === 'aurelle'/);
+  assert.match(route, /successionOn\(\) \? readSuccession\(database\) : null/); assert.match(route, /succession && profile\?\.nation_id === 'aurelle'/);
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const cfg = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_SUCCESSION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), [value], `${file}: preview on, production off`);

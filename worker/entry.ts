@@ -5,6 +5,7 @@ import { getDatabase } from '../lib/db';
 import { readCityLocation } from '../lib/city-location';
 import { runCabinetCron } from '../lib/cabinet-cron';
 import { cronJobsOn, type CronFlagBindings } from '../lib/cron-gates';
+import { flagOn } from '../lib/flag-pack.mjs'; // #988
 import { runRallyCron } from '../lib/rallies'; // #867
 import { runRallySpeechCron, type RallySpeechBindings } from '../lib/rally-speech-ai'; // #876
 import { runDiplomacyCron } from '../lib/diplomacy';
@@ -35,7 +36,7 @@ const worker = {
     if (on.diplomacy) ctx.waitUntil((async () => runDiplomacyCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string }))()
       .then(() => undefined, error => { console.warn('[cron] AI treaty proposals failed', error instanceof Error ? error.name : 'unknown'); }));
     // #362: the AI Monarch's yearly Crown debasement decree; a no-op unless HARIMU_CROWN_DEBASEMENT_ENABLED="true". Never runs on a read.
-    if (on.crown) ctx.waitUntil((async () => runCrownCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true', emissionCaps: (env as unknown as { HARIMU_EMISSION_CAPS_ENABLED?: string }).HARIMU_EMISSION_CAPS_ENABLED === 'true' }))()
+    if (on.crown) ctx.waitUntil((async () => runCrownCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), { enabled: flagOn(env, 'HARIMU_CROWN_DEBASEMENT_ENABLED'), emissionCaps: (env as unknown as { HARIMU_EMISSION_CAPS_ENABLED?: string }).HARIMU_EMISSION_CAPS_ENABLED === 'true' }))()
       .then(() => undefined, error => { console.warn('[cron] Crown debasement failed', error instanceof Error ? error.name : 'unknown'); }));
     // #441: AI town hall answers for closed halls; a no-op unless HARIMU_TOWN_HALLS_ENABLED and HARIMU_AI_TOWN_HALL_ANSWERS_ENABLED are "true" (both default "false"), with the AI binding and budget. Never runs on a read.
     if (on.townHall) ctx.waitUntil((async () => runTownHallCron(await getDatabase(), Math.floor(controller.scheduledTime / 1000), env as unknown as Parameters<typeof runTownHallCron>[2]))()

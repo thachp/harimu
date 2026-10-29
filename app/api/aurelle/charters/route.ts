@@ -6,16 +6,18 @@ import { royalFavorBalance } from '@/lib/aurelle';
 import { actCharter, parseCharterCommand, readCharter, revokeCharter } from '@/lib/aurelle-charters';
 import { charterGrantFavorCost, charterRenewFavorCost, charterRenewWindowSeconds, charterTermSeconds } from '@/lib/aurelle-charter-rules';
 import { qaTestCitizenAllowed, type QaBindings } from '@/lib/qa-tools';
+import { flagOn } from '@/lib/flag-pack.mjs'; // #988
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
-const flags = () => env as unknown as QaBindings & { HARIMU_AURELLE_CHARTERS_ENABLED?: string; HARIMU_FAVOR_DECAY_ENABLED?: string };
+const flags = () => env as unknown as QaBindings & { HARIMU_FAVOR_DECAY_ENABLED?: string };
+const chartersOn = () => flagOn(env, 'HARIMU_AURELLE_CHARTERS_ENABLED');
 const notFound = () => privateJson({ error: 'Not found.', reason: 'disabled' }, 404);
 const favorDecayAt = (now: number) => flags().HARIMU_FAVOR_DECAY_ENABLED === 'true' ? now : undefined;
 
 // #531: Aurelle guild charter PoC. Flag HARIMU_AURELLE_CHARTERS_ENABLED off (the shipped default) is a 404 before anything else (auth, validation, reads and writes).
 export async function GET(request: Request) {
-  if (flags().HARIMU_AURELLE_CHARTERS_ENABLED !== 'true') return notFound();
+  if (!chartersOn()) return notFound();
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   const db = await getDatabase(); const now = Math.floor(Date.now() / 1000);
@@ -24,7 +26,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (flags().HARIMU_AURELLE_CHARTERS_ENABLED !== 'true') return notFound();
+  if (!chartersOn()) return notFound();
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   if (!isSameOriginCommand(request)) return privateJson({ error: 'Same-origin request required.' }, 403);

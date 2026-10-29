@@ -27,11 +27,12 @@ test('quoteCrownTessera uses the official milli rate and rounds down in integer 
   assert.equal(quoteCrownTessera(1.5, 500), 0);
 });
 
-test('the flag is "true" in preview and "false" in production, with a full-line comment', async () => {
+test('the flag is "true" in preview and "false" in production, inside HARIMU_AURELLE_PACK, with a full-line pack comment', async () => {
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const cfg = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_TSR_VIEW_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), [value], file);
-    assert.match(cfg, new RegExp(`^\\s*// #999:.*\\n\\s*"HARIMU_AURELLE_TSR_VIEW_ENABLED": "${value}",$`, 'm'), `${file}: the comment is a full line above the flag`);
+    assert.equal([...cfg.matchAll(/"HARIMU_AURELLE_TSR_VIEW_ENABLED"\s*:/g)].length, 1, `${file}: not a standalone var as well as the pack`);
+    assert.match(cfg, /^\s*\/\/ #988 \/ #999:.*\n\s*"HARIMU_AURELLE_PACK": \{$/m, `${file}: the pack comment is a full line above HARIMU_AURELLE_PACK`);
   }
 });
 
@@ -51,10 +52,13 @@ test('the Aurelle panel shows the official-rate line only when the plan carries 
   assert.doesNotMatch(render('market', { ...plan, walletMinor: 1999, crownRateMilli: 500 }), /10\.00 TSR/);
 });
 
+const aurellePack = (overrides = {}) => JSON.stringify({
+  HARIMU_AURELLE_RISING_ENABLED: 'false', HARIMU_AURELLE_COUP_ENABLED: 'false', HARIMU_AURELLE_CHARTERS_ENABLED: 'false',
+  HARIMU_AURELLE_SUCCESSION_ENABLED: 'false', HARIMU_CROWN_DEBASEMENT_ENABLED: 'false', HARIMU_AURELLE_TSR_VIEW_ENABLED: 'false', ...overrides,
+});
 async function setup(t, { tsr = false, mint = false } = {}) {
   const r = await localRuntime(); t.after(() => r.close());
-  if (tsr) r.setFixtureEnv('HARIMU_AURELLE_TSR_VIEW_ENABLED', 'true');
-  if (mint) r.setFixtureEnv('HARIMU_CROWN_DEBASEMENT_ENABLED', 'true');
+  if (tsr || mint) r.setFixtureEnv('HARIMU_AURELLE_PACK', aurellePack({ ...(tsr ? { HARIMU_AURELLE_TSR_VIEW_ENABLED: 'true' } : {}), ...(mint ? { HARIMU_CROWN_DEBASEMENT_ENABLED: 'true' } : {}) }));
   await r.db.prepare("UPDATE citizens SET nation_id='aurelle' WHERE clerk_user_id='alice'").run();
   await r.call('world', null);
   return r;
