@@ -100,7 +100,7 @@ test('scope: MVP nations only; no real-world reference, Notable or influence spr
   const t=all().join(' ');
   assert.doesNotMatch(t,/\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/); assert.doesNotMatch(t,/\b(Earth|America|Europe|China|Russia|Rome|Roman|Britain|Columbus)\b|Notable|@/); assert.doesNotMatch(t,/influence|sanction|embargo/i);
 });
-test('unwired: nothing in app/ or components/ imports land-copy', () => {
+test('unwired: nothing in app/ or components/ imports land-copy, except the #1017 zone legend', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/land-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/world-zones.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/land-copy/, f);
 });

@@ -38,6 +38,19 @@ test('only a closed snapshot renders aggregate counts and foreign namespace cann
  const h=harness({...snapshot(),nationId:'foreign'});h.all(h.render()).find(node=>node?.type==='form').props.onSubmit({preventDefault(){}});await new Promise(setImmediate);assert.equal(h.received.length,0);assert.match(renderToStaticMarkup(h.render()),/Citizenship or election changed/);
 });
 
+test('#1016 High Court certification renders on a closed ballot only when the snapshot carries the line',async()=>{
+ const closed=()=>{const data=snapshot();data.status='closed';data.result={winner:ids[0],humanBallots:1,simulatedPublicUnits:1,weightScale:4,rounds:[{human:{[ids[0]]:1,[ids[1]]:0,[ids[2]]:0},simulatedUnits:{[ids[0]]:0,[ids[1]]:0,[ids[2]]:0},weightedUnits:{[ids[0]]:0,[ids[1]]:0,[ids[2]]:0},eliminated:null}]};return data;};
+ const plain=renderToStaticMarkup(harness(closed()).render());
+ assert.match(plain,/Voting closed/);assert.doesNotMatch(plain,/High Court|President-elect/);
+ const awaiting={...closed(),certification:{state:'awaiting',certifiesAt:1,line:'The count is finished. The AI High Court certifies the result within 24 hours.'}};
+ const waitHtml=renderToStaticMarkup(harness(awaiting).render());
+ assert.match(waitHtml,/aria-label="High Court certification"/);assert.match(waitHtml,/within 24 hours/);assert.doesNotMatch(waitHtml,/President-elect/);
+ const certified={...closed(),certification:{state:'certified',certifiesAt:1,line:'The AI High Court has certified the result. Ines Varro is President-elect.'}};
+ assert.match(renderToStaticMarkup(harness(certified).render()),/Ines Varro is President-elect/);
+ const open={...snapshot(),certification:{state:'certified',certifiesAt:1,line:'The AI High Court has certified the result. Ines Varro is President-elect.'}};
+ assert.doesNotMatch(renderToStaticMarkup(harness(open).render()),/High Court|President-elect/);
+});
+
 test('#936 ranked ballot accepts a cycle-N election id (QA2)',async()=>{
  const data={...snapshot(),id:'kindle-presidential-poc-1-cycle-1'};const h=harness(data);
  h.all(h.render()).find(node=>node?.type==='form').props.onSubmit({preventDefault(){}});await new Promise(setImmediate);

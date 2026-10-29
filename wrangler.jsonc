@@ -91,7 +91,9 @@
       // #992: closed-system internal residence permit for home-city moves (Korund, Meridian; Varkand at Amber/Red). Off: #781 path unchanged.
       "HARIMU_INTERNAL_PERMIT_ENABLED": "true",
       // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
-      "HARIMU_SAVINGS_SHIELD_ENABLED": "true"
+      "HARIMU_SAVINGS_SHIELD_ENABLED": "true",
+      // #1016: closed Kindle presidential ballot shows High Court certification (awaiting for 24 hours, then certified). Off: no certification field, ballot unchanged. Display only.
+      "HARIMU_KINDLE_CERTIFICATION_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
@@ -258,6 +260,8 @@
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
+    // #1017: zone overlay legend explains each zone and keys the capital/outpost markers (docs §6.1, §23.2). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "true",
     // #790: square chat shadow-mute (docs 21.3), new messages only. Operator list of citizenId@muteISO or citizenId@muteISO..unmuteISO entries (max 90; unmute by closing the window, not deleting it), comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.
     // #790 unmute: close the window (id@mute..unmute) so posts made during the mute stay hidden. Deleting an entry reveals that window's posts; only do it as a deliberate admin action.
     "HARIMU_CHAT_SHADOW_MUTE": "",

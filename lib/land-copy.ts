@@ -1,6 +1,6 @@
 /** Land copy: zone tooltips, World Registry purchase and city founding news for Kindle, Korund and Aurelle (issue #338). Content
  * only: lib/map-zones.ts (#66), lib/world-registry.ts (#122) and lib/city-founding.ts (#124) own zones, purchases and founding, and
- * no UI imports this. Canon: harimu-docs world/map-design §6.1 (Heartland never capturable; Frontier; Wildlands; the Commons cannot
+ * the only UI import is app/world-zones.tsx (#1017 zone legend, zoneTooltips). Canon: harimu-docs world/map-design §6.1 (Heartland never capturable; Frontier; Wildlands; the Commons cannot
  * be bought, claimed only by war, treaty or joint development), territory-cities-warfare §15.1 (unclaimed Wildlands squares next to
  * owned land can be bought from the World Registry; an Expedition travels to a Wildlands site and on arrival claims a radius-2
  * block; minimum distance between cities is 6 squares; since v0.7 the nation's AI leadership decides: Kindle the AI government,
