@@ -13,7 +13,7 @@ import { ActionButton } from './action-button';
 import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import { CountryScene } from './country-scene';
 import { HomeMoveCard } from './home-move-card'; // #781
-import { capitalCityForNation, citiesForNation, cityForNation } from '@/lib/cities';
+import { capitalCityForNation, cityForNation, residentCitiesForNation } from '@/lib/cities';
 import type { CityLocation, CoResident } from '@/lib/city-location';
 import { NationComparison } from './nation-comparison';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
@@ -802,7 +802,7 @@ export default function Home() {
     const timer = window.setTimeout(() => setHoldExpiredFor(holdEpisode), identityHoldTimeoutMs);
     return () => window.clearTimeout(timer);
   }, [sessionLoading, holdEpisode]);
-  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;specialtyRole?:string;specialtyNote?:string}} | null>(null);
+  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;specialtyRole?:string;specialtyNote?:string;spaWcNote?:string}} | null>(null);
   const [cityError, setCityError] = useState('');
   const [cityRetry, setCityRetry] = useState(0);
   const [cityTravelPending, setCityTravelPending] = useState(false);
@@ -814,7 +814,7 @@ export default function Home() {
     const loadCity = async () => {
       try {
         const response = await fetch('/api/city', {cache:'no-store',signal:controller.signal});
-        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;specialtyRole?:string;specialtyNote?:string;error?:string};
+        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;specialtyRole?:string;specialtyNote?:string;spaWcNote?:string;error?:string};
         if (controller.signal.aborted || epoch !== citizenEpoch.current) return;
         if (!response.ok || value.nationId !== citizenNationId || !cityForNation(value.nationId,value.currentCityId)) throw Error(value.error ?? 'City account unavailable.');
         setCityAccount({key:citizenSessionKey,value}); setCityError('');
@@ -1308,7 +1308,7 @@ export default function Home() {
     cityTravelLock.current=true;setCityTravelPending(true);setCityError('');
     try {
       const response=await fetch('/api/city',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'travel',cityId})});
-      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;specialtyRole?:string;specialtyNote?:string;error?:string};
+      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;specialtyRole?:string;specialtyNote?:string;spaWcNote?:string;error?:string};
       if(epoch!==citizenEpoch.current)return;
       if(!response.ok || value.nationId!==citizenNation.id || value.currentCityId!==cityId)throw Error(value.error ?? 'Travel could not be confirmed. Refresh your city account before retrying.');
       setCityAccount({key:citizenSessionKey,value});
@@ -1844,7 +1844,7 @@ export default function Home() {
   const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} />{countryOwnNation ? <HomeMoveCard nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} /> : null}</>;
   const countryPanel = <section aria-label={`${countryWord()} travel`}><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
   const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
-    <CitySummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} city={activeCity} nation={citizenNation ?? selected} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} onView={changeView} tierUnlocks={currentCityAccount?.tierName && currentCityAccount.districtSlots != null && currentCityAccount.unlocks ? { tierName: currentCityAccount.tierName, districtSlots: currentCityAccount.districtSlots, unlocks: currentCityAccount.unlocks } : null} festivalNote={currentCityAccount?.festivalNote ?? null} specialtyRole={currentCityAccount?.specialtyRole ?? null} specialtyNote={currentCityAccount?.specialtyNote ?? null} />
+    <CitySummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} city={activeCity} nation={citizenNation ?? selected} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} onView={changeView} tierUnlocks={currentCityAccount?.tierName && currentCityAccount.districtSlots != null && currentCityAccount.unlocks ? { tierName: currentCityAccount.tierName, districtSlots: currentCityAccount.districtSlots, unlocks: currentCityAccount.unlocks } : null} festivalNote={currentCityAccount?.festivalNote ?? null} specialtyRole={currentCityAccount?.specialtyRole ?? null} specialtyNote={currentCityAccount?.specialtyNote ?? null} spaWcNote={currentCityAccount?.spaWcNote ?? null} />
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {welcomeBack && <WelcomeBack nationId={citizenNation?.id} data={welcomeBack} now={Date.now()} onClose={() => setWelcomeBack(null)} />}{firstLoopHint}{weekTracker}{dailyLoop}
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
@@ -1931,7 +1931,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? `${countryWord()} travel` : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} onWelcomeBack={setWelcomeBack} />}
-    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} openNations={previewOpenNations(openNations, clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} armyMap={armyMapFlag} countdown={guestActive || !citizenNation ? undefined : { nationId: citizenNation.id, cycleStartAt, election, wars: simulation?.wars ?? null }} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} openNations={previewOpenNations(openNations, clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} armyMap={armyMapFlag} wcNote={currentCityAccount?.spaWcNote} countdown={guestActive || !citizenNation ? undefined : { nationId: citizenNation.id, cycleStartAt, election, wars: simulation?.wars ?? null }} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
@@ -1947,7 +1947,7 @@ export default function Home() {
           const quality: QualityInput | undefined = 'skip' in choice ? choice : ticket ? { answers: choice.answers, ticket } : undefined;
           void runWork('commit-work', order, undefined, quality); }} />}
       {pendingNation && <CitizenshipDialog key={`${citizenSessionKey}:${pendingNation.id}`} nation={pendingNation} reviewStorageKey={reviewStorageKey} currentNationName={citizenNation?.name} expectedNationId={enrollmentExpectedNation}
-        homeCities={enrollHomeCity ? citiesForNation(pendingNation.id) : undefined}
+        homeCities={enrollHomeCity ? residentCitiesForNation(pendingNation.id) : undefined}
         session={clerkConfigured ? citizenSessionStatus : 'ready'} pending={enrollmentPending} error={enrollmentError}
         onRetrySession={() => setSessionRetry(value=>value+1)} onClose={() => { if (!enrollmentLock.current) closeEnrollmentReview(); }}
         onConfirm={cityId => void confirmEnrollment(pendingNation, cityId)}

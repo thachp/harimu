@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { expandFlagPacks, flagOn, flagValue } from '../lib/flag-pack.mjs';
+import { expandFlagPacks, FLAG_PACKS, flagOn, flagValue } from '../lib/flag-pack.mjs';
 import { armiesEnabled } from '../lib/army-rules.ts';
 import { dashboardManagedVars } from '../scripts/wrangler-pin.mjs';
 
@@ -24,8 +24,13 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK };
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 12);
+  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 5);
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 5);
+  const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
+  assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_CITY_PACK: prod.vars.HARIMU_CITY_PACK }, 'HARIMU_SPA_WC_BONUS_ENABLED'), false);
   assert.equal(flagOn(on, 'HARIMU_GRAY_RATION_RISE_ENABLED'), true);
   assert.equal(flagOn({ ...on, HARIMU_GRAY_MARKET_ENABLED: 'false' }, 'HARIMU_GRAY_MARKET_ENABLED'), false, 'a direct binding wins over the pack');
   assert.equal(flagValue({ HARIMU_GRAY_PACK: '{' }, 'HARIMU_GRAY_MARKET_ENABLED'), undefined, 'a bad pack is off');

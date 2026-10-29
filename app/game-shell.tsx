@@ -73,6 +73,8 @@ export type GameShellProps = {
   mapOverlays?: boolean;
   /** #738 slice 4: flags.armyMap; the Army positions overlay is available only while true. */
   armyMap?: boolean;
+  /** #798: spa-home WC line. Omitted leaves the Work capacity tooltip unchanged. */
+  wcNote?: string | null;
   onSelectNation?: (id: string) => void;
   accountControls?: ReactNode;
   socialDock?: ReactNode;
@@ -104,7 +106,7 @@ function HudHelp({ label, children, help, open = false }: { label: string; child
   return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ openNations, worldClock, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ openNations, worldClock, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -182,7 +184,7 @@ export function GameShell({ openNations, worldClock, holidayName, countdown = nu
       <div className="game-identity"><span className="game-crest" aria-hidden="true">H</span><div><strong>HARIMU</strong><span><span role="status">{identityHold === 'loading' ? 'Loading your citizen…' : null}</span>{identityHold !== 'none' ? null : <>{emblemOn && <NationEmblemMark id={resourceNation.id} name={resourceNation.name} />}{resourceNation.name}<i />{identityStatus({ guestDemo, localDemo, hasCitizenNation: Boolean(citizenNation) }, emblemOn)}</>}</span></div></div>
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>
         {guestDemo ? <span>No account · sample actions only</span> : !citizenNation && !localDemo ? <HudHelp label="Resources" open={isOpen("Resources")} help="Work capacity, money, food, materials and knowledge unlock after citizenship. Exploring nations does not create a citizen."><span>Resources unlock after citizenship</span></HudHelp> : <>
-        <HudHelp label="Work capacity" open={isOpen("Work capacity")} help="Work capacity (WC) is energy available for jobs and civic actions. Meals restore it. Jobs use real-time timers."><Lightning size={19} weight="fill" aria-hidden="true" /><strong>{capacity}</strong><span>WC</span></HudHelp>
+        <HudHelp label="Work capacity" open={isOpen("Work capacity")} help={`Work capacity (WC) is energy available for jobs and civic actions. Meals restore it. Jobs use real-time timers.${wcNote ? ` ${wcNote}` : ''}`}><Lightning size={19} weight="fill" aria-hidden="true" /><strong>{capacity}</strong><span>WC</span></HudHelp>
         {onOpenWallet && currencyCode === 'SPK' ? <button type="button" className="game-wallet-button" aria-label={`Open wallet · ${walletMinor === undefined ? 'loading' : (walletMinor / 100).toFixed(2)} SPK`} aria-haspopup="dialog" onClick={onOpenWallet}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></button>
         : <HudHelp label="Wallet" open={isOpen("Wallet")} help={`Your ${currencyCode} wallet holds national money. Amounts update after completed transactions; loading means the citizen snapshot has not arrived.`}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></HudHelp>}
         <HudHelp label="Food" open={isOpen("Food")} help="Food in your inventory can be used for meals to restore work capacity. Loading means the citizen snapshot has not arrived."><Bread size={19} aria-hidden="true" /><strong>{inventory?.food ?? 'Loading'}</strong><span>Food</span></HudHelp>

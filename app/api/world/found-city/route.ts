@@ -6,6 +6,7 @@ import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { foundCity, parseFoundingCommand } from '@/lib/city-founding';
 import { citySpecialtyFields } from '@/lib/cities'; // #996
 import { cityTierName, cityTierUnlockFields, cityTierFestivalNote } from '@/lib/city-tier'; // #952 / #979 / #984
+import { flagOn } from '@/lib/flag-pack.mjs'; // #798 city pack
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -14,7 +15,7 @@ const privateJson = (data: unknown, status = 200) => Response.json(data, { statu
 export async function POST(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  const enabled = (env as unknown as { HARIMU_CITY_FOUNDING_ENABLED?: string }).HARIMU_CITY_FOUNDING_ENABLED === 'true';
+  const enabled = flagOn(env, 'HARIMU_CITY_FOUNDING_ENABLED');
   // #384 L1: flag off answers before the travel read or the citizen read (same body as foundCity's own refusal).
   if (!enabled) return privateJson({ error: 'City founding is not enabled yet.', reason: 'disabled' }, 403);
   { // #123: location-bound while travelling (QA1 on #264); no-op unless HARIMU_TRAVEL_ENABLED=true.
@@ -34,11 +35,10 @@ export async function POST(request: Request) {
   // #979: unlocks flag adds districtSlots + unlocks (and tierName) from the doc table; flag off leaves the body unchanged.
   // #984: festival-note flag adds festivalNote from the Cities tier table; flag off leaves the body unchanged.
   // #996: specialty flag adds specialtyRole/specialtyNote when the city is in the catalog (founded cities omit).
-  const vars = env as unknown as { HARIMU_CITY_TIER_GROWTH_ENABLED?: string; HARIMU_CITY_TIER_UNLOCKS_ENABLED?: string; HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?: string; HARIMU_CITY_SPECIALTY_NOTE_ENABLED?: string };
-  const growth = vars.HARIMU_CITY_TIER_GROWTH_ENABLED === 'true';
-  const unlocksOn = vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED === 'true';
-  const noteOn = vars.HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED === 'true';
-  const specialtyOn = vars.HARIMU_CITY_SPECIALTY_NOTE_ENABLED === 'true';
+  const growth = (env as unknown as { HARIMU_CITY_TIER_GROWTH_ENABLED?: string }).HARIMU_CITY_TIER_GROWTH_ENABLED === 'true';
+  const unlocksOn = flagOn(env, 'HARIMU_CITY_TIER_UNLOCKS_ENABLED');
+  const noteOn = flagOn(env, 'HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED');
+  const specialtyOn = flagOn(env, 'HARIMU_CITY_SPECIALTY_NOTE_ENABLED');
   const tier = growth ? result.city.tier : 1;
   let city: Record<string, unknown> = growth ? { ...result.city, tier, tierName: cityTierName(tier) } : { ...result.city, tier };
   if (unlocksOn) city = { ...city, ...cityTierUnlockFields(tier) };
