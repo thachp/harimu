@@ -72,29 +72,25 @@ test('flag off by default; only the packed string "true" turns the HUD on, and a
   assert.equal(worldAgesEnabled({ HARIMU_UI_PACK: { HARIMU_WORLD_AGES_ENABLED: 'true' }, HARIMU_WORLD_AGES_ENABLED: 'false' }), false);
 });
 
-test('every shell bundler inlines the Age flag so a browser bundle never reads process', async () => {
-  const { readdir, readFile } = await import('node:fs/promises');
-  const dir = new URL('../scripts/', import.meta.url);
-  const bundlers = [];
-  for (const name of await readdir(dir)) {
-    if (!name.endsWith('.mjs')) continue;
-    const src = await readFile(new URL(name, dir), 'utf8');
-    if (/from 'esbuild'/.test(src) && /\bdefine\s*:/.test(src)) bundlers.push([name, src]);
-  }
-  assert.ok(bundlers.length >= 8);
-  for (const [name, src] of bundlers) assert.match(src, /process\.env\.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED/, name);
+test('the server reads the pack and the shell takes a prop; no browser bundle reads process for this flag', async () => {
+  const shell = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
+  const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  const route = await readFile(new URL('../app/api/world/route.ts', import.meta.url), 'utf8');
   const helper = await readFile(new URL('../lib/world-age.ts', import.meta.url), 'utf8');
-  assert.match(helper, /process\.env\.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED/);
-  assert.doesNotMatch(helper, /process\.env\.HARIMU_WORLD_AGES_ENABLED/);
+  assert.match(route, /worldAges: flagOn\(env, 'HARIMU_WORLD_AGES_ENABLED'\)/);
+  assert.match(page, /setWorldAges\(data\.worldAges === true\)/);
+  assert.match(page, /worldAges=\{worldAges\}/);
+  assert.match(shell, /\{worldAges && !guestDemo && worldClock && <AgeReadout /);
+  assert.equal(shell.match(/<AgeReadout /g).length, 1);
+  assert.doesNotMatch(shell, /worldAgesEnabled\(/);
+  assert.doesNotMatch(`${shell}\n${helper}\n${page}`, /process\.env\.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED|process\.env\.HARIMU_WORLD_AGES_ENABLED/);
 });
 
-test('flag off: the HUD clock renders no Age markup unless the flag is on (readout is gated, guest demo stays hidden)', async () => {
+test('flag off: the HUD clock renders no Age markup unless the prop is on (guest demo stays hidden)', async () => {
   const src = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
-  assert.match(src, /\{worldAgesEnabled\(\) && !guestDemo && worldClock && <AgeReadout /);
-  assert.equal(src.match(/<AgeReadout /g).length, 1);
   assert.match(src, /title=\{tip\}/);
   assert.match(src, /<GameTimer compact endsAt=\{age\.endsAt\} label="Next Age in"/);
-  assert.match(src, /Age \$\{age\.age\}|ageHudLine\(age\)/);
+  assert.match(src, /ageHudLine\(age\)/);
 });
 
 test('preview pack is on, production pack is off, and neither file adds a text binding', async () => {
@@ -106,8 +102,8 @@ test('preview pack is on, production pack is off, and neither file adds a text b
   assert.equal(prod.vars.HARIMU_UI_PACK.HARIMU_WORLD_AGES_ENABLED, 'false');
   assert.equal(expandFlagPacks(preview.vars).HARIMU_WORLD_AGES_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_WORLD_AGES_ENABLED, 'false');
-  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, 'true');
-  assert.equal(varsForProcessEnv(prod.vars).NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, undefined);
+  assert.equal(varsForProcessEnv(prod.vars).HARIMU_WORLD_AGES_ENABLED, undefined);
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, undefined);
   assert.equal(prod.vars.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, undefined);
 });

@@ -81,8 +81,7 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(flagOn({ HARIMU_UI_PACK: prod.vars.HARIMU_UI_PACK }, 'HARIMU_WORLD_AGES_ENABLED'), false);
   assert.equal(expandFlagPacks(preview.vars).HARIMU_WORLD_AGES_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_WORLD_AGES_ENABLED, 'false');
-  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, 'true', 'the client build still inlines the packed flag');
-  assert.equal(varsForProcessEnv(prod.vars).NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, 'false');
-  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, HARIMU_WORLD_AGES_ENABLED: 'false' }).NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, 'false', 'a direct string wins');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, undefined, 'the client build does not inline the packed age flag');
+  assert.equal(varsForProcessEnv(prod.vars).HARIMU_WORLD_AGES_ENABLED, undefined);
   assert.equal(flagOn({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, HARIMU_WORLD_AGES_ENABLED: 'false' }, 'HARIMU_WORLD_AGES_ENABLED'), false, 'a direct string wins over the pack');
 });

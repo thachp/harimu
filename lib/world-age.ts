@@ -8,13 +8,9 @@ export const AGE_GAME_YEARS = 12;
 export const ageYearMs = 30 * 86_400_000;
 export const ageLengthMs = AGE_GAME_YEARS * ageYearMs;
 
-/** HARIMU_WORLD_AGES_ENABLED lives in HARIMU_UI_PACK, not its own text binding. The client build copies the
- *  packed value onto NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED so Next (and the shell bundlers) inline this one read.
- *  A direct string still wins when a caller passes env. */
-export const worldAgesEnabled = (env?: unknown) => flagOn(
-  env ?? { HARIMU_WORLD_AGES_ENABLED: process.env.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED },
-  'HARIMU_WORLD_AGES_ENABLED',
-);
+/** HARIMU_WORLD_AGES_ENABLED lives in HARIMU_UI_PACK, not its own text binding. Callers pass the Worker env
+ *  (GET /api/world). A direct string still wins. This module never reads process.env, so a browser bundle cannot inline a constant. */
+export const worldAgesEnabled = (env?: unknown) => flagOn(env, 'HARIMU_WORLD_AGES_ENABLED');
 
 export type WorldAge = { age: number; year: number; startsAt: number; endsAt: number; remainingMs: number };
 

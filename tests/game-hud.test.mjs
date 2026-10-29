@@ -31,6 +31,13 @@ test('#455/#533: while the citizen row loads the top bar shows a neutral or load
 });
 test('citizen resource help is keyboard native and screen reader descriptive, with explicit snapshot loading',()=>{const tree=render({citizenNation:props.nation});const summaries=tree.filter(n=>n?.type==='summary');assert.equal(summaries.length,6);for(const summary of summaries){const description=tree.find(n=>n?.props?.id===summary.props['aria-describedby']);assert.ok(description);assert.ok(text(nodes(description)).length>40);}assert.match(text(tree),/Loading world/);assert.match(text(tree),/real-time deadline/);assert.match(text(tree),/Loading/);});
 test('world snapshot uses compressed day and visits while Civic is active for nation view',()=>{const tree=render({view:'nation',worldClock:{gameDay:2,latestTick:1,pendingTicks:0}});assert.match(text(tree),/Day 2 · 12×/);assert.match(text(tree),/TICK 1 · ON VISITS/);assert.equal(tree.find(n=>n?.type==='button'&&n.props['aria-label']==='Open Civic').props['aria-current'],'page');assert.equal(tree.find(n=>n?.type==='a'&&n.props.className==='game-glossary').props.href,'https://docs.harimu.com/appendices/glossary/');});
+test('#1041 flag on renders Age N, year Y of 12; flag off and the guest demo render none',()=>{
+  const worldClock={epochSeconds:1_700_000_000,nowSeconds:1_700_000_000,gameDay:1,latestTick:0};
+  const shown=tree=>{const walk=node=>{if(Array.isArray(node))return node.flatMap(walk); if(!node||typeof node!=='object')return [node]; if(typeof node.type==='function'&&node.type.name==='AgeReadout')return walk(node.type(node.props)); return [node,...[node.props?.children].flat(Infinity).flatMap(walk)];}; return walk(tree).filter(n=>typeof n==='string').join(' ');};
+  assert.match(shown(render({citizenNation:props.nation,worldClock,worldAges:true})),/Age 1, year 1 of 12/);
+  assert.doesNotMatch(shown(render({citizenNation:props.nation,worldClock})),/Age 1, year 1 of 12/);
+  assert.doesNotMatch(shown(render({citizenNation:props.nation,worldClock,worldAges:true,guestDemo:true})),/Age 1, year 1 of 12/);
+});
 
 test('only success notices expire; errors remain until dismissed',()=>{
   const originalSet=globalThis.setTimeout,originalClear=globalThis.clearTimeout;
