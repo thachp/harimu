@@ -47,7 +47,7 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  if(importsOn){const n=cityImportsFields(nationId,cityId);if(n)out={...out,...n};} // #1001 port / trade zone only
  if(populationOn)out={...out,populationNote:cityTierPopulationNote(tier)}; // #1014 read-only
  if(governorOn)out={...out,...cityGovernorFields(nationId,tier)}; // #1007
- if(seaOn&&cityImportsFields(nationId,cityId)){const n=seaLanesStormNote(await worldEpochMs(db),Date.now(),true);if(n)out={...out,seaLanesNote:n};} // #1034 port / trade zone, winter only
+ if(seaOn&&/port/i.test(cityForNation(nationId,cityId)?.role??'')){const n=seaLanesStormNote(await worldEpochMs(db),Date.now(),true);if(n)out={...out,seaLanesNote:n};} // #1034 ports only (ARC #1037), winter only
  return out;
 }
 export async function GET(request:Request){

@@ -43,11 +43,11 @@ test('flag: in HARIMU_CITY_PACK, "true" in preview and "false" in production', (
 test('route: winter port freight pays less only with the flag on; inland, summer and flag off are unchanged', async t => {
   const r = await localRuntime(); t.after(() => r.close());
   await r.db.prepare("UPDATE work_orders SET nation_id='confluence' WHERE id='freight'").run(); // fixture: freight from a Confluence port
-  const at = async (user, cityId, season, flag) => {
+  const at = async (user, cityId, season, flag, nation = 'confluence') => {
     r.setFixtureEnv(FLAG, flag);
     const epochSec = Math.floor((r.now - (seasonOrder.indexOf(season) * seasonLengthMs + 3_600_000)) / 1000);
     await r.db.prepare("INSERT INTO world_clock (id,epoch_seconds) VALUES ('main',?) ON CONFLICT(id) DO UPDATE SET epoch_seconds=excluded.epoch_seconds").bind(epochSec).run();
-    await r.db.prepare("UPDATE citizens SET nation_id='confluence', capacity=100 WHERE clerk_user_id=?").bind(user).run();
+    await r.db.prepare("UPDATE citizens SET nation_id=?, capacity=100 WHERE clerk_user_id=?").bind(nation, user).run();
     await r.db.prepare('UPDATE work_shifts SET claimed_at=? WHERE clerk_user_id=? AND claimed_at IS NULL').bind(new Date(r.now).toISOString(), user).run(); // free the one active shift
     const moved = await r.call('city', user, { action: 'travel', cityId });
     assert.equal(moved.data.currentCityId, cityId, JSON.stringify(moved.data));
@@ -62,6 +62,12 @@ test('route: winter port freight pays less only with the flag on; inland, summer
   assert.deepEqual(await at('bob', 'lanu-terraces', 'winter', 'true'), { quantity: 2, note: undefined }, 'inland');
   assert.deepEqual(await at('alice', 'oalin-harbor', 'summer', 'true'), { quantity: 2, note: undefined }, 'summer');
   assert.deepEqual(await at('bob', 'oalin-harbor', 'winter', 'false'), { quantity: 2, note: undefined }, 'flag off');
+  // ARC on #1037: ports only. Tsenga SEZ is an inland trade zone (it has the #1001 imports note) and stays unchanged in winter.
+  await r.db.prepare("UPDATE work_orders SET nation_id='meridian' WHERE id='freight'").run();
+  r.setFixtureEnv(FLAG, 'true');
+  assert.deepEqual(await at('alice', 'tsenga-sez', 'winter', 'true', 'meridian'), { quantity: 2, note: undefined }, 'trade zone, not a port');
+  r.setFixtureEnv('HARIMU_CITY_IMPORTS_NOTE_ENABLED', 'true');
+  assert.match((await r.call('city', 'alice')).data.importsNote, /^Trade zone/, 'Tsenga SEZ passes the #1001 port-or-trade-zone check');
 });
 
 test('route: exact-second payout at the autumn→winter and winter→spring boundaries (port, flag on)', async t => {

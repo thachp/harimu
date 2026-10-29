@@ -9,7 +9,7 @@ import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, en
 import { recordEnrollHome, resolveEnrollHomeCity } from '@/lib/city-location'; // #965
 import { gameSeasonAt, seaFreightQuantity } from '@/lib/game-season'; // #1034
 import { jobTypeOf } from '@/lib/mvp-job-types'; // #1034
-import { cityImportsFields } from '@/lib/cities'; // #1034
+import { cityForNation } from '@/lib/cities'; // #1034
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
 import { charterMealSeconds } from '@/lib/aurelle-charters'; // #531
 import { readCrownMint } from '@/lib/crown-debasement';
@@ -685,7 +685,7 @@ async function handlePost(request: Request) {
     if (flagOn(env, 'HARIMU_SEASON_SEA_LANES_ENABLED') && jobTypeOf(workOrderId) === 'freight' && order.nation_id) {
       const where = await database.prepare('SELECT current_city_id FROM citizen_city_locations WHERE user_id = ? AND nation_id = ?').bind(userId, order.nation_id).first<{ current_city_id: string }>().catch(() => null);
       const clock = await database.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{ epoch_seconds: number }>().catch(() => null);
-      const port = Boolean(where && cityImportsFields(order.nation_id, where.current_city_id));
+      const port = /port/i.test(where ? cityForNation(order.nation_id, where.current_city_id)?.role ?? '' : ''); // ARC #1037: ports only (docs §17.1 sea lanes); inland trade zones unaffected
       reward.quantity = seaFreightQuantity(reward.quantity, gameSeasonAt(clock ? Number(clock.epoch_seconds) * 1000 : 0, Date.parse(now))?.season, port);
     }
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();

@@ -51,7 +51,7 @@ export function nextFestivalAt(nationId: string, epochMs: number, nowMs: number)
 /** #1034 (docs §17.1 "seasons ... affect sea lanes"): winter storms slow sea freight from port cities. Server flag
  * HARIMU_SEASON_SEA_LANES_ENABLED (in HARIMU_CITY_PACK): "true" in preview, "false" in production; off means callers skip this.
  * [ASSUMPTION] values from #1034: winter 80% for port freight, other seasons ×1.0, rounded down, never below 1 unit. Inland freight is unaffected.
- * `port` is the caller's port / trade-zone check (lib/cities.ts cityHasImports, #1001). */
+ * `port` is the caller's port-only check (role contains Port; ARC on #1037: inland trade zones are not sea lanes). */
 export const winterFreightPercent = 80; // integer percent, no float math
 export const seaLanesStormy = (season: GameSeason | null | undefined, port: boolean) => port && season === 'winter';
 export function seaFreightQuantity(quantity: number, season: GameSeason | null | undefined, port: boolean): number {
