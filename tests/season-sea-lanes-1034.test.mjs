@@ -99,6 +99,3 @@ test('route: exact-second payout at the autumn→winter and winter→spring boun
   assert.equal(await payAt(4 * L), 2, 'first spring second (wrap)');
   assert.equal(await payAt(7 * L), 1, 'next year winter');
 });
-  assert.equal(noClock.status, 200, JSON.stringify(noClock.data));
-  assert.equal(noClock.data.shifts.find(s => !s.claimedAt).rewardQuantity, 2, 'no clock: no storm cut');
-});
