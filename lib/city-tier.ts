@@ -47,6 +47,14 @@ export function cityTierFestivalNote(tier: number): string {
   const t = Math.min(4, Math.max(1, Math.floor(Number.isFinite(tier) ? tier : 1)));
   return t >= 2 ? 'Festivals are available at this tier.' : 'Festivals unlock at Town (T2).';
 }
+const people = (n: number) => n.toLocaleString('en-US');
+/** #1014: read-only population band from the Cities tier table (humans + AI). Same floors as cityTierFor. Does not change who counts or when a city grows. */
+export function cityTierPopulationNote(tier: number): string {
+  const t = Math.min(4, Math.max(1, Math.floor(Number.isFinite(tier) ? tier : 1)));
+  if (t <= 1) return `Up to ${people(floors[0])} (humans and AI).`;
+  if (t >= 4) return `${people(floors[2])} or more (humans and AI).`;
+  return `${people(floors[t - 2])} to ${people(floors[t - 1])} (humans and AI).`;
+}
 /** Population floor of the next tier, or null at T4. */
 export function nextTierFloor(tier: number): number | null {
   if (!Number.isInteger(tier) || tier < 1 || tier >= 4) return null;

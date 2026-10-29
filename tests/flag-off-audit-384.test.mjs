@@ -32,6 +32,7 @@ const flagOffPins = {
   HARIMU_CITY_IMPORTS_NOTE_ENABLED: 'city-imports-note-1001.test.mjs',
   HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED: 'city-civic-unit-note-1006.test.mjs',
   HARIMU_CITY_GOVERNOR_NOTE_ENABLED: 'city-governor-note-1007.test.mjs',
+  HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED: 'city-tier-population-note-1014.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
