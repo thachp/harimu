@@ -1,3 +1,4 @@
+import {flagOn} from '@/lib/flag-pack.mjs';
 import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
 import {env} from 'cloudflare:workers';
@@ -9,7 +10,7 @@ const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache
 // #781: flag off is a 404 before auth and before any database read.
 const enabled=()=>(env as unknown as {HARIMU_HOME_CITY_MOVE_ENABLED?:string}).HARIMU_HOME_CITY_MOVE_ENABLED==='true';
 /** #992: closed-system permit gate. Off: move path identical to #781. */
-const permitEnabled=()=>(env as unknown as {HARIMU_INTERNAL_PERMIT_ENABLED?:string}).HARIMU_INTERNAL_PERMIT_ENABLED==='true';
+const permitEnabled=()=>flagOn(env,'HARIMU_INTERNAL_PERMIT_ENABLED');
 /** #992 [ASSUMPTION]: until the Alert Level writer lands, Varkand alert is green unless tests set HARIMU_VARKAND_ALERT. */
 const varkandAlert=():VarkandAlert=>{const v=(env as unknown as {HARIMU_VARKAND_ALERT?:string}).HARIMU_VARKAND_ALERT;return v==='amber'||v==='red'||v==='green'?v:'green';};
 const notFound=()=>json({error:'Not found.'},404);
