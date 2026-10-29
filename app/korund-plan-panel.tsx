@@ -23,10 +23,10 @@ export type KorundCommand = { action: KorundAction; requestId: string; preferenc
 /** #43: what the gray-market card asks the page to send (the page adds the request id). */
 export type GrayCommand = { action: 'korund-gray-post-offer'; amountMinor: number; askRate: number } | { action: 'korund-gray-accept-offer'; offerId: string };
 
-export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, onCommand, onGray, onRetry, onRefresh, onNavigate }: {
+export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, shiftDay, onCommand, onGray, onRetry, onRefresh, onNavigate }: {
   plan: KorundPlanView | null; scene: SceneView; capacity: number; pending: boolean; uncertain: boolean;
   localDemo: boolean; error: string | null; onCommand: (action: KorundAction, shiftId?: string, preferences?: string[]) => void;
-  otherShiftActive?: boolean; onGray?: (command: GrayCommand) => void;
+  otherShiftActive?: boolean; shiftDay?: { started: number; cap: number; resetsAt: string } | null; onGray?: (command: GrayCommand) => void;
   onRetry: () => void; onRefresh: () => void; onNavigate: (scene: SceneView) => void;
 }) {
   const formatTime=useDisplayTimestamp();
@@ -55,6 +55,7 @@ export function KorundPlanPanel({ plan, scene, capacity, pending, uncertain, loc
       {plan.shortfall && <section className="korund-shortfall" aria-label="Plan inspection"><p role="status">{korundShortfallCopy.notice(plan.shortfall.workUnit, plan.shortfall.percent)}</p><p>{korundShortfallCopy.ledger}</p><p><small>City feed: {plan.shortfall.press}</small></p></section>}
       {plan.bureau ? <LaborBureau bureau={plan.bureau} pending={pending} uncertain={uncertain} formatTime={formatTime} onCommand={onCommand} /> : null}
       <p>One assigned shift at a time. {plan.bureau ? 'Bureau placement is recorded; shift pay is unchanged.' : 'Job preferences, reassignment and production-drive progression are planned.'}</p>
+      {shiftDay ? <p>Shifts today: {shiftDay.started} of {shiftDay.cap}. Resets after the daily tick ({shiftDay.resetsAt}).</p> : null}
       {active ? <><GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" /><p>{active.orderName} · {ready ? 'Complete · collect your Labor Notes' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} minutes remaining` : 'Checking timing…'}</p>
         <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!now, 'Checking the shift timer…'], [!ready, 'Your assignment is underway. Collect after it finishes.'])} onClick={() => onCommand('korund-claim-work', active.id)}>Collect assigned-shift wages</ActionButton></> :
         <ActionButton type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([otherShiftActive, 'Collect your earlier nation’s shift first.'], [capacity < plan.assignment.capacityCost, `You need ${plan.assignment.capacityCost} WC. Prepare a meal or wait for recovery.`])} onClick={() => onCommand('korund-start-work')}>Begin assigned shift · {plan.assignment.capacityCost} WC</ActionButton>}

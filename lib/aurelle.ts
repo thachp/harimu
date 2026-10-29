@@ -2,6 +2,7 @@ import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
 import type { CrownMint } from './crown-debasement'; // #362 (type only: tests/aurelle.test.py loads this file straight into Node, so it needs no runtime import of a module)
 import { farmingShiftYield, leadingFoodUnits, seasonAt, storedFoodUnits } from './season-yield.ts'; // #1033
+import { refuseNewShift } from './shift-soft-cap.ts'; // #1047
 // Bounded prototype tuning; no gold backing, issuance, ranks or charter allocation model.
 export const aurelleJob = {id:'aurelle-food-estate',name:'Chartered food-estate service',capacityCost:4,hours:2,wageMinor:800,foodOutput:4,favorReward:2} as const;
 export const aurelleFoodPriceMinor=150;
@@ -165,7 +166,7 @@ export async function readAurelle(db:GameDatabase,userId:string,options:{favorDe
  shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,...(isAurelleCharter(s.work_order_id)?{}:{rewardItem:'estate food',rewardQuantity:leadingFoodUnits(s.output)}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
 /** #531: mealSeconds is the household-meal cooldown; only a chartered citizen (flag on) passes a shorter one. The SQL keeps its literal 7200, so the shorter window is a shifted reference time. */
-export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;seasonFarming?:boolean}={}){
+export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;seasonFarming?:boolean;shiftSoftCap?:boolean}={}){
  const id=command.requestId.toLowerCase(),shiftId=command.shiftId?.toLowerCase()??null;
  const quantity=command.action==='aurelle-buy-food'?command.quantity!:command.action==='aurelle-household-meal'?2:0;
  const receipt=()=>db.prepare('SELECT clerk_user_id,action,quantity,shift_id FROM aurelle_receipts WHERE id=?').bind(id).first<{clerk_user_id:string;action:string;quantity:number;shift_id:string|null}>();
@@ -174,6 +175,7 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  if(existing) return matches(existing)?{status:200,replayed:true}:{status:409,error:'Request identifier is bound to a different account, action or quantity.'};
  const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  if(citizen?.nation_id!=='aurelle'&&command.action!=='aurelle-claim-work') return {status:409,error:'Aurelle citizenship required. Original balances remain in their own currency.'};
+ if(command.action==='aurelle-start-work'&&options.shiftSoftCap){const blocked=await refuseNewShift(db,userId,now);if(blocked)return{status:409,error:blocked.error};}
  const iso=new Date(now*1000).toISOString();
  // #886 (c): flag on and a named charter job: start it; a charter shift's claim pays into aurelle_charter_settlements with its Crown issuance record (keyed on the shift, not the flag).
  const charter=command.action==='aurelle-start-work'&&options.mvpJobTypes&&isAurelleCharter(command.jobId)?command.jobId:null;

@@ -493,6 +493,8 @@ type CitizenSnapshot = {
   plan: { horizon: PlanHorizon; note: string; completedIds: string[] } | null;
   decision: CitizenDecision | null;
   shifts: WorkShift[];
+  /** #1047: productive shifts started in the current real day. Absent while the cap flag is off. */
+  shiftDay?: { started: number; cap: number; resetsAt: string } | null;
   economy?: Economy;
   market?: MarketState;
   playerMarket?: PlayerMarketState;
@@ -754,6 +756,7 @@ export default function Home() {
     } catch { return kioskClosed; }
   };
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
+  const [shiftDay, setShiftDay] = useState<{ started: number; cap: number; resetsAt: string } | null>(null); // #1047
   const [workPending, setWorkPending] = useState(false);
   const [workError, setWorkError] = useState<string | null>(null);
   const workLock = useRef(false);
@@ -848,7 +851,7 @@ export default function Home() {
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
     setCitizenNationId(null); seededNationId.current = null; setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
-    setEconomy(null); setRewardsView(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setCycleStartAt(null); setVerification(null); setWorkShifts([]);
+    setEconomy(null); setRewardsView(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setCycleStartAt(null); setVerification(null); setWorkShifts([]); setShiftDay(null);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
     setKorundPlan(null); korundIntent.current = null; setKorundCommand(null);
     setPlanNote(''); setCompletedPlanIds([]); setPlanSaved(false); setHorizon('week'); setCommittedDecision(null);
@@ -973,12 +976,13 @@ export default function Home() {
         // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
         // Starting a shift has no request id, so it is never retried automatically.
         const response = action === 'commit-work' ? await fetch('/api/citizen', init) : await fetchIdempotent(fetch, '/api/citizen', init);
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; profile?: CitizenSnapshot['profile'] };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; shiftDay?: { started: number; cap: number; resetsAt: string } | null; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; profile?: CitizenSnapshot['profile'] };
       if (epoch !== citizenEpoch.current) return;
         if (result.simulation) setSimulation(result.simulation);
         if ('korundPlan' in result) setKorundPlan(result.korundPlan ?? null);
         if ('aurellePlan' in result) setAurellePlan(result.aurellePlan ?? null);
         if (result.shifts) { setWorkShifts(result.shifts); setSnapshotRequestedAt(requestedAt); }
+        if ('shiftDay' in result) setShiftDay(result.shiftDay ?? null);
         if (result.economy) setEconomy(result.economy);
         if (result.market) setMarket(result.market);
         if (result.playerMarket) setPlayerMarket(result.playerMarket);
@@ -1211,11 +1215,12 @@ export default function Home() {
     persist(command);
     try {
       const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
-      const result = await response.json() as { error?: string; ok?: boolean; replayed?:boolean; korundPlan?: KorundPlanView; capacity?: number; shifts?: WorkShift[] };
+      const result = await response.json() as { error?: string; ok?: boolean; replayed?:boolean; korundPlan?: KorundPlanView; capacity?: number; shifts?: WorkShift[]; shiftDay?: { started: number; cap: number; resetsAt: string } | null };
       if (epoch !== citizenEpoch.current) return;
       if (response.status >= 500 || (response.ok && (!result.korundPlan || typeof result.capacity !== 'number'))) throw new Error('Action needs confirmation.');
       if (result.korundPlan) setKorundPlan(result.korundPlan);
       if (result.shifts) setWorkShifts(result.shifts);
+      if ('shiftDay' in result) setShiftDay(result.shiftDay ?? null);
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       korundIntent.current = null; setKorundCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Korund action refused; refresh your assignment and ration book.'); return; }
@@ -1251,11 +1256,12 @@ export default function Home() {
     persist(command);
     try {
       const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
-      const result = await response.json() as { error?: string; ok?: boolean; aurellePlan?: AurellePlanView; capacity?: number; shifts?: WorkShift[] };
+      const result = await response.json() as { error?: string; ok?: boolean; aurellePlan?: AurellePlanView; capacity?: number; shifts?: WorkShift[]; shiftDay?: { started: number; cap: number; resetsAt: string } | null };
       if (epoch !== citizenEpoch.current) return;
       if (response.status >= 500 || (response.ok && (!result.aurellePlan || typeof result.capacity !== 'number'))) throw new Error('Action needs confirmation.');
       if (result.aurellePlan) setAurellePlan(result.aurellePlan);
       if (result.shifts) setWorkShifts(result.shifts);
+      if ('shiftDay' in result) setShiftDay(result.shiftDay ?? null);
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       aurelleIntent.current = null; setAurelleCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Aurelle action refused; refresh your charter account.'); return; }
@@ -1353,6 +1359,7 @@ export default function Home() {
     if (snapshot.simulation) setSimulation(snapshot.simulation);
     setVerification(snapshot.verification ?? null);
     setWorkShifts(snapshot.shifts ?? []);
+    setShiftDay(snapshot.shiftDay ?? null); // #1047: absent while the cap flag is off
     if (snapshot.market) setMarket(snapshot.market);
     if (snapshot.playerMarket) setPlayerMarket(snapshot.playerMarket);
     if ('election' in snapshot)setElection(snapshot.election??null);
@@ -1642,11 +1649,11 @@ export default function Home() {
       else if (priorNationShift.currency === 'CRN') startAurelleAction('aurelle-claim-work', priorNationShift.id);
       else if (priorNationShift.currency === 'CUR') void claimNationShift(priorNationShift.id); // #487: generic wage ledger
       else void runWork('claim-work', undefined, priorNationShift.id); }} />;
-  const korundPanel = <KorundPlanPanel plan={korundPlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
+  const korundPanel = <KorundPlanPanel plan={korundPlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)} shiftDay={shiftDay}
     uncertain={Boolean(korundCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
     onCommand={startKorundAction} onGray={startGrayAction} onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}
     onRefresh={() => void runWork('refresh-work')} />;
-  const aurellePanel = <AurellePlanPanel plan={aurellePlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
+  const aurellePanel = <AurellePlanPanel plan={aurellePlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)} shiftDay={shiftDay}
     uncertain={Boolean(aurelleCommand || korundCommand || marketCommand || playerCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
     onCommand={startAurelleAction} onRetry={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }} onRefresh={() => void runWork('refresh-work')} />;
   // #344: Korund's State store and Aurelle's royal store are not the flagged market. The local demo and guest sandbox have no server flag.
@@ -1759,7 +1766,7 @@ export default function Home() {
       </>}
       {viewMode === 'workplace' && !['korund','aurelle'].includes(citizenNation.id) && <>
         <WorkSummary capacity={capacity} contributions={availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length} onMarket={marketShown ? () => changeView('market') : undefined} />
-        <WorkShiftBoard onNavigate={changeView} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
+        <WorkShiftBoard onNavigate={changeView} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} shiftDay={shiftDay} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
           onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
         <section className="scene-work-orders"><h2>Available contributions</h2>
           {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <ActionButton key={order.id} type="button"

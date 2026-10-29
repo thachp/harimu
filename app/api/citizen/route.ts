@@ -43,6 +43,7 @@ import { qaTestCitizenAllowed, qaTestNationSql } from '@/lib/qa-tools';
 import { liveNations, nationPlayable, playableNationIds } from '@/lib/nation-openings'; // #485, #489, #872
 import { mvpJobTypesEnabled } from '@/lib/mvp-job-types'; // #886 (b)
 import { farmingShiftYield, isFarmingShift, seasonAt, seasonFarmingEnabled } from '@/lib/season-yield'; // #1033
+import { readShiftDay, shiftCapRefusal, shiftSoftCapEnabled } from '@/lib/shift-soft-cap'; // #1047
 import { emissionCapsEnabled } from '@/lib/emission-caps-rules'; // #885
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
@@ -82,7 +83,7 @@ const grayMarketOn = () => flagOn(env, 'HARIMU_GRAY_MARKET_ENABLED');
 // #968: a #776 ration cut adds one shortage line on the rumored street rate (HARIMU_GRAY_RATION_RISE_ENABLED). Off: no line. Read model only.
 const grayRationRiseOn = () => flagOn(env, 'HARIMU_GRAY_RATION_RISE_ENABLED');
 // #490: the generic per-nation wage ledger and work commands ship off (HARIMU_NATION_WORK_ENABLED).
-const nationWorkOptions = () => ({ enabled: (env as unknown as { HARIMU_NATION_WORK_ENABLED?: string }).HARIMU_NATION_WORK_ENABLED === 'true', bindings: env as never });
+const nationWorkOptions = () => ({ enabled: (env as unknown as { HARIMU_NATION_WORK_ENABLED?: string }).HARIMU_NATION_WORK_ENABLED === 'true', bindings: env as never, shiftSoftCap: shiftSoftCapEnabled(env) });
 // #736: per-citizen daily gray-market volume cap (HARIMU_GRAY_DAILY_CAP_ENABLED); off = today's behaviour.
 const grayDailyCapOn = () => flagOn(env, 'HARIMU_GRAY_DAILY_CAP_ENABLED');
 // #749: completed gray-market trades add private Suspicion (HARIMU_GRAY_SUSPICION_ENABLED); off = no read, view unchanged.
@@ -105,7 +106,7 @@ const korundRationStabilityOn = () => korundRationStabilityEnabled(env as unknow
 const korundStabilityRecoveryOn = () => korundStabilityRecoveryEnabled(env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string; HARIMU_KORUND_RATION_STABILITY_ENABLED?: string; HARIMU_KORUND_STABILITY_RECOVERY_ENABLED?: string });
 // #797: gray-market checkpoint seizure of cash bundles, destroyed as a sink (HARIMU_GRAY_SEIZURE_ENABLED); off = no roll, no write, no read.
 const graySeizureOn = () => flagOn(env, 'HARIMU_GRAY_SEIZURE_ENABLED');
-const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn(), rationRecovery: korundStabilityRecoveryOn(), seasonFarming: seasonFarmingEnabled(env) });
+const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn(), rationRecovery: korundStabilityRecoveryOn(), seasonFarming: seasonFarmingEnabled(env), shiftSoftCap: shiftSoftCapEnabled(env) });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
 const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn(), standing: korundStandingOn(), bureauTsr: korundTsrViewOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged. #994 standing and #1000 Bureau quote are read-only too.
@@ -188,6 +189,11 @@ function serializeProfile(
   };
 }
 
+async function shiftDayFields(database: Awaited<ReturnType<typeof getDatabase>>, userId: string, nowSeconds: number) {
+  const shiftDay = await readShiftDay(database, env, userId, nowSeconds);
+  return shiftDay ? { shiftDay } : {};
+}
+
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, { status: 401 });
@@ -255,7 +261,8 @@ export async function GET(request: Request) {
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
   // #872 (ARC ruling): nations this account may play here beyond the live three (nationPlayable, never a flag alone). Absent when none: production and the public unchanged.
   const playable = playableNationIds(env as never, userId), flagPlayable = playable.some(id => !(liveNations as readonly string[]).includes(id));
-  return privateJson({ ...(flagPlayable ? { openNations: playable } : {}), ...(cycleStartAt != null ? { cycleStartAt } : {}),
+  const shiftDay = await shiftDayFields(database, userId, readNow);
+  return privateJson({ ...(flagPlayable ? { openNations: playable } : {}), ...(cycleStartAt != null ? { cycleStartAt } : {}), ...shiftDay,
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountIdFor(election!.id)}:{})}:null,
     collectivePetitions,
@@ -354,9 +361,10 @@ async function handlePost(request: Request) {
   }
   if (typeof body.action === 'string' && body.action.startsWith('aurelle-')) {
     if (!validAurelleCommand(body)) return privateJson({error:'Use a valid request identifier, shift identifier and food quantity of 1 or 2.'},{status:400});
-    const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000),await charterMealSeconds(database,userId,Math.floor(Date.parse(now)/1000),chartersOn()),{mvpJobTypes:mvpJobTypesEnabled(env as never),emissionCaps:emissionCapsEnabled(env as never),seasonFarming:seasonFarmingEnabled(env)}); // #531, #886 (c), #885, #1033
+    const seconds=Math.floor(Date.parse(now)/1000);
+    const result=await executeAurelle(database,userId,body,seconds,await charterMealSeconds(database,userId,seconds,chartersOn()),{mvpJobTypes:mvpJobTypesEnabled(env as never),emissionCaps:emissionCapsEnabled(env as never),seasonFarming:seasonFarmingEnabled(env),shiftSoftCap:shiftSoftCapEnabled(env)}); // #531, #886 (c), #885, #1033, #1047
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,...await shiftDayFields(database,userId,seconds),aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,seconds,korundReadOptions()),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (body.action === 'nation-start-work' || body.action === 'nation-claim-work') {
@@ -364,9 +372,10 @@ async function handlePost(request: Request) {
     const options = nationWorkOptions();
     if (!options.enabled) return privateJson({ error: 'Not found.', reason: 'disabled' }, { status: 404 });
     if (!validNationWorkCommand(body)) return privateJson({ error: 'Use a valid request or shift identifier and a job id.' }, { status: 400 });
-    const result = await executeNationWork(database, userId, body, Math.floor(Date.parse(now) / 1000), options);
+    const seconds = Math.floor(Date.parse(now) / 1000);
+    const result = await executeNationWork(database, userId, body, seconds, options);
     const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ capacity: number }>();
-    return privateJson({ ...result, ok: result.status === 200, ...await nationWorkPlanPart(database, userId), shifts: await readShifts(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
+    return privateJson({ ...result, ok: result.status === 200, ...await shiftDayFields(database, userId, seconds), ...await nationWorkPlanPart(database, userId), shifts: await readShifts(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
   if (typeof body.action === 'string' && body.action.startsWith('korund-')) {
@@ -374,7 +383,7 @@ async function handlePost(request: Request) {
     const seconds=Math.floor(Date.parse(now)/1000);
     const result=await executeKorund(database,userId,body,seconds,korundOptions());
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
-    return privateJson({...result,ok:result.status===200,shifts:await readShifts(database,userId),aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,seconds,korundReadOptions()),capacity:citizen?.capacity??0},{status:result.status});
+    return privateJson({...result,ok:result.status===200,...await shiftDayFields(database,userId,seconds),shifts:await readShifts(database,userId),aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,seconds,korundReadOptions()),capacity:citizen?.capacity??0},{status:result.status});
   }
 
   if (body.action === 'government-petition') {
@@ -685,6 +694,9 @@ async function handlePost(request: Request) {
     const payBase = scaled ? { ...base, quantity: scaled.units } : base;
     const reward = { ...payBase, ...applyQuality(payBase, quality.multiplierPct) };
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
+    const shiftSeconds = Math.floor(Date.parse(now) / 1000);
+    const day = await readShiftDay(database, env, userId, shiftSeconds);
+    if (day && day.started >= day.cap) return privateJson({ error: shiftCapRefusal, shiftDay: day }, { status: 409 });
     // D1 batch is transactional: scheduling and debiting succeed together.
     const [scheduled] = await database.batch([
       database.prepare(startShiftSql).bind(id, order.id, order.name, scaled?.output ?? rule.output,
@@ -701,11 +713,12 @@ async function handlePost(request: Request) {
     const shifts = await readShifts(database, userId);
     const profile = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?')
       .bind(userId).first<{ capacity: number }>();
+    const shiftDay = day ? { shiftDay: { ...day, started: day.started + (scheduled.meta.changes ? 1 : 0) } } : {};
     if (!scheduled.meta.changes) {
       return privateJson({ error: 'Finish your active shift, check your citizenship and available capacity.',
-        shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
+        shifts, capacity: profile?.capacity ?? 0, ...shiftDay }, { status: 409 });
     }
-    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), ...shiftDay, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   if (body.action === 'claim-work') {
@@ -733,7 +746,7 @@ async function handlePost(request: Request) {
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return privateJson({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
-    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, ...await shiftDayFields(database, userId, Math.floor(Date.parse(now) / 1000)), aurellePlan:await readAurelleView(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   return privateJson({ error: 'Unknown action.' }, { status: 400 });
