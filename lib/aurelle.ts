@@ -1,6 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
 import type { CrownMint } from './crown-debasement'; // #362 (type only: tests/aurelle.test.py loads this file straight into Node, so it needs no runtime import of a module)
+import { farmingShiftYield, leadingFoodUnits, storedFoodUnits } from './season-yield.ts'; // #1033
 // Bounded prototype tuning; no gold backing, issuance, ranks or charter allocation model.
 export const aurelleJob = {id:'aurelle-food-estate',name:'Chartered food-estate service',capacityCost:4,hours:2,wageMinor:800,foodOutput:4,favorReward:2} as const;
 export const aurelleFoodPriceMinor=150;
@@ -22,7 +23,7 @@ const charterList=Object.keys(aurelleCharterJobs).map(id=>`'${id}'`).join(','); 
 export const aurelleSchemas=[
  `CREATE TABLE aurelle_resources(id TEXT PRIMARY KEY,initial_food INTEGER NOT NULL CHECK(initial_food>=0),initial_minor INTEGER NOT NULL CHECK(initial_minor>=0))`,
  `CREATE TABLE aurelle_receipts(id TEXT PRIMARY KEY,clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),action TEXT NOT NULL CHECK(action IN ('aurelle-start-work','aurelle-claim-work','aurelle-buy-food','aurelle-household-meal')),quantity INTEGER NOT NULL CHECK(quantity BETWEEN 0 AND 2),shift_id TEXT,occurred_at INTEGER NOT NULL,capacity_applied INTEGER NOT NULL DEFAULT 0 CHECK(capacity_applied IN (0,1)))`,
- `CREATE TABLE aurelle_settlements(shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),wage_minor INTEGER NOT NULL CHECK(wage_minor=800),food_output INTEGER NOT NULL CHECK(food_output=4),favor INTEGER NOT NULL CHECK(favor=2),settled_at INTEGER NOT NULL)`,
+ `CREATE TABLE aurelle_settlements(shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),wage_minor INTEGER NOT NULL CHECK(wage_minor=800),food_output INTEGER NOT NULL CHECK(food_output>=1),favor INTEGER NOT NULL CHECK(favor=2),settled_at INTEGER NOT NULL)`,
  `CREATE TABLE aurelle_purchases(id TEXT PRIMARY KEY REFERENCES aurelle_receipts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),quantity INTEGER NOT NULL CHECK(quantity IN (1,2)),spend_minor INTEGER NOT NULL CHECK(spend_minor=quantity*150))`,
  `CREATE TABLE aurelle_charter_settlements(shift_id TEXT PRIMARY KEY REFERENCES work_shifts(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),job_id TEXT NOT NULL,wage_minor INTEGER NOT NULL CHECK(wage_minor>0),settled_at INTEGER NOT NULL)`,
  `CREATE TABLE crown_issuances(id TEXT PRIMARY KEY,shift_id TEXT NOT NULL UNIQUE REFERENCES work_shifts(id),clerk_user_id TEXT NOT NULL,amount_minor INTEGER NOT NULL CHECK(amount_minor>0),source TEXT NOT NULL CHECK(source IN ('aurelle-charter-wage','aurelle-food-estate-wage')),issued_at INTEGER NOT NULL)`,
@@ -161,10 +162,10 @@ export async function readAurelle(db:GameDatabase,userId:string,options:{favorDe
  return {available:citizen?.nation_id==='aurelle',mode:'bounded charter economy',charter:{id:'food-estate',name:'Highspire food-estate charter',active:true},job:aurelleJob,
  walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,favor:favor,publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,
  mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+(options.mealSeconds??aurelleMealSeconds))*1000).toISOString(),
- shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,...(isAurelleCharter(s.work_order_id)?{}:{rewardItem:'estate food',rewardQuantity:4}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
+ shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'CRN',wageMinor:800,...(isAurelleCharter(s.work_order_id)?{}:{rewardItem:'estate food',rewardQuantity:leadingFoodUnits(s.output)}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
 /** #531: mealSeconds is the household-meal cooldown; only a chartered citizen (flag on) passes a shorter one. The SQL keeps its literal 7200, so the shorter window is a shifted reference time. */
-export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds,options:{mvpJobTypes?:boolean;emissionCaps?:boolean}={}){
+export async function executeAurelle(db:GameDatabase,userId:string,command:AurelleCommand,now:number,mealSeconds:number=aurelleMealSeconds,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;seasonFarming?:boolean}={}){
  const id=command.requestId.toLowerCase(),shiftId=command.shiftId?.toLowerCase()??null;
  const quantity=command.action==='aurelle-buy-food'?command.quantity!:command.action==='aurelle-household-meal'?2:0;
  const receipt=()=>db.prepare('SELECT clerk_user_id,action,quantity,shift_id FROM aurelle_receipts WHERE id=?').bind(id).first<{clerk_user_id:string;action:string;quantity:number;shift_id:string|null}>();
@@ -200,22 +201,36 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
   db.prepare("UPDATE work_shifts SET claimed_at=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND EXISTS(SELECT 1 FROM aurelle_charter_settlements WHERE shift_id=work_shifts.id AND clerk_user_id=?)").bind(iso,shiftId,userId,userId),
   ]);
  }
- else if(command.action==='aurelle-start-work') await db.batch([
+ else if(command.action==='aurelle-start-work') {
+ await db.batch([
  db.prepare(aurelleStartReceiptSql).bind(id,now,userId,id),db.prepare(aurelleStartSql).bind(iso,new Date((now+7200)*1000).toISOString(),id,userId),
  db.prepare(aurelleStartDebitSql).bind(iso,userId,id),
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)").bind(id,userId,id,userId),
  ]);
+ if(options.seasonFarming){
+  const scaled=await farmingShiftYield(db,'4 food contributed to charter estate supply',aurelleJob.foodOutput,now*1000,true);
+  if(scaled) await db.prepare('UPDATE work_shifts SET output=? WHERE id=? AND clerk_user_id=?').bind(scaled.output,id,userId).run();
+ }
+ }
  else if(command.action==='aurelle-claim-work'){
   // #957: always write a Crown issuance for the food-estate wage; #885 cap guard only while the flag is on (flag-off settle binds stay byte-identical).
+  // #1033: food other than 4 is bound only when the start line stored a season mark. Otherwise aurelleSettleSql stays byte-identical.
+  const savedFood=options.seasonFarming&&shiftId?(await db.prepare('SELECT output FROM work_shifts WHERE id=? AND clerk_user_id=? AND work_order_id=?').bind(shiftId,userId,aurelleJob.id).first<{output:string}>())?.output:undefined;
+  const food=savedFood===undefined?null:storedFoodUnits(savedFood,aurelleJob.foodOutput);
   let claimReceipt=db.prepare(aurelleClaimReceiptSql).bind(id,now,shiftId,userId,iso,id);
   let foodSettle=db.prepare(aurelleSettleSql).bind(now,id,userId);
+  let capStart=0,capEnd=0,capYear=0;
   if(options.emissionCaps){
    const epoch=Number((await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>())?.epoch_seconds??0);
    const yearSeconds=30*86400; // emissionCapsConfig.gameYearSeconds
-   const year=Math.floor(Math.max(0,now-epoch)/yearSeconds)+1;
-   const start=epoch+(year-1)*yearSeconds, end=start+yearSeconds;
-   claimReceipt=db.prepare(aurelleClaimReceiptSql+crownYearCapSql).bind(id,now,shiftId,userId,iso,id,start,end,year);
-   foodSettle=db.prepare(aurelleSettleSql+crownYearCapSql).bind(now,id,userId,start,end,year);
+   capYear=Math.floor(Math.max(0,now-epoch)/yearSeconds)+1;
+   capStart=epoch+(capYear-1)*yearSeconds; capEnd=capStart+yearSeconds;
+   claimReceipt=db.prepare(aurelleClaimReceiptSql+crownYearCapSql).bind(id,now,shiftId,userId,iso,id,capStart,capEnd,capYear);
+   foodSettle=db.prepare(aurelleSettleSql+crownYearCapSql).bind(now,id,userId,capStart,capEnd,capYear);
+  }
+  if(food!=null){
+   const seasonSql=aurelleSettleSql.replace('800,4,2,?','800,?,2,?');
+   foodSettle=db.prepare(options.emissionCaps?seasonSql+crownYearCapSql:seasonSql).bind(...(options.emissionCaps?[food,now,id,userId,capStart,capEnd,capYear]:[food,now,id,userId]));
   }
   await db.batch([
   db.prepare(aurellePoolLockSql),claimReceipt,foodSettle,db.prepare(crownFoodEstateIssuanceSql).bind(shiftId),

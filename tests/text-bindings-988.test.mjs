@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 18);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 19);
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 5);
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 10);
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);

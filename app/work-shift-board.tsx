@@ -11,6 +11,7 @@ import type { WorkShift } from '@/lib/work-shifts';
 const gradeNames: Record<string, string> = { poor: 'Poor', fair: 'Fair', good: 'Good', excellent: 'Excellent' };
 const gradeLabel = (grade: WorkShift['qualityGrade']) => grade ? gradeNames[grade] : 'Base (step skipped)';
 const qualityText = (shift: WorkShift) => shift.qualityMultiplierPct === undefined ? '' : ` · Quality: ${gradeLabel(shift.qualityGrade)} ×${(shift.qualityMultiplierPct / 100).toFixed(2)}`;
+const seasonHistory = (output: string) => { const mark = output.match(/ · ([A-Z][a-z]+: [+\u2212]\d+% harvest)$/); return mark ? ` · ${mark[1]}` : ''; }; // #1033
 import type { SceneView } from '@/lib/scene-navigation';
 import { describeKindlePay } from '@/lib/income-tax';
 
@@ -76,7 +77,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
         </div>
       ) : <p>Choose a contribution to start your next shift.</p>}
       {completed.map((shift) => (
-        <p key={shift.id}><strong>Recorded: {shift.orderName}</strong><br />{shift.wageMinor !== undefined ? `${(shift.wageMinor / 100).toFixed(2)} SPK + ${shift.rewardQuantity} ${shift.rewardItem}${qualityText(shift)}` : shift.output}</p>
+        <p key={shift.id}><strong>Recorded: {shift.orderName}</strong><br />{shift.wageMinor !== undefined ? `${(shift.wageMinor / 100).toFixed(2)} SPK + ${shift.rewardQuantity} ${shift.rewardItem}${qualityText(shift)}${seasonHistory(shift.output)}` : shift.output}</p>
       ))}
     </section>
   );
