@@ -83,6 +83,17 @@ test('#764: a muted news desk shows the persona-muted notice; a normal edition d
  const html=renderToStaticMarkup(React.createElement(real.NewsEdition,{news:{...edition('kindle'),personaMuted:true}}));
  assert.match(html,/data-persona-muted="true"/);assert.equal(html.includes(notice),true);
 });
+test('#981: a plan-stat line renders only when the edition carries one, and the visible number is that line', () => {
+ const render = news => renderToStaticMarkup(React.createElement(real.NewsEdition, { news }));
+ const off = render(edition('korund'));
+ assert.doesNotMatch(off, /news-plan-stat|of plan/);
+ const line = 'Food brigades press on: 87% of plan'; // not recomputed from percent 88: the panel prints the server line only
+ const on = render({ ...edition('korund'), planStat: { resource: 'food', output: 35, target: 40, percent: 88, line } });
+ assert.match(on, /class="news-plan-stat"/); assert.match(on, new RegExp(line));
+ assert.equal(on.split('87').length - 1, 1, 'the widget shows the server line once');
+ assert.doesNotMatch(on, /88/);
+ assert.match(on, /Work recorded/);
+});
 test('#742: an edition in templates-only mode shows the template-mode footer; a normal edition does not',()=>{
  const footer=require('../lib/kill-switch-copy.ts').templateMode.footer.text;
  assert.doesNotMatch(renderToStaticMarkup(React.createElement(real.NewsEdition,{news:edition('korund')})),new RegExp(footer));
