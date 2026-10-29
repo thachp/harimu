@@ -9,6 +9,7 @@
 import type { GameDatabase } from './database-contract';
 import { nationOpening, nationPlayable, type NationJob, type NationOpening } from './nation-openings';
 import type { QaBindings } from './qa-tools';
+import { refuseNewShift } from './shift-soft-cap.ts'; // #1047
 
 export const nationWorkSchemas = [
  `CREATE TABLE IF NOT EXISTS nation_wage_funds (nation_id TEXT PRIMARY KEY REFERENCES nations(id), initial_minor INTEGER NOT NULL CHECK(initial_minor >= 0))`,
@@ -33,6 +34,8 @@ export type NationWorkOptions = {
   bindings?: QaBindings & Readonly<Record<string, string | undefined>>;
   /** Tests inject openings with jobs; production passes none and reads the registry. */
   openings?: readonly NationOpening[];
+  /** #1047: refuse a new productive shift once today's soft cap is full. Off: this command is unchanged. */
+  shiftSoftCap?: boolean;
 };
 export type NationWorkShift = { id: string; jobId: string; orderName: string; capacitySpent: number; startedAt: string; completesAt: string; claimedAt: string | null; wageMinor: number | null };
 export type NationWorkPlan = { nationId: string; currency: { code: string; name: string }; jobs: readonly NationJob[]; walletMinor: number; fundMinor: number; shifts: NationWorkShift[] };
@@ -90,6 +93,7 @@ export async function executeNationWork(db: GameDatabase, userId: string, comman
     if (!job) return notFound('unknown_job');
     const existing = await db.prepare('SELECT s.clerk_user_id,s.work_order_id,k.nation_id FROM work_shifts s LEFT JOIN nation_wage_starts k ON k.shift_id=s.id WHERE s.id=?').bind(id).first<{ clerk_user_id: string; work_order_id: string; nation_id: string | null }>();
     if (existing) return existing.clerk_user_id === userId && existing.work_order_id === job.id && existing.nation_id === nationId ? { status: 200, replayed: true } : { status: 409, reason: 'request_reused', error: 'Request identifier already used.' };
+    if (options.shiftSoftCap) { const blocked = await refuseNewShift(db, userId, now); if (blocked) return { status: 409, reason: 'shift_cap', error: blocked.error }; }
     await db.batch([
       // The work order is only the foreign-key target of the shift. It is closed so /api/world never lists it (a flag-on nation must not leak).
       db.prepare(`INSERT OR IGNORE INTO work_orders (id,nation_id,name,detail,capacity_cost,status,sort_order) VALUES (?,?,?,?,?,'closed',1000)`).bind(job.id, nationId, job.name, job.output, job.capacityCost),
