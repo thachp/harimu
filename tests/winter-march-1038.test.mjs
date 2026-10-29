@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { localRuntime } from './helpers/local-runtime.mjs';
 
 const boot = await localRuntime({ backend: 'sqlite' });
-const M = await boot.importModule('lib/army-map.ts'), W = await boot.importModule('lib/winter-march.ts'), Season = await boot.importModule('lib/game-season.ts');
+const M = await boot.importModule('lib/army-map.ts'), W = await boot.importModule('lib/winter-march.ts'), Season = await boot.importModule('lib/game-season.ts'), S = await boot.importModule('lib/army-supply.ts');
 await boot.close();
 const seasonSec = Season.seasonLengthMs / 1000, epoch = 5_000_000, winterStart = epoch + 3 * seasonSec;
 const plains = new Map(), routeOf = n => Array.from({ length: n }, (_, i) => ({ x: i + 1, y: 0 }));
@@ -77,6 +77,41 @@ test('a winter march stays 1.5× in spring, and an autumn march stays 1× with n
   assert.deepEqual([autumn.unit.x, autumn.unit.y], [autumn.fast.x, autumn.fast.y], 'armyPositions stays 1×');
   assert.notDeepEqual([autumn.unit.x, autumn.unit.y], [autumn.slow.x, autumn.slow.y]);
   assert.equal(autumn.note, null, 'no winter card line');
+});
+
+const supplyScene = () => {
+  const terrain = M.terrainMap(), pace = { epochSeconds: epoch, enabled: true }, day = S.ARMY_SUPPLY_GAME_DAY_SECONDS;
+  const home = M.nationCapital('kindle');
+  const probe = M.unitMarch('kindle', [{ attacker_nation: 'kindle', defender_nation: 'korund', declared_at: 0, mobilization_ends_at: 1 }], 2);
+  const step = p => terrain.get(`${p.x},${p.y}`);
+  const cutAt = (start, factor) => S.supplyCutAt(home, probe.route, start, step, factor);
+  const base = cutAt(0, 1);
+  const war = start => [{ attacker_nation: 'kindle', defender_nation: 'korund', declared_at: start - 10, mobilization_ends_at: start }];
+  const spring = epoch + 4 * seasonSec, wStart = spring - 1, wNow = wStart + base + day;
+  const aStart = winterStart - 1, aNow = aStart + base + day;
+  return { terrain, pace, cutAt, base, war, wStart, wNow, aStart, aNow };
+};
+test('a winter march checked in spring keeps the 1.5× supply cut, including cutDays and strengthLossPct', () => {
+  const { terrain, pace, cutAt, base, war, wStart, wNow } = supplyScene();
+  assert.equal(cutAt(0, W.WINTER_MARCH_MULTIPLIER), base * W.WINTER_MARCH_MULTIPLIER);
+  assert.equal(Season.gameSeasonAt(epoch * 1000, wStart * 1000).season, 'winter');
+  assert.equal(Season.gameSeasonAt(epoch * 1000, wNow * 1000).season, 'spring');
+  const slow = S.supplyState(cutAt(wStart, W.WINTER_MARCH_MULTIPLIER), wNow), fast = S.supplyState(cutAt(wStart, 1), wNow);
+  assert.notDeepEqual(slow, fast);
+  assert.ok(slow.cut && fast.cut && slow.cutDays !== fast.cutDays && slow.strengthLossPct !== fast.strengthLossPct);
+  assert.deepEqual(S.unitSupply('kindle', war(wStart), wNow, terrain, pace), slow);
+});
+test('an autumn march checked in winter keeps the 1× supply cut', () => {
+  const { terrain, pace, cutAt, war, aStart, aNow } = supplyScene();
+  assert.equal(Season.gameSeasonAt(epoch * 1000, aStart * 1000).season, 'autumn');
+  assert.equal(Season.gameSeasonAt(epoch * 1000, aNow * 1000).season, 'winter');
+  const fast = S.supplyState(cutAt(aStart, 1), aNow), slow = S.supplyState(cutAt(aStart, W.WINTER_MARCH_MULTIPLIER), aNow);
+  assert.notDeepEqual(fast, slow);
+  assert.deepEqual(S.unitSupply('kindle', war(aStart), aNow, terrain, pace), fast);
+});
+test('flag off leaves the supply cut time unchanged', () => {
+  const { terrain, cutAt, war, wStart, wNow } = supplyScene();
+  assert.deepEqual(S.unitSupply('kindle', war(wStart), wNow, terrain, null), S.supplyState(cutAt(wStart, 1), wNow));
 });
 
 test('the army card shows Winter roads: marches take longer with the real and game time', async () => {
