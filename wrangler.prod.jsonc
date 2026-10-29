@@ -45,7 +45,8 @@
       "HARIMU_CITY_SPECIALTY_NOTE_ENABLED": "false",
       "HARIMU_CITY_CAPTURE_NOTE_ENABLED": "false",
       "HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED": "false",
-      "HARIMU_CITY_IMPORTS_NOTE_ENABLED": "false"
+      "HARIMU_CITY_IMPORTS_NOTE_ENABLED": "false",
+      "HARIMU_CITY_GOVERNOR_NOTE_ENABLED": "false"
     },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
@@ -81,6 +82,8 @@
       "HARIMU_KORUND_SHORTFALL_ENABLED": "false",
       "HARIMU_KORUND_PLAN_STATS_ENABLED": "false",
       "HARIMU_WALLET_STREET_RATE_ENABLED": "false",
+      // #1000: Labor Note balance shows its Tessera value at the Bureau rate, marked not convertible (docs §12.8 Display). Off: no line. Display only.
+      "HARIMU_KORUND_TSR_VIEW_ENABLED": "false",
       "HARIMU_KORUND_RATION_CUT_ENABLED": "false",
       "HARIMU_KORUND_RATION_STABILITY_ENABLED": "false",
       "HARIMU_KORUND_STABILITY_RECOVERY_ENABLED": "false",
@@ -243,19 +246,17 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "false",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "false",
-    // #243: filler wire stories (lib/press-templates.ts packs) in the National news edition under their in-world byline; they give way once a player paper publishes.
-    "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "false",
-    // #85: nation skin PoC on the top bar (Kindle / Korund / Aurelle colors + one CSS motif each); guests and pre-citizens keep the neutral bar.
-    "NEXT_PUBLIC_HARIMU_NATION_SKIN": "false",
-    "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false",
-    // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
-    "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",
-    // #970: Korund ration card as a stamped booklet (docs §23.2). "true" in preview, "false" in production.
-    "NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET": "false",
-    // #1009: Kindle ballots as a civic form (docs §23.2). One JSON binding. Preview "true", production "false". The client build expands NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT. A direct string binding still wins.
+    // #988/#1008/#1009: UI skin flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off. The client build expands each NEXT_PUBLIC_* name. A direct string binding still wins.
     "HARIMU_UI_PACK": {
+      "NEXT_PUBLIC_HARIMU_NATION_SKIN": "false",
+      "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "false",
+      "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false",
+      "NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET": "false",
+      "NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS": "false",
       "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "false"
-    }
+    },
+    // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]

@@ -2291,6 +2291,13 @@ html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; 
 .korund-ration-booklet .korund-booklet-page button { min-height: 44px; min-width: 44px; max-width: 100%; margin-top: 8px; white-space: normal; text-align: start; }
 .korund-ration-booklet .korund-booklet-stamp { flex: 0 0 auto; display: grid; place-items: center; width: calc(52px * var(--text-scale, 1)); height: calc(52px * var(--text-scale, 1)); margin-inline-start: auto; border: 2px dashed var(--nation-accent, #d7bb8a); border-radius: 50%; color: var(--nation-accent, #d7bb8a); font-size: calc(11px * var(--text-scale, 1)); font-weight: 700; letter-spacing: .06em; line-height: 1; text-transform: uppercase; transform: rotate(-14deg); }
 
+/* #1008: Aurelle royal decree as a sealed scroll. Tokens come from the parent document. No animation. */
+.aurelle-sealed-scroll { position: relative; min-width: 0; }
+.aurelle-sealed-scroll > .nation-document-masthead { min-width: 0; padding-inline-end: calc(62px * var(--text-scale, 1)); border-bottom: 3px double var(--nation-accent, #d9bd83); background-color: var(--nation-paper, #352846); background-image: var(--nation-pattern); }
+.aurelle-sealed-scroll > .aurelle-scroll-seal { position: absolute; z-index: 1; top: 14px; inset-inline-end: 14px; display: grid; place-items: center; width: calc(46px * var(--text-scale, 1)); height: calc(46px * var(--text-scale, 1)); border-radius: 50%; border: 3px solid var(--nation-edge, #aa926a); background: var(--nation-accent, #d9bd83); pointer-events: none; }
+.aurelle-sealed-scroll > .aurelle-scroll-seal .nation-crest { width: calc(24px * var(--text-scale, 1)); height: calc(28px * var(--text-scale, 1)); }
+.aurelle-sealed-scroll summary { display: flex; align-items: center; min-height: 44px; min-width: 44px; }
+
 /* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
 button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 
