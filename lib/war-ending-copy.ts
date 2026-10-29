@@ -1,5 +1,5 @@
 /** Surrender and concession war-ending copy for Kindle, Korund and Aurelle (issue #744, companion to #427). Content only:
- * lib/war-endings.ts owns proposals, ratification and the peace lock, and nothing imports this. lib/peace-copy.ts covers peace
+ * lib/war-endings.ts owns proposals, ratification and the peace lock, and returns these refusal lines. The war banner shows the pending and result lines. Press stays unwired. lib/peace-copy.ts covers peace
  * treaties and ceasefires; this sibling covers surrender and concession only. Canon: territory-cities-warfare §15.3 and §15.4
  * (Decision 109: private title stays with its owner; no line promises compensation or says private land changes hands),
  * trade-diplomacy-sanctions §13.1 (Kindle Assembly, Korund Chairman, Aurelle Crown) and §13.2. Bylines match lib/press-templates.ts.

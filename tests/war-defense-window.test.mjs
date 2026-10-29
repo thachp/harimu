@@ -97,7 +97,7 @@ test('flag off: nothing is saved, nothing is sent, and the Country view shows no
   const rules = await r.importModule('lib/war-rules.ts'), copy = await r.importModule('lib/war-copy.ts');
   const src = await readFile(new URL('../app/war-banner.tsx', import.meta.url), 'utf8');
   const exports = {}; new Function('exports', 'require', ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText)(exports,
-    name => ({ '@/lib/war-copy': copy, '@/lib/war-rules': rules, '@/lib/war-weariness-copy': { wearinessBanners: {}, wearinessStrip: {} }, './game-timer': { GameTimer: () => null }, './display-preferences': { useDisplayTimestamp: () => v => String(v) }, '@/lib/war': {} })[name] ?? require(name));
+    name => ({ '@/lib/war-copy': copy, '@/lib/war-rules': rules, '@/lib/war-weariness-copy': { wearinessBanners: {}, wearinessStrip: {} }, '@/lib/war-ending-copy': { endingBodyFor: () => ({ text: '' }), endingResults: {} }, './game-timer': { GameTimer: () => null }, './display-preferences': { useDisplayTimestamp: () => v => String(v) }, '@/lib/war': {} })[name] ?? require(name));
   const { DefenseWindow } = exports;
   assert.equal(renderToStaticMarkup(createElement(DefenseWindow, { windows: world.data.simulation.wars?.defenseWindows, nationId: 'korund', offsetMinutes: -420 })), '', 'flag off: nothing renders');
   const windows = { korund: { startHourUtc: 14, changedAt: null, nextChangeAt: null }, kindle: { startHourUtc: 22, changedAt: null, nextChangeAt: null } };

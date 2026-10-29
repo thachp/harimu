@@ -78,7 +78,8 @@ test('figures are the code\'s own: peace-lock days, maxCededSquares, and the Kin
  const max=Number(endingsSrc.match(/export const maxCededSquares = (\d+)/)[1]);
  assert.equal(WAR_ENDING_MAX_CEDED_SQUARES,max);
  assert.match(endingsSrc,/value\.length < 1/);
- assert.match(endingsSrc,/Cede 1 to \$\{maxCededSquares\}/);
+ assert.match(endingsSrc,/length > maxCededSquares/);
+ assert.match(endingsSrc,/refusal\('bad_squares'\)/);
  assert.equal(WAR_ENDING_MIN_CEDED_SQUARES,1);
  assert.match(endingsSrc,/yes \* 2 > total/);
  assert.match(endingsSrc,/yes \* 3 >= total \* 2/);
@@ -149,7 +150,9 @@ test('voices stay distinct; nothing glorifies the ending or names a real-world p
  assert.doesNotMatch(endingPressFor('korund').report.endingRejected.text,/weari|defeat|Chairman refused/i);
  assert.match(D.status.text,/awaits ratification/);
 });
-test('unwired: nothing in app/, components/ or lib/ imports war-ending-copy',()=>{
+test('unwired except refusals and the war banner: press and the proposal form do not import war-ending-copy',()=>{
+ const wired=new Set(['lib/war-endings.ts','app/war-banner.tsx']);
  const walkDir=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walkDir(p):[p];}); } catch { return []; } };
- for(const f of [...walkDir('app'),...walkDir('components'),...walkDir('lib')]) if(/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-ending-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/war-ending-copy/,f);
+ for(const f of [...walkDir('app'),...walkDir('components'),...walkDir('lib')]) if(/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-ending-copy.ts')&&!wired.has(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/war-ending-copy/,f);
+ for(const f of wired) assert.match(readFileSync(f,'utf8'),/war-ending-copy/,f);
 });
