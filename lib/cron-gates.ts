@@ -1,7 +1,7 @@
+import { flagOn } from './flag-pack.mjs';
 /** #384: which scheduled jobs have their flag on. worker/entry.ts opens the database for a job only when its flag is on, so a flag-off
  *  cron never opens a Hyperdrive connection or runs the Postgres readiness path. Each job's own lib check still applies (AI binding, budget).
- *  #988: flagOn so a packed flag (HARIMU_AURELLE_PACK) still gates its job. A direct string binding still wins. */
-import { flagOn } from './flag-pack.mjs';
+ *  #988: flagOn so a packed flag (HARIMU_AURELLE_PACK, HARIMU_CITY_PACK) still gates its job. A direct string binding still wins. */
 export type CronFlagBindings = Partial<Record<(typeof cronJobFlags)[CronJob][number], string>>;
 export const cronJobFlags = {
   cabinet: ['HARIMU_AI_CABINET_RESPONSES_ENABLED'],

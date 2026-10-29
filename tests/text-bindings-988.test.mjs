@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
+  const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_GRAY_RATION_RISE_ENABLED'), true);
   assert.equal(flagOn({ ...on, HARIMU_GRAY_MARKET_ENABLED: 'false' }, 'HARIMU_GRAY_MARKET_ENABLED'), false, 'a direct binding wins over the pack');
@@ -32,7 +32,10 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(armiesEnabled({ ...on, HARIMU_WAR_ENABLED: 'true' }), true);
   assert.equal(armiesEnabled({ HARIMU_ARMY_PACK: prod.vars.HARIMU_ARMY_PACK, HARIMU_WAR_ENABLED: 'true' }), false);
   assert.equal(expandFlagPacks(preview.vars).HARIMU_ARMY_BATTLES_ENABLED, 'true');
+  assert.equal(flagOn(on, 'HARIMU_CITY_CAPTURE_NOTE_ENABLED'), true);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_CITY_TIER_GROWTH_ENABLED, 'true');
   assert.equal('HARIMU_GRAY_PACK' in expandFlagPacks(preview.vars), false);
+  assert.equal('HARIMU_CITY_PACK' in expandFlagPacks(preview.vars), false);
   assert.equal(flagOn(on, 'HARIMU_AURELLE_TSR_VIEW_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CROWN_DEBASEMENT_ENABLED'), true);
   assert.equal(flagOn({ ...on, HARIMU_AURELLE_TSR_VIEW_ENABLED: 'false' }, 'HARIMU_AURELLE_TSR_VIEW_ENABLED'), false, 'a direct binding wins over the Aurelle pack');
