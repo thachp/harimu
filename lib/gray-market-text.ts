@@ -35,6 +35,15 @@ export const rumorLine = (hundredths: number): string => fillGray(rumoredRate.li
 /** #758 [not in #314] wallet line under the LN balance; always labeled a rumor, never official. */
 export const walletRumorTag = 'rumor, not official';
 export const walletStreetRateLine = (hundredths: number | null): string => hundredths === null ? `Rumored street rate: no recent trades (${walletRumorTag})` : `Rumored street rate: about ${rate(hundredths)} (${walletRumorTag})`;
+/** #1000 Bureau display quote (docs §12.8). TSR minor units per 100 LN minor units: 1.00 LN = 0.20 TSR.
+ *  [ASSUMPTION] the docs name the Bureau rate and give no figure. Same minor-unit round-down as lib/wallet.ts quoteTessera.
+ *  Not the rumored street rate above (that line is FC per LN and stays a rumor). Display only. */
+export const laborNoteBureauHundredths = 20;
+export function quoteLaborNoteTessera(laborMinor: number, hundredths = laborNoteBureauHundredths): number {
+  if (!Number.isSafeInteger(laborMinor) || laborMinor <= 0 || !Number.isSafeInteger(hundredths) || hundredths <= 0) return 0;
+  return Math.floor(laborMinor * hundredths / 100);
+}
+export const bureauTsrLine = (laborMinor: number): string => `≈ ${(quoteLaborNoteTessera(laborMinor) / 100).toFixed(2)} TSR at the Bureau rate · not convertible`;
 export const noOffersLine = offerLines.none[0].text;
 export const postedLine = (amountMinor: number, askRate: number): string => fillGray(offerLines.posted[0].text, { amount: ln(amountMinor), askRate: rate(askRate) });
 export const acceptedLine = (amountMinor: number, askRate: number): string => fillGray(offerLines.accepted[0].text, { amount: ln(amountMinor), askRate: rate(askRate) });

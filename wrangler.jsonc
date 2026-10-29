@@ -77,6 +77,8 @@
       "HARIMU_KORUND_SHORTFALL_ENABLED": "true",
       "HARIMU_KORUND_PLAN_STATS_ENABLED": "true",
       "HARIMU_WALLET_STREET_RATE_ENABLED": "true",
+      // #1000: Labor Note balance shows its Tessera value at the Bureau rate, marked not convertible (docs §12.8 Display). Off: no line. Display only.
+      "HARIMU_KORUND_TSR_VIEW_ENABLED": "true",
       "HARIMU_KORUND_RATION_CUT_ENABLED": "true",
       "HARIMU_KORUND_RATION_STABILITY_ENABLED": "true",
       "HARIMU_KORUND_STABILITY_RECOVERY_ENABLED": "true",
