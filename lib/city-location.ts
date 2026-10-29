@@ -1,6 +1,6 @@
 import type {GameDatabase} from './database-contract';
 import {nationNotables} from './notable-choice';
-import { capitalCityForNation, citiesForNation, cityForNation } from './cities';
+import { capitalCityForNation, citiesForNation, cityForNation, residentCitiesForNation } from './cities';
 export const cityLocationSchema=`CREATE TABLE IF NOT EXISTS citizen_city_locations (
  user_id TEXT PRIMARY KEY REFERENCES citizens(clerk_user_id) ON DELETE CASCADE,
  nation_id TEXT NOT NULL, home_city_id TEXT NOT NULL, current_city_id TEXT NOT NULL, updated_at INTEGER NOT NULL
@@ -8,7 +8,7 @@ export const cityLocationSchema=`CREATE TABLE IF NOT EXISTS citizen_city_locatio
 export type CityLocation={nationId:string;homeCityId:string;currentCityId:string};
 export async function readCityLocation(db:GameDatabase,userId:string,nationId:string,now:number):Promise<CityLocation>{
  const capital=capitalCityForNation(nationId);if(!capital)throw new Error('Unknown nation city.');
- const ids=citiesForNation(nationId).map(city=>city.id);
+ const ids=residentCitiesForNation(nationId).map(city=>city.id); // #798: a spa-home city stays put
  const placeholders=ids.map(()=>'?').join(',');
  // #781: a move in this nation keeps its city. #965: with no move in this nation, a catalog home is kept (signup choice; no cooldown row).
  // A home that disagrees with a move in this nation, a nation change, or an unknown city still resets to the capital.
