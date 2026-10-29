@@ -56,7 +56,7 @@ test('flag pinned: folded into HARIMU_CITY_PACK, preview "true", production "fal
   assert.equal(prod.vars.HARIMU_CITY_PACK.HARIMU_CITY_IMPORTS_NOTE_ENABLED, 'false');
   assert.equal('HARIMU_CITY_IMPORTS_NOTE_ENABLED' in preview.vars, false);
   assert.equal('HARIMU_CITY_IMPORTS_NOTE_ENABLED' in prod.vars, false);
-  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 10); // #1007 governor + #1014 population band + #798 spa WC bonus
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 11); // #1007 governor + #1014 population band + #798 spa WC bonus + #1034 sea lanes
   assert.ok(FLAG_PACKS.HARIMU_CITY_PACK.includes('HARIMU_CITY_IMPORTS_NOTE_ENABLED'));
 });
 

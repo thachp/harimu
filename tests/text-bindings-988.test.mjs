@@ -26,7 +26,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 18);
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 5);
-  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 10);
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 11);
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 7);
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };

@@ -63,5 +63,6 @@ export function seaLanesStormNote(epochMs: number, nowMs: number, port: boolean)
   const now = gameSeasonAt(epochMs, nowMs);
   if (!now || !seaLanesStormy(now.season, port)) return null;
   const hours = Math.max(1, Math.ceil(now.remainingMs / 3_600_000)), days = Math.floor(hours / 24), rest = hours % 24;
-  return `Winter storms: sea freight slowed until spring (${days ? `${days}d ` : ''}${rest || !days ? `${rest}h ` : ''}left).`.replace(' left', ' left').replace(/ \)/, ')');
+  const left = [days ? `${days}d` : '', rest || !days ? `${rest}h` : ''].filter(Boolean).join(' ');
+  return `Winter storms: sea freight slowed until spring (${left} left).`;
 }
