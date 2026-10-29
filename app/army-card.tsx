@@ -16,13 +16,13 @@ export function ArmyCard() {
   const send = async (body: Record<string, unknown>, done: string) => {
     const res = await fetch('/api/army', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, requestId: crypto.randomUUID() }) });
     const data: { army?: ArmyView; error?: string } = await (res.json() as Promise<{ army?: ArmyView; error?: string }>).catch(() => ({}));
-    if (res.ok) { setArmy(data.army ?? null); setNote(done); } else setNote(armyFailureNote(body.action as ArmyCommand['action'], unit.name, String(data.error ?? res.status)));
+    if (res.ok) { setArmy(data.army ? { ...data.army, march: data.army.march ?? army.march } : null); setNote(done); } else setNote(armyFailureNote(body.action as ArmyCommand['action'], unit.name, String(data.error ?? res.status)));
   };
   // #738 slice 2: shown only when the GET carried strength (HARIMU_ARMY_DRILLS_ENABLED on).
   const drill = async () => {
     const res = await fetch('/api/army/drill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: crypto.randomUUID() }) });
     const data: { army?: ArmyView; reason?: string; error?: string } = await (res.json() as Promise<{ army?: ArmyView; reason?: string; error?: string }>).catch(() => ({}));
-    if (res.ok) { setArmy(data.army ?? null); setNote(fill(unitMembership.drilled.text, unit.name)); }
+    if (res.ok) { setArmy(data.army ? { ...data.army, march: data.army.march ?? army.march } : null); setNote(fill(unitMembership.drilled.text, unit.name)); }
     else setNote(data.reason === 'already_drilled' ? unitMembership.drilledToday.text : armyFailureNote('stance', unit.name, String(data.error ?? res.status)));
   };
   return <section className="army-card" aria-label="Your unit">
@@ -30,6 +30,7 @@ export function ArmyCard() {
     <p>{fill(unitCard.commanderLabel, unit.name, unit.officer)}</p>
     <p>{unitCard.memberCountLabel}: {unit.memberCount}</p>
     {unit.strength !== undefined && <p>{unitCard.strengthLabel}: {unit.strength} · {unitCard.moraleLabel}: {unit.morale}</p>}
+    {army.march && <p>Winter roads: marches take longer. {army.march.time}</p>}
     {unit.supply?.cut && <p>{supplyCutLine(unit.supply)}</p>}
     {unit.battle && <p>{battleLine(unit.battle)}</p>}
     {army.woundedUntil && <p>{woundedLine(army.woundedUntil)}</p>}

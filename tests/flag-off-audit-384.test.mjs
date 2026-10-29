@@ -92,6 +92,7 @@ const flagOffPins = {
   HARIMU_ARMY_MAP_ENABLED: 'army-map-738.test.mjs',
   HARIMU_ARMY_SUPPLY_ENABLED: 'army-supply-738.test.mjs',
   HARIMU_ARMY_BATTLES_ENABLED: 'army-battles-738.test.mjs',
+  HARIMU_WINTER_MARCH_ENABLED: 'winter-march-1038.test.mjs',
   HARIMU_I_VOTED_BADGE_ENABLED: 'i-voted-782.test.mjs',
   HARIMU_KINDLE_POLLING_ENABLED: 'kindle-polling-740.test.mjs',
   HARIMU_PLANK_VOTES_ENABLED: 'plank-votes-831.test.mjs',
@@ -136,6 +137,7 @@ const flagOffPins = {
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
   HARIMU_KINDLE_POLICY_LEDGER_ENABLED: 'policy-ledger-985.test.mjs',
   HARIMU_KINDLE_CERTIFICATION_ENABLED: 'kindle-certification-1016.test.mjs',
+  HARIMU_WORLD_AGES_ENABLED: 'world-ages-1041.test.mjs', // #1041 flag off: no Age line
   HARIMU_SEASON_FARMING_ENABLED: 'season-farming-1033.test.mjs',
 };
 
