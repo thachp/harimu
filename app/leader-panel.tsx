@@ -3,6 +3,7 @@ import { NationDocument } from './nation-document';
 import type { GovernmentSnapshot } from '../lib/government';
 import { leaderPersonas, leaderProgramme } from '../lib/leader-personas';
 import { governmentDisclosure } from '../lib/government-disclosure';
+import { nationDisclosureFor, whyLink } from '../lib/decision-disclosure-copy'; // #985
 import type { SimulationState } from '../lib/world-simulation';
 import { GameTimer } from './game-timer';
 import { AiBadge, AiTextTag } from './ai-disclosure';
@@ -18,6 +19,7 @@ export function LeaderPanel({snapshot,simulation}:{snapshot:GovernmentSnapshot;s
   const persona=snapshot.presidium&&crowned&&snapshot.presidium.chairman.name!==crowned.name?{...crowned,name:snapshot.presidium.chairman.name,biography:'Confirmed as Chairman by the Presidium after an emergency session. Citizens receive official statements; council deliberation stays private.'}:crowned;
   if(!persona)return null;
   const disclosure=governmentDisclosure(snapshot);
+  const kindleBrief=nationDisclosureFor('kindle');
   return <section className="leader-panel" aria-label={`${persona.office} of ${snapshot.nationId}`}>
     <div className="leader-identity">
       <svg viewBox="0 0 80 96" role="img" aria-label={`Stylized portrait of ${persona.name}`} width="80" height="96">
@@ -34,6 +36,7 @@ export function LeaderPanel({snapshot,simulation}:{snapshot:GovernmentSnapshot;s
       {snapshot.presidium.session?.status==='open'&&<p role="status">State Media rumor: the Presidium is meeting in emergency session.</p>}</section>}
     <details><summary>Current pledges and programme</summary><ul>{leaderProgramme(snapshot).map(pledge=><li key={pledge.title}><strong>{pledge.title}</strong> · {pledge.status}</li>)}</ul></details>
     <NationDocument nationId={snapshot.nationId} label={disclosure.title} className="leader-statement"><details><summary>Why? · {disclosure.title}</summary><p><AiTextTag provenance={disclosure.provenance}/></p><p>{disclosure.text}</p>{disclosure.kind==='brief' && <><p><strong>Goal:</strong> {snapshot.decision.title}.</p><p><strong>Other priorities:</strong> Food, infrastructure and workplace support compete for this proposal. Food safety takes precedence; otherwise recorded petition counts rank them, with ties favoring food, then infrastructure.</p></>}</details></NationDocument>
+    {snapshot.policyLedger && snapshot.nationId==='kindle' && kindleBrief && <section aria-label="Policy Ledger"><h4>Policy Ledger</h4>{!snapshot.policyLedger.length ? <p>No published decisions are on the ledger yet.</p> : <ol>{snapshot.policyLedger.map(entry => <li key={entry.id}><p>{new Date(entry.publishedAt * 1000).toISOString().slice(0, 10)} · {entry.office} <AiBadge /> · {entry.title}</p><details><summary aria-label={whyLink.accessibleName}>{whyLink.label} · {kindleBrief.title}</summary><p><AiTextTag provenance="deterministic"/></p><p>{entry.brief}</p><p>{kindleBrief.notPublished.text}</p></details></li>)}</ol>}</section>}
     {simulation && <details><summary>Upcoming routine review</summary><GameTimer endsAt={(simulation.clock.epochSeconds+(simulation.clock.latestTick+1)*simulation.clock.cadenceSeconds)*1000} label="Next policy settlement"/><p>Processed on a server visit after the deadline. No election or major AI decision is scheduled in this preview.</p></details>}
   </section>;
 }

@@ -1,5 +1,5 @@
 /** AI decision disclosure copy: the "Why?" link, each nation's disclosure frame and the not-published lines (issue #497). Content only: the
- * existing government disclosure code owns the data and what it publishes, and no UI imports this. Canon: harimu-docs ai-leadership §8.6
+ * existing government disclosure code owns the data and what it publishes. The Kindle Policy Ledger (#985) is the UI that imports this. Canon: harimu-docs ai-leadership §8.6
  * (Kindle: every decision with a published Reasoning Brief covering goals, inputs considered and alternatives rejected, while the private
  * rationale and secret terms are held back; Korund: state media only, all reasoning hidden; Aurelle: decrees with ceremonial preambles, the
  * Privy Council's deliberations hidden; "the default is public rationale only, never raw chain-of-thought"), ui-ux §23.2 ("a 'Why?' link on
