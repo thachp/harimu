@@ -9,6 +9,8 @@ import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location
 import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
 import {latestCityCapture} from '@/lib/city-capture-history'; // #1028
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
+import {seaLanesStormNote} from '@/lib/game-season'; // #1034
+import {seasonAt} from '@/lib/season-yield'; // #1035 shared season: null without a clock
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 async function context(request:Request){
@@ -17,6 +19,11 @@ async function context(request:Request){
  return {db,userId,nationId:citizen?.nation_id??null,now:Math.floor(Date.now()/1000)};
 }
 
+/** #1034: world clock seconds for #1035's seasonAt. No world_clock row: null, so no season and no storm note. */
+async function worldClock(db:Awaited<ReturnType<typeof getDatabase>>){
+ const row=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>().catch(()=>null);
+ return row?{epochSeconds:Number(row.epoch_seconds),nowSeconds:Math.floor(Date.now()/1000)}:null;
+}
 async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nationId:string,cityId:string,body:Record<string,unknown>){
  const unlocksOn=flagOn(env,'HARIMU_CITY_TIER_UNLOCKS_ENABLED');
  const noteOn=flagOn(env,'HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED');
@@ -26,7 +33,8 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  const importsOn=flagOn(env,'HARIMU_CITY_IMPORTS_NOTE_ENABLED'); // #1001 direct string still wins
  const populationOn=flagOn(env,'HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED'); // #1014
  const governorOn=flagOn(env,'HARIMU_CITY_GOVERNOR_NOTE_ENABLED'); // #1007
- if(!unlocksOn&&!noteOn&&!specialtyOn&&!captureOn&&!civicOn&&!importsOn&&!populationOn&&!governorOn)return body;
+ const seaOn=flagOn(env,'HARIMU_SEASON_SEA_LANES_ENABLED'); // #1034
+ if(!unlocksOn&&!noteOn&&!specialtyOn&&!captureOn&&!civicOn&&!importsOn&&!populationOn&&!governorOn&&!seaOn)return body;
  let tier=1;
  if(flagOn(env,'HARIMU_CITY_TIER_GROWTH_ENABLED')){
   const row=await db.prepare('SELECT tier FROM world_cities WHERE id=?').bind(cityId).first<{tier:number}>();
@@ -41,6 +49,7 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  if(importsOn){const n=cityImportsFields(nationId,cityId);if(n)out={...out,...n};} // #1001 port / trade zone only
  if(populationOn)out={...out,populationNote:cityTierPopulationNote(tier)}; // #1014 read-only
  if(governorOn)out={...out,...cityGovernorFields(nationId,tier)}; // #1007
+ if(seaOn&&/port/i.test(cityForNation(nationId,cityId)?.role??'')){const clock=await worldClock(db);const n=seasonAt(clock)==='winter'?seaLanesStormNote(clock!.epochSeconds*1000,clock!.nowSeconds*1000,true):null;if(n)out={...out,seaLanesNote:n};} // #1034 ports only (ARC #1037), winter only
  return out;
 }
 export async function GET(request:Request){
