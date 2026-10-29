@@ -2,6 +2,7 @@ import { mapLimited } from './async-limits'; // #679
 import { runVoteBuyingWatch } from './vote-buying-watch'; // #825
 import { runRiskScoring } from './risk-scoring'; // #879
 import { dormantAt } from './dormancy-rules'; // #739
+import { releaseDormantJobs } from './dormant-job'; // #1066
 import { runFoundingDay30 } from './founding-period'; // #612
 import { finalizeDueElection } from './elections';
 import { runKindleAssembly, type AssemblyTickConfig } from './assembly';
@@ -184,6 +185,8 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   // #679: the flag-gated runners each cost several sequential database round trips, and over Hyperdrive every round trip is slow, so one GET /api/world with the
   // preview flags on waited for all of them in a row (about 80 round trips, ~30 s on preview). Runners that touch separate state run as concurrent chains (see
   // worldRunnerChains); inside a chain the old order is kept. Every runner is idempotent per tick or time as before.
+  // #1066: dormant citizens release their job on this existing pass. GET /api/world and citizen POST already pass dormancy. No new cron. Flag off: not called.
+  if (options.dormancy === true) await releaseDormantJobs(db, now);
   await runWorldChains(worldRunnerChains(db, now, options));
   return readWorldSimulation(db, now, { war: options.war, warAssembly: options.warAssembly, warEndings: options.warEndings, warWeariness: options.warWeariness, warWearinessLosses: options.warWearinessLosses, diplomacy: options.diplomacy, embargo: options.embargo, reserve: options.reserve });
 
