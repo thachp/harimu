@@ -269,7 +269,9 @@
     // #1023: HUD world clock shows the current game season and the countdown to the next (docs §17.1, 7.5 real days each). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_SEASON_CLOCK": "false",
     // #1029: HUD shows the nation's next festival in game time (docs §17.1). "true" in preview, "false" in production.
-    "NEXT_PUBLIC_HARIMU_FESTIVAL_CALENDAR": "false"
+    "NEXT_PUBLIC_HARIMU_FESTIVAL_CALENDAR": "false",
+    // #1042: the player's own citizen card shows how long they have lived in game years (docs §17.2, 1 real month = 1 game year). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]
