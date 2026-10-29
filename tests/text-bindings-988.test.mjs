@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { expandFlagPacks, flagOn, flagValue } from '../lib/flag-pack.mjs';
+import { expandFlagPacks, flagOn, flagValue, varsForProcessEnv } from '../lib/flag-pack.mjs';
 import { armiesEnabled } from '../lib/army-rules.ts';
 import { dashboardManagedVars } from '../scripts/wrangler-pin.mjs';
 
@@ -33,4 +33,10 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(armiesEnabled({ HARIMU_ARMY_PACK: prod.vars.HARIMU_ARMY_PACK, HARIMU_WAR_ENABLED: 'true' }), false);
   assert.equal(expandFlagPacks(preview.vars).HARIMU_ARMY_BATTLES_ENABLED, 'true');
   assert.equal('HARIMU_GRAY_PACK' in expandFlagPacks(preview.vars), false);
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, undefined, 'the sealed-scroll flag is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, 'true', 'the client build still inlines the packed flag');
+  assert.equal(varsForProcessEnv(prod.vars).NEXT_PUBLIC_HARIMU_NATION_SKIN, 'false');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_NATION_SKIN: 'false' }).NEXT_PUBLIC_HARIMU_NATION_SKIN, 'false', 'a direct string wins');
 });
