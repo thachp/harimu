@@ -251,7 +251,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "true",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "true",
-    // #988/#1008/#1009: UI skin flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off. The client build expands each NEXT_PUBLIC_* name. A direct string binding still wins.
+    // #988/#1008/#1009/#1039: UI skin flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off. The client build expands each NEXT_PUBLIC_* name. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "true",
       "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "true",
@@ -259,7 +259,8 @@
       "NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET": "true",
       "NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS": "true",
       "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "true",
-      "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "true"
+      "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "true",
+      "NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
