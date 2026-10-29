@@ -2,6 +2,7 @@
  *  Derived on read from the slice-4 march (no table, no writes). Behind HARIMU_ARMY_SUPPLY_ENABLED (needs HARIMU_ARMY_MAP_ENABLED and its flags). */
 import { armyMapEnabled, moveSeconds, terrainMap, unitMarch, type ArmyPosition, type ArmyWar } from './army-map';
 import { flagOn } from './flag-pack.mjs';
+import { marchTimeFactor, type MarchPace } from './winter-march'; // #1038: the same locked march clock, not a new supply rule
 
 export const armySupplyEnabled = (env: unknown) => armyMapEnabled(env) && flagOn(env, 'HARIMU_ARMY_SUPPLY_ENABLED');
 /** [ASSUMPTION] Tuning values (the docs give none). Each nation's depot is its capital; a supply line reaches this many squares (Chebyshev) from it. */
@@ -15,9 +16,9 @@ export const PERCENT = 100;
 type Point = { x: number; y: number };
 const cheb = (a: Point, b: Point) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 /** When the unit entered the first square beyond the depot's range on `route` (it sets out at `startAt`), or null if the route never leaves it. */
-export function supplyCutAt(depot: Point, route: readonly Point[], startAt: number, terrainAt: (p: Point) => string | undefined): number | null {
+export function supplyCutAt(depot: Point, route: readonly Point[], startAt: number, terrainAt: (p: Point) => string | undefined, factor = 1): number | null {
   let spent = 0;
-  for (const step of route) { spent += moveSeconds(terrainAt(step)); if (cheb(depot, step) > ARMY_SUPPLY_RANGE_SQUARES) return startAt + spent; }
+  for (const step of route) { spent += moveSeconds(terrainAt(step)) * factor; if (cheb(depot, step) > ARMY_SUPPLY_RANGE_SQUARES) return startAt + spent; }
   return null;
 }
 export type SupplyState = { cut: boolean; cutDays: number; strengthLossPct: number };
@@ -28,8 +29,9 @@ export function supplyState(cutAt: number | null, now: number): SupplyState {
 }
 export const applySupplyLoss = (strength: number, lossPct: number) => Math.max(0, Math.floor(strength * (PERCENT - lossPct) / PERCENT));
 /** A nation's unit supply at `now`: home or within range is supplied; when the war ends the unit is home and supplied again. */
-export function unitSupply(nationId: string, wars: readonly ArmyWar[], now: number, terrain: ReadonlyMap<string, string> = terrainMap()): SupplyState {
+export function unitSupply(nationId: string, wars: readonly ArmyWar[], now: number, terrain: ReadonlyMap<string, string> = terrainMap(), pace: MarchPace | null = null): SupplyState {
   const march = unitMarch(nationId, wars, now);
-  return supplyState(march ? supplyCutAt(march.home, march.route, march.war.mobilization_ends_at, s => terrain.get(`${s.x},${s.y}`)) : null, now);
+  const factor = march && pace ? marchTimeFactor(pace.epochSeconds, march.war.mobilization_ends_at, true) : 1;
+  return supplyState(march ? supplyCutAt(march.home, march.route, march.war.mobilization_ends_at, s => terrain.get(`${s.x},${s.y}`), factor) : null, now);
 }
-export const withSupply = (units: readonly ArmyPosition[], wars: readonly ArmyWar[], now: number) => units.map(u => ({ ...u, supply: unitSupply(u.nationId, wars, now) }));
+export const withSupply = (units: readonly ArmyPosition[], wars: readonly ArmyWar[], now: number, pace: MarchPace | null = null) => units.map(u => ({ ...u, supply: unitSupply(u.nationId, wars, now, undefined, pace) }));
