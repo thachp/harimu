@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { citiesForNation, cityForNation, cityHasImports, cityImportsFields, cityImportsNote, outpostCityForNation } from '../lib/cities.ts';
+import { FLAG_PACKS } from '../lib/flag-pack.mjs';
 import { localRuntime } from './helpers/local-runtime.mjs';
 
 const read = file => readFileSync(file, 'utf8');
@@ -48,10 +49,15 @@ test('catalog: every port and trade zone has a note; inland, capital, shipyard, 
   assert.equal(cityImportsNote({ role: 'Port / signals' }), PORT);
 });
 
-test('flag pinned: preview "true", production "false", standalone (not a pack)', () => {
-  assert.match(read('wrangler.jsonc'), /"HARIMU_CITY_IMPORTS_NOTE_ENABLED":\s*"true"/);
-  assert.match(read('wrangler.prod.jsonc'), /"HARIMU_CITY_IMPORTS_NOTE_ENABLED":\s*"false"/);
-  assert.doesNotMatch(read('lib/flag-pack.mjs'), /HARIMU_CITY_IMPORTS_NOTE_ENABLED/);
+test('flag pinned: folded into HARIMU_CITY_PACK, preview "true", production "false"', () => {
+  const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
+  const preview = strip(read('wrangler.jsonc')), prod = strip(read('wrangler.prod.jsonc'));
+  assert.equal(preview.vars.HARIMU_CITY_PACK.HARIMU_CITY_IMPORTS_NOTE_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_CITY_PACK.HARIMU_CITY_IMPORTS_NOTE_ENABLED, 'false');
+  assert.equal('HARIMU_CITY_IMPORTS_NOTE_ENABLED' in preview.vars, false);
+  assert.equal('HARIMU_CITY_IMPORTS_NOTE_ENABLED' in prod.vars, false);
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 6);
+  assert.ok(FLAG_PACKS.HARIMU_CITY_PACK.includes('HARIMU_CITY_IMPORTS_NOTE_ENABLED'));
 });
 
 test('flag off: /api/city and found-city leave importsNote off; flag on notes only port and trade-zone cities', async t => {
