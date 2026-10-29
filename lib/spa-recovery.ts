@@ -1,8 +1,8 @@
 /** #798: spa-home Work Capacity recovery. Docs name a small bonus and no number. One recovery step already
  *  refills to the maximum, so a +1 WC grant cannot show. ARC option A: a shorter interval, no migration.
  *  [ASSUMPTION] 23/24 of the normal interval — one WC of a 24-WC day, sooner, never under the 60s floor. */
-import type { GameDatabase } from './database-contract.ts';
-import { cityForNation } from './cities.ts';
+import type { GameDatabase } from './database-contract';
+import { cityForNation } from './cities';
 import { flagOn } from './flag-pack.mjs';
 
 export const spaWcNote = 'Spa city: you recover a little extra Work Capacity here.';

@@ -4,9 +4,9 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { cityForNation, citiesForNation, residentCitiesForNation } from '../lib/cities.ts';
-import { spaRecoveryInterval, spaWcNote } from '../lib/spa-recovery.ts';
 
-const day = 86400, sooner = spaRecoveryInterval(day);
+const day = 86400, sooner = Math.floor(day * 23 / 24);
+const spaWcNote = 'Spa city: you recover a little extra Work Capacity here.';
 
 test('Emberwell and Shen Springs are Health / tourism spa cities; Isling Springs keeps Spa / tourism and the spa mark; the three-pin list stays three', () => {
   assert.equal(sooner, 82800);
@@ -31,6 +31,9 @@ const clockOf = (r, user) => r.db.prepare('SELECT recovered_at FROM capacity_clo
 
 test('flag off: a spa home waits the full day; flag on: it fills at the shorter interval once, and a non-spa home does not', async t => {
   const r = await localRuntime(); t.after(() => r.close());
+  const spa = await r.importModule('lib/spa-recovery.ts');
+  assert.equal(spa.spaRecoveryInterval(day), sooner);
+  assert.equal(spa.spaWcNote, spaWcNote);
   const sec = Math.floor(r.now / 1000);
   await place(r, 'alice', 'emberwell');
   for (const user of ['alice', 'bob']) {
