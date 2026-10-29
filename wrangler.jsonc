@@ -35,14 +35,14 @@
     "HARIMU_NOTABLES_ENABLED": "true",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "true",
     "HARIMU_CITY_FOUNDING_ENABLED": "true",
-    // #952 / #966: a founded city promotes one tier after 7 real days above the next population floor, and drops one tier after 7 real days short of food or housing (never below T1; a capital never below its starting tier). Off: the daily check does not run and readers still see T1.
-    "HARIMU_CITY_TIER_GROWTH_ENABLED": "true",
-    // #979: city panel shows each tier's district slots and unlocks (docs Cities table). Off: found-city and /api/city leave those fields off the response; the panel is unchanged.
-    "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "true",
-    // #984: city panel shows a read-only festival availability note from the Cities tier table (T2+ available; T1 unlocks at Town). Off: found-city and /api/city leave festivalNote off; the panel is unchanged.
-    "HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED": "true",
-    // #996: city panel shows the catalog specialty/role and a jobs-match note (port/trade also mention imports). Off: /api/city and found-city leave specialty fields off; the panel is unchanged.
-    "HARIMU_CITY_SPECIALTY_NOTE_ENABLED": "true",
+    // #988 / #1003: one JSON binding for city tier growth and panel notes (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    "HARIMU_CITY_PACK": {
+      "HARIMU_CITY_TIER_GROWTH_ENABLED": "true",
+      "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "true",
+      "HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED": "true",
+      "HARIMU_CITY_SPECIALTY_NOTE_ENABLED": "true",
+      "HARIMU_CITY_CAPTURE_NOTE_ENABLED": "true"
+    },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
     // #764: per-persona AI mute (operator control, not a feature flag). "" = off; "all" or a comma list of persona ids (Notable ids, <nation>-news-desk, kindle-cabinet, kindle-town-hall, kindle-debate) skips that persona's model calls. Unknown values fail closed to "all".
@@ -53,7 +53,6 @@
     "HARIMU_TESSERA_EXCHANGE_ENABLED": "false",
     // #631: preview-only Tessera TEST faucet (50.00 TSR once per citizen, labeled test). Off; it also needs NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW=true, so production refuses it.
     "HARIMU_TEST_FAUCET_ENABLED": "true",
-    "HARIMU_LABOR_BUREAU_ENABLED": "true",
     // #489: per-nation opening flags (seven-nations Stage 0). Off; even when "true" a nation is enrollable only by a QA-allowlisted account (lib/nation-openings.ts nationPlayable).
     // #487: Confluence PoC. "true" in preview only (QA-allowlisted accounts); production "false".
     "HARIMU_CONFLUENCE_ENABLED": "true",
@@ -65,7 +64,7 @@
     "HARIMU_FULMARA_ENABLED": "false",
     // #486 (Stage 0 closeout): a flag-on nation opens only when its registry entry is complete (capital and biome, currency, wage fund, jobs). Off: unchanged.
     "HARIMU_NATION_READINESS_ENABLED": "true",
-    // #988: one JSON binding for the gray-market and Korund plan flags (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    // #988: one JSON binding for the gray-market and Korund plan flags, the labor bureau, the internal residence permit, and the savings shield (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
     "HARIMU_GRAY_PACK": {
       "HARIMU_GRAY_MARKET_ENABLED": "true",
       "HARIMU_GRAY_DAILY_CAP_ENABLED": "true",
@@ -73,23 +72,26 @@
       "HARIMU_GRAY_SEIZURE_ENABLED": "true",
       "HARIMU_GRAY_RATION_RISE_ENABLED": "true",
       "HARIMU_KORUND_MEDALS_ENABLED": "true",
+      // #994: Plan medals raise displayed Standing on the Korund plan (derived on read from the #737 medal total; citizens.standing is not written). Off: no planStanding, panel unchanged. Also needs HARIMU_KORUND_MEDALS_ENABLED.
+      "HARIMU_KORUND_STANDING_ENABLED": "true",
       "HARIMU_KORUND_SHORTFALL_ENABLED": "true",
       "HARIMU_KORUND_PLAN_STATS_ENABLED": "true",
       "HARIMU_WALLET_STREET_RATE_ENABLED": "true",
       "HARIMU_KORUND_RATION_CUT_ENABLED": "true",
       "HARIMU_KORUND_RATION_STABILITY_ENABLED": "true",
-      "HARIMU_KORUND_STABILITY_RECOVERY_ENABLED": "true"
+      "HARIMU_KORUND_STABILITY_RECOVERY_ENABLED": "true",
+      "HARIMU_LABOR_BUREAU_ENABLED": "true",
+      // #992: closed-system internal residence permit for home-city moves (Korund, Meridian; Varkand at Amber/Red). Off: #781 path unchanged.
+      "HARIMU_INTERNAL_PERMIT_ENABLED": "true",
+      // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
+      "HARIMU_SAVINGS_SHIELD_ENABLED": "true"
     },
-    // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
-    "HARIMU_SAVINGS_SHIELD_ENABLED": "true",
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
     // #886 (a): the MVP job-type catalog (8 types, ARC on #886) at GET /api/jobs/types. Off: 404; nothing else reads it.
     "HARIMU_MVP_JOB_TYPES_ENABLED": "true",
     // #781: move your home city within your own nation for a fee of 10 units of the nation's wallet currency (SPK Kindle, LN Korund; no wallet currency: not_open_yet), once per 7 real days (POST /api/city/home). Off: 404 before auth, no read or write; home stays the capital.
     "HARIMU_HOME_CITY_MOVE_ENABLED": "true",
-    // #992: closed-system internal residence permit for home-city moves (Korund, Meridian; Varkand at Amber/Red). Off: #781 path unchanged.
-    "HARIMU_INTERNAL_PERMIT_ENABLED": "true",
     // #965: choose a home city at enrollment from the nation's catalog (lib/cities.ts); the capital is preselected and used when cityId is omitted. Off: cityId is ignored and home stays the capital. No home_city_moves row, so the #781 fee and cooldown do not start.
     "HARIMU_ENROLL_HOME_CITY_ENABLED": "true",
     // #777: goods-market seller fee (0.5%, rounded down) written as a sink row with each fill and netted from the wallet. Off: no fee written or read.

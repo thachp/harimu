@@ -28,6 +28,7 @@ const flagOffPins = {
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
   HARIMU_CITY_SPECIALTY_NOTE_ENABLED: 'city-specialty-note-996.test.mjs',
+  HARIMU_CITY_CAPTURE_NOTE_ENABLED: 'city-capture-note-1002.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
@@ -45,6 +46,7 @@ const flagOffPins = {
   HARIMU_GRAY_SEIZURE_ENABLED: 'gray-seizure-797.test.mjs',
   HARIMU_GRAY_RATION_RISE_ENABLED: 'gray-ration-rise-968.test.mjs', // #968
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
+  HARIMU_KORUND_STANDING_ENABLED: 'korund-standing-994.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
   HARIMU_KORUND_PLAN_STATS_ENABLED: 'korund-plan-stats-981.test.mjs', // #981 flag off: no plan stat, no quota read
   HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
