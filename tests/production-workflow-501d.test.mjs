@@ -80,7 +80,7 @@ test('build runs in a clean environment (QA3), and build-production asserts the 
   assert.equal(env.PATH, '/bin'); assert.equal(env.GITHUB_SHA, head, 'the build stamp still works'); assert.equal(env.HARIMU_WAR_ENABLED, 'false', 'config vars win over ambient flags'); assert.equal(env.HARIMU_PRODUCTION_STORAGE, 'true');
   const calls = [], spawn = (cmd, args, options) => { calls.push({ cmd, args, options }); return { status: 0 }; };
   assert.throws(() => buildProduction({}, { spawn, readConfig: () => good() }), /HARIMU_DEPLOY_ENVIRONMENT=production is required/);
-  assert.throws(() => buildProduction({ HARIMU_DEPLOY_ENVIRONMENT: 'production' }, { spawn }), /Production config refused[^]*placeholder/, 'the checked-in placeholder config is asserted, not built');
+  assert.throws(() => buildProduction({ HARIMU_DEPLOY_ENVIRONMENT: 'production' }, { spawn, readConfig: () => good(c => { c.hyperdrive[0].id = 'PLACEHOLDER-x'; }) }), /Production config refused[^]*placeholder/, 'a placeholder config is asserted, not built');
   assert.throws(() => buildProduction({ HARIMU_DEPLOY_ENVIRONMENT: 'production' }, { spawn, readConfig: () => good(c => { c.vars.HARIMU_WAR_ENABLED = 'true'; }) }), /Production config refused/); assert.equal(calls.length, 0, 'nothing is spawned when the assertion fails');
   assert.equal(buildProduction({ ...ambient, HARIMU_DEPLOY_ENVIRONMENT: 'production' }, { spawn, readConfig: () => good() }), 0); assert.deepEqual(calls[0].args, ['build']); assert.equal(calls[0].options.env.CLOUDFLARE_API_TOKEN, undefined);
 });
@@ -89,7 +89,7 @@ test('QA3 #644 gaps: main() runs the journal gate, and the driver keeps the jour
   const base = { HARIMU_DEPLOY_ENVIRONMENT: 'production', PATH: process.env.PATH }, argv = [`--qa2-go-sha=${head}`, '--dry-run'];
   let gateCalls = 0;
   await assert.rejects(deployMain(argv, base, { journalProblems: () => { gateCalls++; return ['Production would keep the unbounded write journal: test.']; } }), /Production deploy refused:\n- Production would keep the unbounded write journal/); assert.equal(gateCalls, 1);
-  await assert.rejects(deployMain(argv, base, { journalProblems: () => { gateCalls++; return []; } }), /Production config refused[^]*placeholder/, 'with the gate clean, the next refusal is the config assertion'); assert.equal(gateCalls, 2);
+  assert.equal(await deployMain(argv, base, { journalProblems: () => { gateCalls++; return []; } }), 0, 'with the gate clean, the checked-in config passes the dry run'); assert.equal(gateCalls, 2);
   assert.match(readFileSync('scripts/deploy-production.mjs', 'utf8'), /journalProblems\(\);[^]*assertProductionConfig\(readProductionConfigRaw\(\)\)/, 'gate runs before the config assertion');
   const driver = readFileSync('lib/postgres/driver.ts', 'utf8');
   assert.match(driver, /export function postgresConnection\([^)]*journal=true\)/, 'the driver default keeps the journal (preview unchanged)'); assert.match(driver, /\{journalRetentionApproved,allowAccountElectionWrites,journal\}/, 'the switch reaches PostgresDatabase');
