@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { getDatabase } from '@/lib/db';
 import { readCommandObject } from '@/lib/command-request';
 import { authorizeWarCaller, handleWarCommand } from '@/lib/war-actions';
+import { peaceRevertEnabled } from '@/lib/war-peace-revert'; // #1054
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -19,6 +20,6 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try { body = await readCommandObject(request, 2048); } catch { return privateJson({ error: 'Send a war command.', reason: 'bad_request' }, 400); }
   const result = await handleWarCommand(await getDatabase(), { enabled: true, limits: bindings.HARIMU_WAR_DECLARATION_LIMITS_ENABLED === 'true', assembly: bindings.HARIMU_WAR_ASSEMBLY_ENABLED === 'true', lossCap: bindings.HARIMU_WAR_LOSS_CAP_ENABLED === 'true', // #912
- endings: bindings.HARIMU_WAR_ENDINGS_ENABLED === 'true', secret: bindings.HARIMU_WAR_ADMIN_SECRET, authorization, body, now: Math.floor(Date.now() / 1000) });
+ endings: bindings.HARIMU_WAR_ENDINGS_ENABLED === 'true', peaceRevert: peaceRevertEnabled(env), secret: bindings.HARIMU_WAR_ADMIN_SECRET, authorization, body, now: Math.floor(Date.now() / 1000) });
   return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }
