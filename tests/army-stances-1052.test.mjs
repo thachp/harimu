@@ -74,6 +74,8 @@ test('the army card shows one stance-mix line during a battle, counts only, from
   await show('a'); assert.match(el.textContent, /Squads: 2 holding, 3 advancing, 4 falling back\./); assert.doesNotMatch(el.textContent, /clerk|user_/);
   army.unit = { ...army.unit, battle: { opponentNationId: 'korund', attacking: true, rounds: 1, status: 'attacker_won' } };
   await show('b'); assert.doesNotMatch(el.textContent, /Squads:/, 'a finished battle has no live mix'); assert.match(el.textContent, /Battle with Korund/);
+  army.unit = { ...army.unit, battle: { opponentNationId: 'korund', attacking: true, rounds: 2, status: 'attacker_won', stances: { hold: 2, advance: 3, fall_back: 4 }, opponentStances: { hold: 5, advance: 6, fall_back: 7 } } };
+  await show('c'); assert.match(el.textContent, /Squads: 2 holding, 3 advancing, 4 falling back\./); assert.match(el.textContent, /Korund squads: 5 holding, 6 advancing, 7 falling back\./);
   await act(async () => root.unmount());
 });
 
@@ -113,15 +115,14 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.ok(takenHold > 0 && (takenAdv - takenHold) * 100 <= takenHold * AB.BATTLE_STANCE_ADVANCE_PCT);
     const card = (await r.call('army', 'alice')).data, battles = (await r.call('army/battles', null)).data;
     assert.deepEqual(card.army.unit.battle.stances, advanced.stances.attacker, 'the card gets the viewer unit only');
-    assert.deepEqual(battles.battles[0].stances, advanced.stances);
+    assert.equal(card.army.unit.battle.opponentStances, undefined, '#1061: the card omits the other side while the battle is live');
+    assert.equal(battles.battles[0].stances, undefined, '#1061: a non-participant gets no live counts');
     const blob = JSON.stringify({ card, battles });
     const ids = (await r.db.prepare('SELECT clerk_user_id FROM army_members').all()).results.map(x => x.clerk_user_id);
     for (const id of ids) assert.equal(blob.includes(id), false, id);
     assert.equal(blob.includes('clerk_user_id'), false);
-    for (const counts of [card.army.unit.battle.stances, battles.battles[0].stances.attacker, battles.battles[0].stances.defender]) {
-      assert.deepEqual(Object.keys(counts).sort(), ['advance', 'fall_back', 'hold']);
-      for (const n of Object.values(counts)) assert.equal(typeof n, 'number');
-    }
+    assert.deepEqual(Object.keys(card.army.unit.battle.stances).sort(), ['advance', 'fall_back', 'hold']);
+    for (const n of Object.values(card.army.unit.battle.stances)) assert.equal(typeof n, 'number');
     const later = now + AB.BATTLE_MAX_ROUNDS * AB.BATTLE_ROUND_SECONDS;
     await AB.recordFinishedBattles(r.db, later);
     const rows = (await r.db.prepare('SELECT * FROM army_battles').all()).results;
@@ -130,7 +131,8 @@ for (const backend of ['sqlite', 'postgres']) {
     await AB.recordFinishedBattles(r.db, later + 60);
     assert.deepEqual((await r.db.prepare('SELECT * FROM army_battles').all()).results, rows, 'a stored row does not change when stances change');
     const stored = (await AB.readBattles(r.db, wars, later + 60))[0];
-    assert.equal(stored.stored, true); assert.equal(stored.stances, undefined);
+    assert.equal(stored.stored, true);
+    assert.deepEqual(stored.stances, advanced.stances, '#1061: a stored battle keeps the mix it resolved with');
     assert.equal(stored.attackerStrength, Number(rows[0].attacker_strength)); assert.equal(stored.defenderStrength, Number(rows[0].defender_strength));
     assert.equal(stored.status, rows[0].status); assert.equal(stored.rounds, Number(rows[0].rounds));
     assert.deepEqual(await AB.readBattles(r.db, wars, later + 60), [stored], 're-reading a finished battle returns the same result');

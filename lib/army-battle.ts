@@ -3,7 +3,8 @@
  *  capital; deterministic, from current strength (which includes the #897 supply loss); every number a named constant; the capital is never
  *  captured. ARC on #910: a finished battle is stored once by the world tick (migration 0096 mirrors armyBattleSchemas); GETs read the stored row and derive only a
  *  running battle. Behind HARIMU_ARMY_BATTLES_ENABLED (needs HARIMU_ARMY_SUPPLY_ENABLED and its flags). #1052: a running battle also applies the unit's
- *  squad-stance mix (counts only). A stored battle is read back as stored. No new flag. */
+ *  squad-stance mix (counts only). A stored battle is read back as stored. #1061: a live response carries only the viewer's side;
+ *  the mix is frozen on the stored row and both sides are visible once the battle has resolved. No new flag. */
 import type { GameDatabase } from './database-contract';
 import { armyUnits, unitForNation } from './army-rules';
 import { marchArrivalAt, marchPace, readActiveWars, unitMarch, type ArmyWar } from './army-map';
@@ -78,13 +79,58 @@ export const armyBattleSchemas = [
  retreated TEXT CHECK(retreated IN ('attacker','defender')),
  attacker_strength INTEGER NOT NULL CHECK(attacker_strength >= 0),
  defender_strength INTEGER NOT NULL CHECK(defender_strength >= 0),
- recorded_at INTEGER NOT NULL
+ recorded_at INTEGER NOT NULL,
+ attacker_hold INTEGER, attacker_advance INTEGER, attacker_fall_back INTEGER,
+ defender_hold INTEGER, defender_advance INTEGER, defender_fall_back INTEGER
 )`,
+];
+/** #1061 (migration 0112): a local database created before the columns existed gets them once. Null means the mix was not stored. */
+export const battleStanceColumns = [
+  'ALTER TABLE army_battles ADD COLUMN attacker_hold INTEGER',
+  'ALTER TABLE army_battles ADD COLUMN attacker_advance INTEGER',
+  'ALTER TABLE army_battles ADD COLUMN attacker_fall_back INTEGER',
+  'ALTER TABLE army_battles ADD COLUMN defender_hold INTEGER',
+  'ALTER TABLE army_battles ADD COLUMN defender_advance INTEGER',
+  'ALTER TABLE army_battles ADD COLUMN defender_fall_back INTEGER',
 ];
 /** One battle per war, attacking unit and staging arrival (ARC on #910). */
 export const battleKey = (warId: string, attackerUnit: string, startedAt: number) => `${warId}:${attackerUnit}:${startedAt}`;
-export type Battle = BattleResult & { attackerNationId: string; defenderNationId: string; startedAt: number; stored: boolean; stances?: { attacker: StanceCounts; defender: StanceCounts } };
-type StoredRow = { battle_key: string; rounds: number; status: 'attacker_won' | 'defender_won'; retreated: 'attacker' | 'defender' | null; attacker_strength: number; defender_strength: number };
+export type StancePair = { attacker: StanceCounts; defender: StanceCounts };
+export type Battle = BattleResult & { attackerNationId: string; defenderNationId: string; startedAt: number; stored: boolean; stances?: StancePair };
+type StoredRow = { battle_key: string; rounds: number; status: 'attacker_won' | 'defender_won'; retreated: 'attacker' | 'defender' | null; attacker_strength: number; defender_strength: number; attacker_hold: number | null; attacker_advance: number | null; attacker_fall_back: number | null; defender_hold: number | null; defender_advance: number | null; defender_fall_back: number | null };
+/** Null on any column means a row stored before #1061: no mix to show. Zero is a real count. */
+export function stancesFromRow(row: Pick<StoredRow, 'attacker_hold' | 'attacker_advance' | 'attacker_fall_back' | 'defender_hold' | 'defender_advance' | 'defender_fall_back'>): StancePair | undefined {
+  const n = [row.attacker_hold, row.attacker_advance, row.attacker_fall_back, row.defender_hold, row.defender_advance, row.defender_fall_back];
+  if (n.some(v => v === null || v === undefined)) return undefined;
+  const [ah, aa, af, dh, da, df] = n.map(v => Number(v));
+  return { attacker: { hold: ah, advance: aa, fall_back: af }, defender: { hold: dh, advance: da, fall_back: df } };
+}
+/** #1061: while the battle is live, only the viewer's nation gets its own counts. After it resolves, both sides are visible.
+ *  Anyone else (no nation, or a nation that is not in the battle) gets none until then. The other side's key is omitted. */
+export function stanceCountsForViewer(battle: { status: string; attackerNationId: string; defenderNationId: string; stances?: StancePair }, viewerNationId: string | null): { attacker?: StanceCounts; defender?: StanceCounts } | undefined {
+  const counts = battle.stances;
+  if (!counts) return undefined;
+  if (battle.status !== 'ongoing') return { attacker: counts.attacker, defender: counts.defender };
+  if (viewerNationId === battle.attackerNationId) return { attacker: counts.attacker };
+  if (viewerNationId === battle.defenderNationId) return { defender: counts.defender };
+  return undefined;
+}
+/** API shape for GET /api/army/battles. Drops the full mix before adding back only what this viewer may see. */
+export function presentBattle<T extends { status: string; attackerNationId: string; defenderNationId: string; stances?: StancePair }>(battle: T, viewerNationId: string | null) {
+  const stances = stanceCountsForViewer(battle, viewerNationId);
+  const copy = { ...battle };
+  delete copy.stances;
+  return stances ? { ...copy, stances } : copy;
+}
+/** Army card: `stances` is the viewer's unit. `opponentStances` is added only after the battle resolves. */
+export function cardStanceCounts(battle: { status: string; attackerNationId: string; defenderNationId: string; stances?: StancePair }, nationId: string): { stances?: StanceCounts; opponentStances?: StanceCounts } {
+  const pair = battle.stances;
+  if (!pair) return {};
+  const own = nationId === battle.attackerNationId ? pair.attacker : nationId === battle.defenderNationId ? pair.defender : undefined;
+  const other = nationId === battle.attackerNationId ? pair.defender : nationId === battle.defenderNationId ? pair.attacker : undefined;
+  if (battle.status === 'ongoing') return own ? { stances: own } : {};
+  return { ...(own ? { stances: own } : {}), ...(other ? { opponentStances: other } : {}) };
+}
 /** The battles at `now` for every staged attacking unit: the stored result once decided (never changes), else derived from current strength and morale.
  *  One read for stored rows; current strength is read only for battles not yet stored. Never writes. */
 export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], now: number, pace: MarchPace | null = null): Promise<(Battle & { key: string; attackerUnit: string; defenderUnit: string; warId: string })[]> {
@@ -95,12 +141,15 @@ export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], no
     return now < startedAt ? [] : [{ unit, defender, startedAt, warId: march.war.id, key: battleKey(march.war.id, unit.id, startedAt) }];
   });
   if (!staged.length) return [];
-  const stored = new Map(((await db.prepare(`SELECT battle_key, rounds, status, retreated, attacker_strength, defender_strength FROM army_battles WHERE battle_key IN (${staged.map(() => '?').join(',')})`)
+  const stored = new Map(((await db.prepare(`SELECT battle_key, rounds, status, retreated, attacker_strength, defender_strength, attacker_hold, attacker_advance, attacker_fall_back, defender_hold, defender_advance, defender_fall_back FROM army_battles WHERE battle_key IN (${staged.map(() => '?').join(',')})`)
     .bind(...staged.map(s => s.key)).all<StoredRow>()).results ?? []).map(r => [r.battle_key, r]));
   return Promise.all(staged.map(async s => {
     const base = { attackerNationId: s.unit.nationId, defenderNationId: s.defender.nationId, startedAt: s.startedAt, key: s.key, attackerUnit: s.unit.id, defenderUnit: s.defender.id, warId: s.warId };
     const row = stored.get(s.key);
-    if (row) return { ...base, stored: true, rounds: Number(row.rounds), status: row.status, retreated: row.retreated ?? null, attackerStrength: Number(row.attacker_strength), defenderStrength: Number(row.defender_strength) };
+    if (row) {
+      const stances = stancesFromRow(row);
+      return { ...base, stored: true, rounds: Number(row.rounds), status: row.status, retreated: row.retreated ?? null, attackerStrength: Number(row.attacker_strength), defenderStrength: Number(row.defender_strength), ...(stances ? { stances } : {}) };
+    }
     // #679: readiness, carried losses and #1052 stance counts do not depend on each other. They share one round trip.
     // A stored battle never starts these reads.
     const [att, def, attLoss, defLoss, attStances, defStances] = await Promise.all([
@@ -111,7 +160,8 @@ export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], no
     const attFull = applyCarriedLoss(s.unit.id, att.strength, attLoss, now), defFull = applyCarriedLoss(s.defender.id, def.strength, defLoss, now);
     const attacker = { strength: applySupplyLoss(attFull, unitSupply(s.unit.nationId, wars, now, undefined, pace).strengthLossPct), morale: att.morale, stances: attStances }, defender = { strength: defFull, morale: def.morale, stances: defStances };
     const resolved = resolveBattle(attacker, defender, roundsAt(s.startedAt, now));
-    return { ...base, stored: false, ...resolved, ...(resolved.status === 'ongoing' ? { stances: { attacker: attStances, defender: defStances } } : {}) };
+    // Keep the mix on a finished derived battle too, so the tick can freeze it. The API still strips the other side while status is ongoing.
+    return { ...base, stored: false, ...resolved, stances: { attacker: attStances, defender: defStances } };
   }));
 }
 /** Pure: strength after carried losses. `left` is what the unit had at the end of its last stored battle; it recovers by
@@ -147,6 +197,9 @@ export async function recordFinishedBattles(db: GameDatabase, now: number, winte
   const members = hit.length ? (await db.prepare(`SELECT clerk_user_id, unit_id FROM army_members WHERE unit_id IN (${hit.map(() => '?').join(',')})`).bind(...hit).all<{ clerk_user_id: string; unit_id: string }>()).results ?? [] : [];
   const wounds = done.flatMap((b, i) => members.filter(m => losers[i] && m.unit_id === losers[i]).map(m => db.prepare('INSERT INTO army_wounds (battle_key, clerk_user_id, wounded_until) VALUES (?,?,?) ON CONFLICT (battle_key, clerk_user_id) DO NOTHING')
     .bind(b.key, m.clerk_user_id, woundedUntil(b.key, m.clerk_user_id, b.startedAt + b.rounds * BATTLE_ROUND_SECONDS))));
-  await db.batch([...done.map(b => db.prepare(`INSERT INTO army_battles (battle_key, war_id, attacker_unit, defender_unit, started_at, rounds, status, retreated, attacker_strength, defender_strength, recorded_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (battle_key) DO NOTHING`).bind(b.key, b.warId, b.attackerUnit, b.defenderUnit, b.startedAt, b.rounds, b.status, b.retreated, b.attackerStrength, b.defenderStrength, now)), ...wounds]);
+  await db.batch([...done.map(b => {
+    const a = b.stances?.attacker, d = b.stances?.defender;
+    return db.prepare(`INSERT INTO army_battles (battle_key, war_id, attacker_unit, defender_unit, started_at, rounds, status, retreated, attacker_strength, defender_strength, recorded_at, attacker_hold, attacker_advance, attacker_fall_back, defender_hold, defender_advance, defender_fall_back)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (battle_key) DO NOTHING`).bind(b.key, b.warId, b.attackerUnit, b.defenderUnit, b.startedAt, b.rounds, b.status, b.retreated, b.attackerStrength, b.defenderStrength, now, a?.hold ?? null, a?.advance ?? null, a?.fall_back ?? null, d?.hold ?? null, d?.advance ?? null, d?.fall_back ?? null);
+  }), ...wounds]);
 }

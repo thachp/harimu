@@ -34,6 +34,7 @@ export function ArmyCard() {
     {unit.supply?.cut && <p>{supplyCutLine(unit.supply)}</p>}
     {unit.battle && <p>{battleLine(unit.battle)}</p>}
     {unit.battle?.stances && <p>{stanceMixLine(unit.battle.stances)}</p>}
+    {unit.battle?.opponentStances && <p>{opponentStanceLine(unit.battle)}</p>}
     {army.woundedUntil && <p>{woundedLine(army.woundedUntil)}</p>}
     {army.member ? <>
       <fieldset><legend>{squadStance.label}</legend>
@@ -58,5 +59,12 @@ export const battleLine = (b: { opponentNationId: string; attacking: boolean; ro
 /** #1052: the unit's stance mix during a battle (counts only; placeholder copy from army-copy). */
 export const stanceMixLine = (s: { hold: number; advance: number; fall_back: number }) =>
   unitMembership.battleStances.text.replace('{hold}', String(s.hold)).replace('{advance}', String(s.advance)).replace('{fall_back}', String(s.fall_back));
+/** #1061: the other side's mix, only when the server sent it (after the battle resolves). */
+export const opponentStanceLine = (b: { opponentNationId: string; opponentStances?: { hold: number; advance: number; fall_back: number } }) => {
+  const s = b.opponentStances;
+  if (!s) return '';
+  const nation = b.opponentNationId.charAt(0).toUpperCase() + b.opponentNationId.slice(1);
+  return unitMembership.opponentBattleStances.text.replace('{nation}', nation).replace('{hold}', String(s.hold)).replace('{advance}', String(s.advance)).replace('{fall_back}', String(s.fall_back));
+};
 /** #911: the wounded line (placeholder copy from army-copy, marked for Content). */
 export const woundedLine = (until: number) => unitMembership.wounded.text.replace('{time}', new Date(until * 1000).toLocaleString());

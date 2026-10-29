@@ -8,7 +8,7 @@ import { serviceUntil } from '@/lib/army-conscription';
 import { marchPace, readActiveWars, winterRoadNote } from '@/lib/army-map';
 import { winterMarchEnabled } from '@/lib/winter-march'; // #1038
 import { applySupplyLoss, armySupplyEnabled, unitSupply } from '@/lib/army-supply';
-import { armyBattlesEnabled, readBattles, withBattleLosses } from '@/lib/army-battle';
+import { armyBattlesEnabled, cardStanceCounts, readBattles, withBattleLosses } from '@/lib/army-battle';
 import { unitById } from '@/lib/army-rules';
 import { readWoundedUntil, woundedRefusal } from '@/lib/army-wounds';
 
@@ -37,9 +37,8 @@ export async function GET(request: Request) {
   const nationId = army.unit ? unitById(army.unit.id)?.nationId : undefined;
   if (army.unit && army.unit.strength !== undefined && nationId && armyBattlesEnabled(env)) {
     const battle = (await readBattles(db, await readActiveWars(db), now, pace)).find(b => b.attackerNationId === nationId || b.defenderNationId === nationId);
-    // #1052: the viewer's own unit mix, counts only, and only while the battle is still running. Flag off: this block does not run.
-    const viewerStances = battle?.status === 'ongoing' ? (battle.attackerNationId === nationId ? battle.stances?.attacker : battle.stances?.defender) : undefined;
-    if (battle) army.unit = { ...army.unit, strength: battle.attackerNationId === nationId ? battle.attackerStrength : battle.defenderStrength, battle: { opponentNationId: battle.attackerNationId === nationId ? battle.defenderNationId : battle.attackerNationId, attacking: battle.attackerNationId === nationId, rounds: battle.rounds, status: battle.status, ...(viewerStances ? { stances: viewerStances } : {}) } };
+    // #1052/#1061: own mix while the battle is live. The other side is omitted until it resolves, then both are sent. Flag off: this block does not run.
+    if (battle) army.unit = { ...army.unit, strength: battle.attackerNationId === nationId ? battle.attackerStrength : battle.defenderStrength, battle: { opponentNationId: battle.attackerNationId === nationId ? battle.defenderNationId : battle.attackerNationId, attacking: battle.attackerNationId === nationId, rounds: battle.rounds, status: battle.status, ...cardStanceCounts(battle, nationId) } };
   }
 
   // #911: a wounded citizen sees when they are back in action (flag off: no extra read).

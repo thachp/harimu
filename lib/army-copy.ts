@@ -92,6 +92,8 @@ export const unitMembership={
  battleLost:L('Battle with {nation} lost after {round} rounds. No capital changes hands.'),
  // PLACEHOLDER copy, marked for Content (proposal: true): #1052, one line for the unit's stance mix during a battle (counts only).
  battleStances:L('Squads: {hold} holding, {advance} advancing, {fall_back} falling back.'),
+ // PLACEHOLDER copy, marked for Content (proposal: true): #1061, the other side's mix once the battle has resolved (counts only).
+ opponentBattleStances:L('{nation} squads: {hold} holding, {advance} advancing, {fall_back} falling back.'),
  // PLACEHOLDER copy, marked for Content (proposal: true): #911, a wounded soldier (never killed, gear kept).
  wounded:L('Wounded, back in action {time}.'),
  notEligible:L('You cannot join this unit: {reason}'),
