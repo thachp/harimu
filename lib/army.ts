@@ -8,7 +8,9 @@ export const armySchemas = [
   // [ASSUMPTION] Leave and stance need replay too, and a deleted member row cannot remember its request id, so every command is logged once here.
   `CREATE TABLE IF NOT EXISTS army_requests (request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL, action TEXT NOT NULL CHECK(action IN ('join','leave','stance')), occurred_at INTEGER NOT NULL)`,
 ];
-export type ArmyView = { serveUntil?: number; woundedUntil?: number; march?: { arrivesAt: number; time: string }; unit: { id: string; name: string; officer: string; memberCount: number; openToVolunteers: boolean; strength?: number; morale?: number; supply?: { cut: boolean; cutDays: number; strengthLossPct: number; rangeSquares?: number; quartermasterSquares?: number }; battle?: { opponentNationId: string; attacking: boolean; rounds: number; status: 'ongoing' | 'attacker_won' | 'defender_won' } } | null; member: boolean; stance: string | null };
+/** #1052: squad-stance totals for one unit. Counts only, never a member's identity. */
+export type StanceCounts = { hold: number; advance: number; fall_back: number };
+export type ArmyView = { serveUntil?: number; woundedUntil?: number; march?: { arrivesAt: number; time: string }; unit: { id: string; name: string; officer: string; memberCount: number; openToVolunteers: boolean; strength?: number; morale?: number; supply?: { cut: boolean; cutDays: number; strengthLossPct: number; rangeSquares?: number; quartermasterSquares?: number }; battle?: { opponentNationId: string; attacking: boolean; rounds: number; status: 'ongoing' | 'attacker_won' | 'defender_won'; stances?: StanceCounts } } | null; member: boolean; stance: string | null };
 type Fail = { ok: false; status: 403 | 409; error: string; reason: string };
 /** The citizen's own nation's unit, membership and stance, and the unit's member count. Never another member's identity. */
 export async function readArmy(db: GameDatabase, userId: string, nowSec = 0, readiness = false): Promise<ArmyView> {
@@ -69,6 +71,15 @@ export async function readUnitReadiness(db: GameDatabase, unitId: string, nowSec
   const shifts = (settled.results ?? []).filter(x => Date.parse(x.settled_at) / 1000 >= Number(x.joined_at)).length;
   const [members, drills, drilled] = [row?.members, row?.drills, row?.drilled].map(n => Number(n ?? 0));
   return { strength: unitStrength(members, drills, shifts), morale: unitMorale(members, drilled) };
+}
+/** #1052: current members' squad stances, alongside readiness. Counts only; the query never selects an identity. */
+export async function readUnitStances(db: GameDatabase, unitId: string): Promise<StanceCounts> {
+  const row = await db.prepare(`SELECT
+      COUNT(CASE WHEN stance = 'hold' THEN 1 END) AS hold,
+      COUNT(CASE WHEN stance = 'advance' THEN 1 END) AS advance,
+      COUNT(CASE WHEN stance = 'fall_back' THEN 1 END) AS fall_back
+    FROM army_members WHERE unit_id = ?`).bind(unitId).first<{ hold: number; advance: number; fall_back: number }>();
+  return { hold: Number(row?.hold ?? 0), advance: Number(row?.advance ?? 0), fall_back: Number(row?.fall_back ?? 0) };
 }
 type DrillFail = { ok: false; status: 409; error: string; reason: 'not_member' | 'already_drilled' | 'request_conflict' };
 /** Replay: the same citizen's request id returns the current state and writes nothing; another citizen's id is a conflict. A concurrent
