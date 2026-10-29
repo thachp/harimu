@@ -265,6 +265,7 @@ body:has(.harimu-game){overflow:auto}
 .faith-status p{margin:8px 0 0}.faith-status [role=alert]{color:#f3b3a6}
 .holiday-banner{border-color:#80d8ce;background:#12333a}.holiday-banner .holiday-line strong{font-size:calc(14px * var(--text-scale, 1))}.holiday-banner .festival-line{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between}.holiday-banner .festival-line>p{flex:1 1 calc(220px * var(--text-scale, 1))}
 .game-clock .game-clock-holiday{color:#80d8ce;letter-spacing:0}
+.game-clock .game-clock-season{color:#e8c77a;letter-spacing:0}
 /* #969: countdown beside the world clock. Flag off renders no .game-countdown, so these rules never match. Paper on the HUD ink is the clock's own contrast. */
 .game-countdown{color:#dce7e8;font-size:calc(12px * var(--text-scale, 1));font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.2}
 @media(max-width:760px){.game-countdown{font-size:calc(10px * var(--text-scale, 1));white-space:normal;max-width:8em}}

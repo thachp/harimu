@@ -35,7 +35,7 @@
     "HARIMU_NOTABLES_ENABLED": "true",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "true",
     "HARIMU_CITY_FOUNDING_ENABLED": "true",
-    // #988 / #1003 / #1006 / #1001 / #1007 / #1014: one JSON binding for city tier growth and panel notes, including the civic-unit note, the imports note, the governor note and the population band (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    // #988 / #1003 / #1006 / #1001 / #1007 / #1014 / #798: one JSON binding for city tier growth, panel notes (civic unit, imports, governor, population band) and the spa WC bonus (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
     "HARIMU_CITY_PACK": {
       "HARIMU_CITY_TIER_GROWTH_ENABLED": "true",
       "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "true",
@@ -45,7 +45,8 @@
       "HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED": "true",
       "HARIMU_CITY_IMPORTS_NOTE_ENABLED": "true",
       "HARIMU_CITY_GOVERNOR_NOTE_ENABLED": "true",
-      "HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED": "true"
+      "HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED": "true",
+      "HARIMU_SPA_WC_BONUS_ENABLED": "true"
     },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
@@ -261,8 +262,8 @@
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
-    // #1017: zone overlay legend explains each zone and keys the capital/outpost markers (docs §6.1, §23.2). "true" in preview, "false" in production.
-    "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "true",
+    // #1023: HUD world clock shows the current game season and the countdown to the next (docs §17.1, 7.5 real days each). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_SEASON_CLOCK": "true",
     // #790: square chat shadow-mute (docs 21.3), new messages only. Operator list of citizenId@muteISO or citizenId@muteISO..unmuteISO entries (max 90; unmute by closing the window, not deleting it), comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.
     // #790 unmute: close the window (id@mute..unmute) so posts made during the mute stay hidden. Deleting an entry reveals that window's posts; only do it as a deliberate admin action.
     "HARIMU_CHAT_SHADOW_MUTE": "",

@@ -70,6 +70,6 @@ test('the enrollment step lists catalog cities with the capital preselected when
   const dialog = await readFile(new URL('../app/citizenship-dialog.tsx', import.meta.url), 'utf8');
   assert.match(dialog, /legend>Home city/); assert.match(dialog, /city\.capital \? ' \(capital\)'/);
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8');
-  assert.match(page, /homeCities=\{enrollHomeCity \? citiesForNation/);
+  assert.match(page, /homeCities=\{enrollHomeCity \? residentCitiesForNation/);
   assert.match(page, /setEnrollHomeCity\(snapshot\.flags\.enrollHomeCity === true\)/);
 });
