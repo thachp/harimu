@@ -2,14 +2,15 @@
  *  supply and morale, with AI commanders deciding retreat). ARC rulings: a battle starts when an attacking unit is staged next to the defender's
  *  capital; deterministic, from current strength (which includes the #897 supply loss); every number a named constant; the capital is never
  *  captured. ARC on #910: a finished battle is stored once by the world tick (migration 0096 mirrors armyBattleSchemas); GETs read the stored row and derive only a
- *  running battle. Behind HARIMU_ARMY_BATTLES_ENABLED (needs HARIMU_ARMY_SUPPLY_ENABLED and its flags). */
+ *  running battle. Behind HARIMU_ARMY_BATTLES_ENABLED (needs HARIMU_ARMY_SUPPLY_ENABLED and its flags). #1052: a running battle also applies the unit's
+ *  squad-stance mix (counts only). A stored battle is read back as stored. No new flag. */
 import type { GameDatabase } from './database-contract';
 import { armyUnits, unitForNation } from './army-rules';
 import { marchArrivalAt, marchPace, readActiveWars, unitMarch, type ArmyWar } from './army-map';
 import { applySupplyLoss, armySupplyEnabled, PERCENT, unitSupply } from './army-supply';
 import { marchTimeFactor, type MarchPace } from './winter-march'; // #1038: battle start follows the slowed march
 import { flagOn } from './flag-pack.mjs';
-import { readUnitReadiness } from './army';
+import { readUnitReadiness, readUnitStances, type StanceCounts } from './army';
 import { woundedUntil } from './army-wounds';
 /** #934: battle square transfers use the same weekly-cap guard as siege captures. #910 does not capture; call `transferBattleSquares` when a path gains transfers. */
 export { transferBattleSquares } from './war-loss-cap';
@@ -26,11 +27,24 @@ export const BATTLE_FORTIFICATION_BONUS_PCT = 25; // the defender fights from it
 export const BATTLE_LOSS_RECOVERY_PCT_PER_GAME_DAY = 10;
 export const BATTLE_LOSS_GAME_DAY_SECONDS = 7200; // one game day (two real hours), as in army-supply
 export const BATTLE_RETREAT_BELOW_PCT = 50;      // an AI commander retreats when its unit falls below this share of its starting strength
+/** [ASSUMPTION] #1052 (docs §15.3 name squad stances and give no figures). Unanimous advance raises damage dealt and taken by this many percent;
+ *  unanimous fall_back lowers both by the same amount. Hold is zero. A mix is the member-weighted share, so one unit stays inside ±10. */
+export const BATTLE_STANCE_ADVANCE_PCT = 10;
+export const BATTLE_STANCE_FALL_BACK_PCT = -10;
 
-export type Side = { strength: number; morale: number };
+export type Side = { strength: number; morale: number; stances?: StanceCounts };
 export type BattleResult = { rounds: number; attackerStrength: number; defenderStrength: number; status: 'ongoing' | 'attacker_won' | 'defender_won'; retreated: 'attacker' | 'defender' | null };
 const hit = (s: Side, bonusPct = 0) => Math.floor(s.strength * s.morale * BATTLE_DAMAGE_PCT * (PERCENT + bonusPct) / (PERCENT * PERCENT * PERCENT));
 const broken = (now: number, start: number) => now === 0 || now * PERCENT < start * BATTLE_RETREAT_BELOW_PCT;
+/** Signed percent from the mix. No members, or an omitted mix, is 0: the same hit as before stances counted. */
+export function stanceShiftPct(counts?: StanceCounts): number {
+  const advance = counts?.advance ?? 0, fall = counts?.fall_back ?? 0, members = (counts?.hold ?? 0) + advance + fall;
+  if (members <= 0) return 0;
+  return Math.trunc((advance * BATTLE_STANCE_ADVANCE_PCT + fall * BATTLE_STANCE_FALL_BACK_PCT) / members);
+}
+/** Scale `base` by the striker's shift (damage dealt) and then the target's (damage taken). A zero shift leaves `base` unchanged. */
+const scaleBy = (base: number, pct: number) => base + Math.trunc(base * pct / PERCENT);
+const withStance = (base: number, dealtPct: number, takenPct: number) => scaleBy(scaleBy(base, dealtPct), takenPct);
 /** Pure and deterministic: plays `roundsElapsed` rounds (at most BATTLE_MAX_ROUNDS). Both sides hit at once each round. If both break in the same
  *  round the attacker retreats (ties go to the defender). The capital is never captured: an attacker win only costs the defender strength. */
 export function resolveBattle(attacker: Side, defender: Side, roundsElapsed: number): BattleResult {
@@ -39,8 +53,9 @@ export function resolveBattle(attacker: Side, defender: Side, roundsElapsed: num
   if (broken(a, attacker.strength)) return done(0, 'defender_won', 'attacker');
   if (broken(d, defender.strength)) return done(0, 'attacker_won', 'defender');
   const rounds = Math.max(0, Math.min(BATTLE_MAX_ROUNDS, Math.floor(roundsElapsed)));
+  const aShift = stanceShiftPct(attacker.stances), dShift = stanceShiftPct(defender.stances);
   for (let r = 1; r <= rounds; r++) {
-    const toDefender = hit({ strength: a, morale: attacker.morale }), toAttacker = hit({ strength: d, morale: defender.morale }, BATTLE_FORTIFICATION_BONUS_PCT);
+    const toDefender = withStance(hit({ strength: a, morale: attacker.morale }), aShift, dShift), toAttacker = withStance(hit({ strength: d, morale: defender.morale }, BATTLE_FORTIFICATION_BONUS_PCT), dShift, aShift);
     a = Math.max(0, a - toAttacker); d = Math.max(0, d - toDefender);
     if (broken(a, attacker.strength)) return done(r, 'defender_won', 'attacker');
     if (broken(d, defender.strength)) return done(r, 'attacker_won', 'defender');
@@ -68,7 +83,7 @@ export const armyBattleSchemas = [
 ];
 /** One battle per war, attacking unit and staging arrival (ARC on #910). */
 export const battleKey = (warId: string, attackerUnit: string, startedAt: number) => `${warId}:${attackerUnit}:${startedAt}`;
-export type Battle = BattleResult & { attackerNationId: string; defenderNationId: string; startedAt: number; stored: boolean };
+export type Battle = BattleResult & { attackerNationId: string; defenderNationId: string; startedAt: number; stored: boolean; stances?: { attacker: StanceCounts; defender: StanceCounts } };
 type StoredRow = { battle_key: string; rounds: number; status: 'attacker_won' | 'defender_won'; retreated: 'attacker' | 'defender' | null; attacker_strength: number; defender_strength: number };
 /** The battles at `now` for every staged attacking unit: the stored result once decided (never changes), else derived from current strength and morale.
  *  One read for stored rows; current strength is read only for battles not yet stored. Never writes. */
@@ -86,15 +101,17 @@ export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], no
     const base = { attackerNationId: s.unit.nationId, defenderNationId: s.defender.nationId, startedAt: s.startedAt, key: s.key, attackerUnit: s.unit.id, defenderUnit: s.defender.id, warId: s.warId };
     const row = stored.get(s.key);
     if (row) return { ...base, stored: true, rounds: Number(row.rounds), status: row.status, retreated: row.retreated ?? null, attackerStrength: Number(row.attacker_strength), defenderStrength: Number(row.defender_strength) };
-    // #679: readiness and the carried-loss row are independent reads (the loss query does not use the readiness result).
-    // They share one round trip; strength is applied after both return. A stored battle never starts these reads.
-    const [att, def, attLoss, defLoss] = await Promise.all([
+    // #679: readiness, carried losses and #1052 stance counts do not depend on each other. They share one round trip.
+    // A stored battle never starts these reads.
+    const [att, def, attLoss, defLoss, attStances, defStances] = await Promise.all([
       readUnitReadiness(db, s.unit.id, now), readUnitReadiness(db, s.defender.id, now),
-      lossRow(db, s.unit.id, now), lossRow(db, s.defender.id, now)]);
+      lossRow(db, s.unit.id, now), lossRow(db, s.defender.id, now),
+      readUnitStances(db, s.unit.id), readUnitStances(db, s.defender.id)]);
     // #738 battle losses: both sides start from the strength their last stored battle left them (recovering per game day).
     const attFull = applyCarriedLoss(s.unit.id, att.strength, attLoss, now), defFull = applyCarriedLoss(s.defender.id, def.strength, defLoss, now);
-    const attacker = { strength: applySupplyLoss(attFull, unitSupply(s.unit.nationId, wars, now, undefined, pace).strengthLossPct), morale: att.morale }, defender = { strength: defFull, morale: def.morale };
-    return { ...base, stored: false, ...resolveBattle(attacker, defender, roundsAt(s.startedAt, now)) };
+    const attacker = { strength: applySupplyLoss(attFull, unitSupply(s.unit.nationId, wars, now, undefined, pace).strengthLossPct), morale: att.morale, stances: attStances }, defender = { strength: defFull, morale: def.morale, stances: defStances };
+    const resolved = resolveBattle(attacker, defender, roundsAt(s.startedAt, now));
+    return { ...base, stored: false, ...resolved, ...(resolved.status === 'ongoing' ? { stances: { attacker: attStances, defender: defStances } } : {}) };
   }));
 }
 /** Pure: strength after carried losses. `left` is what the unit had at the end of its last stored battle; it recovers by

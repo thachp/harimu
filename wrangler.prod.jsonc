@@ -49,7 +49,8 @@
       "HARIMU_CITY_GOVERNOR_NOTE_ENABLED": "false",
       "HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED": "false",
       "HARIMU_CITY_CAPTURE_HISTORY_ENABLED": "false",
-      "HARIMU_SPA_WC_BONUS_ENABLED": "false"
+      "HARIMU_SPA_WC_BONUS_ENABLED": "false",
+      "HARIMU_SEASON_SEA_LANES_ENABLED": "false"
     },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
@@ -255,7 +256,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "false",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "false",
-    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1050: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
+    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1050/#1055: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
     // The client build expands each NEXT_PUBLIC_* name. HARIMU_WORLD_AGES_ENABLED stays in the pack and is read with flagOn. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "false",
@@ -268,6 +269,7 @@
       "NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP": "false",
       "NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP": "false",
       "NEXT_PUBLIC_HARIMU_AURELLE_WALLET_PARITY": "false",
+      "NEXT_PUBLIC_HARIMU_KORUND_WALLET_RATIONS": "false",
       "HARIMU_WORLD_AGES_ENABLED": "false",
       "NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE": "false"
     },
