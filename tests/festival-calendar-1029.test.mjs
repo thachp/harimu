@@ -61,3 +61,11 @@ test('preview on, production off', async () => {
     assert.match(t, new RegExp(`"NEXT_PUBLIC_HARIMU_FESTIVAL_CALENDAR": "${v}"`), f);
   }
 });
+
+test('faith festivals follow the game-day clock, not a non-zero world epoch', () => {
+  const e = epoch + 5 * DAY + 123; // world epoch off the game-year boundary
+  const oath = nextFestivalAt('kindle', e, epoch + 80 * GAME_DAY);
+  assert.equal(oath.name, 'Oath Day'); assert.equal(oath.startsAt, epoch + 90 * GAME_DAY); assert.equal(oath.endsAt, epoch + 91 * GAME_DAY);
+  const a = nextFestivalAt('aurelle', e, epoch + 90 * GAME_DAY + 1);
+  assert.equal(a.name, 'Oath Day'); assert.equal(a.active, true); assert.equal(a.startsAt, epoch + 90 * GAME_DAY);
+});

@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import {test} from 'node:test';
 import ts from 'typescript';
 const require=createRequire(import.meta.url),settle=()=>new Promise(setImmediate);
+const civic={};new Function('exports','require',ts.transpileModule(await readFile(new URL('../app/kindle-civic-ballot.tsx',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText)(civic,require);
 const candidates=['ines-varro','tobin-achterberg','mara-quell'].map(id=>({id,name:id,platform:'Fixture'}));
 for(const kind of ['ballot','petitions']){
  const source=ts.transpileModule(await readFile(new URL(`../app/${kind==='ballot'?'ranked-ballot':'collective-petitions'}.tsx`,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
@@ -12,7 +13,7 @@ for(const kind of ['ballot','petitions']){
   const states=kind==='ballot'?[initial,candidates.map(c=>c.id),'',false,false,false]:[initial,'',false,false,false,'Fixture title','Fixture petition demand'];
   let cursor=0,refCursor=0;const refs=[],requests=[],received=[];
   const react={useEffect(){},useCallback:fn=>fn,useRef(value){const i=refCursor++;return refs[i]??(refs[i]={current:value});},useState(value){const i=cursor++;if(!(i in states))states[i]=value;return[states[i],value=>states[i]=typeof value==='function'?value(states[i]):value];}};
-  const exports={};new Function('exports','require','fetch',source)(exports,name=>name==='react'?react:name==='./display-preferences'?{useDisplayTimestamp:()=>String}:name==='./nation-document'?{NationDocument:'section'}:name==='./ai-disclosure'?{AiBadge:'span'}:name==='./action-button'?{ActionButton:'button'}:name==='./game-timer'?{GameTimer:'span'}:name.startsWith('../lib/')?require(`${name}.ts`):require(name),(url,options)=>new Promise((resolve,reject)=>requests.push({options,resolve:data=>resolve({ok:true,status:200,json:async()=>data}),reject})));
+  const exports={};new Function('exports','require','fetch',source)(exports,name=>name==='react'?react:name==='./display-preferences'?{useDisplayTimestamp:()=>String}:name==='./nation-document'?{NationDocument:'section'}:name==='./ai-disclosure'?{AiBadge:'span'}:name==='./action-button'?{ActionButton:'button'}:name==='./game-timer'?{GameTimer:'span'}:name==='./kindle-civic-ballot'?civic:name.startsWith('../lib/')?require(`${name}.ts`):require(name),(url,options)=>new Promise((resolve,reject)=>requests.push({options,resolve:data=>resolve({ok:true,status:200,json:async()=>data}),reject})));
   const render=()=>{cursor=refCursor=0;return exports[kind==='ballot'?'RankedBallot':'CollectivePetitionsPanel']({onSnapshot:data=>received.push(data)});};
   const all=node=>[node,...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child=>typeof child==='object'?all(child):[child])];
   const controls=()=>all(render());
