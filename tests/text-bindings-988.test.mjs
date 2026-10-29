@@ -35,6 +35,8 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(flagOn(on, 'HARIMU_CITY_CAPTURE_NOTE_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CITY_IMPORTS_NOTE_ENABLED'), true);
+  assert.equal(flagOn(on, 'HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED'), true);
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED, 'false');
   assert.equal(flagOn({ ...on, HARIMU_CITY_IMPORTS_NOTE_ENABLED: 'false' }, 'HARIMU_CITY_IMPORTS_NOTE_ENABLED'), false, 'a direct binding wins over the pack');
   assert.equal(expandFlagPacks(preview.vars).HARIMU_CITY_IMPORTS_NOTE_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_CITY_IMPORTS_NOTE_ENABLED, 'false');

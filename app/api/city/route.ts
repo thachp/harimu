@@ -5,7 +5,7 @@ import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
-import {cityTierUnlockFields,cityTierFestivalNote} from '@/lib/city-tier'; // #979 / #984
+import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -22,7 +22,8 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  const captureOn=flagOn(env,'HARIMU_CITY_CAPTURE_NOTE_ENABLED'); // #1002
  const civicOn=flagOn(env,'HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED'); // #1006
  const importsOn=flagOn(env,'HARIMU_CITY_IMPORTS_NOTE_ENABLED'); // #1001 direct string still wins
- if(!unlocksOn&&!noteOn&&!specialtyOn&&!captureOn&&!civicOn&&!importsOn)return body;
+ const populationOn=flagOn(env,'HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED'); // #1014
+ if(!unlocksOn&&!noteOn&&!specialtyOn&&!captureOn&&!civicOn&&!importsOn&&!populationOn)return body;
  let tier=1;
  if(flagOn(env,'HARIMU_CITY_TIER_GROWTH_ENABLED')){
   const row=await db.prepare('SELECT tier FROM world_cities WHERE id=?').bind(cityId).first<{tier:number}>();
@@ -35,6 +36,7 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  if(captureOn){const n=cityCaptureNote(nationId,cityId);if(n)out={...out,captureNote:n};} // #1002
  if(civicOn){const n=cityCivicUnitNote(nationId);if(n)out={...out,civicUnitNote:n};} // #1006
  if(importsOn){const n=cityImportsFields(nationId,cityId);if(n)out={...out,...n};} // #1001 port / trade zone only
+ if(populationOn)out={...out,populationNote:cityTierPopulationNote(tier)}; // #1014 read-only
  return out;
 }
 export async function GET(request:Request){

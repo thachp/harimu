@@ -35,15 +35,16 @@ export function WorldInstitutionsButton({ onView, enabled = uiV2PanelEnabled() }
 
 /** City, top of the panel (flag on): "Status: Capital" first on a capital only (from the city catalog), the Household destination is promoted to the primary action (as in the concept), the other destinations are the rows. */
 export type CityTierUnlockView = { tierName: string; districtSlots: number; unlocks: readonly string[] }; // #979
-export function CitySummary({ cityName, city, nation, destinations, onView, tierUnlocks, festivalNote, specialtyRole, specialtyNote, captureNote, civicUnitNote, enabled = uiV2PanelEnabled(), icons = uiV2CityEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; tierUnlocks?: CityTierUnlockView | null; festivalNote?: string | null; specialtyRole?: string | null; specialtyNote?: string | null; captureNote?: string | null; civicUnitNote?: string | null; enabled?: boolean; icons?: boolean }) {
+export function CitySummary({ cityName, city, nation, destinations, onView, tierUnlocks, festivalNote, populationNote, specialtyRole, specialtyNote, captureNote, civicUnitNote, enabled = uiV2PanelEnabled(), icons = uiV2CityEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; tierUnlocks?: CityTierUnlockView | null; festivalNote?: string | null; populationNote?: string | null; specialtyRole?: string | null; specialtyNote?: string | null; captureNote?: string | null; civicUnitNote?: string | null; enabled?: boolean; icons?: boolean }) {
   if (!enabled) return null;
   const home = destinations.find(card => card.id === 'household');
   const tierStats = tierUnlocks ? [{ label: 'Tier', value: tierUnlocks.tierName }, { label: 'Districts', value: String(tierUnlocks.districtSlots) }, { label: 'Unlocks', value: tierUnlocks.unlocks.join(', ') }] : [];
+  const populationStats = populationNote ? [{ label: 'Population', value: populationNote }] : []; // #1014 read-only note
   const festivalStats = festivalNote ? [{ label: 'Festivals', value: festivalNote }] : []; // #984 read-only note
   const specialtyStats = specialtyRole ? [{ label: 'Specialty', value: specialtyNote ? `${specialtyRole}. ${specialtyNote}` : specialtyRole }] : []; // #996
   const captureStats = captureNote ? [{ label: 'Capture', value: captureNote }] : []; // #1002 read-only note
   const civicUnitStats = civicUnitNote ? [{ label: 'Civic unit', value: civicUnitNote }] : []; // #1006 read-only note
-  return <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), ...tierStats, ...festivalStats, ...specialtyStats, ...captureStats, ...civicUnitStats, { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
+  return <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...captureStats, ...civicUnitStats, { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
     rows={destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? cityPlaceIcon(card.id) : undefined, onSelect: () => onView(card.id) }))}
     primary={home ? { label: home.label, icon: icons ? cityPlaceIcon(home.id) : undefined, onSelect: () => onView(home.id) } : undefined} />; // S7 follow-up: with the City pills on, rows carry the pill's icon
 }
