@@ -23,7 +23,6 @@ export function seasonEffectLine(season: GameSeason): string {
   return `${seasonLabels[season]}: ${delta < 0 ? '−' : '+'}${Math.abs(delta)}% harvest`;
 }
 
-const seasonMark = / · ([A-Z][a-z]+: [+\u2212]\d+% harvest)$/;
 /** 7.5 real days, in integer seconds. Not a 7.5 float. */
 const seasonLengthSeconds = (15 * 86_400) / 2;
 
@@ -51,9 +50,13 @@ export const leadingFoodUnits = (output: string, fallback = 4) => {
   return match ? Number(match[1]) : fallback;
 };
 
-/** Food count to bind instead of the literal 4, or null to keep the shipped settle SQL. A line with no season mark pays today's 4. */
-export function storedFoodUnits(output: string, baseUnits: number): number | null {
-  if (!seasonMark.test(output)) return null;
-  const units = leadingFoodUnits(output, baseUnits);
-  return units === baseUnits ? null : units;
+/** Food a claim may take from a stamped line. Only a count `seasonYieldUnits(base, season)` can produce for some season;
+ *  every other line, including a forged count, pays the base. */
+export function storedFoodUnits(output: string, base: number): number {
+  const line = /^(\d+) food\b/.exec(output);
+  if (!line) return base;
+  const units = Number(line[1]);
+  if (!Number.isInteger(units)) return base;
+  for (const season of seasonOrder) if (seasonYieldUnits(base, season) === units) return units;
+  return base;
 }

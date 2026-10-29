@@ -27,8 +27,11 @@ test('each season multiplier floors, and 1 unit is the floor', () => {
   assert.equal(seasonYieldUnits(-2, 'summer'), -2);
   assert.equal(seasonEffectLine('winter'), 'Winter: −30% harvest');
   assert.equal(seasonEffectLine('autumn'), 'Autumn: +20% harvest');
-  assert.equal(storedFoodUnits('4 food contributed to state ration supply', 4), null);
+  assert.equal(storedFoodUnits('9 food contributed to state ration supply · Winter: −30% harvest', 4), 4);
+  assert.equal(storedFoodUnits('0 food contributed to state ration supply', 4), 4);
   assert.equal(storedFoodUnits('2 food contributed to state ration supply · Winter: −30% harvest', 4), 2);
+  assert.equal(storedFoodUnits('11 food brought in · Summer: +10% harvest', 10), 11, 'summer 110% of 10 is a real stamp');
+  assert.equal(storedFoodUnits('9 food brought in · Summer: +10% harvest', 10), 10);
   for (const id of ['harvest', 'korund-food-production', 'aurelle-food-estate']) assert.equal(isFarmingShift(id), true);
   for (const id of ['orchard', 'herding', 'freight', 'korund-quarry-gang', 'aurelle-quarry-charter']) assert.equal(isFarmingShift(id), false);
 });
@@ -111,7 +114,7 @@ test('flag on: Korund and Aurelle winter food is below an autumn shift; flag off
   assert.ok(winter.food < autumn.food);
 });
 
-test('Korund winter claim settles food_output 2 with caps off and caps on, and still pays the stamped line if the flag is then off', async t => {
+test('Korund winter claim settles food_output 2 with caps off and caps on', async t => {
   for (const caps of [false, true]) {
     const r = await localRuntime(); t.after(() => r.close());
     r.setFixtureEnv('HARIMU_SEASON_FARMING_ENABLED', 'true');
@@ -121,7 +124,6 @@ test('Korund winter claim settles food_output 2 with caps off and caps on, and s
     const id = randomUUID();
     assert.equal((await r.call('citizen', 'alice', { action: 'korund-start-work', requestId: id })).status, 200);
     assert.match((await r.db.prepare('SELECT output FROM work_shifts WHERE id=?').bind(id).first()).output, /^2 food/);
-    r.setFixtureEnv('HARIMU_SEASON_FARMING_ENABLED', 'false');
     r.setNow(r.now + 7200 * 1000);
     const claim = await r.call('citizen', 'alice', { action: 'korund-claim-work', shiftId: id });
     assert.equal(claim.status, 200, `caps ${caps} ${JSON.stringify(claim.data)}`);
@@ -129,6 +131,32 @@ test('Korund winter claim settles food_output 2 with caps off and caps on, and s
     assert.equal(Number(row.food_output), 2, `caps ${caps}`);
     assert.equal(Number(row.wage_minor), 800);
   }
+});
+
+test('flag off Korund claim ignores a stamp and runs the same SQL as an unstamped claim', async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='korund', capacity=24").run();
+  const claimSql = async (user, output) => {
+    await r.db.prepare('UPDATE citizens SET capacity=24 WHERE clerk_user_id=?').bind(user).run();
+    const id = randomUUID();
+    assert.equal((await r.call('citizen', user, { action: 'korund-start-work', requestId: id })).status, 200);
+    if (output) await r.db.prepare('UPDATE work_shifts SET output=? WHERE id=?').bind(output, id).run();
+    r.setNow(r.now + 7200 * 1000);
+    const seen = [];
+    const prepare = r.db.prepare.bind(r.db);
+    r.db.prepare = sql => { seen.push(String(sql)); return prepare(sql); };
+    const claim = await r.call('citizen', user, { action: 'korund-claim-work', shiftId: id });
+    r.db.prepare = prepare;
+    assert.equal(claim.status, 200, JSON.stringify(claim.data));
+    const food = Number((await r.db.prepare('SELECT food_output FROM korund_settlements WHERE shift_id=?').bind(id).first()).food_output);
+    return { seen: seen.filter(sql => /work_shifts|korund_settlements|labor_note_issuances|initial_minor=initial_minor/.test(sql)), food };
+  };
+  const plain = await claimSql('alice', null);
+  const forged = await claimSql('bob', '9 food contributed to state ration supply · Winter: −30% harvest');
+  assert.equal(plain.food, 4);
+  assert.equal(forged.food, 4, 'flag off pays the unseasoned amount');
+  assert.deepEqual(forged.seen, plain.seen);
+  assert.equal(plain.seen.some(sql => sql.includes('SELECT output FROM work_shifts')), false);
 });
 
 test('a direct false string wins over a true pack on the harvest route', async t => {
