@@ -135,6 +135,7 @@ const flagOffPins = {
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
   HARIMU_KINDLE_POLICY_LEDGER_ENABLED: 'policy-ledger-985.test.mjs',
   HARIMU_KINDLE_CERTIFICATION_ENABLED: 'kindle-certification-1016.test.mjs',
+  HARIMU_WORLD_AGES_ENABLED: 'world-ages-1041.test.mjs', // #1041 flag off: no Age line
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.
