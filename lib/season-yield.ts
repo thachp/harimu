@@ -24,25 +24,37 @@ export function seasonEffectLine(season: GameSeason): string {
 }
 
 /** 7.5 real days, in integer seconds. Not a 7.5 float. */
-const seasonLengthSeconds = (15 * 86_400) / 2;
+export const seasonLengthSeconds = (15 * 86_400) / 2;
 
 export type IntegerClock = { epochSeconds: number; nowSeconds: number };
+type SeasonClock = { epochSeconds?: number | null; nowSeconds?: number | null } | null | undefined;
 
-/** Both fields integers, or null. A missing clock is not epoch 0. Shared by seasonAt and the shift-day cap. */
-export function integerClock(clock: { epochSeconds?: number | null; nowSeconds?: number | null } | null | undefined): IntegerClock | null {
+/** Both fields integers, or null. A missing clock is not epoch 0. Shared by seasonAt, gameYearAt, and the shift-day cap. */
+export function integerClock(clock: SeasonClock): IntegerClock | null {
   if (!clock) return null;
   const epoch = clock.epochSeconds, now = clock.nowSeconds;
   if (typeof epoch !== 'number' || typeof now !== 'number' || !Number.isInteger(epoch) || !Number.isInteger(now)) return null;
   return { epochSeconds: epoch, nowSeconds: now };
 }
 
-/** The season for a world clock `{ epochSeconds, nowSeconds }`, both integers. Null when there is no clock.
- *  A missing clock is not epoch 0. Callers treat null as no season effect. */
-export function seasonAt(clock: { epochSeconds?: number | null; nowSeconds?: number | null } | null | undefined): GameSeason | null {
+/** Season index on the integer clock. Null when there is no clock. A missing clock is not epoch 0. */
+function seasonIndex(clock: SeasonClock): number | null {
   const tick = integerClock(clock);
   if (!tick) return null;
-  const index = Math.floor(Math.max(0, tick.nowSeconds - tick.epochSeconds) / seasonLengthSeconds);
-  return seasonOrder[index % 4];
+  return Math.floor(Math.max(0, tick.nowSeconds - tick.epochSeconds) / seasonLengthSeconds);
+}
+
+/** The season for a world clock `{ epochSeconds, nowSeconds }`, both integers. Null when there is no clock.
+ *  A missing clock is not epoch 0. Callers treat null as no season effect. */
+export function seasonAt(clock: SeasonClock): GameSeason | null {
+  const index = seasonIndex(clock);
+  return index === null ? null : seasonOrder[index % 4];
+}
+
+/** #1023 game year (1-based) on seasonAt's integer clock: four seasons, one 30-real-day year. Null when there is no clock. */
+export function gameYearAt(clock: SeasonClock): number | null {
+  const index = seasonIndex(clock);
+  return index === null ? null : Math.floor(index / 4) + 1;
 }
 
 /** Null season: the caller keeps the original output and unit count. */
