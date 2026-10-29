@@ -71,6 +71,7 @@ import { checkAurelleSealedScrolls } from './aurelle-sealed-scroll-check.mjs';
 import { checkKindleCivicBallot } from './kindle-civic-ballot-check.mjs';
 import { checkMobileTopdownMap } from './mobile-topdown-map-check.mjs';
 import { checkMobileTwoTap } from './mobile-two-tap-check.mjs';
+import { checkAurelleWalletParity } from './aurelle-wallet-parity-check.mjs';
 import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 import { fontsBeforeShots } from './layout-standalone.mjs';
@@ -255,6 +256,7 @@ try {
   await checkKindleCivicBallot({ browser, css, preflight, failures, rows }); // #1009: Kindle civic ballot
   await checkMobileTopdownMap({ browser, css, preflight, failures, rows }); // #1039: phone top-down map, desktop unchanged
   await checkMobileTwoTap({ browser, css, preflight, failures, rows }); // #1040: daily-loop actions within two taps on a phone
+  await checkAurelleWalletParity({ browser, css, preflight, failures, rows }); // #1050: Aurelle mint parity on the top-bar coins
 } finally { await browser.close(); }
 console.log(rows.join('\n'));
 if (failures.length) { console.error(`\nHUD layout check FAILED:\n${failures.join('\n')}`); process.exit(1); }

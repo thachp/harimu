@@ -204,6 +204,10 @@ body:has(.harimu-game){overflow:auto}
  .game-dock{flex-wrap:wrap}
  .game-dock button span{overflow-wrap:anywhere;text-align:center;line-height:1.15}
 }
+/* #1050: Aurelle mint parity on the wallet chip. Flag off renders no .game-wallet-code. Each word is its own nowrap item, so a narrow row wraps between words. */
+.game-resources .game-wallet-code{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:0;row-gap:0;min-width:0;max-width:100%;letter-spacing:0;line-height:1.15;white-space:normal;overflow-wrap:normal;word-break:normal;hyphens:manual}
+.game-resources .game-wallet-parity,.game-resources .game-wallet-moved{flex:0 0 auto;letter-spacing:0;text-transform:none;white-space:nowrap;overflow-wrap:normal;word-break:normal}
+@media(min-width:761px){.game-resources .game-wallet-code{flex-wrap:nowrap}}
 /* #377: on a phone the destination cards and the nation strip wrap into a grid inside the page width instead of a row that scrolls sideways (text such as
    "Goods and citizen listings" and "Stability 81" was cut off at the right edge). Cards are at least 44px tall; at big text they drop to one column. */
 @media(max-width:760px){.game-context-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(150px * var(--text-scale, 1))),1fr));overflow:visible}.game-context-items>button{flex:none;min-width:0;max-width:none;min-height:44px}.game-context-items>p{grid-column:1/-1}}

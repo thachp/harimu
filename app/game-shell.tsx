@@ -26,6 +26,7 @@ import { contextStripStatus } from '@/lib/context-strip-copy'; // #379: a visito
 import { topbarCountdownEnabled, type CountdownInput } from '@/lib/topbar-countdown'; // #969
 import { festivalCalendarEnabled, gameSeasonAt, nextFestivalAt, seasonClockEnabled, seasonLabels } from '@/lib/game-season'; // #1023, #1029
 import { ageHudLine, ageRemainingTip, worldAgeAt } from '@/lib/world-age'; // #1041
+import { aurelleWalletParity, type AurelleMintView } from '@/lib/aurelle-wallet-parity'; // #1050
 import { TopbarCountdown } from './topbar-countdown';
 
 type GameNation = { id: string; name: string; capital?: string; color?: string };
@@ -53,6 +54,8 @@ export type GameShellProps = {
   capacity: number;
   currencyCode?: 'SPK' | 'LN' | 'CRN';
   walletMinor?: number;
+  /** #1050: Royal Mint payload already on the Aurelle plan. Absent leaves the chip unchanged. */
+  crownMint?: AurelleMintView | null;
   /** When set, the SPK wallet value in the top bar opens the Wallet panel. */
   onOpenWallet?: () => void;
   inventory?: { food: number; materials: number; knowledge: number };
@@ -121,12 +124,12 @@ function NationEmblemMark({ id, name }: { id: string; name: string }) {
 const helpEscapes = new WeakSet<Event>();
 /** One top-bar help item. Which one is open is owned by GameShell (lib/hud-help.ts: one at a time, hover or keyboard focus opens,
  *  leave / blur / Escape closes), so `open` is controlled and clicking never toggles it natively. */
-function HudHelp({ label, children, help, open = false }: { label: string; children: ReactNode; help: string; open?: boolean }) {
+function HudHelp({ label, children, help, open = false, name }: { label: string; children: ReactNode; help: string; open?: boolean; name?: string }) {
   const helpId = helpIdOf(label);
-  return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
+  return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-label={name} aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ openNations, worldClock, worldAges = false, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [], onDailyLoop }: GameShellProps) {
+export function GameShell({ openNations, worldClock, worldAges = false, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, crownMint, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [], onDailyLoop }: GameShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -200,6 +203,10 @@ export function GameShell({ openNations, worldClock, worldAges = false, holidayN
   const breadcrumbs = <nav className="game-location-banner game-breadcrumbs" aria-label="Current location"><button type="button" onClick={() => navigate('world')}>World</button>{view !== 'world' && <><span>›</span><button type="button" onClick={() => navigate('country')}>{shownNationName}</button></>}{view === 'nation' && <><span>›</span><span>{nation.capital ?? 'Capital'}</span></>}{!['world','country','nation'].includes(view) && <><span>›</span><button type="button" onClick={() => navigate('square')}>{viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City'}</button>{view !== 'square' && <><span>›</span><span>{sceneTitle}</span></>}</>}</nav>;
   // #189: in Country the stage scrolls, so the location row and shift chip sit in its flow instead of floating over the heading and controls.
   const shiftChip = shiftSummary ? <button type="button" className="game-shift-chip" onClick={() => navigate('workplace')}><span className="game-live-dot" /><strong>{shiftSummary.title}</strong>{shiftSummary.endsAt !== undefined ? <GameTimer compact endsAt={shiftSummary.endsAt * 1000} label="Shift" expiredText={shiftSummary.expiredText} /> : <span>Active shift</span>}<CaretRight /></button> : null;
+  const parity = aurelleWalletParity(citizenNation?.id, currencyCode, crownMint);
+  const walletAmount = walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2);
+  const walletHelp = parity ? `Your CRN wallet holds national money. Current mint parity is ${parity.words} Tessera per Crown, the Royal Mint official rate of ${parity.rate}.${parity.moved ? ' The parity has moved since the last mint change.' : ''} Amounts update after completed transactions; loading means the citizen snapshot has not arrived.` : `Your ${currencyCode} wallet holds national money. Amounts update after completed transactions; loading means the citizen snapshot has not arrived.`;
+  const walletName = parity ? `Wallet, ${walletMinor === undefined ? 'loading' : `${walletAmount} Crowns`}. Current mint parity is ${parity.words} Tessera per Crown.${parity.moved ? ' The parity has moved since the last mint change.' : ''}` : undefined;
   return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}${railOn ? ' game-rail-on' : ''}${cityStripHidden(view) ? ' game-city-v2' : ''}${uiV2MobileEnabled() ? ' game-mobile-v2' : ''}`}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
     <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{railOn ? null : breadcrumbs}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} visitor={visitor} overlays={mapOverlays} armyMap={armyMap} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
@@ -208,8 +215,8 @@ export function GameShell({ openNations, worldClock, worldAges = false, holidayN
       <div className="game-resources" aria-label={guestDemo ? 'Guest examples' : citizenNation || localDemo ? 'Citizen resources' : 'Citizenship resources'}>
         {guestDemo ? <span>No account · sample actions only</span> : !citizenNation && !localDemo ? <HudHelp label="Resources" open={isOpen("Resources")} help="Work capacity, money, food, materials and knowledge unlock after citizenship. Exploring nations does not create a citizen."><span>Resources unlock after citizenship</span></HudHelp> : <>
         <HudHelp label="Work capacity" open={isOpen("Work capacity")} help={`Work capacity (WC) is energy available for jobs and civic actions. Meals restore it. Jobs use real-time timers.${wcNote ? ` ${wcNote}` : ''}`}><Lightning size={19} weight="fill" aria-hidden="true" /><strong>{capacity}</strong><span>WC</span></HudHelp>
-        {onOpenWallet && currencyCode === 'SPK' ? <button type="button" className="game-wallet-button" aria-label={`Open wallet · ${walletMinor === undefined ? 'loading' : (walletMinor / 100).toFixed(2)} SPK`} aria-haspopup="dialog" onClick={onOpenWallet}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></button>
-        : <HudHelp label="Wallet" open={isOpen("Wallet")} help={`Your ${currencyCode} wallet holds national money. Amounts update after completed transactions; loading means the citizen snapshot has not arrived.`}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></HudHelp>}
+        {onOpenWallet && currencyCode === 'SPK' ? <button type="button" className="game-wallet-button" aria-label={`Open wallet · ${walletMinor === undefined ? 'loading' : (walletMinor / 100).toFixed(2)} SPK`} aria-haspopup="dialog" onClick={onOpenWallet}><Coins size={19} aria-hidden="true" /><strong>{walletAmount}</strong><span>{currencyCode}</span></button>
+        : <HudHelp label="Wallet" name={walletName} open={isOpen("Wallet")} help={walletHelp}><Coins size={19} aria-hidden="true" /><strong>{walletAmount}</strong>{parity ? <span className="game-wallet-code">{currencyCode}<span className="game-wallet-parity"> ·</span><span className="game-wallet-parity"> parity</span><span className="game-wallet-parity"> {parity.rate}</span>{parity.moved ? <span className="game-wallet-moved"> · moved</span> : null}</span> : <span>{currencyCode}</span>}</HudHelp>}
         <HudHelp label="Food" open={isOpen("Food")} help="Food in your inventory can be used for meals to restore work capacity. Loading means the citizen snapshot has not arrived."><Bread size={19} aria-hidden="true" /><strong>{inventory?.food ?? 'Loading'}</strong><span>Food</span></HudHelp>
         <HudHelp label="Materials" open={isOpen("Materials")} help="Materials are supplies held by your citizen for production. Loading means the citizen snapshot has not arrived."><Cube size={18} aria-hidden="true" /><strong>{inventory?.materials ?? 'Loading'}</strong><span>Mat.</span></HudHelp>
         <HudHelp label="Knowledge" open={isOpen("Knowledge")} help="Knowledge is a resource held by your citizen for learning and production. Loading means the citizen snapshot has not arrived."><BookOpen size={18} aria-hidden="true" /><strong>{inventory?.knowledge ?? 'Loading'}</strong><span>Know.</span></HudHelp></>}
