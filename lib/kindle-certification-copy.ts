@@ -1,6 +1,6 @@
 /** Kindle count, certification and transition-week copy: the results-hidden line while voting is open, the count and certification states, a
  * results caption, the transition-week banner and two press headline frames (issue #609). Content only: the count, certification, fraud flags
- * and challenges belong to the elections work, and nothing imports this module. Canon: harimu-docs elections §9.1 (Voting: ballots secret,
+ * and challenges belong to the elections work. The transition-week banner is read by the certification rules (#1025); every other line stays unwired. Canon: harimu-docs elections §9.1 (Voting: ballots secret,
  * results hidden until close; Certification: automatic count, the AI High Court certifies within 24 hours, challenges only for detected fraud
  * flags; Transition: the outgoing AI President cannot spend treasury or declare war), §9.5 (fraud flags quarantine suspicious ballots for
  * review; results, verified-human turnout and per-district counts are published) and Decision 65 (NPCs cast no election ballots).
