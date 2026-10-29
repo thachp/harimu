@@ -67,3 +67,21 @@ export function cityCaptureNote(nationId: string, cityId: string): string | null
   if (cityForNation(nationId, cityId)) return HEARTLAND_CAPTURE_NOTE;
   return null;
 }
+
+/** #1006: read-only civic-unit note for the city panel (docs Territory, Cities & Warfare §15.2).
+ *  Each city is also a voting district (Kindle, Ilmar, Confluence, Hoarvale), a Grove (Veldwood),
+ *  a garrison district (Varkand), a port ward (Fulmara) or a plan unit (Korund).
+ *  [ASSUMPTION] Aurelle and Meridian: no civic unit named in existing lore — omit the note. */
+export const CITY_CIVIC_UNIT_BY_NATION: Readonly<Record<string, string>> = {
+  kindle: 'voting district',
+  ilmar: 'voting district',
+  confluence: 'voting district',
+  hoarvale: 'voting district',
+  veldwood: 'Grove',
+  varkand: 'garrison district',
+  fulmara: 'port ward',
+  korund: 'plan unit',
+};
+export function cityCivicUnitNote(nationId: string): string | null {
+  return CITY_CIVIC_UNIT_BY_NATION[nationId] ?? null;
+}

@@ -29,6 +29,7 @@ const flagOffPins = {
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
   HARIMU_CITY_SPECIALTY_NOTE_ENABLED: 'city-specialty-note-996.test.mjs',
   HARIMU_CITY_CAPTURE_NOTE_ENABLED: 'city-capture-note-1002.test.mjs',
+  HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED: 'city-civic-unit-note-1006.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
@@ -96,6 +97,7 @@ const flagOffPins = {
   HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
+  HARIMU_AURELLE_TSR_VIEW_ENABLED: 'aurelle-tsr-view-999.test.mjs', // #999 flag off: no crownRateMilli, no line
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
   HARIMU_TARGETED_SANCTIONS_ENABLED: 'goods-sanctions-601.test.mjs',
   HARIMU_WAR_ENABLED: 'war-actions.test.mjs',
