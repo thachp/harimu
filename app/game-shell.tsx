@@ -25,6 +25,7 @@ import { uiV2MobileEnabled } from '@/lib/ui-v2-mobile';
 import { contextStripStatus } from '@/lib/context-strip-copy'; // #379: a visitor's strip says "Visitor preview", not "Citizen snapshot"
 import { topbarCountdownEnabled, type CountdownInput } from '@/lib/topbar-countdown'; // #969
 import { festivalCalendarEnabled, gameSeasonAt, nextFestivalAt, seasonClockEnabled, seasonLabels } from '@/lib/game-season'; // #1023, #1029
+import { ageHudLine, ageRemainingTip, worldAgeAt } from '@/lib/world-age'; // #1041
 import { TopbarCountdown } from './topbar-countdown';
 
 type GameNation = { id: string; name: string; capital?: string; color?: string };
@@ -32,6 +33,8 @@ export type GameShellProps = {
   /** #872: nations opened in this environment by a per-nation flag (GET /api/citizen, only when nationPlayable opens one for this account); absent = the hardcoded live list. */
   openNations?: readonly string[];
   worldClock?: WorldClock;
+  /** #1041: true only when GET /api/world says so (flagOn of HARIMU_UI_PACK). Absent is off. */
+  worldAges?: boolean;
   /** #280: name of today's public holiday (endorsed festival), when faith is on. */
   holidayName?: string | null;
   /** #969: nation's next event inputs. The chip renders only while NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN is "true". */
@@ -123,7 +126,7 @@ function HudHelp({ label, children, help, open = false }: { label: string; child
   return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ openNations, worldClock, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [], onDailyLoop }: GameShellProps) {
+export function GameShell({ openNations, worldClock, worldAges = false, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [], onDailyLoop }: GameShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -211,7 +214,7 @@ export function GameShell({ openNations, worldClock, holidayName, countdown = nu
         <HudHelp label="Materials" open={isOpen("Materials")} help="Materials are supplies held by your citizen for production. Loading means the citizen snapshot has not arrived."><Cube size={18} aria-hidden="true" /><strong>{inventory?.materials ?? 'Loading'}</strong><span>Mat.</span></HudHelp>
         <HudHelp label="Knowledge" open={isOpen("Knowledge")} help="Knowledge is a resource held by your citizen for learning and production. Loading means the citizen snapshot has not arrived."><BookOpen size={18} aria-hidden="true" /><strong>{inventory?.knowledge ?? 'Loading'}</strong><span>Know.</span></HudHelp></>}
       </div>
-      <div className="game-account"><HudHelp label="World clock" open={isOpen("World clock")} help={guestDemo ? 'This disposable example has no world clock. Its sample actions complete immediately.' : 'Game days start at 1; simulation ticks count completed two-hour intervals from 0. Day 2 with tick 1 means the second game day and one completed tick. World days use 12× real-time compression: one real day is 12 game days. This preview processes simulation ticks on visits, not continuously. Work shifts always finish at their real-time deadline.'}><span className="game-clock">{guestDemo ? 'Sample' : worldClock ? `Day ${worldClock.gameDay} · 12×` : citizenNation ? 'Loading world' : 'World preview'}<small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : guestDemo ? 'NO WORLD CHANGES' : citizenNation ? 'AWAITING SNAPSHOT' : '12× · ON VISITS'}</small>{holidayName && <small className="game-clock-holiday">Public holiday</small>}{seasonClockEnabled() && !guestDemo && worldClock && <SeasonReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{festivalCalendarEnabled() && !guestDemo && worldClock && citizenNation && <FestivalReadout nationId={citizenNation.id} epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{nextDeadline && <span className="game-next-deadline"><GameTimer compact endsAt={nextDeadline.endsAt} label={nextDeadline.label} expiredText={nextDeadline.expiredText} /></span>}</span></HudHelp>{topbarCountdownEnabled() && countdown && <TopbarCountdown input={countdown} open={isOpen('Next event')} epochSeconds={worldClock?.epochSeconds} />}<a className="game-glossary" href="https://docs.harimu.com/appendices/glossary/" target="_blank" rel="noreferrer" aria-label="Game glossary, official documentation (opens new tab)"><BookOpen size={17} aria-hidden="true" /><span>Glossary</span></a><GameSettings/><div id="game-notification-slot" />{accountControls}</div>
+      <div className="game-account"><HudHelp label="World clock" open={isOpen("World clock")} help={guestDemo ? 'This disposable example has no world clock. Its sample actions complete immediately.' : 'Game days start at 1; simulation ticks count completed two-hour intervals from 0. Day 2 with tick 1 means the second game day and one completed tick. World days use 12× real-time compression: one real day is 12 game days. This preview processes simulation ticks on visits, not continuously. Work shifts always finish at their real-time deadline.'}><span className="game-clock">{guestDemo ? 'Sample' : worldClock ? `Day ${worldClock.gameDay} · 12×` : citizenNation ? 'Loading world' : 'World preview'}<small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : guestDemo ? 'NO WORLD CHANGES' : citizenNation ? 'AWAITING SNAPSHOT' : '12× · ON VISITS'}</small>{holidayName && <small className="game-clock-holiday">Public holiday</small>}{seasonClockEnabled() && !guestDemo && worldClock && <SeasonReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{worldAges && !guestDemo && worldClock && <AgeReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{festivalCalendarEnabled() && !guestDemo && worldClock && citizenNation && <FestivalReadout nationId={citizenNation.id} epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{nextDeadline && <span className="game-next-deadline"><GameTimer compact endsAt={nextDeadline.endsAt} label={nextDeadline.label} expiredText={nextDeadline.expiredText} /></span>}</span></HudHelp>{topbarCountdownEnabled() && countdown && <TopbarCountdown input={countdown} open={isOpen('Next event')} epochSeconds={worldClock?.epochSeconds} />}<a className="game-glossary" href="https://docs.harimu.com/appendices/glossary/" target="_blank" rel="noreferrer" aria-label="Game glossary, official documentation (opens new tab)"><BookOpen size={17} aria-hidden="true" /><span>Glossary</span></a><GameSettings/><div id="game-notification-slot" />{accountControls}</div>
     </header>
     {view !== 'country' && (!railOn || shiftChip) && <div className="game-stage-overlay">{railOn ? null : breadcrumbs}{shiftChip}</div>}
     {noticeVisible && <div className="game-notice" role={noticeKind === 'error' ? 'alert' : 'status'}><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setDismissedNotice(notice)}><X size={16} /></button></div>}
@@ -227,6 +230,14 @@ export function GameShell({ openNations, worldClock, holidayName, countdown = nu
   </main>;
 }
 export default GameShell;
+
+/** #1041 (docs §17.2): current world Age beside the season line. The title is real time and game time to the next Age (#29); the timer is the same live countdown the season line uses. */
+export function AgeReadout({ epochSeconds, nowSeconds }: { epochSeconds: number; nowSeconds: number }) {
+  const age = worldAgeAt(epochSeconds * 1000, nowSeconds * 1000);
+  if (!age) return null;
+  const tip = ageRemainingTip(age.endsAt, nowSeconds * 1000);
+  return <small className="game-clock-age" title={tip}><span className="sr-only">World age: </span>{ageHudLine(age)}<span className="game-next-deadline"><GameTimer compact endsAt={age.endsAt} label="Next Age in" expiredText="The next Age has begun · refresh to confirm." /></span></small>;
+}
 
 /** #1023 (docs §17.1): current game season and the countdown to the next, from the world clock's epoch. Display only. */
 export function SeasonReadout({ epochSeconds, nowSeconds }: { epochSeconds: number; nowSeconds: number }) {
