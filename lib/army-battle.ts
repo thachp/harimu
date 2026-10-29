@@ -5,8 +5,9 @@
  *  running battle. Behind HARIMU_ARMY_BATTLES_ENABLED (needs HARIMU_ARMY_SUPPLY_ENABLED and its flags). */
 import type { GameDatabase } from './database-contract';
 import { armyUnits, unitForNation } from './army-rules';
-import { marchArrivalAt, readActiveWars, unitMarch, type ArmyWar } from './army-map';
+import { marchArrivalAt, marchPace, readActiveWars, unitMarch, type ArmyWar } from './army-map';
 import { applySupplyLoss, armySupplyEnabled, PERCENT, unitSupply } from './army-supply';
+import { marchTimeFactor, type MarchPace } from './winter-march'; // #1038: battle start follows the slowed march
 import { flagOn } from './flag-pack.mjs';
 import { readUnitReadiness } from './army';
 import { woundedUntil } from './army-wounds';
@@ -71,11 +72,11 @@ export type Battle = BattleResult & { attackerNationId: string; defenderNationId
 type StoredRow = { battle_key: string; rounds: number; status: 'attacker_won' | 'defender_won'; retreated: 'attacker' | 'defender' | null; attacker_strength: number; defender_strength: number };
 /** The battles at `now` for every staged attacking unit: the stored result once decided (never changes), else derived from current strength and morale.
  *  One read for stored rows; current strength is read only for battles not yet stored. Never writes. */
-export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], now: number): Promise<(Battle & { key: string; attackerUnit: string; defenderUnit: string; warId: string })[]> {
+export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], now: number, pace: MarchPace | null = null): Promise<(Battle & { key: string; attackerUnit: string; defenderUnit: string; warId: string })[]> {
   const staged = armyUnits.flatMap(unit => {
     const march = unitMarch(unit.nationId, wars, now), defender = march ? unitForNation(march.war.defender_nation) : null;
     if (!march || !defender || !march.war.id) return [];
-    const startedAt = marchArrivalAt(march);
+    const startedAt = marchArrivalAt(march, undefined, pace ? marchTimeFactor(pace.epochSeconds, march.war.mobilization_ends_at, true) : 1);
     return now < startedAt ? [] : [{ unit, defender, startedAt, warId: march.war.id, key: battleKey(march.war.id, unit.id, startedAt) }];
   });
   if (!staged.length) return [];
@@ -92,7 +93,7 @@ export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], no
       lossRow(db, s.unit.id, now), lossRow(db, s.defender.id, now)]);
     // #738 battle losses: both sides start from the strength their last stored battle left them (recovering per game day).
     const attFull = applyCarriedLoss(s.unit.id, att.strength, attLoss, now), defFull = applyCarriedLoss(s.defender.id, def.strength, defLoss, now);
-    const attacker = { strength: applySupplyLoss(attFull, unitSupply(s.unit.nationId, wars, now).strengthLossPct), morale: att.morale }, defender = { strength: defFull, morale: def.morale };
+    const attacker = { strength: applySupplyLoss(attFull, unitSupply(s.unit.nationId, wars, now, undefined, pace).strengthLossPct), morale: att.morale }, defender = { strength: defFull, morale: def.morale };
     return { ...base, stored: false, ...resolveBattle(attacker, defender, roundsAt(s.startedAt, now)) };
   }));
 }
@@ -120,8 +121,8 @@ export const destroyedUnit = (b: { retreated: 'attacker' | 'defender' | null; at
   b.retreated === 'attacker' ? b.attackerUnit : b.retreated === 'defender' ? b.defenderUnit : null;
 /** World tick (write path, behind the flag): store every finished, not yet stored battle once. INSERT ... ON CONFLICT DO NOTHING on the battle key, so
  *  concurrent ticks store exactly one row and a later strength change never alters it. */
-export async function recordFinishedBattles(db: GameDatabase, now: number) {
-  const done = (await readBattles(db, await readActiveWars(db), now)).filter(b => !b.stored && b.status !== 'ongoing');
+export async function recordFinishedBattles(db: GameDatabase, now: number, winter = false) {
+  const done = (await readBattles(db, await readActiveWars(db), now, await marchPace(db, winter))).filter(b => !b.stored && b.status !== 'ongoing');
   if (!done.length) return;
   // #911 (ARC on #944): only a unit that retreated broken is destroyed; its members are wounded (never killed), in the same batch; conditional too,
   // so a replay keeps the first times. A round-limit loss (retreated null) wounds no one.
