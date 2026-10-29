@@ -30,6 +30,7 @@ const flagOffPins = {
   HARIMU_CITY_SPECIALTY_NOTE_ENABLED: 'city-specialty-note-996.test.mjs',
   HARIMU_SPA_WC_BONUS_ENABLED: 'spa-wc-recovery-798.test.mjs', // #798 flag off: the same recovery interval
   HARIMU_CITY_CAPTURE_NOTE_ENABLED: 'city-capture-note-1002.test.mjs',
+  HARIMU_CITY_CAPTURE_HISTORY_ENABLED: 'city-capture-history-1028.test.mjs', // #1028 flag off: no capture read, no field
   HARIMU_CITY_IMPORTS_NOTE_ENABLED: 'city-imports-note-1001.test.mjs',
   HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED: 'city-civic-unit-note-1006.test.mjs',
   HARIMU_CITY_GOVERNOR_NOTE_ENABLED: 'city-governor-note-1007.test.mjs',
