@@ -79,10 +79,10 @@ export function WorkSummary({ capacity, contributions, onMarket, enabled = uiV2P
     rows={[{ id: 'shifts', label: 'Your work shifts', icon: cityPlaceIcon('workplace'), onSelect: jump('#citizen-work-shifts') }, { id: 'orders', label: 'Available contributions', onSelect: jump('.scene-work-orders') }]}
     primary={onMarket ? { label: 'Take your earnings to market', icon: cityPlaceIcon('market'), onSelect: onMarket } : undefined} />;
 }
-export function MarketSummary({ nation, walletMinor, food, board, listings, onHousehold, enabled = uiV2PanelEnabled() }: { nation: Pick<Nation, 'id' | 'name' | 'currency'>; walletMinor?: number | null; food?: number | null; board: boolean; listings: boolean; onHousehold: () => void; enabled?: boolean }) {
+export function MarketSummary({ nation, walletMinor, food, board, listings, onHousehold, importsNote, enabled = uiV2PanelEnabled() }: { nation: Pick<Nation, 'id' | 'name' | 'currency'>; walletMinor?: number | null; food?: number | null; board: boolean; listings: boolean; onHousehold: () => void; importsNote?: string | null; enabled?: boolean }) {
   if (!enabled) return null;
   return <PanelV2 title="Market" subtitle="Goods and citizen listings" rowsLabel="Market"
-    stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), ...(food == null ? [] : [{ label: 'Food', value: String(food) }])]}
+    stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), ...(food == null ? [] : [{ label: 'Food', value: String(food) }]), ...(importsNote ? [{ label: 'Imports', value: importsNote }] : [])]} // #1001 read-only
     rows={[...(nation.id === 'kindle' ? [{ id: 'starter', label: 'Kindle starter market', icon: cityPlaceIcon('market'), onSelect: jump('.citizen-market:not(.player-market)') }] : []), // #894 (QA2): the Kindle-named row only for Kindle
       ...(board ? [{ id: 'board', label: 'City market board', onSelect: jump('.market-board') }] : []), ...(listings ? [{ id: 'listings', label: 'Kindle citizen listings', onSelect: jump('.player-market') }] : [])]}
     primary={{ label: 'Return to household', icon: cityPlaceIcon('household'), onSelect: onHousehold }} />;

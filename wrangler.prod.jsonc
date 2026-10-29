@@ -37,14 +37,15 @@
     "HARIMU_NOTABLES_ENABLED": "false",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
-    // #988 / #1003: one JSON binding for city tier growth and panel notes (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    // #988 / #1003 / #1006 / #1001: one JSON binding for city tier growth and panel notes, including the civic-unit note and the imports note (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
     "HARIMU_CITY_PACK": {
       "HARIMU_CITY_TIER_GROWTH_ENABLED": "false",
       "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "false",
       "HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED": "false",
       "HARIMU_CITY_SPECIALTY_NOTE_ENABLED": "false",
       "HARIMU_CITY_CAPTURE_NOTE_ENABLED": "false",
-      "HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED": "false"
+      "HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED": "false",
+      "HARIMU_CITY_IMPORTS_NOTE_ENABLED": "false"
     },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
