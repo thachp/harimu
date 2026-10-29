@@ -37,7 +37,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
   const modules = [
     'lib/storage-selection.ts','lib/leader-personas.ts','lib/weekly-addresses.ts','app/api/addresses/route.ts',
     'lib/square-chat-validation.ts', 'lib/cities.ts', 'lib/spa-recovery.ts', 'lib/city-location.ts', 'lib/map-zones.ts', 'lib/globe-mapping.ts', 'lib/map-zone-labels.ts', 'lib/city-founding.ts', 'lib/city-tier.ts', 'app/api/world/found-city/route.ts', 'lib/map-ownership.ts', 'app/api/world/ownership/route.ts', 'lib/map-unrest.ts', 'app/api/world/unrest/route.ts', 'lib/civic-rank-rules.ts', 'lib/civic-rank.ts', 'app/api/citizen/civic-rank/route.ts', 'lib/kindle-budget.ts', 'app/api/kindle/budget/route.ts', 'lib/map-resources.ts', 'app/api/world/resources/route.ts', 'lib/city-capture-history.ts', 'app/api/city/route.ts', 'lib/home-move.ts', 'app/api/city/home/route.ts',
-    'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','lib/election-calendars.ts','lib/kindle-certification-rules.ts','app/api/election/route.ts',
+    'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','lib/election-calendars.ts','lib/kindle-certification-copy.ts','lib/kindle-certification-rules.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
     'lib/mvp-job-types.ts', 'app/api/jobs/types/route.ts', 'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/government.ts',

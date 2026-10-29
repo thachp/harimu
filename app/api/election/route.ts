@@ -20,6 +20,7 @@ const preview=()=>accountElectionEnabled(env as unknown as {NEXT_PUBLIC_HARIMU_D
 const cycleId=(now:number)=>electionIdFor(presidentialCycle(env as unknown as CalendarBindings,now));
 const kindle=async(db:GameDatabase,userId:string)=>(await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>())?.nation_id==='kindle';
 // #1016: flag off returns the snapshot unchanged (no certification key). A closed count with no confirmed result stays unchanged too.
+// #1025: a certified count inside the transition week also carries certification.transition. Same object, no extra write.
 function published(snapshot:ElectionSnapshot,now:number){
  if(!kindleCertificationEnabled(env))return snapshot;
  const winnerId=snapshot.result?.winner??null;

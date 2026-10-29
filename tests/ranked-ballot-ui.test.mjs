@@ -51,6 +51,18 @@ test('#1016 High Court certification renders on a closed ballot only when the sn
  assert.doesNotMatch(renderToStaticMarkup(harness(open).render()),/High Court|President-elect/);
 });
 
+test('#1025 transition-week caretaker line renders on a closed ballot only while certification.transition is set',async()=>{
+ const closed=()=>{const data=snapshot();data.status='closed';data.result={winner:ids[0],humanBallots:1,simulatedPublicUnits:1,weightScale:4,rounds:[{human:{[ids[0]]:1,[ids[1]]:0,[ids[2]]:0},simulatedUnits:{[ids[0]]:0,[ids[1]]:0,[ids[2]]:0},weightedUnits:{[ids[0]]:0,[ids[1]]:0,[ids[2]]:0},eliminated:null}]};return data;};
+ const line='Transition period. Inauguration 2023-11-22 22:13:20 UTC. Until inauguration, the outgoing AI President cannot spend the treasury or declare war.';
+ const shown={...closed(),certification:{state:'certified',certifiesAt:1,line:'The AI High Court has certified the result. Ines Varro is President-elect.',transition:{endsAt:2,line}}};
+ const html=renderToStaticMarkup(harness(shown).render());
+ assert.match(html,/aria-label="Transition week"/);assert.match(html,/cannot spend the treasury or declare war/);assert.match(html,/Transition period\. Inauguration 2023-11-22 22:13:20 UTC/);
+ const gone={...closed(),certification:{state:'certified',certifiesAt:1,line:'The AI High Court has certified the result. Ines Varro is President-elect.'}};
+ assert.doesNotMatch(renderToStaticMarkup(harness(gone).render()),/cannot spend the treasury or declare war|aria-label="Transition week"/);
+ const open={...snapshot(),status:'open',certification:shown.certification};
+ assert.doesNotMatch(renderToStaticMarkup(harness(open).render()),/cannot spend the treasury or declare war|aria-label="Transition week"/);
+});
+
 test('#936 ranked ballot accepts a cycle-N election id (QA2)',async()=>{
  const data={...snapshot(),id:'kindle-presidential-poc-1-cycle-1'};const h=harness(data);
  h.all(h.render()).find(node=>node?.type==='form').props.onSubmit({preventDefault(){}});await new Promise(setImmediate);
