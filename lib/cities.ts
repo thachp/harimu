@@ -47,6 +47,10 @@ export function outpostCityForNation(nationId: string): City | undefined {
   const o = outposts[nationId]; if (!o) return undefined;
   return { id: o.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), nationId, name: o.name, capital: false, role: o.role, description: o.description };
 }
+/** The nation whose frontier outpost has this catalog id (Ashby Crossing → kindle). Independent of who is looking. */
+export function outpostNationForCity(cityId: string): string | undefined {
+  return Object.keys(outposts).find(nationId => outpostCityForNation(nationId)?.id === cityId);
+}
 
 /** #996: read-only specialty note from the Cities catalog / nation Cities tables (docs What a city does > Jobs).
  *  Capitals show as "Capital"; Port / Trade zone roles also mention imports. [ASSUMPTION] Founded or unknown

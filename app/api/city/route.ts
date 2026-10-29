@@ -7,6 +7,7 @@ import {cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,city
 import {spaWcBonusEnabled,spaWcNote} from '@/lib/spa-recovery'; // #798
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
+import {latestCityCapture} from '@/lib/city-capture-history'; // #1028
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -45,7 +46,8 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
 export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now)}));
+ const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now);
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads}));
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
@@ -66,6 +68,13 @@ export async function POST(request:Request){
  ]);
  if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now)}));
+ const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now);
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads}));
 }
 const spaField=(nationId:string,homeCityId:string,currentCityId:string)=>spaWcBonusEnabled(env)&&cityForNation(nationId,homeCityId)?.spa&&currentCityId===homeCityId?{spaWcNote}:{};
+/** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads. */
+async function cityReads(db:Awaited<ReturnType<typeof getDatabase>>,userId:string,nationId:string,cityId:string,now:number){
+ if(!flagOn(env,'HARIMU_CITY_CAPTURE_HISTORY_ENABLED'))return {presence:await cityPresence(db,nationId,now),coResidents:await cityCoResidents(db,userId,nationId,cityId,now)};
+ const [presence,coResidents,captureHistory]=await Promise.all([cityPresence(db,nationId,now),cityCoResidents(db,userId,nationId,cityId,now),latestCityCapture(db,nationId,cityId)]);
+ return {presence,coResidents,...(captureHistory?{captureHistory}:{})};
+}
