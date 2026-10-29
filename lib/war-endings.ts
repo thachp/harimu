@@ -9,6 +9,7 @@ import { kindleSeats } from './diplomacy';
 import { soleRatification, type PartySeats, type Ratification } from './diplomacy-rules';
 import { isWarNation, kindlePartyWeary, requestIdOk, wearyKindleParties, type WarNationId } from './war-rules';
 import { kindleVoteWeariness, type VoteWearinessOptions } from './war-weariness'; // #427 slice 3
+import { endingRefusalFor } from './war-ending-copy'; // #1026: one refusal line per reason; reason and status codes stay here
 
 export const warEndingsSchemas = [
   `CREATE TABLE IF NOT EXISTS war_end_terms (
@@ -56,6 +57,7 @@ export function decideEnding(kind: 'surrender' | 'concession', proposer: WarNati
 
 type Square = { x: number; y: number };
 const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
+const refusal = (reason: string) => endingRefusalFor(reason)!.line.text;
 const cleanSquares = (value: unknown): Square[] | null => {
   if (!Array.isArray(value) || value.length < 1 || value.length > maxCededSquares) return null;
   const out = value.map(s => ({ x: Number((s as Square)?.x), y: Number((s as Square)?.y) }));
@@ -78,27 +80,27 @@ const publicTerms = (r: Row) => ({ id: r.id, warId: r.war_id, kind: r.kind, prop
 export type ProposeEndingCommand = { nation: WarNationId; warId: string; kind: string; squares?: unknown; requestId: string };
 /** A war party's authorized office (checked by the caller) proposes to surrender, or to cede its own squares. Idempotent per requestId; one pending ending per war. */
 export async function proposeWarEnding(db: GameDatabase, command: ProposeEndingCommand, now: number) {
-  if (!requestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
-  if (command.kind !== 'surrender' && command.kind !== 'concession') return fail(400, 'bad_request', 'Propose a surrender or a concession.');
+  if (!requestIdOk(command.requestId)) return fail(400, 'bad_request', refusal('bad_request'));
+  if (command.kind !== 'surrender' && command.kind !== 'concession') return fail(400, 'bad_request', refusal('bad_request'));
   const read = () => db.prepare(`SELECT ${columns} FROM war_end_terms WHERE request_id=?`).bind(command.requestId).first<Row>();
   const prior = await read();
-  if (prior) return prior.war_id === command.warId && prior.proposer_nation === command.nation && prior.kind === command.kind ? { ok: true as const, replay: true as const, terms: publicTerms(prior) } : fail(409, 'request_reused', 'That request id was already used for a different command.');
+  if (prior) return prior.war_id === command.warId && prior.proposer_nation === command.nation && prior.kind === command.kind ? { ok: true as const, replay: true as const, terms: publicTerms(prior) } : fail(409, 'request_reused', refusal('request_reused'));
   const war = await db.prepare('SELECT attacker_nation,defender_nation,ended_at FROM wars WHERE id=?').bind(command.warId).first<{ attacker_nation: WarNationId; defender_nation: WarNationId; ended_at: number | null }>();
-  if (!war) return fail(409, 'not_found', 'No such war.');
-  if (war.ended_at !== null) return fail(409, 'war_ended', 'That war has already ended.');
-  if (war.attacker_nation !== command.nation && war.defender_nation !== command.nation) return fail(403, 'not_a_party', 'Your nation is not a party to that war.');
+  if (!war) return fail(409, 'not_found', refusal('not_found'));
+  if (war.ended_at !== null) return fail(409, 'war_ended', refusal('war_ended'));
+  if (war.attacker_nation !== command.nation && war.defender_nation !== command.nation) return fail(403, 'not_a_party', refusal('not_a_party'));
   const other = war.attacker_nation === command.nation ? war.defender_nation : war.attacker_nation;
   let squares: Square[] | null = null;
   if (command.kind === 'concession') {
     squares = cleanSquares(command.squares);
-    if (!squares) return fail(400, 'bad_squares', `Cede 1 to ${maxCededSquares} distinct squares.`);
-    if (await ineligibleSquare(db, command.nation, squares)) return fail(409, 'square_not_cedable', 'Only Frontier squares your nation governs, never privately owned, can be ceded.');
+    if (!squares) return fail(400, 'bad_squares', refusal('bad_squares'));
+    if (await ineligibleSquare(db, command.nation, squares)) return fail(409, 'square_not_cedable', refusal('square_not_cedable'));
   }
   await db.prepare('INSERT INTO war_end_terms (id,request_id,war_id,kind,proposer_nation,other_nation,squares_json,proposed_at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING')
     .bind(`wend-${command.requestId}`, command.requestId, command.warId, command.kind, command.nation, other, squares ? JSON.stringify(squares) : null, now).run()
     .catch(error => { if (isUniqueViolation(error)) return null; throw error; });
   const saved = await read();
-  return saved ? { ok: true as const, terms: publicTerms(saved) } : fail(409, 'ending_pending', 'An ending of this war is already awaiting ratification.');
+  return saved ? { ok: true as const, terms: publicTerms(saved) } : fail(409, 'ending_pending', refusal('ending_pending'));
 }
 
 const changes = (result: unknown) => Number((result as { meta?: { changes?: number } })?.meta?.changes ?? 0);

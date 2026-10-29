@@ -137,7 +137,7 @@ test('war banner: one weariness line in the viewer nation\'s own voice, only whe
   const { renderToStaticMarkup } = await import('react-dom/server');
   const require = createRequire(import.meta.url);
   const copy = await r.importModule('lib/war-weariness-copy.ts');
-  const stubs = { '@/lib/war-copy': await r.importModule('lib/war-copy.ts'), '@/lib/war-rules': await r.importModule('lib/war-rules.ts'), '@/lib/war-weariness-copy': copy, './game-timer': { GameTimer: () => null }, './display-preferences': { useDisplayTimestamp: () => v => String(v) }, '@/lib/war': {} };
+  const stubs = { '@/lib/war-copy': await r.importModule('lib/war-copy.ts'), '@/lib/war-rules': await r.importModule('lib/war-rules.ts'), '@/lib/war-weariness-copy': copy, '@/lib/war-ending-copy': { endingBodyFor: () => ({ text: '' }), endingResults: {} }, './game-timer': { GameTimer: () => null }, './display-preferences': { useDisplayTimestamp: () => v => String(v) }, '@/lib/war': {} };
   const exports = {}; const src = await readFile(new URL('../app/war-banner.tsx', import.meta.url), 'utf8');
   new Function('exports', 'require', ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText)(exports, name => name in stubs ? stubs[name] : require(name));
   const war = { id: 'w1', attacker: 'kindle', defender: 'korund', casusBelli: '', declaredBy: 'x', declaredAt: 1000, mobilizationEndsAt: 2000, status: 'active', endedAt: null, endKind: null, peaceLockEndsAt: null };
