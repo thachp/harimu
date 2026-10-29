@@ -25,6 +25,13 @@ export function ArmyCard() {
     if (res.ok) { setArmy(data.army ? { ...data.army, march: data.army.march ?? army.march } : null); setNote(fill(unitMembership.drilled.text, unit.name)); }
     else setNote(data.reason === 'already_drilled' ? unitMembership.drilledToday.text : armyFailureNote('stance', unit.name, String(data.error ?? res.status)));
   };
+  // #1053: shown only when the GET carried the supply range (HARIMU_ARMY_QUARTERMASTER_ENABLED on).
+  const quartermaster = async () => {
+    const res = await fetch('/api/army/quartermaster', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: crypto.randomUUID() }) });
+    const data: { army?: ArmyView; reason?: string; error?: string } = await (res.json() as Promise<{ army?: ArmyView; reason?: string; error?: string }>).catch(() => ({}));
+    if (res.ok) { if (data.army) setArmy({ ...data.army, march: data.army.march ?? army.march }); setNote(fill(unitMembership.quartermasterDone.text, unit.name)); }
+    else setNote(data.reason === 'already_shifted' ? unitMembership.quartermasterToday.text : armyFailureNote('stance', unit.name, String(data.error ?? res.status)));
+  };
   return <section className="army-card" aria-label="Your unit">
     <h3>{fill(unitCard.title, unit.name)}</h3>
     <p>{fill(unitCard.commanderLabel, unit.name, unit.officer)}</p>
@@ -32,6 +39,7 @@ export function ArmyCard() {
     {unit.strength !== undefined && <p>{unitCard.strengthLabel}: {unit.strength} · {unitCard.moraleLabel}: {unit.morale}</p>}
     {army.march && <p>Winter roads: marches take longer. {army.march.time}</p>}
     {unit.supply?.cut && <p>{supplyCutLine(unit.supply)}</p>}
+    {unit.supply?.rangeSquares !== undefined && <p>{supplyRangeLine(unit.supply.rangeSquares, unit.supply.quartermasterSquares ?? 0)}</p>}
     {unit.battle && <p>{battleLine(unit.battle)}</p>}
     {unit.battle?.stances && <p>{stanceMixLine(unit.battle.stances)}</p>}
     {army.woundedUntil && <p>{woundedLine(army.woundedUntil)}</p>}
@@ -41,6 +49,7 @@ export function ArmyCard() {
       </fieldset>
       <p>{squadStance.oneInput.text}</p>
       {unit.strength !== undefined && <><p>{unitMembership.drillsHelper.text}</p><button type="button" onClick={() => void drill()}>{unitMembership.drillButton}</button></>}
+      {unit.supply?.rangeSquares !== undefined && <button type="button" onClick={() => void quartermaster()}>{unitMembership.quartermasterButton}</button>}
       {army.serveUntil ? <><p>{fill(unitMembership.calledUp.text, unit.name)}</p><button type="button" onClick={() => void fetch('/api/army/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"action":"stay"}' }).then(async r => { const reason = r.ok ? '' : ((await r.json().catch(() => ({}))) as { reason?: string }).reason; setNote(r.ok ? fill(unitMembership.stayed.text, unit.name) : r.status === 409 && reason === 'not_conscripted' ? fill(unitMembership.stayRefused.text, unit.name) : armyFailureNote('stance', unit.name, String(r.status))); }).catch(() => setNote(armyFailureNote('stance', unit.name, 'network')))}>{unitMembership.stayButton}</button></> : <button type="button" onClick={() => void send({ action: 'leave' }, fill(unitMembership.left.text, unit.name))}>{unitMembership.leaveButton}</button>}
     </> : !unit.openToVolunteers ? <p>{unitMembership.notOpenYet.text}</p> : <button type="button" onClick={() => void send({ action: 'join', unitId: unit.id }, fill(unitMembership.joined.text, unit.name))}>{unitMembership.joinButton}</button>}
     {note && <p role="status">{note}</p>}
@@ -60,3 +69,5 @@ export const stanceMixLine = (s: { hold: number; advance: number; fall_back: num
   unitMembership.battleStances.text.replace('{hold}', String(s.hold)).replace('{advance}', String(s.advance)).replace('{fall_back}', String(s.fall_back));
 /** #911: the wounded line (placeholder copy from army-copy, marked for Content). */
 export const woundedLine = (until: number) => unitMembership.wounded.text.replace('{time}', new Date(until * 1000).toLocaleString());
+/** #1053: "Supply range: N squares (+k from quartermasters)". */
+export const supplyRangeLine = (n: number, k: number) => unitMembership.supplyRange.text.replace('{n}', String(n)).replace('{k}', String(k));

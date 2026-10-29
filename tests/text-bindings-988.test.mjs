@@ -25,7 +25,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 20); // #1047 shift soft cap stays inside the pack
-  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 6); // #1038 winter march stays inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 7); // #1038 winter march and #1053 quartermaster stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 13); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1055 Korund wallet rations stay inside the pack
