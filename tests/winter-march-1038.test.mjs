@@ -51,6 +51,34 @@ test('a march already under way keeps its original ETA when the season turns', (
   assert.notDeepEqual(at(W.marchTimeFactor(epoch, start, true)), at(W.marchTimeFactor(epoch, spring, true)));
 });
 
+test('a winter march stays 1.5× in spring, and an autumn march stays 1× with no card line in winter', () => {
+  const terrain = M.terrainMap(), pace = { epochSeconds: epoch, enabled: true };
+  const probe = M.unitMarch('kindle', [{ attacker_nation: 'kindle', defender_nation: 'korund', declared_at: 0, mobilization_ends_at: 1 }], 2);
+  const first = M.moveSeconds(terrain.get(`${probe.route[0].x},${probe.route[0].y}`));
+  const spot = (start, now) => {
+    const war = { attacker_nation: 'kindle', defender_nation: 'korund', declared_at: start - 10, mobilization_ends_at: start };
+    const unit = M.armyPositions([war], now, terrain, pace).find(u => u.nationId === 'kindle');
+    const at = factor => M.positionAfter(probe.home, probe.route, now - start, p => terrain.get(`${p.x},${p.y}`), factor);
+    return { unit, note: M.winterRoadNote('kindle', [war], now, pace), slow: at(W.WINTER_MARCH_MULTIPLIER), fast: at(1) };
+  };
+  const spring = epoch + 4 * seasonSec, wStart = spring - 1, wNow = wStart + first + 1;
+  assert.equal(Season.gameSeasonAt(epoch * 1000, wStart * 1000).season, 'winter');
+  assert.equal(Season.gameSeasonAt(epoch * 1000, wNow * 1000).season, 'spring');
+  const winter = spot(wStart, wNow);
+  assert.notDeepEqual([winter.slow.x, winter.slow.y], [winter.fast.x, winter.fast.y]);
+  assert.deepEqual([winter.unit.x, winter.unit.y], [winter.slow.x, winter.slow.y], 'armyPositions stays 1.5× after the season turns');
+  const slowEta = wStart + (M.marchArrivalAt({ war: { attacker_nation: 'kindle', defender_nation: 'korund', declared_at: 0, mobilization_ends_at: wStart }, route: probe.route }, terrain) - wStart) * W.WINTER_MARCH_MULTIPLIER;
+  assert.equal(winter.note?.arrivesAt, slowEta, 'card ETA stays 1.5×');
+  assert.equal(winter.note.time, W.winterMarchTime(slowEta - wNow));
+  const aStart = winterStart - 1, aNow = aStart + first + 1;
+  assert.equal(Season.gameSeasonAt(epoch * 1000, aStart * 1000).season, 'autumn');
+  assert.equal(Season.gameSeasonAt(epoch * 1000, aNow * 1000).season, 'winter');
+  const autumn = spot(aStart, aNow);
+  assert.deepEqual([autumn.unit.x, autumn.unit.y], [autumn.fast.x, autumn.fast.y], 'armyPositions stays 1×');
+  assert.notDeepEqual([autumn.unit.x, autumn.unit.y], [autumn.slow.x, autumn.slow.y]);
+  assert.equal(autumn.note, null, 'no winter card line');
+});
+
 test('the army card shows Winter roads: marches take longer with the real and game time', async () => {
   const card = readFileSync('app/army-card.tsx', 'utf8');
   assert.match(card, /Winter roads: marches take longer\. \{army\.march\.time\}/);
@@ -69,6 +97,22 @@ test('the army card shows Winter roads: marches take longer with the real and ga
   assert.ok(el.textContent.includes(`Winter roads: marches take longer. ${time}`));
   await act(async () => root.unmount()); el.remove();
 });
+
+for (const backend of ['sqlite', 'postgres']) {
+  test(`${backend}: readBattles starts at the slowed winter arrival`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close());
+    const B = await r.importModule('lib/army-battle.ts');
+    const spring = epoch + 4 * seasonSec, start = spring - 1;
+    const wars = [{ id: 'w1038b', attacker_nation: 'kindle', defender_nation: 'korund', declared_at: start - 10, mobilization_ends_at: start }];
+    const march = M.unitMarch('kindle', wars, start + 1), terrain = M.terrainMap();
+    const fastAt = M.marchArrivalAt(march, terrain, 1), slowAt = M.marchArrivalAt(march, terrain, W.WINTER_MARCH_MULTIPLIER);
+    assert.ok(fastAt + 1 < slowAt);
+    const pace = { epochSeconds: epoch, enabled: true };
+    assert.equal((await B.readBattles(r.db, wars, fastAt + 1, pace)).length, 0, 'still on the road at 1.5×');
+    const [battle] = await B.readBattles(r.db, wars, slowAt, pace);
+    assert.equal(battle.startedAt, slowAt);
+  });
+}
 
 const MAP = { HARIMU_ARMIES_ENABLED: 'true', HARIMU_WAR_ENABLED: 'true', HARIMU_ARMY_MAP_ENABLED: 'true' };
 for (const backend of ['sqlite', 'postgres']) {
