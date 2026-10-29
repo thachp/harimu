@@ -3,7 +3,7 @@ import {getDatabase} from '@/lib/db';
 import {startCityTravel} from '@/lib/travel';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {cityForNation,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote} from '@/lib/cities'; // #996/#1002/#1006
+import {cityForNation,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996/#1002/#1006
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote} from '@/lib/city-tier'; // #979 / #984
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
@@ -21,7 +21,8 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  const specialtyOn=flagOn(env,'HARIMU_CITY_SPECIALTY_NOTE_ENABLED'); // #996
  const captureOn=flagOn(env,'HARIMU_CITY_CAPTURE_NOTE_ENABLED'); // #1002
  const civicOn=flagOn(env,'HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED'); // #1006
- if(!unlocksOn&&!noteOn&&!specialtyOn&&!captureOn&&!civicOn)return body;
+ const governorOn=flagOn(env,'HARIMU_CITY_GOVERNOR_NOTE_ENABLED'); // #1007
+ if(!unlocksOn&&!noteOn&&!specialtyOn&&!captureOn&&!civicOn&&!governorOn)return body;
  let tier=1;
  if(flagOn(env,'HARIMU_CITY_TIER_GROWTH_ENABLED')){
   const row=await db.prepare('SELECT tier FROM world_cities WHERE id=?').bind(cityId).first<{tier:number}>();
@@ -33,6 +34,7 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  if(specialtyOn){const s=citySpecialtyFields(nationId,cityId);if(s)out={...out,...s};} // #996 catalog only
  if(captureOn){const n=cityCaptureNote(nationId,cityId);if(n)out={...out,captureNote:n};} // #1002
  if(civicOn){const n=cityCivicUnitNote(nationId);if(n)out={...out,civicUnitNote:n};} // #1006
+ if(governorOn)out={...out,...cityGovernorFields(nationId,tier)}; // #1007
  return out;
 }
 export async function GET(request:Request){

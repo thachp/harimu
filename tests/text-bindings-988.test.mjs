@@ -34,6 +34,7 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_ARMY_BATTLES_ENABLED, 'true');
   assert.equal(flagOn(on, 'HARIMU_CITY_CAPTURE_NOTE_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED'), true);
+  assert.equal(flagOn(on, 'HARIMU_CITY_GOVERNOR_NOTE_ENABLED'), true);
   assert.equal(expandFlagPacks(preview.vars).HARIMU_CITY_TIER_GROWTH_ENABLED, 'true');
   assert.equal('HARIMU_GRAY_PACK' in expandFlagPacks(preview.vars), false);
   assert.equal('HARIMU_CITY_PACK' in expandFlagPacks(preview.vars), false);
