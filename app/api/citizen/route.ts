@@ -42,6 +42,7 @@ import { availableWith, checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWri
 import { qaTestCitizenAllowed, qaTestNationSql } from '@/lib/qa-tools';
 import { liveNations, nationPlayable, playableNationIds } from '@/lib/nation-openings'; // #485, #489, #872
 import { mvpJobTypesEnabled } from '@/lib/mvp-job-types'; // #886 (b)
+import { farmingShiftYield, isFarmingShift, seasonAt, seasonFarmingEnabled } from '@/lib/season-yield'; // #1033
 import { emissionCapsEnabled } from '@/lib/emission-caps-rules'; // #885
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
@@ -104,7 +105,7 @@ const korundRationStabilityOn = () => korundRationStabilityEnabled(env as unknow
 const korundStabilityRecoveryOn = () => korundStabilityRecoveryEnabled(env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string; HARIMU_KORUND_RATION_STABILITY_ENABLED?: string; HARIMU_KORUND_STABILITY_RECOVERY_ENABLED?: string });
 // #797: gray-market checkpoint seizure of cash bundles, destroyed as a sink (HARIMU_GRAY_SEIZURE_ENABLED); off = no roll, no write, no read.
 const graySeizureOn = () => flagOn(env, 'HARIMU_GRAY_SEIZURE_ENABLED');
-const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn(), rationRecovery: korundStabilityRecoveryOn() });
+const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn(), rationRecovery: korundStabilityRecoveryOn(), seasonFarming: seasonFarmingEnabled(env) });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
 const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn(), standing: korundStandingOn(), bureauTsr: korundTsrViewOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged. #994 standing and #1000 Bureau quote are read-only too.
@@ -353,7 +354,7 @@ async function handlePost(request: Request) {
   }
   if (typeof body.action === 'string' && body.action.startsWith('aurelle-')) {
     if (!validAurelleCommand(body)) return privateJson({error:'Use a valid request identifier, shift identifier and food quantity of 1 or 2.'},{status:400});
-    const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000),await charterMealSeconds(database,userId,Math.floor(Date.parse(now)/1000),chartersOn()),{mvpJobTypes:mvpJobTypesEnabled(env as never),emissionCaps:emissionCapsEnabled(env as never)}); // #531, #886 (c), #885
+    const result=await executeAurelle(database,userId,body,Math.floor(Date.parse(now)/1000),await charterMealSeconds(database,userId,Math.floor(Date.parse(now)/1000),chartersOn()),{mvpJobTypes:mvpJobTypesEnabled(env as never),emissionCaps:emissionCapsEnabled(env as never),seasonFarming:seasonFarmingEnabled(env)}); // #531, #886 (c), #885, #1033
     const citizen=await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id=?').bind(userId).first<{capacity:number}>();
     return privateJson({...result,ok:result.status===200,aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),shifts:await readShifts(database,userId),capacity:citizen?.capacity??0},{status:result.status});
   }
@@ -677,11 +678,16 @@ async function handlePost(request: Request) {
       id = ticketShift; key = await shiftAnswerKey(secret, ticketShift, harvestQuestions);
     }
     const quality = gradeShift(workOrderId, input, 'human', key);
-    const reward = { ...base, ...applyQuality(base, quality.multiplierPct) };
+    // #1033 [ASSUMPTION]: season scales the base food units (floor, never below 1) before the quality multiplier. Wages are not seasonal.
+    const clockRow = seasonFarmingEnabled(env) && isFarmingShift(workOrderId)
+      ? await database.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{ epoch_seconds: number }>() : null;
+    const scaled = farmingShiftYield(rule.output, base.quantity, seasonAt(clockRow ? { epochSeconds: Number(clockRow.epoch_seconds), nowSeconds: Math.floor(Date.parse(now) / 1000) } : null));
+    const payBase = scaled ? { ...base, quantity: scaled.units } : base;
+    const reward = { ...payBase, ...applyQuality(payBase, quality.multiplierPct) };
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
     // D1 batch is transactional: scheduling and debiting succeed together.
     const [scheduled] = await database.batch([
-      database.prepare(startShiftSql).bind(id, order.id, order.name, rule.output,
+      database.prepare(startShiftSql).bind(id, order.id, order.name, scaled?.output ?? rule.output,
         order.capacity_cost, now, completesAt, userId, order.capacity_cost,
         order.nation_id, order.nation_id, userId),
       database.prepare(debitShiftSql).bind(order.capacity_cost, now, userId, id, userId),
