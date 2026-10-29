@@ -62,7 +62,7 @@ import { embassyChatSchemas } from './embassy-chat'; // #882
 import { armySchemas, armyDrillSchemas } from './army'; // #738
 import { conscriptionSchemas, conscriptStayColumn } from './army-conscription'; // #738 slice 3
 import { holySiteSchemas } from './holy-sites'; // #855
-import { armyBattleSchemas } from './army-battle'; // #738 battles
+import { armyBattleSchemas, battleStanceColumns } from './army-battle'; // #738 battles, #1061 stance columns
 import { armyWoundSchemas } from './army-wounds'; // #911
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
@@ -479,6 +479,10 @@ async function initialize(database: GameDatabase) {
   // #738 (migration 0082): army_conscripts gained stayed_at; a local database created before it gets the column once.
   const conscriptColumns = await database.prepare('PRAGMA table_info(army_conscripts)').all<{ name: string }>();
   if (!conscriptColumns.results.some(column => column.name === 'stayed_at')) await database.prepare(conscriptStayColumn).run();
+
+  // #1061 (migration 0112): stance counts frozen on a stored battle. A table just created from armyBattleSchemas already has them.
+  const battleCols = await database.prepare('PRAGMA table_info(army_battles)').all<{ name: string }>();
+  if (battleCols.results.length > 0 && !battleCols.results.some(column => column.name === 'attacker_hold')) await database.batch(battleStanceColumns.map(sql => database.prepare(sql)));
 
   // #400: treaties gained broken_by (migration 0040); a local database created before it gets the column once.
   const treatyColumns = await database.prepare('PRAGMA table_info(treaties)').all<{ name: string }>();
