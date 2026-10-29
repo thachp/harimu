@@ -48,14 +48,20 @@ import { kindleCycleStartAt, presidentialCycle, presidentialWindow, type Calenda
 /** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => (env as unknown as { HARIMU_CROWN_DEBASEMENT_ENABLED?: string }).HARIMU_CROWN_DEBASEMENT_ENABLED === 'true'; // #362
-/** #362: the Aurelle plan plus, while HARIMU_CROWN_DEBASEMENT_ENABLED is on, the read-only Royal Mint strip. Flag off: exactly readAurelle. */
+/** #999: Crown balance quoted in TSR at the official rate. Off: no crownRateMilli and no extra mint read. */
+const aurelleTsrViewOn = () => (env as unknown as { HARIMU_AURELLE_TSR_VIEW_ENABLED?: string }).HARIMU_AURELLE_TSR_VIEW_ENABLED === 'true';
+/** #362: the Aurelle plan plus, while HARIMU_CROWN_DEBASEMENT_ENABLED is on, the read-only Royal Mint strip. Flag off: exactly readAurelle.
+ *  #999: while HARIMU_AURELLE_TSR_VIEW_ENABLED is on, crownRateMilli is that strip's official rate (baseline parity when the mint flag is off). */
 const chartersOn = () => (env as unknown as { HARIMU_AURELLE_CHARTERS_ENABLED?: string }).HARIMU_AURELLE_CHARTERS_ENABLED === 'true'; // #531
 async function readAurelleView(database: Awaited<ReturnType<typeof getDatabase>>, userId: string) {
   // #529: Royal Favor decay is evaluated at the current time only while HARIMU_FAVOR_DECAY_ENABLED is on (off: the flat rule, as before).
   const decayOn = (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true';
   const mealSeconds = await charterMealSeconds(database, userId, Math.floor(Date.now() / 1000), chartersOn()); // #531: undefined unless HARIMU_AURELLE_CHARTERS_ENABLED and an active charter
   const plan = await readAurelle(database, userId, { ...(decayOn ? { favorDecayAt: Math.floor(Date.now() / 1000) } : {}), ...(mealSeconds === undefined ? {} : { mealSeconds }) });
-  return crownMintOn() && plan.available ? { ...plan, mint: await readCrownMint(database, Math.floor(Date.now() / 1000)) } : plan;
+  const mintOn = crownMintOn(), tsrOn = aurelleTsrViewOn();
+  if (!plan.available || (!mintOn && !tsrOn)) return plan;
+  const mint = await readCrownMint(database, Math.floor(Date.now() / 1000));
+  return { ...plan, ...(mintOn ? { mint } : {}), ...(tsrOn ? { crownRateMilli: mint.officialRate.tesseraMilliPerCrown } : {}) };
 }
 /** #490: the generic nation wage plan, only while HARIMU_NATION_WORK_ENABLED is on and the citizen's nation has a wage ledger and is playable for the account. Otherwise no key at all. */
 async function nationWorkPlanPart(database: Awaited<ReturnType<typeof getDatabase>>, userId: string) {

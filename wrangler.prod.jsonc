@@ -183,6 +183,8 @@
     "HARIMU_EMBARGO_ENABLED": "false",
     // #362: Aurelle Crown debasement PoC (mint parity, Currency Confidence, Monarch decree). Off until QA; decrees are written only by the scheduled Worker.
     "HARIMU_CROWN_DEBASEMENT_ENABLED": "false",
+    // #999: Aurelle charter account shows the Crown balance in Tessera at the official Royal Mint rate (docs §12.8 Display). Off: no crownRateMilli and no line under Crowns. Display only: no exchange and no migration.
+    "HARIMU_AURELLE_TSR_VIEW_ENABLED": "false",
     // #442: Kindle canvassing PoC (party members' ground-game quests; display-only district visibility, never votes). Off until QA.
     "HARIMU_CANVASSING_ENABLED": "false",
     // #441: Kindle town hall PoC (citizen questions for 24 hours, top 10 answered). Off until QA. An operator sets HARIMU_TOWN_HALL_OPEN_AT (epoch seconds) to open every candidate's hall; unset it never opens.
