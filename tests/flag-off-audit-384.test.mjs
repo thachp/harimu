@@ -97,6 +97,7 @@ const flagOffPins = {
   HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
+  HARIMU_AURELLE_TSR_VIEW_ENABLED: 'aurelle-tsr-view-999.test.mjs', // #999 flag off: no crownRateMilli, no line
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
   HARIMU_TARGETED_SANCTIONS_ENABLED: 'goods-sanctions-601.test.mjs',
   HARIMU_WAR_ENABLED: 'war-actions.test.mjs',
