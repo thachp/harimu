@@ -132,3 +132,7 @@ export const applyRationCut=(coupons:KorundCoupon[],cut:KorundRationCut|null):Ko
 export const korundRationCutCopy={label:'Rations are reduced',notice:'Plan output fell short, so this week\'s rations are reduced.',stability:'Stability falls with the rations.',withdrawn:'withdrawn this week (ration cut)'} as const;
 /** #983 [ASSUMPTION] Content's rationRecovery notice (lib/ration-copy.ts). The doc names the cut, not this sentence. */
 export const korundRationRecoveryCopy={notice:'Stability recovers with the plan.'} as const;
+
+/** #970: Korund ration card as a stamped booklet (docs §23.2). Build flag NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET
+ *  ("true" in preview, "false" in production). Only the exact string "true" enables it. No new ration data. */
+export function korundRationBookletEnabled(value: string | undefined = process.env.NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET): boolean { return value === 'true'; }

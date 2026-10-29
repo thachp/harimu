@@ -245,7 +245,9 @@
     "NEXT_PUBLIC_HARIMU_NATION_SKIN": "false",
     "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false",
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
-    "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false"
+    "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",
+    // #970: Korund ration card as a stamped booklet (docs §23.2). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]

@@ -2263,6 +2263,19 @@ html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; 
 .korund-coupons ul { margin: 6px 0; padding-left: 18px; }
 .korund-coupons li { margin: 4px 0; }
 
+/* #970: Korund ration booklet. Nation tokens come from the parent document. No animation. */
+.korund-ration-booklet { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.korund-ration-booklet .korund-booklet-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 2px solid var(--nation-accent, #d7bb8a); }
+.korund-ration-booklet .korund-booklet-head h4 { margin: 0; letter-spacing: .04em; }
+.korund-ration-booklet .korund-booklet-kicker { margin: 2px 0 0; }
+.korund-ration-booklet .korund-booklet-pages { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.korund-ration-booklet .korund-booklet-page { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px; min-width: 0; margin: 0; padding: 10px 12px; border: 1px solid var(--nation-edge, #a98068); border-left: 4px solid var(--nation-accent, #d7bb8a); background: color-mix(in srgb, var(--nation-paper, #3b2325) 88%, var(--nation-ink, #f6ead3)); }
+.korund-ration-booklet .korund-booklet-page-body { flex: 1 1 10rem; min-width: 0; }
+.korund-ration-booklet .korund-booklet-page-body strong,
+.korund-ration-booklet .korund-booklet-page-body > span { display: block; }
+.korund-ration-booklet .korund-booklet-page button { min-height: 44px; min-width: 44px; max-width: 100%; margin-top: 8px; white-space: normal; text-align: start; }
+.korund-ration-booklet .korund-booklet-stamp { flex: 0 0 auto; display: grid; place-items: center; width: calc(52px * var(--text-scale, 1)); height: calc(52px * var(--text-scale, 1)); margin-inline-start: auto; border: 2px dashed var(--nation-accent, #d7bb8a); border-radius: 50%; color: var(--nation-accent, #d7bb8a); font-size: calc(11px * var(--text-scale, 1)); font-weight: 700; letter-spacing: .06em; line-height: 1; text-transform: uppercase; transform: rotate(-14deg); }
+
 /* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
 button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 
