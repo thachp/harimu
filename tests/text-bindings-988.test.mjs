@@ -28,7 +28,7 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 6);
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 11); // #1028 capture history stays inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 10); // #1039 phone map, #1040 two-tap, and #1041 world Age stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 11); // #1039 phone map, #1040 two-tap, #1041 world Age, and #1042 citizen game age stay inside the pack
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
@@ -97,4 +97,9 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP, 'false');
   assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP, 'true', 'the client build still inlines the packed two-tap flag');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP: 'false' }).NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP, 'false', 'a direct string wins');
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE, undefined, 'the citizen game age is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE, 'true', 'the client build still inlines the packed citizen age flag');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE: 'false' }).NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE, 'false', 'a direct string wins');
 });
