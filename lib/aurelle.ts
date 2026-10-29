@@ -202,15 +202,15 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
   ]);
  }
  else if(command.action==='aurelle-start-work') {
+ const plain='4 food contributed to charter estate supply';
+ const scaled=options.seasonFarming?await farmingShiftYield(db,plain,aurelleJob.foodOutput,now*1000,true):null;
  await db.batch([
  db.prepare(aurelleStartReceiptSql).bind(id,now,userId,id),db.prepare(aurelleStartSql).bind(iso,new Date((now+7200)*1000).toISOString(),id,userId),
  db.prepare(aurelleStartDebitSql).bind(iso,userId,id),
  db.prepare("UPDATE aurelle_receipts SET capacity_applied=1 WHERE id=? AND clerk_user_id=? AND action='aurelle-start-work' AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)").bind(id,userId,id,userId),
+ // #1033: stamp once, in this batch. A replay or a settled shift does not match the unstamped line.
+ ...(scaled?[db.prepare('UPDATE work_shifts SET output=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND output=?').bind(scaled.output,id,userId,plain)]:[]),
  ]);
- if(options.seasonFarming){
-  const scaled=await farmingShiftYield(db,'4 food contributed to charter estate supply',aurelleJob.foodOutput,now*1000,true);
-  if(scaled) await db.prepare('UPDATE work_shifts SET output=? WHERE id=? AND clerk_user_id=?').bind(scaled.output,id,userId).run();
- }
  }
  else if(command.action==='aurelle-claim-work'){
   // #957: always write a Crown issuance for the food-estate wage; #885 cap guard only while the flag is on (flag-off settle binds stay byte-identical).

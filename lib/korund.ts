@@ -174,16 +174,16 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
   const started=await db.prepare('SELECT id FROM work_shifts WHERE id=? AND clerk_user_id=?').bind(id,userId).first();
   return started?{status:200}:{status:409,error:'Finish your active shift or check your Work Capacity before starting the assigned job.'};
  }
+ const plain='4 food contributed to state ration supply';
+ const scaled=options.seasonFarming?await farmingShiftYield(db,plain,korundJob.foodOutput,now*1000,true):null;
  await db.batch([
  db.prepare(korundStartSql).bind(id,iso,new Date((now+7200)*1000).toISOString(),userId,userId,id,id,id,id),
  db.prepare(korundStartReceiptSql).bind(id,userId),db.prepare(korundDebitSql).bind(iso,userId,id),
  db.prepare('UPDATE korund_work_starts SET capacity_applied=1 WHERE id=? AND EXISTS(SELECT 1 FROM work_shifts WHERE id=? AND clerk_user_id=?)').bind(id,id,userId),
+ // #1033: stamp once, in this batch. A replay or a settled shift does not match the unstamped line.
+ ...(scaled?[db.prepare('UPDATE work_shifts SET output=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND output=?').bind(scaled.output,id,userId,plain)]:[]),
  ]);
  const started=await db.prepare('SELECT id FROM work_shifts WHERE id=? AND clerk_user_id=?').bind(id,userId).first();
- if(started&&options.seasonFarming){
-  const scaled=await farmingShiftYield(db,'4 food contributed to state ration supply',korundJob.foodOutput,now*1000,true);
-  if(scaled) await db.prepare('UPDATE work_shifts SET output=? WHERE id=? AND clerk_user_id=?').bind(scaled.output,id,userId).run();
- }
  return started?{status:200}:{status:409,error:'Finish your active shift or check your Work Capacity before starting the assigned job.'};
  }
  if(command.action==='korund-claim-work') {

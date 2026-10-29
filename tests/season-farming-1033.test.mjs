@@ -9,7 +9,8 @@ import { test } from 'node:test';
 import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { flagOn } from '../lib/flag-pack.mjs';
-import { isFarmingShift, seasonEffectLine, seasonFarmingEnabled, seasonYieldUnits, storedFoodUnits } from '../lib/season-yield.ts';
+import { gameSeasonAt, seasonLengthMs } from '../lib/game-season.ts';
+import { isFarmingShift, seasonEffectLine, seasonFarmingEnabled, seasonYieldPercents, seasonYieldUnits, storedFoodUnits } from '../lib/season-yield.ts';
 
 const require = createRequire(import.meta.url);
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
@@ -17,8 +18,9 @@ const SEASON = 7.5 * 86400;
 const setSeason = (r, index) => r.db.prepare("INSERT INTO world_clock (id,epoch_seconds) VALUES ('main',?) ON CONFLICT(id) DO UPDATE SET epoch_seconds=excluded.epoch_seconds").bind(Math.floor(r.now / 1000) - index * SEASON).run();
 
 test('each season multiplier floors, and 1 unit is the floor', () => {
+  assert.deepEqual(seasonYieldPercents, { spring: 100, summer: 110, autumn: 120, winter: 70 });
   assert.deepEqual(['spring', 'summer', 'autumn', 'winter'].map(s => seasonYieldUnits(10, s)), [10, 11, 12, 7]);
-  assert.equal(seasonYieldUnits(4, 'autumn'), 4, '4 × 1.2 floors to 4');
+  assert.equal(seasonYieldUnits(4, 'autumn'), Math.max(1, Math.floor(4 * 120 / 100)));
   assert.equal(seasonYieldUnits(4, 'winter'), 2);
   assert.equal(seasonYieldUnits(1, 'winter'), 1);
   assert.equal(seasonEffectLine('winter'), 'Winter: −30% harvest');
@@ -115,6 +117,48 @@ test('a direct false string wins over a true pack on the harvest route', async t
   const start = await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'harvest' });
   assert.equal(start.data.shifts[0].output, '480 food contributed to the savanna harvest');
   assert.equal(start.data.shifts[0].rewardQuantity, 4);
+});
+
+test('exact-second boundaries: last autumn second pays 4, first winter second pays 2; winter wraps to spring', () => {
+  const epoch = 1_700_000_000_000, sec = seasonLengthMs / 1000;
+  assert.equal(sec, 7.5 * 86400);
+  const pay = (offsetSec) => { const season = gameSeasonAt(epoch, epoch + offsetSec * 1000).season; return [season, seasonYieldUnits(4, season)]; };
+  assert.deepEqual(pay(3 * sec - 1), ['autumn', 4]);
+  assert.deepEqual(pay(3 * sec), ['winter', 2]);
+  assert.deepEqual(pay(4 * sec - 1), ['winter', 2]);
+  assert.deepEqual(pay(4 * sec), ['spring', 4]);
+  assert.equal(gameSeasonAt(epoch, epoch + 4 * sec * 1000).year, 2);
+});
+
+test('a start retry across a season boundary and a settled shift keep the stamped line', async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  r.setFixtureEnv('HARIMU_SEASON_FARMING_ENABLED', 'true');
+  const elapsed = (seconds) => r.db.prepare("INSERT INTO world_clock (id,epoch_seconds) VALUES ('main',?) ON CONFLICT(id) DO UPDATE SET epoch_seconds=excluded.epoch_seconds").bind(Math.floor(r.now / 1000) - seconds).run();
+  const stamp = `UPDATE work_shifts SET output=? WHERE id=? AND clerk_user_id=? AND claimed_at IS NULL AND output=?`;
+  const once = async (user, nation, plain) => {
+    await r.db.prepare('UPDATE citizens SET nation_id=?, capacity=24 WHERE clerk_user_id=?').bind(nation, user).run();
+    const id = randomUUID();
+    const action = nation === 'korund' ? 'korund-start-work' : 'aurelle-start-work';
+    await elapsed(3 * SEASON - 1);
+    assert.equal((await r.call('citizen', user, { action, requestId: id })).status, 200);
+    const first = (await r.db.prepare('SELECT output FROM work_shifts WHERE id=?').bind(id).first()).output;
+    assert.match(first, /Autumn: \+20% harvest/);
+    await elapsed(3 * SEASON);
+    assert.equal((await r.call('citizen', user, { action, requestId: id })).status, 200, 'replay');
+    assert.equal((await r.db.prepare('SELECT output FROM work_shifts WHERE id=?').bind(id).first()).output, first, 'a later season does not restamp');
+    assert.equal((await r.db.prepare(stamp).bind('rewritten', id, user, plain).run()).meta.changes, 0, 'the unstamped line is already gone');
+    r.setNow(r.now + 7200 * 1000);
+    const claim = nation === 'korund' ? 'korund-claim-work' : 'aurelle-claim-work';
+    assert.equal((await r.call('citizen', user, { action: claim, requestId: randomUUID(), shiftId: id })).status, 200);
+    await elapsed(4 * SEASON);
+    assert.equal((await r.call('citizen', user, { action, requestId: id })).status, 200, 'replay after claim');
+    assert.equal((await r.db.prepare(stamp).bind('rewritten', id, user, plain).run()).meta.changes, 0, 'a settled shift is not rewritten');
+    assert.equal((await r.db.prepare('SELECT output FROM work_shifts WHERE id=?').bind(id).first()).output, first);
+    const table = nation === 'korund' ? 'korund_settlements' : 'aurelle_settlements';
+    assert.equal(Number((await r.db.prepare(`SELECT food_output FROM ${table} WHERE shift_id=?`).bind(id).first()).food_output), 4);
+  };
+  await once('alice', 'korund', '4 food contributed to state ration supply');
+  await once('bob', 'aurelle', '4 food contributed to charter estate supply');
 });
 
 test('shift history names the season effect', async () => {
