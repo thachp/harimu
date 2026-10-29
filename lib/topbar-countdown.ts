@@ -31,8 +31,31 @@ export function compactCountdown(remainingMs: number): string | null {
   if (hours > 0) return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
   return minutes ? `${minutes}m` : `${seconds}s`;
 }
+/** Repaint period. Reduced motion never ticks faster than once a minute (no per-second flicker). */
+export function countdownIntervalMs(reducedMotion: boolean): number { return reducedMotion ? 60_000 : 1_000; }
+/** Remaining time floored to a minute. The last minute is one bucket, so a name built from it changes at most once a minute. */
+export function minuteBucketMs(remainingMs: number): number {
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 0;
+  return remainingMs < 60_000 ? 30_000 : Math.floor(remainingMs / 60_000) * 60_000;
+}
+/** Same shape as the chip, but the last minute stays "under 1m" instead of counting seconds. */
+export function minuteCountdown(remainingMs: number): string | null {
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) return null;
+  const seconds = Math.floor(remainingMs / 1000);
+  const days = Math.floor(seconds / day), hours = Math.floor(seconds % day / 3600), minutes = Math.floor(seconds % 3600 / 60);
+  if (days > 0) return hours ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+  return minutes > 0 ? `${minutes}m` : 'under 1m';
+}
 /** Game day at an epoch second, the same count as the world clock (day 1 at the epoch). */
 export const gameDayAt = (epochSeconds: number, atSeconds: number) => Math.floor(Math.max(0, atSeconds - epochSeconds) * 12 / day) + 1;
+/** Accessible name: "Election in 3d 4h", then real time and game time (docs §23.2). Stable for a full minute. */
+export function countdownAccessName(mark: CountdownMark, nowMs: number, epochSeconds?: number): string {
+  const bucket = minuteBucketMs(Math.max(0, mark.at * 1000 - nowMs));
+  const real = minuteCountdown(bucket) ?? '0m', game = minuteCountdown(bucket * 12) ?? '0m';
+  const gameDay = typeof epochSeconds === 'number' && Number.isFinite(epochSeconds) ? ` Game day ${gameDayAt(epochSeconds, mark.at)}.` : '';
+  return `${mark.label} in ${real}. ${real} real time; ${game} game time.${gameDay}`;
+}
 /** Tooltip: the event, then real time and game time (docs §23.2). Game day only when the world epoch is known. */
 export function countdownTip(mark: CountdownMark, nowMs: number, epochSeconds?: number): string {
   const remaining = Math.max(0, mark.at * 1000 - nowMs);
