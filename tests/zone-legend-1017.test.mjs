@@ -45,6 +45,17 @@ test('flag on: four zones with their §6.1 line, plus capital and outpost keys',
   assert.ok(html.startsWith('<ul class="legend legendExplained"'));
 });
 
+test('swatches and marker glyphs stay aria-hidden in both legends (color is not the only cue)', () => {
+  for (const explained of [true, false]) {
+    const html = render(explained);
+    const swatches = html.match(/<span style="background:[^"]*"[^>]*>/g) || [];
+    assert.equal(swatches.length, 4, `explained=${explained}`);
+    for (const s of swatches) assert.match(s, /aria-hidden="true"/, s);
+  }
+  const on = render(true);
+  assert.match(on, /<b aria-hidden="true">★<\/b>/); assert.match(on, /<b aria-hidden="true">▲<\/b>/);
+});
+
 test('flag off: the #66 legend, names only, no keys', () => {
   const html = render(false);
   assert.equal((html.match(/<li>/g) || []).length, 4);
