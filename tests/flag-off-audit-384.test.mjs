@@ -140,6 +140,7 @@ const flagOffPins = {
   HARIMU_WORLD_AGES_ENABLED: 'world-ages-1041.test.mjs', // #1041 flag off: no Age line
   HARIMU_FAITH_FESTIVAL_HUD_ENABLED: 'faith-festival-hud-1048.test.mjs', // #1048 flag off: the clock renders no faith-festival line
   HARIMU_SEASON_FARMING_ENABLED: 'season-farming-1033.test.mjs',
+  HARIMU_SHIFT_SOFT_CAP_ENABLED: 'shift-soft-cap-1047.test.mjs', // #1047 flag off: no count, no refusal, no extra query
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.

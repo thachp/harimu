@@ -40,7 +40,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','lib/election-calendars.ts','lib/kindle-certification-copy.ts','lib/kindle-certification-rules.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
     'lib/mvp-job-types.ts', 'lib/game-season.ts', 'lib/season-yield.ts', 'app/api/jobs/types/route.ts', 'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',
-    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/government.ts',
+    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-soft-cap.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/government.ts',
     'lib/korund-plan-stats.ts', 'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/policy-ledger.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts','lib/chat-shadow-mute.ts', 'lib/diplomatic-hall.ts', 'lib/founding-period.ts', 'lib/founding-period-copy.ts', 'lib/aurelle-succession.ts', 'lib/aurelle-succession-rules.ts', 'app/api/aurelle-succession/route.ts', 'lib/diplomatic-hall-copy.ts', 'app/api/diplomatic-hall/route.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/religious-harmony.ts','lib/holy-sites.ts','app/api/faith/holy-sites/route.ts','lib/world-simulation.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',

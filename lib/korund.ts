@@ -10,6 +10,7 @@ import {planMedals,korundMedalOwnFood} from './korund-medals-rules'; // #737
 import {korundPlanStanding,type KorundPlanStanding} from './korund-standing-rules'; // #994
 import {korundRationCut,korundRationRecoveryCities,applyRationCut,shortfallPercent,type KorundRationCut,korundShortfall,type KorundShortfall,korundWeeklyQuotaFood,korundWeekSeconds,readCouponsAndQuota,korundCouponGoods,korundCouponRedeemSql,type KorundCoupon,type KorundQuota} from './korund-coupons';
 import { farmingShiftYield, leadingFoodUnits, seasonAt, storedFoodUnits } from './season-yield.ts'; // #1033
+import { refuseNewShift } from './shift-soft-cap.ts'; // #1047
 export const korundJob = {id:'korund-food-production',name:'State food-production brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4} as const;
 export const gameWeekSeconds = korundWeekSeconds;
 export const korundSchemas = [
@@ -132,7 +133,7 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,...(isKorundPost(s.work_order_id)?{}:{rewardItem:'state food',rewardQuantity:leadingFoodUnits(s.output)}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }
-export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;seasonFarming?:boolean}={}) {
+export async function executeKorund(db:GameDatabase,userId:string,command:KorundCommand,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;seasonFarming?:boolean;shiftSoftCap?:boolean}={}) {
  const nation=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>();
  if(command.action==='korund-gray-post-offer'||command.action==='korund-gray-accept-offer'){
   // #43: the gray market ships off; with the flag off these actions are not found and change nothing.
@@ -163,6 +164,7 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
  if(conflicting) return {status:409,error:'Request identifier already used for another action.'};
  const existing=await db.prepare('SELECT clerk_user_id,work_order_id FROM work_shifts WHERE id=?').bind(id).first<{clerk_user_id:string;work_order_id:string}>();
  if(existing) return existing.clerk_user_id===userId&&(existing.work_order_id===korundJob.id||isKorundPost(existing.work_order_id))?{status:200,replayed:true}:{status:409,error:'Work identifier already used.'};
+ if(options.shiftSoftCap){const blocked=await refuseNewShift(db,userId,now);if(blocked)return{status:409,error:blocked.error};}
  // #886 (b), flag on only: the citizen's latest Labor Bureau post, when it is a playable post, is the shift they work; otherwise the brigade below, unchanged.
  const post=options.mvpJobTypes?(await db.prepare(latestPostSql).bind(userId).first<{job_id:string}>())?.job_id:undefined;
  if(isKorundPost(post)){
