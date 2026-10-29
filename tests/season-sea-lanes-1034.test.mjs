@@ -11,13 +11,10 @@ const jsonc = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\s*\/\/.*$
 const FLAG = 'HARIMU_SEASON_SEA_LANES_ENABLED';
 
 test('multiplier: winter port freight ×0.8 rounded down, floor 1; inland and other seasons unchanged', () => {
-  for (const season of seasonOrder) {
-    for (const q of [1, 2, 5, 10, 211]) {
-      assert.equal(seaFreightQuantity(q, season, false), q, `inland ${season} ${q}`);
-      assert.equal(seaFreightQuantity(q, season, true), season === 'winter' ? Math.max(1, Math.floor(q * 0.8)) : q, `port ${season} ${q}`);
-    }
-  }
-  assert.deepEqual([1, 2, 5, 10, 211].map(q => seaFreightQuantity(q, 'winter', true)), [1, 1, 4, 8, 168]);
+  const qs = [1, 2, 3, 4, 5, 9, 10, 15, 211];
+  assert.deepEqual(qs.map(q => seaFreightQuantity(q, 'winter', true)), [1, 1, 2, 3, 4, 7, 8, 12, 168], 'winter port: floor(q*80/100), min 1');
+  for (const season of ['spring', 'summer', 'autumn']) assert.deepEqual(qs.map(q => seaFreightQuantity(q, season, true)), [1, 2, 3, 4, 5, 9, 10, 15, 211], `port ${season}`);
+  for (const season of seasonOrder) assert.deepEqual(qs.map(q => seaFreightQuantity(q, season, false)), [1, 2, 3, 4, 5, 9, 10, 15, 211], `inland ${season}`);
   assert.equal(seaFreightQuantity(2, null, true), 2);
   assert.equal(seaLanesStormy('winter', true), true);
   assert.equal(seaLanesStormy('winter', false), false);
@@ -65,4 +62,26 @@ test('route: winter port freight pays less only with the flag on; inland, summer
   assert.deepEqual(await at('bob', 'lanu-terraces', 'winter', 'true'), { quantity: 2, note: undefined }, 'inland');
   assert.deepEqual(await at('alice', 'oalin-harbor', 'summer', 'true'), { quantity: 2, note: undefined }, 'summer');
   assert.deepEqual(await at('bob', 'oalin-harbor', 'winter', 'false'), { quantity: 2, note: undefined }, 'flag off');
+});
+
+test('route: exact-second payout at the autumn→winter and winter→spring boundaries (port, flag on)', async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  r.setFixtureEnv(FLAG, 'true');
+  await r.db.prepare("UPDATE work_orders SET nation_id='confluence' WHERE id='freight'").run();
+  await r.db.prepare("UPDATE citizens SET nation_id='confluence', capacity=100 WHERE clerk_user_id='alice'").run();
+  assert.equal((await r.call('city', 'alice', { action: 'travel', cityId: 'oalin-harbor' })).data.currentCityId, 'oalin-harbor');
+  const nowSec = Math.floor(r.now / 1000), L = seasonLengthMs / 1000; // 648000 s
+  const payAt = async elapsedSec => { // world clock started `elapsedSec` seconds before now
+    await r.db.prepare("INSERT INTO world_clock (id,epoch_seconds) VALUES ('main',?) ON CONFLICT(id) DO UPDATE SET epoch_seconds=excluded.epoch_seconds").bind(nowSec - elapsedSec).run();
+    await r.db.prepare('UPDATE work_shifts SET claimed_at=? WHERE clerk_user_id=? AND claimed_at IS NULL').bind(new Date(r.now).toISOString(), 'alice').run();
+    await r.db.prepare("UPDATE citizens SET capacity=100 WHERE clerk_user_id='alice'").run();
+    const started = await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'freight' });
+    assert.equal(started.status, 200, JSON.stringify(started.data));
+    return started.data.shifts.find(s => !s.claimedAt).rewardQuantity;
+  };
+  assert.equal(await payAt(3 * L - 1), 2, 'last autumn second');
+  assert.equal(await payAt(3 * L), 1, 'first winter second');
+  assert.equal(await payAt(4 * L - 1), 1, 'last winter second');
+  assert.equal(await payAt(4 * L), 2, 'first spring second (wrap)');
+  assert.equal(await payAt(7 * L), 1, 'next year winter');
 });
