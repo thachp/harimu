@@ -1,3 +1,5 @@
+import { flagOn } from './flag-pack.mjs';
+
 /** #994 Korund Standing from Plan medals (docs 12.11 step 3: over-fulfilment earns medals and Standing).
  *  Derived on read from the #737 medal total. No table, no migration, no write of citizens.standing.
  *  [ASSUMPTION] the docs name Exemplary Worker and do not give medal counts. One pinned table:
@@ -32,6 +34,5 @@ export const korundStandingCopy = {
   raised: (label: string) => `Last week's Plan medal raised your Standing to ${label}.`,
 } as const;
 
-/** Both flags, exactly "true". Standing also needs the #737 medals path. */
-export const korundStandingEnabled = (env: { HARIMU_KORUND_MEDALS_ENABLED?: string; HARIMU_KORUND_STANDING_ENABLED?: string } | null | undefined) =>
-  env?.HARIMU_KORUND_MEDALS_ENABLED === 'true' && env?.HARIMU_KORUND_STANDING_ENABLED === 'true';
+/** Both flags, exactly "true", including when they live in HARIMU_GRAY_PACK (#988). Standing also needs the #737 medals path. A direct string still wins. */
+export const korundStandingEnabled = (env: unknown) => flagOn(env, 'HARIMU_KORUND_MEDALS_ENABLED') && flagOn(env, 'HARIMU_KORUND_STANDING_ENABLED');

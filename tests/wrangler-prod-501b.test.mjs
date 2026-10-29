@@ -8,6 +8,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { assertPostgresApplicationRole } from '../lib/storage-selection.ts';
 import { bootstrapEmptyPostgres } from '../scripts/postgres-migrations.mjs';
 import { hyperdriveIdProblem, productionWorker, readProductionConfigRaw, runtimeRoleGrantSql } from '../scripts/production-config.mjs';
+import { expandFlagPacks, flagPackProblems, isFlagPackName } from '../lib/flag-pack.mjs';
 
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = readProductionConfigRaw();
@@ -22,7 +23,7 @@ const productionOnlyVars = { HARIMU_PRODUCTION_STORAGE: 'true' };
 // Build-time UI flags (baked into the client bundle at build): on in preview, always "false" in production. Exactly these four.
 const previewOnUiFlags = ['NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE', 'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_UI_V2_MOBILE', 'NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD', 'NEXT_PUBLIC_HARIMU_MOD_CONSOLE', 'NEXT_PUBLIC_HARIMU_NATION_SKIN', 'NEXT_PUBLIC_HARIMU_WIRE_BYLINES', 'NEXT_PUBLIC_HARIMU_RARE_MARKER', 'NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN'];
 const previewOnFlags = [
-  'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_CITY_TIER_GROWTH_ENABLED', 'HARIMU_CITY_TIER_UNLOCKS_ENABLED', 'HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED', 'HARIMU_REALTIME_PRESENCE', // preview-flags-on (politics, founding, presence, #979 unlocks, #984 festival note)
+  'HARIMU_KINDLE_ASSEMBLY_ENABLED', 'HARIMU_PRIMARIES_ENABLED', 'HARIMU_CANVASSING_ENABLED', 'HARIMU_TOWN_HALLS_ENABLED', 'HARIMU_DEBATE_ENABLED', 'HARIMU_CITY_FOUNDING_ENABLED', 'HARIMU_CITY_TIER_GROWTH_ENABLED', 'HARIMU_CITY_TIER_UNLOCKS_ENABLED', 'HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED', 'HARIMU_CITY_SPECIALTY_NOTE_ENABLED', 'HARIMU_REALTIME_PRESENCE', // preview-flags-on (politics, founding, presence, #979 unlocks, #984 festival note, #996 specialty)
   'HARIMU_TEST_FAUCET_ENABLED',
   'HARIMU_LABOR_BUREAU_ENABLED',
   'HARIMU_GRAY_MARKET_ENABLED',
@@ -92,6 +93,7 @@ const previewOnFlags = [
   'HARIMU_KILL_SWITCH_EVENTS_ENABLED', // #764
   'HARIMU_CLERK_RISK_SIGNALS_ENABLED', // #943
   'HARIMU_KINDLE_BUDGET_VIEW_ENABLED', // #789
+  'HARIMU_KINDLE_POLICY_LEDGER_ENABLED', // #985
   'HARIMU_DIPLOMACY_ENABLED',
   'HARIMU_EMBARGO_ENABLED',
   'HARIMU_TARGETED_SANCTIONS_ENABLED',
@@ -145,7 +147,9 @@ test('vars: same names as preview except the listed differences; every flag fals
   assert.deepEqual(prodNames.filter(n => !previewNames.includes(n)).sort(), Object.keys(productionOnlyVars).sort());
   assert.deepEqual(previewNames.filter(n => !prodNames.includes(n)).sort(), [...previewOnlyVars].sort());
   for (const name of ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_QA_TEST_CITIZENS', 'HARIMU_QA_TEST_CITIZEN_IDS', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED', 'HARIMU_AI_PRICE_REVIEWED_UNTIL', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED']) assert.equal(name in prod.vars, false, name);
+  const flat = config => expandFlagPacks(config.vars);
   for (const [name, value] of Object.entries(prod.vars)) {
+    if (isFlagPackName(name)) { assert.equal(flagPackProblems(name, value, { allFalse: true }), null, name); assert.equal(flagPackProblems(name, preview.vars[name], { allTrue: true }), null, `${name} preview`); continue; }
     if (name in differingVars) assert.equal(value, differingVars[name][1], name);
     else if (name in productionOnlyVars) assert.equal(value, productionOnlyVars[name], name);
     else assert.equal(value, preview.vars[name], `${name} must equal preview unless listed in differingVars`);
@@ -153,23 +157,24 @@ test('vars: same names as preview except the listed differences; every flag fals
     assert.ok(!/SECRET|TOKEN|PASSWORD|ADMIN_URL|PRIVATE/.test(name), `${name} looks like a secret name`);
     assert.ok(!/^(sk_|postgres(ql)?:\/\/)/.test(value), `${name} looks like a secret value`);
   }
-  const flags = config => Object.keys(config.vars).filter(n => /_ENABLED$/.test(n)).sort();
+  const flags = config => Object.keys(flat(config)).filter(n => /_ENABLED$/.test(n)).sort();
   assert.deepEqual(flags(prod), flags(preview), 'the *_ENABLED flag set equals preview, so a new flag cannot be forgotten');
-  assert.ok(flags(prod).length > 40); for (const flag of flags(prod)) assert.equal(prod.vars[flag], 'false', flag);
+  assert.ok(flags(prod).length > 40); for (const flag of flags(prod)) assert.equal(flat(prod)[flag], 'false', flag);
   assert.equal(prod.vars.HARIMU_STORAGE_MAINTENANCE, 'false');
   assert.strictEqual(prod.vars.HARIMU_PRODUCTION_STORAGE, 'true', 'exactly "true": TRUE, 1 or "" silently take the old (non-production) path in selectStorageBackend');
 });
 
 test('preview flags: exactly the previewOnFlags are "true", the deliberate exceptions stay "false", and production is "false" for every one', () => {
-  const flags = config => Object.keys(config.vars).filter(n => /_ENABLED$/.test(n) || previewOnUiFlags.includes(n) || previewOnFlags.includes(n));
-  const previewTrue = flags(preview).filter(n => preview.vars[n] === 'true').sort();
+  const flat = config => expandFlagPacks(config.vars);
+  const flags = config => Object.keys(flat(config)).filter(n => /_ENABLED$/.test(n) || previewOnUiFlags.includes(n) || previewOnFlags.includes(n));
+  const previewTrue = flags(preview).filter(n => flat(preview)[n] === 'true').sort();
   assert.deepEqual(previewTrue, [...previewOnFlags, 'HARIMU_ACCOUNT_ELECTION_POC_ENABLED'].sort(), 'a new "true" preview flag must be added to previewOnFlags on purpose');
-  for (const name of previewOffFlags) assert.equal(preview.vars[name], 'false', `${name} must stay "false" in preview`);
-  for (const name of [...previewOnFlags, ...previewOffFlags]) assert.equal(prod.vars[name], 'false', `${name} must be "false" in production`);
+  for (const name of previewOffFlags) assert.equal(flat(preview)[name], 'false', `${name} must stay "false" in preview`);
+  for (const name of [...previewOnFlags, ...previewOffFlags]) assert.equal(flat(prod)[name], 'false', `${name} must be "false" in production`);
   assert.equal(preview.vars.HARIMU_QA_TEST_CITIZENS, 'false'); assert.equal(preview.vars.HARIMU_QA_TEST_CITIZEN_IDS, undefined);
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW, 'true', 'the test faucet needs the preview marker too');
-  for (const name of previewOnFlags) assert.ok(name in preview.vars, name);
-  for (const name of previewOnUiFlags) { assert.equal(preview.vars[name], 'true', `${name} preview`); assert.equal(prod.vars[name], 'false', `${name} production`); } // the production allowlist (nonFalse) never lists them
+  for (const name of previewOnFlags) assert.ok(name in flat(preview), name);
+  for (const name of previewOnUiFlags) { assert.equal(flat(preview)[name], 'true', `${name} preview`); assert.equal(flat(prod)[name], 'false', `${name} production`); } // the production allowlist (nonFalse) never lists them
 });
 
 test('flag comments copied into wrangler.prod.jsonc equal the preview comments (they cannot drift unnoticed)', () => {

@@ -41,7 +41,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
     'lib/mvp-job-types.ts', 'app/api/jobs/types/route.ts', 'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',
     'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/government.ts',
-    'lib/korund-plan-stats.ts', 'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts','lib/chat-shadow-mute.ts', 'lib/diplomatic-hall.ts', 'lib/founding-period.ts', 'lib/founding-period-copy.ts', 'lib/aurelle-succession.ts', 'lib/aurelle-succession-rules.ts', 'app/api/aurelle-succession/route.ts', 'lib/diplomatic-hall-copy.ts', 'app/api/diplomatic-hall/route.ts', 'lib/command-request.ts',
+    'lib/korund-plan-stats.ts', 'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/policy-ledger.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts','lib/chat-shadow-mute.ts', 'lib/diplomatic-hall.ts', 'lib/founding-period.ts', 'lib/founding-period-copy.ts', 'lib/aurelle-succession.ts', 'lib/aurelle-succession-rules.ts', 'app/api/aurelle-succession/route.ts', 'lib/diplomatic-hall-copy.ts', 'app/api/diplomatic-hall/route.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/religious-harmony.ts','lib/holy-sites.ts','app/api/faith/holy-sites/route.ts','lib/world-simulation.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',
     'lib/qa-tools.ts','lib/nation-openings.ts','lib/onboarding-preferences.ts','lib/first-week.ts','lib/first-week-server.ts','lib/notable-profiles.ts','lib/notable-roster.ts','lib/notable-choice.ts','lib/notables.ts','app/api/notables/route.ts','lib/korund-posts.ts','lib/korund.ts','lib/korund-queue.ts','lib/korund-coupons.ts','lib/ai-news.ts','lib/ai-budget.ts','lib/ai-failover.ts',
@@ -111,11 +111,13 @@ export async function readVerification(userId) {
     let source = await readFile(join(root, sourcePath), 'utf8');
     source = source.replace(/from (['"])([^'"]+)\1/g, (match, quote, specifier) => {
       let target;
+      const bare = specifier.replace(/\.tsx?$/, '');
       if (specifier === 'cloudflare:workers') target = envPath;
+      else if (specifier.endsWith('.mjs')) target = specifier.startsWith('@/') ? resolve(root, specifier.slice(2)) : resolve(root, dirname(sourcePath), specifier);
       else if (specifier === '@/lib/ballot-privacy'||specifier === './ballot-privacy') target=privacyPath;
       else if (specifier === '@/lib/verification') target = verificationPath;
-      else if (specifier.startsWith('@/')) target = join(directory, `${specifier.slice(2)}.mjs`);
-      else if (specifier.startsWith('.')) target = resolve(directory, dirname(sourcePath), `${specifier}.mjs`);
+      else if (specifier.startsWith('@/')) target = join(directory, `${bare.slice(2)}.mjs`);
+      else if (specifier.startsWith('.')) target = resolve(directory, dirname(sourcePath), `${bare}.mjs`);
       else throw new Error(`Unexpected external runtime dependency: ${specifier}`);
       return `from ${JSON.stringify(pathToFileURL(target).href)}`;
     });

@@ -8,6 +8,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { componentModule } from './helpers/component-module.mjs';
+import { expandFlagPacks } from '../lib/flag-pack.mjs';
 import {
   korundStandingWorker, korundStandingGood, korundStandingExemplary, korundStandingGoodAt, korundStandingExemplaryAt,
   korundStandingLabel, korundPlanStanding, korundStandingCopy, korundStandingEnabled,
@@ -61,9 +62,9 @@ test('copy [ASSUMPTION]: exact notice, length caps, panel uses the copy module o
 });
 
 test('preview flag is "true" and production is "false"', async () => {
-  const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
-  assert.equal(strip(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8')).vars.HARIMU_KORUND_STANDING_ENABLED, 'true');
-  assert.equal(strip(await readFile(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8')).vars.HARIMU_KORUND_STANDING_ENABLED, 'false');
+  const flat = async file => expandFlagPacks(JSON.parse((await readFile(new URL(file, import.meta.url), 'utf8')).replace(/^\s*\/\/.*$/gm, '')).vars);
+  assert.equal((await flat('../wrangler.jsonc')).HARIMU_KORUND_STANDING_ENABLED, 'true');
+  assert.equal((await flat('../wrangler.prod.jsonc')).HARIMU_KORUND_STANDING_ENABLED, 'false');
 });
 
 async function setup(t, { medals = true, standing = true } = {}) {

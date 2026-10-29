@@ -6,6 +6,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { resolveLocalModule } from './helpers/component-module.mjs';
 import { confidenceAfter, crownConfig, debasedBp, debasedParity, debasementBpOk, gameYear, monarchPlan, officialTesseraMilli, rumoredPremiumBp } from '../lib/crown-debasement-rules.ts';
 
 const YEAR = crownConfig.gameYearSeconds;
@@ -167,8 +168,8 @@ test('the Aurelle panel shows the Royal Mint strip only when the plan carries it
       const specifier = match[2]; let url;
       if (specifier.endsWith('.css')) url = 'data:text/javascript,export default {}';
       else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
-        const base = specifier.startsWith('@/') ? resolve(root, specifier.slice(2)) : resolve(dirname(path), specifier); let child;
-        for (const extension of ['.ts', '.tsx']) { try { await readFile(base + extension); child = base + extension; break; } catch { /* try next */ } }
+        const base = specifier.startsWith('@/') ? resolve(root, specifier.slice(2)) : resolve(dirname(path), specifier);
+        const child = await resolveLocalModule(base);
         assert.ok(child, specifier); url = await componentModule(child);
       } else url = import.meta.resolve(specifier);
       output = output.replace(match[0], `from ${JSON.stringify(url)}`);

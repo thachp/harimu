@@ -10,6 +10,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { resolveLocalModule } from './helpers/component-module.mjs';
 import { nationPlanPanelNation } from '../lib/nation-panels.ts';
 import { firstWeekArcs } from '../lib/first-week.ts';
 
@@ -23,8 +24,7 @@ async function componentModule(path) {
     if (specifier.endsWith('.css')) url='data:text/javascript,export default {}';
     else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
       const base=specifier.startsWith('@/')?resolve(root,specifier.slice(2)):resolve(dirname(path),specifier);
-      let child;
-      for (const extension of ['.ts','.tsx']) {try{await readFile(base+extension);child=base+extension;break;}catch{/* Try the other source extension. */}}
+      const child=await resolveLocalModule(base);
       assert.ok(child,`Resolve actual component dependency ${specifier}`);
       url=await componentModule(child);
     } else url=import.meta.resolve(specifier);

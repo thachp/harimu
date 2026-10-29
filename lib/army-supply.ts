@@ -1,8 +1,9 @@
 /** #738 slice 5: supply lines and depots (docs §15.3 Logistics: "Units need supply lines from depots; cut supply lines reduce strength each game day").
  *  Derived on read from the slice-4 march (no table, no writes). Behind HARIMU_ARMY_SUPPLY_ENABLED (needs HARIMU_ARMY_MAP_ENABLED and its flags). */
 import { armyMapEnabled, moveSeconds, terrainMap, unitMarch, type ArmyPosition, type ArmyWar } from './army-map';
+import { flagOn } from './flag-pack.mjs';
 
-export const armySupplyEnabled = (env: unknown) => armyMapEnabled(env) && (env as { HARIMU_ARMY_SUPPLY_ENABLED?: string } | null)?.HARIMU_ARMY_SUPPLY_ENABLED === 'true';
+export const armySupplyEnabled = (env: unknown) => armyMapEnabled(env) && flagOn(env, 'HARIMU_ARMY_SUPPLY_ENABLED');
 /** [ASSUMPTION] Tuning values (the docs give none). Each nation's depot is its capital; a supply line reaches this many squares (Chebyshev) from it. */
 export const ARMY_SUPPLY_RANGE_SQUARES = 5;
 /** [ASSUMPTION] While the line is cut a unit loses this share of its strength per full game day, up to the cap. */

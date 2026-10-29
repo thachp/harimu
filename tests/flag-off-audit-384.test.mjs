@@ -10,10 +10,11 @@ import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { cronJobFlags, cronJobsOn } from '../lib/cron-gates.ts';
 import { selectStorageBackend } from '../lib/storage-selection.ts';
+import { expandFlagPacks } from '../lib/flag-pack.mjs';
 
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const configs = { 'wrangler.jsonc': strip(readFileSync('wrangler.jsonc', 'utf8')), 'wrangler.prod.jsonc': strip(readFileSync('wrangler.prod.jsonc', 'utf8')) };
-const declared = config => Object.keys(config.vars).filter(name => /^HARIMU_[A-Z0-9_]+_ENABLED$/.test(name)).sort();
+const declared = config => Object.keys(expandFlagPacks(config.vars)).filter(name => /^HARIMU_[A-Z0-9_]+_ENABLED$/.test(name)).sort();
 
 // Flag -> the test file that pins its flag-off path (no writes / inert). Register every new flag here.
 const flagOffPins = {
@@ -26,6 +27,7 @@ const flagOffPins = {
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
+  HARIMU_CITY_SPECIALTY_NOTE_ENABLED: 'city-specialty-note-996.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
@@ -122,6 +124,7 @@ const flagOffPins = {
   HARIMU_KILL_SWITCH_EVENTS_ENABLED: 'kill-switch-events-764.test.mjs',
   HARIMU_CLERK_RISK_SIGNALS_ENABLED: 'clerk-risk-signals-943.test.mjs',
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
+  HARIMU_KINDLE_POLICY_LEDGER_ENABLED: 'policy-ledger-985.test.mjs',
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.

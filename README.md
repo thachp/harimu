@@ -307,7 +307,7 @@ Postgres (Hyperdrive) never bootstraps schema, so numbered `db/postgres/NNNN_*.s
 
 Flow: **dev → release → main**. PRs merge into `dev`, which does **not** deploy. PM cuts `release` from `dev` daily; hotfixes land on `release` and are merged back into `dev`.
 
-`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** on a push to `release` in this repository (or a manual `workflow_dispatch` on `release`). It never runs for `dev`, `main` or PRs. Each run checks out that commit, runs `npm run check`, applies pending Postgres migrations (any failure means no deploy), then runs `npm run deploy` (pinned wrangler, `--keep-vars`, #119 guard). Because it is triggered by the push itself rather than by a CI `workflow_run`, a cancelled or superseded CI run cannot drop the newest release deploy. Runs queue (never cancelled mid-migration) and only the newest pending one runs next. The commit SHA and Cloudflare version ID go to the job summary. `workflow_dispatch` defaults to a full deploy; set `migrate_only` to only migrate. Production stays manual.
+`.github/workflows/deploy-preview.yml` deploys **harimu-preview only** on a push to `release` in this repository (or a manual `workflow_dispatch` on `release`). It never runs for `dev`, `main` or PRs. Each run checks out that commit, runs `npm run check`, applies pending Postgres migrations (any failure means no deploy), then runs `npm run deploy` (pinned wrangler, live dashboard QA vars copied back, no `--keep-vars`, #119 guard). Because it is triggered by the push itself rather than by a CI `workflow_run`, a cancelled or superseded CI run cannot drop the newest release deploy. Runs queue (never cancelled mid-migration) and only the newest pending one runs next. The commit SHA and Cloudflare version ID go to the job summary. `workflow_dispatch` defaults to a full deploy; set `migrate_only` to only migrate. Production stays manual.
 
 Repository secrets (environment `preview`):
 
@@ -324,9 +324,9 @@ They are `"unknown"`/`null` if no SHA is available.
 
 **Korund (or any playable nation) test citizen on preview:**
 1. Sign in on preview with the QA account and enroll in any nation.
-2. PM sets two Worker variables on **harimu-preview only** (Cloudflare dashboard; deploys keep them: `--keep-vars` plus the deploy script leaving both names out of the built deploy config, #394):
+2. PM sets two Worker variables on **harimu-preview only** (Cloudflare dashboard). A release deploy reads the live settings and copies only these names back (#394, #988); it does not use `--keep-vars`, so other removed plain-text vars are not kept:
    `HARIMU_QA_TEST_CITIZENS=true` and `HARIMU_QA_TEST_CITIZEN_IDS=<comma-separated Clerk user ids of QA accounts>`.
-   These are account ids, not credentials. Never commit them. `HARIMU_QA_TEST_CITIZENS` stays `"false"` in `wrangler.jsonc` as the default (local runs, tests, a new Worker), but `npm run deploy` removes both names from the built config, so a release deploy no longer resets them. Consequence: a value removed in the dashboard is not restored by a deploy; an unset var means off.
+   These are account ids, not credentials. Never commit them. `HARIMU_QA_TEST_CITIZENS` stays `"false"` in `wrangler.jsonc` as the default (local runs, tests, a new Worker). The deploy does not upload that default over the live value. Consequence: a value removed in the dashboard is not restored by a deploy; an unset var means off. The same copy-back covers `HARIMU_SQUARE_PURCHASE_ENABLED` and `HARIMU_TESSERA_EXCHANGE_ENABLED`.
 3. From the signed-in preview tab:
    `fetch('/api/citizen',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'qa-test-nation',nationId:'korund'})})`.
    This moves only that citizen to the chosen nation (the city resets to its capital) and does not spend the free citizenship change.

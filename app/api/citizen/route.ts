@@ -4,6 +4,7 @@ import { publicSuccession, readSuccession } from '@/lib/aurelle-succession'; // 
 import {accountElectionEnabled,accountElectionDatabase,accountIdFor} from '@/lib/preview-election';
 import { wearinessEnabled, wearinessLossesEnabled, type WearinessBindings } from '@/lib/war-weariness'; // #423
 import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
+import { withPolicyLedger } from '@/lib/policy-ledger'; // #985
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { recordEnrollHome, resolveEnrollHomeCity } from '@/lib/city-location'; // #965
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
@@ -12,6 +13,7 @@ import { readCrownMint } from '@/lib/crown-debasement';
 import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from '@/lib/korund-coupons'; // #967, #983
 import { korundStandingEnabled } from '@/lib/korund-standing-rules'; // #994
+import { flagOn } from '@/lib/flag-pack.mjs'; // #988
 import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
@@ -65,31 +67,31 @@ async function nationWorkPlanPart(database: Awaited<ReturnType<typeof getDatabas
 }
 const laborBureauOn = () => (env as unknown as { HARIMU_LABOR_BUREAU_ENABLED?: string }).HARIMU_LABOR_BUREAU_ENABLED === 'true';
 // #43: the Korund gray market ships off (HARIMU_GRAY_MARKET_ENABLED).
-const grayMarketOn = () => (env as unknown as { HARIMU_GRAY_MARKET_ENABLED?: string }).HARIMU_GRAY_MARKET_ENABLED === 'true';
+const grayMarketOn = () => flagOn(env, 'HARIMU_GRAY_MARKET_ENABLED');
 // #968: a #776 ration cut adds one shortage line on the rumored street rate (HARIMU_GRAY_RATION_RISE_ENABLED). Off: no line. Read model only.
-const grayRationRiseOn = () => (env as unknown as { HARIMU_GRAY_RATION_RISE_ENABLED?: string }).HARIMU_GRAY_RATION_RISE_ENABLED === 'true';
+const grayRationRiseOn = () => flagOn(env, 'HARIMU_GRAY_RATION_RISE_ENABLED');
 // #490: the generic per-nation wage ledger and work commands ship off (HARIMU_NATION_WORK_ENABLED).
 const nationWorkOptions = () => ({ enabled: (env as unknown as { HARIMU_NATION_WORK_ENABLED?: string }).HARIMU_NATION_WORK_ENABLED === 'true', bindings: env as never });
 // #736: per-citizen daily gray-market volume cap (HARIMU_GRAY_DAILY_CAP_ENABLED); off = today's behaviour.
-const grayDailyCapOn = () => (env as unknown as { HARIMU_GRAY_DAILY_CAP_ENABLED?: string }).HARIMU_GRAY_DAILY_CAP_ENABLED === 'true';
+const grayDailyCapOn = () => flagOn(env, 'HARIMU_GRAY_DAILY_CAP_ENABLED');
 // #749: completed gray-market trades add private Suspicion (HARIMU_GRAY_SUSPICION_ENABLED); off = no read, view unchanged.
-const graySuspicionOn = () => (env as unknown as { HARIMU_GRAY_SUSPICION_ENABLED?: string }).HARIMU_GRAY_SUSPICION_ENABLED === 'true';
+const graySuspicionOn = () => flagOn(env, 'HARIMU_GRAY_SUSPICION_ENABLED');
 // #737: Plan medals for weekly quota over-fulfilment (HARIMU_KORUND_MEDALS_ENABLED); off = no medal read, panel unchanged.
-const korundMedalsOn = () => (env as unknown as { HARIMU_KORUND_MEDALS_ENABLED?: string }).HARIMU_KORUND_MEDALS_ENABLED === 'true';
+const korundMedalsOn = () => flagOn(env, 'HARIMU_KORUND_MEDALS_ENABLED');
 // #994: displayed Standing from the #737 medal total (HARIMU_KORUND_STANDING_ENABLED). Also needs the medals flag. Off: no planStanding. citizens.standing is not written.
-const korundStandingOn = () => korundStandingEnabled(env as unknown as { HARIMU_KORUND_MEDALS_ENABLED?: string; HARIMU_KORUND_STANDING_ENABLED?: string });
+const korundStandingOn = () => korundStandingEnabled(env);
 // #759: weekly quota shortfall inspection notice and zero-bonus ledger line (HARIMU_KORUND_SHORTFALL_ENABLED); off = no shortfall read, panel unchanged.
-const korundShortfallOn = () => (env as unknown as { HARIMU_KORUND_SHORTFALL_ENABLED?: string }).HARIMU_KORUND_SHORTFALL_ENABLED === 'true';
+const korundShortfallOn = () => flagOn(env, 'HARIMU_KORUND_SHORTFALL_ENABLED');
 // #758: rumored LN street rate in the Korund wallet (HARIMU_WALLET_STREET_RATE_ENABLED); off = no read, wallet unchanged.
-const walletStreetRateOn = () => (env as unknown as { HARIMU_WALLET_STREET_RATE_ENABLED?: string }).HARIMU_WALLET_STREET_RATE_ENABLED === 'true';
+const walletStreetRateOn = () => flagOn(env, 'HARIMU_WALLET_STREET_RATE_ENABLED');
 // #776: a closed-week plan shortfall withdraws ration coupons from this week's book (HARIMU_KORUND_RATION_CUT_ENABLED); off = coupons unchanged.
-const korundRationCutOn = () => (env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string }).HARIMU_KORUND_RATION_CUT_ENABLED === 'true';
+const korundRationCutOn = () => flagOn(env, 'HARIMU_KORUND_RATION_CUT_ENABLED');
 // #967: a #776 ration cut also lowers Korund Stability. Needs the cut flag too; off leaves the score and the notice unchanged.
 const korundRationStabilityOn = () => korundRationStabilityEnabled(env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string; HARIMU_KORUND_RATION_STABILITY_ENABLED?: string });
 // #983: one Stability step back up the met week after that cut. Needs the #967 flags too; off leaves the score, the notice and the read unchanged.
 const korundStabilityRecoveryOn = () => korundStabilityRecoveryEnabled(env as unknown as { HARIMU_KORUND_RATION_CUT_ENABLED?: string; HARIMU_KORUND_RATION_STABILITY_ENABLED?: string; HARIMU_KORUND_STABILITY_RECOVERY_ENABLED?: string });
 // #797: gray-market checkpoint seizure of cash bundles, destroyed as a sink (HARIMU_GRAY_SEIZURE_ENABLED); off = no roll, no write, no read.
-const graySeizureOn = () => (env as unknown as { HARIMU_GRAY_SEIZURE_ENABLED?: string }).HARIMU_GRAY_SEIZURE_ENABLED === 'true';
+const graySeizureOn = () => flagOn(env, 'HARIMU_GRAY_SEIZURE_ENABLED');
 const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn(), rationRecovery: korundStabilityRecoveryOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
@@ -255,7 +257,7 @@ export async function GET(request: Request) {
     economy,
     market,
     playerMarket,
-    government: governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, // #612: one extra field, only with the flag on, for the three MVP nations
+    government: await withPolicyLedger(database, governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, env), // #612 founding/succession; #985 ledger only for Kindle with the flag on
     shifts,
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -387,7 +389,7 @@ async function handlePost(request: Request) {
     }
     const citizen = await database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at FROM citizens WHERE clerk_user_id=?`)
       .bind(userId).first<CitizenProfileRow>();
-    return privateJson({ ok:true, government: publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId, { korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' })),
+    return privateJson({ ok:true, government: await withPolicyLedger(database, publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId, { korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' })), env),
       citizenship: citizen ? serializeCitizenship(citizen,true) : null });
   }
 
@@ -429,7 +431,7 @@ async function handlePost(request: Request) {
     ) AS taken`).bind(userId,userId,userId,userId,userId).first<{taken:number}>())?.taken);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
       simulation,verification:await readVerification(userId),
-      government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null,
+      government:await withPolicyLedger(database, profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null, env),
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),
       economy:await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
