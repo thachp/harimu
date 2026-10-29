@@ -29,6 +29,11 @@ const flagOffPins = {
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
   HARIMU_CITY_SPECIALTY_NOTE_ENABLED: 'city-specialty-note-996.test.mjs',
   HARIMU_SPA_WC_BONUS_ENABLED: 'spa-wc-recovery-798.test.mjs', // #798 flag off: the same recovery interval
+  HARIMU_CITY_CAPTURE_NOTE_ENABLED: 'city-capture-note-1002.test.mjs',
+  HARIMU_CITY_IMPORTS_NOTE_ENABLED: 'city-imports-note-1001.test.mjs',
+  HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED: 'city-civic-unit-note-1006.test.mjs',
+  HARIMU_CITY_GOVERNOR_NOTE_ENABLED: 'city-governor-note-1007.test.mjs',
+  HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED: 'city-tier-population-note-1014.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
@@ -46,6 +51,7 @@ const flagOffPins = {
   HARIMU_GRAY_SEIZURE_ENABLED: 'gray-seizure-797.test.mjs',
   HARIMU_GRAY_RATION_RISE_ENABLED: 'gray-ration-rise-968.test.mjs', // #968
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
+  HARIMU_KORUND_STANDING_ENABLED: 'korund-standing-994.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
   HARIMU_KORUND_PLAN_STATS_ENABLED: 'korund-plan-stats-981.test.mjs', // #981 flag off: no plan stat, no quota read
   HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
@@ -56,6 +62,7 @@ const flagOffPins = {
   HARIMU_KINDLE_SALES_TAX_ENABLED: 'kindle-sales-tax-844.test.mjs',
   HARIMU_MVP_JOB_TYPES_ENABLED: 'mvp-job-types-886.test.mjs',
   HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
+  HARIMU_KORUND_TSR_VIEW_ENABLED: 'korund-tsr-view-1000.test.mjs',
   HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
   HARIMU_KORUND_RATION_STABILITY_ENABLED: 'korund-ration-stability-967.test.mjs',
   HARIMU_KORUND_STABILITY_RECOVERY_ENABLED: 'korund-stability-recovery-983.test.mjs',
@@ -95,6 +102,7 @@ const flagOffPins = {
   HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
+  HARIMU_AURELLE_TSR_VIEW_ENABLED: 'aurelle-tsr-view-999.test.mjs', // #999 flag off: no crownRateMilli, no line
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
   HARIMU_TARGETED_SANCTIONS_ENABLED: 'goods-sanctions-601.test.mjs',
   HARIMU_WAR_ENABLED: 'war-actions.test.mjs',
@@ -137,7 +145,7 @@ const switchOffPins = {
 // preview-flags-on: switches turned on in preview only (production keeps them "false", pinned by wrangler-prod-501b). Their off path is still pinned above.
 const previewOnSwitches = ['HARIMU_REALTIME_PRESENCE', 'NEXT_PUBLIC_HARIMU_REALTIME_PRESENCE'];
 const notSwitches = ['NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'HARIMU_PRODUCTION_STORAGE', 'HARIMU_POSTGRES_CUTOVER_READY', 'HARIMU_POSTGRES_JOURNAL_RETENTION_APPROVED', 'HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED',
-  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_UI_V2_MOBILE', 'NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD', 'NEXT_PUBLIC_HARIMU_MOD_CONSOLE', 'NEXT_PUBLIC_HARIMU_NATION_SKIN', 'NEXT_PUBLIC_HARIMU_WIRE_BYLINES', 'NEXT_PUBLIC_HARIMU_RARE_MARKER', 'NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN', 'NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET'];
+  'NEXT_PUBLIC_HARIMU_NATION_SYMBOLS', 'NEXT_PUBLIC_HARIMU_UI_V2_CREST', 'NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM', 'NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR', 'NEXT_PUBLIC_HARIMU_UI_V2_PANEL', 'NEXT_PUBLIC_HARIMU_UI_V2_RAIL', 'NEXT_PUBLIC_HARIMU_UI_V2_WORLD', 'NEXT_PUBLIC_HARIMU_UI_V2_NATION', 'NEXT_PUBLIC_HARIMU_UI_V2_CITY', 'NEXT_PUBLIC_HARIMU_UI_V2_MOBILE', 'NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD', 'NEXT_PUBLIC_HARIMU_MOD_CONSOLE', 'NEXT_PUBLIC_HARIMU_NATION_SKIN', 'NEXT_PUBLIC_HARIMU_WIRE_BYLINES', 'NEXT_PUBLIC_HARIMU_RARE_MARKER', 'NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN', 'NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET', 'NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS'];
 
 test('every boolean wrangler var that is not *_ENABLED is a registered switch (off in both configs) or a listed config value', () => {
   for (const [file, config] of Object.entries(configs)) {

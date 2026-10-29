@@ -37,6 +37,12 @@ export const confidenceAfter = (before: number): number => Math.max(0, before - 
 export function officialTesseraMilli(parity: number): number {
   return Math.floor(crownConfig.baselineTessera * crownConfig.baselineParity / Math.max(1, parity));
 }
+/** #999: Crown minor units (100 = 1.00 CRN) quoted in Tessera minor units (100 = 1.00 TSR) at the official rate.
+ *  `tesseraMilliPerCrown` is officialTesseraMilli — the same thousandths the Royal Mint strip shows. Rounded down, so a quote never overstates value. */
+export function quoteCrownTessera(crownMinor: number, tesseraMilliPerCrown: number): number {
+  if (!Number.isSafeInteger(crownMinor) || crownMinor <= 0 || !Number.isSafeInteger(tesseraMilliPerCrown) || tesseraMilliPerCrown <= 0) return 0;
+  return Math.floor(crownMinor * tesseraMilliPerCrown / 1000);
+}
 /** Cumulative debasement against the baseline parity, in basis points (0 when never debased). */
 export const debasedBp = (parity: number): number => Math.max(0, Math.floor((parity - crownConfig.baselineParity) * 10000 / crownConfig.baselineParity));
 /** The noisy "full-weight old coins trade at a premium" rumor (docs 12.3 and 12.9), derived on read, never an order book:

@@ -65,3 +65,65 @@ export function citySpecialtyFields(nationId: string, cityId: string): CitySpeci
       : "Jobs here match this city's specialty.";
   return { specialtyRole, specialtyNote };
 }
+
+/** #1001: Local market (docs Cities of Harimu > What a city does). True when the role contains Port or Trade zone.
+ *  A shipyard, frontier, or capital does not qualify unless that role text matches. */
+export function cityHasImports(city: { role: string }): boolean {
+  return /port|trade zone/i.test(city.role);
+}
+/** Port markets and trade zones use different one-line notes. Null when the role does not qualify. */
+export function cityImportsNote(city: { role: string }): string | null {
+  if (!cityHasImports(city)) return null;
+  return /port/i.test(city.role) ? 'Port market: foreign imports arrive here.' : 'Trade zone: foreign imports arrive here.';
+}
+export type CityImportsFields = { importsNote: string };
+/** [ASSUMPTION] Founded or unknown cities omit the note until catalogued. Frontiers stay on the frontier role. */
+export function cityImportsFields(nationId: string, cityId: string): CityImportsFields | null {
+  const outpost = outpostCityForNation(nationId);
+  const city = cityForNation(nationId, cityId) ?? (outpost && outpost.id === cityId ? outpost : undefined);
+  if (!city) return null;
+  const importsNote = cityImportsNote(city);
+  return importsNote ? { importsNote } : null;
+}
+/** #1002: read-only capture-status note for the city panel (docs Cities of Harimu > War: capture and loss).
+ *  Heartland = catalog cities (capitals and the other Heartland cities); war refuses these via capital/heartland
+ *  (`capturableCity` in lib/siege.ts, #912/#934). Frontier = `outpostCityForNation` (border outposts war can besiege).
+ *  [ASSUMPTION] Founded or unknown cities (not in this catalog or the #123 outpost list) omit the note until a
+ *  square-zone lookup is wired; founded cities on Frontier would show the frontier line. */
+export const HEARTLAND_CAPTURE_NOTE = 'Heartland city: can never be captured.';
+export const FRONTIER_CAPTURE_NOTE = 'Frontier city: can be besieged and captured in war (two assaults on different days).';
+export function cityCaptureNote(nationId: string, cityId: string): string | null {
+  const outpost = outpostCityForNation(nationId);
+  if (outpost && outpost.id === cityId) return FRONTIER_CAPTURE_NOTE;
+  if (cityForNation(nationId, cityId)) return HEARTLAND_CAPTURE_NOTE;
+  return null;
+}
+
+/** #1006: read-only civic-unit note for the city panel (docs Territory, Cities & Warfare §15.2).
+ *  Each city is also a voting district (Kindle, Ilmar, Confluence, Hoarvale), a Grove (Veldwood),
+ *  a garrison district (Varkand), a port ward (Fulmara) or a plan unit (Korund).
+ *  [ASSUMPTION] Aurelle and Meridian: no civic unit named in existing lore — omit the note. */
+export const CITY_CIVIC_UNIT_BY_NATION: Readonly<Record<string, string>> = {
+  kindle: 'voting district',
+  ilmar: 'voting district',
+  confluence: 'voting district',
+  hoarvale: 'voting district',
+  veldwood: 'Grove',
+  varkand: 'garrison district',
+  fulmara: 'port ward',
+  korund: 'plan unit',
+};
+export function cityCivicUnitNote(nationId: string): string | null {
+  return CITY_CIVIC_UNIT_BY_NATION[nationId] ?? null;
+}
+
+/** #1007: read-only governor line for the city panel (docs Territory, Cities & Warfare §15.2: "an AI governor (an AI Mayor
+ *  elected by human citizens in Kindle; appointed elsewhere)"; Cities tier table: T2 Town unlocks "a local governor").
+ *  [ASSUMPTION] No Kindle mayor exists in data yet and no nation's appointing office is named in lore, so the generic labels show. */
+export const KINDLE_GOVERNOR_NOTE = 'AI Mayor, elected by citizens';
+export const APPOINTED_GOVERNOR_NOTE = 'AI governor, appointed';
+export const NO_GOVERNOR_NOTE = 'No local governor yet (unlocks at Town tier)';
+export function cityGovernorFields(nationId: string, tier: number): { governorNote: string; governorAi: boolean } {
+  if (tier < 2) return { governorNote: NO_GOVERNOR_NOTE, governorAi: false };
+  return { governorNote: nationId === 'kindle' ? KINDLE_GOVERNOR_NOTE : APPOINTED_GOVERNOR_NOTE, governorAi: true };
+}

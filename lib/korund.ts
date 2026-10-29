@@ -7,6 +7,7 @@ import { laborNoteSql, laborNoteBinds } from './korund-wallet';
 import { readGray, postOffer, acceptOffer, type GrayView } from './gray-market';
 import {readWalletStreetRate,type WalletStreetRate} from './wallet-street-rate'; // #758 (display only)
 import {planMedals,korundMedalOwnFood} from './korund-medals-rules'; // #737
+import {korundPlanStanding,type KorundPlanStanding} from './korund-standing-rules'; // #994
 import {korundRationCut,korundRationRecoveryCities,applyRationCut,shortfallPercent,type KorundRationCut,korundShortfall,type KorundShortfall,korundWeeklyQuotaFood,korundWeekSeconds,readCouponsAndQuota,korundCouponGoods,korundCouponRedeemSql,type KorundCoupon,type KorundQuota} from './korund-coupons';
 export const korundJob = {id:'korund-food-production',name:'State food-production brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4} as const;
 export const gameWeekSeconds = korundWeekSeconds;
@@ -50,7 +51,7 @@ export const korundMealSql = `INSERT OR IGNORE INTO korund_meals(id,clerk_user_i
 export type KorundPlan = { available:boolean; mode:'bounded state planning'; assignment:typeof korundJob;
  walletMinor:number;foodQuantity:number;publicFoodRemaining:number;publicFundMinor:number;
  gameWeek:number;couponFoodRemaining:number;couponExpiresAt:string;mealReadyAt:string|null;shifts:WorkShift[];queue?:RationQueue;
- coupons?:KorundCoupon[];quota?:KorundQuota;bureau?:BureauView;gray?:GrayView;medals?:{total:number;lastWeek:boolean};shortfall?:KorundShortfall|null;rationCut?:KorundRationCut|null;rationRecovery?:true;streetRate?:WalletStreetRate|null;clothingQuantity?:number;goodsQuantity?:number };
+ coupons?:KorundCoupon[];quota?:KorundQuota;bureau?:BureauView;gray?:GrayView;medals?:{total:number;lastWeek:boolean};planStanding?:KorundPlanStanding;shortfall?:KorundShortfall|null;rationCut?:KorundRationCut|null;rationRecovery?:true;bureauTsr?:true;streetRate?:WalletStreetRate|null;clothingQuantity?:number;goodsQuantity?:number };
 export type KorundCommand = {action:'korund-start-work'|'korund-claim-work'|'korund-redeem-ration'|'korund-household-meal'|'korund-join-ration-queue'|'korund-cancel-ration-queue'|'korund-redeem-coupon'|'korund-set-preferences'|'korund-request-assignment'|'korund-gray-post-offer'|'korund-gray-accept-offer'; requestId?:string;amountMinor?:number;askRate?:number;offerId?:string;preferences?:string[];shiftId?:string;queueId?:string;coupon?:'clothing'|'goods';gameWeek?:number};
 const uuid=(v:unknown):v is string=>typeof v==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 export function validKorundCommand(body:Record<string,unknown>):body is Record<string,unknown>&KorundCommand {
@@ -85,7 +86,7 @@ async function week(db:GameDatabase,now:number) {
  const start=clock.epoch_seconds+index*gameWeekSeconds;
  return {number:index+1,start,end:start+gameWeekSeconds,expiresAt:new Date((start+gameWeekSeconds)*1000).toISOString()};
 }
-export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;shortfall?:boolean;rationCut?:boolean;rationStability?:boolean;rationRecovery?:boolean;streetRate?:boolean;grayRationRise?:boolean}={}):Promise<KorundPlan> {
+export async function readKorund(db:GameDatabase,userId:string,now:number,options:{mvpJobTypes?:boolean;emissionCaps?:boolean;laborBureau?:boolean;grayMarket?:boolean;grayDailyCap?:boolean;graySuspicion?:boolean;graySeizure?:boolean;medals?:boolean;standing?:boolean;shortfall?:boolean;rationCut?:boolean;rationStability?:boolean;rationRecovery?:boolean;bureauTsr?:boolean;streetRate?:boolean;grayRationRise?:boolean}={}):Promise<KorundPlan> {
  const w=await week(db,now);
  const [citizen,ledger,shifts]=await Promise.all([
  db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string}>(),
@@ -105,7 +106,10 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  const bureau=options.laborBureau&&citizen?.nation_id==='korund'?{bureau:await readBureau(db,userId,now)}:{};
  // #43: the gray market is in the plan only with HARIMU_GRAY_MARKET_ENABLED on, and only for a Korund citizen.
  const gray=options.grayMarket&&citizen?.nation_id==='korund'?{gray:await readGray(db,userId,now,{dailyCap:options.grayDailyCap===true,suspicion:options.graySuspicion===true,seizure:options.graySeizure===true})}:{};
- const medals=options.medals&&citizen?.nation_id==='korund'?{medals:await readMedals(db,userId,w.start,w.number)}:{};
+ const medalRow=options.medals&&citizen?.nation_id==='korund'?await readMedals(db,userId,w.start,w.number):null;
+ const medals=medalRow?{medals:medalRow}:{};
+ // #994: Standing is the #737 medal total, derived on this read. No extra query and no write of citizens.standing. Needs the medals read.
+ const planStanding=options.standing&&medalRow?{planStanding:korundPlanStanding(medalRow)}:{};
  // #759: last closed week's unit food vs the quota (read-only, Korund only, flag on only); null = met or no closed week yet.
  const korund=citizen?.nation_id==='korund',prevFood=korund&&(options.shortfall||options.rationCut)&&w.number>=2?await closedWeekFood(db,w.start):null;
  const shortfall=options.shortfall&&korund?{shortfall:prevFood===null?null:korundShortfall(w.number-1,prevFood)}:{};
@@ -116,12 +120,14 @@ export async function readKorund(db:GameDatabase,userId:string,now:number,option
  const rationCut=options.rationCut&&korund?{rationCut:cut&&options.rationStability?{...cut,stability:true as const}:cut}:{};
  // #983: the met week after that cut. Flag off: no read and no key, so the plan shape is unchanged.
  const recovery=options.rationRecovery&&korund&&(await korundRationRecoveryCities(db,w.start-(w.number-1)*gameWeekSeconds,now))>0?{rationRecovery:true as const}:{};
+ // #1000: Bureau TSR quote under the LN balance. No query: the panel formats walletMinor. Flag off: no key.
+ const bureauTsr=options.bureauTsr&&citizen?.nation_id==='korund'?{bureauTsr:true as const}:{};
  // #758: rumored street rate under the wallet, Korund only, flag on only; null = not heard of the gray market (hidden).
  // QA1 on #775: the rumor needs the gray market itself on (HARIMU_GRAY_MARKET_ENABLED) as well as the street-rate flag.
  const streetRate=options.streetRate&&options.grayMarket&&citizen?.nation_id==='korund'?{streetRate:await readWalletStreetRate(db,userId,now)}:{};
  // #968: a current #776 cut adds one shortage line on the rumored street rate. Display only; post and accept are unchanged.
  if(options.grayRationRise&&cut){const line=streetShortageLine();const board=(gray as {gray?:GrayView}).gray;if(board)board.shortage=line;const heard=(streetRate as {streetRate?:WalletStreetRate|null}).streetRate;if(heard)heard.shortage=line;}
- return {...extra,...bureau,...gray,...medals,...shortfall,...rationCut,...recovery,...streetRate,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
+ return {...extra,...bureau,...gray,...medals,...planStanding,...shortfall,...rationCut,...recovery,...bureauTsr,...streetRate,available:citizen?.nation_id==='korund',mode:'bounded state planning',assignment:korundJob,walletMinor:ledger?.wallet??0,foodQuantity:ledger?.food??0,
  publicFoodRemaining:ledger?.public_food??0,publicFundMinor:ledger?.funds??0,gameWeek:w.number,couponFoodRemaining:ledger?.coupon_used?0:2,couponExpiresAt:w.expiresAt,
  queue:citizen?.nation_id==='korund'?await readRationQueue(db,userId,w.number,now):{waiting:0,requestId:null,position:null},mealReadyAt:ledger?.last_meal==null?null:new Date((ledger.last_meal+7200)*1000).toISOString(),shifts:shifts.results.map(s=>({id:s.id,orderName:s.order_name,output:s.output,capacitySpent:s.capacity_spent,currency:'LN',wageMinor:800,...(isKorundPost(s.work_order_id)?{}:{rewardItem:'state food',rewardQuantity:4}),startedAt:s.started_at,completesAt:s.completes_at,claimedAt:s.claimed_at}))};
 }

@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import { PanelV2 } from './panel-v2';
+import { AiBadge } from './ai-disclosure';
 import { cityStatusStat, uiV2PanelEnabled } from '@/lib/ui-v2-panel';
 import { countryWord } from '@/lib/ui-v2-rail';
 import type { CityDestination } from '@/lib/city-destinations';
@@ -35,13 +36,17 @@ export function WorldInstitutionsButton({ onView, enabled = uiV2PanelEnabled() }
 
 /** City, top of the panel (flag on): "Status: Capital" first on a capital only (from the city catalog), the Household destination is promoted to the primary action (as in the concept), the other destinations are the rows. */
 export type CityTierUnlockView = { tierName: string; districtSlots: number; unlocks: readonly string[] }; // #979
-export function CitySummary({ cityName, city, nation, destinations, onView, tierUnlocks, festivalNote, specialtyRole, specialtyNote, spaWcNote, enabled = uiV2PanelEnabled(), icons = uiV2CityEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; tierUnlocks?: CityTierUnlockView | null; festivalNote?: string | null; specialtyRole?: string | null; specialtyNote?: string | null; spaWcNote?: string | null; enabled?: boolean; icons?: boolean }) {
+export function CitySummary({ cityName, city, nation, destinations, onView, tierUnlocks, festivalNote, populationNote, specialtyRole, specialtyNote, captureNote, civicUnitNote, governorNote, governorAi = false, spaWcNote, enabled = uiV2PanelEnabled(), icons = uiV2CityEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; tierUnlocks?: CityTierUnlockView | null; festivalNote?: string | null; populationNote?: string | null; specialtyRole?: string | null; specialtyNote?: string | null; captureNote?: string | null; civicUnitNote?: string | null; governorNote?: string | null; governorAi?: boolean; spaWcNote?: string | null; enabled?: boolean; icons?: boolean }) {
   if (!enabled) return null;
   const home = destinations.find(card => card.id === 'household');
   const tierStats = tierUnlocks ? [{ label: 'Tier', value: tierUnlocks.tierName }, { label: 'Districts', value: String(tierUnlocks.districtSlots) }, { label: 'Unlocks', value: tierUnlocks.unlocks.join(', ') }] : [];
+  const populationStats = populationNote ? [{ label: 'Population', value: populationNote }] : []; // #1014 read-only note
   const festivalStats = festivalNote ? [{ label: 'Festivals', value: festivalNote }] : []; // #984 read-only note
   const specialtyStats = specialtyRole ? [{ label: 'Specialty', value: specialtyNote ? `${specialtyRole}. ${specialtyNote}` : specialtyRole }] : []; // #996
-  const panel = <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), ...tierStats, ...festivalStats, ...specialtyStats, { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
+  const captureStats = captureNote ? [{ label: 'Capture', value: captureNote }] : []; // #1002 read-only note
+  const civicUnitStats = civicUnitNote ? [{ label: 'Civic unit', value: civicUnitNote }] : []; // #1006 read-only note
+  const governorStats = governorNote ? [{ label: 'Governor', value: governorAi ? <>{governorNote} <AiBadge /></> : governorNote }] : []; // #1007 read-only
+  const panel = <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...captureStats, ...civicUnitStats, ...governorStats, { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
     rows={destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? cityPlaceIcon(card.id) : undefined, onSelect: () => onView(card.id) }))}
     primary={home ? { label: home.label, icon: icons ? cityPlaceIcon(home.id) : undefined, onSelect: () => onView(home.id) } : undefined} />; // S7 follow-up: with the City pills on, rows carry the pill's icon
   return spaWcNote ? <>{panel}<p>{spaWcNote}</p></> : panel; // #798: absent unless the API sends it
@@ -78,10 +83,10 @@ export function WorkSummary({ capacity, contributions, onMarket, enabled = uiV2P
     rows={[{ id: 'shifts', label: 'Your work shifts', icon: cityPlaceIcon('workplace'), onSelect: jump('#citizen-work-shifts') }, { id: 'orders', label: 'Available contributions', onSelect: jump('.scene-work-orders') }]}
     primary={onMarket ? { label: 'Take your earnings to market', icon: cityPlaceIcon('market'), onSelect: onMarket } : undefined} />;
 }
-export function MarketSummary({ nation, walletMinor, food, board, listings, onHousehold, enabled = uiV2PanelEnabled() }: { nation: Pick<Nation, 'id' | 'name' | 'currency'>; walletMinor?: number | null; food?: number | null; board: boolean; listings: boolean; onHousehold: () => void; enabled?: boolean }) {
+export function MarketSummary({ nation, walletMinor, food, board, listings, onHousehold, importsNote, enabled = uiV2PanelEnabled() }: { nation: Pick<Nation, 'id' | 'name' | 'currency'>; walletMinor?: number | null; food?: number | null; board: boolean; listings: boolean; onHousehold: () => void; importsNote?: string | null; enabled?: boolean }) {
   if (!enabled) return null;
   return <PanelV2 title="Market" subtitle="Goods and citizen listings" rowsLabel="Market"
-    stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), ...(food == null ? [] : [{ label: 'Food', value: String(food) }])]}
+    stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), ...(food == null ? [] : [{ label: 'Food', value: String(food) }]), ...(importsNote ? [{ label: 'Imports', value: importsNote }] : [])]} // #1001 read-only
     rows={[...(nation.id === 'kindle' ? [{ id: 'starter', label: 'Kindle starter market', icon: cityPlaceIcon('market'), onSelect: jump('.citizen-market:not(.player-market)') }] : []), // #894 (QA2): the Kindle-named row only for Kindle
       ...(board ? [{ id: 'board', label: 'City market board', onSelect: jump('.market-board') }] : []), ...(listings ? [{ id: 'listings', label: 'Kindle citizen listings', onSelect: jump('.player-market') }] : [])]}
     primary={{ label: 'Return to household', icon: cityPlaceIcon('household'), onSelect: onHousehold }} />;

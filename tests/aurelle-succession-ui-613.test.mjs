@@ -82,7 +82,7 @@ async function loadPanel() {
   const js = ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const exports = {};
   new Function('exports', 'require', 'module', js)(exports, name => ({
-    './nation-document': { NationDocument: ({ children }) => React.createElement('div', null, children) }, '../lib/leader-personas': personas, '../lib/government-disclosure': disclosure, '../lib/decision-disclosure-copy': require('../lib/decision-disclosure-copy.ts'),
+    './nation-document': { NationDocument: ({ children }) => React.createElement('div', null, children) }, './nation-crest': { NationCrest: () => null }, '../lib/aurelle-sealed-scrolls': require('../lib/aurelle-sealed-scrolls.ts'), '../lib/leader-personas': personas, '../lib/government-disclosure': disclosure, '../lib/decision-disclosure-copy': require('../lib/decision-disclosure-copy.ts'),
     './game-timer': { GameTimer: () => null }, './ai-disclosure': { AiBadge: () => null, AiTextTag: () => null },
   })[name] ?? require(name), { exports });
   return exports.LeaderPanel;
@@ -106,7 +106,7 @@ test('leader panel: the succession line, the acceded ruler, and nothing when the
 
 test('the succession fields are attached in the citizen route only behind the flag, and the lib stays read-only', async () => {
   const route = await readFile(new URL('../app/api/citizen/route.ts', import.meta.url), 'utf8');
-  assert.match(route, /successionOn \? readSuccession\(database\) : null/); assert.match(route, /succession && profile\?\.nation_id === 'aurelle'/);
+  assert.match(route, /successionOn\(\) \? readSuccession\(database\) : null/); assert.match(route, /succession && profile\?\.nation_id === 'aurelle'/);
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const cfg = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_SUCCESSION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), [value], `${file}: preview on, production off`);
