@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { acquisitionRules, zoneLabels, zoneOrder, type Zone } from '@/lib/map-zone-labels';
 import type { WorldSquare } from '@/lib/map-zones';
+import { zoneTooltips } from '@/lib/land-copy';
 import styles from './world-zones.module.css';
 
 export const zoneOverlayKey = 'harimu:zone-overlay';
@@ -9,6 +10,20 @@ export const zoneOverlayKey = 'harimu:zone-overlay';
 export const zoneColors: Record<Zone, string> = { heartland: '#c9893a', frontier: '#d9c46a', wildlands: '#6f9a6b', commons: '#8a6fb8' };
 type Payload = { width: number; height: number; squares: WorldSquare[] };
 const ownerName = (owner: string | null, names: Record<string, string>) => owner ? names[owner] ?? owner : 'Unclaimed';
+
+/** #1017: build flag NEXT_PUBLIC_HARIMU_ZONE_LEGEND ("true" in preview, "false" in production). */
+export const zoneLegendEnabled = (value: string | undefined = process.env.NEXT_PUBLIC_HARIMU_ZONE_LEGEND) => value === 'true';
+
+/** Zone legend (#66). With #1017 on, each zone also says what it means (docs §6.1, copy from lib/land-copy.ts #338) and the
+ *  grid's ★/▲ markers get a key, so the legend never relies on color alone (§23.2). Off: the #66 markup, unchanged. */
+export function ZoneLegend({ explained = zoneLegendEnabled() }: { explained?: boolean }) {
+  if (!explained) return <ul className={styles.legend} aria-label="Zone legend">{zoneOrder.map(z => <li key={z}><span style={{ background: zoneColors[z] }} aria-hidden="true" />{zoneLabels[z]}</li>)}</ul>;
+  return <ul className={`${styles.legend} ${styles.legendExplained}`} aria-label="Zone legend">
+    {zoneOrder.map(z => <li key={z}><span style={{ background: zoneColors[z] }} aria-hidden="true" /><strong>{zoneLabels[z]}</strong><small>{zoneTooltips[z].text}</small></li>)}
+    <li><b aria-hidden="true">★</b><strong>Capital</strong></li>
+    <li><b aria-hidden="true">▲</b><strong>Border outpost</strong></li>
+  </ul>;
+}
 
 /** Plain-words inspector fields for one square (#66). */
 export function squareInspection(square: WorldSquare, names: Record<string, string> = {}) {
@@ -37,7 +52,7 @@ export function WorldZones({ nationNames = {} }: { nationNames?: Record<string, 
   return <section className={styles.zones} aria-label="World map zones">
     <label className={styles.toggle}><input type="checkbox" checked={show} onChange={e => setShow(e.target.checked)} /> Zone overlay</label>
     {show && <>
-      <ul className={styles.legend} aria-label="Zone legend">{zoneOrder.map(z => <li key={z}><span style={{ background: zoneColors[z] }} aria-hidden="true" />{zoneLabels[z]}</li>)}</ul>
+      <ZoneLegend />
       {error && <p role="alert">World squares are unavailable right now.</p>}
       {!data && !error && <p role="status">Loading world squares…</p>}
       {data && <div className={styles.grid} style={{ gridTemplateColumns: `repeat(${data.width}, 1fr)` }} role="group" aria-label={`World squares, ${data.width} by ${data.height}`}>
