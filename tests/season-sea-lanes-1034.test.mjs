@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { gameSeasonAt, seaFreightQuantity, seaLanesStormNote, seaLanesStormy, seasonLengthMs, seasonOrder } from '../lib/game-season.ts';
 import { FLAG_PACKS } from '../lib/flag-pack.mjs';
+import { seasonAt } from '../lib/season-yield.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
 
 const jsonc = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
@@ -19,6 +20,13 @@ test('multiplier: winter port freight ×0.8 rounded down, floor 1; inland and ot
   assert.equal(seaLanesStormy('winter', true), true);
   assert.equal(seaLanesStormy('winter', false), false);
   assert.equal(seaLanesStormy('autumn', true), false);
+});
+
+test('missing world clock (#1035 seasonAt null) means no storm cut, not epoch 0', () => {
+  const L = seasonLengthMs / 1000, nowSeconds = 2731 * L + 3600; // from epoch 0 this would be winter
+  assert.equal(seasonAt({ epochSeconds: 0, nowSeconds }), 'winter');
+  for (const clock of [null, undefined, {}, { nowSeconds }, { epochSeconds: null, nowSeconds }]) assert.equal(seaFreightQuantity(2, seasonAt(clock), true), 2);
+  assert.equal(seaFreightQuantity(2, seasonAt({ epochSeconds: 0, nowSeconds }), true), 1);
 });
 
 test('storm note: only for a port in winter, counted from a non-zero world epoch', () => {
@@ -90,13 +98,7 @@ test('route: exact-second payout at the autumn→winter and winter→spring boun
   assert.equal(await payAt(4 * L - 1), 1, 'last winter second');
   assert.equal(await payAt(4 * L), 2, 'first spring second (wrap)');
   assert.equal(await payAt(7 * L), 1, 'next year winter');
-  // #1035 seasonAt: no world clock is no season (not epoch 0), so no storm cut and no note.
-  await r.db.prepare("DELETE FROM world_clock WHERE id='main'").run();
-  r.setNow((2731 * L + 3600) * 1000); // counted from epoch 0 this instant would be winter, so an epoch-0 fallback fails here
-  await r.db.prepare('UPDATE work_shifts SET claimed_at=? WHERE clerk_user_id=? AND claimed_at IS NULL').bind(new Date(r.now).toISOString(), 'alice').run();
-  await r.db.prepare("UPDATE citizens SET capacity=100 WHERE clerk_user_id='alice'").run();
-  assert.equal((await r.call('city', 'alice')).data.seaLanesNote, undefined, 'no clock: no note');
-  const noClock = await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'freight' });
+});
   assert.equal(noClock.status, 200, JSON.stringify(noClock.data));
   assert.equal(noClock.data.shifts.find(s => !s.claimedAt).rewardQuantity, 2, 'no clock: no storm cut');
 });
