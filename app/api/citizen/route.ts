@@ -25,6 +25,7 @@ import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, 
 import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket, shiftAnswerKey } from '@/lib/shift-quality-key';
 import { marketFlagOn } from '@/lib/market-visibility';
 import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
+import { recoveryIntervalForHome, spaWcBonusEnabled } from '@/lib/spa-recovery'; // #798
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection,electionIdFor} from '@/lib/elections';
 import {readCollectivePetitions,recordVerifiedHumanVisit} from '@/lib/collective-petitions';
@@ -195,6 +196,7 @@ export async function GET(request: Request) {
   const database = await getDatabase();
   const readNow = Math.floor(Date.now() / 1000);
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
+  const wcInterval = await recoveryIntervalForHome(database, userId, interval, spaWcBonusEnabled(env)); // #798: meals keep `interval`
   const foundingOn = (env as unknown as { HARIMU_FOUNDING_PERIOD_ENABLED?: string }).HARIMU_FOUNDING_PERIOD_ENABLED === 'true';
   const accountLevel=accountElectionEnabled(env as unknown as {NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW?:string;HARIMU_ACCOUNT_ELECTION_POC_ENABLED?:string});
   const electionDatabase=accountLevel?accountElectionDatabase(database):database;
@@ -202,7 +204,7 @@ export async function GET(request: Request) {
   // Only the reads that need the profile or the verification (election, collective petitions, first week, government) wait for them, in the second wave.
   const [simulation, capacity, starterFood, [profile, plan, itemResult, decision, politicalAction], verification, market, aurellePlan, korundPlan, nationWork, economy, playerMarket, shifts, founding, succession] = await Promise.all([
     readWorldSimulation(database, readNow, { reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warAssembly: (env as unknown as { HARIMU_WAR_ASSEMBLY_ENABLED?: string }).HARIMU_WAR_ASSEMBLY_ENABLED === 'true', warEndings: (env as unknown as { HARIMU_WAR_ENDINGS_ENABLED?: string }).HARIMU_WAR_ENDINGS_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true' }),
-    readCapacityProjection(database, userId, readNow, interval),
+    readCapacityProjection(database, userId, readNow, wcInterval),
     pendingStarterFood(database, userId),
     Promise.all([
     database.prepare(`SELECT clerk_user_id, nation_id, nation_changes, display_name, capacity,
@@ -231,7 +233,7 @@ export async function GET(request: Request) {
     readAurelleView(database,userId),
     readKorund(database,userId,Math.floor(Date.now()/1000),korundReadOptions()),
     nationWorkPlanPart(database,userId),
-    readEconomy(database, userId, interval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
+    readEconomy(database, userId, wcInterval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
     readPlayerMarket(database, userId),
     readShifts(database, userId),
     foundingOn ? readFoundingState(database, readNow) : null, // #612: read-only, flag off: not read
@@ -299,7 +301,7 @@ export async function POST(request: Request) {
 /** #205: the preview-election opening, verified-human visit and starter grant/capacity clock that GET used to write. */
 async function recordCivicPresence(database: Awaited<ReturnType<typeof getDatabase>>, userId: string, now: number) {
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
-  await recoverCapacity(database, userId, new Date(now * 1000).toISOString(), interval);
+  await recoverCapacity(database, userId, new Date(now * 1000).toISOString(), await recoveryIntervalForHome(database, userId, interval, spaWcBonusEnabled(env)));
   const citizen = await database.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   // The completed-day petition review latch that GET used to write (QA1 on #217); the world tick also latches it.
   if (citizen?.nation_id) await latchGovernmentReviews(database, citizen.nation_id, now);
@@ -322,7 +324,8 @@ async function handlePost(request: Request) {
   }
   const simulation = await advanceWorld(database, undefined, { ...((env as unknown as { HARIMU_VOTE_BUYING_WATCH_ENABLED?: string }).HARIMU_VOTE_BUYING_WATCH_ENABLED === 'true' ? { voteBuyingWatch: true } : {}), ...((env as unknown as { HARIMU_RISK_SCORING_ENABLED?: string }).HARIMU_RISK_SCORING_ENABLED === 'true' ? { riskScoring: true } : {}), dormancy: (env as unknown as { HARIMU_DORMANCY_ENABLED?: string }).HARIMU_DORMANCY_ENABLED === 'true', reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true', aurelleRising: aurelleRisingOn(), aurelleCoup: aurelleCoupOn(), favorDecay: (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true', kindleAssembly: assemblyTickConfig(env as unknown as AssemblyBindings), primaries: primaryTickConfig(env as unknown as PrimaryBindings), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warLimits: (env as unknown as { HARIMU_WAR_DECLARATION_LIMITS_ENABLED?: string }).HARIMU_WAR_DECLARATION_LIMITS_ENABLED === 'true', warAssembly: (env as unknown as { HARIMU_WAR_ASSEMBLY_ENABLED?: string }).HARIMU_WAR_ASSEMBLY_ENABLED === 'true', warEndings: (env as unknown as { HARIMU_WAR_ENDINGS_ENABLED?: string }).HARIMU_WAR_ENDINGS_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true', targetedSanctions: (env as unknown as { HARIMU_TARGETED_SANCTIONS_ENABLED?: string }).HARIMU_TARGETED_SANCTIONS_ENABLED === 'true', foundingPeriod: (env as unknown as { HARIMU_FOUNDING_PERIOD_ENABLED?: string }).HARIMU_FOUNDING_PERIOD_ENABLED === 'true' , religiousHarmony: (env as unknown as { HARIMU_RELIGIOUS_HARMONY_ENABLED?: string }).HARIMU_RELIGIOUS_HARMONY_ENABLED === 'true' }); // #842 harmony after dormancy (dormancy-739 pin)
   const interval = recoveryInterval((env as unknown as { HARIMU_CAPACITY_RECOVERY_SECONDS?: string }).HARIMU_CAPACITY_RECOVERY_SECONDS);
-  await recoverCapacity(database, userId, new Date().toISOString(), interval);
+  const wcInterval = await recoveryIntervalForHome(database, userId, interval, spaWcBonusEnabled(env)); // #798
+  await recoverCapacity(database, userId, new Date().toISOString(), wcInterval);
   let body: Record<string, unknown>;
   try {
     body = await readCommandObject(request);
@@ -407,7 +410,7 @@ async function handlePost(request: Request) {
     if (!validPlayerCommand(body)) return privateJson({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: typeof body.listingId === 'string' ? body.listingId.toLowerCase() : undefined };
     const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), kindleSalesTaxEnabled(env as never) ? { salesTaxSql: playerFillSalesTaxSql } : {}); // #844 follow-up
-    return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),
+    return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }),
       playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
   }
 
@@ -416,7 +419,7 @@ async function handlePost(request: Request) {
     const command = { ...body, requestId: body.requestId.toLowerCase() };
     const result = await executeMarketCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), interval);
     const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ capacity: number }>();
-    return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),
+    return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }),
       market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
@@ -444,7 +447,7 @@ async function handlePost(request: Request) {
       government:await withPolicyLedger(database, profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null, env),
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),
-      economy:await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
+      economy:await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
     },{status:ok?200:409});
     const current=await readCurrent();
     // A repeated choice has no further effect, including after an uncertain response.
@@ -696,7 +699,7 @@ async function handlePost(request: Request) {
       return privateJson({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0 }, { status: 409 });
     }
-    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   if (body.action === 'claim-work') {
@@ -724,7 +727,7 @@ async function handlePost(request: Request) {
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return privateJson({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
-    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 
   return privateJson({ error: 'Unknown action.' }, { status: 400 });
