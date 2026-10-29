@@ -24,11 +24,11 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 19);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 20); // #1047 shift soft cap stays inside the pack
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 7); // #1054 peace revert stays inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 12); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1055 Korund wallet rations stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 13); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1055 Korund wallet rations stay inside the pack
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
@@ -88,6 +88,15 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED, undefined, 'the client build does not inline the packed age flag');
   assert.equal(varsForProcessEnv(prod.vars).HARIMU_WORLD_AGES_ENABLED, undefined);
   assert.equal(flagOn({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, HARIMU_WORLD_AGES_ENABLED: 'false' }, 'HARIMU_WORLD_AGES_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_SHIFT_SOFT_CAP_ENABLED, undefined, 'the shift soft cap is not its own binding');
+  assert.equal(prod.vars.HARIMU_SHIFT_SOFT_CAP_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_SHIFT_SOFT_CAP_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_SHIFT_SOFT_CAP_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_SHIFT_SOFT_CAP_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_SHIFT_SOFT_CAP_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_SHIFT_SOFT_CAP_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_SHIFT_SOFT_CAP_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_SHIFT_SOFT_CAP_ENABLED: 'false' }, 'HARIMU_SHIFT_SOFT_CAP_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, undefined, 'the phone top-down map is not its own binding');
   assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'true');
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'false');

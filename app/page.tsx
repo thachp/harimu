@@ -495,6 +495,8 @@ type CitizenSnapshot = {
   plan: { horizon: PlanHorizon; note: string; completedIds: string[] } | null;
   decision: CitizenDecision | null;
   shifts: WorkShift[];
+  /** #1047: productive shifts started in the current real day. Absent while the cap flag is off. */
+  shiftDay?: { started: number; cap: number; resetsAt: string } | null;
   economy?: Economy;
   market?: MarketState;
   playerMarket?: PlayerMarketState;
@@ -598,6 +600,7 @@ export default function Home() {
   const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
   const [worldAges, setWorldAges] = useState(false); // #1041: GET /api/world worldAges, from flagOn(HARIMU_UI_PACK)
+  const [faithFestivalHud, setFaithFestivalHud] = useState(false); // #1048: GET /api/world faithFestivalHud, from flagOn(HARIMU_UI_PACK)
   const [walletOpen, setWalletOpen] = useState(false);
   // #252: the step for the next quality shift; ticket/questions come from the server (null ticket = local demo).
   const [qualityOrder, setQualityOrder] = useState<{ order: WorkOrder; ticket: string | null; questions: readonly QualityQuestion[] } | null>(null);
@@ -756,6 +759,7 @@ export default function Home() {
     } catch { return kioskClosed; }
   };
   const [workShifts, setWorkShifts] = useState<WorkShift[]>([]);
+  const [shiftDay, setShiftDay] = useState<{ started: number; cap: number; resetsAt: string } | null>(null); // #1047
   const [workPending, setWorkPending] = useState(false);
   const [workError, setWorkError] = useState<string | null>(null);
   const workLock = useRef(false);
@@ -850,7 +854,7 @@ export default function Home() {
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
     setCitizenNationId(null); seededNationId.current = null; setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
-    setEconomy(null); setRewardsView(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setCycleStartAt(null); setVerification(null); setWorkShifts([]);
+    setEconomy(null); setRewardsView(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setCycleStartAt(null); setVerification(null); setWorkShifts([]); setShiftDay(null);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
     setKorundPlan(null); korundIntent.current = null; setKorundCommand(null);
     setPlanNote(''); setCompletedPlanIds([]); setPlanSaved(false); setHorizon('week'); setCommittedDecision(null);
@@ -928,6 +932,7 @@ export default function Home() {
         worldEvents: WorldEvent[];
         simulation?: SimulationState;
         worldAges?: boolean;
+        faithFestivalHud?: boolean;
       };
       if (data.nations.length) setWorldNations(data.nations);
       if (data.workOrders.length) setAvailableWorkOrders(data.workOrders);
@@ -935,6 +940,7 @@ export default function Home() {
       if (data.worldEvents.length) setWorldEvents(data.worldEvents);
       if (data.simulation) setSimulation(data.simulation);
       setWorldAges(data.worldAges === true);
+      setFaithFestivalHud(data.faithFestivalHud === true);
     }
 
     void loadWorld().catch(() => { /* Keep the existing public snapshot when unavailable. */ });
@@ -975,12 +981,13 @@ export default function Home() {
         // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
         // Starting a shift has no request id, so it is never retried automatically.
         const response = action === 'commit-work' ? await fetch('/api/citizen', init) : await fetchIdempotent(fetch, '/api/citizen', init);
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; profile?: CitizenSnapshot['profile'] };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; shiftDay?: { started: number; cap: number; resetsAt: string } | null; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; profile?: CitizenSnapshot['profile'] };
       if (epoch !== citizenEpoch.current) return;
         if (result.simulation) setSimulation(result.simulation);
         if ('korundPlan' in result) setKorundPlan(result.korundPlan ?? null);
         if ('aurellePlan' in result) setAurellePlan(result.aurellePlan ?? null);
         if (result.shifts) { setWorkShifts(result.shifts); setSnapshotRequestedAt(requestedAt); }
+        if ('shiftDay' in result) setShiftDay(result.shiftDay ?? null);
         if (result.economy) setEconomy(result.economy);
         if (result.market) setMarket(result.market);
         if (result.playerMarket) setPlayerMarket(result.playerMarket);
@@ -1213,11 +1220,12 @@ export default function Home() {
     persist(command);
     try {
       const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
-      const result = await response.json() as { error?: string; ok?: boolean; replayed?:boolean; korundPlan?: KorundPlanView; capacity?: number; shifts?: WorkShift[] };
+      const result = await response.json() as { error?: string; ok?: boolean; replayed?:boolean; korundPlan?: KorundPlanView; capacity?: number; shifts?: WorkShift[]; shiftDay?: { started: number; cap: number; resetsAt: string } | null };
       if (epoch !== citizenEpoch.current) return;
       if (response.status >= 500 || (response.ok && (!result.korundPlan || typeof result.capacity !== 'number'))) throw new Error('Action needs confirmation.');
       if (result.korundPlan) setKorundPlan(result.korundPlan);
       if (result.shifts) setWorkShifts(result.shifts);
+      if ('shiftDay' in result) setShiftDay(result.shiftDay ?? null);
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       korundIntent.current = null; setKorundCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Korund action refused; refresh your assignment and ration book.'); return; }
@@ -1253,11 +1261,12 @@ export default function Home() {
     persist(command);
     try {
       const response = await fetch('/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command) });
-      const result = await response.json() as { error?: string; ok?: boolean; aurellePlan?: AurellePlanView; capacity?: number; shifts?: WorkShift[] };
+      const result = await response.json() as { error?: string; ok?: boolean; aurellePlan?: AurellePlanView; capacity?: number; shifts?: WorkShift[]; shiftDay?: { started: number; cap: number; resetsAt: string } | null };
       if (epoch !== citizenEpoch.current) return;
       if (response.status >= 500 || (response.ok && (!result.aurellePlan || typeof result.capacity !== 'number'))) throw new Error('Action needs confirmation.');
       if (result.aurellePlan) setAurellePlan(result.aurellePlan);
       if (result.shifts) setWorkShifts(result.shifts);
+      if ('shiftDay' in result) setShiftDay(result.shiftDay ?? null);
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       aurelleIntent.current = null; setAurelleCommand(null); persist(null);
       if (!response.ok) { setWorkError(result.error ?? 'Aurelle action refused; refresh your charter account.'); return; }
@@ -1355,6 +1364,7 @@ export default function Home() {
     if (snapshot.simulation) setSimulation(snapshot.simulation);
     setVerification(snapshot.verification ?? null);
     setWorkShifts(snapshot.shifts ?? []);
+    setShiftDay(snapshot.shiftDay ?? null); // #1047: absent while the cap flag is off
     if (snapshot.market) setMarket(snapshot.market);
     if (snapshot.playerMarket) setPlayerMarket(snapshot.playerMarket);
     if ('election' in snapshot)setElection(snapshot.election??null);
@@ -1644,11 +1654,11 @@ export default function Home() {
       else if (priorNationShift.currency === 'CRN') startAurelleAction('aurelle-claim-work', priorNationShift.id);
       else if (priorNationShift.currency === 'CUR') void claimNationShift(priorNationShift.id); // #487: generic wage ledger
       else void runWork('claim-work', undefined, priorNationShift.id); }} />;
-  const korundPanel = <KorundPlanPanel plan={korundPlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
+  const korundPanel = <KorundPlanPanel plan={korundPlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)} shiftDay={shiftDay}
     uncertain={Boolean(korundCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
     onCommand={startKorundAction} onGray={startGrayAction} onRetry={() => { if (korundIntent.current) void runKorundCommand(korundIntent.current); }}
     onRefresh={() => void runWork('refresh-work')} />;
-  const aurellePanel = <AurellePlanPanel plan={aurellePlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)}
+  const aurellePanel = <AurellePlanPanel plan={aurellePlan} scene={viewMode} capacity={capacity} pending={workPending} otherShiftActive={Boolean(priorNationShift)} shiftDay={shiftDay}
     uncertain={Boolean(aurelleCommand || korundCommand || marketCommand || playerCommand)} localDemo={!clerkConfigured} error={workError} onNavigate={changeView}
     onCommand={startAurelleAction} onRetry={() => { if (aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }} onRefresh={() => void runWork('refresh-work')} />;
   // #344: Korund's State store and Aurelle's royal store are not the flagged market. The local demo and guest sandbox have no server flag.
@@ -1761,7 +1771,7 @@ export default function Home() {
       </>}
       {viewMode === 'workplace' && !['korund','aurelle'].includes(citizenNation.id) && <>
         <WorkSummary capacity={capacity} contributions={availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length} onMarket={marketShown ? () => changeView('market') : undefined} />
-        <WorkShiftBoard onNavigate={changeView} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
+        <WorkShiftBoard onNavigate={changeView} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} shiftDay={shiftDay} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
           onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
         <section className="scene-work-orders"><h2>Available contributions</h2>
           {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <ActionButton key={order.id} type="button"
@@ -1950,7 +1960,7 @@ export default function Home() {
       : viewMode === 'world' || viewMode === 'nation' ? 'Nations' : viewMode === 'square' ? 'City destinations' : viewMode === 'country' ? `${countryWord()} travel` : 'Household';
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} onWelcomeBack={setWelcomeBack} />}
-    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} openNations={previewOpenNations(openNations, clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} armyMap={armyMapFlag} wcNote={currentCityAccount?.spaWcNote} countdown={guestActive || !citizenNation ? undefined : { nationId: citizenNation.id, cycleStartAt, election, wars: simulation?.wars ?? null }} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldAges={worldAges} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
+    <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} openNations={previewOpenNations(openNations, clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} armyMap={armyMapFlag} wcNote={currentCityAccount?.spaWcNote} countdown={guestActive || !citizenNation ? undefined : { nationId: citizenNation.id, cycleStartAt, election, wars: simulation?.wars ?? null }} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldAges={worldAges} faithFestivalHud={faithFestivalHud} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
       currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} korundCoupons={citizenNation?.id === 'korund' && korundPlan ? { couponFoodRemaining: korundPlan.couponFoodRemaining, couponExpiresAt: korundPlan.couponExpiresAt } : undefined} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}

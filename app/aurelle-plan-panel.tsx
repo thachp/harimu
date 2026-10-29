@@ -33,9 +33,9 @@ export type AurellePlanView = {
 
 const actionStyle = { minHeight: 44, maxWidth: '100%', whiteSpace: 'normal' } as const;
 
-export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, onCommand, onRetry, onRefresh, onNavigate }: {
+export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, localDemo, error, otherShiftActive, shiftDay, onCommand, onRetry, onRefresh, onNavigate }: {
   plan: AurellePlanView | null; scene: SceneView; capacity: number; pending: boolean; uncertain: boolean;
-  localDemo: boolean; error: string | null; otherShiftActive?: boolean;
+  localDemo: boolean; error: string | null; otherShiftActive?: boolean; shiftDay?: { started: number; cap: number; resetsAt: string } | null;
   onCommand: (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void;
   onRetry: () => void; onRefresh: () => void; onNavigate: (scene: SceneView) => void;
 }) {
@@ -61,6 +61,7 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {scene === 'workplace' ? <>
         <p style={{ width: '100%' }}>{plan.charter.name} · {plan.charter.active ? 'Active' : 'Inactive'}<br />4 WC · {formatDuration(7200000)} real / {formatDuration(7200000 * gameTimeCompression)} game · 8 CRN and 2 Favor on collection.</p>
+        {shiftDay ? <p>Shifts today: {shiftDay.started} of {shiftDay.cap}. Resets after the daily tick ({shiftDay.resetsAt}).</p> : null}
         {active ? <><GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" /><p style={{ width: '100%' }}>{active.orderName} · {ready ? 'Ready to collect' : now ? `${Math.max(1, Math.ceil((Date.parse(active.completesAt) - now) / 60000))} min remaining` : 'Checking timer…'}</p><ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([!now, 'Checking the service timer…'], [!ready, 'Service is underway. Collect after it finishes.'])} onClick={() => onCommand('aurelle-claim-work', active.id)}>Collect service reward</ActionButton></> : <ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending, uncertain) ?? firstActionReason([otherShiftActive, 'Collect your earlier nation’s shift first.'], [!plan.charter.active, 'An active charter is required for service.'], [capacity < 4, 'You need 4 WC. Prepare a meal or wait for capacity recovery.'], [plan.publicFundMinor < 800, 'The service fund cannot cover another reward yet.'])} onClick={() => onCommand('aurelle-start-work')}>Begin chartered service · 4 WC</ActionButton>}
         {otherShiftActive && <p style={{ width: '100%' }}>Collect your earlier nation’s shift first.</p>}
         {!active && plan.publicFundMinor < 800 && <p style={{ width: '100%' }}>The finite service fund cannot cover another reward yet.</p>}

@@ -97,7 +97,9 @@
       // #1016: closed Kindle presidential ballot shows High Court certification (awaiting for 24 hours, then certified). Off: no certification field, ballot unchanged. Display only.
       "HARIMU_KINDLE_CERTIFICATION_ENABLED": "true",
       // #1033: game season scales farming shift output (docs §17.1). Off: the same units and the same result line.
-      "HARIMU_SEASON_FARMING_ENABLED": "true"
+      "HARIMU_SEASON_FARMING_ENABLED": "true",
+      // #1047: daily soft cap on productive shifts (docs §17.3). Off: no count, no refusal, no extra query.
+      "HARIMU_SHIFT_SOFT_CAP_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
@@ -258,8 +260,8 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "true",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "true",
-    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1055: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
-    // The client build expands each NEXT_PUBLIC_* name. HARIMU_WORLD_AGES_ENABLED stays in the pack and is read with flagOn. A direct string binding still wins.
+    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1048/#1055: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
+    // The client build expands each NEXT_PUBLIC_* name. HARIMU_WORLD_AGES_ENABLED and HARIMU_FAITH_FESTIVAL_HUD_ENABLED stay in the pack and are read with flagOn. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "true",
       "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "true",
@@ -272,7 +274,8 @@
       "NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP": "true",
       "NEXT_PUBLIC_HARIMU_KORUND_WALLET_RATIONS": "true",
       "HARIMU_WORLD_AGES_ENABLED": "true",
-      "NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE": "true"
+      "NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE": "true",
+      "HARIMU_FAITH_FESTIVAL_HUD_ENABLED": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",

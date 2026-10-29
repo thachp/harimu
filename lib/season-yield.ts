@@ -26,14 +26,22 @@ export function seasonEffectLine(season: GameSeason): string {
 /** 7.5 real days, in integer seconds. Not a 7.5 float. */
 export const seasonLengthSeconds = (15 * 86_400) / 2;
 
+export type IntegerClock = { epochSeconds: number; nowSeconds: number };
 type SeasonClock = { epochSeconds?: number | null; nowSeconds?: number | null } | null | undefined;
 
-/** Season index on the integer clock. Null when there is no clock. A missing clock is not epoch 0. */
-function seasonIndex(clock: SeasonClock): number | null {
+/** Both fields integers, or null. A missing clock is not epoch 0. Shared by seasonAt, gameYearAt, and the shift-day cap. */
+export function integerClock(clock: SeasonClock): IntegerClock | null {
   if (!clock) return null;
   const epoch = clock.epochSeconds, now = clock.nowSeconds;
   if (typeof epoch !== 'number' || typeof now !== 'number' || !Number.isInteger(epoch) || !Number.isInteger(now)) return null;
-  return Math.floor(Math.max(0, now - epoch) / seasonLengthSeconds);
+  return { epochSeconds: epoch, nowSeconds: now };
+}
+
+/** Season index on the integer clock. Null when there is no clock. A missing clock is not epoch 0. */
+function seasonIndex(clock: SeasonClock): number | null {
+  const tick = integerClock(clock);
+  if (!tick) return null;
+  return Math.floor(Math.max(0, tick.nowSeconds - tick.epochSeconds) / seasonLengthSeconds);
 }
 
 /** The season for a world clock `{ epochSeconds, nowSeconds }`, both integers. Null when there is no clock.

@@ -43,6 +43,8 @@ export const shiftSchema = `CREATE TABLE IF NOT EXISTS work_shifts (
 )`;
 export const activeShiftIndex = `CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_shift
   ON work_shifts(clerk_user_id) WHERE claimed_at IS NULL`;
+/** #1047: the daily soft-cap count is one citizen's shifts in a started_at range. */
+export const shiftDayIndex = `CREATE INDEX IF NOT EXISTS idx_work_shifts_user_started ON work_shifts(clerk_user_id, started_at)`;
 
 export const startShiftSql = `INSERT INTO work_shifts
   (id, clerk_user_id, work_order_id, order_name, output, capacity_spent, started_at, completes_at)

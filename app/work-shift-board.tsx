@@ -15,7 +15,13 @@ const seasonHistory = (output: string) => { const mark = output.match(/ · ([A-Z
 import type { SceneView } from '@/lib/scene-navigation';
 import { describeKindlePay } from '@/lib/income-tax';
 
-export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onRefresh, onClaim, onNavigate }: {
+/** [ASSUMPTION] the reset sentence. The count line is the issue's "Shifts today: N of 3". Absent when the cap flag is off. */
+export function ShiftsToday({ day }: { day?: { started: number; cap: number; resetsAt: string } | null }) {
+  if (!day) return null;
+  return <p>Shifts today: {day.started} of {day.cap}. Resets after the daily tick ({day.resetsAt}).</p>;
+}
+
+export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onRefresh, onClaim, onNavigate, shiftDay }: {
   onNavigate?: (view: SceneView) => void;
   shifts: WorkShift[];
   economy: Economy | null;
@@ -24,6 +30,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
   localDemo: boolean;
   error: string | null;
   onClaim: (id: string) => void;
+  shiftDay?: { started: number; cap: number; resetsAt: string } | null;
 }) {
   const formatTime=useDisplayTimestamp();
   const [now, setNow] = useState(0);
@@ -51,6 +58,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
       <button type="button" disabled={pending} aria-describedby={pending ? "work-pending-reason" : undefined} onClick={onRefresh}>Refresh citizen account</button>
       {pending && <small id="work-pending-reason">An action is being saved. Please wait.</small>}
       <p>One shift at a time. Work continues while you are away.</p>
+      <ShiftsToday day={shiftDay} />
       {error && <p role="alert">{error}</p>}
       {active ? (
         <div>
