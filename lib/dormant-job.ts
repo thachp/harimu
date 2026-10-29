@@ -32,11 +32,11 @@ const doomed = (user: boolean) => `SELECT s.id FROM work_shifts s WHERE s.claime
   AND NOT EXISTS (SELECT 1 FROM crown_issuances t WHERE t.shift_id=s.id)
   AND NOT EXISTS (SELECT 1 FROM labor_note_issuances t WHERE t.shift_id=s.id)`;
 
-/** Release every dormant citizen, or one citizen when userId is set. Safe to call again. */
-export async function releaseDormantJobs(db: GameDatabase, now: number, userId?: string): Promise<void> {
+/** Statements for one batch. advanceWorld appends these to its clock batch so a world GET gains no round trip (#679). */
+export function dormantJobStatements(db: GameDatabase, now: number, userId?: string) {
   const cut = dormantAt(now), one = Boolean(userId), tail = one ? [cut, userId] : [cut];
   const drop = (table: string, column: string) => db.prepare(`DELETE FROM ${table} WHERE ${column} IN (${doomed(one)})`).bind(...tail);
-  await db.batch([
+  return [
     db.prepare(`INSERT INTO dormant_job_releases (absence_key,clerk_user_id,job_id,released_at)
       SELECT absence_key,clerk_user_id,job_id,? FROM (
         SELECT c.clerk_user_id || ':' || c.last_active_at AS absence_key, c.clerk_user_id AS clerk_user_id, COALESCE(${heldJob}, ${openShift}) AS job_id
@@ -44,7 +44,12 @@ export async function releaseDormantJobs(db: GameDatabase, now: number, userId?:
       ) held WHERE job_id IS NOT NULL ON CONFLICT (absence_key) DO NOTHING`).bind(now, ...tail),
     drop('shift_rewards', 'shift_id'), drop('shift_quality', 'shift_id'), drop('korund_work_starts', 'id'), drop('nation_wage_starts', 'shift_id'),
     db.prepare(`DELETE FROM work_shifts WHERE id IN (${doomed(one)})`).bind(...tail),
-  ]);
+  ];
+}
+
+/** Release every dormant citizen, or one citizen when userId is set. Safe to call again. */
+export async function releaseDormantJobs(db: GameDatabase, now: number, userId?: string): Promise<void> {
+  await db.batch(dormantJobStatements(db, now, userId));
 }
 
 /** True when this absence (the raw last_active_at, not a reformatted copy) released a job. */
