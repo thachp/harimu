@@ -97,6 +97,7 @@ test('Policy Ledger rows show each public brief behind Why?; flag off the panel 
   const exports = {};
   new Function('exports', 'require', 'module', js)(exports, name => ({
     './nation-document': { NationDocument: ({ children }) => React.createElement('div', null, children) },
+    './nation-crest': { NationCrest: () => null }, '../lib/aurelle-sealed-scrolls': require('../lib/aurelle-sealed-scrolls.ts'),
     '../lib/leader-personas': require('../lib/leader-personas.ts'), '../lib/government-disclosure': require('../lib/government-disclosure.ts'), '../lib/decision-disclosure-copy': require('../lib/decision-disclosure-copy.ts'),
     './game-timer': { GameTimer: () => null }, './ai-disclosure': { AiBadge: () => React.createElement('small', { className: 'ai-badge' }, 'SI'), AiTextTag: () => React.createElement('small', null, 'Simulated statement') },
   })[name] ?? require(name), { exports });

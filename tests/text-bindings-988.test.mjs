@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { expandFlagPacks, flagOn, flagValue } from '../lib/flag-pack.mjs';
+import { expandFlagPacks, flagOn, flagValue, varsForProcessEnv } from '../lib/flag-pack.mjs';
 import { armiesEnabled } from '../lib/army-rules.ts';
 import { dashboardManagedVars } from '../scripts/wrangler-pin.mjs';
 
@@ -42,11 +42,17 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_CITY_TIER_GROWTH_ENABLED, 'true');
   assert.equal('HARIMU_GRAY_PACK' in expandFlagPacks(preview.vars), false);
   assert.equal('HARIMU_CITY_PACK' in expandFlagPacks(preview.vars), false);
+  assert.equal('HARIMU_AURELLE_PACK' in expandFlagPacks(preview.vars), false);
   assert.equal(flagOn(on, 'HARIMU_AURELLE_TSR_VIEW_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CROWN_DEBASEMENT_ENABLED'), true);
   assert.equal(flagOn({ ...on, HARIMU_AURELLE_TSR_VIEW_ENABLED: 'false' }, 'HARIMU_AURELLE_TSR_VIEW_ENABLED'), false, 'a direct binding wins over the Aurelle pack');
   assert.equal(flagOn({ HARIMU_AURELLE_PACK: prod.vars.HARIMU_AURELLE_PACK }, 'HARIMU_AURELLE_RISING_ENABLED'), false);
   assert.equal(expandFlagPacks(preview.vars).HARIMU_AURELLE_TSR_VIEW_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_AURELLE_TSR_VIEW_ENABLED, 'false');
-  assert.equal('HARIMU_AURELLE_PACK' in expandFlagPacks(preview.vars), false);
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, undefined, 'the sealed-scroll flag is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, 'true', 'the client build still inlines the packed flag');
+  assert.equal(varsForProcessEnv(prod.vars).NEXT_PUBLIC_HARIMU_NATION_SKIN, 'false');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_NATION_SKIN: 'false' }).NEXT_PUBLIC_HARIMU_NATION_SKIN, 'false', 'a direct string wins');
 });

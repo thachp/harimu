@@ -82,7 +82,7 @@ async function loadPanel() {
   const js = ts.transpileModule(src, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const exports = {};
   new Function('exports', 'require', 'module', js)(exports, name => ({
-    './nation-document': { NationDocument: ({ children }) => React.createElement('div', null, children) }, '../lib/leader-personas': personas, '../lib/government-disclosure': disclosure, '../lib/decision-disclosure-copy': require('../lib/decision-disclosure-copy.ts'),
+    './nation-document': { NationDocument: ({ children }) => React.createElement('div', null, children) }, './nation-crest': { NationCrest: () => null }, '../lib/aurelle-sealed-scrolls': require('../lib/aurelle-sealed-scrolls.ts'), '../lib/leader-personas': personas, '../lib/government-disclosure': disclosure, '../lib/decision-disclosure-copy': require('../lib/decision-disclosure-copy.ts'),
     './game-timer': { GameTimer: () => null }, './ai-disclosure': { AiBadge: () => null, AiTextTag: () => null },
   })[name] ?? require(name), { exports });
   return exports.LeaderPanel;
