@@ -93,6 +93,8 @@ const korundStandingOn = () => korundStandingEnabled(env);
 const korundShortfallOn = () => flagOn(env, 'HARIMU_KORUND_SHORTFALL_ENABLED');
 // #758: rumored LN street rate in the Korund wallet (HARIMU_WALLET_STREET_RATE_ENABLED); off = no read, wallet unchanged.
 const walletStreetRateOn = () => flagOn(env, 'HARIMU_WALLET_STREET_RATE_ENABLED');
+// #1000: LN balance quoted in TSR at the Bureau rate. Read only. Off: no bureauTsr key, wallet line unchanged.
+const korundTsrViewOn = () => flagOn(env, 'HARIMU_KORUND_TSR_VIEW_ENABLED');
 // #776: a closed-week plan shortfall withdraws ration coupons from this week's book (HARIMU_KORUND_RATION_CUT_ENABLED); off = coupons unchanged.
 const korundRationCutOn = () => flagOn(env, 'HARIMU_KORUND_RATION_CUT_ENABLED');
 // #967: a #776 ration cut also lowers Korund Stability. Needs the cut flag too; off leaves the score and the notice unchanged.
@@ -104,7 +106,7 @@ const graySeizureOn = () => flagOn(env, 'HARIMU_GRAY_SEIZURE_ENABLED');
 const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), emissionCaps: emissionCapsEnabled(env as never), laborBureau: laborBureauOn(), grayMarket: grayMarketOn(), grayDailyCap: grayDailyCapOn(), graySuspicion: graySuspicionOn(), graySeizure: graySeizureOn(), medals: korundMedalsOn(), shortfall: korundShortfallOn(), streetRate: walletStreetRateOn(), rationCut: korundRationCutOn(), rationStability: korundRationStabilityOn(), rationRecovery: korundStabilityRecoveryOn() });
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
-const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn(), standing: korundStandingOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged. #994 standing is read-only too.
+const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn(), standing: korundStandingOn(), bureauTsr: korundTsrViewOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged. #994 standing and #1000 Bureau quote are read-only too.
 
 export const dynamic = 'force-dynamic';
 const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);

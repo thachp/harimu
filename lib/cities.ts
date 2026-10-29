@@ -104,3 +104,14 @@ export const CITY_CIVIC_UNIT_BY_NATION: Readonly<Record<string, string>> = {
 export function cityCivicUnitNote(nationId: string): string | null {
   return CITY_CIVIC_UNIT_BY_NATION[nationId] ?? null;
 }
+
+/** #1007: read-only governor line for the city panel (docs Territory, Cities & Warfare §15.2: "an AI governor (an AI Mayor
+ *  elected by human citizens in Kindle; appointed elsewhere)"; Cities tier table: T2 Town unlocks "a local governor").
+ *  [ASSUMPTION] No Kindle mayor exists in data yet and no nation's appointing office is named in lore, so the generic labels show. */
+export const KINDLE_GOVERNOR_NOTE = 'AI Mayor, elected by citizens';
+export const APPOINTED_GOVERNOR_NOTE = 'AI governor, appointed';
+export const NO_GOVERNOR_NOTE = 'No local governor yet (unlocks at Town tier)';
+export function cityGovernorFields(nationId: string, tier: number): { governorNote: string; governorAi: boolean } {
+  if (tier < 2) return { governorNote: NO_GOVERNOR_NOTE, governorAi: false };
+  return { governorNote: nationId === 'kindle' ? KINDLE_GOVERNOR_NOTE : APPOINTED_GOVERNOR_NOTE, governorAi: true };
+}
