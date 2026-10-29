@@ -35,3 +35,21 @@ export function outpostCityForNation(nationId: string): City | undefined {
   const o = outposts[nationId]; if (!o) return undefined;
   return { id: o.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), nationId, name: o.name, capital: false, role: o.role, description: o.description };
 }
+
+/** #996: read-only specialty note from the Cities catalog / nation Cities tables (docs What a city does > Jobs).
+ *  Capitals show as "Capital"; Port / Trade zone roles also mention imports. [ASSUMPTION] Founded or unknown
+ *  cities (not in this catalog or the #123 outpost list) omit specialty fields until catalogued. */
+export type CitySpecialtyFields = { specialtyRole: string; specialtyNote: string };
+export function citySpecialtyFields(nationId: string, cityId: string): CitySpecialtyFields | null {
+  const outpost = outpostCityForNation(nationId);
+  const city = cityForNation(nationId, cityId) ?? (outpost && outpost.id === cityId ? outpost : undefined);
+  if (!city) return null;
+  const specialtyRole = city.role === 'capital' ? 'Capital' : city.role === 'frontier' ? 'Frontier' : String(city.role);
+  const portOrTrade = /port|trade zone/i.test(specialtyRole);
+  const specialtyNote = city.role === 'capital'
+    ? 'Jobs and national institutions are based here.'
+    : portOrTrade
+      ? "Jobs here match this city's specialty. A port or trade zone adds imports."
+      : "Jobs here match this city's specialty.";
+  return { specialtyRole, specialtyNote };
+}

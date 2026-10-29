@@ -3,7 +3,7 @@ import {getDatabase} from '@/lib/db';
 import {startCityTravel} from '@/lib/travel';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {cityForNation} from '@/lib/cities';
+import {cityForNation,citySpecialtyFields} from '@/lib/cities'; // #996 specialty
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote} from '@/lib/city-tier'; // #979 / #984
 export const dynamic='force-dynamic';
@@ -14,11 +14,12 @@ async function context(request:Request){
  return {db,userId,nationId:citizen?.nation_id??null,now:Math.floor(Date.now()/1000)};
 }
 
-async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,cityId:string,body:Record<string,unknown>){
- const vars=env as unknown as {HARIMU_CITY_TIER_UNLOCKS_ENABLED?:string;HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?:string;HARIMU_CITY_TIER_GROWTH_ENABLED?:string};
+async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nationId:string,cityId:string,body:Record<string,unknown>){
+ const vars=env as unknown as {HARIMU_CITY_TIER_UNLOCKS_ENABLED?:string;HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?:string;HARIMU_CITY_TIER_GROWTH_ENABLED?:string;HARIMU_CITY_SPECIALTY_NOTE_ENABLED?:string};
  const unlocksOn=vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED==='true';
  const noteOn=vars.HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED==='true';
- if(!unlocksOn&&!noteOn)return body;
+ const specialtyOn=vars.HARIMU_CITY_SPECIALTY_NOTE_ENABLED==='true'; // #996
+ if(!unlocksOn&&!noteOn&&!specialtyOn)return body;
  let tier=1;
  if(vars.HARIMU_CITY_TIER_GROWTH_ENABLED==='true'){
   const row=await db.prepare('SELECT tier FROM world_cities WHERE id=?').bind(cityId).first<{tier:number}>();
@@ -27,12 +28,13 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,cityId
  let out:Record<string,unknown>={...body};
  if(unlocksOn)out={...out,...cityTierUnlockFields(tier)};
  if(noteOn)out={...out,festivalNote:cityTierFestivalNote(tier)}; // #984 read-only
+ if(specialtyOn){const s=citySpecialtyFields(nationId,cityId);if(s)out={...out,...s};} // #996 catalog only
  return out;
 }
 export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json(await withTierUnlocks(ctx.db,location.currentCityId,{...location,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now)}));
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now)}));
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
@@ -53,5 +55,5 @@ export async function POST(request:Request){
  ]);
  if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json(await withTierUnlocks(ctx.db,current.currentCityId,{...current,homeCityId:location.homeCityId,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now)}));
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now)}));
 }
