@@ -264,6 +264,8 @@
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
     // #1023: HUD world clock shows the current game season and the countdown to the next (docs §17.1, 7.5 real days each). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_SEASON_CLOCK": "true",
+    // #1029: HUD shows the nation's next festival in game time (docs §17.1). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_FESTIVAL_CALENDAR": "true",
     // #790: square chat shadow-mute (docs 21.3), new messages only. Operator list of citizenId@muteISO or citizenId@muteISO..unmuteISO entries (max 90; unmute by closing the window, not deleting it), comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.
     // #790 unmute: close the window (id@mute..unmute) so posts made during the mute stay hidden. Deleting an entry reveals that window's posts; only do it as a deliberate admin action.
     "HARIMU_CHAT_SHADOW_MUTE": "",
