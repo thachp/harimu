@@ -5,7 +5,8 @@ import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { armiesEnabled, armyDrillsEnabled, parseArmyCommand } from '@/lib/army-rules';
 import { readArmy, runArmyCommand } from '@/lib/army';
 import { serviceUntil } from '@/lib/army-conscription';
-import { readActiveWars } from '@/lib/army-map';
+import { marchPace, readActiveWars, winterRoadNote } from '@/lib/army-map';
+import { winterMarchEnabled } from '@/lib/winter-march'; // #1038
 import { applySupplyLoss, armySupplyEnabled, unitSupply } from '@/lib/army-supply';
 import { armyBattlesEnabled, readBattles, withBattleLosses } from '@/lib/army-battle';
 import { unitById } from '@/lib/army-rules';
@@ -24,23 +25,25 @@ export async function GET(request: Request) {
   // ARC on #839: GET never writes; the draft and term-end release run on POST /api/army/draft (the card's open action).
   const until = await serviceUntil(db, userId, now);
   const army = await readArmy(db, userId, now, armyDrillsEnabled(env));
+  const pace = await marchPace(db, winterMarchEnabled(env)); // flag off: no clock read
   // #738 battle losses: carried losses first, then the #897 supply loss below, the same order as battle resolution (QA2 on #940).
   if (army.unit && army.unit.strength !== undefined && armyBattlesEnabled(env)) army.unit = { ...army.unit, strength: await withBattleLosses(db, army.unit.id, army.unit.strength, now) };
   const unit = army.unit;
   // #738 slice 5: a cut supply line lowers the shown strength (only while HARIMU_ARMY_SUPPLY_ENABLED is on and strength is shown; off: no extra read).
   if (unit && unit.strength !== undefined && armySupplyEnabled(env)) {
-    const supply = unitSupply(unitById(unit.id)?.nationId ?? '', await readActiveWars(db), now);
+    const supply = unitSupply(unitById(unit.id)?.nationId ?? '', await readActiveWars(db), now, undefined, pace);
     army.unit = { ...unit, strength: applySupplyLoss(unit.strength, supply.strengthLossPct), supply };
   }  // #738 battles: your unit's battle (as attacker or defender), with the strength it has left, only while HARIMU_ARMY_BATTLES_ENABLED is on.
   const nationId = army.unit ? unitById(army.unit.id)?.nationId : undefined;
   if (army.unit && army.unit.strength !== undefined && nationId && armyBattlesEnabled(env)) {
-    const battle = (await readBattles(db, await readActiveWars(db), now)).find(b => b.attackerNationId === nationId || b.defenderNationId === nationId);
+    const battle = (await readBattles(db, await readActiveWars(db), now, pace)).find(b => b.attackerNationId === nationId || b.defenderNationId === nationId);
     if (battle) army.unit = { ...army.unit, strength: battle.attackerNationId === nationId ? battle.attackerStrength : battle.defenderStrength, battle: { opponentNationId: battle.attackerNationId === nationId ? battle.defenderNationId : battle.attackerNationId, attacking: battle.attackerNationId === nationId, rounds: battle.rounds, status: battle.status } };
   }
 
   // #911: a wounded citizen sees when they are back in action (flag off: no extra read).
   const wounded = armyBattlesEnabled(env) ? await readWoundedUntil(db, userId, now) : null;
-  return privateJson({ army: { ...army, ...(until ? { serveUntil: until } : {}), ...(wounded ? { woundedUntil: wounded } : {}) } });
+  const march = pace && nationId ? winterRoadNote(nationId, await readActiveWars(db), now, pace) : null;
+  return privateJson({ army: { ...army, ...(march ? { march } : {}), ...(until ? { serveUntil: until } : {}), ...(wounded ? { woundedUntil: wounded } : {}) } });
 }
 
 /** POST {action:'join', unitId} | {action:'leave'} | {action:'stance', stance}, each with a requestId (replay returns the current state, writes nothing). */
