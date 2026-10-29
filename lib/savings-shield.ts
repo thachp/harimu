@@ -4,10 +4,11 @@
  *  which is both the treasury debit and the wallet credit (status 'paid'), or a logged skip with its reason. Flag HARIMU_SAVINGS_SHIELD_ENABLED. */
 import type { GameDatabase } from './database-contract';
 import { kindleTreasuryBalanceSql } from './economy';
+import { flagOn } from './flag-pack.mjs';
 import { readReserveBoard } from './spark-supply';
 import { DORMANCY_DAYS } from './dormancy-rules';
 export { savingsShieldCreditsSchema } from './market-orders';
-export const savingsShieldEnabled = (env: { HARIMU_SAVINGS_SHIELD_ENABLED?: string } | null | undefined) => env?.HARIMU_SAVINGS_SHIELD_ENABLED === 'true';
+export const savingsShieldEnabled = (env: unknown) => flagOn(env, 'HARIMU_SAVINGS_SHIELD_ENABLED');
 /** [ASSUMPTION] the docs' cap is "about 30 game days of the nation's median wage": 30 x 800 minor (one 800-minor Kindle shift per game day) = 240 SPK. */
 /** ARC (Oct 23): the cap stays 240 SPK (30 game days of an 800-minor daily wage). */
 export const SHIELD_CAP_MINOR = 30 * 800;
