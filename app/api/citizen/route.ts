@@ -65,7 +65,7 @@ async function nationWorkPlanPart(database: Awaited<ReturnType<typeof getDatabas
   const plan = await readNationWork(database, userId, options);
   return plan ? { nationWorkPlan: plan } : {};
 }
-const laborBureauOn = () => (env as unknown as { HARIMU_LABOR_BUREAU_ENABLED?: string }).HARIMU_LABOR_BUREAU_ENABLED === 'true';
+const laborBureauOn = () => flagOn(env, 'HARIMU_LABOR_BUREAU_ENABLED');
 // #43: the Korund gray market ships off (HARIMU_GRAY_MARKET_ENABLED).
 const grayMarketOn = () => flagOn(env, 'HARIMU_GRAY_MARKET_ENABLED');
 // #968: a #776 ration cut adds one shortage line on the rumored street rate (HARIMU_GRAY_RATION_RISE_ENABLED). Off: no line. Read model only.
