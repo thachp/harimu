@@ -4,6 +4,6 @@ import type { KorundRationLine } from '@/lib/korund-wallet-rations';
  *  Each word is its own nowrap item. A narrow top bar wraps between words. */
 export function KorundWalletRations({ line }: { line: KorundRationLine | null }) {
   if (!line) return null;
-  const parts = line.expired ? ['·', 'expired'] : ['·', String(line.remaining), 'food', 'coupons'];
+  const parts = line.expired ? ['·', 'expired'] : ['·', ...line.text.split(' ')];
   return <>{parts.map(word => <span key={word} className="game-wallet-ration">{` ${word}`}</span>)}</>;
 }

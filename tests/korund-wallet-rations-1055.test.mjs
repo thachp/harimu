@@ -47,7 +47,8 @@ test('the line matches the plan count, says that count in words, and says expire
   assert.equal(couponCountWords(0), 'zero'); assert.equal(couponCountWords(3), 'three'); assert.equal(couponCountWords(21), 'twenty one');
   const live = korundWalletRations('korund', coupons(3), now, true);
   assert.equal(live.text, '3 food coupons'); assert.equal(live.words, 'three food coupons'); assert.equal(live.expired, false);
-  assert.equal(korundWalletRations('korund', coupons(1), now, true).words, 'one food coupon');
+  const one = korundWalletRations('korund', coupons(1), now, true);
+  assert.equal(one.text, '1 food coupon'); assert.equal(one.words, 'one food coupon');
   assert.equal(korundWalletRations('korund', coupons(0), now, true).text, '0 food coupons');
   const ended = korundWalletRations('korund', coupons(3, '2026-06-01T00:00:00.000Z'), now, true);
   assert.equal(ended.expired, true); assert.equal(ended.text, 'expired'); assert.equal(ended.words, 'three food coupons');
@@ -69,6 +70,10 @@ test("Korund with plan data shows the coupon count; Korund with no plan, and eve
   assert.match(shown, /game-wallet-rations/);
   assert.match(shown, /LN<span class="game-wallet-ration"> ·<\/span><span class="game-wallet-ration"> 3<\/span><span class="game-wallet-ration"> food<\/span><span class="game-wallet-ration"> coupons<\/span>/);
   assert.match(shown, /aria-label="Wallet, 8\.00 Labor Notes\. Three food coupons\."/);
+  const one = withFlag('true', () => shell('korund', coupons(1)));
+  assert.match(one, /LN<span class="game-wallet-ration"> ·<\/span><span class="game-wallet-ration"> 1<\/span><span class="game-wallet-ration"> food<\/span><span class="game-wallet-ration"> coupon<\/span>/);
+  assert.doesNotMatch(one, /game-wallet-ration"> coupons</);
+  assert.match(one, /aria-label="Wallet, 8\.00 Labor Notes\. One food coupon\."/);
   assert.match(shown, /Remaining food coupons this week: three food coupons\./);
   const ended = withFlag('true', () => shell('korund', coupons(2, '2000-01-01T00:00:00.000Z')));
   assert.match(ended, /game-wallet-ration"> expired</);

@@ -33,7 +33,8 @@ export function korundWalletRations(nationId: string | undefined, coupons: Korun
   if (!Number.isFinite(expires)) return null;
   const expired = expires <= now;
   const words = remaining === 1 ? 'one food coupon' : `${couponCountWords(remaining)} food coupons`;
-  return { remaining, words, expired, text: expired ? 'expired' : `${remaining} food coupons` };
+  const text = expired ? 'expired' : remaining === 1 ? '1 food coupon' : `${remaining} food coupons`;
+  return { remaining, words, expired, text };
 }
 
 const walletHelp = (code: string) => `Your ${code} wallet holds national money. Amounts update after completed transactions; loading means the citizen snapshot has not arrived.`;
