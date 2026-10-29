@@ -10,9 +10,11 @@ export const isFarmingShift = (jobId: string) => jobTypeOf(jobId) === 'farming';
 /** [ASSUMPTION] integer percents of base units until ARC picks others: spring 100, summer 110, autumn 120, winter 70. */
 export const seasonYieldPercents: Record<GameSeason, number> = { spring: 100, summer: 110, autumn: 120, winter: 70 };
 
-/** Integer units: floor(base × percent / 100), never below 1. A base of 4 floors summer and autumn back to 4; winter is 2. */
-export function seasonYieldUnits(baseUnits: number, season: GameSeason): number {
-  return Math.max(1, Math.floor(baseUnits * seasonYieldPercents[season] / 100));
+/** Integer units: floor(base × percent / 100), never below 1. A base of 4 floors summer and autumn back to 4; winter is 2.
+ *  A base of 0 or less is returned unchanged so a season cannot mint food from nothing. */
+export function seasonYieldUnits(base: number, season: GameSeason): number {
+  const pct = seasonYieldPercents[season];
+  return base <= 0 ? base : Math.max(1, Math.floor(base * pct / 100));
 }
 
 /** [ASSUMPTION] result-line copy. The minus is U+2212, matching the wallet. Spring is "+0%". Percent is pct − 100. */

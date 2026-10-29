@@ -23,6 +23,8 @@ test('each season multiplier floors, and 1 unit is the floor', () => {
   assert.equal(seasonYieldUnits(4, 'autumn'), Math.max(1, Math.floor(4 * 120 / 100)));
   assert.equal(seasonYieldUnits(4, 'winter'), 2);
   assert.equal(seasonYieldUnits(1, 'winter'), 1);
+  assert.equal(seasonYieldUnits(0, 'winter'), 0, 'a zero base mints nothing');
+  assert.equal(seasonYieldUnits(-2, 'summer'), -2);
   assert.equal(seasonEffectLine('winter'), 'Winter: −30% harvest');
   assert.equal(seasonEffectLine('autumn'), 'Autumn: +20% harvest');
   assert.equal(storedFoodUnits('4 food contributed to state ration supply', 4), null);
@@ -107,6 +109,26 @@ test('flag on: Korund and Aurelle winter food is below an autumn shift; flag off
   assert.equal(autumn.food, 4); assert.match(autumn.output, /Autumn: \+20% harvest/);
   assert.equal(winter.food, 2); assert.match(winter.output, /^2 food/); assert.match(winter.output, /Winter: −30% harvest/);
   assert.ok(winter.food < autumn.food);
+});
+
+test('Korund winter claim settles food_output 2 with caps off and caps on, and still pays the stamped line if the flag is then off', async t => {
+  for (const caps of [false, true]) {
+    const r = await localRuntime(); t.after(() => r.close());
+    r.setFixtureEnv('HARIMU_SEASON_FARMING_ENABLED', 'true');
+    if (caps) r.setFixtureEnv('HARIMU_EMISSION_CAPS_ENABLED', 'true');
+    await r.db.prepare("UPDATE citizens SET nation_id='korund', capacity=24 WHERE clerk_user_id='alice'").run();
+    await setSeason(r, 3);
+    const id = randomUUID();
+    assert.equal((await r.call('citizen', 'alice', { action: 'korund-start-work', requestId: id })).status, 200);
+    assert.match((await r.db.prepare('SELECT output FROM work_shifts WHERE id=?').bind(id).first()).output, /^2 food/);
+    r.setFixtureEnv('HARIMU_SEASON_FARMING_ENABLED', 'false');
+    r.setNow(r.now + 7200 * 1000);
+    const claim = await r.call('citizen', 'alice', { action: 'korund-claim-work', shiftId: id });
+    assert.equal(claim.status, 200, `caps ${caps} ${JSON.stringify(claim.data)}`);
+    const row = await r.db.prepare('SELECT food_output, wage_minor FROM korund_settlements WHERE shift_id=?').bind(id).first();
+    assert.equal(Number(row.food_output), 2, `caps ${caps}`);
+    assert.equal(Number(row.wage_minor), 800);
+  }
 });
 
 test('a direct false string wins over a true pack on the harvest route', async t => {

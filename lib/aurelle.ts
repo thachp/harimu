@@ -215,9 +215,9 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  }
  else if(command.action==='aurelle-claim-work'){
   // #957: always write a Crown issuance for the food-estate wage; #885 cap guard only while the flag is on (flag-off settle binds stay byte-identical).
-  // #1033: food other than 4 is bound only when the start line stored a season mark. Otherwise aurelleSettleSql stays byte-identical.
-  const savedFood=options.seasonFarming&&shiftId?(await db.prepare('SELECT output FROM work_shifts WHERE id=? AND clerk_user_id=? AND work_order_id=?').bind(shiftId,userId,aurelleJob.id).first<{output:string}>())?.output:undefined;
-  const food=savedFood===undefined?null:storedFoodUnits(savedFood,aurelleJob.foodOutput);
+  // #1033: pay the food on the stamped start line, even if the season flag is off at claim. No season mark keeps aurelleSettleSql byte-identical.
+  const saved=shiftId?(await db.prepare('SELECT output FROM work_shifts WHERE id=? AND clerk_user_id=? AND work_order_id=?').bind(shiftId,userId,aurelleJob.id).first<{output:string}>())?.output:undefined;
+  const food=saved===undefined?null:storedFoodUnits(saved,aurelleJob.foodOutput);
   let claimReceipt=db.prepare(aurelleClaimReceiptSql).bind(id,now,shiftId,userId,iso,id);
   let foodSettle=db.prepare(aurelleSettleSql).bind(now,id,userId);
   let capStart=0,capEnd=0,capYear=0;

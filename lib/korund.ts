@@ -207,9 +207,9 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
   return paid?{status:200}:{status:409,error:'Assigned shift is unavailable, unfinished, or the finite Labor Note fund cannot pay it yet.'};
  }
  // #957: always write a Labor Note issuance for the brigade wage; #885 cap guard only while the flag is on (flag-off settle binds stay byte-identical).
- // #1033: food other than 4 is bound only when the start line stored a season mark. Otherwise korundSettleSql stays byte-identical.
- const savedFood=options.seasonFarming?(await db.prepare('SELECT output FROM work_shifts WHERE id=? AND clerk_user_id=? AND work_order_id=?').bind(shiftId,userId,korundJob.id).first<{output:string}>())?.output:undefined;
- const food=savedFood===undefined?null:storedFoodUnits(savedFood,korundJob.foodOutput);
+ // #1033: pay the food on the stamped start line, even if the season flag is off at claim. No season mark keeps korundSettleSql byte-identical.
+ const saved=(await db.prepare('SELECT output FROM work_shifts WHERE id=? AND clerk_user_id=? AND work_order_id=?').bind(shiftId,userId,korundJob.id).first<{output:string}>())?.output;
+ const food=saved===undefined?null:storedFoodUnits(saved,korundJob.foodOutput);
  let brigadeSettle=db.prepare(korundSettleSql).bind(now,shiftId,userId,iso);
  let capStart=0,capEnd=0;
  if(options.emissionCaps){
@@ -220,7 +220,7 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
   brigadeSettle=db.prepare(korundSettleSql+laborNoteMonthCapSql).bind(now,shiftId,userId,iso,capStart,capEnd);
  }
  if(food!=null){
-  const seasonSql=korundSettleSql.replace('800,4,?','800,?,?,?');
+  const seasonSql=korundSettleSql.replace('800,4,?','800,?,?');
   brigadeSettle=db.prepare(options.emissionCaps?seasonSql+laborNoteMonthCapSql:seasonSql).bind(...(options.emissionCaps?[food,now,shiftId,userId,iso,capStart,capEnd]:[food,now,shiftId,userId,iso]));
  }
  await db.batch([db.prepare(korundPoolLockSql),brigadeSettle,db.prepare(laborNoteBrigadeIssuanceSql).bind(shiftId),
