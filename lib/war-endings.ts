@@ -10,6 +10,7 @@ import { soleRatification, type PartySeats, type Ratification } from './diplomac
 import { isWarNation, kindlePartyWeary, requestIdOk, wearyKindleParties, type WarNationId } from './war-rules';
 import { kindleVoteWeariness, type VoteWearinessOptions } from './war-weariness'; // #427 slice 3
 import { endingRefusalFor } from './war-ending-copy'; // #1026: one refusal line per reason; reason and status codes stay here
+import { revertPeaceCaptures } from './war-peace-revert'; // #1054
 
 export const warEndingsSchemas = [
   `CREATE TABLE IF NOT EXISTS war_end_terms (
@@ -108,7 +109,7 @@ const changes = (result: unknown) => Number((result as { meta?: { changes?: numb
  *  re-checks in its own WHERE (war still open; every square still Frontier, governed by the ceding nation and never privately bought), and the square moves and the war's
  *  end in the same batch are gated on that row now being enacted at this tick, so a failed re-check moves nothing and ends nothing. A decision counts only on a strict
  *  rowcount of 1; when the enacting UPDATE changes nothing, a guarded reject records why. Enacted: the war ends as a treaty (peace lock). */
-export async function decideWarEndings(db: GameDatabase, now: number, wearinessOptions: VoteWearinessOptions = {}) {
+export async function decideWarEndings(db: GameDatabase, now: number, wearinessOptions: VoteWearinessOptions & { peaceRevert?: boolean } = {}) {
   const rows = (await db.prepare(`SELECT ${columns} FROM war_end_terms WHERE status='proposed' ORDER BY proposed_at,id LIMIT 20`).all<Row>()).results;
   if (!rows.length) return 0;
   const seats = await kindleSeats(db), weariness = await kindleVoteWeariness(db, now, wearinessOptions); // #427 slice 3: read once, at decision time
@@ -129,7 +130,10 @@ export async function decideWarEndings(db: GameDatabase, now: number, wearinessO
       .bind(row.other_nation, sq.x, sq.y, row.proposer_nation, sq.x, sq.y, row.id, now));
     const end = db.prepare(`UPDATE wars SET ended_at=?,end_kind='treaty' WHERE id=? AND ended_at IS NULL AND ${enacted}`).bind(now, row.war_id, row.id, now);
     const results = await db.batch([enact, ...moves, end]);
-    if (changes(results[0]) === 1) { decided++; continue; }
+    if (changes(results[0]) === 1) {
+      if (wearinessOptions.peaceRevert && row.kind === 'concession') await revertPeaceCaptures(db, row.war_id, now); // surrender is left as it was
+      decided++; continue;
+    }
     // Not enacted: either another tick decided it, or a re-check failed. Record the reason (guarded, so a decided row is left alone).
     const war = await db.prepare('SELECT ended_at FROM wars WHERE id=?').bind(row.war_id).first<{ ended_at: number | null }>();
     const reason = !war || war.ended_at !== null ? 'war_ended' : await ineligibleSquare(db, row.proposer_nation, squares) ? 'square_not_cedable' : 'stale';

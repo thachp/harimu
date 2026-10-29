@@ -147,6 +147,7 @@
     // #741: Kindle civic rank ladder (Resident → Leading Citizen; an honor, no office or vote weight). Off: GET /api/citizen/civic-rank is 404, /api/citizen sends no civicRank and kindle-7-rank is unavailable. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_CIVIC_RANK_ENABLED": "true",
     // #988: one JSON binding for the army flags (needs HARIMU_WAR_ENABLED too). Preview on, production off. A direct HARIMU_* var still wins.
+    // #1054: HARIMU_WAR_PEACE_REVERT_ENABLED sits in this pack (needs HARIMU_WAR_ENABLED). A treaty returns unceded captures.
     "HARIMU_ARMY_PACK": {
       "HARIMU_ARMIES_ENABLED": "true",
       "HARIMU_ARMY_DRILLS_ENABLED": "true",
@@ -154,7 +155,8 @@
       "HARIMU_ARMY_SUPPLY_ENABLED": "true",
       "HARIMU_ARMY_BATTLES_ENABLED": "true",
       // #1038: winter army marches take longer. [ASSUMPTION] 1.5×, locked when the march starts.
-      "HARIMU_WINTER_MARCH_ENABLED": "true"
+      "HARIMU_WINTER_MARCH_ENABLED": "true",
+      "HARIMU_WAR_PEACE_REVERT_ENABLED": "true"
     },
     // #842: Religious Harmony (docs 14.5): a per-nation 0–100 score from festival holidays, festival joins, banned-festival joins and Korund raids, feeding Stability (±5) and shown on the faith panel (Korund: band only). Off: no Stability input, no panel line, no reads. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_RELIGIOUS_HARMONY_ENABLED": "true",

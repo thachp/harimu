@@ -115,6 +115,7 @@ const flagOffPins = {
   HARIMU_WAR_ASSEMBLY_ENABLED: 'war-assembly-427.test.mjs',
   HARIMU_WAR_LOSS_CAP_ENABLED: 'war-loss-cap-912.test.mjs',
   HARIMU_WAR_ENDINGS_ENABLED: 'war-endings-427.test.mjs',
+  HARIMU_WAR_PEACE_REVERT_ENABLED: 'war-peace-revert-1054.test.mjs',
   HARIMU_DIPLOMACY_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_EMBARGO_ENABLED: 'embargo.test.mjs',
   HARIMU_CROWN_DEBASEMENT_ENABLED: 'flag-off-audit-384.test.mjs',
