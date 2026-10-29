@@ -69,6 +69,7 @@ import { checkTopbarCountdown } from './topbar-countdown-check.mjs';
 import { checkKorundRationBooklet } from './korund-ration-booklet-check.mjs';
 import { checkAurelleSealedScrolls } from './aurelle-sealed-scroll-check.mjs';
 import { checkKindleCivicBallot } from './kindle-civic-ballot-check.mjs';
+import { checkKorundWalletRations } from './korund-wallet-rations-check.mjs';
 import { checkMobileTopdownMap } from './mobile-topdown-map-check.mjs';
 import { checkMobileTwoTap } from './mobile-two-tap-check.mjs';
 import { checkMapOverlays } from './map-overlays-layout-check.mjs';
@@ -253,6 +254,7 @@ try {
   await checkKorundRationBooklet({ browser, css, preflight, failures, rows }); // #970: Korund ration booklet
   await checkAurelleSealedScrolls({ browser, css, preflight, failures, rows }); // #1008: Aurelle sealed scrolls
   await checkKindleCivicBallot({ browser, css, preflight, failures, rows }); // #1009: Kindle civic ballot
+  await checkKorundWalletRations({ browser, css, preflight, failures, rows }); // #1055: Korund food coupons on the top-bar wallet
   await checkMobileTopdownMap({ browser, css, preflight, failures, rows }); // #1039: phone top-down map, desktop unchanged
   await checkMobileTwoTap({ browser, css, preflight, failures, rows }); // #1040: daily-loop actions within two taps on a phone
 } finally { await browser.close(); }
