@@ -47,6 +47,7 @@ import type {ElectionSnapshot} from '../lib/elections';
 import {CollectivePetitionsPanel} from './collective-petitions';
 import type {CollectivePetitions} from '../lib/collective-petitions';
 import { CitizenDock } from './citizen-dock';
+import { CitizenGameAgeLine, citizenGameAgeEnabled } from './citizen-game-age'; // #1042
 import { householdStock, householdWalletMinor, itemCount } from '@/lib/ui-v2-household';
 import { SceneNews } from './world-scene';
 import { noticeboardEvents } from '@/lib/noticeboard'; // #375
@@ -804,7 +805,7 @@ export default function Home() {
     const timer = window.setTimeout(() => setHoldExpiredFor(holdEpisode), identityHoldTimeoutMs);
     return () => window.clearTimeout(timer);
   }, [sessionLoading, holdEpisode]);
-  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number}}} | null>(null);
+  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;seaLanesNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number}}} | null>(null);
   const [cityError, setCityError] = useState('');
   const [cityRetry, setCityRetry] = useState(0);
   const [cityTravelPending, setCityTravelPending] = useState(false);
@@ -816,7 +817,7 @@ export default function Home() {
     const loadCity = async () => {
       try {
         const response = await fetch('/api/city', {cache:'no-store',signal:controller.signal});
-        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number};error?:string};
+        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;seaLanesNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number};error?:string};
         if (controller.signal.aborted || epoch !== citizenEpoch.current) return;
         if (!response.ok || value.nationId !== citizenNationId || !cityForNation(value.nationId,value.currentCityId)) throw Error(value.error ?? 'City account unavailable.');
         setCityAccount({key:citizenSessionKey,value}); setCityError('');
@@ -1312,7 +1313,7 @@ export default function Home() {
     cityTravelLock.current=true;setCityTravelPending(true);setCityError('');
     try {
       const response=await fetch('/api/city',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'travel',cityId})});
-      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number};error?:string};
+      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;seaLanesNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number};error?:string};
       if(epoch!==citizenEpoch.current)return;
       if(!response.ok || value.nationId!==citizenNation.id || value.currentCityId!==cityId)throw Error(value.error ?? 'Travel could not be confirmed. Refresh your city account before retrying.');
       setCityAccount({key:citizenSessionKey,value});
@@ -1772,7 +1773,7 @@ export default function Home() {
       {viewMode === 'market' && !marketShown && <section className="scene-market-closed"><h2>Market</h2><p>The market is not open yet. Work a shift and check back soon.</p></section>}
       {viewMode === 'market' && marketShown && !['korund','aurelle'].includes(citizenNation.id) && <>
         <MarketSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor)} food={citizenNation.id === 'kindle' && economy ? itemCount(economy.inventory, 'food') : null} board={Boolean(orderBookApi.book)}
-          listings={citizenNation.id !== 'confluence' && (!orderBookApi.book || Boolean(playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')))} onHousehold={() => changeView('household')} importsNote={currentCityAccount?.importsNote ?? null} />
+          listings={citizenNation.id !== 'confluence' && (!orderBookApi.book || Boolean(playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')))} onHousehold={() => changeView('household')} importsNote={currentCityAccount?.importsNote ?? null} seaLanesNote={currentCityAccount?.seaLanesNote ?? null} />
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
@@ -1824,6 +1825,7 @@ export default function Home() {
     <p>{selected.id === 'kindle' ? 'Work · Trade · Household meals' : selected.id === 'korund' ? 'Assigned work · Rations · Household meals' : selected.id === 'aurelle' ? 'Chartered service · Crowns · Favor' : 'Unfinished nation · Chat available; work, markets and government previews are not built yet'}</p>
     <details><summary>Rules and limits</summary><p>Each nation keeps its own rules. Computer-controlled leaders (AI/SI) follow fixed game rules: the same situation produces the same decision. No live AI model is connected. Petitions require a verified phone number to count, but phone verification has not been set up yet, so petition submission is unavailable. Territory ownership and foreign trade are not built yet.</p></details>
     {citizenNation ? <><p>Your citizen: {citizenNation.name}. {citizenshipRuleLabel(citizenshipStatus,formatTime)}</p>
+      {citizenGameAgeEnabled() && !guestActive && <CitizenGameAgeLine clock={simulation?.clock} enrolledAt={citizenshipStatus?.enrolledAt} />}
       {citizenNation.id!==selected.id && citizenshipStatus?.canChange && <button type="button" onClick={()=>beginEnrollment(selected.id)}>Change citizenship to {selected.shortName}</button>}</> : <ActionButton type="button" reason={firstActionReason([clerkConfigured && citizenSessionStatus === 'loading', 'Your citizen account is loading. Please wait before choosing citizenship.'], [clerkConfigured && citizenSessionStatus === 'error', 'Your citizen account could not load. Retry loading it before choosing citizenship.'])} onClick={()=>{if (!clerkConfigured || !['loading','error'].includes(citizenSessionStatus)) beginEnrollment(selected.id);}}>Choose citizenship · {selected.shortName}</ActionButton>}
     <WorldInstitutionsButton onView={changeView} />
   </section>;
