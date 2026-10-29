@@ -271,6 +271,7 @@ body:has(.harimu-game){overflow:auto}
 .game-clock .game-clock-season{color:#e8c77a;letter-spacing:0}
 .game-clock .game-clock-age{color:#f3dca6;letter-spacing:0}
 .game-clock .game-clock-festival{color:#80d8ce;letter-spacing:0}
+.game-clock .game-clock-faith{color:#d7c4f5;letter-spacing:0}
 /* #969: countdown beside the world clock. Flag off renders no .game-countdown, so these rules never match. Paper on the HUD ink is the clock's own contrast. */
 .game-countdown{color:#dce7e8;font-size:calc(12px * var(--text-scale, 1));font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.2}
 @media(max-width:760px){.game-countdown{font-size:calc(10px * var(--text-scale, 1));white-space:normal;max-width:8em}}
