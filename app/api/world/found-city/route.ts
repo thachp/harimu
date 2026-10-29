@@ -4,7 +4,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { foundCity, parseFoundingCommand } from '@/lib/city-founding';
-import { cityImportsFields, citySpecialtyFields, cityCaptureNote, cityCivicUnitNote } from '@/lib/cities'; // #996 / #1001 / #1002 / #1006
+import { cityImportsFields, citySpecialtyFields, cityCaptureNote, cityCivicUnitNote, cityGovernorFields } from '@/lib/cities'; // #996 / #1001 / #1002 / #1006 / #1007
 import { cityTierName, cityTierUnlockFields, cityTierFestivalNote } from '@/lib/city-tier'; // #952 / #979 / #984
 import { flagOn } from '@/lib/flag-pack.mjs'; // #988 / #1003
 
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
   // #1002: capture-note flag adds captureNote for catalog/outpost cities (founded cities omit until square-zone lookup).
   // #1006: civic-unit flag adds civicUnitNote from the nation map (Aurelle/Meridian omit).
   // #1001: imports flag adds importsNote when the catalog role is Port or Trade zone (founded cities omit).
+  // #1007: governor flag adds governorNote/governorAi from nation + tier (T1: not-yet note).
   const growth = flagOn(env, 'HARIMU_CITY_TIER_GROWTH_ENABLED');
   const unlocksOn = flagOn(env, 'HARIMU_CITY_TIER_UNLOCKS_ENABLED');
   const noteOn = flagOn(env, 'HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED');
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
   const captureOn = flagOn(env, 'HARIMU_CITY_CAPTURE_NOTE_ENABLED');
   const civicOn = flagOn(env, 'HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED');
   const importsOn = flagOn(env, 'HARIMU_CITY_IMPORTS_NOTE_ENABLED'); // direct string still wins
+  const governorOn = flagOn(env, 'HARIMU_CITY_GOVERNOR_NOTE_ENABLED');
   const tier = growth ? result.city.tier : 1;
   let city: Record<string, unknown> = growth ? { ...result.city, tier, tierName: cityTierName(tier) } : { ...result.city, tier };
   if (unlocksOn) city = { ...city, ...cityTierUnlockFields(tier) };
@@ -53,5 +55,6 @@ export async function POST(request: Request) {
   if (captureOn) { const n = cityCaptureNote(result.city.nationId, result.city.id); if (n) city = { ...city, captureNote: n }; }
   if (civicOn) { const n = cityCivicUnitNote(result.city.nationId); if (n) city = { ...city, civicUnitNote: n }; }
   if (importsOn) { const n = cityImportsFields(result.city.nationId, result.city.id); if (n) city = { ...city, ...n }; }
+  if (governorOn) city = { ...city, ...cityGovernorFields(result.city.nationId, tier) };
   return privateJson({ ...result, city });
 }
