@@ -47,3 +47,22 @@ export function nextFestivalAt(nationId: string, epochMs: number, nowMs: number)
   const pick = picks[0];
   return pick ? { ...pick, season: gameSeasonAt(epochMs, pick.startsAt)!.season, active: pick.startsAt <= nowMs } : null;
 }
+
+/** #1034 (docs §17.1 "seasons ... affect sea lanes"): winter storms slow sea freight from port cities. Server flag
+ * HARIMU_SEASON_SEA_LANES_ENABLED (in HARIMU_CITY_PACK): "true" in preview, "false" in production; off means callers skip this.
+ * [ASSUMPTION] values from #1034: winter 80% for port freight, other seasons ×1.0, rounded down, never below 1 unit. Inland freight is unaffected.
+ * `port` is the caller's port-only check (role contains Port; ARC on #1037: inland trade zones are not sea lanes). */
+export const winterFreightPercent = 80; // integer percent, no float math
+export const seaLanesStormy = (season: GameSeason | null | undefined, port: boolean) => port && season === 'winter';
+export function seaFreightQuantity(quantity: number, season: GameSeason | null | undefined, port: boolean): number {
+  if (!seaLanesStormy(season, port) || !Number.isFinite(quantity) || quantity <= 0) return quantity;
+  return Math.max(1, Math.floor(quantity * winterFreightPercent / 100));
+}
+/** The port city panel's one-line note while winter lasts, with the time left on the season clock. Null otherwise. */
+export function seaLanesStormNote(epochMs: number, nowMs: number, port: boolean): string | null {
+  const now = gameSeasonAt(epochMs, nowMs);
+  if (!now || !seaLanesStormy(now.season, port)) return null;
+  const hours = Math.max(1, Math.ceil(now.remainingMs / 3_600_000)), days = Math.floor(hours / 24), rest = hours % 24;
+  const left = [days ? `${days}d` : '', rest || !days ? `${rest}h` : ''].filter(Boolean).join(' ');
+  return `Winter storms: sea freight slowed until spring (${left} left).`;
+}
