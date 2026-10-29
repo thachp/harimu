@@ -49,8 +49,25 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await r.call('army/quartermaster', 'bob', { requestId: 'qm-1053-a1' })).data.reason, 'request_conflict');
     const again = await r.call('army/quartermaster', 'alice', { requestId: 'qm-1053-a2' }); assert.equal(again.status, 409); assert.equal(again.data.reason, 'already_shifted');
     assert.deepEqual([(await card()).rangeSquares, (await card()).quartermasterSquares], [6, 1]);
-    const qmUnit = (await r.call('army/positions', null)).data.units.find(u => u.nationId === 'kindle');
-    assert.ok(qmUnit.supply, 'positions overlay carries supply');
+    const posRange = async () => Object.fromEntries((await r.call('army/positions', null)).data.units.map(u => [u.nationId, u.supply.rangeSquares]));
+    assert.deepEqual(await posRange(), { kindle: 6, korund: 5, aurelle: 5 }, 'M8: positions carry base 5 + 1 shift; no shift is base');
+    // M8: positions cap: four more shifts on record (5 in the window) is +3, range 8; flag off drops the range key.
+    for (const d of [1, 2, 3, 4]) await r.db.prepare("INSERT INTO army_quartermaster_shifts (request_id, clerk_user_id, unit_id, game_day, shifted_at) VALUES (?, 'alice', 'kindle-home-guard', ?, ?)").bind(`qm-1053-cap${d}`, -d, Math.floor(r.now / 1000)).run();
+    assert.equal((await posRange()).kindle, 8, 'capped at base 5 + 3'); assert.equal((await card()).rangeSquares, 8);
+    r.setFixtureEnv('HARIMU_ARMY_QUARTERMASTER_ENABLED', 'false'); assert.deepEqual(await posRange(), { kindle: undefined, korund: undefined, aurelle: undefined }, 'flag off: no range');
+    r.setFixtureEnv('HARIMU_ARMY_QUARTERMASTER_ENABLED', 'true');
+    await r.db.prepare("DELETE FROM army_quartermaster_shifts WHERE request_id LIKE 'qm-1053-cap%'").run();
+    // M8: the overlay's cut state uses the extra range. At one second after the base-range cut, +3 squares still means supplied.
+    const wars = await M.readActiveWars(r.db), march = M.unitMarch('kindle', wars, now), terr = M.terrainMap(), at = p => terr.get(`${p.x},${p.y}`);
+    const baseCut = S.supplyCutAt(march.home, march.route, march.war.mobilization_ends_at, at), wideCut = S.supplyCutAt(march.home, march.route, march.war.mobilization_ends_at, at, 1, 3);
+    assert.ok(baseCut !== null && (wideCut === null || wideCut > baseCut + 1), 'the fixture march leaves the base range first');
+    const T = baseCut + 1, realNow = r.now; r.setNow(T * 1000);
+    for (const d of [1, 2, 3]) await r.db.prepare("INSERT INTO army_quartermaster_shifts (request_id, clerk_user_id, unit_id, game_day, shifted_at) VALUES (?, 'alice', 'kindle-home-guard', ?, ?)").bind(`qm-1053-t${d}`, -10 - d, T).run();
+    const kSup = async () => (await r.call('army/positions', null)).data.units.find(u => u.nationId === 'kindle').supply;
+    assert.deepEqual(await kSup(), { cut: false, cutDays: 0, strengthLossPct: 0, rangeSquares: 8 }, 'supplied with +3');
+    r.setFixtureEnv('HARIMU_ARMY_QUARTERMASTER_ENABLED', 'false'); assert.deepEqual(await kSup(), { cut: true, cutDays: 0, strengthLossPct: 0 }, 'flag off: base range, cut');
+    r.setFixtureEnv('HARIMU_ARMY_QUARTERMASTER_ENABLED', 'true');
+    await r.db.prepare("DELETE FROM army_quartermaster_shifts WHERE request_id LIKE 'qm-1053-t%'").run(); r.setNow(realNow);
     // flag off with a shift on record: supply identical to the no-shift output
     r.setFixtureEnv('HARIMU_ARMY_QUARTERMASTER_ENABLED', undefined); assert.deepEqual(await card(), off); r.setFixtureEnv('HARIMU_ARMY_QUARTERMASTER_ENABLED', 'true');
     const shiftedAt = Number((await r.db.prepare("SELECT shifted_at FROM army_quartermaster_shifts WHERE request_id='qm-1053-a1'").first()).shifted_at);
@@ -58,6 +75,24 @@ for (const backend of ['sqlite', 'postgres']) {
     r.setNow((shiftedAt + DAY) * 1000); assert.equal((await card()).quartermasterSquares, 0, 'expired at exactly one game day');
     assert.equal((await r.call('army', 'alice', { action: 'leave', requestId: 'qm-1053-leave' })).status, 200);
     r.setNow(shiftedAt * 1000); assert.equal((await Q.readQuartermasterExtra(r.db, shiftedAt)).get('kindle'), undefined, 'a former member\'s shift no longer counts');
+  });
+}
+
+for (const backend of ['sqlite', 'postgres']) {
+  test(`${backend}: M11 a wounded member is refused; M7 a shift on record for another unit does not count`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close()); await r.call('citizen', 'alice'); await r.call('citizen', 'bob');
+    for (const [k, v] of Object.entries({ ...ON, HARIMU_ARMY_DRILLS_ENABLED: 'true', HARIMU_ARMY_BATTLES_ENABLED: 'true' })) r.setFixtureEnv(k, v);
+    for (const u of ['alice', 'bob']) assert.equal((await r.call('army', u, { action: 'join', unitId: 'kindle-home-guard', requestId: `qm-1053-j-${u}` })).status, 200);
+    const now = Math.floor(r.now / 1000);
+    await r.db.prepare("INSERT INTO army_wounds (battle_key, clerk_user_id, wounded_until) VALUES ('b1053', 'alice', ?)").bind(now + 3600).run();
+    const hurt = await r.call('army/quartermaster', 'alice', { requestId: 'qm-1053-w1' });
+    assert.equal(hurt.status, 409); assert.equal(hurt.data.reason, 'wounded'); assert.equal(hurt.data.error, 'You are wounded and out of action until you recover.'); assert.equal(hurt.data.woundedUntil, now + 3600);
+    assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM army_quartermaster_shifts').first()).n), 0, 'no row written');
+    // M7: bob's shift was logged for kindle, then bob is moved to another unit: it no longer counts for either unit.
+    assert.equal((await r.call('army/quartermaster', 'bob', { requestId: 'qm-1053-b1' })).status, 200);
+    assert.equal((await Q.readQuartermasterExtra(r.db, now)).get('kindle'), 1);
+    await r.db.prepare("UPDATE army_members SET unit_id = 'korund-home-guard' WHERE clerk_user_id = 'bob'").run();
+    const extra = await Q.readQuartermasterExtra(r.db, now); assert.equal(extra.get('kindle'), undefined); assert.equal(extra.get('korund'), undefined);
   });
 }
 
