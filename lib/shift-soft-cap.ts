@@ -45,7 +45,9 @@ export async function readShiftDay(db: GameDatabase, env: object | null | undefi
   return { started: Number(row?.n ?? 0), cap: DAILY_SHIFT_SOFT_CAP, resetsAt: iso(day.resetsAt) };
 }
 
-/** Call only when the flag is on. Null when the clock is missing or the citizen is under the cap. Does not write. */
+/** Assumes the caller already checked HARIMU_SHIFT_SOFT_CAP_ENABLED. This passes a hard-coded "true"
+ *  and does not read the caller's env, so skipping that check would enforce the cap while the flag is off.
+ *  Null when the clock is missing or the citizen is under the cap. Does not write. */
 export async function refuseNewShift(db: GameDatabase, userId: string, nowSeconds: number): Promise<{ error: string; shiftDay: ShiftDay } | null> {
   const shiftDay = await readShiftDay(db, { HARIMU_SHIFT_SOFT_CAP_ENABLED: 'true' }, userId, nowSeconds);
   if (!shiftDay || shiftDay.started < shiftDay.cap) return null;

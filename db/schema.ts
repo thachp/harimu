@@ -159,7 +159,8 @@ export const workShifts = sqliteTable('work_shifts', {
   startedAt: text('started_at').notNull(),
   completesAt: text('completes_at').notNull(),
   claimedAt: text('claimed_at'),
-}, (table) => [uniqueIndex('idx_one_active_shift').on(table.clerkUserId).where(sql`${table.claimedAt} IS NULL`)]);
+}, (table) => [uniqueIndex('idx_one_active_shift').on(table.clerkUserId).where(sql`${table.claimedAt} IS NULL`),
+  index('idx_work_shifts_user_started').on(table.clerkUserId, table.startedAt)]);
 
 export const shiftRewards = sqliteTable('shift_rewards', {
   shiftId: text('shift_id').primaryKey().references(() => workShifts.id),

@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { flagOn } from '../lib/flag-pack.mjs';
 import { DAILY_SHIFT_SOFT_CAP, readShiftDay, refuseNewShift, SHIFT_DAY_SECONDS, shiftCapRefusal, shiftDayAt, shiftSoftCapEnabled, shiftsTodayLine } from '../lib/shift-soft-cap.ts';
+import { shiftDayIndex } from '../lib/work-shifts.ts';
 
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const DAY = SHIFT_DAY_SECONDS;
@@ -37,6 +38,14 @@ test('shift day uses the integer world clock: missing clock is null, never epoch
   await r.db.prepare('DELETE FROM world_clock').run();
   assert.equal(await readShiftDay(r.db, { HARIMU_SHIFT_SOFT_CAP_ENABLED: 'true' }, 'alice', epoch), null);
   assert.equal(await refuseNewShift(r.db, 'alice', epoch), null, 'no clock, no refusal');
+});
+
+test('migration 0111 is the same CREATE INDEX in drizzle and postgres, matching the boot index', () => {
+  const drizzle = readFileSync('drizzle/0111_shift_day_index.sql', 'utf8');
+  const postgres = readFileSync('db/postgres/0111_shift_day_index.sql', 'utf8');
+  assert.equal(postgres, drizzle);
+  assert.equal(drizzle.split('\n').filter(line => line && !line.startsWith('--')).join('\n').trim(), shiftDayIndex + ';');
+  assert.match(readFileSync('lib/shift-soft-cap.ts', 'utf8'), /Assumes the caller already checked HARIMU_SHIFT_SOFT_CAP_ENABLED/);
 });
 
 test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and a direct string wins', () => {

@@ -76,7 +76,7 @@ import { kindlePolicyLedgerSchemas } from './policy-ledger'; // #985
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
 import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
 import { economySchema, recoverySchema, rewardSchema, fundSchema, incomeTaxSchema, employerBudgetMinor, rewards } from './economy';
-import { shiftSchema, activeShiftIndex } from './work-shifts';
+import { shiftSchema, activeShiftIndex, shiftDayIndex } from './work-shifts';
 import { shiftQualitySchema } from './shift-quality';
 import { env } from 'cloudflare:workers';
 import { isolateOnce } from './postgres/readiness';
@@ -258,7 +258,7 @@ async function initialize(database: GameDatabase) {
     database.prepare('CREATE INDEX IF NOT EXISTS idx_citizen_decisions_user_committed ON citizen_decisions(clerk_user_id, committed_at)'),
   ]);
 
-  await database.batch([database.prepare(shiftSchema), database.prepare(activeShiftIndex)]);
+  await database.batch([database.prepare(shiftSchema), database.prepare(activeShiftIndex), database.prepare(shiftDayIndex)]);
   await database.prepare(shiftQualitySchema).run();
 
   await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema), database.prepare(incomeTaxSchema),
