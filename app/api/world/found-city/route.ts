@@ -15,7 +15,7 @@ const privateJson = (data: unknown, status = 200) => Response.json(data, { statu
 export async function POST(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  const enabled = (env as unknown as { HARIMU_CITY_FOUNDING_ENABLED?: string }).HARIMU_CITY_FOUNDING_ENABLED === 'true';
+  const enabled = flagOn(env, 'HARIMU_CITY_FOUNDING_ENABLED');
   // #384 L1: flag off answers before the travel read or the citizen read (same body as foundCity's own refusal).
   if (!enabled) return privateJson({ error: 'City founding is not enabled yet.', reason: 'disabled' }, 403);
   { // #123: location-bound while travelling (QA1 on #264); no-op unless HARIMU_TRAVEL_ENABLED=true.

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { expandFlagPacks, flagOn, flagValue, varsForProcessEnv } from '../lib/flag-pack.mjs';
+import { expandFlagPacks, FLAG_PACKS, flagOn, flagValue, varsForProcessEnv } from '../lib/flag-pack.mjs';
 import { armiesEnabled } from '../lib/army-rules.ts';
 import { dashboardManagedVars } from '../scripts/wrangler-pin.mjs';
 
@@ -24,8 +24,15 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 18);
+  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 5);
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 10);
+  assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 7);
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
+  assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_CITY_PACK: prod.vars.HARIMU_CITY_PACK }, 'HARIMU_SPA_WC_BONUS_ENABLED'), false);
   assert.equal(flagOn(on, 'HARIMU_GRAY_RATION_RISE_ENABLED'), true);
   assert.equal(flagOn({ ...on, HARIMU_GRAY_MARKET_ENABLED: 'false' }, 'HARIMU_GRAY_MARKET_ENABLED'), false, 'a direct binding wins over the pack');
   assert.equal(flagValue({ HARIMU_GRAY_PACK: '{' }, 'HARIMU_GRAY_MARKET_ENABLED'), undefined, 'a bad pack is off');
@@ -57,4 +64,13 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS, 'true', 'the client build still inlines the packed flag');
   assert.equal(varsForProcessEnv(prod.vars).NEXT_PUBLIC_HARIMU_NATION_SKIN, 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_NATION_SKIN: 'false' }).NEXT_PUBLIC_HARIMU_NATION_SKIN, 'false', 'a direct string wins');
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, undefined, 'the civic-ballot flag is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, 'true', 'the client build still inlines the packed flag');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT: 'false' }).NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, 'false', 'a direct string wins');
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_ZONE_LEGEND, undefined, 'the zone legend is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_ZONE_LEGEND, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_ZONE_LEGEND, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_ZONE_LEGEND, 'true', 'the client build still inlines the packed zone legend');
 });

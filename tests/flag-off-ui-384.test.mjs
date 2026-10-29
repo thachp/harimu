@@ -32,7 +32,7 @@ const respond = (status, body) => async () => new Response(JSON.stringify(body),
 
 test('L2: AssemblyBallot renders nothing when GET /api/assembly is 404; baseline: a 200 snapshot renders the panel', async t => {
   const { AssemblyBallot } = load('assembly-ballot.tsx', { './session-retry': load('session-retry.tsx', {}), './nation-document': { NationDocument: ({ children }) => React.createElement('section', null, children) },
-    './ai-disclosure': stub(), './action-button': stub(), './game-timer': stub(), '../lib/assembly-copy': { ballotExplainer: { title: 'Ballot', body: [] }, resultsCaption: '' } });
+    './ai-disclosure': stub(), './action-button': stub(), './game-timer': stub(), './kindle-civic-ballot': load('kindle-civic-ballot.tsx', {}), '../lib/assembly-copy': { ballotExplainer: { title: 'Ballot', body: [] }, resultsCaption: '' } });
   let calls = 0;
   const off = await mount(t, React.createElement(AssemblyBallot), { fetch: async (...a) => { calls++; return respond(404, { error: 'Not found.' })(...a); } });
   await off.settle();
