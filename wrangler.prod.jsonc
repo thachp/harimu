@@ -37,16 +37,14 @@
     "HARIMU_NOTABLES_ENABLED": "false",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
-    // #952 / #966: a founded city promotes one tier after 7 real days above the next population floor, and drops one tier after 7 real days short of food or housing (never below T1; a capital never below its starting tier). Off: the daily check does not run and readers still see T1.
-    "HARIMU_CITY_TIER_GROWTH_ENABLED": "false",
-    // #979: city panel shows each tier's district slots and unlocks (docs Cities table). Off: found-city and /api/city leave those fields off the response; the panel is unchanged.
-    "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "false",
-    // #984: city panel shows a read-only festival availability note from the Cities tier table (T2+ available; T1 unlocks at Town). Off: found-city and /api/city leave festivalNote off; the panel is unchanged.
-    "HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED": "false",
-    // #996: city panel shows the catalog specialty/role and a jobs-match note (port/trade also mention imports). Off: /api/city and found-city leave specialty fields off; the panel is unchanged.
-    "HARIMU_CITY_SPECIALTY_NOTE_ENABLED": "false",
-    // #1002: city panel shows Heartland (never capturable) vs Frontier (can be besieged) capture status. Off: /api/city and found-city leave captureNote off; the panel is unchanged.
-    "HARIMU_CITY_CAPTURE_NOTE_ENABLED": "false",
+    // #988 / #1003: one JSON binding for city tier growth and panel notes (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    "HARIMU_CITY_PACK": {
+      "HARIMU_CITY_TIER_GROWTH_ENABLED": "false",
+      "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "false",
+      "HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED": "false",
+      "HARIMU_CITY_SPECIALTY_NOTE_ENABLED": "false",
+      "HARIMU_CITY_CAPTURE_NOTE_ENABLED": "false"
+    },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
     // #764: per-persona AI mute (operator control, not a feature flag). "" = off; "all" or a comma list of persona ids (Notable ids, <nation>-news-desk, kindle-cabinet, kindle-town-hall, kindle-debate) skips that persona's model calls. Unknown values fail closed to "all".

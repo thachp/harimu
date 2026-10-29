@@ -6,6 +6,7 @@ import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { foundCity, parseFoundingCommand } from '@/lib/city-founding';
 import { citySpecialtyFields, cityCaptureNote } from '@/lib/cities'; // #996 / #1002
 import { cityTierName, cityTierUnlockFields, cityTierFestivalNote } from '@/lib/city-tier'; // #952 / #979 / #984
+import { flagOn } from '@/lib/flag-pack.mjs'; // #988 / #1003
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -35,12 +36,11 @@ export async function POST(request: Request) {
   // #984: festival-note flag adds festivalNote from the Cities tier table; flag off leaves the body unchanged.
   // #996: specialty flag adds specialtyRole/specialtyNote when the city is in the catalog (founded cities omit).
   // #1002: capture-note flag adds captureNote for catalog/outpost cities (founded cities omit until square-zone lookup).
-  const vars = env as unknown as { HARIMU_CITY_TIER_GROWTH_ENABLED?: string; HARIMU_CITY_TIER_UNLOCKS_ENABLED?: string; HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?: string; HARIMU_CITY_SPECIALTY_NOTE_ENABLED?: string; HARIMU_CITY_CAPTURE_NOTE_ENABLED?: string };
-  const growth = vars.HARIMU_CITY_TIER_GROWTH_ENABLED === 'true';
-  const unlocksOn = vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED === 'true';
-  const noteOn = vars.HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED === 'true';
-  const specialtyOn = vars.HARIMU_CITY_SPECIALTY_NOTE_ENABLED === 'true';
-  const captureOn = vars.HARIMU_CITY_CAPTURE_NOTE_ENABLED === 'true';
+  const growth = flagOn(env, 'HARIMU_CITY_TIER_GROWTH_ENABLED');
+  const unlocksOn = flagOn(env, 'HARIMU_CITY_TIER_UNLOCKS_ENABLED');
+  const noteOn = flagOn(env, 'HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED');
+  const specialtyOn = flagOn(env, 'HARIMU_CITY_SPECIALTY_NOTE_ENABLED');
+  const captureOn = flagOn(env, 'HARIMU_CITY_CAPTURE_NOTE_ENABLED');
   const tier = growth ? result.city.tier : 1;
   let city: Record<string, unknown> = growth ? { ...result.city, tier, tierName: cityTierName(tier) } : { ...result.city, tier };
   if (unlocksOn) city = { ...city, ...cityTierUnlockFields(tier) };

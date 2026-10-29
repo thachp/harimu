@@ -6,6 +6,7 @@ import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {cityForNation,citySpecialtyFields,cityCaptureNote} from '@/lib/cities'; // #996 specialty / #1002 capture
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote} from '@/lib/city-tier'; // #979 / #984
+import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 async function context(request:Request){
@@ -15,14 +16,13 @@ async function context(request:Request){
 }
 
 async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nationId:string,cityId:string,body:Record<string,unknown>){
- const vars=env as unknown as {HARIMU_CITY_TIER_UNLOCKS_ENABLED?:string;HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?:string;HARIMU_CITY_TIER_GROWTH_ENABLED?:string;HARIMU_CITY_SPECIALTY_NOTE_ENABLED?:string;HARIMU_CITY_CAPTURE_NOTE_ENABLED?:string};
- const unlocksOn=vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED==='true';
- const noteOn=vars.HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED==='true';
- const specialtyOn=vars.HARIMU_CITY_SPECIALTY_NOTE_ENABLED==='true'; // #996
- const captureOn=vars.HARIMU_CITY_CAPTURE_NOTE_ENABLED==='true'; // #1002
+ const unlocksOn=flagOn(env,'HARIMU_CITY_TIER_UNLOCKS_ENABLED');
+ const noteOn=flagOn(env,'HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED');
+ const specialtyOn=flagOn(env,'HARIMU_CITY_SPECIALTY_NOTE_ENABLED'); // #996
+ const captureOn=flagOn(env,'HARIMU_CITY_CAPTURE_NOTE_ENABLED'); // #1002
  if(!unlocksOn&&!noteOn&&!specialtyOn&&!captureOn)return body;
  let tier=1;
- if(vars.HARIMU_CITY_TIER_GROWTH_ENABLED==='true'){
+ if(flagOn(env,'HARIMU_CITY_TIER_GROWTH_ENABLED')){
   const row=await db.prepare('SELECT tier FROM world_cities WHERE id=?').bind(cityId).first<{tier:number}>();
   if(row)tier=Number(row.tier);
  }
