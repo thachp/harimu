@@ -122,4 +122,5 @@ export const siegeSchemas = [
   'CREATE INDEX IF NOT EXISTS idx_city_sieges_war ON city_sieges(war_id)',
   'CREATE INDEX IF NOT EXISTS idx_city_captures_war ON city_captures(war_id, defender_nation)',
   'CREATE INDEX IF NOT EXISTS idx_city_captures_siege ON city_captures(siege_id)',
+  'CREATE INDEX IF NOT EXISTS idx_city_sieges_city_key ON city_sieges(city_key)', // #1028: latest capture for one city is an indexed read
 ] as const;
