@@ -88,6 +88,8 @@
     "HARIMU_MVP_JOB_TYPES_ENABLED": "false",
     // #781: move your home city within your own nation for a fee of 10 units of the nation's wallet currency (SPK Kindle, LN Korund; no wallet currency: not_open_yet), once per 7 real days (POST /api/city/home). Off: 404 before auth, no read or write; home stays the capital.
     "HARIMU_HOME_CITY_MOVE_ENABLED": "false",
+    // #992: closed-system internal residence permit for home-city moves (Korund, Meridian; Varkand at Amber/Red). Off: #781 path unchanged.
+    "HARIMU_INTERNAL_PERMIT_ENABLED": "false",
     // #965: choose a home city at enrollment from the nation's catalog (lib/cities.ts); the capital is preselected and used when cityId is omitted. Off: cityId is ignored and home stays the capital. No home_city_moves row, so the #781 fee and cooldown do not start.
     "HARIMU_ENROLL_HOME_CITY_ENABLED": "false",
     // #777: goods-market seller fee (0.5%, rounded down) written as a sink row with each fill and netted from the wallet. Off: no fee written or read.
