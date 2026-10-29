@@ -109,6 +109,25 @@ export async function korundRationCutCities(db:GameDatabase,epoch:number,at:numb
 }
 /** #967 applies only when #776 would cut. Either flag off leaves Stability unchanged. */
 export const korundRationStabilityEnabled=(env:{HARIMU_KORUND_RATION_CUT_ENABLED?:string;HARIMU_KORUND_RATION_STABILITY_ENABLED?:string}|null|undefined)=>env?.HARIMU_KORUND_RATION_CUT_ENABLED==='true'&&env?.HARIMU_KORUND_RATION_STABILITY_ENABLED==='true';
+/** #983: 1 when the closed week met the quota and that same week had the #967 step (the week before it was a #776 shortfall, so the cut was in effect while the plan was met).
+ *  [ASSUMPTION] exactly one step, once, the first met week after a cut week — not gradual and not a second step on a later met week. An unmet week does not recover. The step is scored the following week, when that met week has closed, the same way #967 scores the cut the week after the miss.
+ *  The PoC has one work unit, so the count is one city or zero. Food is the only input, so a replay of the same week cannot add a second step. */
+export function korundStabilityRecoveryCount(week:number,closedFood:number,priorFood:number):number{
+ if(week<3||shortfallPercent(closedFood)!==0)return 0;
+ return korundRationCut(week-1,shortfallPercent(priorFood))?1:0;
+}
+/** #983: Korund cities recovering one Stability step in the game week that contains `at`. No query before two closed weeks exist. */
+export async function korundRationRecoveryCities(db:GameDatabase,epoch:number,at:number):Promise<number>{
+ const week=Math.floor(Math.max(0,at-epoch)/korundWeekSeconds)+1;
+ if(week<3)return 0;
+ const start=epoch+(week-1)*korundWeekSeconds;
+ const row=await db.prepare('SELECT COALESCE((SELECT SUM(food_output) FROM korund_settlements WHERE settled_at>=? AND settled_at<?),0) AS closed_food,COALESCE((SELECT SUM(food_output) FROM korund_settlements WHERE settled_at>=? AND settled_at<?),0) AS prior_food').bind(start-korundWeekSeconds,start,start-2*korundWeekSeconds,start-korundWeekSeconds).first<{closed_food:number;prior_food:number}>();
+ return korundStabilityRecoveryCount(week,Number(row?.closed_food??0),Number(row?.prior_food??0));
+}
+/** #983 applies only on the #967 path. Any flag off leaves the score, the notice and this read unchanged. */
+export const korundStabilityRecoveryEnabled=(env:{HARIMU_KORUND_RATION_CUT_ENABLED?:string;HARIMU_KORUND_RATION_STABILITY_ENABLED?:string;HARIMU_KORUND_STABILITY_RECOVERY_ENABLED?:string}|null|undefined)=>korundRationStabilityEnabled(env)&&env?.HARIMU_KORUND_STABILITY_RECOVERY_ENABLED==='true';
 export const applyRationCut=(coupons:KorundCoupon[],cut:KorundRationCut|null):KorundCoupon[]=>cut?coupons.map(c=>(cut.withdrawn as string[]).includes(c.kind)?{...c,withdrawn:true as const}:c):coupons;
 /** Content's rationCut (lib/ration-copy.ts, #336), mirrored here so the panel keeps its one copy import (a test pins them equal). */
 export const korundRationCutCopy={label:'Rations are reduced',notice:'Plan output fell short, so this week\'s rations are reduced.',stability:'Stability falls with the rations.',withdrawn:'withdrawn this week (ration cut)'} as const;
+/** #983 [ASSUMPTION] Content's rationRecovery notice (lib/ration-copy.ts). The doc names the cut, not this sentence. */
+export const korundRationRecoveryCopy={notice:'Stability recovers with the plan.'} as const;

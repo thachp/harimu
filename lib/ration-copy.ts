@@ -83,3 +83,10 @@ export const rationCut={
  citizen:L('The portions are smaller. Nobody says much about it.'),
  proposal:true,
 } as const;
+
+/** #983: one line when Stability steps back up the week a met plan follows a ration-cut hit.
+ *  [ASSUMPTION] §12.11 names the cut and not this sentence. */
+export const rationRecovery={
+ notice:L('Stability recovers with the plan.'),
+ proposal:true,
+} as const;
