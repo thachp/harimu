@@ -41,6 +41,8 @@
     "HARIMU_CITY_TIER_GROWTH_ENABLED": "false",
     // #979: city panel shows each tier's district slots and unlocks (docs Cities table). Off: found-city and /api/city leave those fields off the response; the panel is unchanged.
     "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "false",
+    // #984: city panel shows a read-only festival availability note from the Cities tier table (T2+ available; T1 unlocks at Town). Off: found-city and /api/city leave festivalNote off; the panel is unchanged.
+    "HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED": "false",
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
     // #764: per-persona AI mute (operator control, not a feature flag). "" = off; "all" or a comma list of persona ids (Notable ids, <nation>-news-desk, kindle-cabinet, kindle-town-hall, kindle-debate) skips that persona's model calls. Unknown values fail closed to "all".
@@ -72,9 +74,11 @@
       "HARIMU_GRAY_RATION_RISE_ENABLED": "false",
       "HARIMU_KORUND_MEDALS_ENABLED": "false",
       "HARIMU_KORUND_SHORTFALL_ENABLED": "false",
+      "HARIMU_KORUND_PLAN_STATS_ENABLED": "false",
       "HARIMU_WALLET_STREET_RATE_ENABLED": "false",
       "HARIMU_KORUND_RATION_CUT_ENABLED": "false",
-      "HARIMU_KORUND_RATION_STABILITY_ENABLED": "false"
+      "HARIMU_KORUND_RATION_STABILITY_ENABLED": "false",
+      "HARIMU_KORUND_STABILITY_RECOVERY_ENABLED": "false"
     },
     // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
     "HARIMU_SAVINGS_SHIELD_ENABLED": "false",
@@ -84,6 +88,8 @@
     "HARIMU_MVP_JOB_TYPES_ENABLED": "false",
     // #781: move your home city within your own nation for a fee of 10 units of the nation's wallet currency (SPK Kindle, LN Korund; no wallet currency: not_open_yet), once per 7 real days (POST /api/city/home). Off: 404 before auth, no read or write; home stays the capital.
     "HARIMU_HOME_CITY_MOVE_ENABLED": "false",
+    // #992: closed-system internal residence permit for home-city moves (Korund, Meridian; Varkand at Amber/Red). Off: #781 path unchanged.
+    "HARIMU_INTERNAL_PERMIT_ENABLED": "false",
     // #965: choose a home city at enrollment from the nation's catalog (lib/cities.ts); the capital is preselected and used when cityId is omitted. Off: cityId is ignored and home stays the capital. No home_city_moves row, so the #781 fee and cooldown do not start.
     "HARIMU_ENROLL_HOME_CITY_ENABLED": "false",
     // #777: goods-market seller fee (0.5%, rounded down) written as a sink row with each fill and netted from the wallet. Off: no fee written or read.

@@ -42,6 +42,11 @@ export function cityTierUnlockFields(tier: number): { tierName: CityTierName; di
   const info = cityTierUnlocks(tier);
   return { tierName: info.name, districtSlots: info.districtSlots, unlocks: [...info.unlocks] };
 }
+/** #984: read-only festival availability note from the Cities tier table (T2 Town unlocks festivals; T1 Village does not). Composes on cityTierUnlocks; does not gate scheduling. */
+export function cityTierFestivalNote(tier: number): string {
+  const t = Math.min(4, Math.max(1, Math.floor(Number.isFinite(tier) ? tier : 1)));
+  return t >= 2 ? 'Festivals are available at this tier.' : 'Festivals unlock at Town (T2).';
+}
 /** Population floor of the next tier, or null at T4. */
 export function nextTierFloor(tier: number): number | null {
   if (!Number.isInteger(tier) || tier < 1 || tier >= 4) return null;

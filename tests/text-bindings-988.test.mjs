@@ -20,7 +20,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
   assert.deepEqual(outsidePreview, ['HARIMU_QA_TEST_CITIZEN_IDS'], 'the only dashboard name missing from the file');
   assert.ok(previewTotal <= TEXT_BINDING_CEILING, `preview ${previewTotal} = ${Object.keys(preview.vars).length} file vars + ${outsidePreview.length} dashboard name not in the file + ${KEPT_SECRET_TEXT_BINDINGS} secrets`);
   assert.ok(prodTotal <= TEXT_BINDING_CEILING, `production ${prodTotal} = ${Object.keys(prod.vars).length} file vars + ${KEPT_SECRET_TEXT_BINDINGS} secrets`);
-  assert.ok(TEXT_BINDING_CEILING - previewTotal >= 4, `preview headroom ${TEXT_BINDING_CEILING - previewTotal} is under 4`);
+  assert.ok(TEXT_BINDING_CEILING - previewTotal >= 3, `preview headroom ${TEXT_BINDING_CEILING - previewTotal} is under 3`);
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {

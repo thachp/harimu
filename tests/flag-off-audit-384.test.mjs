@@ -26,6 +26,7 @@ const flagOffPins = {
   HARIMU_CITY_FOUNDING_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
+  HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
@@ -44,8 +45,10 @@ const flagOffPins = {
   HARIMU_GRAY_RATION_RISE_ENABLED: 'gray-ration-rise-968.test.mjs', // #968
   HARIMU_KORUND_MEDALS_ENABLED: 'korund-medals-737.test.mjs',
   HARIMU_KORUND_SHORTFALL_ENABLED: 'korund-shortfall-759.test.mjs',
+  HARIMU_KORUND_PLAN_STATS_ENABLED: 'korund-plan-stats-981.test.mjs', // #981 flag off: no plan stat, no quota read
   HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
   HARIMU_HOME_CITY_MOVE_ENABLED: 'home-city-move-781.test.mjs',
+  HARIMU_INTERNAL_PERMIT_ENABLED: 'internal-residence-permit-992.test.mjs',
   HARIMU_ENROLL_HOME_CITY_ENABLED: 'enroll-home-city-965.test.mjs',
   HARIMU_SAVINGS_SHIELD_ENABLED: 'savings-shield-824.test.mjs',
   HARIMU_KINDLE_SALES_TAX_ENABLED: 'kindle-sales-tax-844.test.mjs',
@@ -53,6 +56,7 @@ const flagOffPins = {
   HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
   HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
   HARIMU_KORUND_RATION_STABILITY_ENABLED: 'korund-ration-stability-967.test.mjs',
+  HARIMU_KORUND_STABILITY_RECOVERY_ENABLED: 'korund-stability-recovery-983.test.mjs',
   HARIMU_NATION_WORK_ENABLED: 'nation-work-490.test.mjs',
   HARIMU_NATION_READINESS_ENABLED: 'nation-readiness-486.test.mjs',
   HARIMU_FAVOR_DECAY_ENABLED: 'favor-decay-529.test.mjs',
