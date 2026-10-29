@@ -111,11 +111,13 @@ export async function readVerification(userId) {
     let source = await readFile(join(root, sourcePath), 'utf8');
     source = source.replace(/from (['"])([^'"]+)\1/g, (match, quote, specifier) => {
       let target;
+      const bare = specifier.replace(/\.tsx?$/, '');
       if (specifier === 'cloudflare:workers') target = envPath;
+      else if (specifier.endsWith('.mjs')) target = specifier.startsWith('@/') ? resolve(root, specifier.slice(2)) : resolve(root, dirname(sourcePath), specifier);
       else if (specifier === '@/lib/ballot-privacy'||specifier === './ballot-privacy') target=privacyPath;
       else if (specifier === '@/lib/verification') target = verificationPath;
-      else if (specifier.startsWith('@/')) target = join(directory, `${specifier.slice(2)}.mjs`);
-      else if (specifier.startsWith('.')) target = resolve(directory, dirname(sourcePath), `${specifier}.mjs`);
+      else if (specifier.startsWith('@/')) target = join(directory, `${bare.slice(2)}.mjs`);
+      else if (specifier.startsWith('.')) target = resolve(directory, dirname(sourcePath), `${bare}.mjs`);
       else throw new Error(`Unexpected external runtime dependency: ${specifier}`);
       return `from ${JSON.stringify(pathToFileURL(target).href)}`;
     });

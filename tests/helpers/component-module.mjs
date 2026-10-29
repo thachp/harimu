@@ -5,6 +5,13 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const cache = new Map();
+/** A relative or @/ import, already joined to an absolute path. An existing .mjs/.js/.ts/.tsx file wins; otherwise try those extensions, TypeScript first. */
+export async function resolveLocalModule(base) {
+  const candidates = /\.(?:mjs|cjs|js|ts|tsx)$/.test(base) ? [base] : [];
+  for (const extension of ['.ts', '.tsx', '.mjs', '.js']) candidates.push(base + extension);
+  for (const candidate of candidates) { try { await readFile(candidate); return candidate; } catch { /* missing */ } }
+  return null;
+}
 export async function componentModule(path) {
   if (cache.has(path)) return cache.get(path);
   const source = (await readFile(path, 'utf8')).replace(/import\s+['"][^'"]+\.css['"];?/g, '');
@@ -13,8 +20,8 @@ export async function componentModule(path) {
     const specifier = match[2]; let url;
     if (specifier.endsWith('.css')) url = 'data:text/javascript,export default {}';
     else if (specifier.startsWith('@/') || specifier.startsWith('.')) {
-      const base = specifier.startsWith('@/') ? resolve(root, specifier.slice(2)) : resolve(dirname(path), specifier); let child;
-      for (const extension of ['.ts', '.tsx']) { try { await readFile(base + extension); child = base + extension; break; } catch { /* try the other extension */ } }
+      const base = specifier.startsWith('@/') ? resolve(root, specifier.slice(2)) : resolve(dirname(path), specifier);
+      const child = await resolveLocalModule(base);
       if (!child) throw new Error(`Cannot resolve ${specifier} from ${path}`);
       url = await componentModule(child);
     } else url = import.meta.resolve(specifier);

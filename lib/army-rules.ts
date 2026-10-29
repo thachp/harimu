@@ -1,6 +1,7 @@
 /** #738 slice 1: army units (docs §15.3 Armies; §11.3 Military job family). Pure and import-free (types aside).
  *  One standing home-guard unit per MVP nation; citizens volunteer, leave and pick a squad stance. Nothing moves or fights yet. */
 import type { ArmyNation, Stance } from './army-copy';
+import { flagOn } from './flag-pack.mjs';
 export type ArmyUnit = { id: string; nationId: ArmyNation; name: string; officer: string };
 /** [ASSUMPTION] Unit and AI officer names are neutral placeholders (≤ 24 characters, army-copy ARMY_NAME_MAX); the docs name no units. */
 export const armyUnits: readonly ArmyUnit[] = [
@@ -16,9 +17,9 @@ export const defaultStance: Stance = 'hold';
 export const unitForNation = (nationId: string | null | undefined) => armyUnits.find(u => u.nationId === nationId) ?? null;
 export const unitById = (id: unknown) => armyUnits.find(u => u.id === id) ?? null;
 /** Both flags: armies sit on top of war (HARIMU_WAR_ENABLED). */
-export const armiesEnabled = (env: unknown) => { const e = (env ?? {}) as { HARIMU_ARMIES_ENABLED?: string; HARIMU_WAR_ENABLED?: string }; return e.HARIMU_ARMIES_ENABLED === 'true' && e.HARIMU_WAR_ENABLED === 'true'; };
+export const armiesEnabled = (env: unknown) => flagOn(env, 'HARIMU_ARMIES_ENABLED') && flagOn(env, 'HARIMU_WAR_ENABLED');
 /** #738 slice 2 flag: drills, strength and morale. Needs both slice-1 flags too. */
-export const armyDrillsEnabled = (env: unknown) => armiesEnabled(env) && (env as { HARIMU_ARMY_DRILLS_ENABLED?: string }).HARIMU_ARMY_DRILLS_ENABLED === 'true';
+export const armyDrillsEnabled = (env: unknown) => armiesEnabled(env) && flagOn(env, 'HARIMU_ARMY_DRILLS_ENABLED');
 /** A game day is 2 real hours (12x clock; the same length as gray-market GAME_DAY_SECONDS, pinned by a test). */
 export const ARMY_GAME_DAY_SECONDS = 7200;
 /** ARC rulings (Oct 23) on #836: participation counts over the last 7 game days. Strength = 10 per member + 3 per drill + 1 per shift

@@ -7,6 +7,7 @@ import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import ts from 'typescript';
 import {nationTheme,nationThemes} from '../lib/nation-themes.ts';
+import {resolveLocalModule} from './helpers/component-module.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const cache=new Map();
 async function load(path){
@@ -17,8 +18,9 @@ async function load(path){
   if(specifier.endsWith('.css'))url='data:text/javascript,export default {}';
   else if(specifier.startsWith('@/')||specifier.startsWith('.')){
    const base=specifier.startsWith('@/')?resolve(root,specifier.slice(2)):resolve(dirname(path),specifier);
-   for(const ext of ['.ts','.tsx']){try{await readFile(base+ext);url=await load(base+ext);break;}catch{/* Try source extension. */}}
-   assert.ok(url,`Resolve ${specifier}`);
+   const child=await resolveLocalModule(base);
+   assert.ok(child,`Resolve ${specifier}`);
+   url=await load(child);
   }else url=import.meta.resolve(specifier);
   output=output.replace(match[0],`${match[0].slice(0,match[0].lastIndexOf('from '))}from ${JSON.stringify(url)}`);
  }
