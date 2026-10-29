@@ -261,7 +261,9 @@
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",
     // #1017: zone overlay legend explains each zone and keys the capital/outpost markers (docs §6.1, §23.2). "true" in preview, "false" in production.
-    "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "false"
+    "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "false",
+    // #1023: HUD world clock shows the current game season and the countdown to the next (docs §17.1, 7.5 real days each). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_SEASON_CLOCK": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]
