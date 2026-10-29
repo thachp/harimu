@@ -22,8 +22,17 @@ export function gameSeasonAt(epochMs: number, nowMs: number): { season: GameSeas
  * Self-contained so the HUD and node tests resolve it without extension-less imports; tests pin it to lib/festivals.ts. */
 export const festivalCalendarEnabled = (value: string | undefined = process.env.NEXT_PUBLIC_HARIMU_FESTIVAL_CALENDAR) => value === 'true';
 type FestivalSlot = { name: string; dayOfYear: number; base: 'game-day' | 'world' };
-const faithDays = { nightOfNames: { name: 'Night of Names', dayOfYear: 270 }, oathDay: { name: 'Oath Day', dayOfYear: 90 }, launching: { name: 'Launching', dayOfYear: 30 }, safeReturn: { name: 'Safe Return', dayOfYear: 210 }, breadDay: { name: 'Bread Day', dayOfYear: 150 }, openDoor: { name: 'Day of the Open Door', dayOfYear: 330 } };
-const faith = (...keys: (keyof typeof faithDays)[]): FestivalSlot[] => keys.map(k => ({ ...faithDays[k], base: 'game-day' }));
+/** #68 days and #270 names for the six scheduled faith festivals. National festivals stay below. */
+const faithDays = {
+  launching: { id: 'launching', faithId: 'fair-wind-vow', name: 'Launching', dayOfYear: 30 },
+  oathDay: { id: 'oath-day', faithId: 'kinward-rite', name: 'Oath Day', dayOfYear: 90 },
+  breadDay: { id: 'bread-day', faithId: 'open-hand', name: 'Bread Day', dayOfYear: 150 },
+  safeReturn: { id: 'safe-return', faithId: 'fair-wind-vow', name: 'Safe Return', dayOfYear: 210 },
+  nightOfNames: { id: 'night-of-names', faithId: 'kinward-rite', name: 'Night of Names', dayOfYear: 270 },
+  openDoor: { id: 'day-of-the-open-door', faithId: 'open-hand', name: 'Day of the Open Door', dayOfYear: 330 },
+} as const;
+export const faithFestivalSlots = [faithDays.launching, faithDays.oathDay, faithDays.breadDay, faithDays.safeReturn, faithDays.nightOfNames, faithDays.openDoor];
+const faith = (...keys: (keyof typeof faithDays)[]): FestivalSlot[] => keys.map(k => ({ name: faithDays[k].name, dayOfYear: faithDays[k].dayOfYear, base: 'game-day' }));
 const national = (name: string, season: GameSeason, day: number): FestivalSlot => ({ name, dayOfYear: seasonOrder.indexOf(season) * 90 + day, base: 'world' });
 /** ASSUMPTION table (#1029): which festivals each nation holds publicly, and the season slot of national festivals whose copy gives a season cue. */
 export const nationFestivalSlots: Readonly<Record<string, readonly FestivalSlot[]>> = {
@@ -35,15 +44,18 @@ export const nationFestivalSlots: Readonly<Record<string, readonly FestivalSlot[
 };
 const gameDayMs = 86_400_000 / 12, yearMs = 360 * gameDayMs;
 
+/** Next (or current) one-game-day window for a festival whose year starts at `base` ms. Faith festivals use base 0 (#68 clock). */
+export function festivalInstant(base: number, dayOfYear: number, nowMs: number): { startsAt: number; endsAt: number; active: boolean } {
+  const offset = dayOfYear * gameDayMs;
+  let startsAt = base + Math.floor((Math.max(nowMs, base) - base) / yearMs) * yearMs + offset;
+  if (startsAt + gameDayMs <= nowMs) startsAt += yearMs;
+  return { startsAt, endsAt: startsAt + gameDayMs, active: startsAt <= nowMs };
+}
+
 /** The nation's next (or current) festival at `nowMs`, with its game season. Null when the nation has none scheduled. */
 export function nextFestivalAt(nationId: string, epochMs: number, nowMs: number): { name: string; season: GameSeason; startsAt: number; endsAt: number; active: boolean } | null {
   if (!Number.isFinite(epochMs) || !Number.isFinite(nowMs)) return null;
-  const picks = (nationFestivalSlots[nationId] ?? []).map(slot => {
-    const base = slot.base === 'world' ? epochMs : 0, offset = slot.dayOfYear * gameDayMs;
-    let startsAt = base + Math.floor((Math.max(nowMs, base) - base) / yearMs) * yearMs + offset;
-    if (startsAt + gameDayMs <= nowMs) startsAt += yearMs;
-    return { name: slot.name, startsAt, endsAt: startsAt + gameDayMs };
-  }).sort((a, b) => a.startsAt - b.startsAt);
+  const picks = (nationFestivalSlots[nationId] ?? []).map(slot => ({ name: slot.name, ...festivalInstant(slot.base === 'world' ? epochMs : 0, slot.dayOfYear, nowMs) })).sort((a, b) => a.startsAt - b.startsAt);
   const pick = picks[0];
-  return pick ? { ...pick, season: gameSeasonAt(epochMs, pick.startsAt)!.season, active: pick.startsAt <= nowMs } : null;
+  return pick ? { ...pick, season: gameSeasonAt(epochMs, pick.startsAt)!.season } : null;
 }

@@ -136,6 +136,7 @@ const flagOffPins = {
   HARIMU_KINDLE_POLICY_LEDGER_ENABLED: 'policy-ledger-985.test.mjs',
   HARIMU_KINDLE_CERTIFICATION_ENABLED: 'kindle-certification-1016.test.mjs',
   HARIMU_WORLD_AGES_ENABLED: 'world-ages-1041.test.mjs', // #1041 flag off: no Age line
+  HARIMU_FAITH_FESTIVAL_HUD_ENABLED: 'faith-festival-hud-1048.test.mjs', // #1048 flag off: the clock renders no faith-festival line
   HARIMU_SEASON_FARMING_ENABLED: 'season-farming-1033.test.mjs',
 };
 

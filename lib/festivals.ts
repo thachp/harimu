@@ -4,11 +4,13 @@
  * tolerates the others in private worship, and Korund bans all of them publicly. Everything here is derived on read; the only
  * write is a citizen joining a festival (POST /api/faith, action "join-festival"). Behind HARIMU_FAITH_ENABLED. */
 import { festivalStanceCopy, mvpFestivalCopy, type MvpFestivalId, type MvpNationId } from './mvp-festival-copy';
+import { festivalStance, type FestivalStance } from './festival-stance.ts';
 import type { GameDatabase } from './database-contract';
+
+export { festivalStance, type FestivalStance };
 
 export const festivalYearGameDays = 360; // [ASSUMPTION] a game year is 360 game days (30 real days at the 12x clock)
 export const devotionPerFestival = 3; // [ASSUMPTION] joining once per festival occurrence
-export type FestivalStance = 'endorsed' | 'tolerated' | 'banned';
 
 /** Day of the game year each festival falls on; each lasts one game day (2 real hours). Spaced 60 game days apart. [ASSUMPTION] */
 export const festivalDayOfYear: Readonly<Record<MvpFestivalId, number>> = {
@@ -27,14 +29,6 @@ export const festivalSchemas = [
  PRIMARY KEY(user_id, festival_id, occurrence)
 )`,
 ];
-
-/** Stance of a nation toward a festival of a faith (pure). Kindle: equal treatment of all faiths. */
-export function festivalStance(nationId: string, faithId: string): FestivalStance | null {
-  if (nationId === 'kindle') return 'tolerated';
-  if (nationId === 'aurelle') return faithId === 'kinward-rite' ? 'endorsed' : 'tolerated';
-  if (nationId === 'korund') return 'banned';
-  return null;
-}
 
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
 
