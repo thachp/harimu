@@ -266,6 +266,7 @@
       "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "false",
       "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "false",
       "NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP": "false",
+      "NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP": "false",
       "HARIMU_WORLD_AGES_ENABLED": "false"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
