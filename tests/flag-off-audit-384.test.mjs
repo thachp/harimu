@@ -59,6 +59,7 @@ const flagOffPins = {
   HARIMU_KINDLE_SALES_TAX_ENABLED: 'kindle-sales-tax-844.test.mjs',
   HARIMU_MVP_JOB_TYPES_ENABLED: 'mvp-job-types-886.test.mjs',
   HARIMU_WALLET_STREET_RATE_ENABLED: 'wallet-street-rate-758.test.mjs',
+  HARIMU_KORUND_TSR_VIEW_ENABLED: 'korund-tsr-view-1000.test.mjs',
   HARIMU_KORUND_RATION_CUT_ENABLED: 'korund-ration-cut-776.test.mjs',
   HARIMU_KORUND_RATION_STABILITY_ENABLED: 'korund-ration-stability-967.test.mjs',
   HARIMU_KORUND_STABILITY_RECOVERY_ENABLED: 'korund-stability-recovery-983.test.mjs',
