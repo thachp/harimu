@@ -10,7 +10,7 @@ import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { flagOn } from '../lib/flag-pack.mjs';
 import { gameSeasonAt, seasonLengthMs } from '../lib/game-season.ts';
-import { isFarmingShift, seasonEffectLine, seasonFarmingEnabled, seasonYieldPercents, seasonYieldUnits, storedFoodUnits } from '../lib/season-yield.ts';
+import { farmingShiftYield, isFarmingShift, seasonAt, seasonEffectLine, seasonFarmingEnabled, seasonYieldPercents, seasonYieldUnits, storedFoodUnits } from '../lib/season-yield.ts';
 
 const require = createRequire(import.meta.url);
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
@@ -119,15 +119,26 @@ test('a direct false string wins over a true pack on the harvest route', async t
   assert.equal(start.data.shifts[0].rewardQuantity, 4);
 });
 
-test('exact-second boundaries: last autumn second pays 4, first winter second pays 2; winter wraps to spring', () => {
-  const epoch = 1_700_000_000_000, sec = seasonLengthMs / 1000;
+test('seasonAt: a missing clock is null, never epoch 0; exact-second boundaries are unchanged', () => {
+  assert.equal(seasonAt(null), null);
+  assert.equal(seasonAt(undefined), null);
+  assert.equal(seasonAt({}), null);
+  assert.equal(seasonAt({ epochSeconds: 0 }), null);
+  assert.equal(seasonAt({ nowSeconds: 1_700_000_000 }), null);
+  assert.equal(farmingShiftYield('4 food contributed to state ration supply', 4, seasonAt(null)), null);
+  const epoch = 1_700_000_000, sec = seasonLengthMs / 1000;
   assert.equal(sec, 7.5 * 86400);
-  const pay = (offsetSec) => { const season = gameSeasonAt(epoch, epoch + offsetSec * 1000).season; return [season, seasonYieldUnits(4, season)]; };
+  const pay = (offsetSec) => {
+    const season = seasonAt({ epochSeconds: epoch, nowSeconds: epoch + offsetSec });
+    assert.equal(season, gameSeasonAt(epoch * 1000, (epoch + offsetSec) * 1000).season);
+    return [season, seasonYieldUnits(4, season)];
+  };
   assert.deepEqual(pay(3 * sec - 1), ['autumn', 4]);
   assert.deepEqual(pay(3 * sec), ['winter', 2]);
   assert.deepEqual(pay(4 * sec - 1), ['winter', 2]);
   assert.deepEqual(pay(4 * sec), ['spring', 4]);
-  assert.equal(gameSeasonAt(epoch, epoch + 4 * sec * 1000).year, 2);
+  assert.equal(gameSeasonAt(epoch * 1000, (epoch + 4 * sec) * 1000).year, 2);
+  assert.notEqual(seasonAt(null), seasonAt({ epochSeconds: 0, nowSeconds: epoch }), 'a missing clock is not the season at epoch 0');
 });
 
 test('a start retry across a season boundary and a settled shift keep the stamped line', async t => {

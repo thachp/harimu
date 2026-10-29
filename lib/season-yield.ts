@@ -1,8 +1,7 @@
 /** #1033, docs §17.1: game season scales farming-shift output (the farming jobs in lib/mvp-job-types.ts).
  *  Flag HARIMU_SEASON_FARMING_ENABLED, inside HARIMU_GRAY_PACK. A direct string still wins. Off: callers keep today's output. */
-import type { GameDatabase } from './database-contract.ts';
 import { flagOn } from './flag-pack.mjs';
-import { gameSeasonAt, seasonLabels, type GameSeason } from './game-season.ts';
+import { seasonLabels, seasonOrder, type GameSeason } from './game-season.ts';
 import { jobTypeOf } from './mvp-job-types.ts';
 
 export const seasonFarmingEnabled = (env: object | null | undefined) => flagOn(env, 'HARIMU_SEASON_FARMING_ENABLED');
@@ -23,18 +22,21 @@ export function seasonEffectLine(season: GameSeason): string {
 }
 
 const seasonMark = / · ([A-Z][a-z]+: [+\u2212]\d+% harvest)$/;
+/** 7.5 real days, in integer seconds. Not a 7.5 float. */
+const seasonLengthSeconds = (15 * 86_400) / 2;
 
-/** Season at `atMs` from the world clock epoch the HUD uses. Null when the clock or the instant is missing. */
-export async function farmingSeasonAt(db: GameDatabase, atMs: number): Promise<GameSeason | null> {
-  if (!Number.isFinite(atMs)) return null;
-  const row = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{ epoch_seconds: number }>();
-  return row ? gameSeasonAt(Number(row.epoch_seconds) * 1000, atMs)?.season ?? null : null;
+/** The season for a world clock `{ epochSeconds, nowSeconds }`, both integers. Null when there is no clock.
+ *  A missing clock is not epoch 0. Callers treat null as no season effect. */
+export function seasonAt(clock: { epochSeconds?: number | null; nowSeconds?: number | null } | null | undefined): GameSeason | null {
+  if (!clock) return null;
+  const epoch = clock.epochSeconds, now = clock.nowSeconds;
+  if (typeof epoch !== 'number' || typeof now !== 'number' || !Number.isInteger(epoch) || !Number.isInteger(now)) return null;
+  const index = Math.floor(Math.max(0, now - epoch) / seasonLengthSeconds);
+  return seasonOrder[index % 4];
 }
 
-/** Null when the flag is off or the clock has no season: the caller keeps the original output and unit count. */
-export async function farmingShiftYield(db: GameDatabase, output: string, baseUnits: number, atMs: number, enabled: boolean): Promise<{ output: string; units: number } | null> {
-  if (!enabled) return null;
-  const season = await farmingSeasonAt(db, atMs);
+/** Null season: the caller keeps the original output and unit count. */
+export function farmingShiftYield(output: string, baseUnits: number, season: GameSeason | null): { output: string; units: number } | null {
   if (!season) return null;
   const units = seasonYieldUnits(baseUnits, season);
   // Only a sentence that begins with the unit count is rewritten. Kindle's "480 food…" line is flavor and stays.

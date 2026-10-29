@@ -1,7 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import type { WorkShift } from './work-shifts';
 import type { CrownMint } from './crown-debasement'; // #362 (type only: tests/aurelle.test.py loads this file straight into Node, so it needs no runtime import of a module)
-import { farmingShiftYield, leadingFoodUnits, storedFoodUnits } from './season-yield.ts'; // #1033
+import { farmingShiftYield, leadingFoodUnits, seasonAt, storedFoodUnits } from './season-yield.ts'; // #1033
 // Bounded prototype tuning; no gold backing, issuance, ranks or charter allocation model.
 export const aurelleJob = {id:'aurelle-food-estate',name:'Chartered food-estate service',capacityCost:4,hours:2,wageMinor:800,foodOutput:4,favorReward:2} as const;
 export const aurelleFoodPriceMinor=150;
@@ -203,7 +203,8 @@ export async function executeAurelle(db:GameDatabase,userId:string,command:Aurel
  }
  else if(command.action==='aurelle-start-work') {
  const plain='4 food contributed to charter estate supply';
- const scaled=options.seasonFarming?await farmingShiftYield(db,plain,aurelleJob.foodOutput,now*1000,true):null;
+ const clockRow=options.seasonFarming?await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>():null;
+ const scaled=farmingShiftYield(plain,aurelleJob.foodOutput,seasonAt(clockRow?{epochSeconds:Number(clockRow.epoch_seconds),nowSeconds:now}:null));
  await db.batch([
  db.prepare(aurelleStartReceiptSql).bind(id,now,userId,id),db.prepare(aurelleStartSql).bind(iso,new Date((now+7200)*1000).toISOString(),id,userId),
  db.prepare(aurelleStartDebitSql).bind(iso,userId,id),

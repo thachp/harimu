@@ -42,7 +42,7 @@ import { availableWith, checkFirstWeekGoal, completeFirstWeekGoal, latchAfterWri
 import { qaTestCitizenAllowed, qaTestNationSql } from '@/lib/qa-tools';
 import { liveNations, nationPlayable, playableNationIds } from '@/lib/nation-openings'; // #485, #489, #872
 import { mvpJobTypesEnabled } from '@/lib/mvp-job-types'; // #886 (b)
-import { farmingShiftYield, isFarmingShift, seasonFarmingEnabled } from '@/lib/season-yield'; // #1033
+import { farmingShiftYield, isFarmingShift, seasonAt, seasonFarmingEnabled } from '@/lib/season-yield'; // #1033
 import { emissionCapsEnabled } from '@/lib/emission-caps-rules'; // #885
 import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
@@ -679,7 +679,9 @@ async function handlePost(request: Request) {
     }
     const quality = gradeShift(workOrderId, input, 'human', key);
     // #1033 [ASSUMPTION]: season scales the base food units (floor, never below 1) before the quality multiplier. Wages are not seasonal.
-    const scaled = seasonFarmingEnabled(env) && isFarmingShift(workOrderId) ? await farmingShiftYield(database, rule.output, base.quantity, Date.parse(now), true) : null;
+    const clockRow = seasonFarmingEnabled(env) && isFarmingShift(workOrderId)
+      ? await database.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{ epoch_seconds: number }>() : null;
+    const scaled = farmingShiftYield(rule.output, base.quantity, seasonAt(clockRow ? { epochSeconds: Number(clockRow.epoch_seconds), nowSeconds: Math.floor(Date.parse(now) / 1000) } : null));
     const payBase = scaled ? { ...base, quantity: scaled.units } : base;
     const reward = { ...payBase, ...applyQuality(payBase, quality.multiplierPct) };
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();

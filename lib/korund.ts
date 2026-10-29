@@ -9,7 +9,7 @@ import {readWalletStreetRate,type WalletStreetRate} from './wallet-street-rate';
 import {planMedals,korundMedalOwnFood} from './korund-medals-rules'; // #737
 import {korundPlanStanding,type KorundPlanStanding} from './korund-standing-rules'; // #994
 import {korundRationCut,korundRationRecoveryCities,applyRationCut,shortfallPercent,type KorundRationCut,korundShortfall,type KorundShortfall,korundWeeklyQuotaFood,korundWeekSeconds,readCouponsAndQuota,korundCouponGoods,korundCouponRedeemSql,type KorundCoupon,type KorundQuota} from './korund-coupons';
-import { farmingShiftYield, leadingFoodUnits, storedFoodUnits } from './season-yield.ts'; // #1033
+import { farmingShiftYield, leadingFoodUnits, seasonAt, storedFoodUnits } from './season-yield.ts'; // #1033
 export const korundJob = {id:'korund-food-production',name:'State food-production brigade',capacityCost:4,hours:2,wageMinor:800,foodOutput:4} as const;
 export const gameWeekSeconds = korundWeekSeconds;
 export const korundSchemas = [
@@ -175,7 +175,8 @@ export async function executeKorund(db:GameDatabase,userId:string,command:Korund
   return started?{status:200}:{status:409,error:'Finish your active shift or check your Work Capacity before starting the assigned job.'};
  }
  const plain='4 food contributed to state ration supply';
- const scaled=options.seasonFarming?await farmingShiftYield(db,plain,korundJob.foodOutput,now*1000,true):null;
+ const clockRow=options.seasonFarming?await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>():null;
+ const scaled=farmingShiftYield(plain,korundJob.foodOutput,seasonAt(clockRow?{epochSeconds:Number(clockRow.epoch_seconds),nowSeconds:now}:null));
  await db.batch([
  db.prepare(korundStartSql).bind(id,iso,new Date((now+7200)*1000).toISOString(),userId,userId,id,id,id,id),
  db.prepare(korundStartReceiptSql).bind(id,userId),db.prepare(korundDebitSql).bind(iso,userId,id),
