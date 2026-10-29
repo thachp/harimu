@@ -60,15 +60,22 @@ for (const backend of ['sqlite', 'postgres']) {
     const history = await r.importModule('lib/city-capture-history.ts');
     assert.equal(history.captureHistoryLine({ heldBy: 'Korund', capturedFrom: 'Kindle', capturedAt: T1 }), line('Korund', 'Kindle', T1));
     assert.deepEqual(history.captureCityKeys('kindle', 'forgehaven'), ['city:forgehaven', 'city:forgehaven']);
-    assert.deepEqual(history.captureCityKeys('kindle', 'ashby-crossing'), ['city:ashby-crossing', 'outpost:kindle']); // [ASSUMPTION] outpost siege key is outpost:{nation}
+    assert.deepEqual(history.captureCityKeys('kindle', 'ashby-crossing'), ['city:ashby-crossing', 'outpost:kindle']); // #419 outpost:{its nation}
+    assert.deepEqual(history.captureCityKeys('korund', 'ashby-crossing'), ['city:ashby-crossing', 'outpost:kindle'], 'a Korund viewer still uses Kindle\'s outpost key');
     const outpost = await history.latestCityCapture(r.db, 'kindle', 'ashby-crossing');
     assert.deepEqual(outpost, { heldBy: 'Korund', capturedFrom: 'Kindle', capturedAt: T2 + 2 * 86400 });
+    const foreign = await history.latestCityCapture(r.db, 'korund', 'ashby-crossing');
+    assert.deepEqual(foreign, outpost, 'a viewer from another nation sees the same outpost history');
 
     const moved = await r.call('city', 'alice', { action: 'travel', cityId: 'kolt-savanna' });
     assert.equal(moved.status, 200, JSON.stringify(moved.data));
     assert.deepEqual(moved.data.captureHistory, { heldBy: 'Kindle', capturedFrom: 'Aurelle', capturedAt: T2 + 86400 });
 
-    if (backend === 'sqlite') {
+    // Same guard as favor-coup-index-616: the Postgres fixture's db.sqlite has exec, not prepare (HARIMU_TEST_STORAGE=postgres).
+    if (typeof r.db.sqlite?.prepare !== 'function') {
+      const indexes = (r.postgresSnapshot?.schema ?? []).filter(entry => entry.type === 'index').map(entry => entry.name);
+      assert.ok(indexes.includes('idx_city_sieges_city_key'), indexes.join(','));
+    } else {
       const plan = r.db.sqlite.prepare('EXPLAIN QUERY PLAN SELECT c.id FROM city_sieges s JOIN city_captures c ON c.siege_id = s.id WHERE s.city_key IN (?, ?) ORDER BY c.captured_at DESC, c.id DESC LIMIT 1').all('city:forgehaven', 'city:forgehaven');
       assert.match(JSON.stringify(plan), /idx_city_sieges_city_key/);
     }

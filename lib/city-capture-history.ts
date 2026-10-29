@@ -1,16 +1,15 @@
 /** #1028: latest capture for the city panel, read from city_captures (via city_sieges.city_key). Display only. */
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
-import { outpostCityForNation } from './cities';
+import { outpostNationForCity } from './cities';
 
 export type CityCaptureHistory = { heldBy: string; capturedFrom: string; capturedAt: number };
 
-/** [ASSUMPTION] A founded city is stored as `city:{id}`. A frontier outpost's siege key is `outpost:{nation}` (#419)
- *  while the panel's city id is the catalog id (Ashby Crossing, …). Both keys are read; the later capture wins. */
-export function captureCityKeys(nationId: string, cityId: string): [string, string] {
-  const outpost = outpostCityForNation(nationId);
-  const second = outpost && outpost.id === cityId ? `outpost:${nationId}` : `city:${cityId}`;
-  return [`city:${cityId}`, second];
+/** [ASSUMPTION] A founded city is stored as `city:{id}`. #419 keys a frontier outpost `outpost:{its nation}`
+ *  (siegeCityKey), not the viewer's nation. The panel city id is the catalog id (Ashby Crossing → outpost:kindle). */
+export function captureCityKeys(_viewerNation: string, cityId: string): [string, string] {
+  const owner = outpostNationForCity(cityId);
+  return [`city:${cityId}`, owner ? `outpost:${owner}` : `city:${cityId}`];
 }
 
 /** [ASSUMPTION] UTC calendar day of captured_at (unix seconds). Names are nations.short_name. */
