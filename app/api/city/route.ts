@@ -3,7 +3,7 @@ import {getDatabase} from '@/lib/db';
 import {startCityTravel} from '@/lib/travel';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {cityForNation,citySpecialtyFields} from '@/lib/cities'; // #996 specialty
+import {cityForNation,cityImportsFields,citySpecialtyFields} from '@/lib/cities'; // #996 specialty, #1001 imports
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote} from '@/lib/city-tier'; // #979 / #984
 export const dynamic='force-dynamic';
@@ -15,11 +15,12 @@ async function context(request:Request){
 }
 
 async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nationId:string,cityId:string,body:Record<string,unknown>){
- const vars=env as unknown as {HARIMU_CITY_TIER_UNLOCKS_ENABLED?:string;HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?:string;HARIMU_CITY_TIER_GROWTH_ENABLED?:string;HARIMU_CITY_SPECIALTY_NOTE_ENABLED?:string};
+ const vars=env as unknown as {HARIMU_CITY_TIER_UNLOCKS_ENABLED?:string;HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?:string;HARIMU_CITY_TIER_GROWTH_ENABLED?:string;HARIMU_CITY_SPECIALTY_NOTE_ENABLED?:string;HARIMU_CITY_IMPORTS_NOTE_ENABLED?:string};
  const unlocksOn=vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED==='true';
  const noteOn=vars.HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED==='true';
  const specialtyOn=vars.HARIMU_CITY_SPECIALTY_NOTE_ENABLED==='true'; // #996
- if(!unlocksOn&&!noteOn&&!specialtyOn)return body;
+ const importsOn=vars.HARIMU_CITY_IMPORTS_NOTE_ENABLED==='true'; // #1001
+ if(!unlocksOn&&!noteOn&&!specialtyOn&&!importsOn)return body;
  let tier=1;
  if(vars.HARIMU_CITY_TIER_GROWTH_ENABLED==='true'){
   const row=await db.prepare('SELECT tier FROM world_cities WHERE id=?').bind(cityId).first<{tier:number}>();
@@ -29,6 +30,7 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  if(unlocksOn)out={...out,...cityTierUnlockFields(tier)};
  if(noteOn)out={...out,festivalNote:cityTierFestivalNote(tier)}; // #984 read-only
  if(specialtyOn){const s=citySpecialtyFields(nationId,cityId);if(s)out={...out,...s};} // #996 catalog only
+ if(importsOn){const n=cityImportsFields(nationId,cityId);if(n)out={...out,...n};} // #1001 port / trade zone only
  return out;
 }
 export async function GET(request:Request){

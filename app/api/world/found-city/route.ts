@@ -4,7 +4,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { foundCity, parseFoundingCommand } from '@/lib/city-founding';
-import { citySpecialtyFields } from '@/lib/cities'; // #996
+import { cityImportsFields, citySpecialtyFields } from '@/lib/cities'; // #996 / #1001
 import { cityTierName, cityTierUnlockFields, cityTierFestivalNote } from '@/lib/city-tier'; // #952 / #979 / #984
 
 export const dynamic = 'force-dynamic';
@@ -34,15 +34,18 @@ export async function POST(request: Request) {
   // #979: unlocks flag adds districtSlots + unlocks (and tierName) from the doc table; flag off leaves the body unchanged.
   // #984: festival-note flag adds festivalNote from the Cities tier table; flag off leaves the body unchanged.
   // #996: specialty flag adds specialtyRole/specialtyNote when the city is in the catalog (founded cities omit).
-  const vars = env as unknown as { HARIMU_CITY_TIER_GROWTH_ENABLED?: string; HARIMU_CITY_TIER_UNLOCKS_ENABLED?: string; HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?: string; HARIMU_CITY_SPECIALTY_NOTE_ENABLED?: string };
+  // #1001: imports flag adds importsNote when the catalog role is Port or Trade zone (founded cities omit).
+  const vars = env as unknown as { HARIMU_CITY_TIER_GROWTH_ENABLED?: string; HARIMU_CITY_TIER_UNLOCKS_ENABLED?: string; HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED?: string; HARIMU_CITY_SPECIALTY_NOTE_ENABLED?: string; HARIMU_CITY_IMPORTS_NOTE_ENABLED?: string };
   const growth = vars.HARIMU_CITY_TIER_GROWTH_ENABLED === 'true';
   const unlocksOn = vars.HARIMU_CITY_TIER_UNLOCKS_ENABLED === 'true';
   const noteOn = vars.HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED === 'true';
   const specialtyOn = vars.HARIMU_CITY_SPECIALTY_NOTE_ENABLED === 'true';
+  const importsOn = vars.HARIMU_CITY_IMPORTS_NOTE_ENABLED === 'true';
   const tier = growth ? result.city.tier : 1;
   let city: Record<string, unknown> = growth ? { ...result.city, tier, tierName: cityTierName(tier) } : { ...result.city, tier };
   if (unlocksOn) city = { ...city, ...cityTierUnlockFields(tier) };
   if (noteOn) city = { ...city, festivalNote: cityTierFestivalNote(tier) };
   if (specialtyOn) { const s = citySpecialtyFields(result.city.nationId, result.city.id); if (s) city = { ...city, ...s }; }
+  if (importsOn) { const n = cityImportsFields(result.city.nationId, result.city.id); if (n) city = { ...city, ...n }; }
   return privateJson({ ...result, city });
 }

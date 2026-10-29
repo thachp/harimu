@@ -28,6 +28,7 @@ const flagOffPins = {
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
   HARIMU_CITY_SPECIALTY_NOTE_ENABLED: 'city-specialty-note-996.test.mjs',
+  HARIMU_CITY_IMPORTS_NOTE_ENABLED: 'city-imports-note-1001.test.mjs',
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',

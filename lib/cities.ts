@@ -53,3 +53,23 @@ export function citySpecialtyFields(nationId: string, cityId: string): CitySpeci
       : "Jobs here match this city's specialty.";
   return { specialtyRole, specialtyNote };
 }
+
+/** #1001: Local market (docs Cities of Harimu > What a city does). True when the role contains Port or Trade zone.
+ *  A shipyard, frontier, or capital does not qualify unless that role text matches. */
+export function cityHasImports(city: { role: string }): boolean {
+  return /port|trade zone/i.test(city.role);
+}
+/** Port markets and trade zones use different one-line notes. Null when the role does not qualify. */
+export function cityImportsNote(city: { role: string }): string | null {
+  if (!cityHasImports(city)) return null;
+  return /port/i.test(city.role) ? 'Port market: foreign imports arrive here.' : 'Trade zone: foreign imports arrive here.';
+}
+export type CityImportsFields = { importsNote: string };
+/** [ASSUMPTION] Founded or unknown cities omit the note until catalogued. Frontiers stay on the frontier role. */
+export function cityImportsFields(nationId: string, cityId: string): CityImportsFields | null {
+  const outpost = outpostCityForNation(nationId);
+  const city = cityForNation(nationId, cityId) ?? (outpost && outpost.id === cityId ? outpost : undefined);
+  if (!city) return null;
+  const importsNote = cityImportsNote(city);
+  return importsNote ? { importsNote } : null;
+}

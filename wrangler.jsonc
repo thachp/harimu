@@ -43,6 +43,8 @@
     "HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED": "true",
     // #996: city panel shows the catalog specialty/role and a jobs-match note (port/trade also mention imports). Off: /api/city and found-city leave specialty fields off; the panel is unchanged.
     "HARIMU_CITY_SPECIALTY_NOTE_ENABLED": "true",
+    // #1001: city panel market shows a one-line imports note when the catalog role is Port or Trade zone. Off: /api/city and found-city leave importsNote off; the panel is unchanged.
+    "HARIMU_CITY_IMPORTS_NOTE_ENABLED": "true",
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
     // #764: per-persona AI mute (operator control, not a feature flag). "" = off; "all" or a comma list of persona ids (Notable ids, <nation>-news-desk, kindle-cabinet, kindle-town-hall, kindle-debate) skips that persona's model calls. Unknown values fail closed to "all".
