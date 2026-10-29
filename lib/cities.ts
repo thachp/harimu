@@ -53,3 +53,17 @@ export function citySpecialtyFields(nationId: string, cityId: string): CitySpeci
       : "Jobs here match this city's specialty.";
   return { specialtyRole, specialtyNote };
 }
+
+/** #1002: read-only capture-status note for the city panel (docs Cities of Harimu > War: capture and loss).
+ *  Heartland = catalog cities (capitals and the other Heartland cities); war refuses these via capital/heartland
+ *  (`capturableCity` in lib/siege.ts, #912/#934). Frontier = `outpostCityForNation` (border outposts war can besiege).
+ *  [ASSUMPTION] Founded or unknown cities (not in this catalog or the #123 outpost list) omit the note until a
+ *  square-zone lookup is wired; founded cities on Frontier would show the frontier line. */
+export const HEARTLAND_CAPTURE_NOTE = 'Heartland city: can never be captured.';
+export const FRONTIER_CAPTURE_NOTE = 'Frontier city: can be besieged and captured in war (two assaults on different days).';
+export function cityCaptureNote(nationId: string, cityId: string): string | null {
+  const outpost = outpostCityForNation(nationId);
+  if (outpost && outpost.id === cityId) return FRONTIER_CAPTURE_NOTE;
+  if (cityForNation(nationId, cityId)) return HEARTLAND_CAPTURE_NOTE;
+  return null;
+}
