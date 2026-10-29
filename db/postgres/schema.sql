@@ -333,7 +333,7 @@ CREATE TABLE "aurelle_settlements" (
 	FOREIGN KEY("shift_id") REFERENCES "work_shifts"("id") ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY("clerk_user_id") REFERENCES "citizens"("clerk_user_id") ON UPDATE no action ON DELETE no action,
 	CONSTRAINT "aurelle_settlement_wage" CHECK("aurelle_settlements"."wage_minor"=800),
-	CONSTRAINT "aurelle_settlement_food" CHECK("aurelle_settlements"."food_output"=4),
+	CONSTRAINT "aurelle_settlement_food" CHECK("aurelle_settlements"."food_output">=1),
 	CONSTRAINT "aurelle_settlement_favor" CHECK("aurelle_settlements"."favor"=2)
 );
 
@@ -362,7 +362,7 @@ CREATE TABLE "korund_settlements" (
 	FOREIGN KEY("shift_id") REFERENCES "work_shifts"("id") ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY("clerk_user_id") REFERENCES "citizens"("clerk_user_id") ON UPDATE no action ON DELETE no action,
 	CONSTRAINT "korund_wage" CHECK("korund_settlements"."wage_minor"=800),
-	CONSTRAINT "korund_output" CHECK("korund_settlements"."food_output"=4)
+	CONSTRAINT "korund_output" CHECK("korund_settlements"."food_output">=1)
 );
 
 CREATE TABLE "korund_work_starts" (

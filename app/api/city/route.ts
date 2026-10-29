@@ -7,8 +7,10 @@ import {cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,city
 import {spaWcBonusEnabled,spaWcNote} from '@/lib/spa-recovery'; // #798
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
+import {latestCityCapture} from '@/lib/city-capture-history'; // #1028
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
 import {seaLanesStormNote} from '@/lib/game-season'; // #1034
+import {seasonAt} from '@/lib/season-yield'; // #1035 shared season: null without a clock
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 async function context(request:Request){
@@ -17,10 +19,10 @@ async function context(request:Request){
  return {db,userId,nationId:citizen?.nation_id??null,now:Math.floor(Date.now()/1000)};
 }
 
-/** #1034: world clock epoch (spring starts here); a database without world_clock reads as 0. */
-async function worldEpochMs(db:Awaited<ReturnType<typeof getDatabase>>){
+/** #1034: world clock seconds for #1035's seasonAt. No world_clock row: null, so no season and no storm note. */
+async function worldClock(db:Awaited<ReturnType<typeof getDatabase>>){
  const row=await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>().catch(()=>null);
- return row?Number(row.epoch_seconds)*1000:0;
+ return row?{epochSeconds:Number(row.epoch_seconds),nowSeconds:Math.floor(Date.now()/1000)}:null;
 }
 async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nationId:string,cityId:string,body:Record<string,unknown>){
  const unlocksOn=flagOn(env,'HARIMU_CITY_TIER_UNLOCKS_ENABLED');
@@ -47,13 +49,14 @@ async function withTierUnlocks(db:Awaited<ReturnType<typeof getDatabase>>,nation
  if(importsOn){const n=cityImportsFields(nationId,cityId);if(n)out={...out,...n};} // #1001 port / trade zone only
  if(populationOn)out={...out,populationNote:cityTierPopulationNote(tier)}; // #1014 read-only
  if(governorOn)out={...out,...cityGovernorFields(nationId,tier)}; // #1007
- if(seaOn&&/port/i.test(cityForNation(nationId,cityId)?.role??'')){const n=seaLanesStormNote(await worldEpochMs(db),Date.now(),true);if(n)out={...out,seaLanesNote:n};} // #1034 ports only (ARC #1037), winter only
+ if(seaOn&&/port/i.test(cityForNation(nationId,cityId)?.role??'')){const clock=await worldClock(db);const n=seasonAt(clock)==='winter'?seaLanesStormNote(clock!.epochSeconds*1000,clock!.nowSeconds*1000,true):null;if(n)out={...out,seaLanesNote:n};} // #1034 ports only (ARC #1037), winter only
  return out;
 }
 export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now)}));
+ const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now);
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads}));
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
@@ -74,6 +77,13 @@ export async function POST(request:Request){
  ]);
  if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),presence:await cityPresence(ctx.db,ctx.nationId,ctx.now),coResidents:await cityCoResidents(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now)}));
+ const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now);
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads}));
 }
 const spaField=(nationId:string,homeCityId:string,currentCityId:string)=>spaWcBonusEnabled(env)&&cityForNation(nationId,homeCityId)?.spa&&currentCityId===homeCityId?{spaWcNote}:{};
+/** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads. */
+async function cityReads(db:Awaited<ReturnType<typeof getDatabase>>,userId:string,nationId:string,cityId:string,now:number){
+ if(!flagOn(env,'HARIMU_CITY_CAPTURE_HISTORY_ENABLED'))return {presence:await cityPresence(db,nationId,now),coResidents:await cityCoResidents(db,userId,nationId,cityId,now)};
+ const [presence,coResidents,captureHistory]=await Promise.all([cityPresence(db,nationId,now),cityCoResidents(db,userId,nationId,cityId,now),latestCityCapture(db,nationId,cityId)]);
+ return {presence,coResidents,...(captureHistory?{captureHistory}:{})};
+}

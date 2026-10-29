@@ -90,4 +90,13 @@ test('route: exact-second payout at the autumn→winter and winter→spring boun
   assert.equal(await payAt(4 * L - 1), 1, 'last winter second');
   assert.equal(await payAt(4 * L), 2, 'first spring second (wrap)');
   assert.equal(await payAt(7 * L), 1, 'next year winter');
+  // #1035 seasonAt: no world clock is no season (not epoch 0), so no storm cut and no note.
+  await r.db.prepare("DELETE FROM world_clock WHERE id='main'").run();
+  r.setNow((2731 * L + 3600) * 1000); // counted from epoch 0 this instant would be winter, so an epoch-0 fallback fails here
+  await r.db.prepare('UPDATE work_shifts SET claimed_at=? WHERE clerk_user_id=? AND claimed_at IS NULL').bind(new Date(r.now).toISOString(), 'alice').run();
+  await r.db.prepare("UPDATE citizens SET capacity=100 WHERE clerk_user_id='alice'").run();
+  assert.equal((await r.call('city', 'alice')).data.seaLanesNote, undefined, 'no clock: no note');
+  const noClock = await r.call('citizen', 'alice', { action: 'commit-work', workOrderId: 'freight' });
+  assert.equal(noClock.status, 200, JSON.stringify(noClock.data));
+  assert.equal(noClock.data.shifts.find(s => !s.claimedAt).rewardQuantity, 2, 'no clock: no storm cut');
 });

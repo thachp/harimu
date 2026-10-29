@@ -35,7 +35,7 @@
     "HARIMU_NOTABLES_ENABLED": "true",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "true",
     "HARIMU_CITY_FOUNDING_ENABLED": "true",
-    // #988 / #1003 / #1006 / #1001 / #1007 / #1014 / #798: one JSON binding for city tier growth, panel notes (civic unit, imports, governor, population band) and the spa WC bonus (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    // #988 / #1003 / #1006 / #1001 / #1007 / #1014 / #798 / #1028: one JSON binding for city tier growth, panel notes (civic unit, imports, governor, population band, capture history) and the spa WC bonus (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
     "HARIMU_CITY_PACK": {
       "HARIMU_CITY_TIER_GROWTH_ENABLED": "true",
       "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "true",
@@ -46,6 +46,7 @@
       "HARIMU_CITY_IMPORTS_NOTE_ENABLED": "true",
       "HARIMU_CITY_GOVERNOR_NOTE_ENABLED": "true",
       "HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED": "true",
+      "HARIMU_CITY_CAPTURE_HISTORY_ENABLED": "true",
       "HARIMU_SPA_WC_BONUS_ENABLED": "true",
       "HARIMU_SEASON_SEA_LANES_ENABLED": "true"
     },
@@ -94,7 +95,9 @@
       // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
       "HARIMU_SAVINGS_SHIELD_ENABLED": "true",
       // #1016: closed Kindle presidential ballot shows High Court certification (awaiting for 24 hours, then certified). Off: no certification field, ballot unchanged. Display only.
-      "HARIMU_KINDLE_CERTIFICATION_ENABLED": "true"
+      "HARIMU_KINDLE_CERTIFICATION_ENABLED": "true",
+      // #1033: game season scales farming shift output (docs §17.1). Off: the same units and the same result line.
+      "HARIMU_SEASON_FARMING_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
@@ -251,7 +254,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "true",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "true",
-    // #988/#1008/#1009: UI skin flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off. The client build expands each NEXT_PUBLIC_* name. A direct string binding still wins.
+    // #988/#1008/#1009/#1039: UI skin flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off. The client build expands each NEXT_PUBLIC_* name. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "true",
       "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "true",
@@ -259,7 +262,8 @@
       "NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET": "true",
       "NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS": "true",
       "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "true",
-      "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "true"
+      "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "true",
+      "NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",

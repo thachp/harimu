@@ -270,6 +270,8 @@ body:has(.harimu-game){overflow:auto}
 /* #969: countdown beside the world clock. Flag off renders no .game-countdown, so these rules never match. Paper on the HUD ink is the clock's own contrast. */
 .game-countdown{color:#dce7e8;font-size:calc(12px * var(--text-scale, 1));font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.2}
 @media(max-width:760px){.game-countdown{font-size:calc(10px * var(--text-scale, 1));white-space:normal;max-width:8em}}
+@media(prefers-reduced-motion:reduce){.game-countdown{animation:none;transition:none}}
+html[data-harimu-reduced-motion] .game-countdown{animation:none;transition:none}
 
 /* #346 tablet / zoomed desktop (761-1100px, and a 1920px screen at 200% zoom): the top bar wraps to two rows (identity + account, then the
    resource chips full width) instead of running off the right edge. Heights scale with text size, so the dock and the overlays

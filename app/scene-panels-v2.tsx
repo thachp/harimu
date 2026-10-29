@@ -8,6 +8,7 @@ import type { CityDestination } from '@/lib/city-destinations';
 import { itemCount, uiV2HouseholdEnabled } from '@/lib/ui-v2-household';
 import { uiV2CityEnabled } from '@/lib/ui-v2-city';
 import { cityPlaceIcon } from './city-pill';
+import { captureHistoryLine, type CityCaptureHistory } from '@/lib/city-capture-history'; // #1028
 
 /** #392 S3: the World and City side-panel pieces that change with NEXT_PUBLIC_HARIMU_UI_V2_PANEL. Each piece reads the build-time flag itself, so
  *  page.tsx never decides it (tests/ui-v2-panel.test.mjs renders these flag off and on, and pins that page.tsx passes no `enabled`). Existing copy only. */
@@ -36,7 +37,7 @@ export function WorldInstitutionsButton({ onView, enabled = uiV2PanelEnabled() }
 
 /** City, top of the panel (flag on): "Status: Capital" first on a capital only (from the city catalog), the Household destination is promoted to the primary action (as in the concept), the other destinations are the rows. */
 export type CityTierUnlockView = { tierName: string; districtSlots: number; unlocks: readonly string[] }; // #979
-export function CitySummary({ cityName, city, nation, destinations, onView, tierUnlocks, festivalNote, populationNote, specialtyRole, specialtyNote, captureNote, civicUnitNote, governorNote, governorAi = false, spaWcNote, enabled = uiV2PanelEnabled(), icons = uiV2CityEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; tierUnlocks?: CityTierUnlockView | null; festivalNote?: string | null; populationNote?: string | null; specialtyRole?: string | null; specialtyNote?: string | null; captureNote?: string | null; civicUnitNote?: string | null; governorNote?: string | null; governorAi?: boolean; spaWcNote?: string | null; enabled?: boolean; icons?: boolean }) {
+export function CitySummary({ cityName, city, nation, destinations, onView, tierUnlocks, festivalNote, populationNote, specialtyRole, specialtyNote, captureNote, captureHistory, civicUnitNote, governorNote, governorAi = false, spaWcNote, enabled = uiV2PanelEnabled(), icons = uiV2CityEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; tierUnlocks?: CityTierUnlockView | null; festivalNote?: string | null; populationNote?: string | null; specialtyRole?: string | null; specialtyNote?: string | null; captureNote?: string | null; captureHistory?: CityCaptureHistory | null; civicUnitNote?: string | null; governorNote?: string | null; governorAi?: boolean; spaWcNote?: string | null; enabled?: boolean; icons?: boolean }) {
   if (!enabled) return null;
   const home = destinations.find(card => card.id === 'household');
   const tierStats = tierUnlocks ? [{ label: 'Tier', value: tierUnlocks.tierName }, { label: 'Districts', value: String(tierUnlocks.districtSlots) }, { label: 'Unlocks', value: tierUnlocks.unlocks.join(', ') }] : [];
@@ -44,9 +45,10 @@ export function CitySummary({ cityName, city, nation, destinations, onView, tier
   const festivalStats = festivalNote ? [{ label: 'Festivals', value: festivalNote }] : []; // #984 read-only note
   const specialtyStats = specialtyRole ? [{ label: 'Specialty', value: specialtyNote ? `${specialtyRole}. ${specialtyNote}` : specialtyRole }] : []; // #996
   const captureStats = captureNote ? [{ label: 'Capture', value: captureNote }] : []; // #1002 read-only note
+  const historyStats = captureHistory ? [{ label: 'History', value: captureHistoryLine(captureHistory) }] : []; // #1028 read-only
   const civicUnitStats = civicUnitNote ? [{ label: 'Civic unit', value: civicUnitNote }] : []; // #1006 read-only note
   const governorStats = governorNote ? [{ label: 'Governor', value: governorAi ? <>{governorNote} <AiBadge /></> : governorNote }] : []; // #1007 read-only
-  const panel = <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...captureStats, ...civicUnitStats, ...governorStats, { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
+  const panel = <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...captureStats, ...historyStats, ...civicUnitStats, ...governorStats, { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
     rows={destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? cityPlaceIcon(card.id) : undefined, onSelect: () => onView(card.id) }))}
     primary={home ? { label: home.label, icon: icons ? cityPlaceIcon(home.id) : undefined, onSelect: () => onView(home.id) } : undefined} />; // S7 follow-up: with the City pills on, rows carry the pill's icon
   return spaWcNote ? <>{panel}<p>{spaWcNote}</p></> : panel; // #798: absent unless the API sends it
