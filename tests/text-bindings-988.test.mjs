@@ -25,7 +25,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 19);
-  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 6);
+  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 7);
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 11); // #1039 phone map, #1040 two-tap, #1041 world Age, and #1042 citizen game age stay inside the pack

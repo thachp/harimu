@@ -85,6 +85,11 @@ export const unitMembership={
  // Content (#887 follow-up), docs §15.3 Logistics: units need supply lines from depots; a cut line lowers strength each game day.
  // {pct} is the server's loss figure. Depot (the capital), range, daily rate and the half-strength cap were approved by ARC on #897 (lib/army-supply.ts); the card names only the cap.
  supplyCut:L('Supply line cut. Strength is down {pct}% and drops each game day the line stays cut, to at most half.'),
+ // #1053 (proposal, for Content): the quartermaster shift and the supply range line.
+ quartermasterButton:'Run a quartermaster shift',
+ quartermasterDone:L('You ran a quartermaster shift for {unit}.'),
+ quartermasterToday:L('You already ran a quartermaster shift this game day.'),
+ supplyRange:L('Supply range: {n} squares (+{k} from quartermasters)'),
  supplyCutLegend:L('supply line cut, strength down {pct}%'),
  // PLACEHOLDER copy, marked for Content (proposal: true): #738 battles, the card line. The capital is never captured.
  battleOngoing:L('Battle with {nation}: round {round}.'),

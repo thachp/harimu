@@ -3,6 +3,7 @@ import { getDatabase } from '@/lib/db';
 import { armyMapEnabled, marchPace, readActiveWars, readArmyPositions } from '@/lib/army-map';
 import { armySupplyEnabled, withSupply } from '@/lib/army-supply';
 import { winterMarchEnabled } from '@/lib/winter-march'; // #1038
+import { armyQuartermasterEnabled, readQuartermasterExtra } from '@/lib/army-quartermaster'; // #1053
 
 // #738 slice 4: unit positions for the "Army positions" map overlay. Public like the other overlay reads (no fog of war yet). Flag off: a 404
 // that opens no database. GET only; it never writes.
@@ -12,5 +13,7 @@ export async function GET() {
   if (!armyMapEnabled(env)) return Response.json({ error: 'Not found.', reason: 'not_found' }, { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
   const db = await getDatabase(), now = Math.floor(Date.now() / 1000), wars = await readActiveWars(db), pace = await marchPace(db, winterMarchEnabled(env)), map = await readArmyPositions(db, now, wars, pace);
   // #738 slice 5: each unit's supply only while HARIMU_ARMY_SUPPLY_ENABLED is on (off: the slice-4 shape, same single read). Winter adds a clock read only while its flag is on.
-  return Response.json(armySupplyEnabled(env) ? { ...map, units: withSupply(map.units, wars, now, pace) } : map, { headers: { 'Cache-Control': 'private, no-store' } });
+  // #1053: quartermaster shifts widen each unit's range (one read, only while that flag is on).
+  const qm = armySupplyEnabled(env) && armyQuartermasterEnabled(env) ? await readQuartermasterExtra(db, now) : null;
+  return Response.json(armySupplyEnabled(env) ? { ...map, units: withSupply(map.units, wars, now, pace, n => qm?.get(n) ?? 0) } : map, { headers: { 'Cache-Control': 'private, no-store' } });
 }
