@@ -11,6 +11,7 @@ import type { WorkShift } from '@/lib/work-shifts';
 import type { SceneView } from '@/lib/scene-navigation';
 import { aurelleFoodPriceMinor } from '@/lib/aurelle';
 import type { CrownMint } from '@/lib/crown-debasement';
+import { quoteCrownTessera } from '@/lib/crown-debasement-rules';
 
 export type AurelleAction = 'aurelle-start-work' | 'aurelle-claim-work' | 'aurelle-buy-food' | 'aurelle-household-meal';
 export type AurelleCommand = { action: AurelleAction; requestId: string; shiftId?: string; quantity?: 1 | 2 };
@@ -26,6 +27,8 @@ export type AurellePlanView = {
   shifts: WorkShift[];
   /** #362: read-only Royal Mint strip; only sent while HARIMU_CROWN_DEBASEMENT_ENABLED is on. */
   mint?: CrownMint;
+  /** #999: official CRN→TSR rate in thousandths of a Tessera per Crown; only sent while HARIMU_AURELLE_TSR_VIEW_ENABLED is on. */
+  crownRateMilli?: number;
 };
 
 const actionStyle = { minHeight: 44, maxWidth: '100%', whiteSpace: 'normal' } as const;
@@ -51,7 +54,7 @@ export function AurellePlanPanel({ plan, scene, capacity, pending, uncertain, lo
   const mealReady = now > 0 && (!plan.mealReadyAt || Date.parse(plan.mealReadyAt) <= now);
   return <NationDocument nationId="aurelle" className="citizen-market aurelle-plan" label="Aurelle charter account"><div aria-busy={pending}>
     <h3>{scene === 'workplace' ? 'Chartered service' : scene === 'market' ? 'Chartered food counter' : scene === 'household' ? 'Aurelle household' : 'Your Aurelle next step'}</h3>
-    <dl><dt>Crowns</dt><dd>{(plan.walletMinor / 100).toFixed(2)} CRN</dd><dt>Food</dt><dd>{plan.foodQuantity}</dd><dt>Royal Favor</dt><dd>{plan.favor} / 100</dd></dl>
+    <dl><dt>Crowns</dt><dd>{(plan.walletMinor / 100).toFixed(2)} CRN{plan.crownRateMilli != null && <><br /><small>≈ {(quoteCrownTessera(plan.walletMinor, plan.crownRateMilli) / 100).toFixed(2)} TSR at the official rate</small></>}</dd><dt>Food</dt><dd>{plan.foodQuantity}</dd><dt>Royal Favor</dt><dd>{plan.favor} / 100</dd></dl>
     {plan.mint && scene !== 'workplace' && <RoyalMintStrip mint={plan.mint} />}
     {uncertain && <div role="alert"><p>Confirm your previous action before starting another.</p><ActionButton style={actionStyle} type="button" reason={pendingActionReason(pending)} onClick={onRetry}>Confirm previous action</ActionButton></div>}
     {error && <p role="alert">{error}</p>}

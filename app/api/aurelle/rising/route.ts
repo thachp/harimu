@@ -8,11 +8,12 @@ import { recordVerifiedHumanVisit } from '@/lib/collective-petitions';
 import { advanceWorld } from '@/lib/world-simulation';
 import { pledge, readAurelleRising, readCrown, validPledgeCommand } from '@/lib/aurelle-rising';
 import { readCoupView } from '@/lib/aurelle-coup';
+import { flagOn } from '@/lib/flag-pack.mjs'; // #988
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
-const enabled = () => (env as unknown as { HARIMU_AURELLE_RISING_ENABLED?: string }).HARIMU_AURELLE_RISING_ENABLED === 'true';
-const coupOn = () => (env as unknown as { HARIMU_AURELLE_COUP_ENABLED?: string }).HARIMU_AURELLE_COUP_ENABLED === 'true'; // #281
+const enabled = () => flagOn(env, 'HARIMU_AURELLE_RISING_ENABLED');
+const coupOn = () => flagOn(env, 'HARIMU_AURELLE_COUP_ENABLED'); // #281
 const faithOn = () => (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true'; // #291
 const orderBook = () => (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true';
 

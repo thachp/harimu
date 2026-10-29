@@ -35,7 +35,7 @@
     "HARIMU_NOTABLES_ENABLED": "true",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "true",
     "HARIMU_CITY_FOUNDING_ENABLED": "true",
-    // #988 / #1003: one JSON binding for city tier growth and panel notes (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    // #988 / #1003 / #1006 / #1001: one JSON binding for city tier growth and panel notes, including the civic-unit note and the imports note (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
     "HARIMU_CITY_PACK": {
       "HARIMU_CITY_TIER_GROWTH_ENABLED": "true",
       "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "true",
@@ -43,6 +43,7 @@
       "HARIMU_CITY_SPECIALTY_NOTE_ENABLED": "true",
       "HARIMU_CITY_CAPTURE_NOTE_ENABLED": "true",
       "HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED": "true",
+      "HARIMU_CITY_IMPORTS_NOTE_ENABLED": "true",
       "HARIMU_CITY_GOVERNOR_NOTE_ENABLED": "true"
     },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
@@ -108,11 +109,15 @@
     "HARIMU_ORDER_BOOK_ENABLED": "true",
     // #459: the market board re-reads GET /api/market/orders every 20 s while open and visible, with up/down markers. Off: no ticker key, no polling.
     "HARIMU_MARKET_TICKER_ENABLED": "true",
-    "HARIMU_AURELLE_RISING_ENABLED": "true",
-    // #281: Aurelle AI palace coup (plot, Power Weight, Crisis Window). Off until QA.
-    "HARIMU_AURELLE_COUP_ENABLED": "true",
-    // #531: Aurelle guild charter PoC (request/renew a market-stall charter for Royal Favor). Off: the charter route is a 404 and nothing is written.
-    "HARIMU_AURELLE_CHARTERS_ENABLED": "true",
+    // #988 / #999: one JSON binding for the Aurelle flags (Cloudflare text-binding headroom). Preview on, production off. A direct HARIMU_* var still wins.
+    "HARIMU_AURELLE_PACK": {
+      "HARIMU_AURELLE_RISING_ENABLED": "true",
+      "HARIMU_AURELLE_COUP_ENABLED": "true",
+      "HARIMU_AURELLE_CHARTERS_ENABLED": "true",
+      "HARIMU_AURELLE_SUCCESSION_ENABLED": "true",
+      "HARIMU_CROWN_DEBASEMENT_ENABLED": "true",
+      "HARIMU_AURELLE_TSR_VIEW_ENABLED": "true"
+    },
     // #465: earned-Tessera rewards (a fixed daily pool split pro-rata over verified settled Kindle shifts, claimed at a kiosk; no exchange, cash-out or conversion). Off: the rewards route is a 404 and the epoch-close cron is a no-op.
     "HARIMU_TESSERA_REWARDS_ENABLED": "false",
     // #283: Kindle mid-term Assembly election (D'Hondt per district, 5% district share). Off until QA. #351: the real calendar is driven by the world clock: set HARIMU_KINDLE_CYCLE_START_AT (epoch seconds, start of day 0 of the first 120-day cycle) and the vote opens at day 60 of every cycle for 72 hours. Without it, HARIMU_KINDLE_ASSEMBLY_OPEN_AT (epoch seconds) is a manual one-off open. Neither set: it never opens.
@@ -163,8 +168,6 @@
     "HARIMU_EMBASSY_CHAT_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
-    // #613: Aurelle hereditary succession PoC (docs coups-transitions 10.4-10.5): the operator succession command (illness, vacancy, abdication, accession) with one gazette item per transition. Off: the route returns 404 and nothing is read. Needs the HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET Worker secret (set in the dashboard, never here).
-    "HARIMU_AURELLE_SUCCESSION_ENABLED": "true",
     // #470 slice 2: relocation support claims after a city capture (Decision 109): one flat Tessera payout per eligible Kindle defender citizen from a capped protocol pot; no exchange, cash-out or conversion. Off: the claim route is a 404 and nothing is read.
     "HARIMU_RELOCATION_SUPPORT_ENABLED": "true",
     // #601: targeted goods sanctions PoC (docs 13.3): a nation bans named goods to another on top of the #363 embargo; food is never listed. Server-side proposals, decided on the citizen POST world tick. Off: nothing is created and trade checks are #363's alone.
@@ -185,8 +188,6 @@
     "HARIMU_DIPLOMACY_ENABLED": "true",
     // #363: embargo PoC (bilateral trade cut). Off until QA; embargoes are proposed and ratified by server code only.
     "HARIMU_EMBARGO_ENABLED": "true",
-    // #362: Aurelle Crown debasement PoC (mint parity, Currency Confidence, Monarch decree). Off until QA; decrees are written only by the scheduled Worker.
-    "HARIMU_CROWN_DEBASEMENT_ENABLED": "true",
     // #442: Kindle canvassing PoC (party members' ground-game quests; display-only district visibility, never votes). Off until QA.
     "HARIMU_CANVASSING_ENABLED": "true",
     // #441: Kindle town hall PoC (citizen questions for 24 hours, top 10 answered). Off until QA. An operator sets HARIMU_TOWN_HALL_OPEN_AT (epoch seconds) to open every candidate's hall; unset it never opens.

@@ -27,7 +27,7 @@ test('wrangler: the flag is "true" in preview (#654 preview-on rule; the POST fa
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const cfg = await read(file);
     assert.deepEqual([...cfg.matchAll(/"HARIMU_AURELLE_SUCCESSION_ENABLED"\s*:\s*"([^"]*)"/g)].map(m => m[1]), [value], file);
-    assert.match(cfg, new RegExp(`^\\s*\\/\\/ #613:.*\\n\\s*"HARIMU_AURELLE_SUCCESSION_ENABLED": "${value}",$`, 'm'), `${file}: the comment is a full line above the flag`);
+    assert.match(cfg, /^\s*\/\/ #988 \/ #999:.*\n\s*"HARIMU_AURELLE_PACK": \{$/m, `${file}: the pack comment is a full line above HARIMU_AURELLE_PACK`);
     assert.deepEqual(cfg.split('\n').filter(l => !/^\s*\/\//.test(l)).filter(l => /\/\/|\/\*/.test(l.replace(/"(?:[^"\\]|\\.)*"/g, '""'))), [], file);
     assert.doesNotMatch(cfg, /"HARIMU_AURELLE_SUCCESSION_ADMIN_SECRET"/, `${file}: the secret is set in the dashboard, never in the config`);
   }
@@ -206,6 +206,6 @@ test('migration 0055 is additive in both dialects and matches the inline schema'
   assert.deepEqual(kinds(sqlite)[0].split(','), Object.keys(rules.successionGazette).sort(), 'the CHECK list is exactly the event kinds that have a gazette line');
   for (const col of ['id', 'seq', 'request_id', 'kind', 'member_id', 'name', 'house', 'occurred_at']) { assert.match(sqlite, new RegExp(`\\b${col} `)); assert.match(pg, new RegExp(`\\b${col} `)); }
   const route = await read('app/api/aurelle-succession/route.ts');
-  assert.ok(route.indexOf("HARIMU_AURELLE_SUCCESSION_ENABLED !== 'true'") < route.indexOf('bearerMatches(') && route.indexOf('bearerMatches(') < route.indexOf('readCommandObject('), 'flag, then credential, then body');
+  assert.ok(route.indexOf("flagOn(env, 'HARIMU_AURELLE_SUCCESSION_ENABLED')") < route.indexOf('bearerMatches(') && route.indexOf('bearerMatches(') < route.indexOf('readCommandObject('), 'flag, then credential, then body');
   assert.doesNotMatch(route, /export async function GET/);
 });

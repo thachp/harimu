@@ -1,7 +1,7 @@
 /** #988: Cloudflare error 10055 counts secrets + plain-text vars, limit 128 (Workers Paid). Hyperdrive, AI, D1 and Durable Objects are not text bindings.
  *  Run 40757731540 printed 123 plain-text vars and the API counted 129. The 6 not in that upload were the 4 dashboard-managed names
  *  (3 of those are in wrangler.jsonc, stripped, then present again) plus 2 secret_text bindings. A JSON pack is one binding.
- *  The ceiling is 127 so a few new flags still fit under 128. */
+ *  The ceiling is 127 so a few new flags still fit under 128. The #1001 imports note is a key of HARIMU_CITY_PACK. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK };
+  const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_GRAY_RATION_RISE_ENABLED'), true);
   assert.equal(flagOn({ ...on, HARIMU_GRAY_MARKET_ENABLED: 'false' }, 'HARIMU_GRAY_MARKET_ENABLED'), false, 'a direct binding wins over the pack');
@@ -34,8 +34,19 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_ARMY_BATTLES_ENABLED, 'true');
   assert.equal(flagOn(on, 'HARIMU_CITY_CAPTURE_NOTE_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED'), true);
+  assert.equal(flagOn(on, 'HARIMU_CITY_IMPORTS_NOTE_ENABLED'), true);
+  assert.equal(flagOn({ ...on, HARIMU_CITY_IMPORTS_NOTE_ENABLED: 'false' }, 'HARIMU_CITY_IMPORTS_NOTE_ENABLED'), false, 'a direct binding wins over the pack');
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_CITY_IMPORTS_NOTE_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_CITY_IMPORTS_NOTE_ENABLED, 'false');
   assert.equal(flagOn(on, 'HARIMU_CITY_GOVERNOR_NOTE_ENABLED'), true);
   assert.equal(expandFlagPacks(preview.vars).HARIMU_CITY_TIER_GROWTH_ENABLED, 'true');
   assert.equal('HARIMU_GRAY_PACK' in expandFlagPacks(preview.vars), false);
   assert.equal('HARIMU_CITY_PACK' in expandFlagPacks(preview.vars), false);
+  assert.equal(flagOn(on, 'HARIMU_AURELLE_TSR_VIEW_ENABLED'), true);
+  assert.equal(flagOn(on, 'HARIMU_CROWN_DEBASEMENT_ENABLED'), true);
+  assert.equal(flagOn({ ...on, HARIMU_AURELLE_TSR_VIEW_ENABLED: 'false' }, 'HARIMU_AURELLE_TSR_VIEW_ENABLED'), false, 'a direct binding wins over the Aurelle pack');
+  assert.equal(flagOn({ HARIMU_AURELLE_PACK: prod.vars.HARIMU_AURELLE_PACK }, 'HARIMU_AURELLE_RISING_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_AURELLE_TSR_VIEW_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_AURELLE_TSR_VIEW_ENABLED, 'false');
+  assert.equal('HARIMU_AURELLE_PACK' in expandFlagPacks(preview.vars), false);
 });
