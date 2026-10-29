@@ -147,7 +147,7 @@ test('a packed true is on, a direct false wins, and a Korund replay at the cap d
   const t0 = Math.floor(r.now / 1000);
   await setEpoch(r, t0);
   const now = iso(t0);
-  const seed = user => Promise.all([0, 1, 2].map(i => r.db.prepare(`INSERT INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at,claimed_at) VALUES (?,?, 'orchard','Pick','fruit',4,?,?,?)`).bind(`${user}-${i}`, user, now, now, now).run()));
+  const seed = async user => { for (const i of [0, 1, 2]) await r.db.prepare(`INSERT INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at,claimed_at) VALUES (?,?, 'orchard','Pick','fruit',4,?,?,?)`).bind(`${user}-${i}`, user, now, now, now).run(); };
   await seed('alice');
   r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({ HARIMU_SHIFT_SOFT_CAP_ENABLED: 'true' }));
   r.setFixtureEnv('HARIMU_SHIFT_SOFT_CAP_ENABLED', 'false');
