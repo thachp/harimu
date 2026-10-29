@@ -9,7 +9,12 @@ export type MapView = 'desktop' | 'topdown';
 export type MapScene = 'world' | 'city';
 export type PanDir = 'left' | 'right' | 'up' | 'down';
 
-export function mobileTopdownMapEnabled(value: string | undefined = process.env.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP): boolean {
+/** Layout bundles that omit the define have no `process`. A missing flag is off; a build that inlines the name still returns that string. */
+export function mobileTopdownMapFlag(): string | undefined {
+  try { return process.env.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP; }
+  catch { return undefined; }
+}
+export function mobileTopdownMapEnabled(value: string | undefined = mobileTopdownMapFlag()): boolean {
   return value === 'true';
 }
 /** `phone` is true at the #847 breakpoint (viewport widths <= 760, i.e. matchMedia max-width: 760px). */

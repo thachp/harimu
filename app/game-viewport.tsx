@@ -6,7 +6,7 @@ import {graphicsOptions} from '../lib/display-preferences';
 import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
-import { MOBILE_MAP_QUERY, cityPanDelta, controlPan, mapEffects, orientWorldGroup, overlayFacing, placeMapCamera, selectMapView, type PanDir } from '../lib/mobile-topdown-map';
+import { MOBILE_MAP_QUERY, cityPanDelta, controlPan, mapEffects, mobileTopdownMapFlag, orientWorldGroup, overlayFacing, placeMapCamera, selectMapView, type PanDir } from '../lib/mobile-topdown-map';
 import { nationSymbolElement } from './nation-symbol';
 import { dressCityPill } from './city-pill';
 import { uiV2CityEnabled } from '../lib/ui-v2-city';
@@ -37,7 +37,7 @@ export type GameViewportProps = {
   cityPills?: boolean;
 };
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
-const liveMapView = () => selectMapView(process.env.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, typeof window !== 'undefined' && window.matchMedia?.(MOBILE_MAP_QUERY).matches === true);
+const liveMapView = () => selectMapView(mobileTopdownMapFlag(), typeof window !== 'undefined' && window.matchMedia?.(MOBILE_MAP_QUERY).matches === true);
 
 export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '', cityPills = uiV2CityEnabled(), armyMap = false, overlays = false }: GameViewportProps) {
   const {preferences:{graphics}}=useDisplayPreferences();

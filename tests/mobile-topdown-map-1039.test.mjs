@@ -3,11 +3,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createContext, runInContext } from 'node:vm';
+import { build } from 'esbuild';
 import * as THREE from 'three';
 import { expandFlagPacks, varsForProcessEnv } from '../lib/flag-pack.mjs';
 import { createCityWorld, globeAnchorVisible, globeFocusRotation, globePoint } from '../lib/game-art.ts';
 import { projectOwnershipCells } from '../lib/globe-mapping.ts';
-import { cityPanDelta, controlPan, mapEffects, mobileTopdownMapEnabled, MOBILE_MAP_MAX_WIDTH, MOBILE_MAP_QUERY, orientWorldGroup, overlayFacing, phoneWidth, placeMapCamera, selectMapView } from '../lib/mobile-topdown-map.ts';
+import { cityPanDelta, controlPan, mapEffects, mobileTopdownMapEnabled, mobileTopdownMapFlag, MOBILE_MAP_MAX_WIDTH, MOBILE_MAP_QUERY, orientWorldGroup, overlayFacing, phoneWidth, placeMapCamera, selectMapView } from '../lib/mobile-topdown-map.ts';
 import { dashboardManagedVars } from '../scripts/wrangler-pin.mjs';
 
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
@@ -37,9 +39,21 @@ test('the #847 breakpoint selects top-down only on a phone with the flag on', ()
   assert.equal(selectMapView('true', phoneWidth(1280)), 'desktop');
   for (const flag of ['false', undefined, 'TRUE']) assert.equal(selectMapView(flag, phoneWidth(390)), 'desktop');
   const vp = read('app/game-viewport.tsx');
-  assert.match(vp, /selectMapView\(process\.env\.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP/);
+  assert.match(vp, /selectMapView\(mobileTopdownMapFlag\(\)/);
+  assert.equal(mobileTopdownMapFlag(), process.env[key]);
   assert.doesNotMatch(vp, /camera\.position\.lerp|quaternion\.slerp|beginCameraAnimation/);
   assert.match(read('lib/mobile-topdown-map.ts'), /no camera animation/i);
+});
+
+test('a browser bundle that never defines the flag stays off and does not throw', async () => {
+  const bundled = await build({
+    stdin: { contents: `import { mobileTopdownMapFlag, selectMapView } from './lib/mobile-topdown-map.ts'; globalThis.__map = { flag: mobileTopdownMapFlag(), view: selectMapView(mobileTopdownMapFlag(), true) };`, resolveDir: process.cwd(), loader: 'ts' },
+    bundle: true, write: false, format: 'iife', platform: 'browser', logLevel: 'silent',
+  });
+  const context = createContext({});
+  runInContext(bundled.outputFiles[0].text, context);
+  assert.equal(context.__map.flag, undefined);
+  assert.equal(context.__map.view, 'desktop');
 });
 
 test('top-down looks straight down with lighter effects; desktop keeps the tilted pose and full effects', () => {
