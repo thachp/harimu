@@ -60,7 +60,8 @@ test('tone: no real-world names, no other nations, no Notable, no blame', () => 
   assert.doesNotMatch(t,/\b(Earth|America\w*|Europe\w*|England|France|Japan|China|Russia\w*)\b/); assert.doesNotMatch(t,/Notable|@|\b(Meridian|Ilmar|Varkand|Veldwood|Hoarvale|Fulmara|Confluence)\b/);
   assert.doesNotMatch(t,/\b(lie|lies|hid|hiding|cover\w*|secret\w*|censor\w*)\b/i);
 });
-test('unwired: nothing in app/, components/ or lib/ imports decision-disclosure-copy', () => {
+test('wired only into the Kindle Policy Ledger panel (#985)', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('decision-disclosure-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/decision-disclosure-copy/, f);
+  const hits=[...walk('app'),...walk('components'),...walk('lib')].filter(f=>/\.(t|j)sx?$/.test(f)&&!f.endsWith('decision-disclosure-copy.ts')&&/decision-disclosure-copy/.test(readFileSync(f,'utf8')));
+  assert.deepEqual(hits, ['app/leader-panel.tsx']);
 });

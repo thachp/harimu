@@ -4,6 +4,7 @@ import { publicSuccession, readSuccession } from '@/lib/aurelle-succession'; // 
 import {accountElectionEnabled,accountElectionDatabase,accountIdFor} from '@/lib/preview-election';
 import { wearinessEnabled, wearinessLossesEnabled, type WearinessBindings } from '@/lib/war-weariness'; // #423
 import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
+import { withPolicyLedger } from '@/lib/policy-ledger'; // #985
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { recordEnrollHome, resolveEnrollHomeCity } from '@/lib/city-location'; // #965
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
@@ -253,7 +254,7 @@ export async function GET(request: Request) {
     economy,
     market,
     playerMarket,
-    government: governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, // #612: one extra field, only with the flag on, for the three MVP nations
+    government: await withPolicyLedger(database, governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, env), // #612 founding/succession; #985 ledger only for Kindle with the flag on
     shifts,
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -385,7 +386,7 @@ async function handlePost(request: Request) {
     }
     const citizen = await database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at FROM citizens WHERE clerk_user_id=?`)
       .bind(userId).first<CitizenProfileRow>();
-    return privateJson({ ok:true, government: publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId, { korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' })),
+    return privateJson({ ok:true, government: await withPolicyLedger(database, publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId, { korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true' })), env),
       citizenship: citizen ? serializeCitizenship(citizen,true) : null });
   }
 
@@ -427,7 +428,7 @@ async function handlePost(request: Request) {
     ) AS taken`).bind(userId,userId,userId,userId,userId).first<{taken:number}>())?.taken);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
       simulation,verification:await readVerification(userId),
-      government:profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null,
+      government:await withPolicyLedger(database, profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,{korundPresidium:(env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true'})):null, env),
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),
       economy:await readEconomy(database, userId, interval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),

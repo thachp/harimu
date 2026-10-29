@@ -11,6 +11,8 @@ export type GovernmentSnapshot = {
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
   petitions?: { requestId: string; topic: PetitionTopic; submittedAt: number; status: 'pending' | 'accepted' | 'deferred'; reason: string; reviewedAt: number | null }[];
+  /** #985: Kindle Policy Ledger. Present only while HARIMU_KINDLE_POLICY_LEDGER_ENABLED is on. */
+  policyLedger?: { id: string; publishedAt: number; office: string; title: string; brief: string }[];
   availableBudgetMinor: number;
   influenceSummary: string;
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
