@@ -59,6 +59,7 @@ import { ShiftQualityStep } from './shift-quality-step';
 import { qualityWorkOrderId, harvestQuestions, type QualityInput, type QualityQuestion } from '@/lib/shift-quality';
 import { AccountMenu } from './account-menu';
 import { DailyLoop } from './daily-loop';
+import { mobileTwoTapEnabled, twoTapCommand, type TwoTapId } from '@/lib/mobile-two-tap';
 import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type AurelleAction } from './aurelle-plan-panel';
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction, type GrayCommand } from './korund-plan-panel';
 import { nationPlanPanelNation } from '@/lib/nation-panels';
@@ -1879,6 +1880,19 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [deadlineShiftId, deadlineShiftEnds, snapshotRequestedAt]);
   const activeShift = priorNationShift ?? (citizenNation?.id === 'aurelle' ? aurellePlan?.shifts ?? [] : citizenNation?.id === 'korund' ? korundPlan?.shifts ?? [] : workShifts).find(shift=>!shift.claimedAt);
+  const twoTap = mobileTwoTapEnabled() && citizenNation && !guestActive ? (id: TwoTapId) => {
+    const cmd = twoTapCommand(citizenNation.id, id, activeShift ? { id: activeShift.id, ready: Date.parse(activeShift.completesAt) <= Date.now() } : null);
+    if (cmd.kind === 'inbox') { ([...document.querySelectorAll('.citizen-dock>button')].find(el => el.textContent?.includes('Civic inbox')) as HTMLButtonElement | undefined)?.click(); return; }
+    if (cmd.kind === 'open-work') { changeView('workplace'); return; }
+    if (cmd.kind === 'korund') { startKorundAction(cmd.action, 'shiftId' in cmd ? cmd.shiftId : undefined); return; }
+    if (cmd.kind === 'aurelle') { startAurelleAction(cmd.action, 'shiftId' in cmd ? cmd.shiftId : undefined); return; }
+    if (cmd.kind === 'start') { const order = availableWorkOrders.find(item => (!item.nationId || item.nationId === citizenNation.id) && item.cost <= capacity); if (order) void commitWork(order); return; }
+    if (cmd.kind !== 'claim') return;
+    if (activeShift?.currency === 'LN') startKorundAction('korund-claim-work', cmd.shiftId);
+    else if (activeShift?.currency === 'CRN') startAurelleAction('aurelle-claim-work', cmd.shiftId);
+    else if (activeShift?.currency === 'CUR') void claimNationShift(cmd.shiftId);
+    else void runWork('claim-work', undefined, cmd.shiftId);
+  } : undefined;
   const nextDeadlineCandidates = [
     activeShift ? {label:'Work',endsAt:activeShift.completesAt} : null,
     citizenNation?.id === 'aurelle' ? aurellePlan?.mealReadyAt ? {label:'Meal',endsAt:aurellePlan.mealReadyAt} : null
@@ -1943,7 +1957,7 @@ export default function Home() {
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
       onOpenWallet={clerkConfigured && !guestActive && citizenNation?.id === 'kindle' ? () => setWalletOpen(true) : undefined}
-      onNavigate={navigateGame} onSelectNation={selectNation}
+      onNavigate={navigateGame} onSelectNation={selectNation} onDailyLoop={twoTap}
       socialDock={<CitizenDock diplomaticHall={hallFlag} key={`${citizenSessionKey}:${citizenNationId}:${citizenSessionStatus}`} nationId={citizenNationId} session={citizenSessionStatus} configured={clerkConfigured && !guestActive} cityId={currentCityAccount?.currentCityId} cityVisible={viewMode==='square'&&Boolean(currentCityAccount)} shifts={[...workShifts,...(korundPlan?.shifts??[]),...(aurellePlan?.shifts??[])]} government={government} collectivePetitions={collectivePetitions} election={election} korund={korundPlan} onNavigate={navigateGame} />}
       accountControls={<>{citizenNation && !guestActive && <button id={MORNING_BRIEF_TRIGGER_ID} type="button" className="game-glossary" onClick={() => setMorningBriefOpen(true)} aria-label="Open morning brief" aria-haspopup="dialog" aria-expanded={morningBriefOpen} aria-controls={morningBriefOpen ? 'morning-brief' : undefined}><Newspaper size={17} aria-hidden="true" /><span>Brief</span></button>}<ClerkAccountControl /></>} />
       {morningBriefOpen && citizenNation && !guestActive && <MorningBrief nationName={citizenNation.name} sections={briefSections} onNavigate={navigateGame} onClose={closeMorningBrief} />}
