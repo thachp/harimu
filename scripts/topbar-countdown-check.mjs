@@ -23,6 +23,10 @@ const probe = () => {
   const vw = document.documentElement.clientWidth, issues = [];
   if (document.documentElement.scrollWidth > vw + 1) issues.push(`page scrolls sideways by ${document.documentElement.scrollWidth - vw}px`);
   const chip = document.querySelector('.game-countdown'), hud = document.querySelector('.game-hud'), dock = document.querySelector('.game-dock');
+  const timer = chip?.closest('[role="timer"]') ?? chip;
+  if (timer && timer.getAttribute('aria-live') !== 'off') issues.push('countdown timer is not aria-live off');
+  const access = timer?.getAttribute('aria-label') ?? '';
+  if (chip && (!access.includes('real time') || !access.includes('game time'))) issues.push(`accessible name missing real and game time ("${access}")`);
   const hudDock = Math.round(hud.getBoundingClientRect().bottom - dock.getBoundingClientRect().top);
   if (hudDock > 0) issues.push(`HUD runs ${hudDock}px into the dock`);
   if (!chip) return { issues, text: '', ratio: 0, tip: '', target: null };
@@ -66,9 +70,9 @@ export async function checkTopbarCountdown({ browser, css, preflight, failures, 
         const shown = await tip.evaluate(el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0);
         if (!shown) failures.push(`${id}: tooltip did not open`);
         if (!text?.includes('real time') || !text.includes('game time')) failures.push(`${id}: tooltip missing real and game time ("${text}")`);
-        if (shots) await page.screenshot({ path: `${shots}/countdown-tooltip-${w}.png`, clip: { x: 0, y: 0, width: w, height: 220 } });
+        if (shots) await page.screenshot({ path: `${shots}/countdown-tooltip-${w}.png`, clip: { x: 0, y: 0, width: w, height: Math.min(h, 320) } });
       }
-      if (shots && (scale === 1 || scale === 1.5)) await page.screenshot({ path: `${shots}/countdown-${w}-${scale * 100}.png`, clip: { x: 0, y: 0, width: w, height: Math.min(h, 180) } });
+      if (shots && (scale === 1 || scale === 1.5)) await page.screenshot({ path: `${shots}/countdown-${w}-${scale * 100}.png`, clip: { x: 0, y: 0, width: w, height: Math.min(h, 280) } });
     }
     rows.push(`${id}: ${flag === 'true' ? result.text : 'hidden'} ${result.target ?? ''} contrast ${result.ratio ? result.ratio.toFixed(1) : 'n/a'}`);
     await context.close();
