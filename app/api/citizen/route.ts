@@ -7,6 +7,9 @@ import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { withPolicyLedger } from '@/lib/policy-ledger'; // #985
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { recordEnrollHome, resolveEnrollHomeCity } from '@/lib/city-location'; // #965
+import { seaFreightQuantity } from '@/lib/game-season'; // #1034
+import { jobTypeOf } from '@/lib/mvp-job-types'; // #1034
+import { cityForNation } from '@/lib/cities'; // #1034
 import { readAurelle, validAurelleCommand, executeAurelle } from '@/lib/aurelle';
 import { charterMealSeconds } from '@/lib/aurelle-charters'; // #531
 import { readCrownMint } from '@/lib/crown-debasement';
@@ -688,10 +691,20 @@ async function handlePost(request: Request) {
     }
     const quality = gradeShift(workOrderId, input, 'human', key);
     // #1033 [ASSUMPTION]: season scales the base food units (floor, never below 1) before the quality multiplier. Wages are not seasonal.
-    const clockRow = seasonFarmingEnabled(env) && isFarmingShift(workOrderId)
+    // #1034 [ASSUMPTION]: winter storms scale port freight's base units (floor(q*80/100), min 1), also before quality. Ports only (ARC #1037).
+    // One world-clock read and one #1035 seasonAt for both effects; no clock means null, so neither effect applies. Flags off: no reads.
+    const farming = seasonFarmingEnabled(env) && isFarmingShift(workOrderId);
+    const seaFreight = flagOn(env, 'HARIMU_SEASON_SEA_LANES_ENABLED') && jobTypeOf(workOrderId) === 'freight' && Boolean(order.nation_id);
+    const clockRow = farming || seaFreight
       ? await database.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{ epoch_seconds: number }>() : null;
-    const scaled = farmingShiftYield(rule.output, base.quantity, seasonAt(clockRow ? { epochSeconds: Number(clockRow.epoch_seconds), nowSeconds: Math.floor(Date.parse(now) / 1000) } : null));
-    const payBase = scaled ? { ...base, quantity: scaled.units } : base;
+    const season = seasonAt(clockRow ? { epochSeconds: Number(clockRow.epoch_seconds), nowSeconds: Math.floor(Date.parse(now) / 1000) } : null);
+    const scaled = farming ? farmingShiftYield(rule.output, base.quantity, season) : null;
+    let payBase = scaled ? { ...base, quantity: scaled.units } : base;
+    if (seaFreight && season === 'winter') {
+      const where = await database.prepare('SELECT current_city_id FROM citizen_city_locations WHERE user_id = ? AND nation_id = ?').bind(userId, order.nation_id).first<{ current_city_id: string }>().catch(() => null);
+      const port = /port/i.test(where ? cityForNation(order.nation_id!, where.current_city_id)?.role ?? '' : '');
+      payBase = { ...payBase, quantity: seaFreightQuantity(payBase.quantity, season, port) };
+    }
     const reward = { ...payBase, ...applyQuality(payBase, quality.multiplierPct) };
     const completesAt = new Date(Date.parse(now) + rule.hours * 60 * 60 * 1000).toISOString();
     const shiftSeconds = Math.floor(Date.parse(now) / 1000);

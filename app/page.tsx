@@ -808,7 +808,7 @@ export default function Home() {
     const timer = window.setTimeout(() => setHoldExpiredFor(holdEpisode), identityHoldTimeoutMs);
     return () => window.clearTimeout(timer);
   }, [sessionLoading, holdEpisode]);
-  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number}}} | null>(null);
+  const [cityAccount, setCityAccount] = useState<{key:number;value:CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;seaLanesNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number}}} | null>(null);
   const [cityError, setCityError] = useState('');
   const [cityRetry, setCityRetry] = useState(0);
   const [cityTravelPending, setCityTravelPending] = useState(false);
@@ -820,7 +820,7 @@ export default function Home() {
     const loadCity = async () => {
       try {
         const response = await fetch('/api/city', {cache:'no-store',signal:controller.signal});
-        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number};error?:string};
+        const value = await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;seaLanesNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number};error?:string};
         if (controller.signal.aborted || epoch !== citizenEpoch.current) return;
         if (!response.ok || value.nationId !== citizenNationId || !cityForNation(value.nationId,value.currentCityId)) throw Error(value.error ?? 'City account unavailable.');
         setCityAccount({key:citizenSessionKey,value}); setCityError('');
@@ -1319,7 +1319,7 @@ export default function Home() {
     cityTravelLock.current=true;setCityTravelPending(true);setCityError('');
     try {
       const response=await fetch('/api/city',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'travel',cityId})});
-      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number};error?:string};
+      const value=await response.json() as CityLocation & {presence:{cityId:string;present:number}[];coResidents?:CoResident[];tierName?:string;districtSlots?:number;unlocks?:string[];festivalNote?:string;populationNote?:string;specialtyRole?:string;specialtyNote?:string;captureNote?:string;civicUnitNote?:string;importsNote?:string;seaLanesNote?:string;governorNote?:string;governorAi?:boolean;spaWcNote?:string;captureHistory?:{heldBy:string;capturedFrom:string;capturedAt:number};error?:string};
       if(epoch!==citizenEpoch.current)return;
       if(!response.ok || value.nationId!==citizenNation.id || value.currentCityId!==cityId)throw Error(value.error ?? 'Travel could not be confirmed. Refresh your city account before retrying.');
       setCityAccount({key:citizenSessionKey,value});
@@ -1780,7 +1780,7 @@ export default function Home() {
       {viewMode === 'market' && !marketShown && <section className="scene-market-closed"><h2>Market</h2><p>The market is not open yet. Work a shift and check back soon.</p></section>}
       {viewMode === 'market' && marketShown && !['korund','aurelle'].includes(citizenNation.id) && <>
         <MarketSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor)} food={citizenNation.id === 'kindle' && economy ? itemCount(economy.inventory, 'food') : null} board={Boolean(orderBookApi.book)}
-          listings={citizenNation.id !== 'confluence' && (!orderBookApi.book || Boolean(playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')))} onHousehold={() => changeView('household')} importsNote={currentCityAccount?.importsNote ?? null} />
+          listings={citizenNation.id !== 'confluence' && (!orderBookApi.book || Boolean(playerMarket?.listings.some((lot) => lot.mine && lot.status === 'open')))} onHousehold={() => changeView('household')} importsNote={currentCityAccount?.importsNote ?? null} seaLanesNote={currentCityAccount?.seaLanesNote ?? null} />
         <CitizenMarket showMeal={false} market={market} economy={economy} capacity={capacity} busy={workPending || Boolean(playerCommand) || Boolean(korundCommand)} uncertain={Boolean(marketCommand) && !workPending} pendingAction={marketCommand?.action}
           onTrade={(side, item, quantity) => void runMarket({ requestId: crypto.randomUUID(), action: 'market-trade', side, item, quantity })}
           onMeal={() => void runMarket({ requestId: crypto.randomUUID(), action: 'household-meal' })} onRetry={() => { if (marketCommand) void runMarket(marketCommand); }} />
