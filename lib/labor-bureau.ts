@@ -29,26 +29,29 @@ export type BureauView = {
 };
 export type BureauResult = { status: number; error?: string; reason?: string; replayed?: boolean; nextRequestAt?: string };
 
-const latestSql = `a.assigned_at=(SELECT MAX(assigned_at) FROM korund_job_assignments WHERE clerk_user_id=a.clerk_user_id)`;
+/** #1066: an assignment older than a dormancy release no longer fills a seat. No release rows: the count is unchanged. */
+const heldSql = `a.assigned_at=(SELECT MAX(assigned_at) FROM korund_job_assignments WHERE clerk_user_id=a.clerk_user_id) AND a.assigned_at>COALESCE((SELECT MAX(released_at) FROM dormant_job_releases WHERE clerk_user_id=a.clerk_user_id),0)`;
 async function filledCounts(db: GameDatabase, exceptUser: string | null) {
-  const { results } = await db.prepare(`SELECT a.job_id AS job_id, COUNT(*) AS n FROM korund_job_assignments a WHERE ${latestSql} AND a.clerk_user_id<>? GROUP BY a.job_id`)
+  const { results } = await db.prepare(`SELECT a.job_id AS job_id, COUNT(*) AS n FROM korund_job_assignments a WHERE ${heldSql} AND a.clerk_user_id<>? GROUP BY a.job_id`)
     .bind(exceptUser ?? '').all<{ job_id: string; n: number }>();
   return Object.fromEntries((results ?? []).map(r => [r.job_id, Number(r.n)])) as Record<string, number>;
 }
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
 
 export async function readBureau(db: GameDatabase, userId: string, now: number): Promise<BureauView> {
-  const [filled, prefs, last] = await Promise.all([
+  const [filled, prefs, last, released] = await Promise.all([
     filledCounts(db, null),
     db.prepare('SELECT first_job, second_job, third_job FROM korund_job_preferences WHERE clerk_user_id=?').bind(userId).first<{ first_job: string; second_job: string; third_job: string }>(),
     db.prepare('SELECT job_id, outcome, reasons, assigned_at FROM korund_job_assignments WHERE clerk_user_id=? ORDER BY assigned_at DESC LIMIT 1').bind(userId)
       .first<{ job_id: string; outcome: BureauOutcome; reasons: string; assigned_at: number }>(),
+    db.prepare('SELECT MAX(released_at) AS at FROM dormant_job_releases WHERE clerk_user_id=?').bind(userId).first<{ at: number | null }>(),
   ]);
+  const held = last && Number(last.assigned_at) > Number(released?.at ?? 0) ? last : null;
   const next = nextRequestAt(last ? Number(last.assigned_at) : null, now);
   return {
     jobs: bureauJobs.map(j => ({ id: j.id, name: j.name, seats: j.seats, filled: Number(filled[j.id] ?? 0), open: quotaGap(j, filled) })),
     preferences: prefs ? [prefs.first_job, prefs.second_job, prefs.third_job] : null,
-    assignment: last ? { jobId: last.job_id, jobName: jobById(last.job_id)?.name ?? last.job_id, outcome: last.outcome, reasons: JSON.parse(last.reasons) as BureauReason[], assignedAt: iso(Number(last.assigned_at)) } : null,
+    assignment: held ? { jobId: held.job_id, jobName: jobById(held.job_id)?.name ?? held.job_id, outcome: held.outcome, reasons: JSON.parse(held.reasons) as BureauReason[], assignedAt: iso(Number(held.assigned_at)) } : null,
     nextRequestAt: next === null ? null : iso(next),
     canRequest: Boolean(prefs) && next === null,
   };

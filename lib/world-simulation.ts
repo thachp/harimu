@@ -2,6 +2,7 @@ import { mapLimited } from './async-limits'; // #679
 import { runVoteBuyingWatch } from './vote-buying-watch'; // #825
 import { runRiskScoring } from './risk-scoring'; // #879
 import { dormantAt } from './dormancy-rules'; // #739
+import { dormantJobStatements } from './dormant-job'; // #1066
 import { runFoundingDay30 } from './founding-period'; // #612
 import { finalizeDueElection } from './elections';
 import { runKindleAssembly, type AssemblyTickConfig } from './assembly';
@@ -129,10 +130,12 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
   // #679 slice 3: the clock insert and the two clock reads share one batch (one round trip, one transaction), so the reads still see the insert, as when they ran after it.
+  // #1066: the job release rides this same batch. A separate batch would put GET /api/world over the #679 round-trip budget. Flag off: those statements are absent.
   const [, clockResult, lastResult] = await db.batch([
     db.prepare("INSERT OR IGNORE INTO world_clock (id,epoch_seconds) VALUES ('main',?)").bind(Math.floor(now/tickSeconds)*tickSeconds),
     db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'"),
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks'),
+    ...(options.dormancy === true ? dormantJobStatements(db, now) : []),
   ]);
   const clock = clockResult?.results[0] as {epoch_seconds:number} | undefined, last = lastResult?.results[0] as {tick:number} | undefined;
   const epoch = clock!.epoch_seconds;
