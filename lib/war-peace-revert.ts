@@ -9,7 +9,8 @@ import { isWarNation } from './war-rules';
 export const peaceRevertSchemas = [
   `CREATE TABLE IF NOT EXISTS war_peace_reverts (
  war_id TEXT PRIMARY KEY REFERENCES wars(id) ON DELETE CASCADE,
- squares INTEGER NOT NULL CHECK(squares >= 0),
+ status TEXT NOT NULL CHECK(status IN ('pending','done')),
+ squares INTEGER CHECK((status='pending')=(squares IS NULL)),
  reverted_at INTEGER NOT NULL
 )`,
 ];
@@ -51,17 +52,19 @@ async function cededKeys(db: GameDatabase, warId: string): Promise<Set<string>> 
   return keys;
 }
 
-type Gate = { gate?: string; gateBinds?: readonly unknown[]; alsoCeded?: readonly { x: number; y: number }[] };
-/** Statements for one war. Empty when a marker or an enacted surrender already exists, so a second call writes nothing.
- *  `gate` is appended to every statement (the caller binds it) so the writes can sit in the same batch as the treaty ending and no-op unless that ending landed. */
-export async function peaceRevertStatements(db: GameDatabase, warId: string, now: number, options: Gate = {}) {
-  if (!revertUncededCaptures) return [];
-  const prior = await db.prepare('SELECT 1 AS n FROM war_peace_reverts WHERE war_id=?').bind(warId).first().catch(tolerate(isMissingRelation, null));
-  if (prior) return [];
-  const surrendered = await db.prepare("SELECT 1 AS n FROM war_end_terms WHERE war_id=? AND kind='surrender' AND status='enacted'").bind(warId).first().catch(tolerate(isMissingRelation, null));
-  if (surrendered) return [];
+type Gate = { gate: string; gateBinds: readonly unknown[] };
+/** One INSERT for the same batch as the treaty ending. It lands only when `gate` is true (this ending just committed) and the war has no marker and did not surrender.
+ *  A treaty with no row is never a candidate. `squares` stays null until the return finishes. */
+export function pendingRevertStatement(db: GameDatabase, warId: string, now: number, options: Gate) {
+  return db.prepare(`INSERT INTO war_peace_reverts (war_id,status,squares,reverted_at) SELECT ?,'pending',NULL,?
+    WHERE NOT EXISTS (SELECT 1 FROM war_peace_reverts WHERE war_id=?)
+    AND NOT EXISTS (SELECT 1 FROM war_end_terms t WHERE t.war_id=? AND t.kind='surrender' AND t.status='enacted')
+    AND ${options.gate}`).bind(warId, now, warId, warId, ...options.gateBinds);
+}
+
+async function squaresToReturn(db: GameDatabase, warId: string, alsoCeded: readonly { x: number; y: number }[] = []) {
   const ceded = await cededKeys(db, warId);
-  for (const square of options.alsoCeded ?? []) if (Number.isInteger(square.x) && Number.isInteger(square.y)) ceded.add(`${square.x},${square.y}`);
+  for (const square of alsoCeded) if (Number.isInteger(square.x) && Number.isInteger(square.y)) ceded.add(`${square.x},${square.y}`);
   const earliest = new Map<string, Hit>();
   for (const hit of await capturedDuring(db, warId)) {
     const key = `${hit.x},${hit.y}`, prev = earliest.get(key);
@@ -74,41 +77,36 @@ export async function peaceRevertStatements(db: GameDatabase, warId: string, now
     if (!zone || zone.zone === 'heartland') continue;
     moves.push(hit);
   }
-  const gate = options.gate ? ` AND ${options.gate}` : '', binds = options.gateBinds ?? [];
-  return [
-    ...moves.map(hit => db.prepare(`UPDATE world_squares SET owner=? WHERE x=? AND y=? AND zone<>'heartland' AND (owner IS NULL OR owner<>?)${gate}`).bind(hit.from_nation, hit.x, hit.y, hit.from_nation, ...binds)),
-    db.prepare(`INSERT INTO war_peace_reverts (war_id,squares,reverted_at) SELECT ?,?,? WHERE NOT EXISTS (SELECT 1 FROM war_peace_reverts WHERE war_id=?)${gate}`).bind(warId, moves.length, now, warId, ...binds),
-  ];
+  return moves;
 }
 
-/** Idempotent per war. Surrender, and a war that is not a treaty, move nothing and write no marker. */
+/** Finishes one pending return. No row, or a finished row, moves nothing: a treaty that ended with the flag off has no marker and is never touched. */
 export async function revertPeaceCaptures(db: GameDatabase, warId: string, now: number): Promise<PeaceRevertResult> {
-  const prior = await db.prepare('SELECT squares FROM war_peace_reverts WHERE war_id=?').bind(warId).first<{ squares: number }>().catch(tolerate(isMissingRelation, null));
-  if (prior) return { squares: Number(prior.squares), replay: true };
-  const war = await db.prepare('SELECT end_kind FROM wars WHERE id=?').bind(warId).first<{ end_kind: string | null }>();
-  if (!war || war.end_kind !== 'treaty') return { squares: 0, replay: false };
-  const statements = await peaceRevertStatements(db, warId, now);
-  if (!statements.length) return { squares: 0, replay: false };
-  await db.batch(statements);
-  const saved = await db.prepare('SELECT squares FROM war_peace_reverts WHERE war_id=?').bind(warId).first<{ squares: number }>();
-  return { squares: Number(saved?.squares ?? 0), replay: false };
+  if (!revertUncededCaptures) return { squares: 0, replay: false };
+  const prior = await db.prepare('SELECT status, squares FROM war_peace_reverts WHERE war_id=?').bind(warId).first<{ status: string; squares: number | null }>().catch(tolerate(isMissingRelation, null));
+  if (!prior) return { squares: 0, replay: false };
+  if (prior.status === 'done') return { squares: Number(prior.squares ?? 0), replay: true };
+  const moves = await squaresToReturn(db, warId);
+  await db.batch([
+    ...moves.map(hit => db.prepare("UPDATE world_squares SET owner=? WHERE x=? AND y=? AND zone<>'heartland' AND (owner IS NULL OR owner<>?) AND EXISTS (SELECT 1 FROM war_peace_reverts WHERE war_id=? AND status='pending')").bind(hit.from_nation, hit.x, hit.y, hit.from_nation, warId)),
+    db.prepare("UPDATE war_peace_reverts SET status='done', squares=? WHERE war_id=? AND status='pending'").bind(moves.length, warId),
+  ]);
+  const saved = await db.prepare('SELECT squares FROM war_peace_reverts WHERE war_id=? AND status=\'done\'').bind(warId).first<{ squares: number }>();
+  return { squares: Number(saved?.squares ?? moves.length), replay: false };
 }
 
-/** Treaty endings whose revert never landed (the worker died after the end, before the marker). Surrender is left alone. Idempotent. */
+/** World tick: only rows this feature marked pending when the war ended. Wars with no marker are not read as candidates. Idempotent. */
 export async function sweepUnrevertedTreaties(db: GameDatabase, now: number): Promise<number> {
-  const rows = (await db.prepare(`SELECT id FROM wars w WHERE w.end_kind='treaty'
-    AND NOT EXISTS (SELECT 1 FROM war_peace_reverts r WHERE r.war_id=w.id)
-    AND NOT EXISTS (SELECT 1 FROM war_end_terms t WHERE t.war_id=w.id AND t.kind='surrender' AND t.status='enacted')
-    ORDER BY w.ended_at, w.id LIMIT 20`).all<{ id: string }>().catch(none([] as { id: string }[]))).results;
+  const rows = (await db.prepare("SELECT war_id FROM war_peace_reverts WHERE status='pending' ORDER BY reverted_at, war_id LIMIT 20").all<{ war_id: string }>().catch(none([] as { war_id: string }[]))).results;
   let repaired = 0;
-  for (const row of rows) if (!(await revertPeaceCaptures(db, row.id, now)).replay) repaired++;
+  for (const row of rows) if (!(await revertPeaceCaptures(db, row.war_id, now)).replay) repaired++;
   return repaired;
 }
 
 /** Derived on read. Flag off: the caller does not call this, so the table is never read. */
 export async function peaceRevertNewsItems(db: GameDatabase, readerNation: string) {
   if (!isWarNation(readerNation)) return [];
-  const rows = (await db.prepare('SELECT war_id, squares, reverted_at FROM war_peace_reverts ORDER BY reverted_at DESC, war_id LIMIT 20').all<{ war_id: string; squares: number; reverted_at: number }>().catch(none([] as { war_id: string; squares: number; reverted_at: number }[]))).results;
+  const rows = (await db.prepare("SELECT war_id, squares, reverted_at FROM war_peace_reverts WHERE status='done' ORDER BY reverted_at DESC, war_id LIMIT 20").all<{ war_id: string; squares: number; reverted_at: number }>().catch(none([] as { war_id: string; squares: number; reverted_at: number }[]))).results;
   const kind = readerNation === 'aurelle' ? 'decree' as const : 'template' as const;
   return rows.map(row => ({ id: `war:${row.war_id}:peace-revert`, title: 'Occupied squares returned', text: peaceRevertLine(Number(row.squares)), occurredAt: Number(row.reverted_at) * 1000, source: 'deterministic' as const, kind }));
 }

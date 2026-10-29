@@ -132,23 +132,38 @@ test('a treaty that ended before the return still gives the squares back on the 
   await seize(c, { warId: war.id, id: 'cap-crash', square: c.squares.siege, from: 'kindle', to: 'korund', at });
   const wars = await c.r.importModule('lib/war.ts');
   assert.equal((await wars.endWar(c.r.db, war.id, 'treaty', at, true, false)).ok, true);
+  // The ending batch committed the pending marker and the process died before the square moves. That is the only row the next tick will finish.
+  await c.run("INSERT INTO war_peace_reverts (war_id,status,squares,reverted_at) VALUES (?,'pending',NULL,?)", war.id, at);
   assert.equal(await c.owner(c.squares.siege), 'korund', 'the end committed and the return did not');
   assert.equal(await c.endings.decideWarEndings(c.r.db, at + 60, { peaceRevert: true }), 0);
   assert.equal(await c.owner(c.squares.siege), 'kindle', 'the next tick returns it');
   assert.equal(await c.endings.decideWarEndings(c.r.db, at + 120, { peaceRevert: true }), 0);
   assert.equal(await c.owner(c.squares.siege), 'kindle');
-  assert.equal(Number((await c.r.db.prepare('SELECT COUNT(*) AS n FROM war_peace_reverts').first()).n), 1);
+  assert.equal((await c.r.db.prepare('SELECT status FROM war_peace_reverts WHERE war_id=?').bind(war.id).first()).status, 'done');
   const d = await setup(t), when = d.nowS();
   const war2 = (await d.command({ action: 'declare', nation: 'korund', role: 'Chairman', defender: 'kindle' })).war;
   await seize(d, { warId: war2.id, id: 'cap-crash-2', square: d.squares.other, from: 'korund', to: 'kindle', at: when, city: 'kolt-savanna' });
   await seize(d, { warId: war2.id, id: 'cap-crash-cede', square: d.squares.ceded, from: 'aurelle', to: 'kindle', at: when, city: 'lumen-harbor' });
   assert.equal((await d.command({ action: 'concede', nation: 'kindle', role: 'President', warId: war2.id, squares: [d.squares.ceded] }, { endings: true })).status, 'proposed');
   assert.equal(await d.endings.decideWarEndings(d.r.db, when + 60), 1);
+  await d.run("INSERT INTO war_peace_reverts (war_id,status,squares,reverted_at) VALUES (?,'pending',NULL,?)", war2.id, when + 60);
   assert.equal(await d.owner(d.squares.other), 'kindle', 'the concession ended and the unceded capture stayed');
   assert.equal(await d.owner(d.squares.ceded), 'korund');
   assert.equal(await d.endings.decideWarEndings(d.r.db, when + 120, { peaceRevert: true }), 0);
   assert.equal(await d.owner(d.squares.other), 'korund', 'the next tick returns the unceded capture');
   assert.equal(await d.owner(d.squares.ceded), 'korund', 'the ceded square stays');
+});
+
+test('a treaty ended while the flag was off stays untouched after the flag turns on', async t => {
+  const c = await setup(t), at = c.nowS();
+  const war = (await c.command({ action: 'declare', nation: 'korund', role: 'Chairman', defender: 'kindle' })).war;
+  await seize(c, { warId: war.id, id: 'cap-old', square: c.squares.siege, from: 'kindle', to: 'korund', at });
+  const wars = await c.r.importModule('lib/war.ts');
+  assert.equal((await wars.endWar(c.r.db, war.id, 'treaty', at, true, false)).ok, true);
+  assert.equal(await c.r.db.prepare('SELECT 1 AS n FROM war_peace_reverts WHERE war_id=?').bind(war.id).first(), null);
+  assert.equal(await c.endings.decideWarEndings(c.r.db, at + 60, { peaceRevert: true }), 0);
+  assert.equal(await c.owner(c.squares.siege), 'korund', 'no marker, so the sweep does not take the square back');
+  assert.equal(await c.r.db.prepare('SELECT 1 AS n FROM war_peace_reverts').first(), null);
 });
 
 test('flag off: a treaty and a concession leave captured squares where they are', async t => {

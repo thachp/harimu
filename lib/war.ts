@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
-import { peaceRevertStatements } from './war-peace-revert'; // #1054
+import { pendingRevertStatement, revertPeaceCaptures } from './war-peace-revert'; // #1054
 import { activeNonAggressionPact } from './diplomacy'; // #402
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
 import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, declarationNextDay, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
@@ -167,10 +167,11 @@ export async function declareWar(db: GameDatabase, command: DeclareWarCommand, n
 export async function endWar(db: GameDatabase, warId: string, kind: WarEndKind, now: number, enabled: boolean, peaceRevert = false) {
   if (!enabled) return fail(403, 'disabled', 'War is not open yet.');
   const end = db.prepare('UPDATE wars SET ended_at=?,end_kind=? WHERE id=? AND ended_at IS NULL').bind(now, kind, warId);
-  // #1054: the return rides in the same batch as the end, and only if this statement made the war a treaty. A retry of an end that already committed still returns the squares.
+  // #1054: the pending marker is in this same transaction, and only if this statement is what ended the war (ended_at = now). The square moves follow; if they do not, the world tick finishes that pending row. A treaty with no row is never touched.
   if (peaceRevert && kind === 'treaty') {
-    const revert = await peaceRevertStatements(db, warId, now, { gate: "EXISTS (SELECT 1 FROM wars WHERE id=? AND end_kind='treaty')", gateBinds: [warId] });
-    await db.batch([end, ...revert]);
+    const pending = pendingRevertStatement(db, warId, now, { gate: "EXISTS (SELECT 1 FROM wars WHERE id=? AND end_kind='treaty' AND ended_at=?)", gateBinds: [warId, now] });
+    await db.batch([end, pending]);
+    await revertPeaceCaptures(db, warId, now);
   } else await end.run();
   const row = await db.prepare(`SELECT ${columns} FROM wars WHERE id=?`).bind(warId).first<Row>();
   return row ? { ok: true as const, war: publicWar(row, now) } : fail(409, 'not_found', 'No such war.');
