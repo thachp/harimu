@@ -9,9 +9,10 @@ export const ageYearMs = 30 * 86_400_000;
 export const ageLengthMs = AGE_GAME_YEARS * ageYearMs;
 
 /** HARIMU_WORLD_AGES_ENABLED lives in HARIMU_UI_PACK, not its own text binding. The client build copies the
- *  packed value onto NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED so Next can inline it. A direct string still wins. */
+ *  packed value onto NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED so Next (and the shell bundlers) inline this one read.
+ *  A direct string still wins when a caller passes env. */
 export const worldAgesEnabled = (env?: unknown) => flagOn(
-  env ?? { HARIMU_WORLD_AGES_ENABLED: process.env.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED ?? process.env.HARIMU_WORLD_AGES_ENABLED },
+  env ?? { HARIMU_WORLD_AGES_ENABLED: process.env.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED },
   'HARIMU_WORLD_AGES_ENABLED',
 );
 

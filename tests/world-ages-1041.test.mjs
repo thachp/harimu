@@ -72,6 +72,22 @@ test('flag off by default; only the packed string "true" turns the HUD on, and a
   assert.equal(worldAgesEnabled({ HARIMU_UI_PACK: { HARIMU_WORLD_AGES_ENABLED: 'true' }, HARIMU_WORLD_AGES_ENABLED: 'false' }), false);
 });
 
+test('every shell bundler inlines the Age flag so a browser bundle never reads process', async () => {
+  const { readdir, readFile } = await import('node:fs/promises');
+  const dir = new URL('../scripts/', import.meta.url);
+  const bundlers = [];
+  for (const name of await readdir(dir)) {
+    if (!name.endsWith('.mjs')) continue;
+    const src = await readFile(new URL(name, dir), 'utf8');
+    if (/from 'esbuild'/.test(src) && /\bdefine\s*:/.test(src)) bundlers.push([name, src]);
+  }
+  assert.ok(bundlers.length >= 8);
+  for (const [name, src] of bundlers) assert.match(src, /process\.env\.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED/, name);
+  const helper = await readFile(new URL('../lib/world-age.ts', import.meta.url), 'utf8');
+  assert.match(helper, /process\.env\.NEXT_PUBLIC_HARIMU_WORLD_AGES_ENABLED/);
+  assert.doesNotMatch(helper, /process\.env\.HARIMU_WORLD_AGES_ENABLED/);
+});
+
 test('flag off: the HUD clock renders no Age markup unless the flag is on (readout is gated, guest demo stays hidden)', async () => {
   const src = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
   assert.match(src, /\{worldAgesEnabled\(\) && !guestDemo && worldClock && <AgeReadout /);
