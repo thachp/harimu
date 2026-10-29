@@ -16,7 +16,7 @@ test('flag pinned: folded into HARIMU_CITY_PACK, preview "true", production "fal
   assert.equal(prod.vars.HARIMU_CITY_PACK.HARIMU_CITY_CAPTURE_HISTORY_ENABLED, 'false');
   assert.equal('HARIMU_CITY_CAPTURE_HISTORY_ENABLED' in preview.vars, false);
   assert.equal('HARIMU_CITY_CAPTURE_HISTORY_ENABLED' in prod.vars, false);
-  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 11);
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // + #1034 sea lanes
   assert.ok(FLAG_PACKS.HARIMU_CITY_PACK.includes('HARIMU_CITY_CAPTURE_HISTORY_ENABLED'));
   assert.match(read('lib/siege.ts'), /idx_city_sieges_city_key ON city_sieges\(city_key\)/);
 });
