@@ -25,7 +25,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 19);
-  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 5);
+  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 6);
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 11); // #1028 capture history stays inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 10); // #1039 phone map + #1041 world Age + #1048 faith festival HUD stay inside the pack
@@ -39,6 +39,10 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(armiesEnabled({ ...on, HARIMU_WAR_ENABLED: 'true' }), true);
   assert.equal(armiesEnabled({ HARIMU_ARMY_PACK: prod.vars.HARIMU_ARMY_PACK, HARIMU_WAR_ENABLED: 'true' }), false);
   assert.equal(expandFlagPacks(preview.vars).HARIMU_ARMY_BATTLES_ENABLED, 'true');
+  assert.equal(flagOn(on, 'HARIMU_WINTER_MARCH_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_ARMY_PACK: prod.vars.HARIMU_ARMY_PACK }, 'HARIMU_WINTER_MARCH_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_WINTER_MARCH_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_WINTER_MARCH_ENABLED, 'false');
   assert.equal(flagOn(on, 'HARIMU_CITY_CAPTURE_NOTE_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CITY_IMPORTS_NOTE_ENABLED'), true);
