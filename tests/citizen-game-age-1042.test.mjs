@@ -111,7 +111,10 @@ test('the citizen card paragraph is unchanged and the age line is gated; preview
   assert.match(page, /\{citizenGameAgeEnabled\(\) && !guestActive && <CitizenGameAgeLine clock=\{simulation\?\.clock\} enrolledAt=\{citizenshipStatus\?\.enrolledAt\} \/>/);
   assert.equal(page.match(/<CitizenGameAgeLine /g).length, 1);
   assert.doesNotMatch(page, /CitizenGameAgeLine[^/]*epochSeconds=\{0\}|CitizenGameAgeLine[^/]*\?\? 0/);
+  const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
-    assert.match(readFileSync(file, 'utf8'), new RegExp(`"NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE": "${value}"`), file);
+    const config = strip(readFileSync(file, 'utf8'));
+    assert.equal(config.vars.NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE, undefined, `${file}: not its own binding`);
+    assert.equal(config.vars.HARIMU_UI_PACK.NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE, value, file);
   }
 });
