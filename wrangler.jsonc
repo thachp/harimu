@@ -251,18 +251,18 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "true",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "true",
-    // #988/#1008: UI skin flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off. The client build expands each NEXT_PUBLIC_* name. A direct string binding still wins.
+    // #988/#1008/#1009: UI skin flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off. The client build expands each NEXT_PUBLIC_* name. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "true",
       "NEXT_PUBLIC_HARIMU_WIRE_BYLINES": "true",
       "NEXT_PUBLIC_HARIMU_RARE_MARKER": "true",
       "NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET": "true",
-      "NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS": "true"
+      "NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS": "true",
+      "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "true",
+      "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
-    // #1017: zone overlay legend explains each zone and keys the capital/outpost markers (docs §6.1, §23.2). "true" in preview, "false" in production.
-    "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "true",
     // #1023: HUD world clock shows the current game season and the countdown to the next (docs §17.1, 7.5 real days each). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_SEASON_CLOCK": "true",
     // #790: square chat shadow-mute (docs 21.3), new messages only. Operator list of citizenId@muteISO or citizenId@muteISO..unmuteISO entries (max 90; unmute by closing the window, not deleting it), comma-separated, not a secret. Empty: nobody is muted. Malformed: mutes nobody, logs a warning.

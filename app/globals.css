@@ -2255,6 +2255,21 @@ html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; 
 :is(.nation-document[data-nation-theme], .game-inspector-body .nation-document[data-nation-theme]) :is(table,thead,tbody,tr,th,td){color:var(--nation-ink)}
 .ranked-ballot table{width:100%;border-collapse:collapse;font-size:calc(12px * var(--text-scale, 1))}.ranked-ballot :is(th,td){padding:8px 4px;text-align:left;border-bottom:1px solid var(--nation-edge)}
 
+/* #1009: Kindle civic ballot. Tokens come from the nation document (--nation-* in lib/nation-themes.ts). No animation. */
+.ranked-ballot .kindle-civic-ballot{display:flex;flex-direction:column;gap:12px;min-width:0;margin:0}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-field{min-width:0;min-inline-size:0;margin:0;padding:10px 12px 12px;border:1px solid var(--nation-edge,#7c9189);border-left:4px solid var(--nation-accent,#246c60);background:var(--nation-paper,#f1eddc)}
+.ranked-ballot .kindle-civic-ballot legend{padding:0 4px;color:var(--nation-ink,#18343e);font-weight:700}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-num{display:inline-grid;place-items:center;min-width:1.6em;min-height:1.6em;margin-inline-end:.35em;padding:0 .2em;border:2px solid var(--nation-accent,#246c60);border-radius:2px;background:var(--nation-paper,#f1eddc);color:var(--nation-ink,#18343e);font-weight:700;line-height:1}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-options{display:flex;flex-direction:column;gap:8px}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-choice{display:flex;align-items:center;gap:10px;min-height:44px;min-width:44px;margin:0;padding:0;border:1px solid var(--nation-edge,#7c9189);background:var(--nation-paper,#f1eddc);color:var(--nation-ink,#18343e);cursor:pointer}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-choice input{width:44px;height:44px;flex:0 0 44px;margin:0;accent-color:var(--nation-accent,#246c60)}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-choice span{min-width:0;padding-inline-end:8px}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-choice:has(input:disabled){cursor:default}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-review{display:flex;flex-direction:column;gap:8px;min-width:0;margin:0;padding:10px 12px;border:1px solid var(--nation-edge,#7c9189);border-top:4px solid var(--nation-accent,#246c60);background:var(--nation-paper,#f1eddc);color:var(--nation-ink,#18343e)}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-review-title{margin:0;font-weight:700}
+.ranked-ballot .kindle-civic-ballot .kindle-civic-summary{margin:0}
+.game-inspector-body .ranked-ballot .kindle-civic-ballot button,.ranked-ballot .kindle-civic-ballot button{min-height:44px;min-width:44px;max-width:100%;padding:8px 12px;white-space:normal;text-align:start}
+
 /* Korund quota bar and coupon book (issue #41) */
 .korund-quota-track { position: relative; height: 8px; overflow: hidden; background: rgba(255, 255, 255, .08); }
 .korund-quota-track span { position: absolute; inset: 0 auto 0 0; height: 100%; }
