@@ -465,6 +465,13 @@ html[data-harimu-reduced-motion] .game-countdown{animation:none;transition:none}
   .game-mobile-v2.game-rail-on .game-inspector-title button svg{transform:rotate(90deg)}.game-mobile-v2.game-rail-on .game-reopen-panel>svg:last-child{transform:rotate(-90deg)}
   .game-mobile-v2 .game-inspector::before{content:"";display:block;width:36px;height:4px;margin:0 auto 6px;border-radius:2px;background:#6f8a92}
 }
+/* #1040: daily-loop shortcuts (NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP). The shell renders them only on a phone. No animation. */
+.game-mobile-v2 .mobile-two-tap{display:flex;gap:6px;margin:0;padding:8px 8px 0}
+.game-mobile-v2 .mobile-two-tap>button{flex:1 1 0;min-width:44px;min-height:44px;padding:4px 6px;border:1px solid #598c94;border-radius:3px;background:#173a44;color:#e7f6f3;font-size:calc(12px * var(--text-scale, 1));line-height:1.2;transition:none;animation:none}
+.game-mobile-v2 .mobile-two-tap>button:focus-visible,.game-mobile-v2 .mobile-two-tap-show:focus-visible{outline:2px solid #f7d080;outline-offset:2px}
+.game-mobile-v2 .game-inspector-body>.mobile-two-tap{position:sticky;top:0;z-index:1;background:#12343e}
+.game-mobile-v2.game-rail-on .mobile-two-tap-bar{flex-direction:column;align-items:stretch;gap:6px;height:auto;padding:6px 8px 8px}
+.game-mobile-v2 .mobile-two-tap-show{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;min-width:44px;color:#cde9e6;transition:none;animation:none}
 /* #85: nation skin PoC on the top bar (NEXT_PUBLIC_HARIMU_NATION_SKIN; app/game-shell.tsx sets data-nation-skin only for a signed-in Kindle, Korund or Aurelle citizen).
    Colors come from each nation's crest palette (lib/nation-crests.ts) on dark grounds, so every existing top bar text color keeps AA contrast; each nation also gets
    one motif drawn with inset shadows or a background image (no borders, padding or size change, so layout is identical). The header type selector keeps these rules above the later S2 chip rules. The nation name stays in text, so no meaning is carried by color alone. */

@@ -82,7 +82,23 @@ export type GameShellProps = {
   onSelectNation?: (id: string) => void;
   accountControls?: ReactNode;
   socialDock?: ReactNode;
+  /** #1040: phone daily-loop shortcuts. Rendered only when NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP is exactly "true". */
+  onDailyLoop?: (id: 'shift' | 'wage' | 'ballot') => void;
 };
+/** #1040: phone only, and only for the exact string "true". Desktop and flag off render nothing. */
+function usePhoneTwoTap(): boolean {
+  const enabled = process.env.NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP === 'true';
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    if (!enabled || typeof matchMedia !== 'function') return;
+    const query = window.matchMedia('(max-width: 760px)');
+    const sync = () => setPhone(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, [enabled]);
+  return enabled && phone;
+}
 const worldTabFormId = 'world-tab-form';
 const railIcons = { world: GlobeHemisphereWest, country: Compass, square: UsersThree } as const; // #392 S4: the same icons the zoom tabs use today
 const places = [
@@ -110,7 +126,7 @@ function HudHelp({ label, children, help, open = false }: { label: string; child
   return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ openNations, worldClock, worldAges = false, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [] }: GameShellProps) {
+export function GameShell({ openNations, worldClock, worldAges = false, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [], onDailyLoop }: GameShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -171,6 +187,9 @@ export function GameShell({ openNations, worldClock, worldAges = false, holidayN
     document.addEventListener('pointerdown', press); document.addEventListener('keydown', key, true);
     return () => { document.removeEventListener('pointerdown', press); document.removeEventListener('keydown', key, true); };
   }, [help.id]);
+  const twoTapPhone = usePhoneTwoTap();
+  const twoTap = twoTapPhone && onDailyLoop ? <nav className="mobile-two-tap" aria-label="Daily loop">{([['shift', 'Shift', 'Start or claim shift'], ['wage', resourceNation.id === 'korund' ? 'Rations' : 'Wages', 'Collect wage or rations'], ['ballot', 'Ballot', 'Open civic inbox ballot']] as const).map(([id, label, ariaLabel]) => <button key={id} type="button" aria-label={ariaLabel} onClick={() => onDailyLoop(id)}>{label}</button>)}</nav> : null;
+  const showDetails = () => { setCollapsed(false); requestAnimationFrame(() => document.getElementById('game-panel-title')?.focus()); };
   const hudHelpHandlers = {
     onPointerOver: (event: PointerEvent) => { if (event.pointerType === 'mouse') dispatchHelp({ type: 'pointer', id: helpOf(event.target) }); },
     onPointerLeave: (event: PointerEvent) => { if (event.pointerType === 'mouse') dispatchHelp({ type: 'pointer', id: null }); },
@@ -200,8 +219,8 @@ export function GameShell({ openNations, worldClock, worldAges = false, holidayN
     {view !== 'country' && (!railOn || shiftChip) && <div className="game-stage-overlay">{railOn ? null : breadcrumbs}{shiftChip}</div>}
     {noticeVisible && <div className="game-notice" role={noticeKind === 'error' ? 'alert' : 'status'}><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setDismissedNotice(notice)}><X size={16} /></button></div>}
     {hasPanel ? <aside id="game-details" className="game-inspector" aria-label={sceneTitle}><header className="game-inspector-title">{identityHold === 'none' && !viewedNationHeld && <NationCrest id={nation.id} size={44} />}<div><small>{shownNationName} / {inspecting ? 'NATION INSPECTION' : visitor ? 'VISITOR PREVIEW' : 'CITIZEN LIFE'}</small><h1 id="game-panel-title" tabIndex={-1}>{sceneTitle}</h1></div><button type="button" aria-label="Collapse details" aria-expanded="true" aria-controls="game-details" onClick={close}><CaretRight size={20} /></button></header><div className="game-inspector-body">
-      {selection?.kind === 'tile' && <section className="game-selection"><small>SELECTED SQUARE</small><h2>{selection.label}</h2><p>{selection.detail}</p></section>}{panel}
-    </div></aside> : <button id="game-reopen" className="game-reopen-panel" type="button" aria-expanded="false" aria-controls="game-details" onClick={() => { setCollapsed(false); requestAnimationFrame(() => document.getElementById('game-panel-title')?.focus()); }}><Compass size={18} /><span>Show {sceneTitle} details</span><CaretRight size={16} /></button>}
+      {twoTap}{selection?.kind === 'tile' && <section className="game-selection"><small>SELECTED SQUARE</small><h2>{selection.label}</h2><p>{selection.detail}</p></section>}{panel}
+    </div></aside> : twoTap ? <div className="game-reopen-panel mobile-two-tap-bar"><button id="game-reopen" className="mobile-two-tap-show" type="button" aria-expanded="false" aria-controls="game-details" onClick={showDetails}><Compass size={18} /><span>Show {sceneTitle} details</span><CaretRight size={16} /></button>{twoTap}</div> : <button id="game-reopen" className="game-reopen-panel" type="button" aria-expanded="false" aria-controls="game-details" onClick={showDetails}><Compass size={18} /><span>Show {sceneTitle} details</span><CaretRight size={16} /></button>}
     {/* #379: the World tab is a real GET submit (?view=world&nation=…) until React hydrates, so an early click loads the globe instead of being dropped; after hydration onClick takes over with no reload. */}
     <form id={worldTabFormId} method="get" hidden><input type="hidden" name="nation" value={nation.id} /></form>
     {railOn ? <div className="game-nav-row"><nav className="game-zoom-rail" aria-label="Zoom level" onKeyDown={event => { const buttons = [...event.currentTarget.querySelectorAll('button')], next = railKeyTarget(event.key, buttons.indexOf(document.activeElement as HTMLButtonElement), buttons.length); if (next !== null) { event.preventDefault(); buttons[next]?.focus(); } }}>{railLevels.map(({id,name}) => { const Icon = railIcons[id], current = railCurrent(id, view); return <button key={id} type={id === 'world' ? 'submit' : 'button'} {...(id === 'world' ? { form: worldTabFormId, name: 'view', value: 'world' } : {})} aria-current={current} onClick={event => { event.preventDefault(); navigate(id); }}><Icon size={22} weight={current ? 'fill' : 'regular'} aria-hidden="true" /><span>{name}</span></button>; })}</nav><nav id="game-location-dock" className="game-dock" aria-label="Game locations">{places.filter(({id}) => locationVisible(id, resourceNation.id, marketOpen) && !(railOn && id in railIcons)).map(({id,name,icon:Icon}) => { const label = resourceNation.id === 'korund' && id === 'market' ? 'State store' : resourceNation.id === 'aurelle' && id === 'market' ? 'Chartered food' : resourceNation.id === 'korund' && id === 'workplace' ? 'Assignment' : name; return <button key={id} type={id === 'world' ? 'submit' : 'button'} {...(id === 'world' ? { form: worldTabFormId, name: 'view', value: 'world' } : {})} aria-label={`Open ${label}`} aria-current={view === id || view === 'nation' && id === 'government' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate(id); }}><Icon size={20} weight={view === id || view === 'nation' && id === 'government' ? 'fill' : 'regular'} /><span>{label}</span>{(view === id || view === 'nation' && id === 'government') && <i />}</button>; })}</nav></div> : <nav id="game-location-dock" className="game-dock" aria-label="Game locations">{places.filter(({id}) => locationVisible(id, resourceNation.id, marketOpen)).map(({id,name,icon:Icon}) => { const label = resourceNation.id === 'korund' && id === 'market' ? 'State store' : resourceNation.id === 'aurelle' && id === 'market' ? 'Chartered food' : resourceNation.id === 'korund' && id === 'workplace' ? 'Assignment' : name; return <button key={id} type={id === 'world' ? 'submit' : 'button'} {...(id === 'world' ? { form: worldTabFormId, name: 'view', value: 'world' } : {})} aria-label={`Open ${label}`} aria-current={view === id || view === 'nation' && id === 'government' ? 'page' : undefined} onClick={event => { event.preventDefault(); navigate(id); }}><Icon size={20} weight={view === id || view === 'nation' && id === 'government' ? 'fill' : 'regular'} /><span>{label}</span>{(view === id || view === 'nation' && id === 'government') && <i />}</button>; })}</nav>}
