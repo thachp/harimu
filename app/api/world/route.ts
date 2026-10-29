@@ -94,8 +94,9 @@ export async function GET() {
 
   return Response.json(
     {
-      // #1041: server flagOn of HARIMU_UI_PACK. The HUD reads this boolean; the browser bundle does not read the flag.
+      // #1041 / #1048: server flagOn of HARIMU_UI_PACK. The HUD reads these booleans; the browser bundle does not read the flags.
       worldAges: flagOn(env, 'HARIMU_WORLD_AGES_ENABLED'),
+      faithFestivalHud: flagOn(env, 'HARIMU_FAITH_FESTIVAL_HUD_ENABLED'),
       simulation,
       nations: nationResult.results.map((nation) => ({
         id: nation.id,

@@ -25,8 +25,11 @@ import { uiV2MobileEnabled } from '@/lib/ui-v2-mobile';
 import { contextStripStatus } from '@/lib/context-strip-copy'; // #379: a visitor's strip says "Visitor preview", not "Citizen snapshot"
 import { topbarCountdownEnabled, type CountdownInput } from '@/lib/topbar-countdown'; // #969
 import { festivalCalendarEnabled, gameSeasonAt, nextFestivalAt, seasonClockEnabled, seasonLabels } from '@/lib/game-season'; // #1023, #1029
+import { faithFestivalHudLine, nextFaithFestivalAt } from '@/lib/faith-festival-hud'; // #1048
 import { ageHudLine, ageRemainingTip, worldAgeAt } from '@/lib/world-age'; // #1041
 import { TopbarCountdown } from './topbar-countdown';
+import { KorundWalletRations } from './korund-wallet-rations'; // #1055
+import { korundWalletHelp, korundWalletName, korundWalletRations, type KorundCouponView } from '@/lib/korund-wallet-rations';
 
 type GameNation = { id: string; name: string; capital?: string; color?: string };
 export type GameShellProps = {
@@ -35,6 +38,8 @@ export type GameShellProps = {
   worldClock?: WorldClock;
   /** #1041: true only when GET /api/world says so (flagOn of HARIMU_UI_PACK). Absent is off. */
   worldAges?: boolean;
+  /** #1048: true only when GET /api/world says so (flagOn of HARIMU_UI_PACK). Absent is off. */
+  faithFestivalHud?: boolean;
   /** #280: name of today's public holiday (endorsed festival), when faith is on. */
   holidayName?: string | null;
   /** #969: nation's next event inputs. The chip renders only while NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN is "true". */
@@ -84,6 +89,8 @@ export type GameShellProps = {
   socialDock?: ReactNode;
   /** #1040: phone daily-loop shortcuts. Rendered only when NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP is exactly "true". */
   onDailyLoop?: (id: 'shift' | 'wage' | 'ballot') => void;
+  /** #1055: this week's food coupons from the loaded Korund plan. Absent leaves the chip unchanged. */
+  korundCoupons?: KorundCouponView | null;
 };
 /** #1040: phone only, and only for the exact string "true". Desktop and flag off render nothing. */
 function usePhoneTwoTap(): boolean {
@@ -121,12 +128,12 @@ function NationEmblemMark({ id, name }: { id: string; name: string }) {
 const helpEscapes = new WeakSet<Event>();
 /** One top-bar help item. Which one is open is owned by GameShell (lib/hud-help.ts: one at a time, hover or keyboard focus opens,
  *  leave / blur / Escape closes), so `open` is controlled and clicking never toggles it natively. */
-function HudHelp({ label, children, help, open = false }: { label: string; children: ReactNode; help: string; open?: boolean }) {
+function HudHelp({ label, children, help, open = false, name }: { label: string; children: ReactNode; help: string; open?: boolean; name?: string }) {
   const helpId = helpIdOf(label);
-  return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
+  return <details className="game-hud-help" data-help-id={helpId} open={open}><summary aria-label={name} aria-describedby={helpId}>{children}</summary><div id={helpId} className="game-hud-tip">{label}: {help}</div></details>;
 }
 
-export function GameShell({ openNations, worldClock, worldAges = false, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [], onDailyLoop }: GameShellProps) {
+export function GameShell({ openNations, worldClock, worldAges = false, faithFestivalHud = false, holidayName, countdown = null, nextDeadline, view, nation, citizenNation, identityHold = 'none', visitorSession = false, viewedNationHeld = false, nations, capacity, currencyCode = 'SPK', walletMinor, onOpenWallet, inventory, shiftSummary, localDemo, guestDemo = false, nationFocusRevision = 0, cameraTourNationId, onUserCamera, shortlistIds = [], notice, noticeKind = 'success', panel, countryMap, currentCityName, onNavigate, marketOpen = true, armyMap = false, mapOverlays = false, wcNote, onSelectNation, accountControls, socialDock, contextTitle, contextItems = [], onDailyLoop, korundCoupons = null }: GameShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [selection, setSelection] = useState<ViewportSelection | null>(null);
   const [dismissedNotice, setDismissedNotice] = useState<string | undefined>();
@@ -141,6 +148,7 @@ export function GameShell({ openNations, worldClock, worldAges = false, holidayN
   }, [notice, noticeKind]);
   const sceneTitle = view === 'country' ? `${countryWord()} map` : view === 'world' ? nation.name : nation.id === 'korund' && view === 'market' ? 'State ration store' : nation.id === 'aurelle' && view === 'market' ? 'Chartered food counter' : nation.id === 'korund' && view === 'workplace' ? 'Assignment board' : titles[view];
   const resourceNation = citizenNation ?? nation;
+  const korundRations = korundWalletRations(citizenNation?.id, korundCoupons); // #1055: null leaves the chip as it is today
   const shownNationName = viewedNationHeld ? 'Your nation' : nation.name; // #455, #533
   const emblemOn = topBarEmblemEnabled(), topbarV2 = uiV2TopbarEnabled(); // #392 S2: topbarV2 adds the restyle (class game-hud-v2); it implies emblemOn
   const railOn = uiV2RailEnabled(); // #392 S4: zoom levels in a left rail, places in the top tabs; the rail replaces the breadcrumb
@@ -209,12 +217,12 @@ export function GameShell({ openNations, worldClock, worldAges = false, holidayN
         {guestDemo ? <span>No account · sample actions only</span> : !citizenNation && !localDemo ? <HudHelp label="Resources" open={isOpen("Resources")} help="Work capacity, money, food, materials and knowledge unlock after citizenship. Exploring nations does not create a citizen."><span>Resources unlock after citizenship</span></HudHelp> : <>
         <HudHelp label="Work capacity" open={isOpen("Work capacity")} help={`Work capacity (WC) is energy available for jobs and civic actions. Meals restore it. Jobs use real-time timers.${wcNote ? ` ${wcNote}` : ''}`}><Lightning size={19} weight="fill" aria-hidden="true" /><strong>{capacity}</strong><span>WC</span></HudHelp>
         {onOpenWallet && currencyCode === 'SPK' ? <button type="button" className="game-wallet-button" aria-label={`Open wallet · ${walletMinor === undefined ? 'loading' : (walletMinor / 100).toFixed(2)} SPK`} aria-haspopup="dialog" onClick={onOpenWallet}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></button>
-        : <HudHelp label="Wallet" open={isOpen("Wallet")} help={`Your ${currencyCode} wallet holds national money. Amounts update after completed transactions; loading means the citizen snapshot has not arrived.`}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span>{currencyCode}</span></HudHelp>}
+        : <HudHelp label="Wallet" name={korundWalletName(walletMinor, currencyCode, korundRations)} open={isOpen("Wallet")} help={korundWalletHelp(currencyCode, korundRations)}><Coins size={19} aria-hidden="true" /><strong>{walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2)}</strong><span className={korundRations ? 'game-wallet-rations' : undefined}>{currencyCode}<KorundWalletRations line={korundRations} /></span></HudHelp>}
         <HudHelp label="Food" open={isOpen("Food")} help="Food in your inventory can be used for meals to restore work capacity. Loading means the citizen snapshot has not arrived."><Bread size={19} aria-hidden="true" /><strong>{inventory?.food ?? 'Loading'}</strong><span>Food</span></HudHelp>
         <HudHelp label="Materials" open={isOpen("Materials")} help="Materials are supplies held by your citizen for production. Loading means the citizen snapshot has not arrived."><Cube size={18} aria-hidden="true" /><strong>{inventory?.materials ?? 'Loading'}</strong><span>Mat.</span></HudHelp>
         <HudHelp label="Knowledge" open={isOpen("Knowledge")} help="Knowledge is a resource held by your citizen for learning and production. Loading means the citizen snapshot has not arrived."><BookOpen size={18} aria-hidden="true" /><strong>{inventory?.knowledge ?? 'Loading'}</strong><span>Know.</span></HudHelp></>}
       </div>
-      <div className="game-account"><HudHelp label="World clock" open={isOpen("World clock")} help={guestDemo ? 'This disposable example has no world clock. Its sample actions complete immediately.' : 'Game days start at 1; simulation ticks count completed two-hour intervals from 0. Day 2 with tick 1 means the second game day and one completed tick. World days use 12× real-time compression: one real day is 12 game days. This preview processes simulation ticks on visits, not continuously. Work shifts always finish at their real-time deadline.'}><span className="game-clock">{guestDemo ? 'Sample' : worldClock ? `Day ${worldClock.gameDay} · 12×` : citizenNation ? 'Loading world' : 'World preview'}<small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : guestDemo ? 'NO WORLD CHANGES' : citizenNation ? 'AWAITING SNAPSHOT' : '12× · ON VISITS'}</small>{holidayName && <small className="game-clock-holiday">Public holiday</small>}{seasonClockEnabled() && !guestDemo && worldClock && <SeasonReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{worldAges && !guestDemo && worldClock && <AgeReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{festivalCalendarEnabled() && !guestDemo && worldClock && citizenNation && <FestivalReadout nationId={citizenNation.id} epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{nextDeadline && <span className="game-next-deadline"><GameTimer compact endsAt={nextDeadline.endsAt} label={nextDeadline.label} expiredText={nextDeadline.expiredText} /></span>}</span></HudHelp>{topbarCountdownEnabled() && countdown && <TopbarCountdown input={countdown} open={isOpen('Next event')} epochSeconds={worldClock?.epochSeconds} />}<a className="game-glossary" href="https://docs.harimu.com/appendices/glossary/" target="_blank" rel="noreferrer" aria-label="Game glossary, official documentation (opens new tab)"><BookOpen size={17} aria-hidden="true" /><span>Glossary</span></a><GameSettings/><div id="game-notification-slot" />{accountControls}</div>
+      <div className="game-account"><HudHelp label="World clock" open={isOpen("World clock")} help={guestDemo ? 'This disposable example has no world clock. Its sample actions complete immediately.' : 'Game days start at 1; simulation ticks count completed two-hour intervals from 0. Day 2 with tick 1 means the second game day and one completed tick. World days use 12× real-time compression: one real day is 12 game days. This preview processes simulation ticks on visits, not continuously. Work shifts always finish at their real-time deadline.'}><span className="game-clock">{guestDemo ? 'Sample' : worldClock ? `Day ${worldClock.gameDay} · 12×` : citizenNation ? 'Loading world' : 'World preview'}<small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : guestDemo ? 'NO WORLD CHANGES' : citizenNation ? 'AWAITING SNAPSHOT' : '12× · ON VISITS'}</small>{holidayName && <small className="game-clock-holiday">Public holiday</small>}{seasonClockEnabled() && !guestDemo && worldClock && <SeasonReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{worldAges && !guestDemo && worldClock && <AgeReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{festivalCalendarEnabled() && !guestDemo && worldClock && citizenNation && <FestivalReadout nationId={citizenNation.id} epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{faithFestivalHud && !guestDemo && worldClock && citizenNation && <FaithFestivalReadout nationId={citizenNation.id} nowSeconds={worldClock.nowSeconds} />}{nextDeadline && <span className="game-next-deadline"><GameTimer compact endsAt={nextDeadline.endsAt} label={nextDeadline.label} expiredText={nextDeadline.expiredText} /></span>}</span></HudHelp>{topbarCountdownEnabled() && countdown && <TopbarCountdown input={countdown} open={isOpen('Next event')} epochSeconds={worldClock?.epochSeconds} />}<a className="game-glossary" href="https://docs.harimu.com/appendices/glossary/" target="_blank" rel="noreferrer" aria-label="Game glossary, official documentation (opens new tab)"><BookOpen size={17} aria-hidden="true" /><span>Glossary</span></a><GameSettings/><div id="game-notification-slot" />{accountControls}</div>
     </header>
     {view !== 'country' && (!railOn || shiftChip) && <div className="game-stage-overlay">{railOn ? null : breadcrumbs}{shiftChip}</div>}
     {noticeVisible && <div className="game-notice" role={noticeKind === 'error' ? 'alert' : 'status'}><span>{notice}</span><button type="button" aria-label="Dismiss notification" onClick={() => setDismissedNotice(notice)}><X size={16} /></button></div>}
@@ -251,4 +259,11 @@ export function FestivalReadout({ nationId, epochSeconds, nowSeconds }: { nation
   const f = nextFestivalAt(nationId, epochSeconds * 1000, nowSeconds * 1000);
   if (!f) return null;
   return <small className="game-clock-festival">Next festival: {f.name} · {seasonLabels[f.season]}{f.active ? ' · today' : <span className="game-next-deadline"><GameTimer compact endsAt={f.startsAt} label="in" expiredText={`${f.name} has begun · refresh to confirm.`} /></span>}</small>;
+}
+
+/** #1048 (docs §17.1): the next faith festival's game date and the nation's #68 stance. The title is the existing #270 stance line. */
+export function FaithFestivalReadout({ nationId, nowSeconds }: { nationId: string; nowSeconds: number }) {
+  const f = nextFaithFestivalAt(nationId, nowSeconds * 1000);
+  if (!f) return null;
+  return <small className="game-clock-faith" title={f.tip ?? undefined}>{faithFestivalHudLine(f)}{f.active ? null : <span className="game-next-deadline"><GameTimer compact endsAt={f.startsAt} label="in" expiredText={`${f.name} has begun · refresh to confirm.`} /></span>}</small>;
 }
