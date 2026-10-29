@@ -259,7 +259,8 @@
       "NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET": "false",
       "NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS": "false",
       "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "false",
-      "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "false"
+      "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "false",
+      "NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP": "false"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",
