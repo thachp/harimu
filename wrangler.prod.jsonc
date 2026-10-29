@@ -37,7 +37,7 @@
     "HARIMU_NOTABLES_ENABLED": "false",
     "HARIMU_AI_CABINET_RESPONSES_ENABLED": "false",
     "HARIMU_CITY_FOUNDING_ENABLED": "false",
-    // #988 / #1003 / #1006 / #1001: one JSON binding for city tier growth and panel notes, including the civic-unit note and the imports note (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
+    // #988 / #1003 / #1006 / #1001 / #1007 / #1014: one JSON binding for city tier growth and panel notes, including the civic-unit note, the imports note, the governor note and the population band (Cloudflare text-binding limit). Preview on, production off. A direct HARIMU_* var still wins.
     "HARIMU_CITY_PACK": {
       "HARIMU_CITY_TIER_GROWTH_ENABLED": "false",
       "HARIMU_CITY_TIER_UNLOCKS_ENABLED": "false",
@@ -46,7 +46,8 @@
       "HARIMU_CITY_CAPTURE_NOTE_ENABLED": "false",
       "HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED": "false",
       "HARIMU_CITY_IMPORTS_NOTE_ENABLED": "false",
-      "HARIMU_CITY_GOVERNOR_NOTE_ENABLED": "false"
+      "HARIMU_CITY_GOVERNOR_NOTE_ENABLED": "false",
+      "HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED": "false"
     },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
@@ -91,7 +92,9 @@
       // #992: closed-system internal residence permit for home-city moves (Korund, Meridian; Varkand at Amber/Red). Off: #781 path unchanged.
       "HARIMU_INTERNAL_PERMIT_ENABLED": "false",
       // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
-      "HARIMU_SAVINGS_SHIELD_ENABLED": "false"
+      "HARIMU_SAVINGS_SHIELD_ENABLED": "false",
+      // #1016: closed Kindle presidential ballot shows High Court certification (awaiting for 24 hours, then certified). Off: no certification field, ballot unchanged. Display only.
+      "HARIMU_KINDLE_CERTIFICATION_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
@@ -253,10 +256,13 @@
       "NEXT_PUBLIC_HARIMU_RARE_MARKER": "false",
       "NEXT_PUBLIC_HARIMU_KORUND_RATION_BOOKLET": "false",
       "NEXT_PUBLIC_HARIMU_AURELLE_SEALED_SCROLLS": "false",
+      "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "false",
       "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "false"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
-    "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false"
+    "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",
+    // #1017: zone overlay legend explains each zone and keys the capital/outpost markers (docs §6.1, §23.2). "true" in preview, "false" in production.
+    "NEXT_PUBLIC_HARIMU_ZONE_LEGEND": "false"
   },
   "durable_objects": { "bindings": [{ "name": "CITY_PRESENCE", "class_name": "CityPresence" }] },
   "migrations": [{ "tag": "v1-city-presence", "new_sqlite_classes": ["CityPresence"] }]

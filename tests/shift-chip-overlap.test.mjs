@@ -6,8 +6,18 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { Window } from 'happy-dom';
+import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
+
+// app/world-zones.tsx imports lib/land-copy.ts, which re-exports from an extensionless sibling (tsc/Next need it that way);
+// point it at the .ts file for Node, as tests/land-copy.test.mjs and tests/zone-legend-1017.test.mjs do.
+const lcSrc = readFileSync('lib/land-copy.ts', 'utf8').replace("from './palace-coup-copy'", `from ${JSON.stringify(pathToFileURL(resolve('lib/palace-coup-copy.ts')).href)}`);
+const lcPath = join(mkdtempSync(join(tmpdir(), 'shift-chip-')), 'land-copy.ts'); writeFileSync(lcPath, lcSrc);
+const landCopy = await import(pathToFileURL(lcPath).href);
 
 const cache = new Map();
 async function load(rel) {
@@ -27,6 +37,7 @@ async function load(rel) {
     if (name === './square-chat') return { SquareChat: () => null };
     if (name === '@phosphor-icons/react') return new Proxy({}, { get: () => () => null });
     if (name === '@clerk/nextjs') return { useClerk: () => ({ mountUserButton() {}, unmountUserButton() {} }) };
+    if (name === '@/lib/land-copy') return landCopy;
     if (name.startsWith('@/lib/')) return require(`../lib/${name.slice(6)}.ts`);
     if (name.startsWith('../lib/')) return require(`${name}.ts`);
     return require(name);
