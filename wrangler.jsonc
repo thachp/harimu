@@ -209,6 +209,8 @@
     "HARIMU_DORMANCY_ENABLED": "true",
     // #789: read-only Kindle national budget card (docs §12.12): treasury balance and income-tax inflow from the ledger.
     "HARIMU_KINDLE_BUDGET_VIEW_ENABLED": "true",
+    // #985: Kindle Policy Ledger (docs §8.6): read-only list of published AI government decisions and each public Reasoning Brief. Off: no ledger read or write, and the leader panel is unchanged.
+    "HARIMU_KINDLE_POLICY_LEDGER_ENABLED": "true",
     // #825: Kindle vote-buying watch (docs §9.5): a player-market transfer within 48h of a Kindle vote, from a party member, campaign actor or 3+-voter payer, records an investigation event.
     "HARIMU_VOTE_BUYING_WATCH_ENABLED": "true",
     // #879: integrity risk scores for staff review (docs §20). New accounts and dense counted civic acts raise a score. Human review only: never an automatic ban or block. GET /api/admin/risk-scores needs HARIMU_ADMIN_TOKEN.

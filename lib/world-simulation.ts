@@ -10,6 +10,7 @@ import { accountElectionDatabase } from './preview-election';
 import { env } from 'cloudflare:workers';
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
+import { policyLedgerEnabled, recordPublishedKindleDecision } from './policy-ledger'; // #985
 import { runSpoilage } from './spoilage';
 import { runAurelleRising } from './aurelle-rising';
 import { runAurelleCoup } from './aurelle-coup';
@@ -145,6 +146,9 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
         .bind(tick,scheduledAt,now,JSON.stringify(proposals)),
       db.prepare(policyExecutionSql).bind(now,tick),
     ]);
+    // #985: the tick is the publish. Flag off does not read or write the ledger. Idempotent per public decision.
+    const kindle = proposals.find(proposal => proposal?.nationId === 'kindle');
+    if (policyLedgerEnabled(env) && kindle) await recordPublishedKindleDecision(db, kindle, scheduledAt);
   }
   // #95 hotfix / #159: scores are written after the ticks commit, so a missing nation_stability_scores table
   // can't abort a tick. Each pass (re)writes scores for every recent tick that lacks them, so a transient
