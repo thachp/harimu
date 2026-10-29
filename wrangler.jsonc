@@ -256,7 +256,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "true",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "true",
-    // #988/#1008/#1009/#1039/#1040/#1041/#1042: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
+    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1055: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
     // The client build expands each NEXT_PUBLIC_* name. HARIMU_WORLD_AGES_ENABLED stays in the pack and is read with flagOn. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "true",
@@ -268,6 +268,7 @@
       "NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT": "true",
       "NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP": "true",
       "NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP": "true",
+      "NEXT_PUBLIC_HARIMU_KORUND_WALLET_RATIONS": "true",
       "HARIMU_WORLD_AGES_ENABLED": "true",
       "NEXT_PUBLIC_HARIMU_CITIZEN_GAME_AGE": "true"
     },
