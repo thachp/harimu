@@ -6,6 +6,7 @@ import {graphicsOptions} from '../lib/display-preferences';
 import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
+import { MOBILE_MAP_QUERY, cityPanDelta, controlPan, mapEffects, mobileTopdownMapFlag, orientWorldGroup, overlayFacing, placeMapCamera, selectMapView, type PanDir } from '../lib/mobile-topdown-map';
 import { nationSymbolElement } from './nation-symbol';
 import { dressCityPill } from './city-pill';
 import { uiV2CityEnabled } from '../lib/ui-v2-city';
@@ -36,6 +37,7 @@ export type GameViewportProps = {
   cityPills?: boolean;
 };
 type CameraControls = { zoom: (delta: number) => void; pan: (x: number, z: number) => void; reset: () => void; focus: (id: LocationId) => void; focusNation: (id: string, select?: boolean) => void };
+const liveMapView = () => selectMapView(mobileTopdownMapFlag(), typeof window !== 'undefined' && window.matchMedia?.(MOBILE_MAP_QUERY).matches === true);
 
 export function GameViewport({ mode, nationId, visitor = false, cityName, marketOpen = true, nations, selectedNationId, nationFocusRevision, cameraTourNationId, onUserCamera, selectedLocation, onSelect, className = '', cityPills = uiV2CityEnabled(), armyMap = false, overlays = false }: GameViewportProps) {
   const {preferences:{graphics}}=useDisplayPreferences();
@@ -54,12 +56,13 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
     if (!container) return;
     let cancelled = false;
     const quality=graphicsOptions(graphics,window.devicePixelRatio);
+    const opening = mapEffects(liveMapView(), quality); // #1039: a phone that loads top-down skips antialias
     let renderer: THREE.WebGLRenderer;
-    try { renderer = new THREE.WebGLRenderer({ antialias: quality.antialias, alpha: false }); }
+    try { renderer = new THREE.WebGLRenderer({ antialias: opening.antialias, alpha: false }); }
     catch { queueMicrotask(() => { if (!cancelled) setFallback(true); }); return () => { cancelled = true; }; }
     queueMicrotask(() => { if (!cancelled) setFallback(false); });
-    renderer.setPixelRatio(quality.pixelRatio);
-    renderer.shadowMap.enabled = quality.shadows;
+    renderer.setPixelRatio(opening.pixelRatio);
+    renderer.shadowMap.enabled = opening.shadows;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -67,12 +70,12 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
     container.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(mode === 'world' ? '#101d29' : '#172c31');
-    if (mode === 'city') scene.fog = new THREE.Fog('#172c31', 35, 85);
+    const cityFog = new THREE.Fog('#172c31', 35, 85);
     const world = mode === 'city' ? createCityWorld(nationId, cityName, { marketOpen }) : createRegionWorld(JSON.parse(nationSignature));
     scene.add(world.group);
     scene.add(new THREE.HemisphereLight('#fff3d6', '#334b4d', 2.2));
-    const sun = new THREE.DirectionalLight('#ffe2ac', 3.2);
-    sun.position.set(-15, 24, 12); sun.castShadow = quality.shadows;
+    const sun = new THREE.DirectionalLight('#ffe2ac', opening.sun);
+    sun.position.set(-15, 24, 12); sun.castShadow = opening.shadows;
     sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
     sun.shadow.camera.top = 22; sun.shadow.camera.bottom = -22; sun.shadow.bias = -.001;
     scene.add(sun);
@@ -119,18 +122,24 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       if (cancelled) return;
       saveCameraSnapshot(cameraKey, { x: target.x, z: target.z, zoom }, bounds);
       const w = Math.max(1, container.clientWidth), h = Math.max(1, container.clientHeight);
+      const view = liveMapView(); // #1039: assigned, never animated
+      const effects = mapEffects(view, quality);
+      scene.fog = effects.fog && mode === 'city' ? cityFog : null;
+      renderer.shadowMap.enabled = effects.shadows; sun.castShadow = effects.shadows; sun.intensity = effects.sun;
+      const atmosphere = world.group.getObjectByName('atmosphere'); if (atmosphere) atmosphere.visible = effects.atmosphere;
+      container.dataset.mapCamera = view;
       const ratio = w / h;
       const span = mode === 'world' ? baseSpan / Math.min(1, ratio) : baseSpan;
       camera.left = -span * ratio / zoom; camera.right = span * ratio / zoom;
       camera.top = span / zoom; camera.bottom = -span / zoom;
-      if (mode === 'world') {
-        world.group.rotation.set(target.z, target.x, 0); camera.position.set(0, 0, 25); camera.lookAt(0, 0, 0);
-      } else { camera.position.set(target.x + 23, 28, target.z + 23); camera.lookAt(target); }
+      if (mode === 'world') orientWorldGroup(world.group, view, target.x, target.z);
+      placeMapCamera(camera, view, mode, target);
       camera.updateProjectionMatrix(); camera.updateMatrixWorld(); scene.updateMatrixWorld();
+      const facing = overlayFacing(view, mode);
       labels.forEach(({ object, button }) => {
         const box = new THREE.Box3().setFromObject(object);
         const point = box.getCenter(new THREE.Vector3()); point.y = box.max.y + .3; point.project(camera);
-        const globeVisible = mode !== 'world' || globeAnchorVisible(object.getWorldPosition(new THREE.Vector3()));
+        const globeVisible = mode !== 'world' || globeAnchorVisible(object.getWorldPosition(new THREE.Vector3()), facing);
         button.hidden = !globeVisible || point.z < -1 || point.z > 1 || Math.abs(point.x) > .98 || Math.abs(point.y) > .98;
         button.style.left = `${(point.x + 1) * w / 2}px`;
         button.style.top = `${(1 - point.y) * h / 2}px`;
@@ -156,7 +165,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       }
       const layers = mode === 'world' ? container.closest('.game-viewport')?.querySelectorAll<HTMLElement>('.map-ownership, .map-resources') ?? [] : []; // #82: Ownership and Resources cells ride the globe squares
       for (const owned of layers) { const spans = [...owned.querySelectorAll<HTMLElement>('span[data-x]')];
-        projectOwnershipCells({ width: Number(owned.dataset.width), height: Number(owned.dataset.height) }, spans.map(s => [Number(s.dataset.x), Number(s.dataset.y)]), world.group, camera, { w, h }, new THREE.Vector3())
+        projectOwnershipCells({ width: Number(owned.dataset.width), height: Number(owned.dataset.height) }, spans.map(s => [Number(s.dataset.x), Number(s.dataset.y)]), world.group, camera, { w, h }, new THREE.Vector3(), facing)
           .forEach((spot, i) => { spans[i].hidden = spot.hidden; spans[i].style.left = `${spot.left}px`; spans[i].style.top = `${spot.top}px`; }); }
       if (highlight.visible) highlight.update();
       renderer.render(scene, camera);
@@ -187,7 +196,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       render();
     };
     controls.current = { zoom: changeZoom, pan, reset: () => { userCamera.current?.(); target.set(0, 0, 0); zoom = 1; setCameraLabel('100%'); highlight.visible = false; render(); }, focus, focusNation };
-    const resize = () => { renderer.setSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight), false); render(); };
+    const resize = () => { renderer.setPixelRatio(mapEffects(liveMapView(), quality).pixelRatio); renderer.setSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight), false); render(); };
     const observer = new ResizeObserver(resize); observer.observe(container); resize();
     const layerWatch = new MutationObserver(render); const viewportEl = container.closest('.game-viewport'); if (viewportEl) layerWatch.observe(viewportEl, { childList: true }); // #82: place the Ownership layer when it mounts
     container.closest('.harimu-game')?.querySelectorAll('.game-stage-overlay > *').forEach(el => observer.observe(el)); // #377: re-place labels when the breadcrumb or shift chip changes size
@@ -204,7 +213,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       dragging.total += Math.abs(dx) + Math.abs(dy); dragging.x = event.clientX; dragging.y = event.clientY;
       const scale = baseSpan * 2 / Math.max(1, container.clientHeight) / zoom;
       if (mode === 'world') pan(dx * .006, dy * .006);
-      else pan((-dx - dy) * scale * .65, (dx - dy) * scale * .65);
+      else { const [x, z] = cityPanDelta(liveMapView(), dx, dy, scale); pan(x, z); }
     };
     const up = (event: PointerEvent) => {
       if (!dragging) return;
@@ -251,6 +260,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
   useEffect(() => { if (selectedNationId && mode === 'world') controls.current?.focusNation(selectedNationId); }, [selectedNationId, nationFocusRevision, mode, nationId, cityName, marketOpen, nationSignature, graphics, visitor, cityPills]);
   useEffect(() => { if (cameraTourNationId && mode === 'world') controls.current?.focusNation(cameraTourNationId, false); }, [cameraTourNationId, mode, nationId, nationSignature, graphics]);
   useEffect(() => { if (selectedLocation && mode === 'city') controls.current?.focus(selectedLocation); }, [selectedLocation, mode, nationId, cityName, graphics]);
+  const nudge = (dir: PanDir) => { const [x, z] = controlPan(liveMapView(), mode, dir); controls.current?.pan(x, z); };
   return <div className={`game-viewport ${className}`} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360 }}>
     <div ref={host} className="viewport-canvas" role="region" aria-label={`${mode === 'city' ? 'City terrain. Drag to pan' : 'Fictional Harimu globe. Drag to rotate'}; scroll to zoom. Arrow keys move the view. Use the location buttons to select with a keyboard.`} tabIndex={0}
       style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360, touchAction: 'none' }}
@@ -258,10 +268,10 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
         if (event.target !== event.currentTarget) return;
         const key = event.key;
         if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', 'Home'].includes(key)) event.preventDefault();
-        if (key === 'ArrowLeft') controls.current?.pan(mode === 'world' ? -.22 : -1, mode === 'world' ? 0 : 1);
-        if (key === 'ArrowRight') controls.current?.pan(mode === 'world' ? .22 : 1, mode === 'world' ? 0 : -1);
-        if (key === 'ArrowUp') controls.current?.pan(mode === 'world' ? 0 : -1, mode === 'world' ? -.15 : -1);
-        if (key === 'ArrowDown') controls.current?.pan(mode === 'world' ? 0 : 1, mode === 'world' ? .15 : 1);
+        if (key === 'ArrowLeft') nudge('left');
+        if (key === 'ArrowRight') nudge('right');
+        if (key === 'ArrowUp') nudge('up');
+        if (key === 'ArrowDown') nudge('down');
         if (key === '+' || key === '=') controls.current?.zoom(.15);
         if (key === '-') controls.current?.zoom(-.15);
         if (key === 'Home') controls.current?.reset();
@@ -274,10 +284,10 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       <span aria-live="polite">{cameraLabel}</span>
       <button type="button" onClick={() => controls.current?.zoom(-.15)} aria-label="Zoom out">−</button>
       <button type="button" onClick={() => controls.current?.reset()}>Centre</button>
-      <button type="button" onClick={() => controls.current?.pan(mode === 'world' ? -.22 : -1, mode === 'world' ? 0 : 1)} aria-label={mode === 'world' ? 'Rotate globe left' : 'Pan left'}>←</button>
-      <button type="button" onClick={() => controls.current?.pan(mode === 'world' ? .22 : 1, mode === 'world' ? 0 : -1)} aria-label={mode === 'world' ? 'Rotate globe right' : 'Pan right'}>→</button>
-      <button type="button" onClick={() => controls.current?.pan(mode === 'world' ? 0 : -1, mode === 'world' ? -.15 : -1)} aria-label={mode === 'world' ? 'Rotate globe up' : 'Pan up'}>↑</button>
-      <button type="button" onClick={() => controls.current?.pan(mode === 'world' ? 0 : 1, mode === 'world' ? .15 : 1)} aria-label={mode === 'world' ? 'Rotate globe down' : 'Pan down'}>↓</button>
+      <button type="button" onClick={() => nudge('left')} aria-label={mode === 'world' ? 'Rotate globe left' : 'Pan left'}>←</button>
+      <button type="button" onClick={() => nudge('right')} aria-label={mode === 'world' ? 'Rotate globe right' : 'Pan right'}>→</button>
+      <button type="button" onClick={() => nudge('up')} aria-label={mode === 'world' ? 'Rotate globe up' : 'Pan up'}>↑</button>
+      <button type="button" onClick={() => nudge('down')} aria-label={mode === 'world' ? 'Rotate globe down' : 'Pan down'}>↓</button>
     </div>
 
 

@@ -24,11 +24,11 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 18);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 19);
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 5);
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 11); // #1028 capture history stays inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 8);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 9);
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
@@ -75,6 +75,10 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_ZONE_LEGEND, 'true');
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_ZONE_LEGEND, 'false');
   assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_ZONE_LEGEND, 'true', 'the client build still inlines the packed zone legend');
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, undefined, 'the phone top-down map is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'true', 'the client build still inlines the packed phone map flag');
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP, undefined, 'the two-tap flag is not its own binding');
   assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP, 'true');
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP, 'false');

@@ -19,6 +19,7 @@
  *  (#970) Korund ration coupons as a stamped booklet, flag off and on (scripts/korund-ration-booklet-check.mjs).
  *  (#1008) Aurelle royal decree as a sealed scroll, flag off and on (scripts/aurelle-sealed-scroll-check.mjs).
  *  (#1009) Kindle Assembly and presidential ballots as a civic form, flag off and on (scripts/kindle-civic-ballot-check.mjs).
+ *  (#1039) Phone map camera is straight down; desktop stays tilted (scripts/mobile-topdown-map-check.mjs).
  *  (#779) Nation fact-list labels never split mid-word (scripts/nation-fact-label-check.mjs).
  *  (#392 S5) World crest chips (scripts/ui-v2-world-check.mjs).
  *  (#392 S3) The UI v2 panel shape, World and City (scripts/ui-v2-panel-check.mjs).
@@ -68,6 +69,7 @@ import { checkTopbarCountdown } from './topbar-countdown-check.mjs';
 import { checkKorundRationBooklet } from './korund-ration-booklet-check.mjs';
 import { checkAurelleSealedScrolls } from './aurelle-sealed-scroll-check.mjs';
 import { checkKindleCivicBallot } from './kindle-civic-ballot-check.mjs';
+import { checkMobileTopdownMap } from './mobile-topdown-map-check.mjs';
 import { checkMobileTwoTap } from './mobile-two-tap-check.mjs';
 import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
@@ -251,6 +253,7 @@ try {
   await checkKorundRationBooklet({ browser, css, preflight, failures, rows }); // #970: Korund ration booklet
   await checkAurelleSealedScrolls({ browser, css, preflight, failures, rows }); // #1008: Aurelle sealed scrolls
   await checkKindleCivicBallot({ browser, css, preflight, failures, rows }); // #1009: Kindle civic ballot
+  await checkMobileTopdownMap({ browser, css, preflight, failures, rows }); // #1039: phone top-down map, desktop unchanged
   await checkMobileTwoTap({ browser, css, preflight, failures, rows }); // #1040: daily-loop actions within two taps on a phone
 } finally { await browser.close(); }
 console.log(rows.join('\n'));

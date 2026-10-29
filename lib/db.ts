@@ -32,6 +32,7 @@ import { aurelleCharterSchemas } from './aurelle-charters';
 import { tesseraRewardSchemas } from './tessera-rewards'; // #465
 import { relocationSupportSchemas } from './relocation-support'; // #470
 import { aurelleFavorIndexes, aurelleSchemas, royalFavorSchemas } from './aurelle';
+import { korundSchemas } from './korund'; // #1033: settlement CREATE, used to relax food_output=4
 import { warSchemas } from './war'; // #309
 import { siegeSchemas } from './siege'; // #419
 import { warCaptureRefusalSchemas } from './war-loss-cap'; // #912
@@ -132,6 +133,20 @@ function databaseBinding() {
   const database = (env as unknown as { DB?: GameDatabase }).DB;
   if (!database) throw new Error('The Harimu database binding is unavailable.');
   return database;
+}
+
+/** #1033: SQLite cannot alter a CHECK. A table still locked to food_output=4 is rebuilt once so a winter yield (at least 1) can settle. */
+async function relaxFoodOutputCheck(database: GameDatabase, table: string, columns: string, createSql: string | undefined) {
+  if (!createSql) return;
+  const row = await database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").bind(table).first<{ sql: string }>();
+  if (!row?.sql || !/food_output(?:"|\b)\s*=\s*4/.test(row.sql)) return;
+  const old = `${table}_yield_old`;
+  await database.batch([
+    database.prepare(`ALTER TABLE ${table} RENAME TO ${old}`),
+    database.prepare(createSql),
+    database.prepare(`INSERT INTO ${table} (${columns}) SELECT ${columns} FROM ${old}`),
+    database.prepare(`DROP TABLE ${old}`),
+  ]);
 }
 
 async function initialize(database: GameDatabase) {
@@ -399,6 +414,8 @@ async function initialize(database: GameDatabase) {
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));
+  await relaxFoodOutputCheck(database, 'korund_settlements', 'shift_id,clerk_user_id,wage_minor,food_output,settled_at', korundSchemas.find(sql => sql.startsWith('CREATE TABLE korund_settlements')));
+  await relaxFoodOutputCheck(database, 'aurelle_settlements', 'shift_id,clerk_user_id,wage_minor,food_output,favor,settled_at', aurelleSchemas.find(sql => sql.startsWith('CREATE TABLE aurelle_settlements')));
   await database.batch(aurelleFavorIndexes.map(sql => database.prepare(sql))); // #616: both tables exist by now (royalFavorSchemas ran in the batch above)
   await database.prepare("INSERT OR IGNORE INTO aurelle_resources(id,initial_food,initial_minor) VALUES ('estate',40,100000)").run();
   await database.prepare("INSERT OR IGNORE INTO world_supply (id,initial_food,unit_minor) VALUES ('kindle-food-supplier',40,100)").run();

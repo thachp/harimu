@@ -157,9 +157,10 @@ export function globePoint(latitude: number, longitude: number, radius = 7): THR
 export function globeFocusRotation(point: THREE.Vector3): { x: number; y: number } {
   return { x: Math.atan2(point.y, Math.hypot(point.x, point.z)), y: -Math.atan2(point.x, point.z) };
 }
-export function globeAnchorVisible(point: THREE.Vector3): boolean {
-  // Hide the back hemisphere and the limb where labels would overlap the globe edge.
-  return point.z / point.length() > .16;
+export function globeAnchorVisible(point: THREE.Vector3, facing: 'z' | 'y' = 'z'): boolean {
+  // Hide the back hemisphere and the limb where labels would overlap the globe edge. #1039: overhead view faces +Y.
+  const axis = facing === 'y' ? point.y : point.z;
+  return axis / point.length() > .16;
 }
 /** Each nation's latitude/longitude comes from lib/globe-mapping.ts (nationGlobeCoordinates), the same mapping the Ownership overlay uses. */
 export function createRegionWorld(nations: readonly { id: string; name?: string; color?: string; latitude: number; longitude: number }[] = []): WorldArt {
@@ -206,6 +207,7 @@ export function createRegionWorld(nations: readonly { id: string; name?: string;
   const planet = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map: texture, roughness: .84 }));
   group.add(planet);
   const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(7.13, 64, 48), new THREE.MeshBasicMaterial({ color: '#78bfdc', transparent: true, opacity: .09, side: THREE.BackSide, depthWrite: false }));
+  atmosphere.name = 'atmosphere'; // #1039: hidden on the phone top-down view
   group.add(atmosphere);
   const selectables: THREE.Object3D[] = [];
   nations.forEach(nation => {
