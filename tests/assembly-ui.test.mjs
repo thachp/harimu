@@ -13,9 +13,11 @@ const copy = await rt.importModule('lib/assembly-copy.ts'), rules = await rt.imp
 const compile = async file => ts.transpileModule(await readFile(new URL(`../app/${file}`, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const load = async (file, shims) => { const exports = {}; new Function('exports', 'require', await compile(file))(exports, name => shims[name] ?? require(name)); return exports; };
 const actions = await load('action-button.tsx', {}), tags = await load('ai-disclosure.tsx', {});
+const civic = await load('kindle-civic-ballot.tsx', {});
 const panel = (await load('assembly-ballot.tsx', {
   '../lib/assembly-copy': copy, './action-button': actions, './ai-disclosure': tags, './game-timer': { GameTimer: ({ label }) => React.createElement('span', null, label) },
   './session-retry': await load('session-retry.tsx', {}), './nation-document': { NationDocument: ({ label, children }) => React.createElement('section', { 'aria-label': label }, children) },
+  './kindle-civic-ballot': civic,
 })).AssemblyPanel;
 const base = () => ({ enabled: true, nationId: 'kindle', id: 'kindle-assembly-account-poc-1', scope: 'preview-citizen', status: 'open', opensAt: 1, closesAt: 2000000000, seats: { perDistrict: 6, up: 3 },
   districts: [], parties: parties.map(p => ({ id: p.id, name: p.name, ideology: p.ideology, color: p.color, blurb: p.blurb, ai: true })), yourDistrict: { id: 'forgehaven', name: 'Forgehaven' }, voted: false, privacyReady: true, privacyReason: '', result: null, headlines: [] });

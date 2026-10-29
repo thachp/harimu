@@ -17,6 +17,7 @@
  *  (#800) Rare resource node marker on the Resources overlay, flag off and on (scripts/rare-marker-check.mjs).
  *  (#969) Top-bar countdown to the next scheduled event, flag off and on (scripts/topbar-countdown-check.mjs).
  *  (#970) Korund ration coupons as a stamped booklet, flag off and on (scripts/korund-ration-booklet-check.mjs).
+ *  (#1009) Kindle Assembly and presidential ballots as a civic form, flag off and on (scripts/kindle-civic-ballot-check.mjs).
  *  (#779) Nation fact-list labels never split mid-word (scripts/nation-fact-label-check.mjs).
  *  (#392 S5) World crest chips (scripts/ui-v2-world-check.mjs).
  *  (#392 S3) The UI v2 panel shape, World and City (scripts/ui-v2-panel-check.mjs).
@@ -64,6 +65,7 @@ import { checkVisitorWording } from './visitor-wording-check.mjs';
 import { checkGlobeLabelPressed } from './globe-label-pressed-check.mjs';
 import { checkTopbarCountdown } from './topbar-countdown-check.mjs';
 import { checkKorundRationBooklet } from './korund-ration-booklet-check.mjs';
+import { checkKindleCivicBallot } from './kindle-civic-ballot-check.mjs';
 import { checkMapOverlays } from './map-overlays-layout-check.mjs';
 import { faithState, congregationState } from './faith-ui-fixtures.mjs';
 import { fontsBeforeShots } from './layout-standalone.mjs';
@@ -244,6 +246,7 @@ try {
   await checkVisitorWording({ browser, css, preflight, failures, rows }); // #379: visitor wording (VISITOR PREVIEW, Household) and guide/pin text fit
   await checkTopbarCountdown({ browser, css, preflight, failures, rows }); // #969: countdown beside the world clock
   await checkKorundRationBooklet({ browser, css, preflight, failures, rows }); // #970: Korund ration booklet
+  await checkKindleCivicBallot({ browser, css, preflight, failures, rows }); // #1009: Kindle civic ballot
 } finally { await browser.close(); }
 console.log(rows.join('\n'));
 if (failures.length) { console.error(`\nHUD layout check FAILED:\n${failures.join('\n')}`); process.exit(1); }

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { expandFlagPacks, flagOn, flagValue } from '../lib/flag-pack.mjs';
+import { expandFlagPacks, flagOn, flagValue, varsForProcessEnv } from '../lib/flag-pack.mjs';
 import { armiesEnabled } from '../lib/army-rules.ts';
 import { dashboardManagedVars } from '../scripts/wrangler-pin.mjs';
 
@@ -48,4 +48,9 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_AURELLE_TSR_VIEW_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_AURELLE_TSR_VIEW_ENABLED, 'false');
   assert.equal('HARIMU_AURELLE_PACK' in expandFlagPacks(preview.vars), false);
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, undefined, 'the civic-ballot flag is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, 'true', 'the client build still inlines the packed flag');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT: 'false' }).NEXT_PUBLIC_HARIMU_KINDLE_CIVIC_BALLOT, 'false', 'a direct string wins');
 });

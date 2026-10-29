@@ -7,6 +7,7 @@ import { AiBadge } from './ai-disclosure';
 import { ActionButton } from './action-button';
 import { SessionRetry, useLoadRetry } from './session-retry';
 import { GameTimer } from './game-timer';
+import { KindleCivicChoice, KindleCivicField, KindleCivicReview, kindleCivicBallotEnabled } from './kindle-civic-ballot';
 
 type Snapshot = AssemblySnapshot & { eligibility?: { eligible: boolean; reason: string }; error?: string };
 
@@ -23,12 +24,19 @@ export function AssemblyPanel({ snapshot, selected, onSelect, onVote, reason, er
     {snapshot.status === 'waiting' && <p>Voting has not opened yet.</p>}
     {snapshot.status === 'open' && snapshot.closesAt !== null && <GameTimer endsAt={snapshot.closesAt * 1000} label="Voting closes" />}
     {snapshot.voted && <p className="i-voted" role="status">I Voted · your receipt is recorded.</p>}
-    {snapshot.status === 'open' && !snapshot.voted && <form onSubmit={event => { event.preventDefault(); if (!reason && selected) onVote(); }}>
+    {snapshot.status === 'open' && !snapshot.voted && (kindleCivicBallotEnabled() ? <form className="kindle-civic-ballot" onSubmit={event => { event.preventDefault(); if (!reason && selected) onVote(); }}>
+      <KindleCivicField n={1} legend="Pick one party list">
+        {snapshot.parties.map(party => <KindleCivicChoice key={party.id} name="assembly-party" value={party.id} checked={selected === party.id} onChange={() => onSelect(party.id)}>{party.name}</KindleCivicChoice>)}
+      </KindleCivicField>
+      <KindleCivicReview n={2} summary={selected ? name(selected) : 'Pick one party list.'}>
+        <ActionButton type="submit" reason={reason ?? (selected ? null : 'Pick one party list.')}>Cast ballot</ActionButton>
+      </KindleCivicReview>
+    </form> : <form onSubmit={event => { event.preventDefault(); if (!reason && selected) onVote(); }}>
       <fieldset><legend>Pick one party list</legend>
         {snapshot.parties.map(party => <label key={party.id}><input type="radio" name="assembly-party" value={party.id} checked={selected === party.id} onChange={() => onSelect(party.id)} /> {party.name}</label>)}
       </fieldset>
       <ActionButton type="submit" reason={reason ?? (selected ? null : 'Pick one party list.')}>Cast ballot</ActionButton>
-    </form>}
+    </form>)}
     {error && <p role="alert">{error}</p>}
     {snapshot.status === 'closed' && result && <section aria-label="Published Assembly count">
       <p>{resultsCaption.humanVotesOnly.text} {resultsCaption.districtCounts.text}</p>
