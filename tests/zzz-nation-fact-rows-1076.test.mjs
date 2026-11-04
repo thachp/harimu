@@ -26,7 +26,7 @@ const panel = async factRows => {
 const statsOf = html => {
   const block = html.match(/<dl class="(panel-v2-stats[^"]*)">([\s\S]*?)<\/dl>/);
   assert.ok(block, 'header fact list is a dl');
-  const pairs = [...block[2].matchAll(/<dt>([^<]*)<\/dt><dd>([^<]*)<\/dd>/g)].map(m => [m[1], m[2]]);
+  const pairs = [...block[2].matchAll(/<dt>(?:<span class="panel-v2-icon" aria-hidden="true">[\s\S]*?<\/span>)?([^<]*)<\/dt><dd>([^<]*)<\/dd>/g)].map(m => [m[1], m[2]]);
   const icons = [...block[2].matchAll(/<span class="panel-v2-icon" aria-hidden="true">/g)].length;
   return { className: block[1], pairs, icons, html: block[2] };
 };
@@ -42,10 +42,10 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK, previe
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 16);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 17);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), /NEXT_PUBLIC_HARIMU_NATION_FACT_ROWS/);
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), /NEXT_PUBLIC_HARIMU_NATION_FACT_ROWS/);
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 16/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 17/);
 });
 
 test('flag on: four real rows for all ten nations; flag off: Capital and Currency; icons are aria-hidden', async () => {
@@ -59,6 +59,8 @@ test('flag on: four real rows for all ten nations; flag off: Capital and Currenc
     assert.equal(on.className, 'panel-v2-stats panel-v2-facts', nation.id);
     assert.deepEqual(on.pairs, [['Capital', nation.capital], ['Government', nation.government], ['Economy', nation.economy], ['Currency', shown]], nation.id);
     assert.equal(on.icons, 4, nation.id);
+    assert.match(on.html, /<dt><span class="panel-v2-icon" aria-hidden="true">/, `${nation.id}: the icon sits inside the dt`);
+    assert.doesNotMatch(on.html, /<div><span class="panel-v2-icon"/, `${nation.id}: the icon is not a sibling of the dt`);
     assert.equal(off.className, 'panel-v2-stats', nation.id);
     assert.deepEqual(off.pairs, [['Capital', nation.capital], ['Currency', shown]], nation.id);
     assert.equal(off.icons, 0, nation.id);
