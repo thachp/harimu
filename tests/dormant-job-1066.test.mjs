@@ -99,21 +99,18 @@ const welcomeHtml = async (data, nationId = 'kindle') => {
 };
 
 for (const backend of ['sqlite', 'postgres']) {
-  test(`${backend}: shield without a job, a settled shift, a second absence, and the request cooldown`, async t => {
+  test(`${backend}: a Dormant return can pay the Savings Shield without a job, and then there is no job-released line`, async t => {
     const r = await localRuntime({ backend }); t.after(() => r.close());
     r.setDormancy(true);
     r.setFixtureEnv('HARIMU_SAVINGS_SHIELD_ENABLED', 'true');
     r.setFixtureEnv('HARIMU_ACCOUNT_ELECTION_POC_ENABLED', 'true');
     r.setFixtureEnv('NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW', 'true');
-    const now = Math.floor(r.now / 1000);
-    const release = async (at) => (await r.importModule('lib/dormant-job.ts')).releaseDormantJobs(r.db, at);
-    const jobs = async (user) => (await r.db.prepare('SELECT job_id FROM dormant_job_releases WHERE clerk_user_id=? ORDER BY released_at, absence_key').bind(user).all()).results.map(row => row.job_id);
-    // (1) A paid Savings Shield with no job does not set jobReleased.
+    await r.call('citizen', 'alice');
     await r.db.prepare('DELETE FROM work_shifts').run();
     await r.db.prepare('DELETE FROM korund_job_assignments').run();
+    const now = Math.floor(r.now / 1000), last = now - 40 * D;
     await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','fixture-cash',-1,?,1)").bind(randomUUID(), 'alice', 10000).run();
     await r.db.prepare("UPDATE economy_funds SET initial_minor = 100000 WHERE id = 'kindle-treasury'").run();
-    const last = now - 40 * D;
     await r.db.prepare("INSERT INTO spark_issuances VALUES ('spark-seed','spark-seed',1,'seed',0,100000,0,100000,'Reserve Board',?,NULL)").bind(last - 3600).run();
     await r.db.prepare("INSERT INTO spark_issuances VALUES ('i1','i1',2,'emergency',1000,10000,100000,110000,'Reserve Board',?,'spark-seed')").bind(last + D).run();
     await r.db.prepare('UPDATE citizens SET last_active_at=? WHERE clerk_user_id=?').bind(iso(last), 'alice').run();
@@ -122,42 +119,89 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal(back.data.welcomeBack.status, 'dormant');
     assert.ok(back.data.welcomeBack.shield.creditMinor > 0, 'the shield paid');
     assert.equal(back.data.welcomeBack.jobReleased, undefined);
-    assert.deepEqual(await jobs('alice'), []);
+    assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM dormant_job_releases').first()).n), 0);
     const html = await welcomeHtml(back.data.welcomeBack);
     assert.match(html, /not counted in quorums/);
     assert.doesNotMatch(html, /Your job slot was released|job board|Labor Bureau|chartered markets/);
-    // (2) A settled unclaimed shift of a 31-day citizen keeps its row and its settlement.
-    await r.db.prepare("INSERT INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at) VALUES ('shift-settled','bob','harvest','Harvest','food',4,?,?)").bind(iso(now), iso(now)).run();
-    await r.db.prepare("INSERT INTO shift_settlements (shift_id,clerk_user_id,wage_minor,item,quantity,settled_at) VALUES ('shift-settled','bob',800,'food',4,?)").bind(iso(now)).run();
-    await r.db.prepare('UPDATE citizens SET last_active_at=? WHERE clerk_user_id=?').bind(iso(now - 31 * D), 'bob').run();
-    await release(now);
-    assert.equal((await r.db.prepare("SELECT claimed_at FROM work_shifts WHERE id='shift-settled'").first()).claimed_at, null);
-    assert.equal(Number((await r.db.prepare("SELECT wage_minor FROM shift_settlements WHERE shift_id='shift-settled'").first()).wage_minor), 800);
-    // (3) Released, then dormant again with no new assignment: the old job is not recorded twice. Re-assigned, then dormant again: only the new assignment, once.
-    await r.db.prepare("INSERT INTO korund_job_assignments (id,clerk_user_id,job_id,outcome,reasons,assigned_at) VALUES ('job-old','alice','korund-plan-clerk','first-choice','[]',?)").bind(now - 50 * D).run();
-    await r.db.prepare('UPDATE citizens SET last_active_at=? WHERE clerk_user_id=?').bind(iso(now - 40 * D), 'alice').run();
-    await release(now);
-    assert.deepEqual(await jobs('alice'), ['korund-plan-clerk']);
-    await r.db.prepare('UPDATE citizens SET last_active_at=? WHERE clerk_user_id=?').bind(iso(now), 'alice').run();
-    await release(now + 31 * D);
-    assert.deepEqual(await jobs('alice'), ['korund-plan-clerk'], 'the old released assignment is not recorded a second time');
-    const backAt = now + 31 * D;
-    await r.db.prepare('UPDATE citizens SET last_active_at=? WHERE clerk_user_id=?').bind(iso(backAt), 'alice').run();
-    await r.db.prepare("INSERT INTO korund_job_assignments (id,clerk_user_id,job_id,outcome,reasons,assigned_at) VALUES ('job-new','alice','korund-quarry-gang','first-choice','[]',?)").bind(backAt).run();
-    await release(backAt + 31 * D);
-    await release(backAt + 31 * D);
-    assert.deepEqual(await jobs('alice'), ['korund-plan-clerk', 'korund-quarry-gang']);
-    // A released assignment does not keep the 30-day request clock.
-    await r.db.prepare('UPDATE korund_job_assignments SET assigned_at=? WHERE id=?').bind(now - 5 * D, 'job-old').run();
-    await r.db.prepare("INSERT INTO korund_job_preferences (clerk_user_id,first_job,second_job,third_job,filed_at) VALUES ('bob','korund-food-production','korund-quarry-gang','korund-foundry-hand',?)").bind(now).run();
-    await r.db.prepare("INSERT INTO korund_job_assignments (id,clerk_user_id,job_id,outcome,reasons,assigned_at) VALUES ('job-bob','bob','korund-plan-clerk','first-choice','[]',?)").bind(now - 5 * D).run();
-    await release(now);
-    const bureau = await r.importModule('lib/labor-bureau.ts');
-    const view = await bureau.readBureau(r.db, 'bob', now);
+  });
+
+  test(`${backend}: a settled unclaimed shift is left in place while an unsettled job is released`, async t => {
+    const w = await setup(t, { backend });
+    await w.seen('alice', 31);
+    await w.r.db.prepare("INSERT INTO shift_settlements (shift_id,clerk_user_id,wage_minor,item,quantity,settled_at) VALUES ('shift-alice','alice',800,'food',4,?)").bind(iso(w.now)).run();
+    const read = await w.read();
+    assert.equal(read.status, 200, JSON.stringify(read.data));
+    const shift = await w.r.db.prepare("SELECT claimed_at FROM work_shifts WHERE id='shift-alice'").first();
+    assert.equal(shift?.claimed_at ?? null, null, 'the settled shift row stays');
+    assert.equal(Number((await w.r.db.prepare("SELECT wage_minor FROM shift_settlements WHERE shift_id='shift-alice'").first()).wage_minor), 800);
+    assert.equal((await w.bureau('alice')).assignment, null, 'the bureau seat still released, so the batch committed');
+  });
+
+  test(`${backend}: a second absence releases only a new assignment, and an old released assignment is not recorded again`, async t => {
+    const w = await setup(t, { backend });
+    await w.r.db.prepare("DELETE FROM work_shifts WHERE clerk_user_id='alice'").run();
+    await w.seen('alice', 40);
+    assert.equal((await w.read()).status, 200);
+    const jobs = async () => (await w.r.db.prepare("SELECT job_id FROM dormant_job_releases WHERE clerk_user_id='alice' ORDER BY released_at, absence_key").all()).results.map(row => row.job_id);
+    assert.deepEqual(await jobs(), ['korund-plan-clerk']);
+    await w.r.db.prepare('UPDATE citizens SET last_active_at=? WHERE clerk_user_id=?').bind(iso(w.now), 'alice').run();
+    w.r.setNow(w.r.now + 31 * D * 1000);
+    assert.equal((await w.read()).status, 200);
+    assert.deepEqual(await jobs(), ['korund-plan-clerk'], 'dormant again with no new assignment: the old one is not recorded again');
+    const backAt = Math.floor(w.r.now / 1000);
+    await w.r.db.prepare('UPDATE citizens SET last_active_at=? WHERE clerk_user_id=?').bind(iso(backAt), 'alice').run();
+    await w.r.db.prepare("INSERT INTO korund_job_assignments (id,clerk_user_id,job_id,outcome,reasons,assigned_at) VALUES ('job-alice-2','alice','korund-quarry-gang','first-choice','[]',?)").bind(backAt).run();
+    w.r.setNow(w.r.now + 31 * D * 1000);
+    assert.equal((await w.read()).status, 200);
+    assert.deepEqual(await jobs(), ['korund-plan-clerk', 'korund-quarry-gang']);
+    assert.equal((await w.read()).status, 200);
+    assert.deepEqual(await jobs(), ['korund-plan-clerk', 'korund-quarry-gang'], 'the new assignment is released once');
+  });
+
+  test(`${backend}: a released assignment does not keep the request cooldown`, async t => {
+    const w = await setup(t, { backend });
+    await w.r.db.prepare("DELETE FROM work_shifts WHERE clerk_user_id='bob'").run();
+    await w.r.db.prepare("INSERT INTO korund_job_assignments (id,clerk_user_id,job_id,outcome,reasons,assigned_at) VALUES ('job-bob','bob','korund-plan-clerk','first-choice','[]',?)").bind(w.now - 5 * D).run();
+    await w.seen('bob', 31);
+    await w.r.db.prepare("INSERT INTO korund_job_preferences (clerk_user_id,first_job,second_job,third_job,filed_at) VALUES ('bob','korund-food-production','korund-quarry-gang','korund-foundry-hand',?)").bind(w.now).run();
+    assert.equal((await w.read()).status, 200);
+    assert.equal((await w.r.db.prepare("SELECT job_id FROM dormant_job_releases WHERE clerk_user_id='bob'").first()).job_id, 'korund-plan-clerk', "bob's own release row");
+    const bureau = await w.r.importModule('lib/labor-bureau.ts');
+    const view = await bureau.readBureau(w.r.db, 'bob', w.now);
     assert.equal(view.assignment, null);
     assert.equal(view.nextRequestAt, null);
     assert.equal(view.canRequest, true);
-    assert.equal((await bureau.requestAssignment(r.db, 'bob', randomUUID(), now)).status, 200);
+    assert.equal((await bureau.requestAssignment(w.r.db, 'bob', randomUUID(), w.now)).status, 200);
+  });
+
+  test(`${backend}: a claimed shift is not an open job`, async t => {
+    const w = await setup(t, { backend });
+    await w.r.db.prepare("DELETE FROM korund_job_assignments WHERE clerk_user_id='alice'").run();
+    await w.r.db.prepare('UPDATE work_shifts SET claimed_at=? WHERE id=?').bind(iso(w.now), 'shift-alice').run();
+    await w.seen('alice', 31);
+    assert.equal((await w.read()).status, 200);
+    assert.ok(await w.r.db.prepare("SELECT id FROM work_shifts WHERE id='shift-alice'").first(), 'the claimed shift stays');
+    assert.equal(await w.r.db.prepare("SELECT job_id FROM dormant_job_releases WHERE clerk_user_id='alice'").first(), null);
+  });
+
+  test(`${backend}: the release records the newest assignment, not the oldest`, async t => {
+    const w = await setup(t, { backend });
+    await w.r.db.prepare("DELETE FROM work_shifts WHERE clerk_user_id='alice'").run();
+    await w.r.db.prepare("INSERT INTO korund_job_assignments (id,clerk_user_id,job_id,outcome,reasons,assigned_at) VALUES ('job-newer','alice','korund-quarry-gang','first-choice','[]',?)").bind(w.now - 10 * D).run();
+    await w.seen('alice', 40);
+    assert.equal((await w.read()).status, 200);
+    assert.equal((await w.r.db.prepare("SELECT job_id FROM dormant_job_releases WHERE clerk_user_id='alice'").first()).job_id, 'korund-quarry-gang');
+  });
+
+  test(`${backend}: a Korund-settled unclaimed shift is left in place`, async t => {
+    const w = await setup(t, { backend });
+    await w.seen('alice', 31);
+    await w.r.db.prepare("INSERT INTO korund_settlements (shift_id,clerk_user_id,wage_minor,food_output,settled_at) VALUES ('shift-alice','alice',800,4,?)").bind(w.now).run();
+    const read = await w.read();
+    assert.equal(read.status, 200, JSON.stringify(read.data));
+    assert.ok(await w.r.db.prepare("SELECT id FROM work_shifts WHERE id='shift-alice'").first());
+    assert.equal(Number((await w.r.db.prepare("SELECT wage_minor FROM korund_settlements WHERE shift_id='shift-alice'").first()).wage_minor), 800);
+    assert.equal((await w.bureau('alice')).assignment, null);
   });
 }
 
