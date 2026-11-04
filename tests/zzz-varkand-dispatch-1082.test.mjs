@@ -1,5 +1,5 @@
-/** #1082: Varkand Alert Level banner and stamped dispatches. The nation read has no stored level (#1081 is not on dev);
- *  a fixture supplies alertLevel, and a missing field is Green. Flag off and other nations stay as they are.
+/** #1082: Varkand Alert Level banner and stamped dispatches. The stored level reaches the nation read through GET /api/world (#1081,
+ *  tests/varkand-alert-1081.test.mjs); here a fixture supplies alertLevel, and a missing field is Green. Flag off and other nations stay as they are.
  *  The zz- prefix keeps this file last so --test-shard does not move earlier files between Postgres shards. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,10 +43,10 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK, previe
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 17);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 18);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), /NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH/);
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), /NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH/);
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 17/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 18/);
   const outside = dashboardManagedVars.filter(name => !(name in preview.vars));
   const previewTotal = Object.keys(preview.vars).length + outside.length + 2;
   assert.ok(127 - previewTotal >= 3, `preview headroom ${127 - previewTotal} is under 3`);
