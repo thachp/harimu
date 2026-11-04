@@ -1,5 +1,5 @@
-/** #1082: Varkand Alert Level banner and stamped dispatches. The nation read has no stored level (#1081 is not on dev);
- *  a fixture supplies alertLevel, and a missing field is Green. Flag off and other nations stay as they are.
+/** #1082: Varkand Alert Level banner and stamped dispatches. The stored level reaches the nation read through GET /api/world (#1081,
+ *  tests/varkand-alert-1081.test.mjs); here a fixture supplies alertLevel, and a missing field is Green. Flag off and other nations stay as they are.
  *  The zz- prefix keeps this file last so --test-shard does not move earlier files between Postgres shards. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
