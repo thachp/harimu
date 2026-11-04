@@ -7,7 +7,8 @@ import {cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,city
 import {spaWcBonusEnabled,spaWcNote} from '@/lib/spa-recovery'; // #798
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
-import {latestCityCapture} from '@/lib/city-capture-history'; // #1028
+import {cityTreatyReturn,latestCityCapture} from '@/lib/city-capture-history'; // #1028, #1078
+import {peaceRevertEnabled} from '@/lib/war-peace-revert'; // #1078 same flag as #1054
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
 import {seaLanesStormNote} from '@/lib/game-season'; // #1034
 import {seasonAt} from '@/lib/season-yield'; // #1035 shared season: null without a clock
@@ -81,9 +82,12 @@ export async function POST(request:Request){
  return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads}));
 }
 const spaField=(nationId:string,homeCityId:string,currentCityId:string)=>spaWcBonusEnabled(env)&&cityForNation(nationId,homeCityId)?.spa&&currentCityId===homeCityId?{spaWcNote}:{};
-/** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads. */
+/** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads.
+ *  #1078: HARIMU_WAR_PEACE_REVERT_ENABLED off does not read city_treaty_returns, so the history object stays the capture alone. */
 async function cityReads(db:Awaited<ReturnType<typeof getDatabase>>,userId:string,nationId:string,cityId:string,now:number){
  if(!flagOn(env,'HARIMU_CITY_CAPTURE_HISTORY_ENABLED'))return {presence:await cityPresence(db,nationId,now),coResidents:await cityCoResidents(db,userId,nationId,cityId,now)};
  const [presence,coResidents,captureHistory]=await Promise.all([cityPresence(db,nationId,now),cityCoResidents(db,userId,nationId,cityId,now),latestCityCapture(db,nationId,cityId)]);
- return {presence,coResidents,...(captureHistory?{captureHistory}:{})};
+ if(!captureHistory||!peaceRevertEnabled(env))return {presence,coResidents,...(captureHistory?{captureHistory}:{})};
+ const treatyReturn=await cityTreatyReturn(db,nationId,cityId);
+ return {presence,coResidents,captureHistory:treatyReturn?{...captureHistory,treatyReturn}:captureHistory};
 }
