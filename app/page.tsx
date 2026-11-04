@@ -65,6 +65,7 @@ import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type Aurel
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction, type GrayCommand } from './korund-plan-panel';
 import { nationPlanPanelNation } from '@/lib/nation-panels';
 import { GovernmentPanel } from './government-panel';
+import { BallotStatus } from './veldwood-ballot-booklet'; // #1088
 import { VarkandAlertBanner } from './varkand-dispatch';
 import { FoundingBanner } from './founding-banner'; // #612
 import { SiegePanel } from './siege-panel'; // #620
@@ -131,7 +132,7 @@ type Nation = {
   position: { x: number; y: number };
   /** #81: band only (server never sends counts). Absent in the static fallback. */
   populationBand?: PopulationBand;
-  /** #1082: optional Alert Level on the Varkand nation read (#1081). The static record does not carry one. */
+  /** #1082/#1081: Alert Level on the Varkand nation read from GET /api/world (stored level, flag HARIMU_VARKAND_ALERT_ENABLED). The static record does not carry one. */
   alertLevel?: 'green' | 'amber' | 'red';
 };
 
@@ -1818,7 +1819,7 @@ export default function Home() {
         {citizenNation.id==='kindle'&&simulation?.reserve&&<ReserveBoardLine reserve={simulation.reserve}/>}
         {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={`aurelle-rising:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={`petitions:${citizenSessionKey}`} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
-        <p>{citizenNation.id==='kindle'&&clerkConfigured?'Kindle’s preview ballot status is shown above. Protests and broader public-opinion systems are planned.':'This location has no counted ballot. Protests and broader public-opinion systems are planned under each nation’s rules.'}</p>
+        <BallotStatus nationId={citizenNation.id} kindleAccount={clerkConfigured} />
       </>}
     </>}
   </section>;
