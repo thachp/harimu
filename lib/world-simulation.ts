@@ -31,6 +31,7 @@ import { readReserveBoard, type ReserveBoard } from './spark-supply'; // #431
 import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 import { korundRationCutCities, korundRationRecoveryCities, korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from './korund-coupons'; // #967, #983
+import { nextDividendDayAt } from './veldwood-wallet-dividend.ts'; // #1063
 
 export const tickSeconds = 7200;
 export const maximumCatchupTicks = 3;
@@ -65,6 +66,8 @@ export type WorldClock = {
   compression: 12; epochSeconds: number; nowSeconds: number; gameDay: number;
   latestTick: number; pendingTicks: number; cadenceSeconds: number;
   mode: 'request-driven durable simulation';
+  /** #1063: next Veldwood Dividend Day, unix seconds. Derived from the epoch. Absent when the clock is not a safe integer. */
+  dividendDayAt?: number;
 };
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
@@ -215,8 +218,10 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
   ]);
   const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
   const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
+  const dividendDayAt = nextDividendDayAt(epoch, now);
   return {clock:{compression:12,epochSeconds:epoch,nowSeconds:now,gameDay:Math.floor(Math.max(0,now-epoch)*12/86400)+1,
-    latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation'},
+    latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation',
+    ...(dividendDayAt == null ? {} : { dividendDayAt })},
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
     supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};

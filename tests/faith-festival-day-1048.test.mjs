@@ -18,7 +18,7 @@ new Function('exports', 'require', await jsx('../app/game-shell.tsx'))(shell, (n
   if (name === 'react') return react;
   if (name === '@phosphor-icons/react') return new Proxy({}, { get: (_, key) => String(key) });
   if (name.endsWith('.css')) return {};
-  if (name === './game-settings' || name === './game-viewport' || name === './nation-crest' || name === './nation-symbol' || name === './topbar-countdown' || name === './korund-wallet-rations') return { GameSettings: blank, default: blank, NationCrest: blank, NationSymbol: blank, TopbarCountdown: blank, KorundWalletRations: blank };
+  if (name === './game-settings' || name === './game-viewport' || name === './nation-crest' || name === './nation-symbol' || name === './topbar-countdown' || name === './korund-wallet-rations' || name === './veldwood-wallet-dividend') return { GameSettings: blank, default: blank, NationCrest: blank, NationSymbol: blank, TopbarCountdown: blank, KorundWalletRations: blank, VeldwoodWalletDividend: blank };
   if (name.startsWith('@/')) return require(`../${name.slice(2)}.ts`);
   return require(name);
 });
