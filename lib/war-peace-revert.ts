@@ -88,19 +88,19 @@ async function squaresToReturn(db: GameDatabase, warId: string, alsoCeded: reado
   return moves;
 }
 
-type ReturnedCity = { capture_id: string; city_key: string; x: number; y: number; from_nation: string };
-/** One history row per capture that had a square in `moves` (ceded and heartland squares are already absent). A second finish inserts nothing. */
+type ReturnedCity = { capture_id: string; city_key: string; x: number; y: number };
+/** One history row per capture that had a square in `moves`. `returned_to` is the nation that move restores (the earliest holder), which can differ from a later capture's from_nation. A second finish inserts nothing. */
 async function returnedCities(db: GameDatabase, warId: string, moves: readonly Hit[]) {
   if (!moves.length) return [];
-  const rows = (await db.prepare(`SELECT c.id AS capture_id, s.city_key AS city_key, q.x AS x, q.y AS y, q.from_nation AS from_nation
+  const rows = (await db.prepare(`SELECT c.id AS capture_id, s.city_key AS city_key, q.x AS x, q.y AS y
     FROM city_captures c JOIN city_sieges s ON s.id=c.siege_id JOIN city_capture_squares q ON q.capture_id=c.id
     WHERE c.war_id=? ORDER BY c.id, q.x, q.y`).bind(warId).all<ReturnedCity>().catch(none([] as ReturnedCity[]))).results;
-  const moved = new Set(moves.map(hit => `${hit.x},${hit.y}`));
+  const restored = new Map(moves.map(hit => [`${hit.x},${hit.y}`, hit.from_nation]));
   const cities = new Map<string, { capture_id: string; city_key: string; from_nation: string }>();
   for (const row of rows) {
-    const id = String(row.capture_id);
-    if (!moved.has(`${Number(row.x)},${Number(row.y)}`) || cities.has(id)) continue;
-    cities.set(id, { capture_id: id, city_key: String(row.city_key), from_nation: String(row.from_nation) });
+    const id = String(row.capture_id), owner = restored.get(`${Number(row.x)},${Number(row.y)}`);
+    if (!owner || cities.has(id)) continue;
+    cities.set(id, { capture_id: id, city_key: String(row.city_key), from_nation: owner });
   }
   return [...cities.values()];
 }

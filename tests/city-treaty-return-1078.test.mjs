@@ -9,10 +9,11 @@ const SECRET = 'a-very-long-server-only-secret';
 const read = file => readFileSync(file, 'utf8');
 const day = at => new Date(at * 1000).toISOString().slice(0, 10);
 
-test('migration 0116, both trees, after 0112 (#1068), 0114 (dev) and 0115 (#1071)', () => {
-  assert.equal(existsSync('db/postgres/0116_city_treaty_returns.sql'), true);
-  assert.equal(existsSync('drizzle/0116_city_treaty_returns.sql'), true);
-  assert.equal(existsSync('db/postgres/0115_city_treaty_returns.sql'), false);
+test('migration 0117, both trees; 0116 is open PR #1068 and 0115 is #1071', () => {
+  assert.equal(existsSync('db/postgres/0117_city_treaty_returns.sql'), true);
+  assert.equal(existsSync('drizzle/0117_city_treaty_returns.sql'), true);
+  assert.equal(existsSync('db/postgres/0116_city_treaty_returns.sql'), false, '0116 is #1068');
+  assert.equal(existsSync('drizzle/0116_city_treaty_returns.sql'), false, '0116 is #1068');
   assert.match(read('app/api/city/route.ts'), /peaceRevertEnabled/);
   assert.match(read('app/scene-panels-v2.tsx'), /treatyReturnLine/);
 });
@@ -104,6 +105,16 @@ test('treaty adds one return; ceded, surrender, re-run, and flag off add none; t
   assert.equal(offEnd.war.endKind, 'treaty');
   assert.deepEqual(await c.rows(war.id), [], 'flag off adds none');
   assert.equal(flagOff.some(sql => /city_treaty_returns/.test(sql)), false);
+
+  // Captured twice: the city row says Korund, and the revert restores the earlier holder, Aurelle.
+  war = await openWar(c); at = c.nowS();
+  await c.run('INSERT INTO war_frontier_transfers (id,war_id,battle_key,request_id,x,y,from_nation,to_nation,transferred_at) VALUES (?,?,?,?,?,?,?,?,?)', 'wft-twice', war.id, 'b-twice', 'req-twice', c.squares.siege.x, c.squares.siege.y, 'aurelle', 'korund', at - 10);
+  await seize(c, { warId: war.id, id: 'cap-twice', square: c.squares.siege, from: 'korund', to: 'kindle', at, city: 'twice-ford' });
+  await c.command({ action: 'propose-end', nation: 'korund', role: 'Chairman', warId: war.id, kind: 'peace' });
+  const twice = await c.command({ action: 'accept-end', nation: 'kindle', role: 'President', warId: war.id }, { peaceRevert: true });
+  assert.equal(twice.ok, true, JSON.stringify(twice));
+  assert.equal((await c.rows(war.id))[0].returned_to, 'aurelle', 'the return names the nation the revert restored');
+  assert.equal((await c.r.db.prepare('SELECT owner FROM world_squares WHERE x=? AND y=?').bind(c.squares.siege.x, c.squares.siege.y).first()).owner, 'aurelle');
 });
 
 test('CitySummary shows the capture line, then returned to X by treaty', async () => {
