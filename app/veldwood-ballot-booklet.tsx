@@ -5,8 +5,13 @@ import { NationCrest } from './nation-crest';
 
 /** #1088: Veldwood ballots as a wood-grain Ballot Booklet (docs §23.2). Build flag
  *  NEXT_PUBLIC_HARIMU_VELDWOOD_BALLOT_BOOKLET ("true" in preview, "false" in production),
- *  carried in HARIMU_UI_PACK. Only the exact string "true" enables it. No new ballot data. */
-export function veldwoodBallotBookletEnabled(value: string | undefined = process.env.NEXT_PUBLIC_HARIMU_VELDWOOD_BALLOT_BOOKLET): boolean {
+ *  carried in HARIMU_UI_PACK. Only the exact string "true" enables it. No new ballot data.
+ *  Layout bundles that omit the define have no `process` (#1101). */
+export function veldwoodBallotBookletFlag(): string | undefined {
+  try { return process.env.NEXT_PUBLIC_HARIMU_VELDWOOD_BALLOT_BOOKLET; }
+  catch { return undefined; }
+}
+export function veldwoodBallotBookletEnabled(value: string | undefined = veldwoodBallotBookletFlag()): boolean {
   return value === 'true';
 }
 
@@ -40,7 +45,7 @@ function VeldwoodBallotBooklet({ text }: { text: string }) {
       <NationCrest id="veldwood" size={36} force labelled />
       <p className="veldwood-ballot-title" aria-hidden="true">Veldwood Ballot Booklet</p>
     </header>
-    <ol className="veldwood-ballot-pages">{lines.map((line, index) => <li key={line} className="veldwood-ballot-page">
+    <ol className="veldwood-ballot-pages">{lines.map((line, index) => <li key={index} className="veldwood-ballot-page">
       <span className="veldwood-ballot-num" aria-hidden="true">{index + 1}</span><p>{line}</p>
     </li>)}</ol>
   </section>;
