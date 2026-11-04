@@ -18,6 +18,7 @@ import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from '@/lib/korund-coupons'; // #967, #983
 import { korundStandingEnabled } from '@/lib/korund-standing-rules'; // #994
 import { flagOn } from '@/lib/flag-pack.mjs'; // #988
+import { varkandRecruitTerm } from '@/lib/varkand-recruit-term'; // #1095
 import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
@@ -266,6 +267,8 @@ export async function GET(request: Request) {
   // #872 (ARC ruling): nations this account may play here beyond the live three (nationPlayable, never a flag alone). Absent when none: production and the public unchanged.
   const playable = playableNationIds(env as never, userId), flagPlayable = playable.some(id => !(liveNations as readonly string[]).includes(id));
   const shiftDay = await shiftDayFields(database, userId, readNow);
+  // #1095: flag off, or any nation but Varkand, adds no key. created_at is already on the profile row.
+  const nationalService = profile && flagOn(env, 'HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED') ? varkandRecruitTerm(profile, Date.now()) : null;
   return privateJson({ ...(flagPlayable ? { openNations: playable } : {}), ...(cycleStartAt != null ? { cycleStartAt } : {}), ...shiftDay,
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountIdFor(election!.id)}:{})}:null,
@@ -283,6 +286,7 @@ export async function GET(request: Request) {
     playerMarket,
     government: await withPolicyLedger(database, governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, env), // #612 founding/succession; #985 ledger only for Kindle with the flag on
     shifts,
+    ...(nationalService ? { nationalService } : {}),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
       : null,

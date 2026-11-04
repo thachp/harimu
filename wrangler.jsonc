@@ -150,6 +150,7 @@
     "HARIMU_CIVIC_RANK_ENABLED": "true",
     // #988: one JSON binding for the army flags (needs HARIMU_WAR_ENABLED too). Preview on, production off. A direct HARIMU_* var still wins.
     // #1054: HARIMU_WAR_PEACE_REVERT_ENABLED sits in this pack (needs HARIMU_WAR_ENABLED). A treaty returns unceded captures.
+    // #1095: HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED sits in this pack. A Varkand citizen's first 7 real days are a recruit term on the citizen read.
     "HARIMU_ARMY_PACK": {
       "HARIMU_ARMIES_ENABLED": "true",
       "HARIMU_ARMY_DRILLS_ENABLED": "true",
@@ -160,7 +161,9 @@
       "HARIMU_WINTER_MARCH_ENABLED": "true",
       // #1053: quartermaster shifts add +1 supply square each (last game day), capped at +3.
       "HARIMU_ARMY_QUARTERMASTER_ENABLED": "true",
-      "HARIMU_WAR_PEACE_REVERT_ENABLED": "true"
+      "HARIMU_WAR_PEACE_REVERT_ENABLED": "true",
+      // #1095: first 7 real days after created_at. Off: GET /api/citizen has no nationalService key.
+      "HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED": "true"
     },
     // #842: Religious Harmony (docs 14.5): a per-nation 0–100 score from festival holidays, festival joins, banned-festival joins and Korund raids, feeding Stability (±5) and shown on the faith panel (Korund: band only). Off: no Stability input, no panel line, no reads. Full-line comment only: scripts/development-config.mjs strips full-line comments.
     "HARIMU_RELIGIOUS_HARMONY_ENABLED": "true",
