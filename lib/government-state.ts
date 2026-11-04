@@ -59,7 +59,7 @@ export async function latchGovernmentReviews(db: GameDatabase, nationId: string,
 type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;snapshot_json:string};
 /** Completed UTC days are reviewed once. By default this persists bounded, idempotent reviews (POST and world-tick paths).
  *  With readOnly (#205, GET /api/citizen) the same reviews are projected in memory and nothing is written. */
-export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean } = {}) {
+export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean; hoarvaleAssent?: boolean } = {}) {
   // #679: the Aurelle crown read touches only the Rising and coup tables, which nothing below writes, so it starts with the first reads instead of last
   // (parked so a run that returns early never leaves an unhandled rejection; the crown branch still rethrows).
   const crownRead = nationId === 'aurelle' ? parked(readCrown(db)) : null;
@@ -77,11 +77,12 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
   ]);
   const inputs = { nationId, availableBudgetMinor: nationId === 'kindle' ? spendableKindleBudget(budget?.balance ?? 0, budget?.cap ?? 0) : 0,
     foodSecurity: needs?.households ? Math.floor(100*(needs.supplied ?? 0)/needs.households) : 100 };
+  const project = (petitionCounts: Record<string, number>) => simulateGovernment({ ...inputs, petitionCounts, now, hoarvaleAssent: options.hoarvaleAssent === true });
   const projected = new Map<number, ReviewRow & { selected_topic: string }>();
   for (const day of days.results) {
     const counts = await db.prepare(`SELECT p.topic,COUNT(*) AS count FROM government_petitions p JOIN government_petition_eligibility e ON e.request_id=p.request_id AND e.clerk_user_id=p.clerk_user_id WHERE p.nation_id=? AND p.period_start=? GROUP BY p.topic`)
       .bind(nationId,day.period_start).all<{ topic: string; count: number }>();
-    const snapshot = simulateGovernment({ ...inputs, petitionCounts: Object.fromEntries(counts.results.map(r=>[r.topic,r.count])) });
+    const snapshot = project(Object.fromEntries(counts.results.map(r=>[r.topic,r.count])));
     if (!snapshot) return null;
     const petitionCount = counts.results.reduce((sum,r)=>sum+r.count,0);
     const snapshotJson = JSON.stringify({ ...snapshot, verificationPolicy: 'tier1-v1' });
@@ -108,11 +109,11 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
   // A review sets the following UTC day's priority. After that, live needs determine the fallback.
   let snapshot = verifiedReview && review && Math.floor(now/86400)*86400 === review.period_start+86400
     ? reviewedSnapshot
-    : simulateGovernment({ ...inputs, petitionCounts: {} });
+    : project({});
   if (!snapshot) return null;
   // A new safety emergency overrides a reviewed priority without rewriting the immutable record.
   if (inputs.foodSecurity < 40 && snapshot.decision.topic !== 'food') {
-    snapshot = simulateGovernment({ ...inputs, petitionCounts: {} })!;
+    snapshot = project({})!;
     snapshot.decision.reason += ' The reviewed priority is temporarily superseded by current food safety needs.';
   }
   if (review) {

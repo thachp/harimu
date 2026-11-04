@@ -75,6 +75,7 @@ import { reconciliationSchemas } from './ledger-reconciliation'; // #432
 import { squareSchema } from './square-chat';
 import { petitionSchema, petitionEligibilitySchema, petitionReviewSchema, petitionResolutionSchema } from './government-state';
 import { kindlePolicyLedgerSchemas } from './policy-ledger'; // #985
+import { hoarvaleBillSchemas } from './hoarvale-assent'; // #1089
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
 import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
 import { economySchema, recoverySchema, rewardSchema, fundSchema, incomeTaxSchema, employerBudgetMinor, rewards } from './economy';
@@ -300,7 +301,7 @@ async function initialize(database: GameDatabase) {
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),
-    database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema), ...kindlePolicyLedgerSchemas.map(sql => database.prepare(sql)), // #985
+    database.prepare(petitionSchema), database.prepare(petitionEligibilitySchema), database.prepare(petitionReviewSchema), database.prepare(petitionResolutionSchema), ...kindlePolicyLedgerSchemas.map(sql => database.prepare(sql)), ...hoarvaleBillSchemas.map(sql => database.prepare(sql)), // #985 #1089
     database.prepare('CREATE INDEX IF NOT EXISTS idx_government_petitions_nation_period ON government_petitions(nation_id, period_start)'),
     database.prepare(cityLocationSchema),
     database.prepare(worldSquaresSchema),
