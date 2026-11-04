@@ -47,7 +47,8 @@ export async function readBureau(db: GameDatabase, userId: string, now: number):
     db.prepare('SELECT MAX(released_at) AS at FROM dormant_job_releases WHERE clerk_user_id=?').bind(userId).first<{ at: number | null }>(),
   ]);
   const held = last && Number(last.assigned_at) > Number(released?.at ?? 0) ? last : null;
-  const next = nextRequestAt(last ? Number(last.assigned_at) : null, now);
+  // A released assignment does not keep the 30-day request clock running.
+  const next = nextRequestAt(held ? Number(held.assigned_at) : null, now);
   return {
     jobs: bureauJobs.map(j => ({ id: j.id, name: j.name, seats: j.seats, filled: Number(filled[j.id] ?? 0), open: quotaGap(j, filled) })),
     preferences: prefs ? [prefs.first_job, prefs.second_job, prefs.third_job] : null,
@@ -81,7 +82,8 @@ export async function requestAssignment(db: GameDatabase, userId: string, reques
   if (prior) return prior.clerk_user_id === userId ? { status: 200, replayed: true } : { status: 409, reason: 'request_reused', error: 'Request identifier already used.' };
   const prefs = await db.prepare('SELECT first_job, second_job, third_job FROM korund_job_preferences WHERE clerk_user_id=?').bind(userId).first<{ first_job: string; second_job: string; third_job: string }>();
   if (!prefs) return { status: 409, reason: 'no_preferences', error: 'File three job preferences first.' };
-  const last = await db.prepare('SELECT MAX(assigned_at) AS at FROM korund_job_assignments WHERE clerk_user_id=?').bind(userId).first<{ at: number | null }>();
+  const last = await db.prepare(`SELECT MAX(a.assigned_at) AS at FROM korund_job_assignments a WHERE a.clerk_user_id=?
+    AND a.assigned_at>COALESCE((SELECT MAX(released_at) FROM dormant_job_releases r WHERE r.clerk_user_id=a.clerk_user_id),0)`).bind(userId).first<{ at: number | null }>();
   const next = nextRequestAt(last?.at == null ? null : Number(last.at), now);
   if (next !== null) return { status: 409, reason: 'too_soon', nextRequestAt: iso(next), error: `Reassignment is not available yet. Your next request opens on ${iso(next)}.` };
   const [shifts, citizen, filled] = await Promise.all([
@@ -91,7 +93,8 @@ export async function requestAssignment(db: GameDatabase, userId: string, reques
   ]);
   const result = assignJob({ preferences: [prefs.first_job, prefs.second_job, prefs.third_job], shifts: Number(shifts?.n ?? 0), standing: citizen?.standing ?? null, filled });
   await db.prepare(`INSERT INTO korund_job_assignments(id, clerk_user_id, job_id, outcome, reasons, assigned_at)
-    SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM korund_job_assignments WHERE clerk_user_id=? AND assigned_at>?)
+    SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM korund_job_assignments a WHERE a.clerk_user_id=? AND a.assigned_at>?
+      AND a.assigned_at>COALESCE((SELECT MAX(released_at) FROM dormant_job_releases r WHERE r.clerk_user_id=a.clerk_user_id),0))
     ON CONFLICT DO NOTHING`).bind(requestId, userId, result.jobId, result.outcome, JSON.stringify(result.reasons), now, userId, now - reassignmentSeconds).run();
   const created = await db.prepare('SELECT clerk_user_id FROM korund_job_assignments WHERE id=?').bind(requestId).first<{ clerk_user_id: string }>();
   return created?.clerk_user_id === userId ? { status: 200 } : { status: 409, reason: 'too_soon', error: 'Reassignment is not available yet.' };
