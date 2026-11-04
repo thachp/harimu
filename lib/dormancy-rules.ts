@@ -1,5 +1,5 @@
 /** #739 slice 1 (docs §17.4 Citizen dormancy): Away at 7 real days, Dormant at 30, Archived at 180. Status and the Welcome back
- *  briefing only, no effects (quotas, quorum, job release, savings shield are later slices). Flag HARIMU_DORMANCY_ENABLED
+ *  briefing. Job release is #1066 (lib/dormant-job.ts), behind this same flag. Quotas and upkeep are later slices. Flag HARIMU_DORMANCY_ENABLED
  *  ("true" in preview, "false" in production); flag off = no read or write of citizens.last_active_at and no briefing.
  *  GET /api/citizen never touches it (#205, ARC): the write is POST /api/citizen/heartbeat. */
 import type { GameDatabase } from './database-contract';
