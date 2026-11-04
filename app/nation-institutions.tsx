@@ -4,10 +4,14 @@ import { useState } from 'react';
 import { rewards } from '@/lib/economy';
 import './nation-institutions.css';
 import { describeKindlePay } from '@/lib/income-tax';
+import { varkandDispatchEnabled } from '@/lib/varkand-dispatch';
+import { VarkandAlertBanner, VarkandDispatchStamp } from './varkand-dispatch';
 
 export type InspectedNation = {
   id: string; name: string; shortName: string; capital: string; government: string; economy: string;
   currency: string; religion: string; population: string; treasury: string; stability: number; motto: string; tradeStatus: string;
+  /** #1082: optional Alert Level on the Varkand nation read (#1081). Absent until that read exists. */
+  alertLevel?: 'green' | 'amber' | 'red';
 };
 type InstitutionWork = { id: string; name: string; detail: string; cost: number; nationId?: string | null };
 /** The institution systems shown for a nation (shared with the #392 S6 rows, so both read the same lore). */
@@ -38,7 +42,9 @@ export function NationInstitutions({ incomeTaxPercent = 0, treasuryPublished = f
   const system = systems.find(item => item.id === (systemId ?? selectedSystemId)) ?? systems[0];
   const ownNation = nation.id === citizenNation?.id;
   const jobs = nation.id === 'kindle' ? workOrders.filter(order => !order.nationId || order.nationId === 'kindle') : [];
+  const dispatch = nation.id === 'varkand' && varkandDispatchEnabled();
   return <section className="nation-inspector" aria-label={`${nation.name} institutions`}>
+    {dispatch && <VarkandAlertBanner alertLevel={nation} />}
     <dl><dt>Government</dt><dd>{nation.government}</dd><dt>Economy</dt><dd>{nation.economy}</dd><dt>Official faith stance</dt><dd>{nation.religion}</dd></dl>
     <details><summary>Example nation profile</summary><p>Illustrative starting figures, not measured live conditions.</p>
       <dl><dt>Population</dt><dd>{nation.population}</dd><dt>Treasury</dt><dd>{treasuryLabel(nation, treasuryPublished, treasuryMinor)}</dd><dt>Stability</dt><dd>{nation.stability} / 100</dd></dl>
@@ -46,7 +52,7 @@ export function NationInstitutions({ incomeTaxPercent = 0, treasuryPublished = f
     {systemPicker && <div className="nation-inspector-systems" role="group" aria-label="Institution systems">
       {systems.map(item => <button key={item.id} type="button" aria-pressed={item.id === system.id} onClick={() => setSelectedSystemId(item.id)}>{item.label}</button>)}
     </div>}
-    <article aria-live="polite"><h3>{system.title}</h3><p>{system.detail}</p></article>
+    <article className={dispatch ? 'varkand-dispatch' : undefined} aria-live="polite">{dispatch && <VarkandDispatchStamp />}<h3>{system.title}</h3><p>{system.detail}</p></article>
     {jobs.length > 0 && <details className="nation-inspector-jobs"><summary>Paid contributions</summary>
       {!ownNation && <p>Kindle citizens only. Your citizenship remains {citizenNation?.shortName ?? 'unselected'}.</p>}
       {jobs.map(order => <article key={order.id}><h4>{order.name}</h4><p>{order.detail} · {order.cost} WC
