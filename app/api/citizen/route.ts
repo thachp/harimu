@@ -115,7 +115,7 @@ const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), em
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
 const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn(), standing: korundStandingOn(), bureauTsr: korundTsrViewOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged. #994 standing and #1000 Bureau quote are read-only too.
-const governmentReadOptions = (readOnly = false) => ({ readOnly, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', varkandDirectorate: flagOn(env, 'HARIMU_VARKAND_DIRECTORATE_ENABLED') }); // #1085 packed in HARIMU_GRAY_PACK
+const governmentReadOptions = (readOnly = false) => ({ readOnly, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', varkandDirectorate: flagOn(env, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), varkandPlebiscite: flagOn(env, 'HARIMU_VARKAND_PLEBISCITE_ENABLED') }); // #1085 directorate, #1094 plebiscite; both packed in HARIMU_GRAY_PACK
 
 export const dynamic = 'force-dynamic';
 const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
