@@ -8,7 +8,7 @@ import type { CityDestination } from '@/lib/city-destinations';
 import { itemCount, uiV2HouseholdEnabled } from '@/lib/ui-v2-household';
 import { uiV2CityEnabled } from '@/lib/ui-v2-city';
 import { cityPlaceIcon } from './city-pill';
-import { captureHistoryLine, type CityCaptureHistory } from '@/lib/city-capture-history'; // #1028
+import { captureHistoryLine, treatyReturnLine, type CityCaptureHistory } from '@/lib/city-capture-history'; // #1028, #1078
 
 /** #392 S3: the World and City side-panel pieces that change with NEXT_PUBLIC_HARIMU_UI_V2_PANEL. Each piece reads the build-time flag itself, so
  *  page.tsx never decides it (tests/ui-v2-panel.test.mjs renders these flag off and on, and pins that page.tsx passes no `enabled`). Existing copy only. */
@@ -45,7 +45,7 @@ export function CitySummary({ cityName, city, nation, destinations, onView, tier
   const festivalStats = festivalNote ? [{ label: 'Festivals', value: festivalNote }] : []; // #984 read-only note
   const specialtyStats = specialtyRole ? [{ label: 'Specialty', value: specialtyNote ? `${specialtyRole}. ${specialtyNote}` : specialtyRole }] : []; // #996
   const captureStats = captureNote ? [{ label: 'Capture', value: captureNote }] : []; // #1002 read-only note
-  const historyStats = captureHistory ? [{ label: 'History', value: captureHistoryLine(captureHistory) }] : []; // #1028 read-only
+  const historyStats = captureHistory ? [{ label: 'History', value: captureHistory.treatyReturn ? <>{captureHistoryLine(captureHistory)}<br />{treatyReturnLine(captureHistory.treatyReturn)}</> : captureHistoryLine(captureHistory) }] : []; // #1028 capture, #1078 return after it
   const civicUnitStats = civicUnitNote ? [{ label: 'Civic unit', value: civicUnitNote }] : []; // #1006 read-only note
   const governorStats = governorNote ? [{ label: 'Governor', value: governorAi ? <>{governorNote} <AiBadge /></> : governorNote }] : []; // #1007 read-only
   const panel = <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...captureStats, ...historyStats, ...civicUnitStats, ...governorStats, { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}

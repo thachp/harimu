@@ -13,6 +13,14 @@ export const peaceRevertSchemas = [
  squares INTEGER CHECK((status='pending')=(squares IS NULL)),
  reverted_at INTEGER NOT NULL
 )`,
+  // #1078: one row per city capture whose squares this treaty returned. Re-running the ending matches the primary key and writes nothing.
+  `CREATE TABLE IF NOT EXISTS city_treaty_returns (
+ capture_id TEXT PRIMARY KEY REFERENCES city_captures(id) ON DELETE CASCADE,
+ war_id TEXT NOT NULL REFERENCES wars(id) ON DELETE CASCADE,
+ city_key TEXT NOT NULL,
+ returned_to TEXT NOT NULL REFERENCES nations(id),
+ returned_at INTEGER NOT NULL
+)`,
 ];
 
 /** [ASSUMPTION] A treaty returns every captured square it does not cede. Parent Architect confirms on the PR. */
@@ -80,15 +88,36 @@ async function squaresToReturn(db: GameDatabase, warId: string, alsoCeded: reado
   return moves;
 }
 
+type ReturnedCity = { capture_id: string; city_key: string; x: number; y: number };
+/** One history row per capture that had a square in `moves`. `returned_to` is the nation that move restores (the earliest holder), which can differ from a later capture's from_nation. A second finish inserts nothing. */
+async function returnedCities(db: GameDatabase, warId: string, moves: readonly Hit[]) {
+  if (!moves.length) return [];
+  const rows = (await db.prepare(`SELECT c.id AS capture_id, s.city_key AS city_key, q.x AS x, q.y AS y
+    FROM city_captures c JOIN city_sieges s ON s.id=c.siege_id JOIN city_capture_squares q ON q.capture_id=c.id
+    WHERE c.war_id=? ORDER BY c.id, q.x, q.y`).bind(warId).all<ReturnedCity>().catch(none([] as ReturnedCity[]))).results;
+  const restored = new Map(moves.map(hit => [`${hit.x},${hit.y}`, hit.from_nation]));
+  const cities = new Map<string, { capture_id: string; city_key: string; from_nation: string }>();
+  for (const row of rows) {
+    const id = String(row.capture_id), owner = restored.get(`${Number(row.x)},${Number(row.y)}`);
+    if (!owner || cities.has(id)) continue;
+    cities.set(id, { capture_id: id, city_key: String(row.city_key), from_nation: owner });
+  }
+  return [...cities.values()];
+}
+
 /** Finishes one pending return. No row, or a finished row, moves nothing: a treaty that ended with the flag off has no marker and is never touched. */
 export async function revertPeaceCaptures(db: GameDatabase, warId: string, now: number): Promise<PeaceRevertResult> {
   if (!revertUncededCaptures) return { squares: 0, replay: false };
-  const prior = await db.prepare('SELECT status, squares FROM war_peace_reverts WHERE war_id=?').bind(warId).first<{ status: string; squares: number | null }>().catch(tolerate(isMissingRelation, null));
+  const prior = await db.prepare('SELECT status, squares, reverted_at FROM war_peace_reverts WHERE war_id=?').bind(warId).first<{ status: string; squares: number | null; reverted_at: number }>().catch(tolerate(isMissingRelation, null));
   if (!prior) return { squares: 0, replay: false };
   if (prior.status === 'done') return { squares: Number(prior.squares ?? 0), replay: true };
   const moves = await squaresToReturn(db, warId);
+  const cities = await returnedCities(db, warId, moves);
+  const at = Number(prior.reverted_at);
   await db.batch([
     ...moves.map(hit => db.prepare("UPDATE world_squares SET owner=? WHERE x=? AND y=? AND zone<>'heartland' AND (owner IS NULL OR owner<>?) AND EXISTS (SELECT 1 FROM war_peace_reverts WHERE war_id=? AND status='pending')").bind(hit.from_nation, hit.x, hit.y, hit.from_nation, warId)),
+    ...cities.map(city => db.prepare(`INSERT INTO city_treaty_returns (capture_id,war_id,city_key,returned_to,returned_at) SELECT ?,?,?,?,?
+      WHERE NOT EXISTS (SELECT 1 FROM city_treaty_returns WHERE capture_id=?) AND EXISTS (SELECT 1 FROM war_peace_reverts WHERE war_id=? AND status='pending')`).bind(city.capture_id, warId, city.city_key, city.from_nation, at, city.capture_id, warId)),
     db.prepare("UPDATE war_peace_reverts SET status='done', squares=? WHERE war_id=? AND status='pending'").bind(moves.length, warId),
   ]);
   const saved = await db.prepare('SELECT squares FROM war_peace_reverts WHERE war_id=? AND status=\'done\'').bind(warId).first<{ squares: number }>();
