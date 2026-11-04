@@ -3,6 +3,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { armiesEnabled } from '@/lib/army-rules';
+import { dormancyEnabled } from '@/lib/dormancy-rules';
 import { releaseExpired, runDraft, stayAfterTerm } from '@/lib/army-conscription';
 
 export const dynamic = 'force-dynamic';
@@ -24,5 +25,5 @@ export async function POST(request: Request) {
   const nation = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>();
   if (!nation?.nation_id) return privateJson({ drafted: null });
   await releaseExpired(db, nation.nation_id, now);
-  return privateJson({ drafted: await runDraft(db, nation.nation_id, now) });
+  return privateJson({ drafted: await runDraft(db, nation.nation_id, now, dormancyEnabled(env)) });
 }

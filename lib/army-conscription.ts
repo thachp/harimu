@@ -2,6 +2,7 @@
  *  existing HARIMU_ARMIES_ENABLED + HARIMU_WAR_ENABLED (ARC). Migration 0080 mirrors conscriptionSchemas. Volunteering stays Kindle-only. */
 import type { GameDatabase } from './database-contract';
 import { unitForNation, defaultStance } from './army-rules';
+import { DORMANCY_DAYS } from './dormancy-rules';
 
 const DAY = 86400;
 /** [ASSUMPTION] One draft per nation per game week (7 game days = 50400 s, the spark-supply game week). */
@@ -9,6 +10,8 @@ export const DRAFT_WEEK_SECONDS = 50400;
 /** Docs §15.4: new citizens cannot be conscripted for 14 real days. Dormant citizens (30 days, lib/dormancy-rules) are skipped. */
 export const NEWCOMER_SHIELD_SECONDS = 14 * DAY;
 export const DORMANT_SECONDS = 30 * DAY;
+/** #1069 (docs §17.4 Away row: "Removed from conscription/quotas"): with HARIMU_DORMANCY_ENABLED on, Away (7 real days) is the cutoff. */
+export const AWAY_SECONDS = DORMANCY_DAYS.away * DAY;
 /** [ASSUMPTION] A conscript serves 2 game weeks and cannot leave the unit before then. */
 export const SERVICE_TERM_SECONDS = 2 * DRAFT_WEEK_SECONDS;
 /** [ASSUMPTION] Korund's lottery draws 1 in 10 eligible citizens (at least 1). Aurelle's levy takes one citizen per home city. */
@@ -32,7 +35,7 @@ export function pickConscripts(nation: string, week: number, eligible: readonly 
 }
 /** Runs this game week's draft for a conscription nation once. The first insert of the draft row wins; every member and conscript insert is
  *  guarded by the winner's token, so a concurrent or replayed draft writes nothing. Returns the number drafted, or null on a replay. */
-export async function runDraft(db: GameDatabase, nationId: string, nowSec: number): Promise<number | null> {
+export async function runDraft(db: GameDatabase, nationId: string, nowSec: number, skipAway = false): Promise<number | null> {
   const unit = unitForNation(nationId);
   if (!unit || !(conscriptionNations as readonly string[]).includes(nationId)) return null;
   const week = Math.floor(nowSec / DRAFT_WEEK_SECONDS);
@@ -42,7 +45,7 @@ export async function runDraft(db: GameDatabase, nationId: string, nowSec: numbe
       LEFT JOIN citizen_city_locations l ON l.user_id = c.clerk_user_id AND l.nation_id = c.nation_id
       LEFT JOIN army_members m ON m.clerk_user_id = c.clerk_user_id
     WHERE c.nation_id = ? AND m.clerk_user_id IS NULL AND c.created_at <= ? AND COALESCE(c.last_active_at, c.created_at) > ?`)
-    .bind(nationId, iso(nowSec - NEWCOMER_SHIELD_SECONDS), iso(nowSec - DORMANT_SECONDS)).all<Eligible>();
+    .bind(nationId, iso(nowSec - NEWCOMER_SHIELD_SECONDS), iso(nowSec - (skipAway ? AWAY_SECONDS : DORMANT_SECONDS))).all<Eligible>();
   const picked = pickConscripts(nationId, week, rows.results ?? []);
   const token = crypto.randomUUID(), mine = 'EXISTS (SELECT 1 FROM army_drafts WHERE nation_id = ? AND game_week = ? AND token = ?)';
   const results = await db.batch([
