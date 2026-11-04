@@ -84,7 +84,7 @@ export const armyBattleSchemas = [
  defender_hold INTEGER, defender_advance INTEGER, defender_fall_back INTEGER
 )`,
 ];
-/** #1061 (migration 0112): a local database created before the columns existed gets them once. Null means the mix was not stored. */
+/** #1061 (migration 0115): a local database created before the columns existed gets them once. Null means the mix was not stored. */
 export const battleStanceColumns = [
   'ALTER TABLE army_battles ADD COLUMN attacker_hold INTEGER',
   'ALTER TABLE army_battles ADD COLUMN attacker_advance INTEGER',

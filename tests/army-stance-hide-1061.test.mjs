@@ -40,9 +40,9 @@ test('a live battle keeps the other side out of the response; a resolved battle 
   assert.equal(JSON.stringify(cardStanceCounts(live, 'kindle')).includes('"advance":23'), false);
 });
 
-test('migration 0112 adds the six count columns, the card only renders an opponent mix the server sent, and there is no new flag', () => {
+test('migration 0115 adds the six count columns, the card only renders an opponent mix the server sent, and there is no new flag', () => {
   const cols = ['attacker_hold', 'attacker_advance', 'attacker_fall_back', 'defender_hold', 'defender_advance', 'defender_fall_back'];
-  const lite = readFileSync('drizzle/0112_army_battle_stances.sql', 'utf8'), pg = readFileSync('db/postgres/0112_army_battle_stances.sql', 'utf8');
+  const lite = readFileSync('drizzle/0115_army_battle_stances.sql', 'utf8'), pg = readFileSync('db/postgres/0115_army_battle_stances.sql', 'utf8');
   const battle = readFileSync('lib/army-battle.ts', 'utf8');
   for (const col of cols) {
     assert.match(lite, new RegExp(`ADD COLUMN ${col} INTEGER`));

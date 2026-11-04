@@ -483,7 +483,7 @@ async function initialize(database: GameDatabase) {
   const conscriptColumns = await database.prepare('PRAGMA table_info(army_conscripts)').all<{ name: string }>();
   if (!conscriptColumns.results.some(column => column.name === 'stayed_at')) await database.prepare(conscriptStayColumn).run();
 
-  // #1061 (migration 0112): stance counts frozen on a stored battle. A table just created from armyBattleSchemas already has them.
+  // #1061 (migration 0115): stance counts frozen on a stored battle. A table just created from armyBattleSchemas already has them.
   const battleCols = await database.prepare('PRAGMA table_info(army_battles)').all<{ name: string }>();
   if (battleCols.results.length > 0 && !battleCols.results.some(column => column.name === 'attacker_hold')) await database.batch(battleStanceColumns.map(sql => database.prepare(sql)));
 
