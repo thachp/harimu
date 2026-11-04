@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 20); // #1047 shift soft cap stays inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 21); // #1047 shift soft cap and #1085 Varkand Directorate stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
@@ -97,6 +97,15 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_SHIFT_SOFT_CAP_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_SHIFT_SOFT_CAP_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_SHIFT_SOFT_CAP_ENABLED: 'false' }, 'HARIMU_SHIFT_SOFT_CAP_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_VARKAND_DIRECTORATE_ENABLED, undefined, 'the Varkand Directorate is not its own binding');
+  assert.equal(prod.vars.HARIMU_VARKAND_DIRECTORATE_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_VARKAND_DIRECTORATE_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_VARKAND_DIRECTORATE_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_VARKAND_DIRECTORATE_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_VARKAND_DIRECTORATE_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_VARKAND_DIRECTORATE_ENABLED: 'false' }, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, undefined, 'the phone top-down map is not its own binding');
   assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'true');
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'false');
