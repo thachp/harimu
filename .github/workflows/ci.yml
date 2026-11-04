@@ -49,13 +49,17 @@ jobs:
   postgres-tests:
     name: Postgres tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    # 45 min (#949). Not a hang: dev run 40066838432 shard 2/4 was still
-    # passing tests when the 30 min cap hit (755 oks, largest gap 27s) while
-    # the other shards finished at 768–848 oks in 21–26m. Run 40686733431
-    # shard 1/4 died the same way at 735 oks vs 783–836 on shards that passed.
-    # The slow shard is a few minutes past 30, and the runner spread is
-    # ~15–30m, so 45 leaves room without dropping tests.
-    timeout-minutes: 45
+    # 60 min (#1061). Not a hang, and not a retry: run 40962877232 (PR #1071,
+    # caacff7) cancelled Postgres shards 1/4 and 4/4 at the 45 min cap while
+    # tests were still passing (shard 4/4 attempt 2 printed ok 809, largest
+    # gap 23s; the aggregate check then failed because the shard was cancelled).
+    # --test-shard walks the sorted file list round-robin, so adding
+    # tests/army-stance-hide-1061.test.mjs early in that list moved later files
+    # onto the previous shard. Shard 4's summed test time became ~1895s.
+    # Green dev 4442d00 (run 41255561104) peaked at ~1786s and finished shard
+    # 2/4 in 43 min, so 45 had no margin left. #949 raised 30 to 45 for the
+    # same reason when the slow shard was only a few minutes past 30.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
