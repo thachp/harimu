@@ -12,7 +12,7 @@ export function VarkandAlertBanner({ alertLevel }: { alertLevel?: unknown }) {
   return <div className="varkand-alert" data-alert={level}>
     <span className="varkand-alert-mark" aria-hidden="true">{alertMark[level]}</span>
     <div className="varkand-alert-copy">
-      <p className="varkand-alert-name" aria-label={`Alert Level: ${name}`}>Alert Level · {name}</p>
+      <p className="varkand-alert-name"><span className="sr-only">{`Alert Level: ${name}`}</span><span aria-hidden="true">Alert Level · {name}</span></p>
       <p className="varkand-alert-meaning">{varkandAlertMeaning[level]}</p>
     </div>
   </div>;

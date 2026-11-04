@@ -95,7 +95,8 @@ test('three levels, the missing-field fallback, flag off, and other nations', as
     for (const html of [withFlag('true', () => civic('varkand', level)), withFlag('true', () => institutions(fixture))]) {
       const banner = bannerOf(html);
       assert.match(banner, new RegExp(`data-alert="${level}"`));
-      assert.match(banner, new RegExp(`aria-label="Alert Level: ${varkandAlertName[level]}"`));
+      assert.match(banner, new RegExp(`<span class="sr-only">Alert Level: ${varkandAlertName[level]}</span>`));
+      assert.doesNotMatch(banner, /aria-label=/);
       assert.match(banner, new RegExp(`aria-hidden="true">${marks[level]}`));
       assert.match(banner, new RegExp(varkandAlertMeaning[level].replace(/[.]/g, '\\.')));
       assert.doesNotMatch(banner, /aria-live|role="status"|role="alert"/);
