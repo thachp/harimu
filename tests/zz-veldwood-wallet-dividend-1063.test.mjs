@@ -1,6 +1,6 @@
 /** #1063: Veldwood top-bar wallet counts down to Dividend Day. Other nations, and the flag off, keep today's chip.
  *  The zz- prefix sorts this file last. Node's --test-shard is round-robin, so a mid-alphabet file moves later files
- *  between the four Postgres shards and the slowest one passes the 45-minute job limit. */
+ *  between the four Postgres shards. Sorting last leaves those shards as they are on dev. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
