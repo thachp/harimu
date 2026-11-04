@@ -1,6 +1,8 @@
 'use client';
 import {useDisplayTimestamp} from './display-preferences';
 import { isLiveNation } from '@/lib/nation-discovery'; // #488
+import { varkandDispatchEnabled } from '@/lib/varkand-dispatch';
+import { VarkandAlertBanner, VarkandDispatchStamp } from './varkand-dispatch';
 import { disabledReasonProps } from '@/lib/action-reasons';
 import { NationDocument } from './nation-document';
 import { LeaderPanel } from './leader-panel';
@@ -22,8 +24,10 @@ const civicBudgetNote = (nationId: string) => nationId === 'kindle'
   ? 'Kindle proposals and executed allocations use the remaining work-programme budget; other prototype nations have no automatic policy-appropriation fund.'
   : `${civicNationNames[nationId] ? `${civicNationNames[nationId]}’s proposals` : 'Proposals here'} are saved for review only: there is no automatic policy-appropriation fund, so nothing is allocated or spent.`;
 
-export function GovernmentPanel({ simulation, verification, snapshot, localDemo, pending, error, onPetition, nationId, onRetry }: {
+export function GovernmentPanel({ simulation, verification, snapshot, localDemo, pending, error, onPetition, nationId, onRetry, alertLevel }: {
   nationId?: string;
+  /** #1082: optional Alert Level on the Varkand nation read. Absent until #1081. */
+  alertLevel?: unknown;
   onRetry?: () => void;
   simulation?: SimulationState;
   verification: VerificationState | null;
@@ -34,9 +38,15 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
   onPetition: (topic: PetitionTopic) => void;
 }) {
   const formatTime=useDisplayTimestamp();
-  if (!snapshot) return <section className="citizen-market" aria-label="Government preview status">{isLiveNation(nationId) ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>}</section>;
+  const dispatch = nationId === 'varkand' && varkandDispatchEnabled();
+  if (!snapshot) return <>
+    {dispatch && <VarkandAlertBanner alertLevel={alertLevel} />}
+    <section className={dispatch ? 'citizen-market varkand-dispatch' : 'citizen-market'} aria-label="Government preview status">{dispatch && <VarkandDispatchStamp />}{isLiveNation(nationId) ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>}</section>
+  </>;
   const petitionReason = pending ? 'An action is being saved. Please wait before submitting a priority request.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : null;
+  const decisionOrder = <><h4>{snapshot.decision.title}</h4><p>Spending proposal: {snapshot.decision.proposedSpendMinor} minor units from {snapshot.availableBudgetMinor} available.{civicSpendingNote(snapshot.nationId)}</p></>;
   return <NationDocument nationId={snapshot.nationId} className="citizen-market government-document" label="Government decisions and citizen petitions"><div aria-busy={pending}>
+    {dispatch && <VarkandAlertBanner alertLevel={alertLevel} />}
     <LeaderPanel snapshot={snapshot} simulation={localDemo ? undefined : simulation} />
     <h3>Government and citizen voice</h3>
     <p>Computer-controlled leaders hold all government offices. AI/SI means artificial or simulated intelligence. Here they follow fixed game rules: the same situation produces the same decision. No live AI model is connected.</p>
@@ -56,8 +66,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
         {simulation.latestExecution ? <p>Last saved allocation: +{simulation.latestExecution.foodQuantity} market food for {(simulation.latestExecution.spendMinor / 100).toFixed(2)} SPK · tick {simulation.latestExecution.tick} · {formatTime(simulation.latestExecution.executedAt * 1000)}. Retries reuse this receipt; they do not spend again.</p> : <p>No food allocation has executed yet. Stock, reserve, budget and policy must all allow it; visiting does not guarantee spending.</p>}
       </> : <p>{snapshot.nationId === 'korund' ? 'Korund’s assigned work fills its separate ration store; your Household and State store show current food and coupons. Automatic government policy spending is not implemented here.' : 'This nation receives saved rule-bound proposals; policy spending and economic execution are not implemented here yet.'}</p>}
     </section>}
-    <h4>{snapshot.decision.title}</h4>
-    <p>Spending proposal: {snapshot.decision.proposedSpendMinor} minor units from {snapshot.availableBudgetMinor} available.{civicSpendingNote(snapshot.nationId)}</p>
+    {dispatch ? <div className="varkand-dispatch"><VarkandDispatchStamp />{decisionOrder}</div> : decisionOrder}
     <p>{snapshot.influenceSummary}</p>
     <h4>Daily priority requests</h4>
     <p>Ask your government to prioritize a need. Completed UTC days receive one recorded review on the next government visit. The selected topic sets the following UTC day’s policy proposal; other topics are deferred. Food safety emergencies can override that priority. Priority requests do not guarantee spending.</p>
@@ -68,7 +77,8 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     {!localDemo && <section aria-label="Your priority request history">
       <h4>Your priority requests</h4>
       {!snapshot.petitions?.length && <p>No priority requests recorded for your current nation.</p>}
-      <ul>{snapshot.petitions?.map(petition=><li key={petition.requestId}>
+      <ul>{snapshot.petitions?.map(petition=><li key={petition.requestId} className={dispatch ? 'varkand-dispatch' : undefined}>
+        {dispatch && <VarkandDispatchStamp />}
         <strong>{petition.topic} · {petition.status}</strong> · {formatTime(petition.submittedAt*1000)}
         <p>{petition.reason}</p>
       </li>)}</ul>
