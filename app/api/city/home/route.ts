@@ -4,6 +4,7 @@ import {getDatabase} from '@/lib/db';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {readCityLocation} from '@/lib/city-location';
+import {readVarkandAlert,varkandAlertEnabled} from '@/lib/varkand-alert'; // #1081
 import {homeMoveCooldownSeconds,homeMoveCurrency,homeMoveFeeMinor,moveHomeCity,nextHomeMoveAt,readPermitForCity,requestInternalPermit,requiresInternalPermit,type VarkandAlert} from '@/lib/home-move';
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -20,12 +21,13 @@ async function context(request:Request){
  const db=await getDatabase();const citizen=await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{nation_id:string|null}>();
  return {db,userId,nationId:citizen?.nation_id??null,now:Math.floor(Date.now()/1000)};
 }
-function permitOpts(nationId:string){return {enabled:permitEnabled(),alert:nationId==='varkand'?varkandAlert():'green' as VarkandAlert};}
+/** #1081: flag on, Varkand reads the stored Directorate level (the same read GET /api/world sends the banner). Off: #992 unchanged. */
+async function permitOpts(db:Parameters<typeof readVarkandAlert>[0],nationId:string){return {enabled:permitEnabled(),alert:nationId!=='varkand'?'green' as VarkandAlert:varkandAlertEnabled(env)?(await readVarkandAlert(db)).level:varkandAlert()};}
 export async function GET(request:Request){
  if(!enabled())return notFound();
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
- const opts=permitOpts(ctx.nationId);
+ const opts=await permitOpts(ctx.db,ctx.nationId);
  const required=opts.enabled&&requiresInternalPermit(ctx.nationId,opts.alert);
  const cityId=new URL(request.url).searchParams.get('cityId');
  const permit=required&&cityId?await readPermitForCity(ctx.db,ctx.userId,cityId,ctx.now):null;
@@ -37,7 +39,7 @@ export async function POST(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  let body:Record<string,unknown>;try{body=await readCommandObject(request);}catch{return json({error:'Invalid request.'},400);}
  if(!requestIdOk(body.requestId)||typeof body.cityId!=='string')return json({error:'Choose a city and send a request id.'},400);
- const opts=permitOpts(ctx.nationId);
+ const opts=await permitOpts(ctx.db,ctx.nationId);
  if(body.action==='request-permit'){
   const result=await requestInternalPermit(ctx.db,ctx.userId,ctx.nationId,body.cityId,body.requestId,ctx.now,opts);
   return result.ok?json(result):json({error:result.reason,reason:result.reason},result.status);

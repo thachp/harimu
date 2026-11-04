@@ -10,6 +10,7 @@ import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
 import { armyBattlesEnabled } from '@/lib/army-battle';
 import { winterMarchEnabled } from '@/lib/winter-march'; // #1038
 import { flagOn } from '@/lib/flag-pack.mjs'; // #988
+import { readVarkandAlert, varkandAlertEnabled } from '@/lib/varkand-alert'; // #1081
 
 export const dynamic = 'force-dynamic';
 
@@ -92,6 +93,8 @@ export async function GET() {
   ]);
   const bands = populationBands(nationResult.results.map(nation => nation.id), Object.fromEntries(enrollmentResult.results.map(row => [row.nation_id, Number(row.citizens)])), undefined, id => !nationIsPreview(id));
 
+  // #1081: flag on, the Varkand nation read carries the stored Alert Level (the #1082 banner reads nation.alertLevel). Off: no field, no read.
+  const varkandAlert = varkandAlertEnabled(env) ? await readVarkandAlert(database) : null;
   return Response.json(
     {
       // #1041 / #1048: server flagOn of HARIMU_UI_PACK. The HUD reads these booleans; the browser bundle does not read the flags.
@@ -116,6 +119,7 @@ export async function GET() {
         tradeStatus: nation.trade_status,
         position: { x: nation.position_x, y: nation.position_y },
         populationBand: bands[nation.id],
+        ...(varkandAlert && nation.id === 'varkand' ? { alertLevel: varkandAlert.level, alertSetAt: varkandAlert.setAt } : {}),
       })),
       workOrders: workOrderResult.results.map((order) => ({
         id: order.id,
