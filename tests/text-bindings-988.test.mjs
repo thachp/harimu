@@ -28,7 +28,7 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 8); // #1053 quartermaster and #1054 peace revert stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 16); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 17); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch stay inside the pack
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
@@ -149,5 +149,10 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_NATION_FACT_ROWS, 'false');
   assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_NATION_FACT_ROWS, 'true', 'the client build still inlines the packed fact-rows flag');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_NATION_FACT_ROWS: 'false' }).NEXT_PUBLIC_HARIMU_NATION_FACT_ROWS, 'false', 'a direct string wins');
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH, undefined, 'the Varkand dispatch flag is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH, 'true', 'the client build still inlines the packed dispatch flag');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH: 'false' }).NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH, 'false', 'a direct string wins');
   assert.ok(TEXT_BINDING_CEILING - count(preview.vars, ['HARIMU_QA_TEST_CITIZEN_IDS']) >= 3, 'preview headroom stays at least 3 under 127');
 });
