@@ -83,6 +83,7 @@ import { ConfluencePriceBoard } from './confluence-price-board';
 import { KindleTradingNote } from './kindle-trading-note'; // #688
 import type { PriceBoard } from '@/lib/confluence-price-band';
 import { ConfluencePillars } from './confluence-pillars';
+import { HoarvaleCivicBills } from './hoarvale-royal-assent';
 import { shiftDeadlineText, shiftDeadlineDelay, deadlineNeedsRefresh } from '@/lib/shift-deadline';
 import { rewards, recoverySeconds, maximumCapacity, type Economy } from '@/lib/economy';
 import {
@@ -1801,6 +1802,7 @@ export default function Home() {
         {simulation?.sieges && <SiegePanel sieges={simulation.sieges} nationId={citizenNation.id} />}
         <FoundingBanner founding={government?.founding} nationId={citizenNation.id} />
         <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
+        {citizenNation.id === 'hoarvale' && <HoarvaleCivicBills nationId={citizenNation.id} />}{/* #1064 */}
         <ArmyCard key={`army:${citizenSessionKey}`}/>{/* QA2 preview report: remount after sign-in like the other session cards; mounted once with no key it kept the signed-out null forever */}
         {citizenNation.id==='kindle'&&clerkConfigured&&<PrimaryCard key={`primary:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={`ranked:${citizenSessionKey}`} onSnapshot={setElection}/>}
