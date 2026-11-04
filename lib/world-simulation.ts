@@ -32,6 +32,7 @@ import { readReserveBoard, type ReserveBoard } from './spark-supply'; // #431
 import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 import { korundRationCutCities, korundRationRecoveryCities, korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from './korund-coupons'; // #967, #983
+import { nextDividendDayAt } from './veldwood-wallet-dividend.ts'; // #1063
 
 export const tickSeconds = 7200;
 export const maximumCatchupTicks = 3;
@@ -66,6 +67,8 @@ export type WorldClock = {
   compression: 12; epochSeconds: number; nowSeconds: number; gameDay: number;
   latestTick: number; pendingTicks: number; cadenceSeconds: number;
   mode: 'request-driven durable simulation';
+  /** #1063: next Veldwood Dividend Day, unix seconds. Derived from the epoch. Absent when the clock is not a safe integer. */
+  dividendDayAt?: number;
 };
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
@@ -104,7 +107,7 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
      // (only while HARIMU_WAR_ENABLED and HARIMU_WAR_ASSEMBLY_ENABLED are on; citizen POST path only).
      { name: 'warAssembly', on: options.war === true && options.warAssembly === true, run: () => decideKindleWarProposals(db, now, options.warLimits === true, { enabled: options.warWeariness === true, losses: options.warWearinessLosses === true }).catch(warnOnly('war assembly')) },
      // #427 slice 2: surrender and concession endings, decided once, also after diplomacy (HARIMU_WAR_ENABLED and HARIMU_WAR_ENDINGS_ENABLED; citizen POST path only).
-     { name: 'warEndings', on: options.war === true && options.warEndings === true, run: () => decideWarEndings(db, now, { enabled: options.warWeariness === true, losses: options.warWearinessLosses === true }).catch(warnOnly('war endings')) }],
+     { name: 'warEndings', on: options.war === true && options.warEndings === true, run: () => decideWarEndings(db, now, { enabled: options.warWeariness === true, losses: options.warWearinessLosses === true, peaceRevert: options.peaceRevert === true }).catch(warnOnly('war endings')) }],
     // #612: the Founding Period's one day-30 event per MVP nation (idempotent).
     [{ name: 'foundingDay30', on: options.foundingPeriod === true, run: () => runFoundingDay30(db, now).catch(warnOnly('founding day-30')) }],
     // #825 Kindle vote-buying watch: one idempotent sweep statement over direct transfers/gifts only (none exist yet, so no query) (HARIMU_VOTE_BUYING_WATCH_ENABLED; citizen POST path only, never a GET).
@@ -125,7 +128,7 @@ export async function runWorldChains(chains: WorldRunner[][]): Promise<void> {
 }
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { armyBattles?: boolean; winterMarch?: boolean; religiousHarmony?: boolean; reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; riskScoring?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { armyBattles?: boolean; winterMarch?: boolean; religiousHarmony?: boolean; reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; riskScoring?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; peaceRevert?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
@@ -218,8 +221,10 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
   ]);
   const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
   const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
+  const dividendDayAt = nextDividendDayAt(epoch, now);
   return {clock:{compression:12,epochSeconds:epoch,nowSeconds:now,gameDay:Math.floor(Math.max(0,now-epoch)*12/86400)+1,
-    latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation'},
+    latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation',
+    ...(dividendDayAt == null ? {} : { dividendDayAt })},
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
     supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
