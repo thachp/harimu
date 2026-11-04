@@ -60,7 +60,7 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await owners(), before, 'the capital is never captured');
     assert.deepEqual((await r.call('army/battles', null)).data, read.result.data, 'deterministic on repeat reads');
     const card = (await r.call('army', 'alice')).data.army.unit;
-    assert.deepEqual(card.battle, { opponentNationId: 'korund', attacking: true, rounds: 0, status: 'attacker_won' }); assert.equal(card.strength, 5);
+    assert.deepEqual(card.battle, { opponentNationId: 'korund', attacking: true, rounds: 0, status: 'attacker_won', stances: { hold: 1, advance: 0, fall_back: 0 }, opponentStances: { hold: 0, advance: 0, fall_back: 0 } }); assert.equal(card.strength, 5);
     assert.match(readFileSync('app/army-card.tsx', 'utf8'), /\{unit\.battle && <p>\{battleLine\(unit\.battle\)\}<\/p>\}/);
   });
 
