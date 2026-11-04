@@ -67,14 +67,14 @@ export async function proposeEnd(db: GameDatabase, command: ProposeEndCommand, n
 
 export type AcceptEndCommand = { nation: string; role: string; warId: string; requestId: string };
 /** The OTHER side's authorized office accepts the pending proposal; the war then ends through endWar as a treaty (ceasefire or peace: the 10-day peace lock starts). */
-export async function acceptEnd(db: GameDatabase, command: AcceptEndCommand, now: number, enabled: boolean) {
+export async function acceptEnd(db: GameDatabase, command: AcceptEndCommand, now: number, enabled: boolean, peaceRevert = false) {
   if (!enabled) return disabled();
   if (!requestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
   const who = actor(command.nation, command.role); if (!who.ok) return who;
   const prior = await byRequest(db, command.requestId);
   if (prior) {
     if (prior.action !== 'accept-end' || prior.war_id !== command.warId || prior.nation !== who.nation) return fail(409, 'request_reused', 'That request id was already used for a different command.');
-    const again = await endWar(db, prior.war_id, 'treaty', now, enabled); // idempotent: a retry finishes an accepted end that did not complete
+    const again = await endWar(db, prior.war_id, 'treaty', now, enabled, peaceRevert); // idempotent: a retry finishes an accepted end that did not complete
     return again.ok ? { ok: true as const, replay: true as const, war: again.war, authority: who.authority } : again;
   }
   const war = await openWar(db, command.warId);
@@ -87,11 +87,11 @@ export async function acceptEnd(db: GameDatabase, command: AcceptEndCommand, now
   await record(db, { requestId: command.requestId, warId: war.id, action: 'accept-end', nation: who.nation, authority: who.authority, now });
   const saved = await byRequest(db, command.requestId);
   if (!saved) return fail(409, 'already_accepted', 'This proposal has already been accepted.');
-  const ended = await endWar(db, war.id, 'treaty', now, enabled);
+  const ended = await endWar(db, war.id, 'treaty', now, enabled, peaceRevert);
   return ended.ok ? { ok: true as const, kind: proposal.end_kind, war: ended.war, authority: who.authority } : ended;
 }
 
-export type WarCommandInput = { enabled: boolean; /** #426: HARIMU_WAR_DECLARATION_LIMITS_ENABLED, default off. */ limits?: boolean; /** #427: HARIMU_WAR_ASSEMBLY_ENABLED, default off. */ assembly?: boolean; /** #427 slice 2: HARIMU_WAR_ENDINGS_ENABLED, default off. */ endings?: boolean; /** #912: HARIMU_WAR_LOSS_CAP_ENABLED, default off. */ lossCap?: boolean; secret: string | undefined; authorization: string | null; body: Record<string, unknown>; now: number };
+export type WarCommandInput = { enabled: boolean; /** #426: HARIMU_WAR_DECLARATION_LIMITS_ENABLED, default off. */ limits?: boolean; /** #427: HARIMU_WAR_ASSEMBLY_ENABLED, default off. */ assembly?: boolean; /** #427 slice 2: HARIMU_WAR_ENDINGS_ENABLED, default off. */ endings?: boolean; /** #912: HARIMU_WAR_LOSS_CAP_ENABLED, default off. */ lossCap?: boolean; /** #1054: HARIMU_WAR_PEACE_REVERT_ENABLED (also needs war). */ peaceRevert?: boolean; secret: string | undefined; authorization: string | null; body: Record<string, unknown>; now: number };
 const text = (value: unknown, max: number) => typeof value === 'string' && value.length > 0 && value.length <= max ? value : '';
 /** `authorizeWarCaller` is also called by the route before it parses the body, so a bad body without credentials is 401, not 400. The server-only entry point: flag first (403, nothing read or written), then the bearer secret (HARIMU_WAR_ADMIN_SECRET; missing or wrong never authorizes), then the command. */
 export async function authorizeWarCaller(input: { enabled: boolean; secret: string | undefined; authorization: string | null }) {
@@ -106,7 +106,7 @@ export async function handleWarCommand(db: GameDatabase, input: WarCommandInput)
   const base = { nation: text(body.nation, 20), role: text(body.role, 40), requestId: text(body.requestId, 64) };
   if (body.action === 'declare') return declareByAuthority(db, { ...base, defender: text(body.defender, 20), casusBelli: typeof body.casusBelli === 'string' ? body.casusBelli : undefined, declaredBy: typeof body.declaredBy === 'string' ? body.declaredBy : undefined }, now, true, input.limits === true, input.assembly === true);
   if (body.action === 'propose-end') return proposeEnd(db, { ...base, warId: text(body.warId, 80), kind: text(body.kind, 20) }, now, true);
-  if (body.action === 'accept-end') return acceptEnd(db, { ...base, warId: text(body.warId, 80) }, now, true);
+  if (body.action === 'accept-end') return acceptEnd(db, { ...base, warId: text(body.warId, 80) }, now, true, input.peaceRevert === true);
   // #427 slice 2: only while HARIMU_WAR_ENDINGS_ENABLED is on; off, these actions are refused exactly like any unknown action.
   if (input.endings === true && (body.action === 'surrender' || body.action === 'concede')) { const who = actor(base.nation, base.role); if (!who.ok) return who;
     const proposed = await proposeWarEnding(db, { nation: who.nation, warId: text(body.warId, 80), kind: body.action === 'surrender' ? 'surrender' : 'concession', squares: body.squares, requestId: base.requestId }, now); return proposed.ok ? { ...proposed, status: 'proposed' as const, authority: who.authority } : proposed; }
