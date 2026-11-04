@@ -67,10 +67,15 @@ test('Amber then Red require a permit; back to Green does not; banner read and p
   const down = await (await admin({ level: 'green' })).json(); assert.equal(down.headline, 'The Directorate lowers the Alert Level to Green.');
   assert.equal(await nationLevel(), 'green');
   assert.equal((await move()).data.reason, 'not_open_yet');
-  const news = (await r.db.prepare("SELECT headline FROM world_events WHERE kind='directorate-alert' ORDER BY sort_order DESC, id").all()).results.map(e => e.headline);
-  assert.equal(news.length, 3); assert.ok(news.includes('The Directorate raises the Alert Level to Amber.'));
-  assert.equal((await (await admin({ level: 'green' })).json()).changed, false, 'same level: no new row or news');
-  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM varkand_alert_levels').first()).n), 3);
+  const news = (await r.db.prepare("SELECT headline, detail, location FROM world_events WHERE kind='directorate-alert' ORDER BY id").all()).results.map(e => [e.headline, e.detail, e.location]);
+  assert.deepEqual(news, [
+    ['The Directorate raises the Alert Level to Amber.', 'Alert Level Amber is in force across Varkand.', 'Varkand'],
+    ['The Directorate raises the Alert Level to Red.', 'Alert Level Red is in force across Varkand.', 'Varkand'],
+    ['The Directorate lowers the Alert Level to Green.', 'Alert Level Green is in force across Varkand.', 'Varkand'],
+  ]);
+  assert.equal((await (await admin({ level: 'green' })).json()).changed, false, 'same level: no write or news');
+  assert.equal(Number((await r.db.prepare("SELECT COUNT(*) AS n FROM world_events WHERE kind='directorate-alert'").first()).n), 3);
+  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM varkand_alert_levels').first()).n), 1, 'single upserted row');
 });
 
 test('flag off: stored Amber is ignored, no alertLevel on the nation read, move behaves as today', async t => {
@@ -82,4 +87,11 @@ test('flag off: stored Amber is ignored, no alertLevel on the nation read, move 
 
 test('single source: home route and world route both read readVarkandAlert', () => {
   for (const f of ['app/api/city/home/route.ts', 'app/api/world/route.ts']) assert.match(read(f), /readVarkandAlert\(/, f);
+});
+
+test('concurrent admin sets do not collide: one row, last write is the level', async t => {
+  const { r, admin } = await world(t);
+  const results = await Promise.all([admin({ level: 'amber' }), admin({ level: 'red' })]);
+  for (const res of results) assert.equal(res.status, 200);
+  assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM varkand_alert_levels').first()).n), 1);
 });
