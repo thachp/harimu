@@ -1,7 +1,7 @@
 import { aurelleRisingSchemas } from './aurelle-rising';
 import { aurelleCoupSchemas } from './aurelle-coup';
 import { laborBureauSchemas } from './labor-bureau';
-import { dormantJobSchemas } from './dormant-job'; // #1066 (migration 0112)
+import { dormantJobSchemas } from './dormant-job'; // #1066 (migration 0115)
 import { korundPostSchemas } from './korund-posts'; // #886 (b)
 import { grayMarketSchemas } from './gray-market';
 import { graySeizureSchemas } from './gray-seizure';
@@ -65,6 +65,7 @@ import { conscriptionSchemas, conscriptStayColumn } from './army-conscription'; 
 import { holySiteSchemas } from './holy-sites'; // #855
 import { armyBattleSchemas } from './army-battle'; // #738 battles
 import { armyWoundSchemas } from './army-wounds'; // #911
+import { armyQuartermasterSchemas } from './army-quartermaster'; // #1053
 import { crownDecreeSchemas } from './crown-debasement'; // #362
 import { canvassSchemas } from './canvassing'; // #442
 import { townHallSchemas } from './town-hall'; // #441
@@ -295,6 +296,7 @@ async function initialize(database: GameDatabase) {
     ...holySiteSchemas.map(sql=>database.prepare(sql)), // #855
     ...armyBattleSchemas.map(sql=>database.prepare(sql)), // #738 battles
     ...armyWoundSchemas.map(sql=>database.prepare(sql)), // #911
+    ...armyQuartermasterSchemas.map(sql=>database.prepare(sql)), // #1053
     ...electionSchemas.map(sql=>database.prepare(sql)),
     ...accountElectionSchemas.map(sql=>database.prepare(sql)),
     ...collectivePetitionSchemas.map(sql=>database.prepare(sql)),
