@@ -36,7 +36,7 @@ for (const backend of ['sqlite', 'postgres']) {
     const rows = await c.logged();
     assert.equal(rows.length, 1);
     assert.deepEqual([rows[0].siege_id, rows[0].battle_key, rows[0].reason, rows[0].request_id], [null, 'assault:city:city-f1', 'foundation_truce', 'req-assault-1']);
-    assert.ok(rows[0].squares >= 1);
+    assert.equal(Number(rows[0].squares), 25); // the whole 5x5 claim block (claimRadius 2) nobody bought
   });
 
   test(`mixed battle logs only the truce squares and moves the rest (${backend})`, async t => {
