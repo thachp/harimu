@@ -7,10 +7,11 @@ import { readArmy, runArmyCommand } from '@/lib/army';
 import { serviceUntil } from '@/lib/army-conscription';
 import { marchPace, readActiveWars, winterRoadNote } from '@/lib/army-map';
 import { winterMarchEnabled } from '@/lib/winter-march'; // #1038
-import { applySupplyLoss, armySupplyEnabled, unitSupply } from '@/lib/army-supply';
+import { applySupplyLoss, ARMY_SUPPLY_RANGE_SQUARES, armySupplyEnabled, unitSupply } from '@/lib/army-supply';
 import { armyBattlesEnabled, readBattles, withBattleLosses } from '@/lib/army-battle';
 import { unitById } from '@/lib/army-rules';
 import { readWoundedUntil, woundedRefusal } from '@/lib/army-wounds';
+import { armyQuartermasterEnabled, readQuartermasterExtra } from '@/lib/army-quartermaster'; // #1053
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -31,8 +32,11 @@ export async function GET(request: Request) {
   const unit = army.unit;
   // #738 slice 5: a cut supply line lowers the shown strength (only while HARIMU_ARMY_SUPPLY_ENABLED is on and strength is shown; off: no extra read).
   if (unit && unit.strength !== undefined && armySupplyEnabled(env)) {
-    const supply = unitSupply(unitById(unit.id)?.nationId ?? '', await readActiveWars(db), now, undefined, pace);
-    army.unit = { ...unit, strength: applySupplyLoss(unit.strength, supply.strengthLossPct), supply };
+    const nation = unitById(unit.id)?.nationId ?? '';
+    // #1053: quartermaster shifts widen the range (flag off: no extra read, extra 0, the supply key keeps its old shape).
+    const qm = armyQuartermasterEnabled(env) ? (await readQuartermasterExtra(db, now)).get(nation) ?? 0 : null;
+    const supply = unitSupply(nation, await readActiveWars(db), now, undefined, pace, qm ?? 0);
+    army.unit = { ...unit, strength: applySupplyLoss(unit.strength, supply.strengthLossPct), supply: qm === null ? supply : { ...supply, rangeSquares: ARMY_SUPPLY_RANGE_SQUARES + qm, quartermasterSquares: qm } };
   }  // #738 battles: your unit's battle (as attacker or defender), with the strength it has left, only while HARIMU_ARMY_BATTLES_ENABLED is on.
   const nationId = army.unit ? unitById(army.unit.id)?.nationId : undefined;
   if (army.unit && army.unit.strength !== undefined && nationId && armyBattlesEnabled(env)) {
