@@ -2298,6 +2298,25 @@ html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; 
 .aurelle-sealed-scroll > .aurelle-scroll-seal .nation-crest { width: calc(24px * var(--text-scale, 1)); height: calc(28px * var(--text-scale, 1)); }
 .aurelle-sealed-scroll summary { display: flex; align-items: center; min-height: 44px; min-width: 44px; }
 
+/* #1082: Varkand Alert Level banner and stamped dispatches. Paper is the nation soft color #c5d0ce, edge the nation color #526b68.
+   Each level has its own outline mark and stripe direction as well as a tint. No animation or transition. */
+.varkand-alert{display:flex;flex-wrap:wrap;align-items:center;gap:10px;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:0 0 12px;padding:10px 12px;border:1px solid;border-inline-start-width:8px}
+.varkand-alert-mark{display:grid;place-items:center;flex:0 0 auto;width:44px;height:44px;border:2px solid currentColor;font-size:22px;line-height:1}
+.varkand-alert-copy{flex:1 1 12rem;min-width:0}
+.varkand-alert-name,.varkand-alert-meaning{margin:0;overflow-wrap:break-word}
+.varkand-alert-name{font-weight:700}
+.varkand-alert[data-alert="green"]{color:#12331c;background:#e7f4e4;border-color:#12331c}
+.varkand-alert[data-alert="green"] .varkand-alert-mark{background-image:repeating-linear-gradient(0deg, transparent 0 4px, currentColor 4px 5px)}
+.varkand-alert[data-alert="amber"]{color:#3a2806;background:#f8f1d6;border-color:#3a2806}
+.varkand-alert[data-alert="amber"] .varkand-alert-mark{background-image:repeating-linear-gradient(135deg, transparent 0 4px, currentColor 4px 5px)}
+.varkand-alert[data-alert="red"]{color:#4a1210;background:#f8e6e2;border-color:#4a1210}
+.varkand-alert[data-alert="red"] .varkand-alert-mark{background-image:repeating-linear-gradient(0deg, transparent 0 4px, currentColor 4px 5px),repeating-linear-gradient(90deg, transparent 0 4px, currentColor 4px 5px)}
+:is(.varkand-dispatch,.nation-inspector article.varkand-dispatch,.game-inspector-body .varkand-dispatch){display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;max-width:100%;box-sizing:border-box;padding:12px;border:1px dashed #526b68;background-color:#c5d0ce;background-image:repeating-linear-gradient(90deg, transparent 0 15px, #526b6826 15px 16px);color:#1a2422}
+:is(.varkand-dispatch,.game-inspector-body .varkand-dispatch) :is(h3,h4,p,strong){color:#1a2422}
+:is(.varkand-dispatch,.game-inspector-body .varkand-dispatch) :is(h3,h4){margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.04em;text-transform:uppercase;overflow-wrap:anywhere}
+.varkand-dispatch-stamp{align-self:flex-end;display:grid;place-items:center;width:44px;height:44px;border:2px dashed #1a2422;border-radius:50%;color:#1a2422;font-size:18px;line-height:1}
+:is(.varkand-alert,.game-inspector-body .varkand-alert) p{color:inherit}
+
 /* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
 button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 
