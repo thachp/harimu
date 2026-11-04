@@ -1,7 +1,7 @@
 import { aurelleRisingSchemas } from './aurelle-rising';
 import { aurelleCoupSchemas } from './aurelle-coup';
 import { laborBureauSchemas } from './labor-bureau';
-import { dormantJobSchemas } from './dormant-job'; // #1066 (migration 0115)
+import { dormantJobSchemas } from './dormant-job'; // #1066 (migration 0116)
 import { korundPostSchemas } from './korund-posts'; // #886 (b)
 import { grayMarketSchemas } from './gray-market';
 import { graySeizureSchemas } from './gray-seizure';
