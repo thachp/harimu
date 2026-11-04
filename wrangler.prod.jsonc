@@ -103,7 +103,9 @@
       // #1047: daily soft cap on productive shifts (docs §17.3). Off: no count, no refusal, no extra query.
       "HARIMU_SHIFT_SOFT_CAP_ENABLED": "false",
       // #1085: Varkand Directorate of the Five Commands. The Chair rotates every 60 real days. Off: no directorate key on the government snapshot.
-      "HARIMU_VARKAND_DIRECTORATE_ENABLED": "false"
+      "HARIMU_VARKAND_DIRECTORATE_ENABLED": "false",
+      // #1094: Varkand Mandate Plebiscite every 150 real days. Off: no mandatePlebiscite key on the government snapshot.
+      "HARIMU_VARKAND_PLEBISCITE_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
