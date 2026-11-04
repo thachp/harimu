@@ -1,3 +1,5 @@
+import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
+
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
   nationId: string;
@@ -7,6 +9,8 @@ export type GovernmentSnapshot = {
   /** #70/#74 Korund: current Chairman, Presidium seats and the latest emergency session (State Media rumor view). */
   presidium?: { chairman: { name: string }; seats: { id: string; name: string; role: string; status: 'serving' | 'purged' }[];
     session: { status: 'open' | 'survived' | 'purged'; openedAt: number; resolvesAt: number; resolvedAt: number | null } | null };
+  /** #1085 Varkand: Chair, the five Commands, and the next Rotation Day. Present only while HARIMU_VARKAND_DIRECTORATE_ENABLED is on. */
+  directorate?: { chair: VarkandCommand; commands: readonly VarkandCommand[]; nextRotationAt: number };
   roles: { name: string; controller: string }[];
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
@@ -80,6 +84,28 @@ export function simulateGovernment(input: {
     },
     influenceSummary: institution.influence,
   };
+}
+
+/** #1085. Flag off, or any nation but Varkand: the same snapshot, and no directorate key. */
+export function withVarkandDirectorate(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  const { chair, nextRotationAt } = varkandChairAt(nowMs);
+  return { ...snapshot, directorate: { chair, commands: varkandCommands, nextRotationAt } };
+}
+
+/** Varkand government read while the flag is on. Flag off returns null, which is today's read. */
+export function varkandGovernmentSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVarkandDirectorate({
+    nationId: 'varkand', mode: 'rule-bound simulation',
+    roles: varkandCommands.map(command => ({ name: `${command.command} Marshal`, controller: 'AI/SI role · deterministic rules' })),
+    decision: {
+      title: 'Directorate order', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Directorate of the Five Commands holds the line. This read names the Chair and the next Rotation Day. It proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The Chair rotates among the five Marshals every 60 real days. Citizens do not elect the Directorate.',
+  }, nowMs, true);
 }
 
 /** Preserve the recorded priority, while rebasing a live proposal onto today's verified funds. */
