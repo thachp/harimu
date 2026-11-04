@@ -2298,8 +2298,42 @@ html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; 
 .aurelle-sealed-scroll > .aurelle-scroll-seal .nation-crest { width: calc(24px * var(--text-scale, 1)); height: calc(28px * var(--text-scale, 1)); }
 .aurelle-sealed-scroll summary { display: flex; align-items: center; min-height: 44px; min-width: 44px; }
 
+/* #1082: Varkand Alert Level banner and stamped dispatches. Paper is the nation soft color #c5d0ce, edge the nation color #526b68.
+   Each level has its own outline mark and stripe direction as well as a tint. No animation or transition. */
+.varkand-alert{display:flex;flex-wrap:wrap;align-items:center;gap:10px;width:100%;max-width:100%;min-width:0;box-sizing:border-box;margin:0 0 12px;padding:10px 12px;border:1px solid;border-inline-start-width:8px}
+.varkand-alert-mark{display:grid;place-items:center;flex:0 0 auto;width:44px;height:44px;border:2px solid currentColor;font-size:calc(22px * var(--text-scale, 1));line-height:1}
+.varkand-alert-copy{flex:1 1 12rem;min-width:0}
+.varkand-alert-name,.varkand-alert-meaning{margin:0;overflow-wrap:break-word}
+.varkand-alert-name{font-weight:700}
+.varkand-alert[data-alert="green"]{color:#12331c;background:#e7f4e4;border-color:#12331c}
+.varkand-alert[data-alert="green"] .varkand-alert-mark{background-image:repeating-linear-gradient(0deg, transparent 0 4px, currentColor 4px 5px)}
+.varkand-alert[data-alert="amber"]{color:#3a2806;background:#f8f1d6;border-color:#3a2806}
+.varkand-alert[data-alert="amber"] .varkand-alert-mark{background-image:repeating-linear-gradient(135deg, transparent 0 4px, currentColor 4px 5px)}
+.varkand-alert[data-alert="red"]{color:#4a1210;background:#f8e6e2;border-color:#4a1210}
+.varkand-alert[data-alert="red"] .varkand-alert-mark{background-image:repeating-linear-gradient(0deg, transparent 0 4px, currentColor 4px 5px),repeating-linear-gradient(90deg, transparent 0 4px, currentColor 4px 5px)}
+:is(.varkand-dispatch,.nation-inspector article.varkand-dispatch,.game-inspector-body .varkand-dispatch){display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;max-width:100%;box-sizing:border-box;padding:12px;border:1px dashed #526b68;background-color:#c5d0ce;background-image:repeating-linear-gradient(90deg, transparent 0 15px, #526b6826 15px 16px);color:#1a2422}
+:is(.varkand-dispatch,.game-inspector-body .varkand-dispatch) :is(h3,h4,p,strong){color:#1a2422}
+:is(.varkand-dispatch,.game-inspector-body .varkand-dispatch) :is(h3,h4){margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.04em;text-transform:uppercase;overflow-wrap:anywhere}
+.varkand-dispatch-stamp{align-self:flex-end;display:grid;place-items:center;width:44px;height:44px;border:2px dashed #1a2422;border-radius:50%;color:#1a2422;font-size:calc(18px * var(--text-scale, 1));line-height:1}
+:is(.varkand-alert,.game-inspector-body .varkand-alert) p{color:inherit}
+
 /* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
 button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 
 /* Shared screen-reader-only utility (#243 follow-up): text stays in the accessibility tree (never display:none / visibility:hidden) but takes no visible space. */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* #1088: Veldwood Ballot Booklet. Field, mark, accent and leaf are the Veldwood crest and mark tokens.
+   Reverse-diagonal stripes (45deg) are the nation pattern, on the cover, the symbol chip and each number. No animation. */
+.veldwood-ballot-booklet{--veldwood-field:#25552f;--veldwood-mark:#f6ead3;--veldwood-accent:#e0a43a;--veldwood-leaf:#96b66d;display:flex;flex-direction:column;min-width:0;max-width:100%;box-sizing:border-box;overflow:hidden;color:var(--veldwood-field);background-color:var(--veldwood-mark);border:2px solid var(--veldwood-accent);border-inline-start-width:calc(12px * var(--text-scale, 1));border-radius:2px 10px 10px 2px}
+:is(.game-inspector-body,.nation-inspector) .veldwood-ballot-booklet{margin:0 0 12px;padding:0;border:2px solid var(--veldwood-accent);border-inline-start-width:calc(12px * var(--text-scale, 1));border-radius:2px 10px 10px 2px;background-color:var(--veldwood-mark);background-image:none;box-shadow:none}
+.veldwood-ballot-cover{display:flex;flex-wrap:wrap;align-items:center;gap:10px;min-width:0;padding:12px;color:var(--veldwood-mark);background-color:var(--veldwood-field);background-image:repeating-linear-gradient(45deg, transparent 0 6px, color-mix(in srgb, var(--veldwood-accent) 55%, transparent) 6px 7px), repeating-linear-gradient(90deg, var(--veldwood-field) 0 5px, color-mix(in srgb, var(--veldwood-field) 82%, var(--veldwood-leaf)) 5px 9px, var(--veldwood-field) 9px 14px)}
+.veldwood-ballot-title{flex:1 1 8rem;min-width:0;margin:0;color:var(--veldwood-mark);font-size:calc(16px * var(--text-scale, 1));font-weight:700;letter-spacing:.03em;line-height:1.3;overflow-wrap:anywhere}
+.veldwood-ballot-booklet .veldwood-ballot-mark{width:calc(36px * var(--text-scale, 1));height:calc(36px * var(--text-scale, 1));flex:0 0 calc(36px * var(--text-scale, 1));margin:0;color:var(--veldwood-accent);background-color:var(--veldwood-field);font-size:calc(20px * var(--text-scale, 1))}
+.veldwood-ballot-pages{list-style:none;display:flex;flex-direction:column;gap:8px;min-width:0;margin:0;padding:10px 12px 12px;background-color:var(--veldwood-mark);background-image:repeating-linear-gradient(45deg, transparent 0 10px, color-mix(in srgb, var(--veldwood-leaf) 42%, transparent) 10px 11px)}
+.veldwood-ballot-page{display:flex;align-items:flex-start;gap:8px;min-width:0;margin:0;padding:8px;border:1px solid color-mix(in srgb, var(--veldwood-field) 28%, var(--veldwood-mark));background-color:color-mix(in srgb, var(--veldwood-mark) 90%, var(--veldwood-leaf))}
+.veldwood-ballot-num{display:grid;place-items:center;flex:0 0 calc(28px * var(--text-scale, 1));width:calc(28px * var(--text-scale, 1));height:calc(28px * var(--text-scale, 1));border:2px solid var(--veldwood-field);background-color:var(--veldwood-mark);background-image:repeating-linear-gradient(45deg, transparent 0 3px, color-mix(in srgb, var(--veldwood-accent) 70%, transparent) 3px 4px);color:var(--veldwood-field);font-size:calc(14px * var(--text-scale, 1));font-weight:700;line-height:1}
+.veldwood-ballot-page p{flex:1 1 auto;min-width:0;margin:0;color:var(--veldwood-field);font-size:calc(15px * var(--text-scale, 1));line-height:1.45;overflow-wrap:anywhere}
+:is(.game-inspector-body,.nation-inspector) .veldwood-ballot-booklet :is(.veldwood-ballot-page p,.veldwood-ballot-num){color:var(--veldwood-field)}
+:is(.game-inspector-body,.nation-inspector) .veldwood-ballot-title{color:var(--veldwood-mark)}
+.veldwood-ballot-booklet :focus-visible{outline:3px solid var(--veldwood-accent);outline-offset:3px}

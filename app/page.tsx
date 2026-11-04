@@ -65,6 +65,8 @@ import { AurellePlanPanel, type AurellePlanView, type AurelleCommand, type Aurel
 import { KorundPlanPanel, PriorNationShift, type KorundPlanView, type KorundCommand, type KorundAction, type GrayCommand } from './korund-plan-panel';
 import { nationPlanPanelNation } from '@/lib/nation-panels';
 import { GovernmentPanel } from './government-panel';
+import { BallotStatus } from './veldwood-ballot-booklet'; // #1088
+import { VarkandAlertBanner } from './varkand-dispatch';
 import { FoundingBanner } from './founding-banner'; // #612
 import { SiegePanel } from './siege-panel'; // #620
 import { AurelleRisingPanel } from './aurelle-rising';
@@ -130,6 +132,8 @@ type Nation = {
   position: { x: number; y: number };
   /** #81: band only (server never sends counts). Absent in the static fallback. */
   populationBand?: PopulationBand;
+  /** #1082/#1081: Alert Level on the Varkand nation read from GET /api/world (stored level, flag HARIMU_VARKAND_ALERT_ENABLED). The static record does not carry one. */
+  alertLevel?: 'green' | 'amber' | 'red';
 };
 
 type WorkOrder = {
@@ -1800,7 +1804,7 @@ export default function Home() {
         {citizenNation.id === 'confluence' && <ConfluencePillars />}{/* #487: read-only Four Pillars */}
         {simulation?.sieges && <SiegePanel sieges={simulation.sieges} nationId={citizenNation.id} />}
         <FoundingBanner founding={government?.founding} nationId={citizenNation.id} />
-        <GovernmentPanel nationId={citizenNation.id} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
+        <GovernmentPanel nationId={citizenNation.id} alertLevel={citizenNation.alertLevel} onRetry={() => setSessionRetry(value => value + 1)} simulation={simulation ?? undefined} verification={verification} snapshot={government} localDemo={!clerkConfigured} pending={governmentPending} error={governmentError} onPetition={(topic) => void petitionGovernment(topic)} />
         <ArmyCard key={`army:${citizenSessionKey}`}/>{/* QA2 preview report: remount after sign-in like the other session cards; mounted once with no key it kept the signed-out null forever */}
         {citizenNation.id==='kindle'&&clerkConfigured&&<PrimaryCard key={`primary:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&clerkConfigured&&<RankedBallot key={`ranked:${citizenSessionKey}`} onSnapshot={setElection}/>}
@@ -1815,7 +1819,7 @@ export default function Home() {
         {citizenNation.id==='kindle'&&simulation?.reserve&&<ReserveBoardLine reserve={simulation.reserve}/>}
         {citizenNation.id==='aurelle'&&clerkConfigured&&<AurelleRisingPanel key={`aurelle-rising:${citizenSessionKey}`}/>}
         {citizenNation.id==='kindle'&&(clerkConfigured?<CollectivePetitionsPanel key={`petitions:${citizenSessionKey}`} onSnapshot={setCollectivePetitions}/>:<p>Collective petitions require a connected Kindle citizen account. Local samples never count.</p>)}
-        <p>{citizenNation.id==='kindle'&&clerkConfigured?'Kindle’s preview ballot status is shown above. Protests and broader public-opinion systems are planned.':'This location has no counted ballot. Protests and broader public-opinion systems are planned under each nation’s rules.'}</p>
+        <BallotStatus nationId={citizenNation.id} kindleAccount={clerkConfigured} />
       </>}
     </>}
   </section>;
@@ -1843,6 +1847,7 @@ export default function Home() {
   const foreignCivic = isForeignCivic(viewMode, viewedNationParam, selected.id, citizenNation?.id);
   const foreignCivicPanel = <section className="game-national-context" aria-label={`${selected.name} government, read-only`}>
     <p className="eyebrow">Civic · {selected.shortName} · read-only</p>
+    {selected.id === 'varkand' && <VarkandAlertBanner alertLevel={selected} />}
     <h2>{selected.government}</h2>
     <p>{selected.name} follows its own institutions. Computer-controlled leaders hold every government office in this release, following fixed game rules.</p>
     <dl><dt>Capital</dt><dd>{selected.capital}</dd><dt>Government</dt><dd>{selected.government}</dd><dt>Economy</dt><dd>{selected.economy}</dd></dl>
