@@ -19,7 +19,6 @@
  *  (#970) Korund ration coupons as a stamped booklet, flag off and on (scripts/korund-ration-booklet-check.mjs).
  *  (#1008) Aurelle royal decree as a sealed scroll, flag off and on (scripts/aurelle-sealed-scroll-check.mjs).
  *  (#1009) Kindle Assembly and presidential ballots as a civic form, flag off and on (scripts/kindle-civic-ballot-check.mjs).
- *  (#1064) Hoarvale Moot bills with a Royal Assent seal, flag off and on (scripts/hoarvale-royal-assent-check.mjs).
  *  (#1039) Phone map camera is straight down; desktop stays tilted (scripts/mobile-topdown-map-check.mjs).
  *  (#779) Nation fact-list labels never split mid-word (scripts/nation-fact-label-check.mjs).
  *  (#392 S5) World crest chips (scripts/ui-v2-world-check.mjs).
@@ -70,7 +69,6 @@ import { checkTopbarCountdown } from './topbar-countdown-check.mjs';
 import { checkKorundRationBooklet } from './korund-ration-booklet-check.mjs';
 import { checkAurelleSealedScrolls } from './aurelle-sealed-scroll-check.mjs';
 import { checkKindleCivicBallot } from './kindle-civic-ballot-check.mjs';
-import { checkHoarvaleRoyalAssent } from './hoarvale-royal-assent-check.mjs';
 import { checkKorundWalletRations } from './korund-wallet-rations-check.mjs';
 import { checkVeldwoodWalletDividend } from './veldwood-wallet-dividend-check.mjs';
 import { checkMobileTopdownMap } from './mobile-topdown-map-check.mjs';
@@ -258,7 +256,6 @@ try {
   await checkKorundRationBooklet({ browser, css, preflight, failures, rows }); // #970: Korund ration booklet
   await checkAurelleSealedScrolls({ browser, css, preflight, failures, rows }); // #1008: Aurelle sealed scrolls
   await checkKindleCivicBallot({ browser, css, preflight, failures, rows }); // #1009: Kindle civic ballot
-  await checkHoarvaleRoyalAssent({ browser, css, preflight, failures, rows }); // #1064: Hoarvale Royal Assent seal
   await checkKorundWalletRations({ browser, css, preflight, failures, rows }); // #1055: Korund food coupons on the top-bar wallet
   await checkVeldwoodWalletDividend({ browser, css, preflight, failures, rows }); // #1063: Veldwood Dividend Day on the top-bar wallet
   await checkMobileTopdownMap({ browser, css, preflight, failures, rows }); // #1039: phone top-down map, desktop unchanged

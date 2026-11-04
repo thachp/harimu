@@ -2298,18 +2298,6 @@ html[data-harimu-reduced-motion] ::backdrop { scroll-behavior: auto !important; 
 .aurelle-sealed-scroll > .aurelle-scroll-seal .nation-crest { width: calc(24px * var(--text-scale, 1)); height: calc(28px * var(--text-scale, 1)); }
 .aurelle-sealed-scroll summary { display: flex; align-items: center; min-height: 44px; min-width: 44px; }
 
-/* #1064: Hoarvale Royal Assent seal on Civic bills. Frost and silver come from the Hoarvale crest; the accent from the nation mark. No animation. */
-.hoarvale-bills{min-width:0;max-width:100%;margin:16px 0;padding:12px;color:var(--hv-ink,#14323a);background:var(--hv-paper,#f4f7f8);border:1px solid var(--hv-silver,#b8c2c9)}
-.hoarvale-bills h3{margin:0 0 8px;font-size:calc(17px * var(--text-scale,1))}
-.hoarvale-bills ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
-.hoarvale-bill{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;min-width:0;max-width:100%;padding:10px 12px;border:1px solid var(--hv-silver,#b8c2c9);background:var(--hv-paper,#f4f7f8)}
-.hoarvale-bill h4{margin:0;min-width:0;flex:1 1 8rem;font-size:calc(15px * var(--text-scale,1));overflow-wrap:break-word}
-.hoarvale-assent{min-width:0;max-width:100%;margin:0}
-.hoarvale-assent-seal{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;max-width:100%}
-.hoarvale-assent-mark{display:grid;place-items:center;flex:0 0 auto;width:calc(44px * var(--text-scale,1));height:calc(44px * var(--text-scale,1));border-radius:50%;border:2px solid var(--hv-frost,#3f7898);color:#fff;background-color:var(--hv-frost,#3f7898);background-image:linear-gradient(135deg,rgba(255,255,255,.45) 25%,transparent 25%),linear-gradient(225deg,rgba(255,255,255,.45) 25%,transparent 25%);background-size:8px 8px;font-size:calc(18px * var(--text-scale,1));line-height:1}
-.hoarvale-bill[data-assent="pending"] .hoarvale-assent-mark{color:var(--hv-ink,#14323a);background-color:var(--hv-paper,#f4f7f8);background-image:none;border-style:dashed}
-.hoarvale-assent-label{min-width:0;font-weight:700;overflow-wrap:break-word}
-
 /* Greyed-out but focusable actions (#84): aria-disabled keeps them in the tab order so the reason is reachable. */
 button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 
