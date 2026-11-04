@@ -1,8 +1,8 @@
 /** #1082: Varkand stamped dispatches and the Alert Level banner (docs §23.2).
  *  NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH is a HARIMU_UI_PACK key ("true" in preview, "false" in production).
  *  Layout bundles that omit the define have no `process`. A missing flag is off.
- *  #1081 is not on dev yet: there is no stored level. Callers pass the optional `alertLevel`
- *  on the Varkand nation read when that field exists. Anything else is Green. */
+ *  #1081: with HARIMU_VARKAND_ALERT_ENABLED on, GET /api/world puts the stored Directorate level on the Varkand
+ *  nation read as `alertLevel` (the same row the #992 permit check reads). A missing field or anything else is Green. */
 export type VarkandAlertLevel = 'green' | 'amber' | 'red';
 
 export function varkandDispatchFlag(): string | undefined {

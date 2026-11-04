@@ -7,6 +7,14 @@ import { readFileSync } from 'node:fs';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { citiesForNation } from '../lib/cities.ts';
 import { expandFlagPacks } from '../lib/flag-pack.mjs';
+import { fileURLToPath } from 'node:url';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { componentModule } from './helpers/component-module.mjs';
+
+const { VarkandAlertBanner } = await import(await componentModule(fileURLToPath(new URL('../app/varkand-dispatch.tsx', import.meta.url))));
+const banner = nation => { const k = 'NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH', prev = process.env[k]; process.env[k] = 'true';
+  try { return renderToStaticMarkup(React.createElement(VarkandAlertBanner, { alertLevel: nation })).match(/data-alert="([a-z]+)"/)[1]; } finally { if (prev === undefined) delete process.env[k]; else process.env[k] = prev; } };
 
 const read = f => readFileSync(f, 'utf8');
 const token = 'fixture-admin-token-1081';
@@ -23,8 +31,9 @@ async function world(t, { flag = true } = {}) {
   const at = new Date(r.now).toISOString();
   await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES ('vik','varkand','vik',18,0,'Good standing',?,?)").bind(at, at).run();
   const move = () => r.call('city-home', 'vik', { cityId: voren, requestId: randomUUID() });
-  const nationLevel = async () => (await r.call('world', 'alice')).data.nations.find(n => n.id === 'varkand')?.alertLevel;
-  return { r, lib, route, admin, move, nationLevel };
+  const varkandRead = async () => (await r.call('world', 'alice')).data.nations.find(n => n.id === 'varkand');
+  const nationLevel = async () => (await varkandRead())?.alertLevel;
+  return { r, lib, route, admin, move, nationLevel, varkandRead };
 }
 
 test('flag registered in HARIMU_GRAY_PACK: preview "true", production "false"', async () => {
@@ -94,4 +103,15 @@ test('concurrent admin sets do not collide: one row, last write is the level', a
   const results = await Promise.all([admin({ level: 'amber' }), admin({ level: 'red' })]);
   for (const res of results) assert.equal(res.status, 200);
   assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM varkand_alert_levels').first()).n), 1);
+});
+
+test('#1082 banner: stored Amber and Red reach the banner through /api/world; flag off the banner stays Green and no field is added', async t => {
+  const { admin, varkandRead } = await world(t);
+  assert.equal(banner(await varkandRead()), 'green');
+  for (const level of ['amber', 'red']) { await admin({ level }); assert.equal(banner(await varkandRead()), level, level); }
+  const off = await world(t, { flag: false });
+  await off.lib.setVarkandAlert(off.r.db, 'red', 1_900_000_000);
+  const nation = await off.varkandRead();
+  assert.equal('alertLevel' in nation, false); assert.equal('alertSetAt' in nation, false);
+  assert.equal(banner(nation), 'green');
 });
