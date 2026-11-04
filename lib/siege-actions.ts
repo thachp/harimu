@@ -12,6 +12,7 @@ import { capGuardSql, decideCapture, defenderLockSql, frontierLedger, refusalSta
 import { assaultRefusal, capturableCity, claimSquares, maxCityIdLength, planCapture, recordAssault, siegeCityKey, validSeconds, windowDay, type CityKind, type SquareFact } from './siege';
 import { canResolveCityAssault, defenseWindowConfig, isWarNation, requestIdOk, warStatus } from './war-rules';
 import { defenseStartHours, readDefenseWindows } from './war';
+import { FOUNDATION_TRUCE_SECONDS, inFoundationTruce, truceText } from './foundation-truce'; // #1070
 
 const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 const refusalText: Record<string, string> = {
@@ -47,9 +48,9 @@ export async function resolveCityAssault(db: GameDatabase, command: AssaultComma
   const war = await db.prepare('SELECT id,attacker_nation,defender_nation,declared_at,mobilization_ends_at,ended_at FROM wars WHERE id=?').bind(command.warId).first<WarRow>();
   if (!war) return fail(409, 'not_found', 'No such war.');
   // The city and its current holder, read from the map (an outpost's holder is its square's owner; a founded city's is world_cities.nation_id).
-  let centre: { x: number; y: number } | null = null, holder: string | null = null;
+  let centre: { x: number; y: number } | null = null, holder: string | null = null, founded: { name: string; at: number } | null = null;
   if (kind === 'outpost') { const o = mvpNations.find(n => n.id === command.cityId)?.outpost; if (o) { centre = o; holder = (await db.prepare('SELECT owner FROM world_squares WHERE x=? AND y=?').bind(o.x, o.y).first<{ owner: string | null }>())?.owner ?? null; } }
-  else { const c = await db.prepare('SELECT nation_id,center_x,center_y FROM world_cities WHERE id=?').bind(command.cityId).first<{ nation_id: string; center_x: number; center_y: number }>().catch(tolerate(isMissingRelation, null)); if (c) { centre = { x: Number(c.center_x), y: Number(c.center_y) }; holder = c.nation_id; } }
+  else { const c = await db.prepare('SELECT nation_id,name,center_x,center_y,founded_at FROM world_cities WHERE id=?').bind(command.cityId).first<{ nation_id: string; name: string; center_x: number; center_y: number; founded_at: number }>().catch(tolerate(isMissingRelation, null)); if (c) { centre = { x: Number(c.center_x), y: Number(c.center_y) }; holder = c.nation_id; founded = { name: c.name, at: Number(c.founded_at) }; } }
   const fact = centre ? await db.prepare('SELECT x,y,zone,owner,feature FROM world_squares WHERE x=? AND y=?').bind(centre.x, centre.y).first<SquareFact>() : null;
   const existing = await db.prepare(`SELECT ${siegeColumns} FROM city_sieges WHERE war_id=? AND city_key=?`).bind(war.id, key).first<SiegeRow>();
   const startHours = defenseStartHours(await readDefenseWindows(db));
@@ -59,6 +60,8 @@ export async function resolveCityAssault(db: GameDatabase, command: AssaultComma
   });
   if (refusal) return fail(409, refusal, refusalText[refusal] ?? 'Refused.');
   if (holder !== war.defender_nation) return fail(409, 'not_defenders_city', "That city does not belong to the war's defender.");
+  // #1070 (docs §15.4): a founded city cannot be assaulted or captured until 10 real days after founded_at (ends exactly at that second).
+  if (founded && !existing?.captured_at && inFoundationTruce(founded.at, now)) return { ...fail(409, 'foundation_truce', truceText(founded)), endsAt: founded.at + FOUNDATION_TRUCE_SECONDS };
   // #577 item 4: a city with nothing the attacker could take (every claim square privately bought) cannot be captured (Decision 109 stand-in): refuse before anything is written.
   if (!existing?.captured_at && !(await capturePlan(db, kind, centre!, war.attacker_nation, war.defender_nation)).transfer.length) return fail(409, 'nothing_to_capture', nothingToCapture);
   const siegeId = existing?.id ?? `siege-${crypto.randomUUID()}`;

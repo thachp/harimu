@@ -3,6 +3,7 @@
  *  siege capture path is byte-identical and nothing here is read. The only war path that moves a square on dev is the siege capture (lib/siege-actions); treaty
  *  cessions (lib/war-endings) are ratified transfers, not war capture, and stay out of scope. Refused captures are written to war_capture_refusals (migration 0094). */
 import type { GameDatabase } from './database-contract';
+import { truceCitiesFor, truceText, underTruce } from './foundation-truce'; // #1070
 
 /** ARC on #921: the docs' "real week" is a rolling 168 hours back from now, not a calendar week. A loss at now − 7d + 1s counts; one at exactly now − 7d does not. */
 export const WAR_LOSS_WINDOW_MS = 168 * 60 * 60 * 1000;
@@ -123,10 +124,13 @@ export async function readCaptureRefusals(db: GameDatabase, warId: string) {
 export async function transferBattleSquares(db: GameDatabase, cmd: {
   warId: string; battleKey: string; requestId: string; attacker: string; defender: string; now: number;
   squares: readonly { x: number; y: number }[];
-}): Promise<{ ok: true; moved: number } | { ok: false; reason: 'weekly_loss_cap' | 'nothing'; lost?: number; limit?: number }> {
+}): Promise<{ ok: true; moved: number; truce?: number } | { ok: false; reason: 'weekly_loss_cap' | 'nothing'; lost?: number; limit?: number } | { ok: false; reason: 'foundation_truce'; error: string; cityId: string; endsAt: number }> {
   if (!cmd.squares.length) return { ok: false, reason: 'nothing' };
+  // #1070 (docs §15.4): squares of a founded city's claim block do not move during its 10-real-day foundation truce; the battle itself still stands.
+  const truce = await truceCitiesFor(db, cmd.squares, cmd.now), open = cmd.squares.filter(sq => !underTruce(sq, truce));
+  if (truce.length && !open.length) return { ok: false, reason: 'foundation_truce', error: truceText(truce[0]), cityId: truce[0].id, endsAt: truce[0].endsAt };
   const owned: CapSquare[] = [];
-  for (const sq of cmd.squares) {
+  for (const sq of open) {
     const row = await db.prepare('SELECT zone,owner FROM world_squares WHERE x=? AND y=?').bind(sq.x, sq.y).first<{ zone: string; owner: string | null }>();
     if (row?.owner === cmd.defender) owned.push({ x: sq.x, y: sq.y, zone: row.zone, from: cmd.defender, to: cmd.attacker });
   }
@@ -152,5 +156,5 @@ export async function transferBattleSquares(db: GameDatabase, cmd: {
     await refusalStatement(db, { ...log, lost: after.lost, reason: 'weekly_cap', squares: frontier.length, limit }).run();
     return { ok: false, reason: 'weekly_loss_cap', lost: after.lost, limit };
   }
-  return { ok: true, moved: frontier.length };
+  return { ok: true, moved: frontier.length, ...(open.length < cmd.squares.length ? { truce: cmd.squares.length - open.length } : {}) };
 }
