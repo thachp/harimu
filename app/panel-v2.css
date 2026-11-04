@@ -8,6 +8,11 @@
 .panel-v2-stats>div{flex:1 1 auto;min-width:min-content}
 .panel-v2 .panel-v2-stats dt{font-size:calc(11px * var(--text-scale, 1));margin:0}
 .panel-v2 .panel-v2-stats dd{margin:0;font-size:calc(13px * var(--text-scale, 1));font-weight:600;text-align:left;overflow-wrap:break-word}
+/* #1076: gold-icon fact rows. One column so a long value wraps on spaces. The label column is min-content and does not break inside a word (#779), including at 320px and 150% text. No animation, so reduced motion is unchanged. */
+.panel-v2 dl.panel-v2-facts{display:grid;grid-template-columns:minmax(0,1fr);gap:8px 0}
+.panel-v2 .panel-v2-facts>div{display:grid;grid-template-columns:auto minmax(min-content,max-content) minmax(0,1fr);align-items:center;column-gap:8px;flex:none;min-width:0;max-width:100%}
+.panel-v2 .panel-v2-facts dt{overflow-wrap:normal;word-break:normal;hyphens:manual;white-space:nowrap;min-width:min-content}
+.panel-v2 .panel-v2-facts dd{min-width:0;overflow-wrap:break-word;word-break:normal;hyphens:manual;white-space:normal}
 .panel-v2 ul.panel-v2-rows{list-style:none;margin:0;padding:0;display:grid}.panel-v2 .panel-v2-rows li{margin:0;padding:0}
 .panel-v2-rows li+li{border-top:1px solid rgba(255,255,255,.08)}
 /* :not(.market-item) lifts these above .game-inspector-body button:not(.market-item), the panel's generic button rule */
