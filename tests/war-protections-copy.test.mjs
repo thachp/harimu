@@ -93,7 +93,8 @@ test('plain system voice: no byline, no AI badge field, no Notable, no nations, 
   assert.doesNotMatch(t,/\b(Earth|America|Europe|England|France|Japan|China|Russia)\b/);
   assert.doesNotMatch(t,/\b(blood|bleed|wound(s)? you|torture|army|armies|troops?|soldiers?)\b/i);
 });
-test('unwired: nothing in app/, components/ or lib/ imports war-protections-copy', () => {
+test('wired only by the #1070 foundation truce: lib/foundation-truce.ts is the sole importer in app/, components/ or lib/', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-protections-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/war-protections-copy/, f);
+  const importers=[...walk('app'),...walk('components'),...walk('lib')].filter(f=>/\.(t|j)sx?$/.test(f)&&!f.endsWith('war-protections-copy.ts')&&/war-protections-copy/.test(readFileSync(f,'utf8')));
+  assert.deepEqual(importers,['lib/foundation-truce.ts']);
 });
