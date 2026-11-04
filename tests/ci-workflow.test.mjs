@@ -32,8 +32,9 @@ test('CI retains all validations and uses both native Node shards without fail-f
   assert.match(workflow, /shard: \[1, 2\]/);
   assert.match(workflow, /node --experimental-strip-types --test --test-shard=\$\{\{ matrix\.shard \}\}\/2 tests\/\*\.test\.mjs/);
   // #949: caps sit above the slow shards. 20/30 min was cancelling suites that were passing.
+  // #1061: 45 min cancelled Postgres shards that were still passing (run 40962877232).
   assert.match(workflow, /timeout-minutes: 30/);
-  assert.match(workflow, /timeout-minutes: 45/);
+  assert.match(workflow, /timeout-minutes: 60/);
   for (const command of ['npm ci', 'npm run test:sql', 'npm run lint', 'npx tsc --noEmit',
     'npx playwright install --with-deps chromium', 'npm run test:layout']) {
     assert.ok(workflow.includes(`run: ${command}`), command);
