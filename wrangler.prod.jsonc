@@ -94,6 +94,8 @@
       "HARIMU_LABOR_BUREAU_ENABLED": "false",
       // #992: closed-system internal residence permit for home-city moves (Korund, Meridian; Varkand at Amber/Red). Off: #781 path unchanged.
       "HARIMU_INTERNAL_PERMIT_ENABLED": "false",
+      // #1081: Varkand Alert Level stored by the Directorate (admin route); feeds the #992 permit check and the Varkand nation read. Off: always Green.
+      "HARIMU_VARKAND_ALERT_ENABLED": "false",
       // #824: Kindle Dormant Savings Shield: on return from Dormant or Archived, a verified Kindle citizen gets min(SPK balance, 240 SPK cap) x 1/2 x the Price Index rise, once per absence, from the treasury welfare line. Off: no read, no write, no copy.
       "HARIMU_SAVINGS_SHIELD_ENABLED": "false",
       // #1016: closed Kindle presidential ballot shows High Court certification (awaiting for 24 hours, then certified). Off: no certification field, ballot unchanged. Display only.

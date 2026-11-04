@@ -131,7 +131,7 @@ type Nation = {
   position: { x: number; y: number };
   /** #81: band only (server never sends counts). Absent in the static fallback. */
   populationBand?: PopulationBand;
-  /** #1082: optional Alert Level on the Varkand nation read (#1081). The static record does not carry one. */
+  /** #1082/#1081: Alert Level on the Varkand nation read from GET /api/world (stored level, flag HARIMU_VARKAND_ALERT_ENABLED). The static record does not carry one. */
   alertLevel?: 'green' | 'amber' | 'red';
 };
 

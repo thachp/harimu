@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 22); // #1047 shift soft cap, #1085 Varkand Directorate, and #1094 Mandate Plebiscite stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 23); // #1047 shift soft cap, #1085 Varkand Directorate, #1081 Varkand alert, and #1094 Mandate Plebiscite stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 8); // #1053 quartermaster and #1054 peace revert stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);

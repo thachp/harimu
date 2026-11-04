@@ -59,6 +59,7 @@ const flagOffPins = {
   HARIMU_MARKET_FEE_ENABLED: 'market-fee-777.test.mjs',
   HARIMU_HOME_CITY_MOVE_ENABLED: 'home-city-move-781.test.mjs',
   HARIMU_INTERNAL_PERMIT_ENABLED: 'internal-residence-permit-992.test.mjs',
+  HARIMU_VARKAND_ALERT_ENABLED: 'varkand-alert-1081.test.mjs',
   HARIMU_ENROLL_HOME_CITY_ENABLED: 'enroll-home-city-965.test.mjs',
   HARIMU_SAVINGS_SHIELD_ENABLED: 'savings-shield-824.test.mjs',
   HARIMU_KINDLE_SALES_TAX_ENABLED: 'kindle-sales-tax-844.test.mjs',

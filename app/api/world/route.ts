@@ -10,6 +10,7 @@ import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
 import { armyBattlesEnabled } from '@/lib/army-battle';
 import { winterMarchEnabled } from '@/lib/winter-march'; // #1038
 import { flagOn } from '@/lib/flag-pack.mjs'; // #988
+import { readVarkandAlert, varkandAlertEnabled } from '@/lib/varkand-alert'; // #1081
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,7 @@ export async function GET() {
   const database = await getDatabase();
   const simulation = await advanceWorld(database, undefined, { religiousHarmony: (env as unknown as { HARIMU_RELIGIOUS_HARMONY_ENABLED?: string }).HARIMU_RELIGIOUS_HARMONY_ENABLED === 'true', // #842
     dormancy: (env as unknown as { HARIMU_DORMANCY_ENABLED?: string }).HARIMU_DORMANCY_ENABLED === 'true', reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true', aurelleRising: flagOn(env, 'HARIMU_AURELLE_RISING_ENABLED'), aurelleCoup: flagOn(env, 'HARIMU_AURELLE_COUP_ENABLED'), favorDecay: (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true', kindleAssembly: assemblyTickConfig(env as unknown as AssemblyBindings), primaries: primaryTickConfig(env as unknown as PrimaryBindings), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true', foundingPeriod: (env as unknown as { HARIMU_FOUNDING_PERIOD_ENABLED?: string }).HARIMU_FOUNDING_PERIOD_ENABLED === 'true', armyBattles: armyBattlesEnabled(env) /* #738 battles: record finished battles once */, winterMarch: winterMarchEnabled(env) /* #1038 */ });
-  const [nationResult, workOrderResult, planningTaskResult, eventResult, enrollmentResult] = await Promise.all([
+  const [nationResult, workOrderResult, planningTaskResult, eventResult, enrollmentResult, varkandAlert] = await Promise.all([
     database.prepare('SELECT * FROM nations ORDER BY sort_order').all<NationRow>(),
     database.prepare("SELECT id, nation_id, name, detail, capacity_cost FROM work_orders WHERE status = 'open' ORDER BY sort_order").all<WorkOrderRow>(),
     database.prepare(`SELECT
@@ -89,6 +90,8 @@ export async function GET() {
     database.prepare('SELECT id, kind, headline, detail, location, occurred_at FROM world_events ORDER BY sort_order').all<WorldEventRow>(),
     // Population bands (#81): only the band leaves the server, never the counts.
     database.prepare('SELECT nation_id, COUNT(*) AS citizens FROM citizens WHERE nation_id IS NOT NULL GROUP BY nation_id').all<{ nation_id: string; citizens: number }>(),
+    // #1081: flag on, the Varkand nation read carries the stored Alert Level (the #1082 banner reads nation.alertLevel). Off: null, no DB read. Same round trip as the reads above.
+    varkandAlertEnabled(env) ? readVarkandAlert(database) : Promise.resolve(null),
   ]);
   const bands = populationBands(nationResult.results.map(nation => nation.id), Object.fromEntries(enrollmentResult.results.map(row => [row.nation_id, Number(row.citizens)])), undefined, id => !nationIsPreview(id));
 
@@ -116,6 +119,7 @@ export async function GET() {
         tradeStatus: nation.trade_status,
         position: { x: nation.position_x, y: nation.position_y },
         populationBand: bands[nation.id],
+        ...(varkandAlert && nation.id === 'varkand' ? { alertLevel: varkandAlert.level, alertSetAt: varkandAlert.setAt } : {}),
       })),
       workOrders: workOrderResult.results.map((order) => ({
         id: order.id,
