@@ -11,6 +11,7 @@ import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-cont
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
+import { FULMARA_EXCHANGE_BELL_CYCLE_DAYS, fulmaraNextExchangeBellAt } from './fulmara-exchange-bell.ts';
 import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
@@ -41,6 +42,8 @@ export type GovernmentSnapshot = {
   };
   /** #1130 Fulmara: non-election shareholder resolutions with share totals. Present only while HARIMU_FULMARA_RESOLUTIONS_ENABLED is on. */
   resolutions?: FulmaraResolution[];
+  /** #1150 Fulmara: next Exchange Bell on a 30-real-day cycle. Present only while HARIMU_FULMARA_EXCHANGE_BELL_ENABLED is on. Opens no trading session. */
+  exchangeBell?: { nextAt: number; cycleDays: 30 };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
@@ -274,6 +277,27 @@ export function withFulmaraCouncil(snapshot: GovernmentSnapshot, nowMs: number, 
 export function withFulmaraResolutions(snapshot: GovernmentSnapshot, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
   return { ...snapshot, resolutions: fulmaraResolutions() };
+}
+
+/** #1150. Flag off, or any nation but Fulmara: the same snapshot, and no exchangeBell key. Opens no trading session. */
+export function withFulmaraExchangeBell(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, exchangeBell: { nextAt: fulmaraNextExchangeBellAt(nowMs), cycleDays: FULMARA_EXCHANGE_BELL_CYCLE_DAYS } };
+}
+
+/** Fulmara read while only the Exchange Bell flag is on. No grandCouncil or resolutions key. Flag off returns null, which is today's read. */
+export function fulmaraExchangeBellSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraExchangeBell({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Exchange Bell', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Exchange Bell', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Exchange Bell is the year\'s opening of trading and falls every 30 real days. Arcport hosts it. This read names the next Exchange Bell. It opens no trading session, moves no prices, lists no trades, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Arcport hosts the Exchange Bell. This read does not open a trading session or record a trade.',
+  }, nowMs, true);
 }
 
 /** Fulmara read while only the resolutions flag is on. No grandCouncil key. Flag off returns null, which is today's read. */
