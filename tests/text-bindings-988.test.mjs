@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 49); // recounted after merging origin/dev 5c486887 (GRAY 48): #1165 Canal Festival is the 49th and last; #1095 recruit term stays in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 50); // [ASSUMPTION] provisional tip+1 on 4e34d8d5 (GRAY 49): #1178 Grand Regatta is the 50th and last; recount after #1176 (~53). #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
@@ -196,7 +196,16 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'false' }, 'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED'), false, 'a direct string wins over the pack');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED');
+  assert.equal(preview.vars.HARIMU_FULMARA_GRAND_REGATTA_ENABLED, undefined, 'the Fulmara Grand Regatta is not its own binding');
+  assert.equal(prod.vars.HARIMU_FULMARA_GRAND_REGATTA_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_GRAND_REGATTA_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_GRAND_REGATTA_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_FULMARA_GRAND_REGATTA_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_FULMARA_GRAND_REGATTA_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'false' }, 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED');
   assert.equal(preview.vars.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, undefined, 'the Confluence Party Congress is not its own binding');
   assert.equal(prod.vars.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, 'true');
