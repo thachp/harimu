@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 const read = f => readFile(new URL(`../${f}`, import.meta.url), 'utf8');
-test('CI runs on pushes to main, release and dev, with no deploy step (#127, #177)', async () => {
+test('CI runs on pushes to release and dev only, with no pull_request trigger and no deploy step (#127, #177, #1110)', async () => {
   const ci = await read('.github/workflows/ci.yml');
-  assert.match(ci, /push:\s*\n\s*branches: \[main, release, dev\]/);
-  assert.match(ci, /pull_request:/);
+  assert.match(ci, /push:\s*\n\s*branches: \[release, dev\]/);
+  assert.doesNotMatch(ci, /pull_request:/);
   assert.doesNotMatch(ci, /npm run deploy|wrangler deploy/);
 });
 test('branch flow is documented and the deploy script names its source branch', async () => {
