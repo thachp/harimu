@@ -1,12 +1,13 @@
 'use client';
 import { createRoot } from 'react-dom/client';
 import { Bank, Hammer, House, Storefront, UsersThree } from '@phosphor-icons/react';
+import type { CityPlaceId } from '../lib/city-places';
 import type { LocationId } from '../lib/game-viewport';
 
-/** #392 S7: the same icons the top tabs and the rail use for these places. */
-const icons = { square: UsersThree, home: House, workplace: Hammer, market: Storefront, government: Bank } as const;
-/** The pill icon for a City destination (the panel rows use it so rows and pills match; decorative). */
-export function cityPlaceIcon(id: 'household' | 'workplace' | 'market' | 'government') { const Icon = icons[id === 'household' ? 'home' : id]; return <Icon size={16} weight="bold" />; }
+/** #392 S7: the same icons the top tabs and the rail use, one per cityPlaceIds entry. */
+const icons: { [K in CityPlaceId]: typeof UsersThree } = { square: UsersThree, home: House, workplace: Hammer, market: Storefront, government: Bank };
+/** The pill icon for a City place (decorative). Rows use the same component. */
+export function cityPlaceIcon(id: CityPlaceId | 'household') { const Icon = icons[id === 'household' ? 'home' : id]; return <Icon size={16} weight="bold" />; }
 
 /** Dresses a City label button (built with the DOM API) as the concept's icon pill with a leader dot under it. The icon and dot are decorative
  *  (aria-hidden); the button keeps its existing text and "Select …" name, focus ring and click. Returns the cleanup for the icon's React root. */
@@ -15,6 +16,6 @@ export function dressCityPill(button: HTMLButtonElement, location: LocationId, d
   const icon = doc.createElement('span'); icon.className = 'viewport-city-pill-icon'; icon.setAttribute('aria-hidden', 'true');
   const dot = doc.createElement('span'); dot.className = 'viewport-city-pill-dot'; dot.setAttribute('aria-hidden', 'true');
   button.insertBefore(icon, button.firstChild); button.appendChild(dot);
-  const Icon = icons[location], root = createRoot(icon); root.render(<Icon size={14} weight="bold" />);
+  const Icon = icons[location as CityPlaceId], root = createRoot(icon); root.render(<Icon size={14} weight="bold" />);
   return () => { queueMicrotask(() => root.unmount()); };
 }
