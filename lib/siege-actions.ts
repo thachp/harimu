@@ -61,7 +61,14 @@ export async function resolveCityAssault(db: GameDatabase, command: AssaultComma
   if (refusal) return fail(409, refusal, refusalText[refusal] ?? 'Refused.');
   if (holder !== war.defender_nation) return fail(409, 'not_defenders_city', "That city does not belong to the war's defender.");
   // #1070 (docs §15.4): a founded city cannot be assaulted or captured until 10 real days after founded_at (ends exactly at that second).
-  if (founded && !existing?.captured_at && inFoundationTruce(founded.at, now)) return { ...fail(409, 'foundation_truce', truceText(founded)), endsAt: founded.at + FOUNDATION_TRUCE_SECONDS };
+  if (founded && !existing?.captured_at && inFoundationTruce(founded.at, now)) {
+    // #1086: with the loss cap on, log the refused assault. No siege row exists yet, so the attempt is keyed by battle_key `assault:<city_key>`.
+    if (lossCap) {
+      const ledger = await frontierLedger(db, war.defender_nation, now), plan = await capturePlan(db, kind, centre!, war.attacker_nation, war.defender_nation);
+      await refusalStatement(db, { battleKey: `assault:${key}`, warId: war.id, requestId: command.requestId, attacker: war.attacker_nation, defender: war.defender_nation, reason: 'foundation_truce', squares: Math.max(1, plan.transfer.length), lost: ledger.lost, limit: weeklyLossLimitOf(ledger.heldAtWindowStart), now }).run();
+    }
+    return { ...fail(409, 'foundation_truce', truceText(founded)), endsAt: founded.at + FOUNDATION_TRUCE_SECONDS };
+  }
   // #577 item 4: a city with nothing the attacker could take (every claim square privately bought) cannot be captured (Decision 109 stand-in): refuse before anything is written.
   if (!existing?.captured_at && !(await capturePlan(db, kind, centre!, war.attacker_nation, war.defender_nation)).transfer.length) return fail(409, 'nothing_to_capture', nothingToCapture);
   const siegeId = existing?.id ?? `siege-${crypto.randomUUID()}`;
