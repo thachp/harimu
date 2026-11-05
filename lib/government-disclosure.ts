@@ -14,6 +14,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.presidium?{presidium:snapshot.presidium}:{}), // #70/#74: public roster only (readGovernment adds it solely while the flag is on)
   ...(snapshot.directorate?{directorate:snapshot.directorate}:{}), // #1085: Chair, Commands, next Rotation Day (readGovernment adds it only while the flag is on)
   ...(snapshot.mandatePlebiscite?{mandatePlebiscite:snapshot.mandatePlebiscite}:{}), // #1094: next Mandate Plebiscite (readGovernment adds it only while the flag is on)
+  ...(snapshot.moot?{moot:{electedAt:snapshot.moot.electedAt,dissolvesBy:snapshot.moot.dissolvesBy,primeMinisterInvestedAt:snapshot.moot.primeMinisterInvestedAt,investitureDeadline:snapshot.moot.investitureDeadline,reservePowersAvailable:snapshot.moot.reservePowersAvailable}}:{}), // #1096: Moot term (readGovernment adds it only while the flag is on)
   ...(snapshot.federalCouncil?{federalCouncil:snapshot.federalCouncil}:{}), // #1098: next Council election and Speaker seat (readGovernment adds it only while the flag is on)
   ...(snapshot.sanctum?{sanctum:snapshot.sanctum}:{}), // #1107: Oracle term, Elders, Stillday, Great Pilgrimage (readGovernment adds it only while the flag is on)
   ...(snapshot.review?{review:{periodStart:snapshot.review.periodStart,reviewedAt:snapshot.review.reviewedAt,petitionCount:snapshot.review.petitionCount,active:snapshot.review.active,expiresAt:snapshot.review.expiresAt}}:{}),

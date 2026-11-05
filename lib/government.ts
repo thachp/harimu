@@ -28,6 +28,8 @@ export type GovernmentSnapshot = {
   policyLedger?: { id: string; publishedAt: number; office: string; title: string; brief: string }[];
   availableBudgetMinor: number;
   influenceSummary: string;
+  /** #1096 Hoarvale: Moot term and investiture deadline. Present only while HARIMU_HOARVALE_MOOT_ENABLED is on. */
+  moot?: HoarvaleMoot;
   /** #1089: Hoarvale Moot bills. Present only when the caller passes hoarvaleAssent (the server flag). Assent sits on the bill. */
   bills?: HoarvaleBill[];
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
@@ -58,6 +60,32 @@ export function billAssent(passedAt: number, dissolvedAt: number | null, now: nu
   return { assentStatus: 'assented', assentAt: due };
 }
 export const hoarvaleBills = (now: number): HoarvaleBill[] => HOARVALE_BILLS.map(bill => ({ id: bill.id, title: bill.title, passedAt: bill.passedAt, ...billAssent(bill.passedAt, bill.dissolvedAt, now) }));
+
+/** #1096, docs §7.7 Government row: the Moot sits at most 120 real days; reserve powers only when no PM is invested within 7 real days.
+ *  Integer seconds. Pure, so no migration. [ASSUMPTION] Terms run back to back from the Unix epoch (the Varkand #1085 anchor),
+ *  so every election is a full-term one. [ASSUMPTION] No investiture is stored yet, so the rule-bound Moot invests its PM
+ *  one real day after the election; hoarvaleMoot still takes any investedAt, so a later stored vote plugs in. */
+export const MOOT_TERM_SECONDS = 120 * 86_400;
+export const INVESTITURE_DEADLINE_SECONDS = 7 * 86_400;
+export const MOOT_INVESTITURE_VOTE_SECONDS = 86_400;
+export type HoarvaleMoot = { electedAt: number; dissolvesBy: number; primeMinisterInvestedAt: number | null; investitureDeadline: number; reservePowersAvailable: boolean };
+export function hoarvaleMoot(electedAt: number, investedAt: number | null, now: number): HoarvaleMoot {
+  const invested = investedAt != null && Number.isSafeInteger(investedAt) && investedAt >= electedAt && investedAt <= now ? investedAt : null;
+  const investitureDeadline = electedAt + INVESTITURE_DEADLINE_SECONDS;
+  return { electedAt, dissolvesBy: electedAt + MOOT_TERM_SECONDS, primeMinisterInvestedAt: invested, investitureDeadline,
+    reservePowersAvailable: invested === null && now >= investitureDeadline };
+}
+/** The current term at `now` (seconds). At exactly dissolvesBy the next term has begun. */
+export function hoarvaleMootAt(now: number): HoarvaleMoot {
+  const t = Number.isSafeInteger(now) && now > 0 ? now : 0;
+  const electedAt = Math.floor(t / MOOT_TERM_SECONDS) * MOOT_TERM_SECONDS;
+  return hoarvaleMoot(electedAt, electedAt + MOOT_INVESTITURE_VOTE_SECONDS, t);
+}
+/** #1096. Flag off, or any nation but Hoarvale: the same snapshot, and no moot key. */
+export function withHoarvaleMoot(snapshot: GovernmentSnapshot, now: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, moot: hoarvaleMootAt(now) };
+}
 
 const institutions = {
   kindle: {
