@@ -28,7 +28,7 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 22); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1100 Fulmara share ticker, #1104 countdown dual time stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 23); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1100 Fulmara share ticker, #1104 countdown dual time, #1064 Hoarvale seal stay inside the pack
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
@@ -228,5 +228,10 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER, 'false');
   assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER, 'true', 'the client build still inlines the packed share-ticker flag');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER: 'false' }).NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER, 'false', 'a direct string wins');
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT, undefined, 'the Hoarvale royal assent flag is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT, 'true', 'the client build still inlines the packed royal-assent flag');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT: 'false' }).NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT, 'false', 'a direct string wins');
   assert.ok(TEXT_BINDING_CEILING - count(preview.vars, ['HARIMU_QA_TEST_CITIZEN_IDS']) >= 3, 'preview headroom stays at least 3 under 127');
 });
