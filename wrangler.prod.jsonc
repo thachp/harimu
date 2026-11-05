@@ -130,6 +130,8 @@
       "HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED": "false",
       // #1117: Kindle presidential term end and the next Ballot Night on the government read. Off: no electionClock key. A held cycle start also adds no key.
       "HARIMU_KINDLE_ELECTION_CLOCK_ENABLED": "false",
+      // #1133: Meridian next Exam Day (once per game year). Off: no examDay key.
+      "HARIMU_MERIDIAN_EXAM_DAY_ENABLED": "false",
       // #1130: Fulmara shareholder resolutions (title, status, share totals) on the government read. Off: no resolutions key.
       "HARIMU_FULMARA_RESOLUTIONS_ENABLED": "false"
     },

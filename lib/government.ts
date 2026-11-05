@@ -3,6 +3,7 @@ import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, co
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
 import { kindleElectionClock, type KindleElectionClock } from './kindle-election.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
+import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
@@ -45,6 +46,8 @@ export type GovernmentSnapshot = {
   assemblyElection?: { cycleStartedAt: number; nextElectionAt: number; intervalDays: 150; ballotOpen: false; leadershipHeedsResult: false };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
+  /** #1133 Meridian: next Exam Day. Present only while HARIMU_MERIDIAN_EXAM_DAY_ENABLED is on. */
+  examDay?: { nextAt: number; cycleDays: 30 };
   /** #1116 Korund: current Five-Year Plan start, next Plan Day and next quarterly Quota Rally. Present only while HARIMU_KORUND_PLAN_CALENDAR_ENABLED is on. */
   planCalendar?: { currentPlanStartedAt: number; nextPlanDayAt: number; nextQuotaRallyAt: number; planIntervalDays: 150; quotaRalliesPerPlan: 4 };
   roles: { name: string; controller: string }[];
@@ -300,6 +303,27 @@ export function withMeridianPartyState(snapshot: GovernmentSnapshot, nowMs: numb
     nextCongressAt: meridianNextPartyCongressAt(nowMs), congressIntervalDays: MERIDIAN_CONGRESS_INTERVAL_DAYS,
     termLimitsSuspendable: true, suspendSupermajority: MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY,
   } };
+}
+
+/** #1133. Flag off, or any nation but Meridian: the same snapshot, and no examDay key. Names no rank and opens no exam. */
+export function withMeridianExamDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
+  return { ...snapshot, examDay: { nextAt: meridianNextExamDayAt(nowMs), cycleDays: MERIDIAN_EXAM_DAY_CYCLE_DAYS } };
+}
+
+/** Meridian read while only the Exam Day flag is on. No partyState key. Flag off returns null, which is today's read. */
+export function meridianExamDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withMeridianExamDay({
+    nationId: 'meridian', mode: 'rule-bound simulation',
+    roles: [{ name: 'Exam Pagoda', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Exam Day', topic: 'work', proposedSpendMinor: 0,
+      reason: 'Exam Day is when ranks are announced. This read names the next Exam Day. It awards no rank and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Ranks are announced on Exam Day. This read does not score an exam or change a rank.',
+  }, nowMs, true);
 }
 
 /** Meridian read while the flag is on. Meridian has no other government snapshot, so this is the smallest one that carries the partyState block. Flag off returns null, which is today's read. */
