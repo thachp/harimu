@@ -8,6 +8,7 @@ import { KORUND_CHAIRMAN_BIRTHDAY_CYCLE_DAYS, korundNextChairmanBirthdayAt } fro
 import { KORUND_PEOPLES_CONGRESS_CYCLE_DAYS, korundNextPeoplesCongressAt } from './korund-peoples-congress.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
+import { MERIDIAN_TURBINE_DAY_CYCLE_DAYS, MERIDIAN_TURBINE_DAY_HOST, meridianNextTurbineDayAt } from './meridian-turbine-day.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
@@ -25,6 +26,7 @@ import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './h
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
+import { FULMARA_GRAND_REGATTA_HOST_CITY, FULMARA_GRAND_REGATTA_INTERVAL_DAYS, fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 import { KINDLE_MARKET_BELL_CYCLE_DAYS, kindleNextMarketBellAt } from './kindle-market-bell.ts';
 
@@ -75,6 +77,8 @@ export type GovernmentSnapshot = {
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   /** #1133 Meridian: next Exam Day. Present only while HARIMU_MERIDIAN_EXAM_DAY_ENABLED is on. */
   examDay?: { nextAt: number; cycleDays: 30 };
+  /** #1175 Meridian: next Turbine Day on a 30-real-day cycle. Present only while HARIMU_MERIDIAN_TURBINE_DAY_ENABLED is on. Holds no grid output, power figure, or bonus. Shen Springs hosts it. */
+  turbineDay?: { nextAt: number; cycleDays: 30; host: 'Shen Springs' };
   /** #1116 Korund: current Five-Year Plan start, next Plan Day and next quarterly Quota Rally. Present only while HARIMU_KORUND_PLAN_CALENDAR_ENABLED is on. */
   planCalendar?: { currentPlanStartedAt: number; nextPlanDayAt: number; nextQuotaRallyAt: number; planIntervalDays: 150; quotaRalliesPerPlan: 4 };
   /** #1147 Korund: next Chairman's Birthday. Present only while HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED is on. Names no Chairman and awards no medal. */
@@ -100,6 +104,8 @@ export type GovernmentSnapshot = {
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
+  /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
+  grandRegatta?: { nextAt: number; intervalDays: 30; hostCity: 'Corvel Isles'; holdsRegatta: false };
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1164 Kindle: next Market Bell on a 30-real-day cycle. Present only while HARIMU_KINDLE_MARKET_BELL_ENABLED is on. Holds no market event, price move, or bonus. */
   marketBell?: { nextAt: number; cycleDays: 30 };
@@ -210,6 +216,30 @@ export function withConfluenceCanalFestival(snapshot: GovernmentSnapshot, nowMs:
     nextAt: confluenceNextCanalFestivalAt(nowMs), intervalDays: CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS as 30,
     hostCity: CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, holdsFestival: false,
   } };
+}
+
+/** #1178. Flag off, or any nation but Fulmara: the same snapshot, and no grandRegatta key. Holds no race, prize, or bonus. */
+export function withFulmaraGrandRegatta(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, grandRegatta: {
+    nextAt: fulmaraNextGrandRegattaAt(nowMs), intervalDays: FULMARA_GRAND_REGATTA_INTERVAL_DAYS as 30,
+    hostCity: FULMARA_GRAND_REGATTA_HOST_CITY, holdsRegatta: false,
+  } };
+}
+
+/** Fulmara read while only the Grand Regatta flag is on. No grandCouncil, resolutions, or exchangeBell key. Flag off returns null, which is today's read. */
+export function fulmaraGrandRegattaSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraGrandRegatta({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Grand Regatta', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Grand Regatta', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Grand Regatta is hosted at Corvel Isles and falls every 30 real days. This read names the next Grand Regatta. It holds no race, lists no prizes or bonuses, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Corvel Isles hosts the Grand Regatta. This read does not hold a race or award a prize.',
+  }, nowMs, true);
 }
 
 /** #1145. Flag off, or any nation but Kindle: the same snapshot, and no foundersForgeDay key. Opens no fair. */
@@ -468,6 +498,27 @@ export function withMeridianPartyState(snapshot: GovernmentSnapshot, nowMs: numb
 export function withMeridianExamDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
   return { ...snapshot, examDay: { nextAt: meridianNextExamDayAt(nowMs), cycleDays: MERIDIAN_EXAM_DAY_CYCLE_DAYS } };
+}
+
+/** #1175. Flag off, or any nation but Meridian: the same snapshot, and no turbineDay key. Holds no grid output, power figure, or bonus. */
+export function withMeridianTurbineDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
+  return { ...snapshot, turbineDay: { nextAt: meridianNextTurbineDayAt(nowMs), cycleDays: MERIDIAN_TURBINE_DAY_CYCLE_DAYS, host: MERIDIAN_TURBINE_DAY_HOST } };
+}
+
+/** Meridian read while only the Turbine Day flag is on. No partyState or examDay key. Flag off returns null, which is today's read. */
+export function meridianTurbineDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withMeridianTurbineDay({
+    nationId: 'meridian', mode: 'rule-bound simulation',
+    roles: [{ name: 'Turbine Day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Turbine Day', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Turbine Day is the anniversary of the national grid and falls every 30 real days. Shen Springs hosts it. This read names the next Turbine Day. It states no grid output, power figure, or bonus, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Shen Springs hosts Turbine Day. This read does not report grid output or a power figure.',
+  }, nowMs, true);
 }
 
 /** Meridian read while only the Exam Day flag is on. No partyState key. Flag off returns null, which is today's read. */
