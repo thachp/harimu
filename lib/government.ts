@@ -7,6 +7,7 @@ import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
+import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
@@ -23,6 +24,8 @@ export type GovernmentSnapshot = {
   mandatePlebiscite?: { nextAt: number; cycleDays: 150 };
   /** #1098 Veldwood: next Federal Council election and the ceremonial Speaker seat. Present only while HARIMU_VELDWOOD_COUNCIL_ENABLED is on. */
   federalCouncil?: { nextElectionAt: number; termDays: 120; speakerSeat: number; speakerRotationDays: 30 };
+  /** #1122 Veldwood: next Vote Day on a 15-real-day cycle. Present only while HARIMU_VELDWOOD_VOTE_DAY_ENABLED is on. */
+  voteDayCalendar?: { nextAt: number; cycleDays: 15 };
   /** #1102 Fulmara: Council of Ten, Lodestar and the Tribune session. Present only while HARIMU_FULMARA_COUNCIL_ENABLED is on. */
   grandCouncil?: {
     councilOfTenNextElectionAt: number; councilOfTenTermDays: 30;
@@ -196,6 +199,12 @@ export function withVeldwoodCouncil(snapshot: GovernmentSnapshot, nowMs: number,
   } };
 }
 
+/** #1122. Flag off, or any nation but Veldwood: the same snapshot, and no voteDayCalendar key. */
+export function withVeldwoodVoteDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'veldwood') return snapshot;
+  return { ...snapshot, voteDayCalendar: { nextAt: veldwoodNextVoteDayAt(nowMs), cycleDays: VELDWOOD_VOTE_DAY_CYCLE_DAYS } };
+}
+
 /** #1102. Flag off, or any nation but Fulmara: the same snapshot, and no grandCouncil key. */
 export function withFulmaraCouncil(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
@@ -321,6 +330,21 @@ export function ilmarSanctumSnapshot(nowMs: number, enabled: boolean): Governmen
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Oracle serves for life, chosen by the Council of Elders. This read does not choose an Oracle, pause Prism trading, or open a pilgrimage.',
+  }, nowMs, true);
+}
+
+/** Veldwood read while only the Vote Day flag is on. No federalCouncil key. Flag off returns null, which is today's read. */
+export function veldwoodVoteDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVeldwoodVoteDay({
+    nationId: 'veldwood', mode: 'rule-bound simulation',
+    roles: [{ name: 'Vote Day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Vote Day', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Vote Days fall every 15 real days. This read names the next Vote Day. It opens no ballot, lists no items, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'A Vote Day is a bundled referendum. This read does not collect votes or change any law.',
   }, nowMs, true);
 }
 

@@ -4,6 +4,8 @@ import { isLiveNation } from '@/lib/nation-discovery'; // #488
 import { varkandDispatchEnabled } from '@/lib/varkand-dispatch';
 import { VarkandAlertBanner, VarkandDispatchStamp } from './varkand-dispatch';
 import { IlmarGlassEdict, ilmarGlassEdictsEnabled } from './ilmar-glass-edict';
+import { FulmaraShareRegister, fulmaraShareLines, fulmaraShareTickerEnabled } from './fulmara-share-ticker';
+import { countdownDualTimeEnabled } from '../lib/game-time';
 import { disabledReasonProps } from '@/lib/action-reasons';
 import { NationDocument } from './nation-document';
 import { LeaderPanel } from './leader-panel';
@@ -16,12 +18,6 @@ import { ForeignAffairsPanel } from './foreign-affairs-panel'; // #308
 import type { SimulationState } from '@/lib/world-simulation';
 import type { VerificationState } from '@/lib/verification';
 import type { GovernmentSnapshot, PetitionTopic } from '@/lib/government';
-
-/** #1104. Same read as lib/game-time countdownDualTimeFlag. Inlined so panel harnesses that stub unknown imports still render. */
-function countdownDualTimeOn(): boolean {
-  try { return process.env.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME === 'true'; }
-  catch { return false; }
-}
 
 /** Term and deadline instants already on the government read. No new clock. Index keys. */
 function GovernmentDeadlines({ snapshot, epochMs }: { snapshot: GovernmentSnapshot; epochMs?: number }) {
@@ -61,11 +57,12 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
   const formatTime=useDisplayTimestamp();
   const dispatch = nationId === 'varkand' && varkandDispatchEnabled();
   const glass = (snapshot?.nationId ?? nationId) === 'ilmar' && ilmarGlassEdictsEnabled();
+  const shares = (snapshot?.nationId ?? nationId) === 'fulmara' && fulmaraShareTickerEnabled();
   if (!snapshot) {
     const notice = isLiveNation(nationId) ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>;
     return <>
       {dispatch && <VarkandAlertBanner alertLevel={alertLevel} />}
-      <section className={dispatch ? 'citizen-market varkand-dispatch' : 'citizen-market'} aria-label="Government preview status">{dispatch && <VarkandDispatchStamp />}{glass ? <IlmarGlassEdict>{notice}</IlmarGlassEdict> : notice}</section>
+      <section className={dispatch ? 'citizen-market varkand-dispatch' : 'citizen-market'} aria-label="Government preview status">{dispatch && <VarkandDispatchStamp />}{shares ? <FulmaraShareRegister lines={[]}>{notice}</FulmaraShareRegister> : glass ? <IlmarGlassEdict>{notice}</IlmarGlassEdict> : notice}</section>
     </>;
   }
   const petitionReason = pending ? 'An action is being saved. Please wait before submitting a priority request.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : null;
@@ -91,7 +88,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
         {simulation.latestExecution ? <p>Last saved allocation: +{simulation.latestExecution.foodQuantity} market food for {(simulation.latestExecution.spendMinor / 100).toFixed(2)} SPK · tick {simulation.latestExecution.tick} · {formatTime(simulation.latestExecution.executedAt * 1000)}. Retries reuse this receipt; they do not spend again.</p> : <p>No food allocation has executed yet. Stock, reserve, budget and policy must all allow it; visiting does not guarantee spending.</p>}
       </> : <p>{snapshot.nationId === 'korund' ? 'Korund’s assigned work fills its separate ration store; your Household and State store show current food and coupons. Automatic government policy spending is not implemented here.' : 'This nation receives saved rule-bound proposals; policy spending and economic execution are not implemented here yet.'}</p>}
     </section>}
-    {glass ? <IlmarGlassEdict>{decisionOrder}</IlmarGlassEdict> : dispatch ? <div className="varkand-dispatch"><VarkandDispatchStamp />{decisionOrder}</div> : decisionOrder}
+    {shares ? <FulmaraShareRegister lines={fulmaraShareLines(snapshot, civicSpendingNote(snapshot.nationId))} /> : glass ? <IlmarGlassEdict>{decisionOrder}</IlmarGlassEdict> : dispatch ? <div className="varkand-dispatch"><VarkandDispatchStamp />{decisionOrder}</div> : decisionOrder}
     <p>{snapshot.influenceSummary}</p>
     <h4>Daily priority requests</h4>
     <p>Ask your government to prioritize a need. Completed UTC days receive one recorded review on the next government visit. The selected topic sets the following UTC day’s policy proposal; other topics are deferred. Food safety emergencies can override that priority. Priority requests do not guarantee spending.</p>
@@ -99,7 +96,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     <p>{civicBudgetNote(snapshot.nationId)}</p>
     {!localDemo && snapshot.review && <p>Last recorded review: {formatTime(snapshot.review.reviewedAt*1000)} · {snapshot.review.petitionCount} priority requests. {snapshot.review.active ? `Priority active until ${formatTime(snapshot.review.expiresAt*1000)}.` : 'Priority expired; the current proposal uses live needs.'} Review inputs and reasons are saved permanently; live proposal funds are recalculated. No model is called.</p>}
     {!localDemo && snapshot.review?.active && <GameTimer endsAt={snapshot.review.expiresAt * 1000} epochMs={simulation?.clock ? simulation.clock.epochSeconds * 1000 : undefined} label="Policy priority expires" />}
-    {countdownDualTimeOn() && <GovernmentDeadlines snapshot={snapshot} epochMs={simulation?.clock ? simulation.clock.epochSeconds * 1000 : undefined} />}
+    {countdownDualTimeEnabled() && <GovernmentDeadlines snapshot={snapshot} epochMs={simulation?.clock ? simulation.clock.epochSeconds * 1000 : undefined} />}
     {!localDemo && <section aria-label="Your priority request history">
       <h4>Your priority requests</h4>
       {!snapshot.petitions?.length && <p>No priority requests recorded for your current nation.</p>}

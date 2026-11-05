@@ -20,13 +20,16 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK, previe
   assert.equal(countdownDualTimeEnabled('true'), true);
   for (const value of [undefined, '', 'false', 'TRUE', '1', ' true']) assert.equal(countdownDualTimeEnabled(value), false);
   assert.match(read('lib/game-time.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME/);
-  assert.match(read('app/government-panel.tsx'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME/);
+  assert.match(read('app/government-panel.tsx'), /countdownDualTimeEnabled\(\)/);
+  assert.match(read('app/work-shift-board.tsx'), /countdownDualTimeEnabled\(\)/);
+  assert.doesNotMatch(read('app/government-panel.tsx'), /process\.env\.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME/);
+  assert.doesNotMatch(read('app/work-shift-board.tsx'), /process\.env\.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME/);
   const preview = strip(read('wrangler.jsonc')), prod = strip(read('wrangler.prod.jsonc'));
   assert.equal(preview.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_UI_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_UI_PACK[key], 'false');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 21);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 22);
 });
 
 test('multi-day and under one hour use the world season at the deadline, and a missing epoch uses 12×', () => {
