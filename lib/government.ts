@@ -2,6 +2,7 @@ import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERID
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
+import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
@@ -19,6 +20,12 @@ export type GovernmentSnapshot = {
   mandatePlebiscite?: { nextAt: number; cycleDays: 150 };
   /** #1098 Veldwood: next Federal Council election and the ceremonial Speaker seat. Present only while HARIMU_VELDWOOD_COUNCIL_ENABLED is on. */
   federalCouncil?: { nextElectionAt: number; termDays: 120; speakerSeat: number; speakerRotationDays: 30 };
+  /** #1102 Fulmara: Council of Ten, Lodestar and the Tribune session. Present only while HARIMU_FULMARA_COUNCIL_ENABLED is on. */
+  grandCouncil?: {
+    councilOfTenNextElectionAt: number; councilOfTenTermDays: 30;
+    lodestarNextElectionAt: number; lodestarTermDays: 90; lodestarConsecutiveReelection: false;
+    tribuneSessionEndsAt: number; tribuneVetoesPerSession: 1;
+  };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
@@ -180,6 +187,16 @@ export function withVeldwoodCouncil(snapshot: GovernmentSnapshot, nowMs: number,
   } };
 }
 
+/** #1102. Flag off, or any nation but Fulmara: the same snapshot, and no grandCouncil key. */
+export function withFulmaraCouncil(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, grandCouncil: {
+    councilOfTenNextElectionAt: fulmaraNextCouncilOfTenElectionAt(nowMs), councilOfTenTermDays: FULMARA_COUNCIL_TERM_DAYS,
+    lodestarNextElectionAt: fulmaraNextLodestarElectionAt(nowMs), lodestarTermDays: FULMARA_LODESTAR_TERM_DAYS, lodestarConsecutiveReelection: false,
+    tribuneSessionEndsAt: fulmaraTribuneSessionEndsAt(nowMs), tribuneVetoesPerSession: 1,
+  } };
+}
+
 /** Varkand read while only the plebiscite flag is on. No directorate key. Flag off returns null, which is today's read. */
 export function varkandPlebisciteSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
   if (!enabled) return null;
@@ -277,6 +294,21 @@ export function veldwoodCouncilSnapshot(nowMs: number, enabled: boolean): Govern
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Council decides collegially. The ceremonial Council Speaker rotates by seniority every 30 real days. This read does not collect votes.',
+  }, nowMs, true);
+}
+
+/** Fulmara read while the flag is on. Fulmara has no other government snapshot, so this is the smallest one that carries the Grand Council block. Flag off returns null, which is today's read. */
+export function fulmaraGovernmentSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraCouncil({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Grand Council', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Grand Council', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Grand Council elects the Council of Ten each game year and the Lodestar for 90 real days. This read names those dates and when the Tribune session ends. It opens no ballot and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The Lodestar cannot stand for the next term. The Tribune of the Docks holds one veto per 30-real-day session. This read does not cast it.',
   }, nowMs, true);
 }
 
