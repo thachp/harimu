@@ -157,6 +157,8 @@ const flagOffPins = {
   HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED: 'zzzzz-meridian-party-1114.test.mjs', // #1114 flag off: no partyState key
   HARIMU_KORUND_PLAN_CALENDAR_ENABLED: 'zzzzz-korund-plan-calendar-1116.test.mjs', // #1116 flag off: no planCalendar key
   HARIMU_AURELLE_CROWN_CALENDAR_ENABLED: 'zzzzzzz-aurelle-crown-1118.test.mjs', // #1118 flag off: no crownCalendar key
+  HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED: 'zzzzzz-confluence-assembly-election-1123.test.mjs', // #1123 flag off: no assemblyElection key
+  HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'zzzzzzz-kindle-election-1117.test.mjs', // #1117 flag off: no electionClock key
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.

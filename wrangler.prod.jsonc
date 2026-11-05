@@ -125,7 +125,12 @@
       // #1122: Veldwood next Vote Day, every 15 real days. Off: no voteDayCalendar key on the government snapshot.
       "HARIMU_VELDWOOD_VOTE_DAY_ENABLED": "false",
       // #1118: Aurelle reign-start display clock and the next Great Council window. Off: no crownCalendar key.
-      "HARIMU_AURELLE_CROWN_CALENDAR_ENABLED": "false"
+      "HARIMU_AURELLE_CROWN_CALENDAR_ENABLED": "false",
+      // #1123: Confluence next People's Assembly election window (every 150 real days) on the government read. Off: no assemblyElection key.
+      "HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED": "false",
+      // #1117: Kindle presidential term end and the next Ballot Night on the government read. Off: no electionClock key. A held cycle start also adds no key.
+      "HARIMU_KINDLE_ELECTION_CLOCK_ENABLED": "false"
+
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
