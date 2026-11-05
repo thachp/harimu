@@ -4,6 +4,7 @@ import { isLiveNation } from '@/lib/nation-discovery'; // #488
 import { varkandDispatchEnabled } from '@/lib/varkand-dispatch';
 import { VarkandAlertBanner, VarkandDispatchStamp } from './varkand-dispatch';
 import { IlmarGlassEdict, ilmarGlassEdictsEnabled } from './ilmar-glass-edict';
+import { IlmarPrismShares, ilmarPrismSharesEnabled } from './ilmar-prism-shares';
 import { FulmaraShareRegister, fulmaraShareLines, fulmaraShareTickerEnabled } from './fulmara-share-ticker';
 import { HoarvaleRoyalAssentBills, hoarvaleRoyalAssentEnabled } from './hoarvale-royal-assent';
 import { countdownDualTimeEnabled } from '../lib/game-time';
@@ -59,11 +60,13 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
   const dispatch = nationId === 'varkand' && varkandDispatchEnabled();
   const glass = (snapshot?.nationId ?? nationId) === 'ilmar' && ilmarGlassEdictsEnabled();
   const shares = (snapshot?.nationId ?? nationId) === 'fulmara' && fulmaraShareTickerEnabled();
+  const prism = (snapshot?.nationId ?? nationId) === 'ilmar' && ilmarPrismSharesEnabled();
   if (!snapshot) {
     const notice = isLiveNation(nationId) ? <><h3>Government preview unavailable</h3><p role="status">Your nation has a policy preview, but its saved decisions have not loaded. No policy or petition count is shown until the server record is available.</p>{onRetry && <button type="button" onClick={onRetry}>Retry government preview</button>}</> : <><h3>Civic play coming soon</h3><p>This nation’s government preview and civic actions are not built yet.</p></>;
     return <>
       {dispatch && <VarkandAlertBanner alertLevel={alertLevel} />}
       <section className={dispatch ? 'citizen-market varkand-dispatch' : 'citizen-market'} aria-label="Government preview status">{dispatch && <VarkandDispatchStamp />}{shares ? <FulmaraShareRegister lines={[]}>{notice}</FulmaraShareRegister> : glass ? <IlmarGlassEdict>{notice}</IlmarGlassEdict> : notice}</section>
+      {prism ? <IlmarPrismShares nationId={nationId} /> : null}
     </>;
   }
   const petitionReason = pending ? 'An action is being saved. Please wait before submitting a priority request.' : !localDemo && !verification?.countedActionsEligible ? verification?.reason ?? 'Checking phone verification before petitions can count.' : null;
@@ -90,6 +93,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
       </> : <p>{snapshot.nationId === 'korund' ? 'Korund’s assigned work fills its separate ration store; your Household and State store show current food and coupons. Automatic government policy spending is not implemented here.' : 'This nation receives saved rule-bound proposals; policy spending and economic execution are not implemented here yet.'}</p>}
     </section>}
     {shares ? <FulmaraShareRegister lines={fulmaraShareLines(snapshot, civicSpendingNote(snapshot.nationId))} /> : glass ? <IlmarGlassEdict>{decisionOrder}</IlmarGlassEdict> : dispatch ? <div className="varkand-dispatch"><VarkandDispatchStamp />{decisionOrder}</div> : decisionOrder}
+    {prism ? <IlmarPrismShares nationId={snapshot.nationId} /> : null}
     {hoarvaleRoyalAssentEnabled() && <HoarvaleRoyalAssentBills nationId={snapshot.nationId} bills={snapshot.bills} />}
     <p>{snapshot.influenceSummary}</p>
     <h4>Daily priority requests</h4>

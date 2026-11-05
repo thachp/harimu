@@ -2407,3 +2407,19 @@ html[data-harimu-reduced-motion] .fulmara-ticker-item{white-space:normal}
 .hoarvale-bill[data-assent="withheld"] .hoarvale-assent-mark{color:var(--hv-ink);background-color:var(--hv-paper);background-image:linear-gradient(90deg,transparent 46%,var(--hv-frost) 46%,var(--hv-frost) 54%,transparent 54%);border-style:solid}
 .hoarvale-assent-label{min-width:0;color:var(--hv-ink);font-size:calc(15px * var(--text-scale, 1));font-weight:700;line-height:1.35;overflow-wrap:anywhere}
 :is(.citizen-market,.game-inspector-body,.nation-document) .hoarvale-bills :is(h3,h4,p,.hoarvale-assent-label){color:var(--hv-ink,#14323a)}
+
+/* #1124: Ilmar Prism contracts. Field #7d6a2b and mark #fff8e0 are the crest; gold #e0bb59 is the mark accent.
+   Dots are the Ilmar pattern. Posted and unposted shares differ by the words Lightshare and Share not posted. No motion. */
+.ilmar-prism-shares{--ilmar-field:#7d6a2b;--ilmar-mark:#fff8e0;--ilmar-gold:#e0bb59;display:flex;flex-direction:column;min-width:0;max-width:100%;box-sizing:border-box;margin:0 0 12px;padding:0;color:var(--ilmar-field);background-color:var(--ilmar-mark);border:1px solid var(--ilmar-gold);border-radius:16px}
+.ilmar-prism-band{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;margin:8px;padding:8px 10px;border-radius:12px;color:var(--ilmar-mark);background-color:var(--ilmar-field);background-image:radial-gradient(var(--ilmar-gold) 1.1px,transparent 1.6px);background-size:7px 7px}
+.ilmar-prism-shares h3{flex:1 1 8rem;min-width:0;margin:0;color:var(--ilmar-mark);font-size:calc(16px * var(--text-scale, 1));line-height:1.35;overflow-wrap:anywhere}
+.ilmar-prism-mark{width:calc(36px * var(--text-scale, 1));height:calc(36px * var(--text-scale, 1));flex:0 0 calc(36px * var(--text-scale, 1));margin:0;color:var(--ilmar-mark);background-color:color-mix(in srgb,var(--ilmar-field) 70%,black);font-size:calc(20px * var(--text-scale, 1))}
+.ilmar-prism-list{list-style:none;display:flex;flex-direction:column;gap:8px;min-width:0;max-width:100%;margin:0;padding:0 8px 8px}
+.ilmar-prism-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;min-width:0;max-width:100%;margin:0;padding:8px;border-radius:12px;background-color:var(--ilmar-mark)}
+.ilmar-prism-row h4{flex:1 1 8rem;min-width:0;margin:0;color:var(--ilmar-field);font-size:calc(15px * var(--text-scale, 1));line-height:1.35;overflow-wrap:anywhere}
+.ilmar-prism-shares p{display:flex;flex-wrap:wrap;gap:8px;min-width:0;max-width:100%;margin:0 8px 8px;color:var(--ilmar-field);font-size:calc(15px * var(--text-scale, 1));line-height:1.45;overflow-wrap:anywhere}
+.ilmar-prism-row p{flex:1 1 10rem;margin:0}
+.ilmar-prism-kind{font-weight:700}
+:is(.citizen-market,.game-inspector-body,.nation-document) .ilmar-prism-shares h3{color:var(--ilmar-mark)}
+:is(.citizen-market,.game-inspector-body,.nation-document) .ilmar-prism-shares :is(h4,p,.ilmar-prism-kind,.ilmar-prism-figure){color:var(--ilmar-field)}
+.ilmar-prism-shares :focus-visible{outline:3px solid var(--ilmar-field);outline-offset:3px}
