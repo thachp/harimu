@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 28); // dev's 27, plus #1102 Fulmara Council; #1114 Meridian party schedule stays in this pack
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 29); // recounted after merging dev: #1102 Fulmara Council, #1113 Confluence Party Congress and #1114 Meridian party schedule stay in this pack with #1107 Ilmar sanctum calendar, #1098 Veldwood Council and #1096 Moot term; #1095 recruit term is in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
@@ -142,6 +142,24 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'false' }, 'HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, undefined, 'the Confluence Party Congress is not its own binding');
+  assert.equal(prod.vars.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED: 'false' }, 'HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED, undefined, 'the Meridian party schedule is not its own binding');
+  assert.equal(prod.vars.HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED: 'false' }, 'HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, undefined, 'the phone top-down map is not its own binding');
   assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'true');
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'false');

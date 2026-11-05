@@ -1,3 +1,4 @@
+import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
@@ -28,6 +29,8 @@ export type GovernmentSnapshot = {
   };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
+  /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
+  party?: { pillars: readonly ['general_secretary', 'president', 'premier', 'assembly_chair']; termLimitCongresses: 2; nextCongressAt: number; congressIntervalDays: 150 };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   roles: { name: string; controller: string }[];
@@ -262,6 +265,30 @@ export function withIlmarSanctum(snapshot: GovernmentSnapshot, nowMs: number, en
     oracleTerm: ILMAR_ORACLE_TERM, councilOfEldersSeats: ILMAR_COUNCIL_OF_ELDERS_SEATS,
     isStillday: ilmarIsStillday(nowMs), nextStilldayAt: ilmarNextStilldayAt(nowMs), nextGreatPilgrimageAt: ilmarNextGreatPilgrimageAt(nowMs),
   } };
+}
+
+/** #1113. Flag off, or any nation but Confluence: the same snapshot, and no party key. */
+export function withConfluenceParty(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
+  return { ...snapshot, party: {
+    pillars: CONFLUENCE_PILLARS, termLimitCongresses: CONFLUENCE_TERM_LIMIT_CONGRESSES,
+    nextCongressAt: confluenceNextPartyCongressAt(nowMs), congressIntervalDays: CONFLUENCE_CONGRESS_INTERVAL_DAYS,
+  } };
+}
+
+/** Confluence read while the flag is on. Confluence has no other government snapshot, so this is the smallest one that carries the party block. Flag off returns null, which is today's read. */
+export function confluencePartySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withConfluenceParty({
+    nationId: 'confluence', mode: 'rule-bound simulation',
+    roles: ['General Secretary', 'President', 'Premier', "Chair of the People's Assembly"].map(name => ({ name, controller: 'AI/SI role · deterministic rules' })),
+    decision: {
+      title: 'Party Congress', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Every 150 real days a Party Congress elects a Central Committee. This read names the Four Pillars and the next Congress. It opens no ballot and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The Four Pillars share collective leadership. Each Pillar may serve 2 Congress terms. This read does not elect a Pillar.',
+  }, nowMs, true);
 }
 
 /** Ilmar read while the flag is on. Ilmar has no other government snapshot, so this is the smallest one that carries the sanctum block. Flag off returns null, which is today's read. */
