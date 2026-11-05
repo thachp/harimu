@@ -1,8 +1,7 @@
 /** #1137: Ilmar next Feast of First Light. Pure: no database, so no migration.
  *  Choosing an Oracle, listing clergy, and spending are out of scope.
- *  [ASSUMPTION] Docs §7.6 tie the feast to a new Oracle or a solstice and give no dates.
- *  Issue #1137 states the only cadence this clock uses: twice per game year, every 15 real days,
- *  from a Unix-epoch style anchor standing in for the two solstices. No other interval is added.
+ *  [ASSUMPTION] 15 real days (set by Architect). Docs §7.6 tie the feast to a new Oracle or a
+ *  solstice and give no dates. This clock uses that interval only.
  *  [ASSUMPTION] The Unix-epoch anchor is VARKAND_CHAIR_ANCHOR_MS from #1085. This function takes
  *  only nowMs. The shard world_clock epoch is per shard, so this read does not follow it.
  *  [ASSUMPTION] Docs give the feast no length, so this read stores no window.
@@ -14,7 +13,7 @@ import { VARKAND_CHAIR_ANCHOR_MS } from './varkand-directorate.ts';
 
 const DAY_MS = 86_400_000;
 
-/** Twice per game year, every 15 real days. Issue #1137 states this interval. */
+/** [ASSUMPTION] 15 real days (set by Architect). */
 export const ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS = 15 as const;
 export const ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_MS = ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS * DAY_MS;
 const maxStep = Math.floor(Number.MAX_SAFE_INTEGER / ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_MS) - 1;
