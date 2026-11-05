@@ -129,7 +129,9 @@
       // #1123: Confluence next People's Assembly election window (every 150 real days) on the government read. Off: no assemblyElection key.
       "HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED": "false",
       // #1117: Kindle presidential term end and the next Ballot Night on the government read. Off: no electionClock key. A held cycle start also adds no key.
-      "HARIMU_KINDLE_ELECTION_CLOCK_ENABLED": "false"
+      "HARIMU_KINDLE_ELECTION_CLOCK_ENABLED": "false",
+      // #1136: Hoarvale next Honors List Day (once per game year = 30 real days) on the government read. Off: no honorsListDay key.
+      "HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED": "false"
 
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
