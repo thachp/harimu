@@ -1,4 +1,5 @@
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
+import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
 import { kindleElectionClock, type KindleElectionClock } from './kindle-election.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
@@ -38,6 +39,8 @@ export type GovernmentSnapshot = {
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
   party?: { pillars: readonly ['general_secretary', 'president', 'premier', 'assembly_chair']; termLimitCongresses: 2; nextCongressAt: number; congressIntervalDays: 150 };
+  /** #1123 Confluence: next People's Assembly election window. Present only while HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED is on. Opens no ballot; the result is not binding. */
+  assemblyElection?: { cycleStartedAt: number; nextElectionAt: number; intervalDays: 150; ballotOpen: false; leadershipHeedsResult: false };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   /** #1133 Meridian: next Exam Day. Present only while HARIMU_MERIDIAN_EXAM_DAY_ENABLED is on. */
@@ -335,10 +338,19 @@ export function withConfluenceParty(snapshot: GovernmentSnapshot, nowMs: number,
   } };
 }
 
+/** #1123. Flag off, or any nation but Confluence: the same snapshot, and no assemblyElection key. */
+export function withConfluenceAssemblyElection(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
+  return { ...snapshot, assemblyElection: {
+    cycleStartedAt: confluenceLastAssemblyElectionAt(nowMs), nextElectionAt: confluenceNextAssemblyElectionAt(nowMs),
+    intervalDays: CONFLUENCE_ASSEMBLY_INTERVAL_DAYS as 150, ballotOpen: false, leadershipHeedsResult: false,
+  } };
+}
+
 /** Confluence read while the flag is on. Confluence has no other government snapshot, so this is the smallest one that carries the party block. Flag off returns null, which is today's read. */
-export function confluencePartySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
-  if (!enabled) return null;
-  return withConfluenceParty({
+export function confluencePartySnapshot(nowMs: number, enabled: boolean, assemblyElection = false): GovernmentSnapshot | null {
+  if (!enabled && !assemblyElection) return null; // #1123: either flag gives Confluence a read
+  return withConfluenceAssemblyElection(withConfluenceParty({
     nationId: 'confluence', mode: 'rule-bound simulation',
     roles: ['General Secretary', 'President', 'Premier', "Chair of the People's Assembly"].map(name => ({ name, controller: 'AI/SI role · deterministic rules' })),
     decision: {
@@ -347,7 +359,7 @@ export function confluencePartySnapshot(nowMs: number, enabled: boolean): Govern
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Four Pillars share collective leadership. Each Pillar may serve 2 Congress terms. This read does not elect a Pillar.',
-  }, nowMs, true);
+  }, nowMs, enabled), nowMs, assemblyElection);
 }
 
 /** Ilmar read while the flag is on. Ilmar has no other government snapshot, so this is the smallest one that carries the sanctum block. Flag off returns null, which is today's read. */
