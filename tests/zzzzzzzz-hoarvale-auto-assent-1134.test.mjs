@@ -107,6 +107,26 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(held[frost.id], ['pending', null]);
     assert.deepEqual(held[band.id], ['assented', due(band)], 'a second pass does not move the assent date');
   });
+
+  test(`#1134 ${backend}: the settle tick at exactly passed_at + 48h assents the bill`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close());
+    await seeded(r);
+    assert.deepEqual(statusOf(await rowsOf(r))[band.id], ['pending', null], 'the band is still pending before the boundary');
+    r.setFixtureEnv(FLAG, 'true');
+    const { tickSeconds } = await r.importModule('lib/world-simulation.ts');
+    const boundary = due(band);
+    assert.equal(boundary, band.passedAt + ASSENT_SECONDS);
+    const epoch = boundary - tickSeconds;
+    await r.db.prepare("INSERT INTO world_clock (id, epoch_seconds) VALUES ('main', ?)").bind(epoch).run();
+    await r.advanceWorld(boundary);
+    const tick = await r.db.prepare('SELECT tick, scheduled_at FROM world_ticks ORDER BY tick DESC LIMIT 1').first();
+    assert.equal(Number(tick.tick), 1);
+    assert.equal(Number(tick.scheduled_at), boundary, 'the tick clock is passed_at + 48h, not one second later');
+    const got = statusOf(await rowsOf(r));
+    assert.deepEqual(got[band.id], ['assented', boundary], 'equal to the boundary assents; a strict < would leave it pending');
+    assert.deepEqual(got[frost.id], ['pending', null], 'Frostcore is one hour old at the band boundary');
+    assert.equal(got[tenure.id][0], 'withheld');
+  });
 }
 
 test('flag off omits the countdown; flag on reports seconds until assent and does not write', async t => {
