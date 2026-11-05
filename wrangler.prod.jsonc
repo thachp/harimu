@@ -164,6 +164,8 @@
       "HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED": "false",
       // #1170: Korund next People's Congress (once per game year, 30 real days, zero offset). Off: no peoplesCongress key.
       "HARIMU_KORUND_PEOPLES_CONGRESS_ENABLED": "false",
+      // #1175: Meridian next Turbine Day (anniversary of the national grid, once per game year = 30 real days). Shen Springs hosts it. Off: no turbineDay key.
+      "HARIMU_MERIDIAN_TURBINE_DAY_ENABLED": "false",
       // #1178: Fulmara next Grand Regatta (once per game year = 30 real days). Off: no grandRegatta key. Holds no race.
       "HARIMU_FULMARA_GRAND_REGATTA_ENABLED": "false"
     },

@@ -33,6 +33,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.party?{party:snapshot.party}:{}), // #1113: Four Pillars and the next Party Congress (readGovernment adds it only while the flag is on)
   ...(snapshot.partyState?{partyState:snapshot.partyState}:{}), // #1114: Meridian Party Congress schedule (readGovernment adds it only while the flag is on)
   ...(snapshot.examDay?{examDay:snapshot.examDay}:{}), // #1133: next Exam Day (readGovernment adds it only while the flag is on)
+  ...(snapshot.turbineDay?{turbineDay:snapshot.turbineDay}:{}), // #1175: next Turbine Day (readGovernment adds it only while the flag is on)
   ...(snapshot.assemblyElection?{assemblyElection:snapshot.assemblyElection}:{}), // #1123: Confluence People's Assembly window (readGovernment adds it only while the flag is on)
   ...(snapshot.canalFestival?{canalFestival:snapshot.canalFestival}:{}), // #1165: next Canal Festival (readGovernment adds it only while the flag is on)
   ...(snapshot.quotaDay?{quotaDay:snapshot.quotaDay}:{}), // #1169: next Quota Day (readGovernment adds it only while the flag is on)

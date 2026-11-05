@@ -8,6 +8,7 @@ import { KORUND_CHAIRMAN_BIRTHDAY_CYCLE_DAYS, korundNextChairmanBirthdayAt } fro
 import { KORUND_PEOPLES_CONGRESS_CYCLE_DAYS, korundNextPeoplesCongressAt } from './korund-peoples-congress.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
+import { MERIDIAN_TURBINE_DAY_CYCLE_DAYS, MERIDIAN_TURBINE_DAY_HOST, meridianNextTurbineDayAt } from './meridian-turbine-day.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
@@ -73,6 +74,8 @@ export type GovernmentSnapshot = {
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   /** #1133 Meridian: next Exam Day. Present only while HARIMU_MERIDIAN_EXAM_DAY_ENABLED is on. */
   examDay?: { nextAt: number; cycleDays: 30 };
+  /** #1175 Meridian: next Turbine Day on a 30-real-day cycle. Present only while HARIMU_MERIDIAN_TURBINE_DAY_ENABLED is on. Holds no grid output, power figure, or bonus. Shen Springs hosts it. */
+  turbineDay?: { nextAt: number; cycleDays: 30; host: 'Shen Springs' };
   /** #1116 Korund: current Five-Year Plan start, next Plan Day and next quarterly Quota Rally. Present only while HARIMU_KORUND_PLAN_CALENDAR_ENABLED is on. */
   planCalendar?: { currentPlanStartedAt: number; nextPlanDayAt: number; nextQuotaRallyAt: number; planIntervalDays: 150; quotaRalliesPerPlan: 4 };
   /** #1147 Korund: next Chairman's Birthday. Present only while HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED is on. Names no Chairman and awards no medal. */
@@ -471,6 +474,27 @@ export function withMeridianPartyState(snapshot: GovernmentSnapshot, nowMs: numb
 export function withMeridianExamDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
   return { ...snapshot, examDay: { nextAt: meridianNextExamDayAt(nowMs), cycleDays: MERIDIAN_EXAM_DAY_CYCLE_DAYS } };
+}
+
+/** #1175. Flag off, or any nation but Meridian: the same snapshot, and no turbineDay key. Holds no grid output, power figure, or bonus. */
+export function withMeridianTurbineDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
+  return { ...snapshot, turbineDay: { nextAt: meridianNextTurbineDayAt(nowMs), cycleDays: MERIDIAN_TURBINE_DAY_CYCLE_DAYS, host: MERIDIAN_TURBINE_DAY_HOST } };
+}
+
+/** Meridian read while only the Turbine Day flag is on. No partyState or examDay key. Flag off returns null, which is today's read. */
+export function meridianTurbineDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withMeridianTurbineDay({
+    nationId: 'meridian', mode: 'rule-bound simulation',
+    roles: [{ name: 'Turbine Day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Turbine Day', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Turbine Day is the anniversary of the national grid and falls every 30 real days. Shen Springs hosts it. This read names the next Turbine Day. It states no grid output, power figure, or bonus, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Shen Springs hosts Turbine Day. This read does not report grid output or a power figure.',
+  }, nowMs, true);
 }
 
 /** Meridian read while only the Exam Day flag is on. No partyState key. Flag off returns null, which is today's read. */
