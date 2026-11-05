@@ -125,7 +125,9 @@
       // #1122: Veldwood next Vote Day, every 15 real days. Off: no voteDayCalendar key on the government snapshot.
       "HARIMU_VELDWOOD_VOTE_DAY_ENABLED": "false",
       // #1118: Aurelle reign-start display clock and the next Great Council window. Off: no crownCalendar key.
-      "HARIMU_AURELLE_CROWN_CALENDAR_ENABLED": "false"
+      "HARIMU_AURELLE_CROWN_CALENDAR_ENABLED": "false",
+      // #1133: Meridian next Exam Day (once per game year). Off: no examDay key.
+      "HARIMU_MERIDIAN_EXAM_DAY_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
