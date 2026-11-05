@@ -139,6 +139,7 @@ const flagOffPins = {
   HARIMU_CLERK_RISK_SIGNALS_ENABLED: 'clerk-risk-signals-943.test.mjs',
   HARIMU_KINDLE_BUDGET_VIEW_ENABLED: 'kindle-budget-789.test.mjs',
   HARIMU_KINDLE_POLICY_LEDGER_ENABLED: 'policy-ledger-985.test.mjs',
+  HARIMU_HOARVALE_ASSENT_ENABLED: 'hoarvale-assent-1089.test.mjs', // #1089 flag off: no bill read or write
   HARIMU_KINDLE_CERTIFICATION_ENABLED: 'kindle-certification-1016.test.mjs',
   HARIMU_WORLD_AGES_ENABLED: 'world-ages-1041.test.mjs', // #1041 flag off: no Age line
   HARIMU_FAITH_FESTIVAL_HUD_ENABLED: 'faith-festival-hud-1048.test.mjs', // #1048 flag off: the clock renders no faith-festival line
