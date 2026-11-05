@@ -108,9 +108,9 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars.HARIMU_FULMARA_EXCHANGE_BELL_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_EXCHANGE_BELL_ENABLED, 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_EXCHANGE_BELL_ENABLED, 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-8), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED', '#1160/#1164/#1165/#1169/#1170/#1175 follow this flag; #1178 is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-8), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED', '#1160/#1164/#1165/#1169/#1170/#1175 follow this flag; #1178 is last');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED'), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED'), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_FULMARA_EXCHANGE_BELL_ENABLED: 'false' }, 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED'), false, 'a direct string wins');
