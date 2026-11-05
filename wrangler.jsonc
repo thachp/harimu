@@ -157,7 +157,9 @@
       // #1164: Kindle next Market Bell (stock-exchange opening anniversary, once per game year = 30 real days) on the government read. Off: no marketBell key.
       "HARIMU_KINDLE_MARKET_BELL_ENABLED": "true",
       // #1165: Confluence next Canal Festival (once per game year = 30 real days) on the government read. Off: no canalFestival key.
-      "HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED": "true"
+      "HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED": "true",
+      // #1169: Confluence next Quota Day (once per game year = 30 real days). Off: no quotaDay key. States no quota, target, or bonus.
+      "HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

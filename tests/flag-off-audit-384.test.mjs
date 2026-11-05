@@ -166,6 +166,7 @@ const flagOffPins = {
   HARIMU_AURELLE_CROWN_CALENDAR_ENABLED: 'zzzzzzz-aurelle-crown-1118.test.mjs', // #1118 flag off: no crownCalendar key
   HARIMU_AURELLE_HEARTH_NIGHT_ENABLED: 'zzzzzzzzzz-aurelle-hearth-night-1146.test.mjs', // #1146 flag off: no hearthNight key
   HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED: 'zzzzzz-confluence-assembly-election-1123.test.mjs', // #1123 flag off: no assemblyElection key
+  HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED: 'zzzzzzzzzzzz-confluence-quota-day-1169.test.mjs', // #1169 flag off: no quotaDay key
   HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'zzzzzzz-kindle-election-1117.test.mjs', // #1117 flag off: no electionClock key
   HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED: 'zzzzzzzzz-kindle-founders-forge-1145.test.mjs', // #1145 flag off: no foundersForgeDay key
   HARIMU_KINDLE_MARKET_BELL_ENABLED: 'zzzzzzzzzzz-kindle-market-bell-1164.test.mjs', // #1164 flag off: no marketBell key
