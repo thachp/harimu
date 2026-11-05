@@ -112,6 +112,8 @@
       "HARIMU_HOARVALE_MOOT_ENABLED": "false",
       // #1098: Veldwood Federal Council term, 120 real days, and the Council Speaker seat. Off: no federalCouncil key on the government snapshot.
       "HARIMU_VELDWOOD_COUNCIL_ENABLED": "false",
+      // #1122: Veldwood next Vote Day, every 15 real days. Off: no voteDayCalendar key on the government snapshot.
+      "HARIMU_VELDWOOD_VOTE_DAY_ENABLED": "false",
       // #1102: Fulmara Council of Ten (30 real days), Lodestar (90 real days, no consecutive re-election) and Tribune session. Off: no grandCouncil key.
       "HARIMU_FULMARA_COUNCIL_ENABLED": "false",
       // #1107: Ilmar Oracle life term, Stilldays, and the Great Pilgrimage on the government read. Off: no sanctum key.
