@@ -142,16 +142,22 @@
       "HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED": "false",
       // #1145: Kindle next Founders' Forge Day (once per game year = 30 real days) on the government read. Off: no foundersForgeDay key.
       "HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED": "false",
+      // #1151: Varkand next Muster Day (once per game year = 30 real days) on the government read. Off: no musterDay key.
+      "HARIMU_VARKAND_MUSTER_DAY_ENABLED": "false",
       // #1146: Aurelle next Hearth Night (Kinward Rite blessing of houses, once per game year = 30 real days). Off: no hearthNight key.
       "HARIMU_AURELLE_HEARTH_NIGHT_ENABLED": "false",
       // #1139: Ilmar Prism contracts (title and whole-number profit share) on the government read. Off: no contracts key.
       "HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED": "false",
       // #1147: Korund next Chairman's Birthday (once per game year, 30 real days). Off: no chairmanBirthday key.
       "HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED": "false",
-      // #1151: Varkand next Muster Day (once per game year = 30 real days) on the government read. Off: no musterDay key.
-      "HARIMU_VARKAND_MUSTER_DAY_ENABLED": "false",
+      // #1159: Veldwood next Dividend Day (once per game year = 30 real days). Off: no dividendDay key. Pays no dividend and states no amount.
+      "HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED": "false",
       // #1150: Fulmara next Exchange Bell (once per game year = 30 real days) on the government read. Off: no exchangeBell key.
       "HARIMU_FULMARA_EXCHANGE_BELL_ENABLED": "false",
+      // #1160: Hoarvale next Aurora Night (once per game year, 30 real days, no midwinter offset). Off: no auroraNight key.
+      "HARIMU_HOARVALE_AURORA_NIGHT_ENABLED": "false",
+      // #1164: Kindle next Market Bell (stock-exchange opening anniversary, once per game year = 30 real days) on the government read. Off: no marketBell key.
+      "HARIMU_KINDLE_MARKET_BELL_ENABLED": "false",
       // #1165: Confluence next Canal Festival (once per game year = 30 real days) on the government read. Off: no canalFestival key.
       "HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED": "false"
     },
@@ -317,7 +323,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "false",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "false",
-    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1048/#1050/#1055/#1063/#1076/#1082/#1088/#1089/#1091/#1100/#1104/#1064/#1124/#1152/#1158: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
+    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1048/#1050/#1055/#1063/#1076/#1082/#1088/#1089/#1091/#1100/#1104/#1064/#1124/#1152/#1158/#1166: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
     // The client build expands each NEXT_PUBLIC_* name. HARIMU_WORLD_AGES_ENABLED, HARIMU_FAITH_FESTIVAL_HUD_ENABLED and HARIMU_HOARVALE_ASSENT_ENABLED stay in the pack and are read with flagOn. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "false",
@@ -345,7 +351,8 @@
       "NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT": "false",
       "NEXT_PUBLIC_HARIMU_ILMAR_PRISM_SHARES": "false",
       "NEXT_PUBLIC_HARIMU_MERIDIAN_PARTY_CONGRESS": "false",
-      "NEXT_PUBLIC_HARIMU_CLOCK_ZOOM": "false"
+      "NEXT_PUBLIC_HARIMU_CLOCK_ZOOM": "false",
+      "NEXT_PUBLIC_HARIMU_NATION_OVERVIEW": "false"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",
