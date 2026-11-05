@@ -124,6 +124,8 @@
       "HARIMU_VELDWOOD_VOTE_DAY_ENABLED": "true",
       // #1118: Aurelle reign-start display clock and the next Great Council window. Off: no crownCalendar key.
       "HARIMU_AURELLE_CROWN_CALENDAR_ENABLED": "true",
+      // #1117: Kindle presidential term end and the next Ballot Night on the government read. Off: no electionClock key. A held cycle start also adds no key.
+      "HARIMU_KINDLE_ELECTION_CLOCK_ENABLED": "true",
       // #1133: Meridian next Exam Day (once per game year). Off: no examDay key.
       "HARIMU_MERIDIAN_EXAM_DAY_ENABLED": "true"
     },

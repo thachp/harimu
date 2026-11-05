@@ -158,6 +158,7 @@ const flagOffPins = {
   HARIMU_MERIDIAN_EXAM_DAY_ENABLED: 'zzzzzzzz-meridian-exam-day-1133.test.mjs', // #1133 flag off: no examDay key
   HARIMU_KORUND_PLAN_CALENDAR_ENABLED: 'zzzzz-korund-plan-calendar-1116.test.mjs', // #1116 flag off: no planCalendar key
   HARIMU_AURELLE_CROWN_CALENDAR_ENABLED: 'zzzzzzz-aurelle-crown-1118.test.mjs', // #1118 flag off: no crownCalendar key
+  HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'zzzzzzz-kindle-election-1117.test.mjs', // #1117 flag off: no electionClock key
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.
