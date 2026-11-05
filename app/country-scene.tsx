@@ -4,10 +4,10 @@ import { citiesForNation, cityForNation } from '../lib/cities';
 import styles from './country-scene.module.css';
 
 import { countryWord } from '../lib/ui-v2-rail';
-export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pending = false, presence, travelEnabled = true, preview = false }: {
+export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pending = false, presence, travelEnabled = true, preview = false, bleed = false }: {
   nationId: string; currentCityId: string | null; homeCityId: string | null;
   onTravel: (cityId: string) => void; pending?: boolean;
-  travelEnabled?: boolean; preview?: boolean;
+  travelEnabled?: boolean; preview?: boolean; bleed?: boolean;
   presence?: readonly { cityId: string; present: number }[];
 }) {
   const [destinationId, setDestinationId] = useState<string | null>(null);
@@ -16,7 +16,7 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
   const current = currentCityId ? cityForNation(nationId, currentCityId) : undefined;
   const home = homeCityId ? cityForNation(nationId, homeCityId) : undefined;
   const pins = [{x:50,y:32},{x:26,y:76},{x:76,y:76}];
-  return <section className={styles.country} aria-labelledby="country-scene-title">
+  return <section className={bleed ? `${styles.country} ${styles.bleed} nation-map-bleed` : styles.country} aria-labelledby="country-scene-title">
     <h2 id="country-scene-title">{countryWord()} map</h2>
     <p>{preview ? 'Sample visit · no citizen changes. ' : ''}Free, instant travel within this nation · home city unchanged.</p>
     <p>Current city: <strong>{current?.name ?? 'Not visiting'}</strong> · Home city: <strong>{home?.name ?? 'None in this nation'}</strong></p>
@@ -25,10 +25,10 @@ export function CountryScene({ nationId, currentCityId, homeCityId, onTravel, pe
       {cities.map((city, index) => {
         const count = presence?.find(entry => entry.cityId === city.id)?.present;
         const knownCount = Number.isInteger(count) && count! >= 0;
-        return <button type="button" key={city.id} className={styles.pin}
+        return <button type="button" key={city.id} className={styles.pin} data-capital={bleed && city.capital ? 'true' : undefined}
         style={{left:`clamp(calc(var(--pin-max) / 2), ${pins[index].x}%, calc(100% - var(--pin-max) / 2))`,top:`${pins[index].y}%`}} aria-pressed={destination?.id === city.id}
         onClick={() => { if (!pending) setDestinationId(city.id); }} disabled={pending} aria-describedby={pending ? "city-travel-pending-reason" : undefined}>
-        <span>{city.name}</span><small>{[city.capital ? 'Capital' : '',city.id === currentCityId ? 'Current' : '',city.id === homeCityId ? 'Home' : ''].filter(Boolean).join(' · ')}</small>
+        {bleed && city.capital ? <span className={styles.capitalMarker} aria-hidden="true" /> : null}<span>{city.name}</span><small>{[city.capital ? 'Capital' : '',city.id === currentCityId ? 'Current' : '',city.id === homeCityId ? 'Home' : ''].filter(Boolean).join(' · ')}</small>
         <small>{knownCount ? `${count} sharing presence` : preview ? 'Presence shows in your own nation' : 'Online count unavailable'}</small>
       </button>; })}
     </div>

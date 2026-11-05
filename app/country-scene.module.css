@@ -16,3 +16,11 @@
 
 .country .pin { font-size: calc(12px * var(--text-scale, 1)); }
 .destination button { background: #24444f; color: #dce7e8; border: 1px solid #607f89; padding: 8px 12px; border-radius: 4px; }
+/* #1166: the nation map fills the stage. Flag off never adds .bleed, so the card above is unchanged. */
+:global(.harimu-game) :global(.game-country-stage):has(:global(.nation-map-bleed)){padding:0;overflow:auto;display:flex;flex-direction:column}
+.bleed{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;max-width:none;width:100%;margin:0;padding:0}
+.bleed .map{flex:1 1 auto;max-width:none;width:100%;height:auto;min-height:240px;margin:0;border:1px solid #d0ad54;border-radius:0;background:#071820}
+.bleed .map path{fill:#0d2530;stroke:#d0ad54}
+.bleed .map .routes{stroke:#f1d58a}
+.capitalMarker{position:absolute;left:50%;top:0;width:8px;height:8px;margin-left:-4px;background:#f1d58a;transform:translateY(-12px) rotate(45deg);box-shadow:0 0 0 1px #071820}
+.bleed button:focus-visible{outline:2px solid #f3ecd6;outline-offset:2px}
