@@ -19,6 +19,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.honorsListDay?{honorsListDay:snapshot.honorsListDay}:{}), // #1136: next Honors List Day (readGovernment adds it only while the flag is on)
   ...(snapshot.federalCouncil?{federalCouncil:snapshot.federalCouncil}:{}), // #1098: next Council election and Speaker seat (readGovernment adds it only while the flag is on)
   ...(snapshot.voteDayCalendar?{voteDayCalendar:snapshot.voteDayCalendar}:{}), // #1122: next Vote Day (readGovernment adds it only while the flag is on)
+  ...(snapshot.dividendDay?{dividendDay:snapshot.dividendDay}:{}), // #1159: next Dividend Day (readGovernment adds it only while the flag is on)
   ...(snapshot.grandCouncil?{grandCouncil:snapshot.grandCouncil}:{}), // #1102: Council of Ten, Lodestar and Tribune session (readGovernment adds it only while the flag is on)
   ...(snapshot.resolutions?{resolutions:snapshot.resolutions.map(row=>({id:row.id,title:row.title,status:row.status,shares:{for:row.shares.for,against:row.shares.against,abstain:row.shares.abstain}}))}:{}), // #1130: title, status, share totals (readGovernment adds them only while the flag is on)
   ...(snapshot.sanctum?{sanctum:snapshot.sanctum}:{}), // #1107: Oracle term, Elders, Stillday, Great Pilgrimage (readGovernment adds it only while the flag is on)
