@@ -119,7 +119,9 @@
       // #1113: Confluence Four Pillars and the next Party Congress on the government read. Off: no party key.
       "HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED": "false",
       // #1114: Meridian Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress (every 150 real days) on the government read. Off: no partyState key.
-      "HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED": "false"
+      "HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED": "false",
+      // #1118: Aurelle reign-start display clock and the next Great Council window. Off: no crownCalendar key.
+      "HARIMU_AURELLE_CROWN_CALENDAR_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
