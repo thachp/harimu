@@ -130,9 +130,10 @@
       "HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED": "false",
       // #1117: Kindle presidential term end and the next Ballot Night on the government read. Off: no electionClock key. A held cycle start also adds no key.
       "HARIMU_KINDLE_ELECTION_CLOCK_ENABLED": "false",
+      // #1133: Meridian next Exam Day (once per game year). Off: no examDay key.
+      "HARIMU_MERIDIAN_EXAM_DAY_ENABLED": "false",
       // #1134: a Hoarvale bill that is still pending receives Royal Assent after 48 real hours, on the world tick. Off: no auto-advance, and the government read omits secondsUntilAssent.
       "HARIMU_HOARVALE_AUTO_ASSENT_ENABLED": "false"
-
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
@@ -296,7 +297,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "false",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "false",
-    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1048/#1050/#1055/#1063/#1076/#1082/#1088/#1089/#1091/#1100/#1104/#1064: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
+    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1048/#1050/#1055/#1063/#1076/#1082/#1088/#1089/#1091/#1100/#1104/#1064/#1124: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
     // The client build expands each NEXT_PUBLIC_* name. HARIMU_WORLD_AGES_ENABLED, HARIMU_FAITH_FESTIVAL_HUD_ENABLED and HARIMU_HOARVALE_ASSENT_ENABLED stay in the pack and are read with flagOn. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "false",
@@ -321,7 +322,8 @@
       "HARIMU_HOARVALE_ASSENT_ENABLED": "false",
       "NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME": "false",
       "NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER": "false",
-      "NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT": "false"
+      "NEXT_PUBLIC_HARIMU_HOARVALE_ROYAL_ASSENT": "false",
+      "NEXT_PUBLIC_HARIMU_ILMAR_PRISM_SHARES": "false"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",
