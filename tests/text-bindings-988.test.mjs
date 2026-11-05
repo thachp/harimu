@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 37); // recounted after #1132: #1130 Fulmara resolutions and #1136 Hoarvale Honors List Day both land → 37; #1095 recruit term stays in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 38); // #1140 took dev to 37 (#1130 Fulmara resolutions and #1136 Honors List Day); #1134 Hoarvale auto assent is the 38th; #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
@@ -214,7 +214,6 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_KINDLE_ELECTION_CLOCK_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_KINDLE_ELECTION_CLOCK_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'false' }, 'HARIMU_KINDLE_ELECTION_CLOCK_ENABLED'), false, 'a direct string wins over the pack');
-
   assert.equal(preview.vars.HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED, undefined, 'the Hoarvale Honors List Day is not its own binding');
   assert.equal(prod.vars.HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED, 'true');
@@ -224,6 +223,15 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'false' }, 'HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_HOARVALE_AUTO_ASSENT_ENABLED, undefined, 'the Hoarvale auto assent flag is not its own binding');
+  assert.equal(prod.vars.HARIMU_HOARVALE_AUTO_ASSENT_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_HOARVALE_AUTO_ASSENT_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_HOARVALE_AUTO_ASSENT_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_HOARVALE_AUTO_ASSENT_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_HOARVALE_AUTO_ASSENT_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'false' }, 'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, undefined, 'the phone top-down map is not its own binding');
   assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'true');
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'false');

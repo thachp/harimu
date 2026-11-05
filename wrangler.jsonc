@@ -133,8 +133,9 @@
       // #1136: Hoarvale next Honors List Day (once per game year = 30 real days) on the government read. Off: no honorsListDay key.
       "HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED": "true",
       // #1130: Fulmara shareholder resolutions (title, status, share totals) on the government read. Off: no resolutions key.
-      "HARIMU_FULMARA_RESOLUTIONS_ENABLED": "true"
-
+      "HARIMU_FULMARA_RESOLUTIONS_ENABLED": "true",
+      // #1134: a Hoarvale bill that is still pending receives Royal Assent after 48 real hours, on the world tick. Off: no auto-advance, and the government read omits secondsUntilAssent.
+      "HARIMU_HOARVALE_AUTO_ASSENT_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
