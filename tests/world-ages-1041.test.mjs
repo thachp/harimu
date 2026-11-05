@@ -89,7 +89,7 @@ test('the server reads the pack and the shell takes a prop; no browser bundle re
 test('flag off: the HUD clock renders no Age markup unless the prop is on (guest demo stays hidden)', async () => {
   const src = await readFile(new URL('../app/game-shell.tsx', import.meta.url), 'utf8');
   assert.match(src, /title=\{tip\}/);
-  assert.match(src, /<GameTimer compact endsAt=\{age\.endsAt\} label="Next Age in"/);
+  assert.match(src, /<GameTimer compact endsAt=\{age\.endsAt\}(?: epochMs=\{[^}]*\})? label="Next Age in"/);
   assert.match(src, /ageHudLine\(age\)/);
 });
 
