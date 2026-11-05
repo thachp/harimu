@@ -2,7 +2,7 @@ import { parked } from './async-limits'; // #679
 import { readCrown } from './aurelle-rising';
 import { readPresidium } from './korund-presidium';
 import type {GameDatabase} from './database-contract';
-import { simulateGovernment, rebaseGovernmentBudget, confluencePartySnapshot, fulmaraGovernmentSnapshot, fulmaraResolutionsSnapshot, ilmarFeastOfFirstLightSnapshot, ilmarPrismContractsSnapshot, ilmarSanctumSnapshot, meridianExamDaySnapshot, meridianPartySnapshot, varkandGovernmentSnapshot, varkandPlebisciteSnapshot, veldwoodCouncilSnapshot, veldwoodVoteDaySnapshot, withAurelleCrownCalendar, withAurelleHearthNight, withConfluenceAssemblyElection, withConfluenceParty, withFulmaraCouncil, withFulmaraResolutions, withHoarvaleAuroraNight, withHoarvaleHonorsListDay, withHoarvaleMoot, withIlmarFeastOfFirstLight, withIlmarPrismContracts, withIlmarSanctum, withKindleElectionClock, withKindleFoundersForgeDay, withKorundChairmanBirthday, withKorundPlanCalendar, withMeridianExamDay, withMeridianPartyState, withVarkandDirectorate, withVarkandPlebiscite, withVeldwoodCouncil, withVeldwoodVoteDay } from './government';
+import { simulateGovernment, rebaseGovernmentBudget, confluencePartySnapshot, fulmaraExchangeBellSnapshot, fulmaraGovernmentSnapshot, fulmaraResolutionsSnapshot, ilmarFeastOfFirstLightSnapshot, ilmarPrismContractsSnapshot, ilmarSanctumSnapshot, meridianExamDaySnapshot, meridianPartySnapshot, varkandGovernmentSnapshot, varkandPlebisciteSnapshot, veldwoodCouncilSnapshot, veldwoodDividendDaySnapshot, veldwoodVoteDaySnapshot, withAurelleCrownCalendar, withAurelleHearthNight, withConfluenceAssemblyElection, withConfluenceParty, withFulmaraCouncil, withFulmaraExchangeBell, withFulmaraResolutions, withHoarvaleAuroraNight, withHoarvaleHonorsListDay, withHoarvaleMoot, withIlmarFeastOfFirstLight, withIlmarPrismContracts, withIlmarSanctum, withKindleElectionClock, withKindleFoundersForgeDay, withVarkandMusterDay, withKorundChairmanBirthday, withKorundPlanCalendar, withMeridianExamDay, withMeridianPartyState, withVarkandDirectorate, withVarkandPlebiscite, withVeldwoodCouncil, withVeldwoodDividendDay, withVeldwoodVoteDay } from './government';
 export const petitionSchema = `CREATE TABLE IF NOT EXISTS government_petitions (
   request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),
   nation_id TEXT NOT NULL, topic TEXT NOT NULL CHECK(topic IN ('food','infrastructure','work')),
@@ -59,7 +59,7 @@ export async function latchGovernmentReviews(db: GameDatabase, nationId: string,
 type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;snapshot_json:string};
 /** Completed UTC days are reviewed once. By default this persists bounded, idempotent reviews (POST and world-tick paths).
  *  With readOnly (#205, GET /api/citizen) the same reviews are projected in memory and nothing is written. */
-export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean; hoarvaleAssent?: boolean; varkandDirectorate?: boolean; hoarvaleMoot?: boolean; varkandPlebiscite?: boolean; veldwoodCouncil?: boolean; veldwoodVoteDay?: boolean; fulmaraCouncil?: boolean; fulmaraResolutions?: boolean; ilmarSanctum?: boolean; ilmarFeastOfFirstLight?: boolean; ilmarPrismContracts?: boolean; confluenceParty?: boolean; confluenceAssemblyElection?: boolean; meridianPartySchedule?: boolean; meridianExamDay?: boolean; korundPlanCalendar?: boolean; korundChairmanBirthday?: boolean; aurelleCrownCalendar?: boolean; aurelleHearthNight?: boolean; kindleElectionClock?: boolean; kindleFoundersForgeDay?: boolean; kindleCycleStartAt?: number | null; hoarvaleHonorsListDay?: boolean; hoarvaleAuroraNight?: boolean } = {}) {
+export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean; hoarvaleAssent?: boolean; varkandDirectorate?: boolean; hoarvaleMoot?: boolean; varkandPlebiscite?: boolean; veldwoodCouncil?: boolean; veldwoodVoteDay?: boolean; veldwoodDividendDay?: boolean; fulmaraCouncil?: boolean; fulmaraResolutions?: boolean; fulmaraExchangeBell?: boolean; ilmarSanctum?: boolean; ilmarFeastOfFirstLight?: boolean; ilmarPrismContracts?: boolean; confluenceParty?: boolean; confluenceAssemblyElection?: boolean; meridianPartySchedule?: boolean; meridianExamDay?: boolean; korundPlanCalendar?: boolean; korundChairmanBirthday?: boolean; aurelleCrownCalendar?: boolean; aurelleHearthNight?: boolean; kindleElectionClock?: boolean; kindleFoundersForgeDay?: boolean; varkandMusterDay?: boolean; kindleCycleStartAt?: number | null; hoarvaleHonorsListDay?: boolean; hoarvaleAuroraNight?: boolean } = {}) {
   // #679: the Aurelle crown read touches only the Rising and coup tables, which nothing below writes, so it starts with the first reads instead of last
   // (parked so a run that returns early never leaves an unhandled rejection; the crown branch still rethrows).
   const crownRead = nationId === 'aurelle' ? parked(readCrown(db)) : null;
@@ -111,27 +111,35 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
     ? reviewedSnapshot
     : project({});
   if (!snapshot) {
-    const nowMs = now * 1000; // #1085/#1094/#1098/#1102/#1107/#1137/#1113/#1114/#1133/#1116/#1122/#1130/#1139: now is seconds; these clocks are integer ms. Flags off stay null.
+    const nowMs = now * 1000; // #1085/#1094/#1098/#1102/#1107/#1137/#1113/#1114/#1133/#1116/#1122/#1130/#1139/#1150: now is seconds; these clocks are integer ms. Flags off stay null.
     if (nationId === 'varkand') {
+      const muster = (built: import('./government').GovernmentSnapshot | null) => built && options.varkandMusterDay ? withVarkandMusterDay(built, nowMs, true) : built; // #1151: rides on an existing Varkand read
       if (options.varkandDirectorate) {
         const built = varkandGovernmentSnapshot(nowMs, true)!;
-        return options.varkandPlebiscite ? withVarkandPlebiscite(built, nowMs, true) : built;
+        return muster(options.varkandPlebiscite ? withVarkandPlebiscite(built, nowMs, true) : built);
       }
-      return varkandPlebisciteSnapshot(nowMs, !!options.varkandPlebiscite);
+      return muster(varkandPlebisciteSnapshot(nowMs, !!options.varkandPlebiscite));
     }
     if (nationId === 'veldwood') {
+      const withDividend = (built: import('./government').GovernmentSnapshot | null) => built && options.veldwoodDividendDay ? withVeldwoodDividendDay(built, nowMs, true) : built; // #1159
       if (options.veldwoodCouncil) {
         const built = veldwoodCouncilSnapshot(nowMs, true)!;
-        return options.veldwoodVoteDay ? withVeldwoodVoteDay(built, nowMs, true) : built;
+        return withDividend(options.veldwoodVoteDay ? withVeldwoodVoteDay(built, nowMs, true) : built);
       }
-      return veldwoodVoteDaySnapshot(nowMs, !!options.veldwoodVoteDay);
+      if (options.veldwoodVoteDay) return withDividend(veldwoodVoteDaySnapshot(nowMs, true));
+      return veldwoodDividendDaySnapshot(nowMs, !!options.veldwoodDividendDay);
     }
     if (nationId === 'fulmara') {
       if (options.fulmaraCouncil) {
         const built = fulmaraGovernmentSnapshot(nowMs, true)!;
-        return options.fulmaraResolutions ? withFulmaraResolutions(built, true) : built;
+        const withResolutions = options.fulmaraResolutions ? withFulmaraResolutions(built, true) : built;
+        return options.fulmaraExchangeBell ? withFulmaraExchangeBell(withResolutions, nowMs, true) : withResolutions;
       }
-      return fulmaraResolutionsSnapshot(!!options.fulmaraResolutions); // #1130
+      if (options.fulmaraResolutions) {
+        const built = fulmaraResolutionsSnapshot(true)!;
+        return options.fulmaraExchangeBell ? withFulmaraExchangeBell(built, nowMs, true) : built;
+      }
+      return fulmaraExchangeBellSnapshot(nowMs, !!options.fulmaraExchangeBell); // #1150
     }
     if (nationId === 'ilmar') {
       if (options.ilmarSanctum) {
@@ -197,8 +205,10 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
   if (nationId === 'hoarvale' && options.hoarvaleAuroraNight) snapshot = withHoarvaleAuroraNight(snapshot, now * 1000, true); // #1160: pure, no read
   if (nationId === 'veldwood' && options.veldwoodCouncil) snapshot = withVeldwoodCouncil(snapshot, now * 1000, true); // #1098
   if (nationId === 'veldwood' && options.veldwoodVoteDay) snapshot = withVeldwoodVoteDay(snapshot, now * 1000, true); // #1122
+  if (nationId === 'veldwood' && options.veldwoodDividendDay) snapshot = withVeldwoodDividendDay(snapshot, now * 1000, true); // #1159: pure, no read
   if (nationId === 'fulmara' && options.fulmaraCouncil) snapshot = withFulmaraCouncil(snapshot, now * 1000, true); // #1102
   if (nationId === 'fulmara' && options.fulmaraResolutions) snapshot = withFulmaraResolutions(snapshot, true); // #1130: pure, no read
+  if (nationId === 'fulmara' && options.fulmaraExchangeBell) snapshot = withFulmaraExchangeBell(snapshot, now * 1000, true); // #1150
   if (nationId === 'ilmar' && options.ilmarSanctum) snapshot = withIlmarSanctum(snapshot, now * 1000, true); // #1107
   if (nationId === 'ilmar' && options.ilmarFeastOfFirstLight) snapshot = withIlmarFeastOfFirstLight(snapshot, now * 1000, true); // #1137
   if (nationId === 'ilmar' && options.ilmarPrismContracts) snapshot = withIlmarPrismContracts(snapshot, true); // #1139: pure, no read
@@ -211,6 +221,7 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
   if (nationId === 'aurelle' && options.aurelleCrownCalendar) snapshot = withAurelleCrownCalendar(snapshot, now * 1000, true); // #1118
   if (nationId === 'aurelle' && options.aurelleHearthNight) snapshot = withAurelleHearthNight(snapshot, now * 1000, true); // #1146: pure, no read
   if (nationId === 'kindle' && options.kindleElectionClock) snapshot = withKindleElectionClock(snapshot, now * 1000, options.kindleCycleStartAt ?? null, true); // #1117: held cycle start adds no key
+  if (nationId === 'varkand' && options.varkandMusterDay) snapshot = withVarkandMusterDay(snapshot, now * 1000, true); // #1151: pure, no read
   if (nationId === 'kindle' && options.kindleFoundersForgeDay) snapshot = withKindleFoundersForgeDay(snapshot, now * 1000, true); // #1145: pure, no read
   return snapshot;
 }

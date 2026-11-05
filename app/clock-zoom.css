@@ -1,0 +1,14 @@
+/* #1158 (#392 S4): clock chip and World / Nation / City / Household zoom controls.
+   Tokens are the S2 chip (game-hud-v2 ground #071820, chip #0d2530, gold #f1d58a, paper #f3ecd6)
+   and the S1 crest edge (#d0ad54, lib/nation-crests crestEdge). The shield clip-path is .nation-crest's.
+   Flag off: this file's rules all start at .game-clock-zoom, so the current chrome is unchanged. */
+.game-clock-zoom{--s2-ground:#071820;--s2-chip:#0d2530;--s2-paper:#f3ecd6;--s2-gold:#f1d58a;--crest-edge:#d0ad54}
+.game-clock-zoom .game-zoom-rail{background:var(--s2-ground);border-right-color:var(--crest-edge);box-shadow:inset -1px 0 0 var(--crest-edge)}
+.game-clock-zoom .game-zoom-rail button.game-zoom-level,.game-clock-zoom .game-dock button.game-zoom-level{position:relative;background:var(--s2-chip);color:var(--s2-paper);box-shadow:inset 0 0 0 1px var(--crest-edge)}
+.game-clock-zoom .game-zoom-rail button.game-zoom-level::before,.game-clock-zoom .game-dock button.game-zoom-level::before{content:'';position:absolute;top:3px;right:3px;width:calc(8px * var(--text-scale, 1));height:calc(9px * var(--text-scale, 1));background:var(--crest-edge);clip-path:polygon(50% 3%,93% 15%,93% 52%,84% 79%,50% 97%,16% 79%,7% 52%,7% 15%);pointer-events:none}
+.game-clock-zoom .game-zoom-rail button.game-zoom-level:hover,.game-clock-zoom .game-dock button.game-zoom-level:hover{background:var(--s2-ground);color:var(--s2-paper)}
+.game-clock-zoom .game-zoom-rail button.game-zoom-level[aria-current],.game-clock-zoom .game-dock button.game-zoom-level[aria-current]{color:var(--s2-gold);background:var(--s2-ground);box-shadow:inset 0 0 0 1px var(--crest-edge),inset 3px 0 0 var(--s2-gold)}
+.game-clock-zoom .game-zoom-rail button.game-zoom-level:focus-visible,.game-clock-zoom .game-dock button.game-zoom-level:focus-visible{outline:2px solid var(--s2-paper);outline-offset:2px}
+.game-clock-zoom .game-account .game-hud-help:has(.game-clock-chip)>summary{background:var(--s2-chip);color:var(--s2-paper);border-radius:10px;box-shadow:inset 0 0 0 1px var(--crest-edge),inset 0 0 0 2px var(--s2-ground),inset 0 0 0 3px #d0ad5455}
+.game-clock-zoom .game-clock-chip,.game-clock-zoom .game-clock-chip>small:not([class]){color:var(--s2-paper)}
+.game-clock-zoom .game-account .game-hud-help:has(.game-clock-chip)>summary:focus-visible{outline:2px solid var(--s2-paper);outline-offset:2px}

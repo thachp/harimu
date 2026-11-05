@@ -13,11 +13,14 @@ import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-cont
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
+import { FULMARA_EXCHANGE_BELL_CYCLE_DAYS, fulmaraNextExchangeBellAt } from './fulmara-exchange-bell.ts';
 import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
+import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
@@ -37,6 +40,8 @@ export type GovernmentSnapshot = {
   federalCouncil?: { nextElectionAt: number; termDays: 120; speakerSeat: number; speakerRotationDays: 30 };
   /** #1122 Veldwood: next Vote Day on a 15-real-day cycle. Present only while HARIMU_VELDWOOD_VOTE_DAY_ENABLED is on. */
   voteDayCalendar?: { nextAt: number; cycleDays: 15 };
+  /** #1159 Veldwood: next Dividend Day (once per game year = 30 real days). Present only while HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED is on. Pays no dividend and states no amount. */
+  dividendDay?: { nextAt: number; cycleDays: 30 };
   /** #1102 Fulmara: Council of Ten, Lodestar and the Tribune session. Present only while HARIMU_FULMARA_COUNCIL_ENABLED is on. */
   grandCouncil?: {
     councilOfTenNextElectionAt: number; councilOfTenTermDays: 30;
@@ -45,6 +50,8 @@ export type GovernmentSnapshot = {
   };
   /** #1130 Fulmara: non-election shareholder resolutions with share totals. Present only while HARIMU_FULMARA_RESOLUTIONS_ENABLED is on. */
   resolutions?: FulmaraResolution[];
+  /** #1150 Fulmara: next Exchange Bell on a 30-real-day cycle. Present only while HARIMU_FULMARA_EXCHANGE_BELL_ENABLED is on. Opens no trading session. */
+  exchangeBell?: { nextAt: number; cycleDays: 30 };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
@@ -79,6 +86,7 @@ export type GovernmentSnapshot = {
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
   /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
   auroraNight?: { nextAt: number; cycleDays: 30 };
+  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1089: Hoarvale Moot bills. Present only when the caller passes hoarvaleAssent (the server flag). Assent sits on the bill. */
   bills?: HoarvaleBill[];
@@ -170,6 +178,14 @@ export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: n
 export function withHoarvaleAuroraNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
   return { ...snapshot, auroraNight: { nextAt: hoarvaleNextAuroraNightAt(nowMs), cycleDays: HOARVALE_AURORA_NIGHT_CYCLE_DAYS } };
+}
+
+/** #1151. Flag off, or any nation but Varkand: the same snapshot, and no musterDay key. Musters no troops, changes no Alert Level. */
+export function withVarkandMusterDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  return { ...snapshot, musterDay: {
+    nextAt: varkandNextMusterDayAt(nowMs), intervalDays: VARKAND_MUSTER_DAY_INTERVAL_DAYS as 30, mustersTroops: false,
+  } };
 }
 
 /** #1145. Flag off, or any nation but Kindle: the same snapshot, and no foundersForgeDay key. Opens no fair. */
@@ -291,6 +307,12 @@ export function withVeldwoodVoteDay(snapshot: GovernmentSnapshot, nowMs: number,
   return { ...snapshot, voteDayCalendar: { nextAt: veldwoodNextVoteDayAt(nowMs), cycleDays: VELDWOOD_VOTE_DAY_CYCLE_DAYS } };
 }
 
+/** #1159. Flag off, or any nation but Veldwood: the same snapshot, and no dividendDay key. Pays no dividend and states no amount. */
+export function withVeldwoodDividendDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'veldwood') return snapshot;
+  return { ...snapshot, dividendDay: { nextAt: veldwoodNextDividendDayAt(nowMs), cycleDays: VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS as 30 } };
+}
+
 /** #1102. Flag off, or any nation but Fulmara: the same snapshot, and no grandCouncil key. */
 export function withFulmaraCouncil(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
@@ -305,6 +327,27 @@ export function withFulmaraCouncil(snapshot: GovernmentSnapshot, nowMs: number, 
 export function withFulmaraResolutions(snapshot: GovernmentSnapshot, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
   return { ...snapshot, resolutions: fulmaraResolutions() };
+}
+
+/** #1150. Flag off, or any nation but Fulmara: the same snapshot, and no exchangeBell key. Opens no trading session. */
+export function withFulmaraExchangeBell(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, exchangeBell: { nextAt: fulmaraNextExchangeBellAt(nowMs), cycleDays: FULMARA_EXCHANGE_BELL_CYCLE_DAYS } };
+}
+
+/** Fulmara read while only the Exchange Bell flag is on. No grandCouncil or resolutions key. Flag off returns null, which is today's read. */
+export function fulmaraExchangeBellSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraExchangeBell({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Exchange Bell', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Exchange Bell', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Exchange Bell is the year\'s opening of trading and falls every 30 real days. Arcport hosts it. This read names the next Exchange Bell. It opens no trading session, moves no prices, lists no trades, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Arcport hosts the Exchange Bell. This read does not open a trading session or record a trade.',
+  }, nowMs, true);
 }
 
 /** Fulmara read while only the resolutions flag is on. No grandCouncil key. Flag off returns null, which is today's read. */
@@ -511,6 +554,21 @@ export function ilmarFeastOfFirstLightSnapshot(nowMs: number, enabled: boolean):
     },
     availableBudgetMinor: 0,
     influenceSummary: 'This read names the next Feast of First Light. It chooses no Oracle and lists no clergy.',
+  }, nowMs, true);
+}
+
+/** Veldwood read while only the Dividend Day flag is on. No federalCouncil or voteDayCalendar key. Flag off returns null, which is today's read. */
+export function veldwoodDividendDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVeldwoodDividendDay({
+    nationId: 'veldwood', mode: 'rule-bound simulation',
+    roles: [{ name: 'Dividend Day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Dividend Day', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Dividend Day is the yearly Citizen Dividend date, once per game year. This read names the next Dividend Day. It pays no dividend and states no amount.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The Common Fund pays a yearly Citizen Dividend. This read names the date only.',
   }, nowMs, true);
 }
 
