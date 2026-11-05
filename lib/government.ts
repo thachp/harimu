@@ -19,9 +19,12 @@ import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolution
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
+import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
+import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
+import { KINDLE_MARKET_BELL_CYCLE_DAYS, kindleNextMarketBellAt } from './kindle-market-bell.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
@@ -86,8 +89,14 @@ export type GovernmentSnapshot = {
   moot?: HoarvaleMoot;
   /** #1136 Hoarvale: next Honors List Day (once per game year = 30 real days). Present only while HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED is on. Awards no titles. */
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
+  /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
+  auroraNight?: { nextAt: number; cycleDays: 30 };
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
+  /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
+  canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
+  /** #1164 Kindle: next Market Bell on a 30-real-day cycle. Present only while HARIMU_KINDLE_MARKET_BELL_ENABLED is on. Holds no market event, price move, or bonus. */
+  marketBell?: { nextAt: number; cycleDays: 30 };
   /** #1089: Hoarvale Moot bills. Present only when the caller passes hoarvaleAssent (the server flag). Assent sits on the bill. */
   bills?: HoarvaleBill[];
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
@@ -174,11 +183,26 @@ export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: n
   } };
 }
 
+/** #1160. Flag off, or any nation but Hoarvale: the same snapshot, and no auroraNight key. Holds no festival and adds no rest bonus. */
+export function withHoarvaleAuroraNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, auroraNight: { nextAt: hoarvaleNextAuroraNightAt(nowMs), cycleDays: HOARVALE_AURORA_NIGHT_CYCLE_DAYS } };
+}
+
 /** #1151. Flag off, or any nation but Varkand: the same snapshot, and no musterDay key. Musters no troops, changes no Alert Level. */
 export function withVarkandMusterDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
   return { ...snapshot, musterDay: {
     nextAt: varkandNextMusterDayAt(nowMs), intervalDays: VARKAND_MUSTER_DAY_INTERVAL_DAYS as 30, mustersTroops: false,
+  } };
+}
+
+/** #1165. Flag off, or any nation but Confluence: the same snapshot, and no canalFestival key. Holds no festival, harvest yield, or bonus. */
+export function withConfluenceCanalFestival(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
+  return { ...snapshot, canalFestival: {
+    nextAt: confluenceNextCanalFestivalAt(nowMs), intervalDays: CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS as 30,
+    hostCity: CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, holdsFestival: false,
   } };
 }
 
@@ -188,6 +212,12 @@ export function withKindleFoundersForgeDay(snapshot: GovernmentSnapshot, nowMs: 
   return { ...snapshot, foundersForgeDay: {
     nextAt: kindleNextFoundersForgeDayAt(nowMs), intervalDays: KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS as 30, opensFair: false,
   } };
+}
+
+/** #1164. Flag off, or any nation but Kindle: the same snapshot, and no marketBell key. Holds no market event, price move, or bonus. */
+export function withKindleMarketBell(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'kindle') return snapshot;
+  return { ...snapshot, marketBell: { nextAt: kindleNextMarketBellAt(nowMs), cycleDays: KINDLE_MARKET_BELL_CYCLE_DAYS } };
 }
 
 const institutions = {
