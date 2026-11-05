@@ -155,6 +155,7 @@ const flagOffPins = {
   HARIMU_FULMARA_RESOLUTIONS_ENABLED: 'zzzzzzzz-fulmara-resolutions-1130.test.mjs', // #1130 flag off: no resolutions key
   HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'zzzzz-ilmar-sanctum-1107.test.mjs', // #1107 flag off: no sanctum key
   HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED: 'zzzzzzzzz-ilmar-feast-first-light-1137.test.mjs', // #1137 flag off: no feastOfFirstLight key
+  HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED: 'zzzzzzzzz-ilmar-prism-contracts-1139.test.mjs', // #1139 flag off: no contracts key
   HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED: 'zzzzzz-confluence-party-1113.test.mjs', // #1113 flag off: no party key
   HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED: 'zzzzz-meridian-party-1114.test.mjs', // #1114 flag off: no partyState key
   HARIMU_MERIDIAN_EXAM_DAY_ENABLED: 'zzzzzzzz-meridian-exam-day-1133.test.mjs', // #1133 flag off: no examDay key
@@ -163,6 +164,7 @@ const flagOffPins = {
   HARIMU_AURELLE_HEARTH_NIGHT_ENABLED: 'zzzzzzzzzz-aurelle-hearth-night-1146.test.mjs', // #1146 flag off: no hearthNight key
   HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED: 'zzzzzz-confluence-assembly-election-1123.test.mjs', // #1123 flag off: no assemblyElection key
   HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'zzzzzzz-kindle-election-1117.test.mjs', // #1117 flag off: no electionClock key
+  HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED: 'zzzzzzzzz-kindle-founders-forge-1145.test.mjs', // #1145 flag off: no foundersForgeDay key
   HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'zzzzzzz-hoarvale-honors-1136.test.mjs', // #1136 flag off: no honorsListDay key
   HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
 };

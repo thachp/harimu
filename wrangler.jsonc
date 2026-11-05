@@ -139,7 +139,11 @@
       // #1137: Ilmar next Feast of First Light (every 15 real days, twice per game year). Off: no feastOfFirstLight key.
       "HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED": "true",
       // #1146: Aurelle next Hearth Night (Kinward Rite blessing of houses, once per game year = 30 real days). Off: no hearthNight key.
-      "HARIMU_AURELLE_HEARTH_NIGHT_ENABLED": "true"
+      "HARIMU_AURELLE_HEARTH_NIGHT_ENABLED": "true",
+      // #1139: Ilmar Prism contracts (title and whole-number profit share) on the government read. Off: no contracts key.
+      "HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED": "true",
+      // #1145: Kindle next Founders' Forge Day (once per game year = 30 real days) on the government read. Off: no foundersForgeDay key.
+      "HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

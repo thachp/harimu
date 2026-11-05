@@ -2406,7 +2406,8 @@ html[data-harimu-reduced-motion] .fulmara-ticker-item{white-space:normal}
 .hoarvale-bill[data-assent="pending"] .hoarvale-assent-mark{color:var(--hv-ink);background-color:var(--hv-paper);background-image:none;border-style:dashed}
 .hoarvale-bill[data-assent="withheld"] .hoarvale-assent-mark{color:var(--hv-ink);background-color:var(--hv-paper);background-image:linear-gradient(90deg,transparent 46%,var(--hv-frost) 46%,var(--hv-frost) 54%,transparent 54%);border-style:solid}
 .hoarvale-assent-label{min-width:0;color:var(--hv-ink);font-size:calc(15px * var(--text-scale, 1));font-weight:700;line-height:1.35;overflow-wrap:anywhere}
-:is(.citizen-market,.game-inspector-body,.nation-document) .hoarvale-bills :is(h3,h4,p,.hoarvale-assent-label){color:var(--hv-ink,#14323a)}
+.hoarvale-assent-date{min-width:0;color:var(--hv-ink);font-size:calc(15px * var(--text-scale, 1));font-weight:400;line-height:1.35;overflow-wrap:anywhere}
+:is(.citizen-market,.game-inspector-body,.nation-document) .hoarvale-bills :is(h3,h4,p,.hoarvale-assent-label,.hoarvale-assent-date){color:var(--hv-ink,#14323a)}
 
 /* #1124: Ilmar Prism contracts. Field #7d6a2b and mark #fff8e0 are the crest; gold #e0bb59 is the mark accent.
    Dots are the Ilmar pattern. Posted and unposted shares differ by the words Lightshare and Share not posted. No motion. */
