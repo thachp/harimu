@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 45); // recounted after merging origin/dev a0d16a33 (GRAY 44): #1151 Varkand Muster Day is the 45th; #1095 recruit term stays in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 46); // recounted after merging origin/dev 33ba31ee (GRAY 45): #1159 Veldwood Dividend Day is the 46th, after #1157 and before #1150 which stays last; #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
@@ -242,6 +242,15 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED: 'false' }, 'HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED, undefined, 'the Veldwood Dividend Day is not its own binding');
+  assert.equal(prod.vars.HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED: 'false' }, 'HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.HARIMU_VARKAND_MUSTER_DAY_ENABLED, undefined, "Varkand Muster Day is not its own binding");
   assert.equal(prod.vars.HARIMU_VARKAND_MUSTER_DAY_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_VARKAND_MUSTER_DAY_ENABLED, 'true');

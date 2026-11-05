@@ -150,6 +150,8 @@
       "HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED": "false",
       // #1151: Varkand next Muster Day (once per game year = 30 real days) on the government read. Off: no musterDay key.
       "HARIMU_VARKAND_MUSTER_DAY_ENABLED": "false",
+      // #1159: Veldwood next Dividend Day (once per game year = 30 real days). Off: no dividendDay key. Pays no dividend and states no amount.
+      "HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED": "false",
       // #1150: Fulmara next Exchange Bell (once per game year = 30 real days) on the government read. Off: no exchangeBell key.
       "HARIMU_FULMARA_EXCHANGE_BELL_ENABLED": "false"
     },
