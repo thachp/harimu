@@ -130,6 +130,8 @@
       "HARIMU_KINDLE_ELECTION_CLOCK_ENABLED": "true",
       // #1133: Meridian next Exam Day (once per game year). Off: no examDay key.
       "HARIMU_MERIDIAN_EXAM_DAY_ENABLED": "true",
+      // #1130: Fulmara shareholder resolutions (title, status, share totals) on the government read. Off: no resolutions key.
+      "HARIMU_FULMARA_RESOLUTIONS_ENABLED": "true",
       // #1137: Ilmar next Feast of First Light (every 15 real days, twice per game year). Off: no feastOfFirstLight key.
       "HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED": "true"
     },

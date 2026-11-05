@@ -152,6 +152,7 @@ const flagOffPins = {
   HARIMU_VELDWOOD_COUNCIL_ENABLED: 'zzzz-veldwood-council-1098.test.mjs', // #1098 flag off: no federalCouncil key
   HARIMU_VELDWOOD_VOTE_DAY_ENABLED: 'zzzzzzz-veldwood-vote-day-1122.test.mjs', // #1122 flag off: no voteDayCalendar key
   HARIMU_FULMARA_COUNCIL_ENABLED: 'zzzzz-fulmara-council-1102.test.mjs', // #1102 flag off: no grandCouncil key
+  HARIMU_FULMARA_RESOLUTIONS_ENABLED: 'zzzzzzzz-fulmara-resolutions-1130.test.mjs', // #1130 flag off: no resolutions key
   HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'zzzzz-ilmar-sanctum-1107.test.mjs', // #1107 flag off: no sanctum key
   HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED: 'zzzzzzzzz-ilmar-feast-first-light-1137.test.mjs', // #1137 flag off: no feastOfFirstLight key
   HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED: 'zzzzzz-confluence-party-1113.test.mjs', // #1113 flag off: no party key
