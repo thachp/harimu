@@ -163,7 +163,9 @@
       // #1169: Confluence next Quota Day (once per game year = 30 real days). Off: no quotaDay key. States no quota, target, or bonus.
       "HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED": "false",
       // #1170: Korund next People's Congress (once per game year, 30 real days, zero offset). Off: no peoplesCongress key.
-      "HARIMU_KORUND_PEOPLES_CONGRESS_ENABLED": "false"
+      "HARIMU_KORUND_PEOPLES_CONGRESS_ENABLED": "false",
+      // #1175: Meridian next Turbine Day (anniversary of the national grid, once per game year = 30 real days). Shen Springs hosts it. Off: no turbineDay key.
+      "HARIMU_MERIDIAN_TURBINE_DAY_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
