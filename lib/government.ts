@@ -25,6 +25,7 @@ import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './h
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
+import { FULMARA_GRAND_REGATTA_HOST_CITY, FULMARA_GRAND_REGATTA_INTERVAL_DAYS, fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 import { KINDLE_MARKET_BELL_CYCLE_DAYS, kindleNextMarketBellAt } from './kindle-market-bell.ts';
 
@@ -100,6 +101,8 @@ export type GovernmentSnapshot = {
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
+  /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
+  grandRegatta?: { nextAt: number; intervalDays: 30; hostCity: 'Corvel Isles'; holdsRegatta: false };
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1164 Kindle: next Market Bell on a 30-real-day cycle. Present only while HARIMU_KINDLE_MARKET_BELL_ENABLED is on. Holds no market event, price move, or bonus. */
   marketBell?: { nextAt: number; cycleDays: 30 };
@@ -210,6 +213,30 @@ export function withConfluenceCanalFestival(snapshot: GovernmentSnapshot, nowMs:
     nextAt: confluenceNextCanalFestivalAt(nowMs), intervalDays: CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS as 30,
     hostCity: CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, holdsFestival: false,
   } };
+}
+
+/** #1178. Flag off, or any nation but Fulmara: the same snapshot, and no grandRegatta key. Holds no race, prize, or bonus. */
+export function withFulmaraGrandRegatta(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, grandRegatta: {
+    nextAt: fulmaraNextGrandRegattaAt(nowMs), intervalDays: FULMARA_GRAND_REGATTA_INTERVAL_DAYS as 30,
+    hostCity: FULMARA_GRAND_REGATTA_HOST_CITY, holdsRegatta: false,
+  } };
+}
+
+/** Fulmara read while only the Grand Regatta flag is on. No grandCouncil, resolutions, or exchangeBell key. Flag off returns null, which is today's read. */
+export function fulmaraGrandRegattaSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraGrandRegatta({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Grand Regatta', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Grand Regatta', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Grand Regatta is hosted at Corvel Isles and falls every 30 real days. This read names the next Grand Regatta. It holds no race, lists no prizes or bonuses, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Corvel Isles hosts the Grand Regatta. This read does not hold a race or award a prize.',
+  }, nowMs, true);
 }
 
 /** #1145. Flag off, or any nation but Kindle: the same snapshot, and no foundersForgeDay key. Opens no fair. */
