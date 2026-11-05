@@ -148,6 +148,7 @@ const flagOffPins = {
   HARIMU_SHIFT_SOFT_CAP_ENABLED: 'shift-soft-cap-1047.test.mjs', // #1047 flag off: no count, no refusal, no extra query
   HARIMU_VARKAND_DIRECTORATE_ENABLED: 'zzz-varkand-directorate-1085.test.mjs', // #1085 flag off: no directorate key
   HARIMU_VARKAND_PLEBISCITE_ENABLED: 'zzzz-varkand-plebiscite-1094.test.mjs', // #1094 flag off: no mandatePlebiscite key
+  HARIMU_VELDWOOD_COUNCIL_ENABLED: 'zzzz-veldwood-council-1098.test.mjs', // #1098 flag off: no federalCouncil key
   HARIMU_FULMARA_COUNCIL_ENABLED: 'zzzzz-fulmara-council-1102.test.mjs', // #1102 flag off: no grandCouncil key
 };
 
