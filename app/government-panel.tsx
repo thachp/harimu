@@ -5,6 +5,7 @@ import { varkandDispatchEnabled } from '@/lib/varkand-dispatch';
 import { VarkandAlertBanner, VarkandDispatchStamp } from './varkand-dispatch';
 import { IlmarGlassEdict, ilmarGlassEdictsEnabled } from './ilmar-glass-edict';
 import { FulmaraShareRegister, fulmaraShareLines, fulmaraShareTickerEnabled } from './fulmara-share-ticker';
+import { HoarvaleRoyalAssentBills, hoarvaleRoyalAssentEnabled } from './hoarvale-royal-assent';
 import { countdownDualTimeEnabled } from '../lib/game-time';
 import { disabledReasonProps } from '@/lib/action-reasons';
 import { NationDocument } from './nation-document';
@@ -89,6 +90,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
       </> : <p>{snapshot.nationId === 'korund' ? 'Korund’s assigned work fills its separate ration store; your Household and State store show current food and coupons. Automatic government policy spending is not implemented here.' : 'This nation receives saved rule-bound proposals; policy spending and economic execution are not implemented here yet.'}</p>}
     </section>}
     {shares ? <FulmaraShareRegister lines={fulmaraShareLines(snapshot, civicSpendingNote(snapshot.nationId))} /> : glass ? <IlmarGlassEdict>{decisionOrder}</IlmarGlassEdict> : dispatch ? <div className="varkand-dispatch"><VarkandDispatchStamp />{decisionOrder}</div> : decisionOrder}
+    {hoarvaleRoyalAssentEnabled() && <HoarvaleRoyalAssentBills nationId={snapshot.nationId} bills={snapshot.bills} />}
     <p>{snapshot.influenceSummary}</p>
     <h4>Daily priority requests</h4>
     <p>Ask your government to prioritize a need. Completed UTC days receive one recorded review on the next government visit. The selected topic sets the following UTC day’s policy proposal; other topics are deferred. Food safety emergencies can override that priority. Priority requests do not guarantee spending.</p>

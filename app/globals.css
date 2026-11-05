@@ -2393,3 +2393,17 @@ html[data-harimu-reduced-motion] .fulmara-ticker-item{white-space:normal}
 :is(.game-inspector-body,.nation-inspector) .veldwood-ballot-booklet :is(.veldwood-ballot-page p,.veldwood-ballot-num){color:var(--veldwood-field)}
 :is(.game-inspector-body,.nation-inspector) .veldwood-ballot-title{color:var(--veldwood-mark)}
 .veldwood-ballot-booklet :focus-visible{outline:3px solid var(--veldwood-accent);outline-offset:3px}
+
+/* #1064: Hoarvale Royal Assent seal on Civic bills. Frost #3f7898 and silver #b8c2c9 are the crest; accent #8ac1c6 is the nation mark. Icon, pattern and text differ by status. No animation. */
+.hoarvale-bills{--hv-paper:#f4f7f8;--hv-ink:#14323a;--hv-frost:#3f7898;--hv-silver:#b8c2c9;--hv-accent:#8ac1c6;min-width:0;max-width:100%;box-sizing:border-box;margin:16px 0;padding:12px;color:var(--hv-ink);background:var(--hv-paper);border:1px solid var(--hv-silver)}
+.hoarvale-bills h3{margin:0 0 8px;color:var(--hv-ink);font-size:calc(17px * var(--text-scale, 1))}
+.hoarvale-bills ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+.hoarvale-bill{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;min-width:0;max-width:100%;padding:10px 12px;border:1px solid var(--hv-silver);background:var(--hv-paper);color:var(--hv-ink)}
+.hoarvale-bill h4{margin:0;min-width:0;flex:1 1 8rem;color:var(--hv-ink);font-size:calc(15px * var(--text-scale, 1));line-height:1.35;overflow-wrap:anywhere}
+.hoarvale-assent{min-width:0;max-width:100%;margin:0;color:var(--hv-ink);font-size:calc(15px * var(--text-scale, 1));line-height:1.4}
+.hoarvale-assent-seal{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;max-width:100%}
+.hoarvale-assent-mark{display:grid;place-items:center;flex:0 0 auto;width:calc(44px * var(--text-scale, 1));height:calc(44px * var(--text-scale, 1));border-radius:50%;border:2px solid var(--hv-frost);color:#fff;background-color:var(--hv-frost);background-image:linear-gradient(135deg,rgba(255,255,255,.45) 25%,transparent 25%),linear-gradient(225deg,rgba(255,255,255,.45) 25%,transparent 25%);background-size:8px 8px;font-size:calc(18px * var(--text-scale, 1));line-height:1}
+.hoarvale-bill[data-assent="pending"] .hoarvale-assent-mark{color:var(--hv-ink);background-color:var(--hv-paper);background-image:none;border-style:dashed}
+.hoarvale-bill[data-assent="withheld"] .hoarvale-assent-mark{color:var(--hv-ink);background-color:var(--hv-paper);background-image:linear-gradient(90deg,transparent 46%,var(--hv-frost) 46%,var(--hv-frost) 54%,transparent 54%);border-style:solid}
+.hoarvale-assent-label{min-width:0;color:var(--hv-ink);font-size:calc(15px * var(--text-scale, 1));font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+:is(.citizen-market,.game-inspector-body,.nation-document) .hoarvale-bills :is(h3,h4,p,.hoarvale-assent-label){color:var(--hv-ink,#14323a)}
