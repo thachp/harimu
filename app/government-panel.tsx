@@ -7,6 +7,7 @@ import { IlmarGlassEdict, ilmarGlassEdictsEnabled } from './ilmar-glass-edict';
 import { IlmarPrismShares, ilmarPrismSharesEnabled } from './ilmar-prism-shares';
 import { FulmaraShareRegister, fulmaraShareLines, fulmaraShareTickerEnabled } from './fulmara-share-ticker';
 import { HoarvaleRoyalAssentBills, hoarvaleRoyalAssentEnabled } from './hoarvale-royal-assent';
+import { MeridianPartyCongress, meridianPartyCongressEnabled } from './meridian-party-congress';
 import { countdownDualTimeEnabled } from '../lib/game-time';
 import { disabledReasonProps } from '@/lib/action-reasons';
 import { NationDocument } from './nation-document';
@@ -95,6 +96,7 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     {shares ? <FulmaraShareRegister lines={fulmaraShareLines(snapshot, civicSpendingNote(snapshot.nationId))} /> : glass ? <IlmarGlassEdict>{decisionOrder}</IlmarGlassEdict> : dispatch ? <div className="varkand-dispatch"><VarkandDispatchStamp />{decisionOrder}</div> : decisionOrder}
     {prism ? <IlmarPrismShares nationId={snapshot.nationId} /> : null}
     {hoarvaleRoyalAssentEnabled() && <HoarvaleRoyalAssentBills nationId={snapshot.nationId} bills={snapshot.bills} />}
+    {meridianPartyCongressEnabled() && <MeridianPartyCongress nationId={snapshot.nationId} partyState={snapshot.partyState} />}
     <p>{snapshot.influenceSummary}</p>
     <h4>Daily priority requests</h4>
     <p>Ask your government to prioritize a need. Completed UTC days receive one recorded review on the next government visit. The selected topic sets the following UTC day’s policy proposal; other topics are deferred. Food safety emergencies can override that priority. Priority requests do not guarantee spending.</p>

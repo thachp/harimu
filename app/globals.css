@@ -2424,3 +2424,16 @@ html[data-harimu-reduced-motion] .fulmara-ticker-item{white-space:normal}
 :is(.citizen-market,.game-inspector-body,.nation-document) .ilmar-prism-shares h3{color:var(--ilmar-mark)}
 :is(.citizen-market,.game-inspector-body,.nation-document) .ilmar-prism-shares :is(h4,p,.ilmar-prism-kind,.ilmar-prism-figure){color:var(--ilmar-field)}
 .ilmar-prism-shares :focus-visible{outline:3px solid var(--ilmar-field);outline-offset:3px}
+
+/* #1152: Meridian Party Congress. Field #8c3d22 and paper #f6ead3 are the crest; slate #d8d4cc is the accent.
+   Crosshatch is the nation pattern. The date, the seat count and the suspension note are words. No motion. */
+.meridian-congress{--md-field:#8c3d22;--md-paper:#f6ead3;--md-slate:#d8d4cc;--md-accent:#b88cac;min-width:0;max-width:100%;box-sizing:border-box;margin:16px 0;padding:12px;color:var(--md-field);background:var(--md-paper);border:1px solid var(--md-slate)}
+.meridian-congress h3{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;margin:0 0 8px;color:var(--md-field);font-size:calc(17px * var(--text-scale, 1));line-height:1.35;overflow-wrap:anywhere}
+.meridian-congress-mark{display:grid;place-items:center;flex:0 0 auto;width:calc(36px * var(--text-scale, 1));height:calc(36px * var(--text-scale, 1));border:2px solid var(--md-field);color:var(--md-paper);background-color:var(--md-field);background-image:repeating-linear-gradient(45deg, transparent 0 3px, color-mix(in srgb, var(--md-paper) 35%, transparent) 3px 4px), repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in srgb, var(--md-paper) 35%, transparent) 3px 4px);font-size:calc(18px * var(--text-scale, 1));line-height:1}
+.meridian-congress p{min-width:0;max-width:100%;margin:0 0 8px;color:var(--md-field);font-size:calc(15px * var(--text-scale, 1));line-height:1.45;overflow-wrap:anywhere}
+.meridian-congress p:last-child{margin-bottom:0}
+.meridian-congress-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;min-width:0;max-width:100%}
+.meridian-congress-label{min-width:0;color:var(--md-field);font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+.meridian-congress-date,.meridian-congress-relative{min-width:0;color:var(--md-field);font-weight:400;line-height:1.35;overflow-wrap:anywhere}
+:is(.citizen-market,.game-inspector-body,.nation-document) .meridian-congress :is(h3,p,.meridian-congress-label,.meridian-congress-date,.meridian-congress-relative){color:var(--md-field,#8c3d22)}
+.meridian-congress :focus-visible{outline:3px solid var(--md-field);outline-offset:3px}
