@@ -1,4 +1,7 @@
+import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
+import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
+import { kindleElectionClock, type KindleElectionClock } from './kindle-election.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
@@ -38,6 +41,8 @@ export type GovernmentSnapshot = {
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
   party?: { pillars: readonly ['general_secretary', 'president', 'premier', 'assembly_chair']; termLimitCongresses: 2; nextCongressAt: number; congressIntervalDays: 150 };
+  /** #1123 Confluence: next People's Assembly election window. Present only while HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED is on. Opens no ballot; the result is not binding. */
+  assemblyElection?: { cycleStartedAt: number; nextElectionAt: number; intervalDays: 150; ballotOpen: false; leadershipHeedsResult: false };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   /** #1116 Korund: current Five-Year Plan start, next Plan Day and next quarterly Quota Rally. Present only while HARIMU_KORUND_PLAN_CALENDAR_ENABLED is on. */
@@ -48,6 +53,8 @@ export type GovernmentSnapshot = {
   petitions?: { requestId: string; topic: PetitionTopic; submittedAt: number; status: 'pending' | 'accepted' | 'deferred'; reason: string; reviewedAt: number | null }[];
   /** #985: Kindle Policy Ledger. Present only while HARIMU_KINDLE_POLICY_LEDGER_ENABLED is on. */
   policyLedger?: { id: string; publishedAt: number; office: string; title: string; brief: string }[];
+  /** #1117 Kindle: presidential term end and the next Ballot Night. Present only while HARIMU_KINDLE_ELECTION_CLOCK_ENABLED is on and the cycle start is set. */
+  electionClock?: KindleElectionClock;
   availableBudgetMinor: number;
   influenceSummary: string;
   /** #1096 Hoarvale: Moot term and investiture deadline. Present only while HARIMU_HOARVALE_MOOT_ENABLED is on. */
@@ -57,6 +64,8 @@ export type GovernmentSnapshot = {
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
   /** #613: Aurelle succession state and the named heir (flag HARIMU_AURELLE_SUCCESSION_ENABLED; absent otherwise). */
   succession?: { status: 'reigning' | 'ailing' | 'vacant' | 'acceded' | 'abdicated'; heir: { name: string; named: boolean } | null };
+  /** #1118 Aurelle: reign-start display clock and the next Great Council window. Present only while HARIMU_AURELLE_CROWN_CALENDAR_ENABLED is on. */
+  crownCalendar?: { reignStartedAt: number; nextGreatCouncilWindowAt: number; reignDisplayDays: number };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
 
@@ -199,6 +208,15 @@ export function withVeldwoodCouncil(snapshot: GovernmentSnapshot, nowMs: number,
   } };
 }
 
+/** #1118. Flag off, or any nation but Aurelle: the same snapshot, and no crownCalendar key. Names no heir and proposes no spending. */
+export function withAurelleCrownCalendar(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
+  return { ...snapshot, crownCalendar: {
+    reignStartedAt: aurelleReignStartedAt(nowMs), nextGreatCouncilWindowAt: aurelleNextGreatCouncilWindowAt(nowMs),
+    reignDisplayDays: AURELLE_REIGN_DISPLAY_DAYS,
+  } };
+}
+
 /** #1122. Flag off, or any nation but Veldwood: the same snapshot, and no voteDayCalendar key. */
 export function withVeldwoodVoteDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'veldwood') return snapshot;
@@ -266,6 +284,14 @@ export function varkandGovernmentSnapshot(nowMs: number, enabled: boolean): Gove
   }, nowMs, true);
 }
 
+/** #1117. Flag off, any nation but Kindle, or a held cycle start: the same snapshot, and no electionClock key. */
+export function withKindleElectionClock(snapshot: GovernmentSnapshot, nowMs: number, cycleStartSeconds: number | null, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'kindle') return snapshot;
+  const electionClock = kindleElectionClock(cycleStartSeconds, nowMs);
+  if (!electionClock) return snapshot;
+  return { ...snapshot, electionClock };
+}
+
 /** #1114. Flag off, or any nation but Meridian: the same snapshot, and no partyState key. */
 export function withMeridianPartyState(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
@@ -312,10 +338,19 @@ export function withConfluenceParty(snapshot: GovernmentSnapshot, nowMs: number,
   } };
 }
 
+/** #1123. Flag off, or any nation but Confluence: the same snapshot, and no assemblyElection key. */
+export function withConfluenceAssemblyElection(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
+  return { ...snapshot, assemblyElection: {
+    cycleStartedAt: confluenceLastAssemblyElectionAt(nowMs), nextElectionAt: confluenceNextAssemblyElectionAt(nowMs),
+    intervalDays: CONFLUENCE_ASSEMBLY_INTERVAL_DAYS as 150, ballotOpen: false, leadershipHeedsResult: false,
+  } };
+}
+
 /** Confluence read while the flag is on. Confluence has no other government snapshot, so this is the smallest one that carries the party block. Flag off returns null, which is today's read. */
-export function confluencePartySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
-  if (!enabled) return null;
-  return withConfluenceParty({
+export function confluencePartySnapshot(nowMs: number, enabled: boolean, assemblyElection = false): GovernmentSnapshot | null {
+  if (!enabled && !assemblyElection) return null; // #1123: either flag gives Confluence a read
+  return withConfluenceAssemblyElection(withConfluenceParty({
     nationId: 'confluence', mode: 'rule-bound simulation',
     roles: ['General Secretary', 'President', 'Premier', "Chair of the People's Assembly"].map(name => ({ name, controller: 'AI/SI role · deterministic rules' })),
     decision: {
@@ -324,7 +359,7 @@ export function confluencePartySnapshot(nowMs: number, enabled: boolean): Govern
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Four Pillars share collective leadership. Each Pillar may serve 2 Congress terms. This read does not elect a Pillar.',
-  }, nowMs, true);
+  }, nowMs, enabled), nowMs, assemblyElection);
 }
 
 /** Ilmar read while the flag is on. Ilmar has no other government snapshot, so this is the smallest one that carries the sanctum block. Flag off returns null, which is today's read. */
