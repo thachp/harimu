@@ -161,6 +161,7 @@ const flagOffPins = {
   HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED: 'zzzzzz-confluence-party-1113.test.mjs', // #1113 flag off: no party key
   HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED: 'zzzzz-meridian-party-1114.test.mjs', // #1114 flag off: no partyState key
   HARIMU_MERIDIAN_EXAM_DAY_ENABLED: 'zzzzzzzz-meridian-exam-day-1133.test.mjs', // #1133 flag off: no examDay key
+  HARIMU_MERIDIAN_TURBINE_DAY_ENABLED: 'zzzzzzzzzzzz-meridian-turbine-day-1175.test.mjs', // #1175 flag off: no turbineDay key
   HARIMU_KORUND_PLAN_CALENDAR_ENABLED: 'zzzzz-korund-plan-calendar-1116.test.mjs', // #1116 flag off: no planCalendar key
   HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED: 'zzzzzzzzzz-korund-chairman-birthday-1147.test.mjs', // #1147 flag off: no chairmanBirthday key
   HARIMU_AURELLE_CROWN_CALENDAR_ENABLED: 'zzzzzzz-aurelle-crown-1118.test.mjs', // #1118 flag off: no crownCalendar key
