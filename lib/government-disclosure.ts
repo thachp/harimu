@@ -23,6 +23,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.resolutions?{resolutions:snapshot.resolutions.map(row=>({id:row.id,title:row.title,status:row.status,shares:{for:row.shares.for,against:row.shares.against,abstain:row.shares.abstain}}))}:{}), // #1130: title, status, share totals (readGovernment adds them only while the flag is on)
   ...(snapshot.sanctum?{sanctum:snapshot.sanctum}:{}), // #1107: Oracle term, Elders, Stillday, Great Pilgrimage (readGovernment adds it only while the flag is on)
   ...(snapshot.feastOfFirstLight?{feastOfFirstLight:snapshot.feastOfFirstLight}:{}), // #1137: next Feast of First Light (readGovernment adds it only while the flag is on)
+  ...(snapshot.contracts?{contracts:snapshot.contracts.map(row=>({title:row.title,sharePercent:row.sharePercent}))}:{}), // #1139: title and whole-number profit share (readGovernment adds them only while the flag is on)
   ...(snapshot.party?{party:snapshot.party}:{}), // #1113: Four Pillars and the next Party Congress (readGovernment adds it only while the flag is on)
   ...(snapshot.partyState?{partyState:snapshot.partyState}:{}), // #1114: Meridian Party Congress schedule (readGovernment adds it only while the flag is on)
   ...(snapshot.examDay?{examDay:snapshot.examDay}:{}), // #1133: next Exam Day (readGovernment adds it only while the flag is on)

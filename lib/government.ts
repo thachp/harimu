@@ -7,6 +7,7 @@ import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
+import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-contracts.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
@@ -45,6 +46,8 @@ export type GovernmentSnapshot = {
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
   feastOfFirstLight?: { nextAt: number; cycleDays: 15 };
+  /** #1139 Ilmar: Prism contracts, each with a title and a whole-number profit share. Present only while HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED is on. */
+  contracts?: IlmarPrismContract[];
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
   party?: { pillars: readonly ['general_secretary', 'president', 'premier', 'assembly_chair']; termLimitCongresses: 2; nextCongressAt: number; congressIntervalDays: 150 };
   /** #1123 Confluence: next People's Assembly election window. Present only while HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED is on. Opens no ballot; the result is not binding. */
@@ -394,6 +397,12 @@ export function withIlmarSanctum(snapshot: GovernmentSnapshot, nowMs: number, en
   } };
 }
 
+/** #1139. Flag off, or any nation but Ilmar: the same snapshot, and no contracts key. */
+export function withIlmarPrismContracts(snapshot: GovernmentSnapshot, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, contracts: ilmarPrismContracts() };
+}
+
 /** #1113. Flag off, or any nation but Confluence: the same snapshot, and no party key. */
 export function withConfluenceParty(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
@@ -443,6 +452,24 @@ export function ilmarSanctumSnapshot(nowMs: number, enabled: boolean): Governmen
     availableBudgetMinor: 0,
     influenceSummary: 'The Oracle serves for life, chosen by the Council of Elders. This read does not choose an Oracle, pause Prism trading, or open a pilgrimage.',
   }, nowMs, true);
+}
+
+/** Ilmar read while only the Prism contracts flag is on. No sanctum key. Flag off returns null, which is today's read. */
+export function ilmarPrismContractsSnapshot(enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarPrismContracts({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [
+      { name: 'Treasury of Endowments', controller: 'AI/SI role · deterministic rules' },
+      { name: 'Guardian Synod', controller: 'AI/SI role · deterministic rules' },
+    ],
+    decision: {
+      title: 'Prism contracts', topic: 'work', proposedSpendMinor: 0,
+      reason: 'Clear Measure credit is a Lightshare profit share or an asset-backed Endowment lease, never a fixed interest rate. This read posts each contract title and its whole-number profit share. It opens no partnership and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Endowment counting-houses post profit shares, not interest. This read does not certify a template, pause Prism trading, or collect the tithe.',
+  }, true);
 }
 
 /** #1137. Flag off, or any nation but Ilmar: the same snapshot, and no feastOfFirstLight key. Chooses no Oracle, lists no clergy, and proposes no spending. */
