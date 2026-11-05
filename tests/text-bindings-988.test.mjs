@@ -24,11 +24,11 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 50); // [ASSUMPTION] provisional tip+1 on 4e34d8d5 (GRAY 49): #1178 Grand Regatta is the 50th and last; recount after #1176 (~53). #1095 recruit term stays in HARIMU_ARMY_PACK
+assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 51); // [ASSUMPTION] provisional tip+1 on f0b59da2 (GRAY 50 Quota Day): #1178 Grand Regatta is the 51st and last; recount after #1176 (~53). #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 27); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1100 Fulmara share ticker, #1104 countdown dual time, #1064 Hoarvale seal, #1124 Ilmar prism shares, #1152 Meridian party congress, #1158 clock chip and zoom controls, #1166 nation overview stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 28); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1100 Fulmara share ticker, #1104 countdown dual time, #1064 Hoarvale seal, #1124 Ilmar prism shares, #1152 Meridian party congress, #1158 clock chip and zoom controls, #1166 nation overview, #1174 globe rim stay inside the pack
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
@@ -196,6 +196,7 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'false' }, 'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED');
   assert.equal(preview.vars.HARIMU_FULMARA_GRAND_REGATTA_ENABLED, undefined, 'the Fulmara Grand Regatta is not its own binding');
   assert.equal(prod.vars.HARIMU_FULMARA_GRAND_REGATTA_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_GRAND_REGATTA_ENABLED, 'true');
@@ -205,7 +206,6 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_FULMARA_GRAND_REGATTA_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_FULMARA_GRAND_REGATTA_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'false' }, 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED'), false, 'a direct string wins over the pack');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED');
   assert.equal(preview.vars.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, undefined, 'the Confluence Party Congress is not its own binding');
   assert.equal(prod.vars.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED, 'true');
@@ -287,6 +287,17 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED: 'false' }, 'HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED, undefined, 'the Confluence Quota Day is not its own binding');
+  assert.equal(prod.vars.HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED: 'false' }, 'HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED');
   assert.equal(preview.vars.HARIMU_VARKAND_MUSTER_DAY_ENABLED, undefined, "Varkand Muster Day is not its own binding");
   assert.equal(prod.vars.HARIMU_VARKAND_MUSTER_DAY_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_VARKAND_MUSTER_DAY_ENABLED, 'true');
