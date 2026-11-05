@@ -154,6 +154,7 @@ const flagOffPins = {
   HARIMU_FULMARA_COUNCIL_ENABLED: 'zzzzz-fulmara-council-1102.test.mjs', // #1102 flag off: no grandCouncil key
   HARIMU_FULMARA_RESOLUTIONS_ENABLED: 'zzzzzzzz-fulmara-resolutions-1130.test.mjs', // #1130 flag off: no resolutions key
   HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'zzzzz-ilmar-sanctum-1107.test.mjs', // #1107 flag off: no sanctum key
+  HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED: 'zzzzzzzzz-ilmar-feast-first-light-1137.test.mjs', // #1137 flag off: no feastOfFirstLight key
   HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED: 'zzzzzzzzz-ilmar-prism-contracts-1139.test.mjs', // #1139 flag off: no contracts key
   HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED: 'zzzzzz-confluence-party-1113.test.mjs', // #1113 flag off: no party key
   HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED: 'zzzzz-meridian-party-1114.test.mjs', // #1114 flag off: no partyState key
@@ -162,6 +163,8 @@ const flagOffPins = {
   HARIMU_AURELLE_CROWN_CALENDAR_ENABLED: 'zzzzzzz-aurelle-crown-1118.test.mjs', // #1118 flag off: no crownCalendar key
   HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED: 'zzzzzz-confluence-assembly-election-1123.test.mjs', // #1123 flag off: no assemblyElection key
   HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'zzzzzzz-kindle-election-1117.test.mjs', // #1117 flag off: no electionClock key
+  HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'zzzzzzz-hoarvale-honors-1136.test.mjs', // #1136 flag off: no honorsListDay key
+  HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.

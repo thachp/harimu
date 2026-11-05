@@ -5,6 +5,7 @@ import { kindleElectionClock, type KindleElectionClock } from './kindle-election
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
+import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-contracts.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
@@ -13,6 +14,7 @@ import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCounc
 import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
+import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
@@ -41,6 +43,8 @@ export type GovernmentSnapshot = {
   resolutions?: FulmaraResolution[];
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
+  /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
+  feastOfFirstLight?: { nextAt: number; cycleDays: 15 };
   /** #1139 Ilmar: Prism contracts, each with a title and a whole-number profit share. Present only while HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED is on. */
   contracts?: IlmarPrismContract[];
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
@@ -65,6 +69,8 @@ export type GovernmentSnapshot = {
   influenceSummary: string;
   /** #1096 Hoarvale: Moot term and investiture deadline. Present only while HARIMU_HOARVALE_MOOT_ENABLED is on. */
   moot?: HoarvaleMoot;
+  /** #1136 Hoarvale: next Honors List Day (once per game year = 30 real days). Present only while HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED is on. Awards no titles. */
+  honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
   /** #1089: Hoarvale Moot bills. Present only when the caller passes hoarvaleAssent (the server flag). Assent sits on the bill. */
   bills?: HoarvaleBill[];
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
@@ -83,7 +89,11 @@ const HOUR = 3600;
 /** Jan 15 2026 12:00 UTC (the fixture clock). The Mint band is due, Frostcore is an hour old, tenure was already dissolved. */
 export const HOARVALE_ASSENT_SAMPLE_AT = 1_768_478_400;
 export type AssentStatus = 'pending' | 'assented' | 'withheld';
-export type HoarvaleBill = { id: string; title: string; passedAt: number; assentStatus: AssentStatus; assentAt: number | null };
+export type HoarvaleBill = {
+  id: string; title: string; passedAt: number; assentStatus: AssentStatus; assentAt: number | null;
+  /** #1134: seconds until Royal Assent. Present on a pending bill only while HARIMU_HOARVALE_AUTO_ASSENT_ENABLED is on. Not a column. */
+  secondsUntilAssent?: number;
+};
 export const HOARVALE_BILLS: readonly { id: string; title: string; passedAt: number; dissolvedAt: number | null }[] = [
   { id: 'hoarvale-frostcore-export', title: 'Frostcore export guidance', passedAt: HOARVALE_ASSENT_SAMPLE_AT - HOUR, dissolvedAt: null },
   { id: 'hoarvale-inflation-band', title: 'Mint inflation band', passedAt: HOARVALE_ASSENT_SAMPLE_AT - ASSENT_SECONDS, dissolvedAt: null },
@@ -95,6 +105,19 @@ export function billAssent(passedAt: number, dissolvedAt: number | null, now: nu
   if (dissolvedAt != null && Number.isSafeInteger(dissolvedAt) && now >= dissolvedAt && dissolvedAt >= passedAt && dissolvedAt < due) return { assentStatus: 'withheld', assentAt: dissolvedAt };
   if (now < due) return { assentStatus: 'pending', assentAt: null };
   return { assentStatus: 'assented', assentAt: due };
+}
+/** #1134: real seconds until Royal Assent for a bill that is still pending. At passedAt + 48h the wait is 0; the settle tick records assent.
+ *  Null for assented, withheld, or a clock that is not a safe integer. Not stored. */
+export function secondsUntilAssent(passedAt: number, status: AssentStatus, now: number): number | null {
+  if (status !== 'pending' || !Number.isSafeInteger(passedAt) || passedAt < 0 || !Number.isSafeInteger(now) || now < 0) return null;
+  const due = passedAt + ASSENT_SECONDS;
+  if (!Number.isSafeInteger(due)) return null;
+  return now >= due ? 0 : due - now;
+}
+/** Same bill when there is no countdown, so a flag-off read keeps today's keys. */
+export function withAssentCountdown(bill: HoarvaleBill, now: number): HoarvaleBill {
+  const seconds = secondsUntilAssent(bill.passedAt, bill.assentStatus, now);
+  return seconds === null ? bill : { ...bill, secondsUntilAssent: seconds };
 }
 export const hoarvaleBills = (now: number): HoarvaleBill[] => HOARVALE_BILLS.map(bill => ({ id: bill.id, title: bill.title, passedAt: bill.passedAt, ...billAssent(bill.passedAt, bill.dissolvedAt, now) }));
 
@@ -122,6 +145,14 @@ export function hoarvaleMootAt(now: number): HoarvaleMoot {
 export function withHoarvaleMoot(snapshot: GovernmentSnapshot, now: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
   return { ...snapshot, moot: hoarvaleMootAt(now) };
+}
+
+/** #1136. Flag off, or any nation but Hoarvale: the same snapshot, and no honorsListDay key. Awards no titles. */
+export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, honorsListDay: {
+    nextAt: hoarvaleNextHonorsListDayAt(nowMs), intervalDays: HOARVALE_HONORS_LIST_INTERVAL_DAYS as 30, awardsTitles: false,
+  } };
 }
 
 const institutions = {
@@ -429,6 +460,27 @@ export function ilmarPrismContractsSnapshot(enabled: boolean): GovernmentSnapsho
     availableBudgetMinor: 0,
     influenceSummary: 'Endowment counting-houses post profit shares, not interest. This read does not certify a template, pause Prism trading, or collect the tithe.',
   }, true);
+}
+
+/** #1137. Flag off, or any nation but Ilmar: the same snapshot, and no feastOfFirstLight key. Chooses no Oracle, lists no clergy, and proposes no spending. */
+export function withIlmarFeastOfFirstLight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, feastOfFirstLight: { nextAt: ilmarNextFeastOfFirstLightAt(nowMs), cycleDays: ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS } };
+}
+
+/** Ilmar read while only the Feast of First Light flag is on. No sanctum key. Flag off returns null, which is today's read. */
+export function ilmarFeastOfFirstLightSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarFeastOfFirstLight({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [{ name: 'Feast of First Light', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Feast of First Light', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Feast of First Light falls every 15 real days, twice per game year. This read names the next feast. It chooses no Oracle, lists no clergy, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Feast of First Light. It chooses no Oracle and lists no clergy.',
+  }, nowMs, true);
 }
 
 /** Veldwood read while only the Vote Day flag is on. No federalCouncil key. Flag off returns null, which is today's read. */

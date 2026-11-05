@@ -12,7 +12,7 @@ import { env } from 'cloudflare:workers';
 import type {GameDatabase} from './database-contract';
 import { readGovernment } from './government-state';
 import { policyLedgerEnabled, recordPublishedKindleDecision } from './policy-ledger'; // #985
-import { hoarvaleAssentEnabled, hoarvaleBillWrites } from './hoarvale-assent'; // #1089
+import { hoarvaleAssentEnabled, hoarvaleAutoAssentEnabled, hoarvaleAutoAssentWrites, hoarvaleBillWrites } from './hoarvale-assent'; // #1089, #1134
 import { runSpoilage } from './spoilage';
 import { runAurelleRising } from './aurelle-rising';
 import { runAurelleCoup } from './aurelle-coup';
@@ -153,6 +153,7 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
         .bind(tick,scheduledAt,now,JSON.stringify(proposals)),
       db.prepare(policyExecutionSql).bind(now,tick),
       ...(hoarvaleAssentEnabled(env) ? hoarvaleBillWrites(db, scheduledAt) : []), // #1089: same batch, no extra round trip
+      ...(hoarvaleAutoAssentEnabled(env) ? hoarvaleAutoAssentWrites(db, scheduledAt) : []), // #1134: pending rows at 48 real hours; flag off adds no statement
     ]);
     // #985: the tick is the publish. Flag off does not read or write the ledger. Idempotent per public decision.
     const kindle = proposals.find(proposal => proposal?.nationId === 'kindle');
