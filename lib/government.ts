@@ -1,3 +1,4 @@
+import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
 import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
@@ -57,6 +58,8 @@ export type GovernmentSnapshot = {
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
   /** #613: Aurelle succession state and the named heir (flag HARIMU_AURELLE_SUCCESSION_ENABLED; absent otherwise). */
   succession?: { status: 'reigning' | 'ailing' | 'vacant' | 'acceded' | 'abdicated'; heir: { name: string; named: boolean } | null };
+  /** #1118 Aurelle: reign-start display clock and the next Great Council window. Present only while HARIMU_AURELLE_CROWN_CALENDAR_ENABLED is on. */
+  crownCalendar?: { reignStartedAt: number; nextGreatCouncilWindowAt: number; reignDisplayDays: number };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
 
@@ -196,6 +199,15 @@ export function withVeldwoodCouncil(snapshot: GovernmentSnapshot, nowMs: number,
   return { ...snapshot, federalCouncil: {
     nextElectionAt: veldwoodNextCouncilElectionAt(nowMs), termDays: VELDWOOD_COUNCIL_TERM_DAYS,
     speakerSeat: veldwoodCouncilSpeakerSeat(nowMs), speakerRotationDays: VELDWOOD_SPEAKER_ROTATION_DAYS,
+  } };
+}
+
+/** #1118. Flag off, or any nation but Aurelle: the same snapshot, and no crownCalendar key. Names no heir and proposes no spending. */
+export function withAurelleCrownCalendar(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
+  return { ...snapshot, crownCalendar: {
+    reignStartedAt: aurelleReignStartedAt(nowMs), nextGreatCouncilWindowAt: aurelleNextGreatCouncilWindowAt(nowMs),
+    reignDisplayDays: AURELLE_REIGN_DISPLAY_DAYS,
   } };
 }
 
