@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 34); // #1123 Confluence assembly election + #1117 Kindle election clock after #1126; previous head was 33; #1095 recruit term stays in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 35); // recounted after merging dev: #1123 Confluence assembly election took dev to 34, and #1133 Meridian Exam Day is the 35th; #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
@@ -169,6 +169,15 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED: 'false' }, 'HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_MERIDIAN_EXAM_DAY_ENABLED, undefined, 'the Meridian Exam Day is not its own binding');
+  assert.equal(prod.vars.HARIMU_MERIDIAN_EXAM_DAY_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_MERIDIAN_EXAM_DAY_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_MERIDIAN_EXAM_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_MERIDIAN_EXAM_DAY_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_MERIDIAN_EXAM_DAY_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_MERIDIAN_EXAM_DAY_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_MERIDIAN_EXAM_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_MERIDIAN_EXAM_DAY_ENABLED: 'false' }, 'HARIMU_MERIDIAN_EXAM_DAY_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.HARIMU_KORUND_PLAN_CALENDAR_ENABLED, undefined, 'the Korund plan calendar is not its own binding');
   assert.equal(prod.vars.HARIMU_KORUND_PLAN_CALENDAR_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_KORUND_PLAN_CALENDAR_ENABLED, 'true');
