@@ -120,6 +120,8 @@
       "HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED": "false",
       // #1114: Meridian Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress (every 150 real days) on the government read. Off: no partyState key.
       "HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED": "false",
+      // #1116: Korund Five-Year Plan start, next Plan Day (every 150 real days) and next quarterly Quota Rally on the government read. Off: no planCalendar key.
+      "HARIMU_KORUND_PLAN_CALENDAR_ENABLED": "false",
       // #1118: Aurelle reign-start display clock and the next Great Council window. Off: no crownCalendar key.
       "HARIMU_AURELLE_CROWN_CALENDAR_ENABLED": "false"
     },
