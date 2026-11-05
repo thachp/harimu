@@ -109,7 +109,9 @@
       // #1096: Hoarvale Moot term (120 real days) and 7-day investiture deadline. Off: no moot key on the government snapshot.
       "HARIMU_HOARVALE_MOOT_ENABLED": "true",
       // #1098: Veldwood Federal Council term, 120 real days, and the Council Speaker seat. Off: no federalCouncil key on the government snapshot.
-      "HARIMU_VELDWOOD_COUNCIL_ENABLED": "true"
+      "HARIMU_VELDWOOD_COUNCIL_ENABLED": "true",
+      // #1107: Ilmar Oracle life term, Stilldays, and the Great Pilgrimage on the government read. Off: no sanctum key.
+      "HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
@@ -275,7 +277,7 @@
     "NEXT_PUBLIC_HARIMU_UI_V2_MOBILE": "true",
     // #392 S9: Household panel in the v2 shape (Wallet, Food, Residence, Pantry rows; family cards with the Vale portraits); existing data only.
     "NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD": "true",
-    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1048/#1050/#1055/#1063/#1076/#1082/#1088/#1089: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
+    // #988/#1008/#1009/#1039/#1040/#1041/#1042/#1048/#1050/#1055/#1063/#1076/#1082/#1088/#1089/#1091: UI flags share one JSON binding (Cloudflare text-binding limit). Preview on, production off.
     // The client build expands each NEXT_PUBLIC_* name. HARIMU_WORLD_AGES_ENABLED, HARIMU_FAITH_FESTIVAL_HUD_ENABLED and HARIMU_HOARVALE_ASSENT_ENABLED stay in the pack and are read with flagOn. A direct string binding still wins.
     "HARIMU_UI_PACK": {
       "NEXT_PUBLIC_HARIMU_NATION_SKIN": "true",
@@ -296,6 +298,7 @@
       "NEXT_PUBLIC_HARIMU_NATION_FACT_ROWS": "true",
       "NEXT_PUBLIC_HARIMU_VARKAND_DISPATCH": "true",
       "NEXT_PUBLIC_HARIMU_VELDWOOD_BALLOT_BOOKLET": "true",
+      "NEXT_PUBLIC_HARIMU_ILMAR_GLASS_EDICTS": "true",
       "HARIMU_HOARVALE_ASSENT_ENABLED": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
