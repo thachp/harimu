@@ -1,5 +1,6 @@
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
+import { kindleElectionClock, type KindleElectionClock } from './kindle-election.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
@@ -46,6 +47,8 @@ export type GovernmentSnapshot = {
   petitions?: { requestId: string; topic: PetitionTopic; submittedAt: number; status: 'pending' | 'accepted' | 'deferred'; reason: string; reviewedAt: number | null }[];
   /** #985: Kindle Policy Ledger. Present only while HARIMU_KINDLE_POLICY_LEDGER_ENABLED is on. */
   policyLedger?: { id: string; publishedAt: number; office: string; title: string; brief: string }[];
+  /** #1117 Kindle: presidential term end and the next Ballot Night. Present only while HARIMU_KINDLE_ELECTION_CLOCK_ENABLED is on and the cycle start is set. */
+  electionClock?: KindleElectionClock;
   availableBudgetMinor: number;
   influenceSummary: string;
   /** #1096 Hoarvale: Moot term and investiture deadline. Present only while HARIMU_HOARVALE_MOOT_ENABLED is on. */
@@ -252,6 +255,14 @@ export function varkandGovernmentSnapshot(nowMs: number, enabled: boolean): Gove
     availableBudgetMinor: 0,
     influenceSummary: 'The Chair rotates among the five Marshals every 60 real days. Citizens do not elect the Directorate.',
   }, nowMs, true);
+}
+
+/** #1117. Flag off, any nation but Kindle, or a held cycle start: the same snapshot, and no electionClock key. */
+export function withKindleElectionClock(snapshot: GovernmentSnapshot, nowMs: number, cycleStartSeconds: number | null, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'kindle') return snapshot;
+  const electionClock = kindleElectionClock(cycleStartSeconds, nowMs);
+  if (!electionClock) return snapshot;
+  return { ...snapshot, electionClock };
 }
 
 /** #1114. Flag off, or any nation but Meridian: the same snapshot, and no partyState key. */
