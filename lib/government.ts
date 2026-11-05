@@ -1,4 +1,5 @@
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
+import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
@@ -11,6 +12,8 @@ export type GovernmentSnapshot = {
     session: { status: 'open' | 'survived' | 'purged'; openedAt: number; resolvesAt: number; resolvedAt: number | null } | null };
   /** #1085 Varkand: Chair, the five Commands, and the next Rotation Day. Present only while HARIMU_VARKAND_DIRECTORATE_ENABLED is on. */
   directorate?: { chair: VarkandCommand; commands: readonly VarkandCommand[]; nextRotationAt: number };
+  /** #1094 Varkand: next Mandate Plebiscite on a 150-real-day cycle. Present only while HARIMU_VARKAND_PLEBISCITE_ENABLED is on. */
+  mandatePlebiscite?: { nextAt: number; cycleDays: 150 };
   roles: { name: string; controller: string }[];
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
@@ -123,6 +126,27 @@ export function withVarkandDirectorate(snapshot: GovernmentSnapshot, nowMs: numb
   if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
   const { chair, nextRotationAt } = varkandChairAt(nowMs);
   return { ...snapshot, directorate: { chair, commands: varkandCommands, nextRotationAt } };
+}
+
+/** #1094. Flag off, or any nation but Varkand: the same snapshot, and no mandatePlebiscite key. */
+export function withVarkandPlebiscite(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  return { ...snapshot, mandatePlebiscite: { nextAt: varkandNextPlebisciteAt(nowMs), cycleDays: VARKAND_PLEBISCITE_CYCLE_DAYS } };
+}
+
+/** Varkand read while only the plebiscite flag is on. No directorate key. Flag off returns null, which is today's read. */
+export function varkandPlebisciteSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVarkandPlebiscite({
+    nationId: 'varkand', mode: 'rule-bound simulation',
+    roles: [{ name: 'Directorate', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Mandate Plebiscite', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Mandate Plebiscite falls every 150 real days. This read names the next date. It opens no ballot and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Citizens are asked to approve the Directorate\'s Order every 150 real days. This read does not collect votes.',
+  }, nowMs, true);
 }
 
 /** Varkand government read while the flag is on. Flag off returns null, which is today's read. */

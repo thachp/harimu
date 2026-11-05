@@ -2,7 +2,7 @@ import { parked } from './async-limits'; // #679
 import { readCrown } from './aurelle-rising';
 import { readPresidium } from './korund-presidium';
 import type {GameDatabase} from './database-contract';
-import { simulateGovernment, rebaseGovernmentBudget, varkandGovernmentSnapshot, withVarkandDirectorate } from './government';
+import { simulateGovernment, rebaseGovernmentBudget, varkandGovernmentSnapshot, varkandPlebisciteSnapshot, withVarkandDirectorate, withVarkandPlebiscite } from './government';
 export const petitionSchema = `CREATE TABLE IF NOT EXISTS government_petitions (
   request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),
   nation_id TEXT NOT NULL, topic TEXT NOT NULL CHECK(topic IN ('food','infrastructure','work')),
@@ -59,7 +59,7 @@ export async function latchGovernmentReviews(db: GameDatabase, nationId: string,
 type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;snapshot_json:string};
 /** Completed UTC days are reviewed once. By default this persists bounded, idempotent reviews (POST and world-tick paths).
  *  With readOnly (#205, GET /api/citizen) the same reviews are projected in memory and nothing is written. */
-export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean; hoarvaleAssent?: boolean; varkandDirectorate?: boolean } = {}) {
+export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean; hoarvaleAssent?: boolean; varkandDirectorate?: boolean; varkandPlebiscite?: boolean } = {}) {
   // #679: the Aurelle crown read touches only the Rising and coup tables, which nothing below writes, so it starts with the first reads instead of last
   // (parked so a run that returns early never leaves an unhandled rejection; the crown branch still rethrows).
   const crownRead = nationId === 'aurelle' ? parked(readCrown(db)) : null;
@@ -110,7 +110,15 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
   let snapshot = verifiedReview && review && Math.floor(now/86400)*86400 === review.period_start+86400
     ? reviewedSnapshot
     : project({});
-  if (!snapshot) return nationId === 'varkand' && options.varkandDirectorate ? varkandGovernmentSnapshot(now * 1000, true) : null; // #1085: now is seconds; the Chair clock is integer ms. Flag off stays null.
+  if (!snapshot) {
+    if (nationId !== 'varkand') return null;
+    const nowMs = now * 1000; // #1085/#1094: now is seconds; both clocks are integer ms. Both flags off stays null.
+    if (options.varkandDirectorate) {
+      const built = varkandGovernmentSnapshot(nowMs, true)!;
+      return options.varkandPlebiscite ? withVarkandPlebiscite(built, nowMs, true) : built;
+    }
+    return varkandPlebisciteSnapshot(nowMs, !!options.varkandPlebiscite);
+  }
   // A new safety emergency overrides a reviewed priority without rewriting the immutable record.
   if (inputs.foodSecurity < 40 && snapshot.decision.topic !== 'food') {
     const emergency = project({});
@@ -147,5 +155,6 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       session: p.session && { status: p.session.status, openedAt: p.session.openedAt, resolvesAt: p.session.resolvesAt, resolvedAt: p.session.resolvedAt } };
   }
   if (nationId === 'varkand' && options.varkandDirectorate) snapshot = withVarkandDirectorate(snapshot, now * 1000, true); // #1085
+  if (nationId === 'varkand' && options.varkandPlebiscite) snapshot = withVarkandPlebiscite(snapshot, now * 1000, true); // #1094
   return snapshot;
 }
