@@ -149,6 +149,7 @@ const flagOffPins = {
   HARIMU_VARKAND_DIRECTORATE_ENABLED: 'zzz-varkand-directorate-1085.test.mjs', // #1085 flag off: no directorate key
   HARIMU_VARKAND_PLEBISCITE_ENABLED: 'zzzz-varkand-plebiscite-1094.test.mjs', // #1094 flag off: no mandatePlebiscite key
   HARIMU_VELDWOOD_COUNCIL_ENABLED: 'zzzz-veldwood-council-1098.test.mjs', // #1098 flag off: no federalCouncil key
+  HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'zzzzz-ilmar-sanctum-1107.test.mjs', // #1107 flag off: no sanctum key
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.

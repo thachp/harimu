@@ -107,7 +107,9 @@
       // #1094: Varkand Mandate Plebiscite every 150 real days. Off: no mandatePlebiscite key on the government snapshot.
       "HARIMU_VARKAND_PLEBISCITE_ENABLED": "true",
       // #1098: Veldwood Federal Council term, 120 real days, and the Council Speaker seat. Off: no federalCouncil key on the government snapshot.
-      "HARIMU_VELDWOOD_COUNCIL_ENABLED": "true"
+      "HARIMU_VELDWOOD_COUNCIL_ENABLED": "true",
+      // #1107: Ilmar Oracle life term, Stilldays, and the Great Pilgrimage on the government read. Off: no sanctum key.
+      "HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
