@@ -21,6 +21,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.sanctum?{sanctum:snapshot.sanctum}:{}), // #1107: Oracle term, Elders, Stillday, Great Pilgrimage (readGovernment adds it only while the flag is on)
   ...(snapshot.party?{party:snapshot.party}:{}), // #1113: Four Pillars and the next Party Congress (readGovernment adds it only while the flag is on)
   ...(snapshot.partyState?{partyState:snapshot.partyState}:{}), // #1114: Meridian Party Congress schedule (readGovernment adds it only while the flag is on)
+  ...(snapshot.assemblyElection?{assemblyElection:snapshot.assemblyElection}:{}), // #1123: Confluence People's Assembly window (readGovernment adds it only while the flag is on)
   ...(snapshot.planCalendar?{planCalendar:snapshot.planCalendar}:{}), // #1116: Korund Plan Day and Quota Rally (readGovernment adds it only while the flag is on)
   ...(snapshot.crownCalendar?{crownCalendar:snapshot.crownCalendar}:{}), // #1118: Aurelle reign start and next Great Council window (readGovernment adds it only while the flag is on)
   ...(snapshot.electionClock?{electionClock:{termEndsAt:snapshot.electionClock.termEndsAt,nextBallotNightAt:snapshot.electionClock.nextBallotNightAt,termDays:snapshot.electionClock.termDays,maxConsecutiveTerms:snapshot.electionClock.maxConsecutiveTerms}}:{}), // #1117: term end and next Ballot Night (readGovernment adds it only while the flag is on)
