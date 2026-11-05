@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 29); // recounted after merging dev: #1102 Fulmara Council, #1113 Confluence Party Congress and #1114 Meridian party schedule stay in this pack with #1107 Ilmar sanctum calendar, #1098 Veldwood Council and #1096 Moot term; #1095 recruit term is in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 30); // #1116 Korund plan calendar on tip's 29 (#1113 Confluence + #1102 Fulmara + #1114 Meridian and earlier); #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
