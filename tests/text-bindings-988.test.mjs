@@ -24,11 +24,11 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 30); // #1116 Korund plan calendar on tip's 29 (#1113 Confluence + #1102 Fulmara + #1114 Meridian and earlier); #1095 recruit term stays in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 31); // #1122 Veldwood Vote Day is the 31st entry after #1116 Korund plan calendar took 30; #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 21); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1104 countdown dual time stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 22); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1100 Fulmara share ticker, #1104 countdown dual time stay inside the pack
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
@@ -124,6 +124,15 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_VELDWOOD_COUNCIL_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_VELDWOOD_COUNCIL_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_VELDWOOD_COUNCIL_ENABLED: 'false' }, 'HARIMU_VELDWOOD_COUNCIL_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_VELDWOOD_VOTE_DAY_ENABLED, undefined, 'the Veldwood Vote Day is not its own binding');
+  assert.equal(prod.vars.HARIMU_VELDWOOD_VOTE_DAY_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_VELDWOOD_VOTE_DAY_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_VELDWOOD_VOTE_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_VELDWOOD_VOTE_DAY_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_VELDWOOD_VOTE_DAY_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_VELDWOOD_VOTE_DAY_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_VELDWOOD_VOTE_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_VELDWOOD_VOTE_DAY_ENABLED: 'false' }, 'HARIMU_VELDWOOD_VOTE_DAY_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.HARIMU_FULMARA_COUNCIL_ENABLED, undefined, 'the Fulmara Council is not its own binding');
   assert.equal(prod.vars.HARIMU_FULMARA_COUNCIL_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_COUNCIL_ENABLED, 'true');
@@ -214,5 +223,10 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME, 'false');
   assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME, 'true', 'the client build still inlines the packed dual-time flag');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME: 'false' }).NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME, 'false', 'a direct string wins');
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER, undefined, 'the Fulmara share ticker flag is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER, 'true', 'the client build still inlines the packed share-ticker flag');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER: 'false' }).NEXT_PUBLIC_HARIMU_FULMARA_SHARE_TICKER, 'false', 'a direct string wins');
   assert.ok(TEXT_BINDING_CEILING - count(preview.vars, ['HARIMU_QA_TEST_CITIZEN_IDS']) >= 3, 'preview headroom stays at least 3 under 127');
 });
