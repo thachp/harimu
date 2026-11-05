@@ -151,7 +151,9 @@
       // #1151: Varkand next Muster Day (once per game year = 30 real days) on the government read. Off: no musterDay key.
       "HARIMU_VARKAND_MUSTER_DAY_ENABLED": "false",
       // #1150: Fulmara next Exchange Bell (once per game year = 30 real days) on the government read. Off: no exchangeBell key.
-      "HARIMU_FULMARA_EXCHANGE_BELL_ENABLED": "false"
+      "HARIMU_FULMARA_EXCHANGE_BELL_ENABLED": "false",
+      // #1165: Confluence next Canal Festival (once per game year = 30 real days) on the government read. Off: no canalFestival key.
+      "HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
