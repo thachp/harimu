@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 26); // #1098 Veldwood Council, #1102 Fulmara Council, and #1107 Ilmar sanctum stay in this pack; #1095 recruit term is in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 27); // dev's 26, plus #1102 Fulmara Council; #1096 Moot, #1098 Veldwood and #1107 Ilmar sanctum stay in this pack
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
