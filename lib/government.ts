@@ -4,6 +4,7 @@ import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, co
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
 import { kindleElectionClock, type KindleElectionClock } from './kindle-election.ts';
 import { KORUND_CHAIRMAN_BIRTHDAY_CYCLE_DAYS, korundNextChairmanBirthdayAt } from './korund-chairman-birthday.ts';
+import { KORUND_PEOPLES_CONGRESS_CYCLE_DAYS, korundNextPeoplesCongressAt } from './korund-peoples-congress.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
@@ -70,6 +71,8 @@ export type GovernmentSnapshot = {
   planCalendar?: { currentPlanStartedAt: number; nextPlanDayAt: number; nextQuotaRallyAt: number; planIntervalDays: 150; quotaRalliesPerPlan: 4 };
   /** #1147 Korund: next Chairman's Birthday. Present only while HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED is on. Names no Chairman and awards no medal. */
   chairmanBirthday?: { nextAt: number; cycleDays: 30 };
+  /** #1170 Korund: next People's Congress. Present only while HARIMU_KORUND_PEOPLES_CONGRESS_ENABLED is on. Holds no votes, motions, delegates, or outcomes. */
+  peoplesCongress?: { nextAt: number; cycleDays: 30 };
   roles: { name: string; controller: string }[];
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
@@ -638,4 +641,10 @@ export function withKorundPlanCalendar(snapshot: GovernmentSnapshot, nowMs: numb
 export function withKorundChairmanBirthday(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'korund') return snapshot;
   return { ...snapshot, chairmanBirthday: { nextAt: korundNextChairmanBirthdayAt(nowMs), cycleDays: KORUND_CHAIRMAN_BIRTHDAY_CYCLE_DAYS } };
+}
+
+/** #1170. Flag off, or any nation but Korund: the same snapshot, and no peoplesCongress key. Holds no votes, motions, delegates, or outcomes. */
+export function withKorundPeoplesCongress(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'korund') return snapshot;
+  return { ...snapshot, peoplesCongress: { nextAt: korundNextPeoplesCongressAt(nowMs), cycleDays: KORUND_PEOPLES_CONGRESS_CYCLE_DAYS } };
 }

@@ -34,6 +34,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.assemblyElection?{assemblyElection:snapshot.assemblyElection}:{}), // #1123: Confluence People's Assembly window (readGovernment adds it only while the flag is on)
   ...(snapshot.planCalendar?{planCalendar:snapshot.planCalendar}:{}), // #1116: Korund Plan Day and Quota Rally (readGovernment adds it only while the flag is on)
   ...(snapshot.chairmanBirthday?{chairmanBirthday:snapshot.chairmanBirthday}:{}), // #1147: next Chairman's Birthday (readGovernment adds it only while the flag is on)
+  ...(snapshot.peoplesCongress?{peoplesCongress:snapshot.peoplesCongress}:{}), // #1170: next People's Congress (readGovernment adds it only while the flag is on)
   ...(snapshot.crownCalendar?{crownCalendar:snapshot.crownCalendar}:{}), // #1118: Aurelle reign start and next Great Council window (readGovernment adds it only while the flag is on)
   ...(snapshot.hearthNight?{hearthNight:snapshot.hearthNight}:{}), // #1146: next Hearth Night (readGovernment adds it only while the flag is on)
   ...(snapshot.electionClock?{electionClock:{termEndsAt:snapshot.electionClock.termEndsAt,nextBallotNightAt:snapshot.electionClock.nextBallotNightAt,termDays:snapshot.electionClock.termDays,maxConsecutiveTerms:snapshot.electionClock.maxConsecutiveTerms}}:{}), // #1117: term end and next Ballot Night (readGovernment adds it only while the flag is on)
