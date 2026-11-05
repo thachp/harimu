@@ -1,3 +1,4 @@
+import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
@@ -20,6 +21,8 @@ export type GovernmentSnapshot = {
   federalCouncil?: { nextElectionAt: number; termDays: 120; speakerSeat: number; speakerRotationDays: 30 };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
+  /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
+  partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   roles: { name: string; controller: string }[];
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
@@ -204,6 +207,34 @@ export function varkandGovernmentSnapshot(nowMs: number, enabled: boolean): Gove
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Chair rotates among the five Marshals every 60 real days. Citizens do not elect the Directorate.',
+  }, nowMs, true);
+}
+
+/** #1114. Flag off, or any nation but Meridian: the same snapshot, and no partyState key. */
+export function withMeridianPartyState(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
+  return { ...snapshot, partyState: {
+    paramountLeaderRoles: MERIDIAN_PARAMOUNT_LEADER_ROLES, standingCommitteeSeats: MERIDIAN_STANDING_COMMITTEE_SEATS,
+    nextCongressAt: meridianNextPartyCongressAt(nowMs), congressIntervalDays: MERIDIAN_CONGRESS_INTERVAL_DAYS,
+    termLimitsSuspendable: true, suspendSupermajority: MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY,
+  } };
+}
+
+/** Meridian read while the flag is on. Meridian has no other government snapshot, so this is the smallest one that carries the partyState block. Flag off returns null, which is today's read. */
+export function meridianPartySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withMeridianPartyState({
+    nationId: 'meridian', mode: 'rule-bound simulation',
+    roles: [
+      { name: 'Paramount Leader (General Secretary and State Chair)', controller: 'AI/SI role · deterministic rules' },
+      { name: 'Standing Committee', controller: 'AI/SI role · deterministic rules' },
+    ],
+    decision: {
+      title: 'Party Congress schedule', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Paramount Leader holds the General Secretary and State Chair posts. The Standing Committee has 7 seats. This read names when the next Party Congress sits. It proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'A Central Committee chosen at the Party Congress every 5 game years picks the leadership. Congress can suspend term limits by a 2/3 vote. This read chooses no one and suspends nothing.',
   }, nowMs, true);
 }
 
