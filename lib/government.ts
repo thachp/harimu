@@ -25,11 +25,36 @@ export type GovernmentSnapshot = {
   policyLedger?: { id: string; publishedAt: number; office: string; title: string; brief: string }[];
   availableBudgetMinor: number;
   influenceSummary: string;
+  /** #1089: Hoarvale Moot bills. Present only when the caller passes hoarvaleAssent (the server flag). Assent sits on the bill. */
+  bills?: HoarvaleBill[];
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
   /** #613: Aurelle succession state and the named heir (flag HARIMU_AURELLE_SUCCESSION_ENABLED; absent otherwise). */
   succession?: { status: 'reigning' | 'ailing' | 'vacant' | 'acceded' | 'abdicated'; heir: { name: string; named: boolean } | null };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
+
+/** Docs §7.7: Royal Assent is automatic 48 real hours after the Moot passes a bill. The Sovereign has no ordinary veto.
+ *  [ASSUMPTION] #1089 also stores `withheld`, which the docs do not name. A bill dissolved before that 48th hour
+ *  (the reserve power) is withheld, and the assent date is the dissolve time. Later dissolve does not un-assent a bill. */
+export const ASSENT_SECONDS = 48 * 3600;
+const HOUR = 3600;
+/** Jan 15 2026 12:00 UTC (the fixture clock). The Mint band is due, Frostcore is an hour old, tenure was already dissolved. */
+export const HOARVALE_ASSENT_SAMPLE_AT = 1_768_478_400;
+export type AssentStatus = 'pending' | 'assented' | 'withheld';
+export type HoarvaleBill = { id: string; title: string; passedAt: number; assentStatus: AssentStatus; assentAt: number | null };
+export const HOARVALE_BILLS: readonly { id: string; title: string; passedAt: number; dissolvedAt: number | null }[] = [
+  { id: 'hoarvale-frostcore-export', title: 'Frostcore export guidance', passedAt: HOARVALE_ASSENT_SAMPLE_AT - HOUR, dissolvedAt: null },
+  { id: 'hoarvale-inflation-band', title: 'Mint inflation band', passedAt: HOARVALE_ASSENT_SAMPLE_AT - ASSENT_SECONDS, dissolvedAt: null },
+  { id: 'hoarvale-tenure-steps', title: 'Tenure pay steps', passedAt: HOARVALE_ASSENT_SAMPLE_AT - 30 * HOUR, dissolvedAt: HOARVALE_ASSENT_SAMPLE_AT - 29 * HOUR },
+];
+export function billAssent(passedAt: number, dissolvedAt: number | null, now: number): { assentStatus: AssentStatus; assentAt: number | null } {
+  if (!Number.isSafeInteger(passedAt) || passedAt < 0 || !Number.isSafeInteger(now) || now < 0) return { assentStatus: 'pending', assentAt: null };
+  const due = passedAt + ASSENT_SECONDS;
+  if (dissolvedAt != null && Number.isSafeInteger(dissolvedAt) && now >= dissolvedAt && dissolvedAt >= passedAt && dissolvedAt < due) return { assentStatus: 'withheld', assentAt: dissolvedAt };
+  if (now < due) return { assentStatus: 'pending', assentAt: null };
+  return { assentStatus: 'assented', assentAt: due };
+}
+export const hoarvaleBills = (now: number): HoarvaleBill[] => HOARVALE_BILLS.map(bill => ({ id: bill.id, title: bill.title, passedAt: bill.passedAt, ...billAssent(bill.passedAt, bill.dissolvedAt, now) }));
 
 const institutions = {
   kindle: {
@@ -47,6 +72,11 @@ const institutions = {
     response: 'The royal council presents citizen petitions to the sovereign for a bounded royal allocation.',
     influence: 'Petitions affect royal priorities. Aurelle retains hereditary succession; petitions do not elect the sovereign.',
   },
+  hoarvale: {
+    roles: ['Sovereign', 'Prime Minister', 'Moot members'],
+    response: 'The Moot passes bills. The Sovereign records Royal Assent on each bill.',
+    influence: 'Petitions affect Moot priorities. The Sovereign is ceremonial and does not hold an ordinary veto; petitions do not elect the Sovereign.',
+  },
 } as const;
 
 function safeCount(value: unknown): number {
@@ -57,8 +87,9 @@ function safeCount(value: unknown): number {
 /** A pure proposal, never an appropriation or a ledger write. Inputs must come from authoritative state. */
 export function simulateGovernment(input: {
   nationId: string; availableBudgetMinor: number; foodSecurity: number;
-  petitionCounts: Record<string, number>;
+  petitionCounts: Record<string, number>; hoarvaleAssent?: boolean; now?: number;
 }): GovernmentSnapshot | null {
+  if (input.nationId === 'hoarvale' && input.hoarvaleAssent !== true) return null;
   if (!Object.hasOwn(institutions, input.nationId)) return null;
   const institution = institutions[input.nationId as keyof typeof institutions];
   const budget = typeof input.availableBudgetMinor === 'number'
@@ -89,6 +120,7 @@ export function simulateGovernment(input: {
       reason: `${institution.response} ${emergency ? `Food security is ${foodSecurity}/100, below the 40-point safety threshold; food takes priority.` : `${count} ${topic} petition${count === 1 ? '' : 's'} set this priority (food ${counts.food}, infrastructure ${counts.infrastructure}, work ${counts.work}; ties favor food, then infrastructure).`} ${budget === 0 ? 'No verified budget is available, so no spending is proposed.' : `The proposal is capped at ${emergency ? '20' : '10'}% of the verified available budget.`}`,
     },
     influenceSummary: institution.influence,
+    ...(input.nationId === 'hoarvale' ? { bills: hoarvaleBills(typeof input.now === 'number' ? input.now : 0) } : {}),
   };
 }
 

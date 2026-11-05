@@ -6,6 +6,7 @@ import { wearinessEnabled, wearinessLossesEnabled, type WearinessBindings } from
 import { peaceRevertEnabled } from '@/lib/war-peace-revert'; // #1054
 import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { withPolicyLedger } from '@/lib/policy-ledger'; // #985
+import { hoarvaleAssentEnabled, withHoarvaleBills } from '@/lib/hoarvale-assent'; // #1089
 import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
 import { recordEnrollHome, resolveEnrollHomeCity } from '@/lib/city-location'; // #965
 import { seaFreightQuantity } from '@/lib/game-season'; // #1034
@@ -53,6 +54,7 @@ import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
 import { kindleCycleStartAt, presidentialCycle, presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918, #936, #969
+const governmentReadOptions = (readOnly = false) => ({ ...(readOnly ? { readOnly: true } : {}), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', hoarvaleAssent: hoarvaleAssentEnabled(env), varkandDirectorate: flagOn(env, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), varkandPlebiscite: flagOn(env, 'HARIMU_VARKAND_PLEBISCITE_ENABLED'), veldwoodCouncil: flagOn(env, 'HARIMU_VELDWOOD_COUNCIL_ENABLED') }); // #1089 Hoarvale assent in HARIMU_UI_PACK; #1085 directorate, #1094 plebiscite, #1098 council in HARIMU_GRAY_PACK
 /** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => flagOn(env, 'HARIMU_CROWN_DEBASEMENT_ENABLED'); // #362
@@ -114,7 +116,6 @@ const korundOptions = () => ({ mvpJobTypes: mvpJobTypesEnabled(env as never), em
 const incomeTaxPercentNow = () => activeIncomeTaxPercent((env as unknown as { HARIMU_KINDLE_INCOME_TAX_ENABLED?: string }).HARIMU_KINDLE_INCOME_TAX_ENABLED);
 const enrollHomeOn = () => (env as unknown as { HARIMU_ENROLL_HOME_CITY_ENABLED?: string }).HARIMU_ENROLL_HOME_CITY_ENABLED === 'true'; // #965
 const korundReadOptions = () => ({ ...korundOptions(), grayRationRise: grayRationRiseOn(), standing: korundStandingOn(), bureauTsr: korundTsrViewOn() }); // #968: reads only. Trades stay on korundOptions(), so the cap is unchanged. #994 standing and #1000 Bureau quote are read-only too.
-const governmentReadOptions = (readOnly = false) => ({ readOnly, korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', varkandDirectorate: flagOn(env, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), varkandPlebiscite: flagOn(env, 'HARIMU_VARKAND_PLEBISCITE_ENABLED'), veldwoodCouncil: flagOn(env, 'HARIMU_VELDWOOD_COUNCIL_ENABLED') }); // #1085 directorate, #1094 plebiscite, #1098 council; packed in HARIMU_GRAY_PACK
 
 export const dynamic = 'force-dynamic';
 const locationBoundActions = new Set(['commit-work', 'market-trade', 'household-meal', 'create-listing', 'buy-listing', 'korund-start-work', 'korund-join-ration-queue', 'korund-redeem-coupon', 'korund-redeem-ration', 'aurelle-start-work', 'cancel-listing', 'aurelle-buy-food', 'aurelle-household-meal', 'korund-household-meal']);
@@ -282,7 +283,7 @@ export async function GET(request: Request) {
     economy,
     market,
     playerMarket,
-    government: await withPolicyLedger(database, governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, env), // #612 founding/succession; #985 ledger only for Kindle with the flag on
+    government: await withHoarvaleBills(database, await withPolicyLedger(database, governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, env), env, civicNow, profile?.nation_id), // #612 founding/succession; #985 ledger; #1089 bills
     shifts,
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
@@ -417,7 +418,7 @@ async function handlePost(request: Request) {
     }
     const citizen = await database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at FROM citizens WHERE clerk_user_id=?`)
       .bind(userId).first<CitizenProfileRow>();
-    return privateJson({ ok:true, government: await withPolicyLedger(database, publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId, governmentReadOptions())), env),
+    return privateJson({ ok:true, government: await withHoarvaleBills(database, await withPolicyLedger(database, publicGovernmentSnapshot(await readGovernment(database, recorded.nation_id, seconds, userId, governmentReadOptions())), env), env, seconds, recorded.nation_id),
       citizenship: citizen ? serializeCitizenship(citizen,true) : null });
   }
 
@@ -459,7 +460,7 @@ async function handlePost(request: Request) {
     ) AS taken`).bind(userId,userId,userId,userId,userId).first<{taken:number}>())?.taken);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
       simulation,verification:await readVerification(userId),
-      government:await withPolicyLedger(database, profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,governmentReadOptions())):null, env),
+      government:await withHoarvaleBills(database, await withPolicyLedger(database, profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,governmentReadOptions())):null, env), env, Math.floor(Date.parse(now)/1000), profile?.nation_id),
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),
       economy:await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
