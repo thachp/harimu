@@ -17,6 +17,7 @@ import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
 import { FULMARA_EXCHANGE_BELL_CYCLE_DAYS, fulmaraNextExchangeBellAt } from './fulmara-exchange-bell.ts';
+import { FULMARA_FAIR_WIND_BLESSING_CYCLE_DAYS, fulmaraNextFairWindBlessingAt } from './fulmara-fair-wind-blessing.ts';
 import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
@@ -57,6 +58,8 @@ export type GovernmentSnapshot = {
   resolutions?: FulmaraResolution[];
   /** #1150 Fulmara: next Exchange Bell on a 30-real-day cycle. Present only while HARIMU_FULMARA_EXCHANGE_BELL_ENABLED is on. Opens no trading session. */
   exchangeBell?: { nextAt: number; cycleDays: 30 };
+  /** #1184 Fulmara: next Fair-Wind Blessing on a 30-real-day cycle. Present only while HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED is on. Holds the next date only. */
+  fairWindBlessing?: { nextAt: number; cycleDays: 30 };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
@@ -363,6 +366,27 @@ export function withFulmaraResolutions(snapshot: GovernmentSnapshot, enabled: bo
 export function withFulmaraExchangeBell(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
   return { ...snapshot, exchangeBell: { nextAt: fulmaraNextExchangeBellAt(nowMs), cycleDays: FULMARA_EXCHANGE_BELL_CYCLE_DAYS } };
+}
+
+/** #1184. Flag off, or any nation but Fulmara: the same snapshot, and no fairWindBlessing key. Holds the next date only. */
+export function withFulmaraFairWindBlessing(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, fairWindBlessing: { nextAt: fulmaraNextFairWindBlessingAt(nowMs), cycleDays: FULMARA_FAIR_WIND_BLESSING_CYCLE_DAYS } };
+}
+
+/** Fulmara read while only the Fair-Wind Blessing flag is on. No grandCouncil, resolutions, or exchangeBell key. Flag off returns null, which is today's read. */
+export function fulmaraFairWindBlessingSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraFairWindBlessing({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Fair-Wind Blessing', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Fair-Wind Blessing', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Fair-Wind Blessing of the convoys falls every 30 real days. This read names the next date. It holds no blessing text, lists no convoy, states no Toll Coupon figure, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Fair-Wind Blessing. It lists no convoy and states no Toll Coupon figure.',
+  }, nowMs, true);
 }
 
 /** Fulmara read while only the Exchange Bell flag is on. No grandCouncil or resolutions key. Flag off returns null, which is today's read. */
