@@ -150,6 +150,7 @@ const flagOffPins = {
   HARIMU_VARKAND_PLEBISCITE_ENABLED: 'zzzz-varkand-plebiscite-1094.test.mjs', // #1094 flag off: no mandatePlebiscite key
   HARIMU_HOARVALE_MOOT_ENABLED: 'moot-term-1096.test.mjs', // #1096 flag off: no moot key
   HARIMU_VELDWOOD_COUNCIL_ENABLED: 'zzzz-veldwood-council-1098.test.mjs', // #1098 flag off: no federalCouncil key
+  HARIMU_VELDWOOD_VOTE_DAY_ENABLED: 'zzzzzzz-veldwood-vote-day-1122.test.mjs', // #1122 flag off: no voteDayCalendar key
   HARIMU_FULMARA_COUNCIL_ENABLED: 'zzzzz-fulmara-council-1102.test.mjs', // #1102 flag off: no grandCouncil key
   HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'zzzzz-ilmar-sanctum-1107.test.mjs', // #1107 flag off: no sanctum key
   HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED: 'zzzzzz-confluence-party-1113.test.mjs', // #1113 flag off: no party key
