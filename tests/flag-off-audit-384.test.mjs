@@ -162,6 +162,8 @@ const flagOffPins = {
   HARIMU_AURELLE_CROWN_CALENDAR_ENABLED: 'zzzzzzz-aurelle-crown-1118.test.mjs', // #1118 flag off: no crownCalendar key
   HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED: 'zzzzzz-confluence-assembly-election-1123.test.mjs', // #1123 flag off: no assemblyElection key
   HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'zzzzzzz-kindle-election-1117.test.mjs', // #1117 flag off: no electionClock key
+  HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'zzzzzzz-hoarvale-honors-1136.test.mjs', // #1136 flag off: no honorsListDay key
+  HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.
