@@ -2323,6 +2323,39 @@ button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 /* Shared screen-reader-only utility (#243 follow-up): text stays in the accessibility tree (never display:none / visibility:hidden) but takes no visible space. */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 
+/* #1100: Fulmara share certificates. Field #4a3279, mark #f1ecff and accent #3aa0ff are the crest;
+   stripe #b598d3 is the nation-mark accent. Vertical stripes are the Fulmara pattern. Status is words.
+   The ticker scrolls only when motion is allowed. The certificate list is the static text. */
+.fulmara-shares{--fulmara-field:#4a3279;--fulmara-mark:#f1ecff;--fulmara-accent:#3aa0ff;--fulmara-stripe:#b598d3;display:flex;flex-direction:column;gap:8px;min-width:0;max-width:100%;box-sizing:border-box;margin:0 0 12px;color:var(--fulmara-field)}
+.fulmara-ticker{overflow:hidden;min-width:0;padding:6px 8px;color:var(--fulmara-mark);background-color:var(--fulmara-field);border:2px solid var(--fulmara-field)}
+.fulmara-ticker-track{display:flex;width:max-content;min-width:100%}
+.fulmara-ticker-copy,.fulmara-ticker-loop{display:flex;flex:0 0 auto;gap:16px;padding-inline-end:16px}
+.fulmara-ticker-item{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:calc(13px * var(--text-scale, 1));line-height:1.4;letter-spacing:.03em;white-space:nowrap}
+.fulmara-share-list{list-style:none;display:flex;flex-direction:column;gap:8px;min-width:0;margin:0;padding:0}
+.fulmara-share{min-width:0;color:var(--fulmara-field);background-color:var(--fulmara-mark);border:2px solid var(--fulmara-field);background-image:repeating-linear-gradient(90deg, transparent 0 10px, color-mix(in srgb, var(--fulmara-stripe) 55%, transparent) 10px 11px)}
+.fulmara-share-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;padding:8px 10px;color:var(--fulmara-mark);background-color:var(--fulmara-field);background-image:repeating-linear-gradient(90deg, transparent 0 5px, color-mix(in srgb, var(--fulmara-accent) 45%, transparent) 5px 6px)}
+.fulmara-share-mark{width:calc(36px * var(--text-scale, 1));height:calc(36px * var(--text-scale, 1));flex:0 0 calc(36px * var(--text-scale, 1));margin:0;color:var(--fulmara-mark);background-color:var(--fulmara-field);font-size:calc(20px * var(--text-scale, 1))}
+.fulmara-share-serial{flex:1 1 8rem;min-width:0;margin:0;color:var(--fulmara-mark);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:calc(13px * var(--text-scale, 1));font-weight:700;letter-spacing:.08em;line-height:1.3;text-transform:uppercase}
+.fulmara-share-title{margin:8px 10px 0;color:var(--fulmara-field);font-size:calc(16px * var(--text-scale, 1));line-height:1.35;overflow-wrap:anywhere}
+.fulmara-share-status{margin:4px 10px 10px;color:var(--fulmara-field);font-size:calc(15px * var(--text-scale, 1));line-height:1.45;overflow-wrap:anywhere}
+:is(.game-inspector-body,.citizen-market) .fulmara-shares :is(h3,h4,p){color:var(--fulmara-field)}
+:is(.game-inspector-body,.citizen-market) .fulmara-share-head :is(p){color:var(--fulmara-mark)}
+.fulmara-shares :focus-visible{outline:3px solid var(--fulmara-field);outline-offset:3px}
+@media (prefers-reduced-motion: no-preference){
+  html:not([data-harimu-reduced-motion]) .fulmara-ticker-track{animation:fulmara-share-scroll 28s linear infinite}
+}
+@keyframes fulmara-share-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion: reduce){
+  .fulmara-ticker{overflow:visible}
+  .fulmara-ticker-track{animation:none;flex-wrap:wrap;width:auto}
+  .fulmara-ticker-loop{display:none}
+  .fulmara-ticker-item{white-space:normal}
+}
+html[data-harimu-reduced-motion] .fulmara-ticker{overflow:visible}
+html[data-harimu-reduced-motion] .fulmara-ticker-track{animation:none;flex-wrap:wrap;width:auto}
+html[data-harimu-reduced-motion] .fulmara-ticker-loop{display:none}
+html[data-harimu-reduced-motion] .fulmara-ticker-item{white-space:normal}
+
 /* #1091: Ilmar edict as illuminated glass. Field #7d6a2b, mark #fff8e0, prism #8d7be0 are the Ilmar crest;
    gold #e0bb59 is the nation mark accent. Dots are the Ilmar pattern. Glow only when motion is allowed. */
 .ilmar-glass-edict{--ilmar-field:#7d6a2b;--ilmar-mark:#fff8e0;--ilmar-prism:#8d7be0;--ilmar-gold:#e0bb59;display:flex;flex-direction:column;min-width:0;max-width:100%;box-sizing:border-box;margin:0 0 12px;padding:0;color:var(--ilmar-field);background-color:color-mix(in srgb,var(--ilmar-mark) 72%,transparent);background-image:radial-gradient(circle at 16% 0%,color-mix(in srgb,var(--ilmar-prism) 42%,transparent),transparent 48%),radial-gradient(var(--ilmar-gold) 1.1px,transparent 1.6px);background-size:auto,8px 8px;border:1px solid color-mix(in srgb,var(--ilmar-gold) 75%,white);border-radius:16px;box-shadow:0 0 0 1px color-mix(in srgb,white 70%,transparent),0 0 18px color-mix(in srgb,var(--ilmar-gold) 55%,transparent),inset 0 1px 0 color-mix(in srgb,white 75%,transparent);backdrop-filter:blur(10px)}

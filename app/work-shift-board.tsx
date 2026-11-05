@@ -14,17 +14,12 @@ const qualityText = (shift: WorkShift) => shift.qualityMultiplierPct === undefin
 const seasonHistory = (output: string) => { const mark = output.match(/ · ([A-Z][a-z]+: [+\u2212]\d+% harvest)$/); return mark ? ` · ${mark[1]}` : ''; }; // #1033
 import type { SceneView } from '@/lib/scene-navigation';
 import { describeKindlePay } from '@/lib/income-tax';
+import { countdownDualTimeEnabled } from '../lib/game-time';
 
 /** [ASSUMPTION] the reset sentence. The count line is the issue's "Shifts today: N of 3". Absent when the cap flag is off. */
 export function ShiftsToday({ day }: { day?: { started: number; cap: number; resetsAt: string } | null }) {
   if (!day) return null;
   return <p>Shifts today: {day.started} of {day.cap}. Resets after the daily tick ({day.resetsAt}).</p>;
-}
-
-/** #1104. Inlined so the work-board harness, which only stubs known imports, still renders. */
-function dualTimeOn(): boolean {
-  try { return process.env.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME === 'true'; }
-  catch { return false; }
 }
 
 export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onRefresh, onClaim, onNavigate, shiftDay, epochMs }: {
@@ -73,7 +68,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
           {active.wageMinor !== undefined && <p>On completion: {describeKindlePay(active.wageMinor, economy?.incomeTaxPercent ?? 0)} + {active.rewardQuantity} {active.rewardItem}{qualityText(active)}</p>}
           {active.qualityPending && <p>Quality step recorded · your grade and reward are revealed when the shift completes.</p>}
           <p>Public contribution target: {active.output} · {active.capacitySpent} WC committed</p>
-          {!(dualTimeOn() && remaining > 0) && <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>}
+          {!(countdownDualTimeEnabled() && remaining > 0) && <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>}
           <GameTimer endsAt={active.completesAt} epochMs={epochMs} label="Shift ends in" readyLabel="Shift ready" />
           <button {...disabledReasonProps(claimReason, "work-claim-reason")} onClick={() => { if (!claimReason) onClaim(active.id); }} type="button">
             {pending ? 'Recording…' : 'Collect wages and goods'}
