@@ -87,7 +87,7 @@ export const warCaptureRefusalSchemas = [
  request_id TEXT NOT NULL CHECK(length(request_id) BETWEEN 8 AND 64),
  attacker_nation TEXT NOT NULL,
  defender_nation TEXT NOT NULL,
- reason TEXT NOT NULL CHECK(reason IN ('weekly_cap','heartland')),
+ reason TEXT NOT NULL CHECK(reason IN ('weekly_cap','heartland','foundation_truce')), -- #1086 (migration 0121)
  squares INTEGER NOT NULL CHECK(squares >= 1),
  lost_in_window INTEGER NOT NULL CHECK(lost_in_window >= 0),
  weekly_limit INTEGER NOT NULL CHECK(weekly_limit >= 1),
@@ -112,7 +112,7 @@ export const warCaptureRefusalSchemas = [
 ];
 export type RefusalSource = { siegeId: string; battleKey?: undefined } | { battleKey: string; siegeId?: undefined };
 /** Write one war-log row for a refused capture. Idempotent per (source, request, reason). */
-export const refusalStatement = (db: GameDatabase, row: RefusalSource & { warId: string; requestId: string; attacker: string; defender: string; reason: 'weekly_cap' | 'heartland'; squares: number; lost: number; limit: number; now: number }) =>
+export const refusalStatement = (db: GameDatabase, row: RefusalSource & { warId: string; requestId: string; attacker: string; defender: string; reason: 'weekly_cap' | 'heartland' | 'foundation_truce'; squares: number; lost: number; limit: number; now: number }) =>
   db.prepare('INSERT OR IGNORE INTO war_capture_refusals (id,siege_id,battle_key,war_id,request_id,attacker_nation,defender_nation,reason,squares,lost_in_window,weekly_limit,refused_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
     .bind(`wcr-${crypto.randomUUID()}`, row.siegeId ?? null, row.battleKey ?? null, row.warId, row.requestId, row.attacker, row.defender, row.reason, row.squares, row.lost, row.limit, row.now);
 /** Read-only war log of refused captures, newest first. */
@@ -128,15 +128,17 @@ export async function transferBattleSquares(db: GameDatabase, cmd: {
   if (!cmd.squares.length) return { ok: false, reason: 'nothing' };
   // #1070 (docs §15.4): squares of a founded city's claim block do not move during its 10-real-day foundation truce; the battle itself still stands.
   const truce = await truceCitiesFor(db, cmd.squares, cmd.now), open = cmd.squares.filter(sq => !underTruce(sq, truce));
+  const ledger = await frontierLedger(db, cmd.defender, cmd.now);
+  const log = { battleKey: cmd.battleKey, warId: cmd.warId, requestId: cmd.requestId, attacker: cmd.attacker, defender: cmd.defender, lost: ledger.lost, now: cmd.now } as const;
+  // #1086: the truce-held squares are logged once per attempt (same idempotency key as weekly_cap/heartland).
+  if (open.length < cmd.squares.length) await refusalStatement(db, { ...log, reason: 'foundation_truce', squares: cmd.squares.length - open.length, limit: weeklyLossLimit(ledger.heldAtWindowStart) }).run();
   if (truce.length && !open.length) return { ok: false, reason: 'foundation_truce', error: truceText(truce[0]), cityId: truce[0].id, endsAt: truce[0].endsAt };
   const owned: CapSquare[] = [];
   for (const sq of open) {
     const row = await db.prepare('SELECT zone,owner FROM world_squares WHERE x=? AND y=?').bind(sq.x, sq.y).first<{ zone: string; owner: string | null }>();
     if (row?.owner === cmd.defender) owned.push({ x: sq.x, y: sq.y, zone: row.zone, from: cmd.defender, to: cmd.attacker });
   }
-  const ledger = await frontierLedger(db, cmd.defender, cmd.now);
   const decision = decideCapture(owned, ledger.lost, ledger.heldAtWindowStart);
-  const log = { battleKey: cmd.battleKey, warId: cmd.warId, requestId: cmd.requestId, attacker: cmd.attacker, defender: cmd.defender, lost: ledger.lost, now: cmd.now } as const;
   if (!decision.ok) { await refusalStatement(db, { ...log, reason: 'weekly_cap', squares: decision.transfer.length, limit: decision.limit }).run(); return { ok: false, reason: 'weekly_loss_cap', lost: decision.lost, limit: decision.limit }; }
   if (decision.heartland.length) await refusalStatement(db, { ...log, reason: 'heartland', squares: decision.heartland.length, limit: 1 }).run();
   const frontier = decision.transfer.filter(t => t.zone === 'frontier');
