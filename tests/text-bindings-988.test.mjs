@@ -24,8 +24,8 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 24); // #1047 shift soft cap, #1085 Varkand Directorate, #1081 Varkand alert, #1094 Mandate Plebiscite, and #1096 Moot term stay inside the pack
-  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 8); // #1053 quartermaster and #1054 peace revert stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 25); // recounted after merging dev: #1098 Veldwood Council and #1096 Moot term stay in this pack; #1095 recruit term is in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 19); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent stay inside the pack
@@ -115,6 +115,15 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_VARKAND_PLEBISCITE_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_VARKAND_PLEBISCITE_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_VARKAND_PLEBISCITE_ENABLED: 'false' }, 'HARIMU_VARKAND_PLEBISCITE_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_VELDWOOD_COUNCIL_ENABLED, undefined, 'the Veldwood Council is not its own binding');
+  assert.equal(prod.vars.HARIMU_VELDWOOD_COUNCIL_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_VELDWOOD_COUNCIL_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_VELDWOOD_COUNCIL_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_VELDWOOD_COUNCIL_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_VELDWOOD_COUNCIL_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_VELDWOOD_COUNCIL_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_VELDWOOD_COUNCIL_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_VELDWOOD_COUNCIL_ENABLED: 'false' }, 'HARIMU_VELDWOOD_COUNCIL_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, undefined, 'the phone top-down map is not its own binding');
   assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'true');
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'false');

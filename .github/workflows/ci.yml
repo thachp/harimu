@@ -3,18 +3,18 @@ name: CI
 # Test-only workflow. There is intentionally NO deploy step and no Cloudflare
 # secrets here. Production deploys stay manual and are owned by the release owner.
 
+# CI runs only on pushes to dev and release (Patrick, Nov 4 2026); PRs rely on local npm test + tsc.
 on:
-  pull_request:
   push:
-    branches: [main, release, dev]
+    branches: [release, dev]
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  # Cancel superseded PR runs only; push runs on dev always finish so PM can cut from a green commit.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # No PR runs now; push runs on dev/release always finish so PM can cut from a green commit.
+  cancel-in-progress: false
 
 jobs:
   node-tests:

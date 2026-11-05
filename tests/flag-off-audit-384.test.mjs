@@ -45,6 +45,7 @@ const flagOffPins = {
   HARIMU_ILMAR_ENABLED: 'nation-openings.test.mjs',
   HARIMU_HOARVALE_ENABLED: 'nation-openings.test.mjs',
   HARIMU_VARKAND_ENABLED: 'nation-openings.test.mjs',
+  HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED: 'varkand-recruit-term-1095.test.mjs',
   HARIMU_VELDWOOD_ENABLED: 'nation-openings.test.mjs',
   HARIMU_FULMARA_ENABLED: 'nation-openings.test.mjs',
   HARIMU_GRAY_MARKET_ENABLED: 'gray-market-43.test.mjs',
@@ -148,6 +149,7 @@ const flagOffPins = {
   HARIMU_VARKAND_DIRECTORATE_ENABLED: 'zzz-varkand-directorate-1085.test.mjs', // #1085 flag off: no directorate key
   HARIMU_VARKAND_PLEBISCITE_ENABLED: 'zzzz-varkand-plebiscite-1094.test.mjs', // #1094 flag off: no mandatePlebiscite key
   HARIMU_HOARVALE_MOOT_ENABLED: 'moot-term-1096.test.mjs', // #1096 flag off: no moot key
+  HARIMU_VELDWOOD_COUNCIL_ENABLED: 'zzzz-veldwood-council-1098.test.mjs', // #1098 flag off: no federalCouncil key
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.

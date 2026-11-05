@@ -19,6 +19,7 @@ import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from '@/lib/korund-coupons'; // #967, #983
 import { korundStandingEnabled } from '@/lib/korund-standing-rules'; // #994
 import { flagOn } from '@/lib/flag-pack.mjs'; // #988
+import { varkandRecruitTerm } from '@/lib/varkand-recruit-term'; // #1095
 import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
 import { readVerification } from '@/lib/verification';
@@ -54,7 +55,7 @@ import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
 import { kindleCycleStartAt, presidentialCycle, presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918, #936, #969
-const governmentReadOptions = (readOnly = false) => ({ ...(readOnly ? { readOnly: true } : {}), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', hoarvaleAssent: hoarvaleAssentEnabled(env), hoarvaleMoot: flagOn(env, 'HARIMU_HOARVALE_MOOT_ENABLED'), varkandDirectorate: flagOn(env, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), varkandPlebiscite: flagOn(env, 'HARIMU_VARKAND_PLEBISCITE_ENABLED') }); // #1089 Hoarvale assent; #1096 Moot term; #1085 directorate and #1094 plebiscite, packed in HARIMU_GRAY_PACK
+const governmentReadOptions = (readOnly = false) => ({ ...(readOnly ? { readOnly: true } : {}), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', hoarvaleAssent: hoarvaleAssentEnabled(env), varkandDirectorate: flagOn(env, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), varkandPlebiscite: flagOn(env, 'HARIMU_VARKAND_PLEBISCITE_ENABLED'), hoarvaleMoot: flagOn(env, 'HARIMU_HOARVALE_MOOT_ENABLED'), veldwoodCouncil: flagOn(env, 'HARIMU_VELDWOOD_COUNCIL_ENABLED') }); // #1089 Hoarvale assent in HARIMU_UI_PACK; #1096 Moot term, #1085 directorate, #1094 plebiscite, #1098 council in HARIMU_GRAY_PACK
 /** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => flagOn(env, 'HARIMU_CROWN_DEBASEMENT_ENABLED'); // #362
@@ -268,6 +269,8 @@ export async function GET(request: Request) {
   // #872 (ARC ruling): nations this account may play here beyond the live three (nationPlayable, never a flag alone). Absent when none: production and the public unchanged.
   const playable = playableNationIds(env as never, userId), flagPlayable = playable.some(id => !(liveNations as readonly string[]).includes(id));
   const shiftDay = await shiftDayFields(database, userId, readNow);
+  // #1095: flag off, or any nation but Varkand, adds no key. created_at is already on the profile row.
+  const nationalService = profile && flagOn(env, 'HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED') ? varkandRecruitTerm(profile, Date.now()) : null;
   return privateJson({ ...(flagPlayable ? { openNations: playable } : {}), ...(cycleStartAt != null ? { cycleStartAt } : {}), ...shiftDay,
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountIdFor(election!.id)}:{})}:null,
@@ -285,6 +288,7 @@ export async function GET(request: Request) {
     playerMarket,
     government: await withHoarvaleBills(database, await withPolicyLedger(database, governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, env), env, civicNow, profile?.nation_id), // #612 founding/succession; #985 ledger; #1089 bills
     shifts,
+    ...(nationalService ? { nationalService } : {}),
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
       : null,
