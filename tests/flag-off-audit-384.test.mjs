@@ -170,6 +170,7 @@ const flagOffPins = {
   HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED: 'zzzzzzzzz-kindle-founders-forge-1145.test.mjs', // #1145 flag off: no foundersForgeDay key
   HARIMU_KINDLE_MARKET_BELL_ENABLED: 'zzzzzzzzzzz-kindle-market-bell-1164.test.mjs', // #1164 flag off: no marketBell key
   HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'zzzzzzzzz-varkand-muster-day-1151.test.mjs', // #1151 flag off: no musterDay key
+  HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'zzzzzzzzz-confluence-canal-festival-1165.test.mjs', // #1165 flag off: no canalFestival key
   HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'zzzzzzz-hoarvale-honors-1136.test.mjs', // #1136 flag off: no honorsListDay key
   HARIMU_HOARVALE_AURORA_NIGHT_ENABLED: 'zzzzzzzzzz-hoarvale-aurora-night-1160.test.mjs', // #1160 flag off: no auroraNight key
   HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
