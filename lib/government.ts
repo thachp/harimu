@@ -5,6 +5,7 @@ import { kindleElectionClock, type KindleElectionClock } from './kindle-election
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
+import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
@@ -37,6 +38,8 @@ export type GovernmentSnapshot = {
   };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
+  /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
+  feastOfFirstLight?: { nextAt: number; cycleDays: 15 };
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
   party?: { pillars: readonly ['general_secretary', 'president', 'premier', 'assembly_chair']; termLimitCongresses: 2; nextCongressAt: number; congressIntervalDays: 150 };
   /** #1123 Confluence: next People's Assembly election window. Present only while HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED is on. Opens no ballot; the result is not binding. */
@@ -377,6 +380,27 @@ export function ilmarSanctumSnapshot(nowMs: number, enabled: boolean): Governmen
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Oracle serves for life, chosen by the Council of Elders. This read does not choose an Oracle, pause Prism trading, or open a pilgrimage.',
+  }, nowMs, true);
+}
+
+/** #1137. Flag off, or any nation but Ilmar: the same snapshot, and no feastOfFirstLight key. Chooses no Oracle, lists no clergy, and proposes no spending. */
+export function withIlmarFeastOfFirstLight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, feastOfFirstLight: { nextAt: ilmarNextFeastOfFirstLightAt(nowMs), cycleDays: ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS } };
+}
+
+/** Ilmar read while only the Feast of First Light flag is on. No sanctum key. Flag off returns null, which is today's read. */
+export function ilmarFeastOfFirstLightSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarFeastOfFirstLight({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [{ name: 'Feast of First Light', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Feast of First Light', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Feast of First Light falls every 15 real days, twice per game year. This read names the next feast. It chooses no Oracle, lists no clergy, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Feast of First Light. It chooses no Oracle and lists no clergy.',
   }, nowMs, true);
 }
 
