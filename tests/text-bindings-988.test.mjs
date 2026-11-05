@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 41); // recounted after merging dev: #1139 Ilmar Prism contracts took the pack to 40, and #1145 Kindle Founders' Forge Day is the 41st; #1095 recruit term stays in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 42); // recounted after merging origin/dev 89829113 (GRAY 41): #1146 Aurelle Hearth Night is the 42nd; #1139 Prism contracts stays last; #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
@@ -206,10 +206,21 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED: 'false' }, 'HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, undefined, 'the Aurelle Hearth Night is not its own binding');
+  assert.equal(prod.vars.HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_AURELLE_HEARTH_NIGHT_ENABLED: 'false' }, 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, undefined, "Kindle Founders' Forge Day is not its own binding");
   assert.equal(prod.vars.HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED'), false);
   assert.equal(expandFlagPacks(preview.vars).HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED: 'false' }, 'HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED'), false, 'a direct string wins over the pack');
