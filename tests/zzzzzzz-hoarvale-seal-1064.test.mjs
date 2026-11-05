@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expandFlagPacks, FLAG_PACKS, varsForProcessEnv } from '../lib/flag-pack.mjs';
+import { displayTimestamp } from '../lib/display-preferences.ts';
 import { HOARVALE_ASSENT_SAMPLE_AT, simulateGovernment } from '../lib/government.ts';
 import { nationCrest } from '../lib/nation-crests.ts';
 import { nationMark } from '../lib/nation-themes.ts';
@@ -51,6 +52,9 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK, previe
   assert.match(await read('app/hoarvale-royal-assent.tsx'), /key=\{index\}/);
   assert.match(await read('app/government-panel.tsx'), /HoarvaleRoyalAssentBills nationId=\{snapshot\.nationId\} bills=\{snapshot\.bills\}/);
   assert.doesNotMatch(await read('app/hoarvale-royal-assent.tsx'), /Moot tax|hoarvaleCivicBills|role="status"/);
+  assert.match(await read('app/hoarvale-royal-assent.tsx'), /useDisplayTimestamp\(\)/);
+  assert.match(await read('app/hoarvale-royal-assent.tsx'), /<time className="hoarvale-assent-date" dateTime=\{dated\.dateTime\}>/);
+  assert.doesNotMatch(await read('app/hoarvale-royal-assent.tsx'), /secondsUntilAssent|HARIMU_HOARVALE_AUTO_ASSENT/);
 });
 
 test('seal styles use the Hoarvale crest and mark, carry a pattern, and do not animate', async () => {
@@ -62,6 +66,8 @@ test('seal styles use the Hoarvale crest and mark, carry a pattern, and do not a
   assert.match(block, /font-size:calc\(17px \* var\(--text-scale, 1\)\)/);
   assert.match(block, /font-size:calc\(15px \* var\(--text-scale, 1\)\)/);
   assert.match(block, /font-size:calc\(18px \* var\(--text-scale, 1\)\)/);
+  assert.match(block, /\.hoarvale-assent-date\{min-width:0;color:var\(--hv-ink\);font-size:calc\(15px \* var\(--text-scale, 1\)\)/);
+  assert.match(block, /:is\(h3,h4,p,\.hoarvale-assent-label,\.hoarvale-assent-date\)\{color:var\(--hv-ink,#14323a\)\}/);
   assert.doesNotMatch(block, /font-size:\s*\d+(\.\d+)?px/);
   assert.doesNotMatch(block, /\b(animation|transition)\s*:/);
   const crest = nationCrest('hoarvale'), mark = nationMark('hoarvale');
@@ -94,21 +100,56 @@ test('flag on: the government read’s bills differ by icon, pattern and text', 
   assert.match(page, /Frostcore export guidance/); assert.match(page, /Mint inflation band/); assert.match(page, /Tenure pay steps/);
   assert.doesNotMatch(page, /Moot tax/);
   assert.match(page, /data-assent="assented"/); assert.match(page, /data-nation-pattern="chevrons"/); assert.match(page, /✚/);
-  assert.match(page, /aria-label="Mint inflation band\. Royal Assent"/);
+  const rowFor = (html, title) => {
+    const start = html.indexOf(`<h4>${title}</h4>`);
+    assert.ok(start >= 0, title);
+    return html.slice(html.lastIndexOf('<li', start), html.indexOf('</li>', start));
+  };
+  const stamp = seconds => ({ iso: new Date(seconds * 1000).toISOString(), label: displayTimestamp(seconds * 1000) });
+  const expectDate = (row, title, text, seconds) => {
+    const dated = stamp(seconds);
+    assert.match(row, new RegExp(`<time class="hoarvale-assent-date" dateTime="${dated.iso}">${dated.label}</time>`));
+    assert.equal(row.match(/aria-label="([^"]*)"/)[1], `${title}. ${text}. ${dated.label}`);
+  };
+  const minted = hoarvale().bills.find(bill => bill.title === 'Mint inflation band');
+  const tenure = hoarvale().bills.find(bill => bill.title === 'Tenure pay steps');
+  const frost = hoarvale().bills.find(bill => bill.title === 'Frostcore export guidance');
+  assert.equal(frost.assentAt, null);
+  assert.equal(typeof minted.assentAt, 'number');
+  assert.equal(typeof tenure.assentAt, 'number');
+  const mintRow = rowFor(page, 'Mint inflation band');
+  const frostRow = rowFor(page, 'Frostcore export guidance');
+  const tenureRow = rowFor(page, 'Tenure pay steps');
+  expectDate(mintRow, 'Mint inflation band', 'Royal Assent', minted.assentAt);
+  expectDate(tenureRow, 'Tenure pay steps', 'Royal Assent withheld', tenure.assentAt);
+  assert.doesNotMatch(frostRow, /<time\b|dateTime=/);
   assert.match(page, /class="hoarvale-assent-label">Royal Assent</);
   assert.match(page, /data-assent="pending"/); assert.match(page, /data-nation-pattern="open-ring"/); assert.match(page, /○/);
-  assert.match(page, /aria-label="Frostcore export guidance\. Awaiting Royal Assent"/);
+  assert.match(frostRow, /aria-label="Frostcore export guidance\. Awaiting Royal Assent"/);
   assert.match(page, />Awaiting Royal Assent</);
   assert.match(page, /data-assent="withheld"/); assert.match(page, /data-nation-pattern="cross"/); assert.match(page, /×/);
-  assert.match(page, /aria-label="Tenure pay steps\. Royal Assent withheld"/);
+  assert.match(tenureRow, /data-assent="withheld"/);
   assert.match(page, />Royal Assent withheld</);
   const start = page.indexOf('class="hoarvale-bills"');
   const sealed = page.slice(start, page.indexOf('</section>', start));
   assert.doesNotMatch(sealed, /role="status"/);
   assert.match(page, /--hv-frost:#3f7898/); assert.match(page, /--hv-accent:#8ac1c6/);
   assert.equal((page.match(/hoarvale-assent-seal/g) ?? []).length, 3);
+  assert.equal((sealed.match(/<time\b/g) ?? []).length, 2);
   const renamed = { ...hoarvale(), bills: [{ id: 'sentinel', title: 'Sentinel bill', passedAt: 1, assentStatus: 'pending', assentAt: null }] };
   const custom = civic('hoarvale', 'true', renamed);
   assert.match(custom, /Sentinel bill/); assert.match(custom, /Awaiting Royal Assent/);
   assert.doesNotMatch(custom, /Frostcore export guidance|Mint inflation band|Tenure pay steps/);
+  const customStart = custom.indexOf('class="hoarvale-bills"');
+  assert.doesNotMatch(custom.slice(customStart, custom.indexOf('</section>', customStart)), /<time\b|dateTime=/);
+  const undated = { ...hoarvale(), bills: [
+    { id: 'bare', title: 'Bare assent', passedAt: 1, assentStatus: 'assented', assentAt: null },
+    { id: 'omitted', title: 'Omitted date', passedAt: 1, assentStatus: 'withheld' },
+    { id: 'bad', title: 'Bad clock', passedAt: 1, assentStatus: 'assented', assentAt: Number.NaN },
+  ] };
+  const blank = civic('hoarvale', 'true', undated);
+  const blankStart = blank.indexOf('class="hoarvale-bills"');
+  const blankSealed = blank.slice(blankStart, blank.indexOf('</section>', blankStart));
+  assert.match(blankSealed, /Bare assent/); assert.match(blankSealed, /Omitted date/); assert.match(blankSealed, /Bad clock/);
+  assert.doesNotMatch(blankSealed, /<time\b|dateTime=|Time unavailable/);
 });
