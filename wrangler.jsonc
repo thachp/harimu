@@ -121,7 +121,9 @@
       // #1116: Korund Five-Year Plan start, next Plan Day (every 150 real days) and next quarterly Quota Rally on the government read. Off: no planCalendar key.
       "HARIMU_KORUND_PLAN_CALENDAR_ENABLED": "true",
       // #1122: Veldwood next Vote Day, every 15 real days. Off: no voteDayCalendar key on the government snapshot.
-      "HARIMU_VELDWOOD_VOTE_DAY_ENABLED": "true"
+      "HARIMU_VELDWOOD_VOTE_DAY_ENABLED": "true",
+      // #1130: Fulmara shareholder resolutions (title, status, share totals) on the government read. Off: no resolutions key.
+      "HARIMU_FULMARA_RESOLUTIONS_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

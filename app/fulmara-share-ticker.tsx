@@ -17,11 +17,16 @@ export function fulmaraShareTickerEnabled(value: string | undefined = fulmaraSha
 
 export const FULMARA_NO_VOTES = 'No votes are open.';
 export type ShareLine = { title: string; status: string };
+const resolutionStatusLabel = { open: 'Open', carried: 'Carried', lost: 'Lost' } as const;
 
-/** The proposal the government panel already shows. No share tally exists on the Fulmara read
- *  (grandCouncil names election instants, not votes), so a missing snapshot is an empty register. */
+/** Shareholder resolutions on the Fulmara read (#1130) are the votes: title, status, and share totals.
+ *  A read with no resolutions list keeps the spending proposal the panel already shows. A missing snapshot is an empty register. */
 export function fulmaraShareLines(snapshot: GovernmentSnapshot | null, spendingNote: string): ShareLine[] {
   if (!snapshot || snapshot.nationId !== 'fulmara') return [];
+  if (snapshot.resolutions) return snapshot.resolutions.map(row => ({
+    title: row.title,
+    status: `${resolutionStatusLabel[row.status]} · ${row.shares.for} for, ${row.shares.against} against, ${row.shares.abstain} abstain`,
+  }));
   return [{
     title: snapshot.decision.title,
     status: `Spending proposal: ${snapshot.decision.proposedSpendMinor} minor units from ${snapshot.availableBudgetMinor} available.${spendingNote}`,
