@@ -2,7 +2,7 @@ import { parked } from './async-limits'; // #679
 import { readCrown } from './aurelle-rising';
 import { readPresidium } from './korund-presidium';
 import type {GameDatabase} from './database-contract';
-import { simulateGovernment, rebaseGovernmentBudget, confluencePartySnapshot, fulmaraGovernmentSnapshot, ilmarSanctumSnapshot, meridianExamDaySnapshot, meridianPartySnapshot, varkandGovernmentSnapshot, varkandPlebisciteSnapshot, veldwoodCouncilSnapshot, veldwoodVoteDaySnapshot, withAurelleCrownCalendar, withConfluenceAssemblyElection, withConfluenceParty, withFulmaraCouncil, withHoarvaleMoot, withIlmarSanctum, withKindleElectionClock, withKorundPlanCalendar, withMeridianExamDay, withMeridianPartyState, withVarkandDirectorate, withVarkandPlebiscite, withVeldwoodCouncil, withVeldwoodVoteDay } from './government';
+import { simulateGovernment, rebaseGovernmentBudget, confluencePartySnapshot, fulmaraGovernmentSnapshot, fulmaraResolutionsSnapshot, ilmarSanctumSnapshot, meridianExamDaySnapshot, meridianPartySnapshot, varkandGovernmentSnapshot, varkandPlebisciteSnapshot, veldwoodCouncilSnapshot, veldwoodVoteDaySnapshot, withAurelleCrownCalendar, withConfluenceAssemblyElection, withConfluenceParty, withFulmaraCouncil, withFulmaraResolutions, withHoarvaleMoot, withIlmarSanctum, withKindleElectionClock, withKorundPlanCalendar, withMeridianExamDay, withMeridianPartyState, withVarkandDirectorate, withVarkandPlebiscite, withVeldwoodCouncil, withVeldwoodVoteDay } from './government';
 export const petitionSchema = `CREATE TABLE IF NOT EXISTS government_petitions (
   request_id TEXT PRIMARY KEY, clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),
   nation_id TEXT NOT NULL, topic TEXT NOT NULL CHECK(topic IN ('food','infrastructure','work')),
@@ -59,7 +59,7 @@ export async function latchGovernmentReviews(db: GameDatabase, nationId: string,
 type ReviewRow = {period_start:number;reviewed_at:number;petition_count:number;snapshot_json:string};
 /** Completed UTC days are reviewed once. By default this persists bounded, idempotent reviews (POST and world-tick paths).
  *  With readOnly (#205, GET /api/citizen) the same reviews are projected in memory and nothing is written. */
-export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean; hoarvaleAssent?: boolean; varkandDirectorate?: boolean; hoarvaleMoot?: boolean; varkandPlebiscite?: boolean; veldwoodCouncil?: boolean; veldwoodVoteDay?: boolean; fulmaraCouncil?: boolean; ilmarSanctum?: boolean; confluenceParty?: boolean; confluenceAssemblyElection?: boolean; meridianPartySchedule?: boolean; meridianExamDay?: boolean; korundPlanCalendar?: boolean; aurelleCrownCalendar?: boolean; kindleElectionClock?: boolean; kindleCycleStartAt?: number | null } = {}) {
+export async function readGovernment(db: GameDatabase, nationId: string, now: number, userId?: string, options: { readOnly?: boolean; korundPresidium?: boolean; hoarvaleAssent?: boolean; varkandDirectorate?: boolean; hoarvaleMoot?: boolean; varkandPlebiscite?: boolean; veldwoodCouncil?: boolean; veldwoodVoteDay?: boolean; fulmaraCouncil?: boolean; fulmaraResolutions?: boolean; ilmarSanctum?: boolean; confluenceParty?: boolean; confluenceAssemblyElection?: boolean; meridianPartySchedule?: boolean; meridianExamDay?: boolean; korundPlanCalendar?: boolean; aurelleCrownCalendar?: boolean; kindleElectionClock?: boolean; kindleCycleStartAt?: number | null } = {}) {
   // #679: the Aurelle crown read touches only the Rising and coup tables, which nothing below writes, so it starts with the first reads instead of last
   // (parked so a run that returns early never leaves an unhandled rejection; the crown branch still rethrows).
   const crownRead = nationId === 'aurelle' ? parked(readCrown(db)) : null;
@@ -111,7 +111,7 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
     ? reviewedSnapshot
     : project({});
   if (!snapshot) {
-    const nowMs = now * 1000; // #1085/#1094/#1098/#1102/#1107/#1113/#1114/#1133/#1116/#1122: now is seconds; these clocks are integer ms. Flags off stay null.
+    const nowMs = now * 1000; // #1085/#1094/#1098/#1102/#1107/#1113/#1114/#1133/#1116/#1122/#1130: now is seconds; these clocks are integer ms. Flags off stay null.
     if (nationId === 'varkand') {
       if (options.varkandDirectorate) {
         const built = varkandGovernmentSnapshot(nowMs, true)!;
@@ -126,7 +126,13 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
       }
       return veldwoodVoteDaySnapshot(nowMs, !!options.veldwoodVoteDay);
     }
-    if (nationId === 'fulmara') return fulmaraGovernmentSnapshot(nowMs, !!options.fulmaraCouncil);
+    if (nationId === 'fulmara') {
+      if (options.fulmaraCouncil) {
+        const built = fulmaraGovernmentSnapshot(nowMs, true)!;
+        return options.fulmaraResolutions ? withFulmaraResolutions(built, true) : built;
+      }
+      return fulmaraResolutionsSnapshot(!!options.fulmaraResolutions);
+    }
     if (nationId === 'ilmar') return ilmarSanctumSnapshot(nowMs, !!options.ilmarSanctum);
     if (nationId === 'confluence') return confluencePartySnapshot(nowMs, !!options.confluenceParty, !!options.confluenceAssemblyElection);
     if (nationId === 'meridian') {
@@ -179,6 +185,7 @@ export async function readGovernment(db: GameDatabase, nationId: string, now: nu
   if (nationId === 'veldwood' && options.veldwoodCouncil) snapshot = withVeldwoodCouncil(snapshot, now * 1000, true); // #1098
   if (nationId === 'veldwood' && options.veldwoodVoteDay) snapshot = withVeldwoodVoteDay(snapshot, now * 1000, true); // #1122
   if (nationId === 'fulmara' && options.fulmaraCouncil) snapshot = withFulmaraCouncil(snapshot, now * 1000, true); // #1102
+  if (nationId === 'fulmara' && options.fulmaraResolutions) snapshot = withFulmaraResolutions(snapshot, true); // #1130: pure, no read
   if (nationId === 'ilmar' && options.ilmarSanctum) snapshot = withIlmarSanctum(snapshot, now * 1000, true); // #1107
   if (nationId === 'confluence' && options.confluenceParty) snapshot = withConfluenceParty(snapshot, now * 1000, true); // #1113
   if (nationId === 'confluence' && options.confluenceAssemblyElection) snapshot = withConfluenceAssemblyElection(snapshot, now * 1000, true); // #1123
