@@ -35,10 +35,10 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK, previe
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 19);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 20);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), /NEXT_PUBLIC_HARIMU_VELDWOOD_BALLOT_BOOKLET/);
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), /NEXT_PUBLIC_HARIMU_VELDWOOD_BALLOT_BOOKLET/);
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 19/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 20/);
 });
 
 test('styles use Veldwood tokens, the reverse-diagonal pattern, scaled type, and no motion', async () => {
@@ -95,4 +95,8 @@ test('a Veldwood viewer gets the booklet; other nations keep their ballot copy a
   assert.match(korund, /korund-ration-booklet/); assert.doesNotMatch(korund, /veldwood-ballot/);
   assert.match(aurelle, /aurelle-sealed-scroll/); assert.doesNotMatch(aurelle, /veldwood-ballot/);
   assert.match(await read('app/page.tsx'), /<BallotStatus nationId=\{citizenNation\.id\} kindleAccount=\{clerkConfigured\} \/>/);
+  const booklet = await read('app/veldwood-ballot-booklet.tsx');
+  assert.match(booklet, /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_VELDWOOD_BALLOT_BOOKLET/);
+  assert.match(booklet, /key=\{index\}/);
+  assert.doesNotMatch(booklet, /key=\{line\}/);
 });

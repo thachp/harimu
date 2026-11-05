@@ -1,3 +1,4 @@
+import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
@@ -24,6 +25,8 @@ export type GovernmentSnapshot = {
     lodestarNextElectionAt: number; lodestarTermDays: 90; lodestarConsecutiveReelection: false;
     tribuneSessionEndsAt: number; tribuneVetoesPerSession: 1;
   };
+  /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
+  sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   roles: { name: string; controller: string }[];
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
@@ -190,6 +193,33 @@ export function varkandGovernmentSnapshot(nowMs: number, enabled: boolean): Gove
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Chair rotates among the five Marshals every 60 real days. Citizens do not elect the Directorate.',
+  }, nowMs, true);
+}
+
+/** #1107. Flag off, or any nation but Ilmar: the same snapshot, and no sanctum key. */
+export function withIlmarSanctum(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, sanctum: {
+    oracleTerm: ILMAR_ORACLE_TERM, councilOfEldersSeats: ILMAR_COUNCIL_OF_ELDERS_SEATS,
+    isStillday: ilmarIsStillday(nowMs), nextStilldayAt: ilmarNextStilldayAt(nowMs), nextGreatPilgrimageAt: ilmarNextGreatPilgrimageAt(nowMs),
+  } };
+}
+
+/** Ilmar read while the flag is on. Ilmar has no other government snapshot, so this is the smallest one that carries the sanctum block. Flag off returns null, which is today's read. */
+export function ilmarSanctumSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarSanctum({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [
+      { name: 'Supreme Oracle', controller: 'AI/SI role · deterministic rules' },
+      { name: 'Council of Elders', controller: 'AI/SI role · deterministic rules' },
+    ],
+    decision: {
+      title: 'Sanctum calendar', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Supreme Oracle holds office for life. The Council of Elders has 12 seats. This read names whether today is a Stillday and when the next Stillday and Great Pilgrimage fall. It proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The Oracle serves for life, chosen by the Council of Elders. This read does not choose an Oracle, pause Prism trading, or open a pilgrimage.',
   }, nowMs, true);
 }
 
