@@ -524,6 +524,14 @@ header.game-hud[data-nation-skin=aurelle]{--skin-ground:#0d1c2b;--skin-chip:#142
 .viewport-world-label.viewport-city-pill:focus-visible{outline:2px solid #80d8ce;outline-offset:3px}
 .harimu-game.game-city-v2{--context-height:calc(0px * var(--text-scale, 1))} /* the bottom strip is not rendered: the scene takes its space */
 @media(max-width:760px){.harimu-game.game-city-v2{grid-template-rows:auto minmax(calc(40px * var(--text-scale, 1)),auto) minmax(260px,44dvh) 0 minmax(0,auto)}}
+/* #1174: with the strip gone the map meets the screen edge, and the camera bar (bottom: 15px) is cut off by the citizen dock and the home-indicator inset.
+   Desktop keeps the overlay and lifts it clear of that bar. Phones keep the in-flow strip (#528); the safe-area pad sits inside it so the stage overflow cannot clip the buttons.
+   World, and a City that still has the destination strip, stay on the 15px overlay. */
+@media(min-width:761px){
+  .game-city-v2 .viewport-controls{bottom:calc(15px + env(safe-area-inset-bottom, 0px))}
+  .game-city-v2:has(.citizen-dock) .viewport-controls{bottom:calc(15px + 44px + env(safe-area-inset-bottom, 0px))}
+}
+@media(max-width:760px){.game-city-v2 .game-stage .viewport-controls{flex-shrink:0;padding-bottom:calc(4px + env(safe-area-inset-bottom, 0px))}}
 @media(max-width:760px){.viewport-world-label.viewport-city-pill{min-height:44px;gap:4px;padding:6px 10px 6px 8px;font-size:calc(11px * var(--text-scale, 1));transform:translate(-50%,-100%)!important}.viewport-city-pill-dot{display:none}}
 @media(max-width:360px){.viewport-world-label.viewport-city-pill{padding:6px 10px}.viewport-city-pill-icon{display:none}} /* the 320 canvas has no room for icons: pills keep the label's own size so #377 placement still fits them */
 /* #874: on a map too short for every full pill (app/game-viewport.tsx sets data-compact-pills), each pill is its 44px icon only; text and "Select …" name stay. */

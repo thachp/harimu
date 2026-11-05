@@ -13,6 +13,7 @@ import { uiV2CityEnabled } from '../lib/ui-v2-city';
 import { MapOverlaysControl } from './map-overlays';
 import { nationPlaces, projectOwnershipCells, WORLD_GRID } from '../lib/globe-mapping';
 import { mapFitRules, nationOpenings } from '../lib/nation-openings';
+import { globeLight, globeRimEnabled } from '../lib/globe-rim';
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
@@ -73,9 +74,19 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
     const cityFog = new THREE.Fog('#172c31', 35, 85);
     const world = mode === 'city' ? createCityWorld(nationId, cityName, { marketOpen }) : createRegionWorld(JSON.parse(nationSignature));
     scene.add(world.group);
-    scene.add(new THREE.HemisphereLight('#fff3d6', '#334b4d', 2.2));
+    const hemisphere = new THREE.HemisphereLight('#fff3d6', '#334b4d', 2.2);
+    scene.add(hemisphere);
     const sun = new THREE.DirectionalLight('#ffe2ac', opening.sun);
     sun.position.set(-15, 24, 12); sun.castShadow = opening.shadows;
+    // #1174: flag off keeps the sun above the globe. Flag on (world only) is a soft rim, so the nations stay readable.
+    const rim = mode === 'world' && globeRimEnabled();
+    if (rim) {
+      const lit = globeLight(true, opening.sun);
+      hemisphere.color.set(lit.sky); hemisphere.groundColor.set(lit.ground); hemisphere.intensity = lit.hemisphere;
+      sun.color.set(lit.sunColor); sun.intensity = lit.sunIntensity; sun.position.set(lit.sunPosition[0], lit.sunPosition[1], lit.sunPosition[2]);
+      const surface = world.group.children[0] as THREE.Mesh;
+      (surface.material as THREE.MeshStandardMaterial).roughness = lit.roughness;
+    }
     sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
     sun.shadow.camera.top = 22; sun.shadow.camera.bottom = -22; sun.shadow.bias = -.001;
     scene.add(sun);
@@ -125,7 +136,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       const view = liveMapView(); // #1039: assigned, never animated
       const effects = mapEffects(view, quality);
       scene.fog = effects.fog && mode === 'city' ? cityFog : null;
-      renderer.shadowMap.enabled = effects.shadows; sun.castShadow = effects.shadows; sun.intensity = effects.sun;
+      renderer.shadowMap.enabled = effects.shadows; sun.castShadow = effects.shadows; sun.intensity = rim ? globeLight(true, effects.sun).sunIntensity : effects.sun;
       const atmosphere = world.group.getObjectByName('atmosphere'); if (atmosphere) atmosphere.visible = effects.atmosphere;
       container.dataset.mapCamera = view;
       const ratio = w / h;
