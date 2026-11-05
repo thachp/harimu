@@ -18,6 +18,7 @@ import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolution
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
@@ -79,6 +80,7 @@ export type GovernmentSnapshot = {
   moot?: HoarvaleMoot;
   /** #1136 Hoarvale: next Honors List Day (once per game year = 30 real days). Present only while HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED is on. Awards no titles. */
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
+  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1089: Hoarvale Moot bills. Present only when the caller passes hoarvaleAssent (the server flag). Assent sits on the bill. */
   bills?: HoarvaleBill[];
@@ -163,6 +165,14 @@ export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: n
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
   return { ...snapshot, honorsListDay: {
     nextAt: hoarvaleNextHonorsListDayAt(nowMs), intervalDays: HOARVALE_HONORS_LIST_INTERVAL_DAYS as 30, awardsTitles: false,
+  } };
+}
+
+/** #1151. Flag off, or any nation but Varkand: the same snapshot, and no musterDay key. Musters no troops, changes no Alert Level. */
+export function withVarkandMusterDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  return { ...snapshot, musterDay: {
+    nextAt: varkandNextMusterDayAt(nowMs), intervalDays: VARKAND_MUSTER_DAY_INTERVAL_DAYS as 30, mustersTroops: false,
   } };
 }
 
