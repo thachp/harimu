@@ -31,6 +31,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.partyState?{partyState:snapshot.partyState}:{}), // #1114: Meridian Party Congress schedule (readGovernment adds it only while the flag is on)
   ...(snapshot.examDay?{examDay:snapshot.examDay}:{}), // #1133: next Exam Day (readGovernment adds it only while the flag is on)
   ...(snapshot.assemblyElection?{assemblyElection:snapshot.assemblyElection}:{}), // #1123: Confluence People's Assembly window (readGovernment adds it only while the flag is on)
+  ...(snapshot.quotaDay?{quotaDay:snapshot.quotaDay}:{}), // #1169: next Quota Day (readGovernment adds it only while the flag is on)
   ...(snapshot.planCalendar?{planCalendar:snapshot.planCalendar}:{}), // #1116: Korund Plan Day and Quota Rally (readGovernment adds it only while the flag is on)
   ...(snapshot.chairmanBirthday?{chairmanBirthday:snapshot.chairmanBirthday}:{}), // #1147: next Chairman's Birthday (readGovernment adds it only while the flag is on)
   ...(snapshot.crownCalendar?{crownCalendar:snapshot.crownCalendar}:{}), // #1118: Aurelle reign start and next Great Council window (readGovernment adds it only while the flag is on)
