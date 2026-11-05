@@ -17,6 +17,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.moot?{moot:{electedAt:snapshot.moot.electedAt,dissolvesBy:snapshot.moot.dissolvesBy,primeMinisterInvestedAt:snapshot.moot.primeMinisterInvestedAt,investitureDeadline:snapshot.moot.investitureDeadline,reservePowersAvailable:snapshot.moot.reservePowersAvailable}}:{}), // #1096: Moot term (readGovernment adds it only while the flag is on)
   ...(snapshot.foundersForgeDay?{foundersForgeDay:snapshot.foundersForgeDay}:{}), // #1145: next Founders' Forge Day (readGovernment adds it only while the flag is on)
   ...(snapshot.honorsListDay?{honorsListDay:snapshot.honorsListDay}:{}), // #1136: next Honors List Day (readGovernment adds it only while the flag is on)
+  ...(snapshot.auroraNight?{auroraNight:snapshot.auroraNight}:{}), // #1160: next Aurora Night (readGovernment adds it only while the flag is on)
   ...(snapshot.federalCouncil?{federalCouncil:snapshot.federalCouncil}:{}), // #1098: next Council election and Speaker seat (readGovernment adds it only while the flag is on)
   ...(snapshot.voteDayCalendar?{voteDayCalendar:snapshot.voteDayCalendar}:{}), // #1122: next Vote Day (readGovernment adds it only while the flag is on)
   ...(snapshot.grandCouncil?{grandCouncil:snapshot.grandCouncil}:{}), // #1102: Council of Ten, Lodestar and Tribune session (readGovernment adds it only while the flag is on)
