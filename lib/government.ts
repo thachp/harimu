@@ -1,3 +1,4 @@
+import { AURELLE_HEARTH_NIGHT_CYCLE_DAYS, aurelleNextHearthNightAt } from './aurelle-hearth-night.ts';
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
 import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
@@ -16,6 +17,7 @@ import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolution
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
@@ -74,6 +76,7 @@ export type GovernmentSnapshot = {
   moot?: HoarvaleMoot;
   /** #1136 Hoarvale: next Honors List Day (once per game year = 30 real days). Present only while HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED is on. Awards no titles. */
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
+  foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1089: Hoarvale Moot bills. Present only when the caller passes hoarvaleAssent (the server flag). Assent sits on the bill. */
   bills?: HoarvaleBill[];
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
@@ -81,6 +84,8 @@ export type GovernmentSnapshot = {
   succession?: { status: 'reigning' | 'ailing' | 'vacant' | 'acceded' | 'abdicated'; heir: { name: string; named: boolean } | null };
   /** #1118 Aurelle: reign-start display clock and the next Great Council window. Present only while HARIMU_AURELLE_CROWN_CALENDAR_ENABLED is on. */
   crownCalendar?: { reignStartedAt: number; nextGreatCouncilWindowAt: number; reignDisplayDays: number };
+  /** #1146 Aurelle: next Hearth Night (once per game year = 30 real days). Present only while HARIMU_AURELLE_HEARTH_NIGHT_ENABLED is on. Blesses no houses. */
+  hearthNight?: { nextAt: number; cycleDays: 30 };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
 
@@ -155,6 +160,14 @@ export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: n
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
   return { ...snapshot, honorsListDay: {
     nextAt: hoarvaleNextHonorsListDayAt(nowMs), intervalDays: HOARVALE_HONORS_LIST_INTERVAL_DAYS as 30, awardsTitles: false,
+  } };
+}
+
+/** #1145. Flag off, or any nation but Kindle: the same snapshot, and no foundersForgeDay key. Opens no fair. */
+export function withKindleFoundersForgeDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'kindle') return snapshot;
+  return { ...snapshot, foundersForgeDay: {
+    nextAt: kindleNextFoundersForgeDayAt(nowMs), intervalDays: KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS as 30, opensFair: false,
   } };
 }
 
@@ -255,6 +268,12 @@ export function withAurelleCrownCalendar(snapshot: GovernmentSnapshot, nowMs: nu
     reignStartedAt: aurelleReignStartedAt(nowMs), nextGreatCouncilWindowAt: aurelleNextGreatCouncilWindowAt(nowMs),
     reignDisplayDays: AURELLE_REIGN_DISPLAY_DAYS,
   } };
+}
+
+/** #1146. Flag off, or any nation but Aurelle: the same snapshot, and no hearthNight key. Blesses no houses, names no heir, and proposes no spending. */
+export function withAurelleHearthNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
+  return { ...snapshot, hearthNight: { nextAt: aurelleNextHearthNightAt(nowMs), cycleDays: AURELLE_HEARTH_NIGHT_CYCLE_DAYS as 30 } };
 }
 
 /** #1122. Flag off, or any nation but Veldwood: the same snapshot, and no voteDayCalendar key. */

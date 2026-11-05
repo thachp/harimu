@@ -24,11 +24,11 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 41); // recounted after merging dev 7793157: #1139 Prism contracts took the pack to 40, and #1147 Korund Chairman's Birthday is the 41st; #1095 recruit term stays in HARIMU_ARMY_PACK
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 43); // recounted after merging origin/dev 44a2ba6 (GRAY 42): #1147 Korund Chairman's Birthday is the 43rd and last; #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 24); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1100 Fulmara share ticker, #1104 countdown dual time, #1064 Hoarvale seal, #1124 Ilmar prism shares stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 25); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1100 Fulmara share ticker, #1104 countdown dual time, #1064 Hoarvale seal, #1124 Ilmar prism shares, #1152 Meridian party congress stay inside the pack
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
   assert.equal(flagOn(on, 'HARIMU_GRAY_MARKET_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_SPA_WC_BONUS_ENABLED'), true);
@@ -215,6 +215,24 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED: 'false' }, 'HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, undefined, 'the Aurelle Hearth Night is not its own binding');
+  assert.equal(prod.vars.HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_AURELLE_HEARTH_NIGHT_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_AURELLE_HEARTH_NIGHT_ENABLED: 'false' }, 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, undefined, "Kindle Founders' Forge Day is not its own binding");
+  assert.equal(prod.vars.HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED: 'false' }, 'HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.HARIMU_KORUND_PLAN_CALENDAR_ENABLED, undefined, 'the Korund plan calendar is not its own binding');
   assert.equal(prod.vars.HARIMU_KORUND_PLAN_CALENDAR_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_KORUND_PLAN_CALENDAR_ENABLED, 'true');
@@ -329,5 +347,10 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_ILMAR_PRISM_SHARES, 'false');
   assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_ILMAR_PRISM_SHARES, 'true', 'the client build still inlines the packed prism-shares flag');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_ILMAR_PRISM_SHARES: 'false' }).NEXT_PUBLIC_HARIMU_ILMAR_PRISM_SHARES, 'false', 'a direct string wins');
+  assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MERIDIAN_PARTY_CONGRESS, undefined, 'the Meridian party congress flag is not its own binding');
+  assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MERIDIAN_PARTY_CONGRESS, 'true');
+  assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MERIDIAN_PARTY_CONGRESS, 'false');
+  assert.equal(varsForProcessEnv(preview.vars).NEXT_PUBLIC_HARIMU_MERIDIAN_PARTY_CONGRESS, 'true', 'the client build still inlines the packed party-congress flag');
+  assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, NEXT_PUBLIC_HARIMU_MERIDIAN_PARTY_CONGRESS: 'false' }).NEXT_PUBLIC_HARIMU_MERIDIAN_PARTY_CONGRESS, 'false', 'a direct string wins');
   assert.ok(TEXT_BINDING_CEILING - count(preview.vars, ['HARIMU_QA_TEST_CITIZEN_IDS']) >= 3, 'preview headroom stays at least 3 under 127');
 });
