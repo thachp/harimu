@@ -2,8 +2,10 @@ import { AURELLE_HEARTH_NIGHT_CYCLE_DAYS, aurelleNextHearthNightAt } from './aur
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
 import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
+import { CONFLUENCE_QUOTA_DAY_CYCLE_DAYS, confluenceNextQuotaDayAt } from './confluence-quota-day.ts';
 import { kindleElectionClock, type KindleElectionClock } from './kindle-election.ts';
 import { KORUND_CHAIRMAN_BIRTHDAY_CYCLE_DAYS, korundNextChairmanBirthdayAt } from './korund-chairman-birthday.ts';
+import { KORUND_PEOPLES_CONGRESS_CYCLE_DAYS, korundNextPeoplesCongressAt } from './korund-peoples-congress.ts';
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
 import { MERIDIAN_TURBINE_DAY_CYCLE_DAYS, MERIDIAN_TURBINE_DAY_HOST, meridianNextTurbineDayAt } from './meridian-turbine-day.ts';
@@ -22,6 +24,7 @@ import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
+import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 import { KINDLE_MARKET_BELL_CYCLE_DAYS, kindleNextMarketBellAt } from './kindle-market-bell.ts';
 
@@ -64,6 +67,8 @@ export type GovernmentSnapshot = {
   party?: { pillars: readonly ['general_secretary', 'president', 'premier', 'assembly_chair']; termLimitCongresses: 2; nextCongressAt: number; congressIntervalDays: 150 };
   /** #1123 Confluence: next People's Assembly election window. Present only while HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED is on. Opens no ballot; the result is not binding. */
   assemblyElection?: { cycleStartedAt: number; nextElectionAt: number; intervalDays: 150; ballotOpen: false; leadershipHeedsResult: false };
+  /** #1169 Confluence: next Quota Day (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED is on. States no quota, target, or bonus. */
+  quotaDay?: { nextAt: number; cycleDays: 30 };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   /** #1133 Meridian: next Exam Day. Present only while HARIMU_MERIDIAN_EXAM_DAY_ENABLED is on. */
@@ -74,6 +79,8 @@ export type GovernmentSnapshot = {
   planCalendar?: { currentPlanStartedAt: number; nextPlanDayAt: number; nextQuotaRallyAt: number; planIntervalDays: 150; quotaRalliesPerPlan: 4 };
   /** #1147 Korund: next Chairman's Birthday. Present only while HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED is on. Names no Chairman and awards no medal. */
   chairmanBirthday?: { nextAt: number; cycleDays: 30 };
+  /** #1170 Korund: next People's Congress. Present only while HARIMU_KORUND_PEOPLES_CONGRESS_ENABLED is on. Holds no votes, motions, delegates, or outcomes. */
+  peoplesCongress?: { nextAt: number; cycleDays: 30 };
   roles: { name: string; controller: string }[];
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
@@ -91,6 +98,8 @@ export type GovernmentSnapshot = {
   /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
   auroraNight?: { nextAt: number; cycleDays: 30 };
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
+  /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
+  canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1164 Kindle: next Market Bell on a 30-real-day cycle. Present only while HARIMU_KINDLE_MARKET_BELL_ENABLED is on. Holds no market event, price move, or bonus. */
   marketBell?: { nextAt: number; cycleDays: 30 };
@@ -191,6 +200,15 @@ export function withVarkandMusterDay(snapshot: GovernmentSnapshot, nowMs: number
   if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
   return { ...snapshot, musterDay: {
     nextAt: varkandNextMusterDayAt(nowMs), intervalDays: VARKAND_MUSTER_DAY_INTERVAL_DAYS as 30, mustersTroops: false,
+  } };
+}
+
+/** #1165. Flag off, or any nation but Confluence: the same snapshot, and no canalFestival key. Holds no festival, harvest yield, or bonus. */
+export function withConfluenceCanalFestival(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
+  return { ...snapshot, canalFestival: {
+    nextAt: confluenceNextCanalFestivalAt(nowMs), intervalDays: CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS as 30,
+    hostCity: CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, holdsFestival: false,
   } };
 }
 
@@ -518,6 +536,12 @@ export function withConfluenceAssemblyElection(snapshot: GovernmentSnapshot, now
   } };
 }
 
+/** #1169. Flag off, or any nation but Confluence: the same snapshot, and no quotaDay key. States no quota, target, or bonus. */
+export function withConfluenceQuotaDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
+  return { ...snapshot, quotaDay: { nextAt: confluenceNextQuotaDayAt(nowMs), cycleDays: CONFLUENCE_QUOTA_DAY_CYCLE_DAYS as 30 } };
+}
+
 /** Confluence read while the flag is on. Confluence has no other government snapshot, so this is the smallest one that carries the party block. Flag off returns null, which is today's read. */
 export function confluencePartySnapshot(nowMs: number, enabled: boolean, assemblyElection = false): GovernmentSnapshot | null {
   if (!enabled && !assemblyElection) return null; // #1123: either flag gives Confluence a read
@@ -671,4 +695,10 @@ export function withKorundPlanCalendar(snapshot: GovernmentSnapshot, nowMs: numb
 export function withKorundChairmanBirthday(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'korund') return snapshot;
   return { ...snapshot, chairmanBirthday: { nextAt: korundNextChairmanBirthdayAt(nowMs), cycleDays: KORUND_CHAIRMAN_BIRTHDAY_CYCLE_DAYS } };
+}
+
+/** #1170. Flag off, or any nation but Korund: the same snapshot, and no peoplesCongress key. Holds no votes, motions, delegates, or outcomes. */
+export function withKorundPeoplesCongress(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'korund') return snapshot;
+  return { ...snapshot, peoplesCongress: { nextAt: korundNextPeoplesCongressAt(nowMs), cycleDays: KORUND_PEOPLES_CONGRESS_CYCLE_DAYS } };
 }
