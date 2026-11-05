@@ -2,4 +2,6 @@
 .timer strong { font-weight: 600; }
 .timer small { font-size: .8em; }
 .compact { font-size: .85em; }
+/* #1104: inherit the surface ink (HUD paper on #071820, nation ink on that nation's paper) so contrast stays with the skin. */
+.dual { display: inline; max-width: 100%; white-space: normal; }
 @media (max-width: 440px) { .timer { line-height: 1.5; } }
