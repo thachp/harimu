@@ -54,7 +54,7 @@ import { activeIncomeTaxPercent } from '@/lib/income-tax';
 import { assemblyTickConfig, type AssemblyBindings } from '@/lib/assembly';
 import { primaryTickConfig, type PrimaryBindings } from '@/lib/primaries';
 import { kindleCycleStartAt, presidentialCycle, presidentialWindow, type CalendarBindings } from '@/lib/election-calendars'; // #918, #936, #969
-const governmentReadOptions = (readOnly = false) => ({ ...(readOnly ? { readOnly: true } : {}), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', hoarvaleAssent: hoarvaleAssentEnabled(env), varkandDirectorate: flagOn(env, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), varkandPlebiscite: flagOn(env, 'HARIMU_VARKAND_PLEBISCITE_ENABLED') }); // #1089 Hoarvale assent; #1085 directorate and #1094 plebiscite, packed in HARIMU_GRAY_PACK
+const governmentReadOptions = (readOnly = false) => ({ ...(readOnly ? { readOnly: true } : {}), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', hoarvaleAssent: hoarvaleAssentEnabled(env), hoarvaleMoot: flagOn(env, 'HARIMU_HOARVALE_MOOT_ENABLED'), varkandDirectorate: flagOn(env, 'HARIMU_VARKAND_DIRECTORATE_ENABLED'), varkandPlebiscite: flagOn(env, 'HARIMU_VARKAND_PLEBISCITE_ENABLED') }); // #1089 Hoarvale assent; #1096 Moot term; #1085 directorate and #1094 plebiscite, packed in HARIMU_GRAY_PACK
 /** #86: the Kindle income tax rate in force (0 while HARIMU_KINDLE_INCOME_TAX_ENABLED is off, the shipped default). */
 /** #235: Korund Labor Bureau (job preferences, AI assignment, 30-day reassignment). Ships off. */
 const crownMintOn = () => flagOn(env, 'HARIMU_CROWN_DEBASEMENT_ENABLED'); // #362
