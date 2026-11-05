@@ -74,7 +74,11 @@ const HOUR = 3600;
 /** Jan 15 2026 12:00 UTC (the fixture clock). The Mint band is due, Frostcore is an hour old, tenure was already dissolved. */
 export const HOARVALE_ASSENT_SAMPLE_AT = 1_768_478_400;
 export type AssentStatus = 'pending' | 'assented' | 'withheld';
-export type HoarvaleBill = { id: string; title: string; passedAt: number; assentStatus: AssentStatus; assentAt: number | null };
+export type HoarvaleBill = {
+  id: string; title: string; passedAt: number; assentStatus: AssentStatus; assentAt: number | null;
+  /** #1134: seconds until Royal Assent. Present on a pending bill only while HARIMU_HOARVALE_AUTO_ASSENT_ENABLED is on. Not a column. */
+  secondsUntilAssent?: number;
+};
 export const HOARVALE_BILLS: readonly { id: string; title: string; passedAt: number; dissolvedAt: number | null }[] = [
   { id: 'hoarvale-frostcore-export', title: 'Frostcore export guidance', passedAt: HOARVALE_ASSENT_SAMPLE_AT - HOUR, dissolvedAt: null },
   { id: 'hoarvale-inflation-band', title: 'Mint inflation band', passedAt: HOARVALE_ASSENT_SAMPLE_AT - ASSENT_SECONDS, dissolvedAt: null },
@@ -86,6 +90,19 @@ export function billAssent(passedAt: number, dissolvedAt: number | null, now: nu
   if (dissolvedAt != null && Number.isSafeInteger(dissolvedAt) && now >= dissolvedAt && dissolvedAt >= passedAt && dissolvedAt < due) return { assentStatus: 'withheld', assentAt: dissolvedAt };
   if (now < due) return { assentStatus: 'pending', assentAt: null };
   return { assentStatus: 'assented', assentAt: due };
+}
+/** #1134: real seconds until Royal Assent for a bill that is still pending. At passedAt + 48h the wait is 0; the settle tick records assent.
+ *  Null for assented, withheld, or a clock that is not a safe integer. Not stored. */
+export function secondsUntilAssent(passedAt: number, status: AssentStatus, now: number): number | null {
+  if (status !== 'pending' || !Number.isSafeInteger(passedAt) || passedAt < 0 || !Number.isSafeInteger(now) || now < 0) return null;
+  const due = passedAt + ASSENT_SECONDS;
+  if (!Number.isSafeInteger(due)) return null;
+  return now >= due ? 0 : due - now;
+}
+/** Same bill when there is no countdown, so a flag-off read keeps today's keys. */
+export function withAssentCountdown(bill: HoarvaleBill, now: number): HoarvaleBill {
+  const seconds = secondsUntilAssent(bill.passedAt, bill.assentStatus, now);
+  return seconds === null ? bill : { ...bill, secondsUntilAssent: seconds };
 }
 export const hoarvaleBills = (now: number): HoarvaleBill[] => HOARVALE_BILLS.map(bill => ({ id: bill.id, title: bill.title, passedAt: bill.passedAt, ...billAssent(bill.passedAt, bill.dissolvedAt, now) }));
 
