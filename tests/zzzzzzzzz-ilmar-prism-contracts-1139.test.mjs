@@ -1,5 +1,5 @@
 /** #1139: Ilmar Prism contracts on the government read (title and a whole-number profit share).
- *  Flag HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no contracts key. #1147 follows it; #1160 is last.
+ *  Flag HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no contracts key. #1147 follows it; #1170 is last.
  *  The zzzzzzzzz- name sorts after zzzzzzzz- so Node's --test-shard round-robin does not move earlier files. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -84,9 +84,9 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars.HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED, 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED, 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-8), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED', '#1147, #1159, #1150, #1160, #1164, #1165, and #1169 follow this flag');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-8), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED', '#1147, #1159, #1150, #1160, #1164, #1165, #1169, and #1170 follow this flag');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED'), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED'), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED: 'false' }, 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED'), false, 'a direct string wins');

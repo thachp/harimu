@@ -106,7 +106,7 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), F, '#1178 is last');
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), F);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 51);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 52);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);

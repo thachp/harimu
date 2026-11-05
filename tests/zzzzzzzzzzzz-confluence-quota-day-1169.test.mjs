@@ -78,9 +78,10 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key, 'after #1165 Canal Festival; #1178 Grand Regatta is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), 'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key, '#1170/#1178 follow this flag');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), 'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), 'HARIMU_KORUND_PEOPLES_CONGRESS_ENABLED');
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cityInstitutions, cityPlaceIds, cityPlaceLabel } from './city-places.ts';
 
 export type CityLocation = 'square' | 'home' | 'workplace' | 'market' | 'government';
 export type WorldBuilding = { location: CityLocation; label: string; position: THREE.Vector3; object: THREE.Object3D };
@@ -8,16 +9,16 @@ type Palette = { wall: number; roof: number; trim: number; stone: number };
 type CapitalProfile = { capital: string; institution: string; palette: Palette; angle: number; spacing: number; riverX: number; landmark: 'fountain' | 'spire' | 'forum' | 'beacon' };
 // Visual interpretations of the fictional capitals, not authoritative city maps.
 export const capitalProfiles: Record<string, CapitalProfile> = {
-  kindle: { capital: 'Forgehaven', institution: 'Assembly hall', palette: { wall: 0xa76643, roof: 0x343e43, trim: 0xcda65b, stone: 0x555c5d }, angle: 0, spacing: 1, riverX: 8, landmark: 'fountain' },
-  confluence: { capital: 'Meetwater', institution: 'Party congress', palette: { wall: 0x9abcc4, roof: 0x315e78, trim: 0x579ab5, stone: 0x6b8389 }, angle: .1, spacing: .94, riverX: -8, landmark: 'forum' },
-  meridian: { capital: 'Steamgate', institution: 'Party-state offices', palette: { wall: 0xad969f, roof: 0x574659, trim: 0xb88cac, stone: 0x716975 }, angle: -.12, spacing: .92, riverX: 8, landmark: 'beacon' },
-  korund: { capital: 'Stonehearth', institution: 'Planning bureau', palette: { wall: 0x929890, roof: 0x465454, trim: 0xaabbb3, stone: 0x687774 }, angle: 0, spacing: .88, riverX: -8, landmark: 'spire' },
-  aurelle: { capital: 'Highspire', institution: 'Royal court', palette: { wall: 0xe8e2ca, roof: 0x7eaaa8, trim: 0xd0ad54, stone: 0xc9c9b9 }, angle: .18, spacing: .9, riverX: 8, landmark: 'spire' },
-  ilmar: { capital: 'Mirrorhall', institution: 'Canon hall', palette: { wall: 0xe4d9b5, roof: 0x8b7840, trim: 0xe0bb59, stone: 0xa69f82 }, angle: -.18, spacing: .86, riverX: -8, landmark: 'beacon' },
-  hoarvale: { capital: 'Rimehall', institution: 'Moot hall', palette: { wall: 0xb4c8c9, roof: 0x42747e, trim: 0x8ac1c6, stone: 0x71888d }, angle: .08, spacing: 1.04, riverX: 8, landmark: 'fountain' },
-  varkand: { capital: 'Watchfast', institution: 'Command directorate', palette: { wall: 0x7e8a78, roof: 0x364a43, trim: 0xa6a078, stone: 0x535f59 }, angle: -.08, spacing: 1.02, riverX: -8, landmark: 'spire' },
-  veldwood: { capital: 'Ringhall', institution: 'Grove council', palette: { wall: 0xb1a981, roof: 0x426b42, trim: 0x96b66d, stone: 0x7e8d70 }, angle: .22, spacing: .84, riverX: 8, landmark: 'forum' },
-  fulmara: { capital: 'Arcport', institution: 'Grand Council', palette: { wall: 0xc5b4d1, roof: 0x574075, trim: 0xb598d3, stone: 0x8a8098 }, angle: -.22, spacing: .98, riverX: -8, landmark: 'beacon' },
+  kindle: { capital: 'Forgehaven', institution: cityInstitutions.kindle, palette: { wall: 0xa76643, roof: 0x343e43, trim: 0xcda65b, stone: 0x555c5d }, angle: 0, spacing: 1, riverX: 8, landmark: 'fountain' },
+  confluence: { capital: 'Meetwater', institution: cityInstitutions.confluence, palette: { wall: 0x9abcc4, roof: 0x315e78, trim: 0x579ab5, stone: 0x6b8389 }, angle: .1, spacing: .94, riverX: -8, landmark: 'forum' },
+  meridian: { capital: 'Steamgate', institution: cityInstitutions.meridian, palette: { wall: 0xad969f, roof: 0x574659, trim: 0xb88cac, stone: 0x716975 }, angle: -.12, spacing: .92, riverX: 8, landmark: 'beacon' },
+  korund: { capital: 'Stonehearth', institution: cityInstitutions.korund, palette: { wall: 0x929890, roof: 0x465454, trim: 0xaabbb3, stone: 0x687774 }, angle: 0, spacing: .88, riverX: -8, landmark: 'spire' },
+  aurelle: { capital: 'Highspire', institution: cityInstitutions.aurelle, palette: { wall: 0xe8e2ca, roof: 0x7eaaa8, trim: 0xd0ad54, stone: 0xc9c9b9 }, angle: .18, spacing: .9, riverX: 8, landmark: 'spire' },
+  ilmar: { capital: 'Mirrorhall', institution: cityInstitutions.ilmar, palette: { wall: 0xe4d9b5, roof: 0x8b7840, trim: 0xe0bb59, stone: 0xa69f82 }, angle: -.18, spacing: .86, riverX: -8, landmark: 'beacon' },
+  hoarvale: { capital: 'Rimehall', institution: cityInstitutions.hoarvale, palette: { wall: 0xb4c8c9, roof: 0x42747e, trim: 0x8ac1c6, stone: 0x71888d }, angle: .08, spacing: 1.04, riverX: 8, landmark: 'fountain' },
+  varkand: { capital: 'Watchfast', institution: cityInstitutions.varkand, palette: { wall: 0x7e8a78, roof: 0x364a43, trim: 0xa6a078, stone: 0x535f59 }, angle: -.08, spacing: 1.02, riverX: -8, landmark: 'spire' },
+  veldwood: { capital: 'Ringhall', institution: cityInstitutions.veldwood, palette: { wall: 0xb1a981, roof: 0x426b42, trim: 0x96b66d, stone: 0x7e8d70 }, angle: .22, spacing: .84, riverX: 8, landmark: 'forum' },
+  fulmara: { capital: 'Arcport', institution: cityInstitutions.fulmara, palette: { wall: 0xc5b4d1, roof: 0x574075, trim: 0xb598d3, stone: 0x8a8098 }, angle: -.22, spacing: .98, riverX: -8, landmark: 'beacon' },
 };
 const materials = new Map<number, THREE.MeshStandardMaterial>();
 function material(color: number) {
@@ -86,7 +87,7 @@ export function createCityWorld(nationId: string, cityName?: string, options: { 
     building.traverse(child => { child.userData = metadata; }); group.add(building); selectables.push(building);
     buildings.push({ location, label, position: new THREE.Vector3(px, 0, pz), object: building });
   };
-  addBuilding('square', `${displayedCity} square`, 0, 0, g => {
+  addBuilding('square', cityPlaceLabel('square', displayedCity, key), 0, 0, g => {
     cylinder(g, 0, 0.11, 0, 0.8, 0.9, 0.22, p.stone);
     cylinder(g, 0, 0.35, 0, 0.65, 0.7, 0.22, p.trim);
     cylinder(g, 0, 0.46, 0, 0.54, 0.54, 0.08, 0x588f96);
@@ -97,14 +98,14 @@ export function createCityWorld(nationId: string, cityName?: string, options: { 
     for (const x of [-1.4, 1.4]) { box(g, x, 0.26, 0, 0.24, 0.13, 0.8, 0x765540); box(g, x, 0.12, -0.27, 0.13, 0.25, 0.13, p.stone); box(g, x, 0.12, 0.27, 0.13, 0.25, 0.13, p.stone); }
     box(g, -1.4, 0.85, -1.2, 0.08, 1.7, 0.08, p.trim); box(g, -1.4, 1.2, -1.2, 0.9, 0.55, 0.12, 0x66513b);
   });
-  addBuilding('home', 'Your household', -4.4, 3.7, g => {
+  addBuilding('home', cityPlaceLabel('home', displayedCity, key), -4.4, 3.7, g => {
     facade(g, p, 2.3, 1.5, 1.8); roof(g, 2.65, 2.1, 0.85, 1.62, p.roof);
     box(g, 0.65, 2.1, -0.4, 0.32, 0.9, 0.35, p.stone);
     box(g, -0.8, 0.24, 1.15, 0.7, 0.3, 0.35, 0x6d8354);
     box(g, 1.55, 0.16, 0.4, 0.2, 0.4, 2.6, 0x9b7950);
     tree(g, -1.75, -0.6, 0.8);
   });
-  addBuilding('workplace', key === 'korund' ? 'Assignment board' : `${displayedCity} work yard`, -4.5, -4, g => {
+  addBuilding('workplace', cityPlaceLabel('workplace', displayedCity, key), -4.5, -4, g => {
     facade(g, p, 3.1, 1.8, 2.1); roof(g, 3.4, 2.4, 0.7, 1.92, p.roof);
     box(g, -0.9, 2.35, -0.65, 0.5, 1.8, 0.5, p.stone); box(g, -0.9, 3.28, -0.65, 0.65, 0.15, 0.65, p.trim);
     for (let i = 0; i < 3; i++) box(g, 2, 0.25 + i * 0.3, -0.5, 0.9 - i * 0.15, 0.3, 0.8, 0x906c46);
@@ -112,7 +113,7 @@ export function createCityWorld(nationId: string, cityName?: string, options: { 
     box(g, -0.4, 0.3, 1.5, 1.9, 0.16, 0.5, 0x654b36);
   });
   // #344: with the market flag off the Kindle-style market building is not drawn (callers pass marketVisible(nation, flag) from lib/market-visibility.ts, which keeps Korund's State ration store and Aurelle's royal store).
-  if (options.marketOpen !== false) addBuilding('market', key === 'korund' ? 'State ration store' : `${displayedCity} market`, 4, 3.8, g => {
+  if (options.marketOpen !== false) addBuilding('market', cityPlaceLabel('market', displayedCity, key), 4, 3.8, g => {
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 1.25;
       box(g, x, 0.52, 0, 1.05, 0.65, 0.75, 0x806346);
@@ -122,7 +123,7 @@ export function createCityWorld(nationId: string, cityName?: string, options: { 
     }
     box(g, 0, 0.08, 0, 4.1, 0.1, 2.1, p.stone);
   });
-  addBuilding('government', profile.institution, 3.7, -4.2, g => {
+  addBuilding('government', cityPlaceLabel('government', displayedCity, key), 3.7, -4.2, g => {
     const aurelle = key === 'aurelle', korund = key === 'korund';
     facade(g, p, 3.3, korund ? 2.5 : 2.1, 2.7);
     box(g, 0, 0.18, 1.65, 3.8, 0.3, 0.65, p.stone); box(g, 0, 0.08, 2, 4.1, 0.16, 0.45, p.stone);
@@ -145,6 +146,7 @@ export function createCityWorld(nationId: string, cityName?: string, options: { 
   for (let i = -2; i <= 2; i++) { box(group, profile.riverX - 2 + i * 0.5, 0.36, 1.1, 0.12, 0.7, 0.12, p.trim); }
   for (const [x, z] of [[-9, -8], [-8, -5], [-9, 0], [-9, 7], [5, 8], [6, -8], [6, -6], [-3, 5], [2, 7], [-6, 0]]) tree(group, x, z, 0.8 + (Math.abs(x) % 3) * 0.16);
   for (const [x, z] of [[-1.3, -3], [1.3, 3], [-3, 1.3], [3, -1.3]]) { cylinder(group, x, 0.8, z, 0.035, 0.05, 1.6, p.stone, 5); cylinder(group, x, 1.65, z, 0.16, 0.16, 0.25, p.trim, 6); }
+  buildings.sort((a, b) => cityPlaceIds.indexOf(a.location) - cityPlaceIds.indexOf(b.location));
   return { group, selectables, buildings, bounds: 14 };
 }
 
