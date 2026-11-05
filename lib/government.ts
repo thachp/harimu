@@ -16,8 +16,11 @@ import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCounc
 import { FULMARA_EXCHANGE_BELL_CYCLE_DAYS, fulmaraNextExchangeBellAt } from './fulmara-exchange-bell.ts';
 import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
+import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
+import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 import { KINDLE_MARKET_BELL_CYCLE_DAYS, kindleNextMarketBellAt } from './kindle-market-bell.ts';
 
@@ -38,6 +41,8 @@ export type GovernmentSnapshot = {
   federalCouncil?: { nextElectionAt: number; termDays: 120; speakerSeat: number; speakerRotationDays: 30 };
   /** #1122 Veldwood: next Vote Day on a 15-real-day cycle. Present only while HARIMU_VELDWOOD_VOTE_DAY_ENABLED is on. */
   voteDayCalendar?: { nextAt: number; cycleDays: 15 };
+  /** #1159 Veldwood: next Dividend Day (once per game year = 30 real days). Present only while HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED is on. Pays no dividend and states no amount. */
+  dividendDay?: { nextAt: number; cycleDays: 30 };
   /** #1102 Fulmara: Council of Ten, Lodestar and the Tribune session. Present only while HARIMU_FULMARA_COUNCIL_ENABLED is on. */
   grandCouncil?: {
     councilOfTenNextElectionAt: number; councilOfTenTermDays: 30;
@@ -80,6 +85,9 @@ export type GovernmentSnapshot = {
   moot?: HoarvaleMoot;
   /** #1136 Hoarvale: next Honors List Day (once per game year = 30 real days). Present only while HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED is on. Awards no titles. */
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
+  /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
+  auroraNight?: { nextAt: number; cycleDays: 30 };
+  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1164 Kindle: next Market Bell on a 30-real-day cycle. Present only while HARIMU_KINDLE_MARKET_BELL_ENABLED is on. Holds no market event, price move, or bonus. */
   marketBell?: { nextAt: number; cycleDays: 30 };
@@ -166,6 +174,20 @@ export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: n
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
   return { ...snapshot, honorsListDay: {
     nextAt: hoarvaleNextHonorsListDayAt(nowMs), intervalDays: HOARVALE_HONORS_LIST_INTERVAL_DAYS as 30, awardsTitles: false,
+  } };
+}
+
+/** #1160. Flag off, or any nation but Hoarvale: the same snapshot, and no auroraNight key. Holds no festival and adds no rest bonus. */
+export function withHoarvaleAuroraNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, auroraNight: { nextAt: hoarvaleNextAuroraNightAt(nowMs), cycleDays: HOARVALE_AURORA_NIGHT_CYCLE_DAYS } };
+}
+
+/** #1151. Flag off, or any nation but Varkand: the same snapshot, and no musterDay key. Musters no troops, changes no Alert Level. */
+export function withVarkandMusterDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  return { ...snapshot, musterDay: {
+    nextAt: varkandNextMusterDayAt(nowMs), intervalDays: VARKAND_MUSTER_DAY_INTERVAL_DAYS as 30, mustersTroops: false,
   } };
 }
 
@@ -292,6 +314,12 @@ export function withAurelleHearthNight(snapshot: GovernmentSnapshot, nowMs: numb
 export function withVeldwoodVoteDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'veldwood') return snapshot;
   return { ...snapshot, voteDayCalendar: { nextAt: veldwoodNextVoteDayAt(nowMs), cycleDays: VELDWOOD_VOTE_DAY_CYCLE_DAYS } };
+}
+
+/** #1159. Flag off, or any nation but Veldwood: the same snapshot, and no dividendDay key. Pays no dividend and states no amount. */
+export function withVeldwoodDividendDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'veldwood') return snapshot;
+  return { ...snapshot, dividendDay: { nextAt: veldwoodNextDividendDayAt(nowMs), cycleDays: VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS as 30 } };
 }
 
 /** #1102. Flag off, or any nation but Fulmara: the same snapshot, and no grandCouncil key. */
@@ -535,6 +563,21 @@ export function ilmarFeastOfFirstLightSnapshot(nowMs: number, enabled: boolean):
     },
     availableBudgetMinor: 0,
     influenceSummary: 'This read names the next Feast of First Light. It chooses no Oracle and lists no clergy.',
+  }, nowMs, true);
+}
+
+/** Veldwood read while only the Dividend Day flag is on. No federalCouncil or voteDayCalendar key. Flag off returns null, which is today's read. */
+export function veldwoodDividendDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVeldwoodDividendDay({
+    nationId: 'veldwood', mode: 'rule-bound simulation',
+    roles: [{ name: 'Dividend Day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Dividend Day', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Dividend Day is the yearly Citizen Dividend date, once per game year. This read names the next Dividend Day. It pays no dividend and states no amount.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The Common Fund pays a yearly Citizen Dividend. This read names the date only.',
   }, nowMs, true);
 }
 
