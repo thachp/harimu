@@ -3,6 +3,7 @@
  *  The Citizen Dividend is yearly (§7.9, §12.3). [ASSUMPTION] that year is the 30-real-day game year (§12.4),
  *  and Dividend Day is the next year boundary on the world clock. No new table: the instant is derived from the epoch.
  *  Clock helpers are #969. Layout bundles that omit the define have no `process`. A missing flag is off. */
+import { countdownDualTimeEnabled, dualTimeCountdown } from './game-time.ts';
 import { gameDayAt, minuteBucketMs, minuteCountdown } from './topbar-countdown.ts';
 
 export const dividendYearSeconds = 30 * 86400;
@@ -43,7 +44,7 @@ export function spokenRemaining(remainingMs: number): string | null {
   return 'under 1 minute';
 }
 
-export type VeldwoodDividendLine = { text: string; real: string; game: string; gameDay: string; bucket: string };
+export type VeldwoodDividendLine = { text: string; real: string; game: string; gameDay: string; bucket: string; calendar: string };
 
 /** Null keeps today's chip: flag off, not Veldwood, no instant, or a clock this line cannot say. */
 export function veldwoodWalletDividend(nationId: string | undefined, dividendDayAt: number | null | undefined, nowMs: number | null | undefined, epochSeconds?: number, enabled = veldwoodWalletDividendEnabled()): VeldwoodDividendLine | null {
@@ -54,18 +55,20 @@ export function veldwoodWalletDividend(nationId: string | undefined, dividendDay
   const real = spokenRemaining(bucketMs), game = spokenRemaining(bucketMs * 12), gameCompact = minuteCountdown(bucketMs * 12);
   if (!real || !game || !gameCompact) return null;
   const gameDay = typeof epochSeconds === 'number' && Number.isFinite(epochSeconds) ? ` Game day ${gameDayAt(epochSeconds, at)}.` : '';
-  return { text: `Dividend Day in ${real} · ${gameCompact} game`, real, game, gameDay, bucket: `${real}|${game}|${gameDay}` };
+  const calendar = countdownDualTimeEnabled() && typeof epochSeconds === 'number' ? dualTimeCountdown(at * 1000, nowMs, epochSeconds * 1000)?.game ?? '' : '';
+  const dated = calendar.startsWith('Year ') ? calendar : '';
+  return { text: dated ? `Dividend Day in ${real} · ${gameCompact} game · ${dated}` : `Dividend Day in ${real} · ${gameCompact} game`, real, game, gameDay, calendar: dated, bucket: dated ? `${real}|${game}|${gameDay}|${dated}` : `${real}|${game}|${gameDay}` };
 }
 
 const walletTail = 'Amounts update after completed transactions; loading means the citizen snapshot has not arrived.';
 export function veldwoodWalletHelp(currencyCode: string, line: VeldwoodDividendLine | null): string {
   if (!line) return `Your ${currencyCode} wallet holds national money. ${walletTail}`;
-  return `Your ${currencyCode} wallet holds national money. ${EXPLAINS} ${line.real} real time; ${line.game} game time.${line.gameDay} ${walletTail}`;
+  return `Your ${currencyCode} wallet holds national money. ${EXPLAINS} ${line.real} real time; ${line.game} game time.${line.gameDay}${line.calendar ? ` ${line.calendar}.` : ''} ${walletTail}`;
 }
 
 /** Replaces the chip's accessible name only while the countdown is showing. "Wallet" stays in the name. The time is the minute bucket. */
 export function veldwoodWalletName(walletMinor: number | undefined, currencyCode: string, line: VeldwoodDividendLine | null): string | undefined {
   if (!line) return undefined;
   const amount = walletMinor === undefined ? 'loading' : `${(walletMinor / 100).toFixed(2)} ${currencyCode === 'LN' ? 'Labor Notes' : currencyCode === 'CRN' ? 'Crowns' : currencyCode}`;
-  return `Wallet, ${amount}. Dividend Day in ${line.real}. ${line.real} real time; ${line.game} game time.${line.gameDay} ${EXPLAINS}`;
+  return `Wallet, ${amount}. Dividend Day in ${line.real}. ${line.real} real time; ${line.game} game time.${line.gameDay}${line.calendar ? ` ${line.calendar}.` : ''} ${EXPLAINS}`;
 }

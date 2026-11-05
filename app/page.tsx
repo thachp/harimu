@@ -1738,7 +1738,7 @@ export default function Home() {
       {viewMode === 'household' && <>
         <HouseholdSummary nation={citizenNation} walletMinor={householdWalletMinor(citizenNation.id, economy?.walletMinor, aurellePlan?.walletMinor, korundPlan?.walletMinor)} {...householdStock(citizenNation.id, economy?.inventory, aurellePlan?.foodQuantity, korundPlan?.foodQuantity)} residence={(currentCityAccount?.homeCityId ? cityForNation(citizenNation.id, currentCityAccount.homeCityId) : capitalCityForNation(citizenNation.id))?.name} />
         <FaithPanel api={faithApi} />
-        {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />}
+        {economy?.nextRecoveryAt && capacity < 24 && <GameTimer endsAt={economy.nextRecoveryAt} epochMs={simulation?.clock ? simulation.clock.epochSeconds * 1000 : undefined} label="Capacity recovery" />}
         {!['korund','aurelle'].includes(citizenNation.id) && <>
         <section className="scene-belongings"><h2>Belongings and recovery</h2><p>{capacity} / 24 WC · {((economy?.walletMinor ?? 0) / 100).toFixed(2)} SPK</p>
           <ul>{economy?.inventory.map((entry) => <li key={entry.item}>{entry.item}: {entry.quantity} available</li>)}</ul>
@@ -1775,7 +1775,7 @@ export default function Home() {
       </>}
       {viewMode === 'workplace' && !['korund','aurelle'].includes(citizenNation.id) && <>
         <WorkSummary capacity={capacity} contributions={availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).length} onMarket={marketShown ? () => changeView('market') : undefined} />
-        <WorkShiftBoard onNavigate={changeView} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} shiftDay={shiftDay} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
+        <WorkShiftBoard onNavigate={changeView} epochMs={simulation?.clock ? simulation.clock.epochSeconds * 1000 : undefined} shifts={workShifts.filter(shift => !shift.currency || shift.currency === 'SPK')} shiftDay={shiftDay} pending={workPending} error={workError} localDemo={!clerkConfigured} economy={economy}
           onRefresh={() => void runWork('refresh-work')} onClaim={(id) => void runWork('claim-work', undefined, id)} />
         <section className="scene-work-orders"><h2>Available contributions</h2>
           {availableWorkOrders.filter((order) => !order.nationId || order.nationId === citizenNation.id).map((order) => <ActionButton key={order.id} type="button"

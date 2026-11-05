@@ -21,8 +21,15 @@ export function ShiftsToday({ day }: { day?: { started: number; cap: number; res
   return <p>Shifts today: {day.started} of {day.cap}. Resets after the daily tick ({day.resetsAt}).</p>;
 }
 
-export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onRefresh, onClaim, onNavigate, shiftDay }: {
+/** #1104. Inlined so the work-board harness, which only stubs known imports, still renders. */
+function dualTimeOn(): boolean {
+  try { return process.env.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME === 'true'; }
+  catch { return false; }
+}
+
+export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onRefresh, onClaim, onNavigate, shiftDay, epochMs }: {
   onNavigate?: (view: SceneView) => void;
+  epochMs?: number;
   shifts: WorkShift[];
   economy: Economy | null;
   onRefresh: () => void;
@@ -53,7 +60,7 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
       {economy && <div aria-label="Citizen wallet and inventory">
         <p><strong>Wallet: {(economy.walletMinor / 100).toFixed(2)} SPK</strong></p>
         <p>{economy.inventory.length ? economy.inventory.map((item) => `${item.quantity} ${item.item}`).join(' · ') : 'Inventory empty · finish work to earn goods'}</p>
-        <GameTimer endsAt={economy.nextRecoveryAt} label="Capacity recovery" />
+        <GameTimer endsAt={economy.nextRecoveryAt} epochMs={epochMs} label="Capacity recovery" />
       </div>}
       <button type="button" disabled={pending} aria-describedby={pending ? "work-pending-reason" : undefined} onClick={onRefresh}>Refresh citizen account</button>
       {pending && <small id="work-pending-reason">An action is being saved. Please wait.</small>}
@@ -66,8 +73,8 @@ export function WorkShiftBoard({ shifts, pending, error, localDemo, economy, onR
           {active.wageMinor !== undefined && <p>On completion: {describeKindlePay(active.wageMinor, economy?.incomeTaxPercent ?? 0)} + {active.rewardQuantity} {active.rewardItem}{qualityText(active)}</p>}
           {active.qualityPending && <p>Quality step recorded · your grade and reward are revealed when the shift completes.</p>}
           <p>Public contribution target: {active.output} · {active.capacitySpent} WC committed</p>
-          <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>
-          <GameTimer endsAt={active.completesAt} label="Shift ends in" readyLabel="Shift ready" />
+          {!(dualTimeOn() && remaining > 0) && <p>{remaining > 0 ? `Underway · ${Math.ceil(remaining / 60000)} min remaining` : 'Shift complete · ready to record'}</p>}
+          <GameTimer endsAt={active.completesAt} epochMs={epochMs} label="Shift ends in" readyLabel="Shift ready" />
           <button {...disabledReasonProps(claimReason, "work-claim-reason")} onClick={() => { if (!claimReason) onClaim(active.id); }} type="button">
             {pending ? 'Recording…' : 'Collect wages and goods'}
           </button>

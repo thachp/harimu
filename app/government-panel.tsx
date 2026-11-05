@@ -17,6 +17,26 @@ import type { SimulationState } from '@/lib/world-simulation';
 import type { VerificationState } from '@/lib/verification';
 import type { GovernmentSnapshot, PetitionTopic } from '@/lib/government';
 
+/** #1104. Same read as lib/game-time countdownDualTimeFlag. Inlined so panel harnesses that stub unknown imports still render. */
+function countdownDualTimeOn(): boolean {
+  try { return process.env.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME === 'true'; }
+  catch { return false; }
+}
+
+/** Term and deadline instants already on the government read. No new clock. Index keys. */
+function GovernmentDeadlines({ snapshot, epochMs }: { snapshot: GovernmentSnapshot; epochMs?: number }) {
+  const rows: { label: string; at: number }[] = [];
+  if (snapshot.federalCouncil) rows.push({ label: 'Council election', at: snapshot.federalCouncil.nextElectionAt });
+  if (snapshot.directorate) rows.push({ label: 'Rotation Day', at: snapshot.directorate.nextRotationAt });
+  if (snapshot.mandatePlebiscite) rows.push({ label: 'Mandate Plebiscite', at: snapshot.mandatePlebiscite.nextAt });
+  if (snapshot.sanctum) {
+    rows.push({ label: 'Next Stillday', at: snapshot.sanctum.nextStilldayAt });
+    rows.push({ label: 'Great Pilgrimage', at: snapshot.sanctum.nextGreatPilgrimageAt });
+  }
+  if (!rows.length) return null;
+  return <ul aria-label="Government deadlines">{rows.map((row, index) => <li key={index}><GameTimer endsAt={row.at} epochMs={epochMs} label={row.label} /></li>)}</ul>;
+}
+
 // #619: only Kindle has a food programme that executes allocations (the Kindle-only block in the simulation section below), so only Kindle's page may mention Kindle allocations or proposals.
 // [ASSUMPTION] wording for Content: the non-Kindle sentences are neutral rewrites of the old "other prototype nations have no automatic policy-appropriation fund" line. Kept in this file because component tests load it under plain Node.
 const civicNationNames: Readonly<Record<string, string>> = { korund: 'Korund', aurelle: 'Aurelle' };
@@ -78,7 +98,8 @@ export function GovernmentPanel({ simulation, verification, snapshot, localDemo,
     <p>One priority request per UTC day. A request is a political act and ends your citizenship grace period.</p>
     <p>{civicBudgetNote(snapshot.nationId)}</p>
     {!localDemo && snapshot.review && <p>Last recorded review: {formatTime(snapshot.review.reviewedAt*1000)} · {snapshot.review.petitionCount} priority requests. {snapshot.review.active ? `Priority active until ${formatTime(snapshot.review.expiresAt*1000)}.` : 'Priority expired; the current proposal uses live needs.'} Review inputs and reasons are saved permanently; live proposal funds are recalculated. No model is called.</p>}
-    {!localDemo && snapshot.review?.active && <GameTimer endsAt={snapshot.review.expiresAt * 1000} label="Policy priority expires" />}
+    {!localDemo && snapshot.review?.active && <GameTimer endsAt={snapshot.review.expiresAt * 1000} epochMs={simulation?.clock ? simulation.clock.epochSeconds * 1000 : undefined} label="Policy priority expires" />}
+    {countdownDualTimeOn() && <GovernmentDeadlines snapshot={snapshot} epochMs={simulation?.clock ? simulation.clock.epochSeconds * 1000 : undefined} />}
     {!localDemo && <section aria-label="Your priority request history">
       <h4>Your priority requests</h4>
       {!snapshot.petitions?.length && <p>No priority requests recorded for your current nation.</p>}
