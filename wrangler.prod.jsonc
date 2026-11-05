@@ -132,6 +132,10 @@
       "HARIMU_KINDLE_ELECTION_CLOCK_ENABLED": "false",
       // #1133: Meridian next Exam Day (once per game year). Off: no examDay key.
       "HARIMU_MERIDIAN_EXAM_DAY_ENABLED": "false",
+      // #1136: Hoarvale next Honors List Day (once per game year = 30 real days) on the government read. Off: no honorsListDay key.
+      "HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED": "false",
+      // #1130: Fulmara shareholder resolutions (title, status, share totals) on the government read. Off: no resolutions key.
+      "HARIMU_FULMARA_RESOLUTIONS_ENABLED": "false",
       // #1134: a Hoarvale bill that is still pending receives Royal Assent after 48 real hours, on the world tick. Off: no auto-advance, and the government read omits secondsUntilAssent.
       "HARIMU_HOARVALE_AUTO_ASSENT_ENABLED": "false"
     },

@@ -9,8 +9,10 @@ import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilma
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
+import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
+import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
@@ -35,6 +37,8 @@ export type GovernmentSnapshot = {
     lodestarNextElectionAt: number; lodestarTermDays: 90; lodestarConsecutiveReelection: false;
     tribuneSessionEndsAt: number; tribuneVetoesPerSession: 1;
   };
+  /** #1130 Fulmara: non-election shareholder resolutions with share totals. Present only while HARIMU_FULMARA_RESOLUTIONS_ENABLED is on. */
+  resolutions?: FulmaraResolution[];
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
@@ -59,6 +63,8 @@ export type GovernmentSnapshot = {
   influenceSummary: string;
   /** #1096 Hoarvale: Moot term and investiture deadline. Present only while HARIMU_HOARVALE_MOOT_ENABLED is on. */
   moot?: HoarvaleMoot;
+  /** #1136 Hoarvale: next Honors List Day (once per game year = 30 real days). Present only while HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED is on. Awards no titles. */
+  honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
   /** #1089: Hoarvale Moot bills. Present only when the caller passes hoarvaleAssent (the server flag). Assent sits on the bill. */
   bills?: HoarvaleBill[];
   /** #612: the Founding Period state, only present while HARIMU_FOUNDING_PERIOD_ENABLED is on (kindle, korund, aurelle). */
@@ -133,6 +139,14 @@ export function hoarvaleMootAt(now: number): HoarvaleMoot {
 export function withHoarvaleMoot(snapshot: GovernmentSnapshot, now: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
   return { ...snapshot, moot: hoarvaleMootAt(now) };
+}
+
+/** #1136. Flag off, or any nation but Hoarvale: the same snapshot, and no honorsListDay key. Awards no titles. */
+export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, honorsListDay: {
+    nextAt: hoarvaleNextHonorsListDayAt(nowMs), intervalDays: HOARVALE_HONORS_LIST_INTERVAL_DAYS as 30, awardsTitles: false,
+  } };
 }
 
 const institutions = {
@@ -248,6 +262,27 @@ export function withFulmaraCouncil(snapshot: GovernmentSnapshot, nowMs: number, 
     lodestarNextElectionAt: fulmaraNextLodestarElectionAt(nowMs), lodestarTermDays: FULMARA_LODESTAR_TERM_DAYS, lodestarConsecutiveReelection: false,
     tribuneSessionEndsAt: fulmaraTribuneSessionEndsAt(nowMs), tribuneVetoesPerSession: 1,
   } };
+}
+
+/** #1130. Flag off, or any nation but Fulmara: the same snapshot, and no resolutions key. */
+export function withFulmaraResolutions(snapshot: GovernmentSnapshot, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, resolutions: fulmaraResolutions() };
+}
+
+/** Fulmara read while only the resolutions flag is on. No grandCouncil key. Flag off returns null, which is today's read. */
+export function fulmaraResolutionsSnapshot(enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraResolutions({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Grand Council', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Share resolutions', topic: 'work', proposedSpendMinor: 0,
+      reason: 'Non-election shareholder resolutions bind the Council of Ten. This read posts each title, its status, and the share totals. It opens no ballot and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'Human holders vote Charter Shares on charters, share issues, reserve rules, and alliances. Abstentions are counted and do not decide the result. This read does not cast a vote.',
+  }, true);
 }
 
 /** Varkand read while only the plebiscite flag is on. No directorate key. Flag off returns null, which is today's read. */
