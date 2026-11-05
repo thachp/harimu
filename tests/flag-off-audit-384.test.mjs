@@ -161,6 +161,7 @@ const flagOffPins = {
   HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED: 'zzzzzz-confluence-party-1113.test.mjs', // #1113 flag off: no party key
   HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED: 'zzzzz-meridian-party-1114.test.mjs', // #1114 flag off: no partyState key
   HARIMU_MERIDIAN_EXAM_DAY_ENABLED: 'zzzzzzzz-meridian-exam-day-1133.test.mjs', // #1133 flag off: no examDay key
+  HARIMU_MERIDIAN_TURBINE_DAY_ENABLED: 'zzzzzzzzzzzz-meridian-turbine-day-1175.test.mjs', // #1175 flag off: no turbineDay key
   HARIMU_KORUND_PLAN_CALENDAR_ENABLED: 'zzzzz-korund-plan-calendar-1116.test.mjs', // #1116 flag off: no planCalendar key
   HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED: 'zzzzzzzzzz-korund-chairman-birthday-1147.test.mjs', // #1147 flag off: no chairmanBirthday key
   HARIMU_KORUND_PEOPLES_CONGRESS_ENABLED: 'zzzzzzzzzz-korund-peoples-congress-1170.test.mjs', // #1170 flag off: no peoplesCongress key
@@ -173,6 +174,7 @@ const flagOffPins = {
   HARIMU_KINDLE_MARKET_BELL_ENABLED: 'zzzzzzzzzzz-kindle-market-bell-1164.test.mjs', // #1164 flag off: no marketBell key
   HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'zzzzzzzzz-varkand-muster-day-1151.test.mjs', // #1151 flag off: no musterDay key
   HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'zzzzzzzzz-confluence-canal-festival-1165.test.mjs', // #1165 flag off: no canalFestival key
+  HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'zzzzzzzzzzz-fulmara-grand-regatta-1178.test.mjs', // #1178 flag off: no grandRegatta key
   HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'zzzzzzz-hoarvale-honors-1136.test.mjs', // #1136 flag off: no honorsListDay key
   HARIMU_HOARVALE_AURORA_NIGHT_ENABLED: 'zzzzzzzzzz-hoarvale-aurora-night-1160.test.mjs', // #1160 flag off: no auroraNight key
   HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
