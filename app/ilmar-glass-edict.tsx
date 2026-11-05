@@ -16,7 +16,7 @@ export function ilmarGlassEdictsEnabled(value: string | undefined = ilmarGlassEd
 /** Translucent glass around the edict the civic screen already shows. No new copy. */
 export function IlmarGlassEdict({ children }: { children: ReactNode }) {
   const mark = nationMark('ilmar');
-  return <article className="ilmar-glass-edict" aria-label="Ilmar edict" data-nation-pattern={mark?.pattern ?? 'dots'} tabIndex={0}>
+  return <article className="ilmar-glass-edict" aria-label="Ilmar edict" data-nation-pattern={mark?.pattern ?? 'dots'}>
     <header className="ilmar-glass-band">
       <span className="nation-symbol ilmar-glass-mark" data-nation-pattern={mark?.pattern ?? 'dots'} aria-hidden="true">{mark?.symbol}</span>
       <NationCrest id="ilmar" size={32} force labelled />

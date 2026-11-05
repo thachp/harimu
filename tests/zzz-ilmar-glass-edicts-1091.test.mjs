@@ -72,7 +72,7 @@ test('an Ilmar viewer gets the glass edict; other nations keep their civic styli
   assert.match(on, /class="ilmar-glass-edict"/);
   assert.match(on, /data-nation-pattern="dots"/);
   assert.match(on, /⬢/);
-  assert.match(on, /tabindex="0"/);
+  assert.doesNotMatch(on, /tabindex/i);
   assert.match(on, /data-nation-crest="ilmar"/);
   assert.match(on, /Ilmar crest: a prism-eye/);
   assert.match(on, new RegExp(soon));
