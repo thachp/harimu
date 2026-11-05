@@ -24,7 +24,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 23); // #1047 shift soft cap, #1085 Varkand Directorate, #1081 Varkand alert, and #1094 Mandate Plebiscite stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 24); // #1047 shift soft cap, #1085 Varkand Directorate, #1081 Varkand alert, #1094 Mandate Plebiscite, and #1102 Fulmara Council stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 8); // #1053 quartermaster and #1054 peace revert stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
@@ -115,6 +115,15 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(expandFlagPacks(preview.vars).HARIMU_VARKAND_PLEBISCITE_ENABLED, 'true');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_VARKAND_PLEBISCITE_ENABLED, 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_VARKAND_PLEBISCITE_ENABLED: 'false' }, 'HARIMU_VARKAND_PLEBISCITE_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(preview.vars.HARIMU_FULMARA_COUNCIL_ENABLED, undefined, 'the Fulmara Council is not its own binding');
+  assert.equal(prod.vars.HARIMU_FULMARA_COUNCIL_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_COUNCIL_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_COUNCIL_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_FULMARA_COUNCIL_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_FULMARA_COUNCIL_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_FULMARA_COUNCIL_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_FULMARA_COUNCIL_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_FULMARA_COUNCIL_ENABLED: 'false' }, 'HARIMU_FULMARA_COUNCIL_ENABLED'), false, 'a direct string wins over the pack');
   assert.equal(preview.vars.NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, undefined, 'the phone top-down map is not its own binding');
   assert.equal(expandFlagPacks(preview.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'true');
   assert.equal(expandFlagPacks(prod.vars).NEXT_PUBLIC_HARIMU_MOBILE_TOPDOWN_MAP, 'false');

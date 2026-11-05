@@ -1,5 +1,6 @@
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
+import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
 
 export type PetitionTopic = 'food' | 'infrastructure' | 'work';
 export type GovernmentSnapshot = {
@@ -14,6 +15,12 @@ export type GovernmentSnapshot = {
   directorate?: { chair: VarkandCommand; commands: readonly VarkandCommand[]; nextRotationAt: number };
   /** #1094 Varkand: next Mandate Plebiscite on a 150-real-day cycle. Present only while HARIMU_VARKAND_PLEBISCITE_ENABLED is on. */
   mandatePlebiscite?: { nextAt: number; cycleDays: 150 };
+  /** #1102 Fulmara: Council of Ten, Lodestar and the Tribune session. Present only while HARIMU_FULMARA_COUNCIL_ENABLED is on. */
+  grandCouncil?: {
+    councilOfTenNextElectionAt: number; councilOfTenTermDays: 30;
+    lodestarNextElectionAt: number; lodestarTermDays: 90; lodestarConsecutiveReelection: false;
+    tribuneSessionEndsAt: number; tribuneVetoesPerSession: 1;
+  };
   roles: { name: string; controller: string }[];
   decision: { title: string; reason: string; proposedSpendMinor: number; topic: PetitionTopic };
   review?: { periodStart: number; reviewedAt: number; petitionCount: number; active: boolean; expiresAt: number };
@@ -134,6 +141,16 @@ export function withVarkandPlebiscite(snapshot: GovernmentSnapshot, nowMs: numbe
   return { ...snapshot, mandatePlebiscite: { nextAt: varkandNextPlebisciteAt(nowMs), cycleDays: VARKAND_PLEBISCITE_CYCLE_DAYS } };
 }
 
+/** #1102. Flag off, or any nation but Fulmara: the same snapshot, and no grandCouncil key. */
+export function withFulmaraCouncil(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, grandCouncil: {
+    councilOfTenNextElectionAt: fulmaraNextCouncilOfTenElectionAt(nowMs), councilOfTenTermDays: FULMARA_COUNCIL_TERM_DAYS,
+    lodestarNextElectionAt: fulmaraNextLodestarElectionAt(nowMs), lodestarTermDays: FULMARA_LODESTAR_TERM_DAYS, lodestarConsecutiveReelection: false,
+    tribuneSessionEndsAt: fulmaraTribuneSessionEndsAt(nowMs), tribuneVetoesPerSession: 1,
+  } };
+}
+
 /** Varkand read while only the plebiscite flag is on. No directorate key. Flag off returns null, which is today's read. */
 export function varkandPlebisciteSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
   if (!enabled) return null;
@@ -161,6 +178,21 @@ export function varkandGovernmentSnapshot(nowMs: number, enabled: boolean): Gove
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Chair rotates among the five Marshals every 60 real days. Citizens do not elect the Directorate.',
+  }, nowMs, true);
+}
+
+/** Fulmara read while the flag is on. Fulmara has no other government snapshot, so this is the smallest one that carries the Grand Council block. Flag off returns null, which is today's read. */
+export function fulmaraGovernmentSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraCouncil({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Grand Council', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Grand Council', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Grand Council elects the Council of Ten each game year and the Lodestar for 90 real days. This read names those dates and when the Tribune session ends. It opens no ballot and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The Lodestar cannot stand for the next term. The Tribune of the Docks holds one veto per 30-real-day session. This read does not cast it.',
   }, nowMs, true);
 }
 

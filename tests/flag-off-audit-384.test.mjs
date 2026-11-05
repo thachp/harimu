@@ -147,6 +147,7 @@ const flagOffPins = {
   HARIMU_SHIFT_SOFT_CAP_ENABLED: 'shift-soft-cap-1047.test.mjs', // #1047 flag off: no count, no refusal, no extra query
   HARIMU_VARKAND_DIRECTORATE_ENABLED: 'zzz-varkand-directorate-1085.test.mjs', // #1085 flag off: no directorate key
   HARIMU_VARKAND_PLEBISCITE_ENABLED: 'zzzz-varkand-plebiscite-1094.test.mjs', // #1094 flag off: no mandatePlebiscite key
+  HARIMU_FULMARA_COUNCIL_ENABLED: 'zzzzz-fulmara-council-1102.test.mjs', // #1102 flag off: no grandCouncil key
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.
