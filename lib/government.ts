@@ -36,6 +36,7 @@ import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
 import { VARKAND_LANTERN_WATCH_CYCLE_DAYS, varkandNextLanternWatchAt } from './varkand-lantern-watch.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { VARKAND_ROTATION_DAY_CYCLE_DAYS, varkandNextRotationDayAt } from './varkand-rotation-day.ts';
+import { varkandCelebrationsCanceled } from './varkand-red-alert-cancels.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS, fulmaraNextDockStrikeRemembranceAt } from './fulmara-dock-strike-remembrance.ts';
 import { FULMARA_GRAND_REGATTA_HOST_CITY, FULMARA_GRAND_REGATTA_INTERVAL_DAYS, fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
@@ -126,11 +127,11 @@ export type GovernmentSnapshot = {
   /** #1208 Hoarvale: next Opening of the Moot (the next term start). Present only while HARIMU_HOARVALE_MOOT_OPENING_ENABLED is on. The next date only. */
   mootOpening?: { nextAt: number };
   electionNight?: { nextAt: number }; // #1219: next date only, while HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED is on
-  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
+  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false; canceled?: true }; // #1151; #1220 `canceled` only at a stored Red Alert
   /** #1207 Varkand: next Rotation Day (the existing 60-real-day Chair term). Present only while HARIMU_VARKAND_ROTATION_DAY_ENABLED is on. Date only. `canceled` is present only while a stored Red Alert holds. */
   rotationDay?: { nextAt: number; cycleDays: 60; canceled?: true };
-  /** #1211 Varkand: next Lantern Watch (once per 30 real days). Present only while HARIMU_VARKAND_LANTERN_WATCH_ENABLED is on. Date only: no host, Red Alert cancellation, or holiday effect. */
-  lanternWatch?: { nextAt: number; cycleDays: 30 };
+  /** #1211 Varkand: next Lantern Watch (once per 30 real days). Present only while HARIMU_VARKAND_LANTERN_WATCH_ENABLED is on. Date only. #1220 adds `canceled` at a stored Red Alert. */
+  lanternWatch?: { nextAt: number; cycleDays: 30; canceled?: true };
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
@@ -285,6 +286,22 @@ export function withVarkandRotationDay(snapshot: GovernmentSnapshot, nowMs: numb
     nextAt: varkandNextRotationDayAt(nowMs), cycleDays: VARKAND_ROTATION_DAY_CYCLE_DAYS as 60,
     ...(canceled ? { canceled: true as const } : {}),
   } };
+}
+
+/** #1220. Flag off, or the Alert Level is not Red: the same snapshot. Red marks celebration rows already on the read.
+ *  Does not add a row, move a date, or mark the Mandate Plebiscite. */
+export function withVarkandRedAlertCancels(snapshot: GovernmentSnapshot, enabled: boolean, level: string | null | undefined): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand' || !varkandCelebrationsCanceled(level)) return snapshot;
+  const musterNeeds = snapshot.musterDay != null && snapshot.musterDay.canceled !== true;
+  const rotationNeeds = snapshot.rotationDay != null && snapshot.rotationDay.canceled !== true;
+  const lanternNeeds = snapshot.lanternWatch != null && snapshot.lanternWatch.canceled !== true;
+  if (!musterNeeds && !rotationNeeds && !lanternNeeds) return snapshot;
+  return {
+    ...snapshot,
+    ...(musterNeeds && snapshot.musterDay ? { musterDay: { ...snapshot.musterDay, canceled: true as const } } : {}),
+    ...(rotationNeeds && snapshot.rotationDay ? { rotationDay: { ...snapshot.rotationDay, canceled: true as const } } : {}),
+    ...(lanternNeeds && snapshot.lanternWatch ? { lanternWatch: { ...snapshot.lanternWatch, canceled: true as const } } : {}),
+  };
 }
 
 /** Varkand read while only the Rotation Day flag is on. No directorate, plebiscite, or musterDay key. Flag off returns null, which is today's read. */
