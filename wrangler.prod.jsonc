@@ -169,7 +169,9 @@
       // #1178: Fulmara next Grand Regatta (once per game year = 30 real days). Off: no grandRegatta key. Holds no race.
       "HARIMU_FULMARA_GRAND_REGATTA_ENABLED": "false",
       // #1179: Fulmara next Charter Day (once per game year = 30 real days, zero offset). Off: no charterDay key. Date only.
-      "HARIMU_FULMARA_CHARTER_DAY_ENABLED": "false"
+      "HARIMU_FULMARA_CHARTER_DAY_ENABLED": "false",
+      // #1191: Aurelle next Coronation Day (once per game year = 30 real days, zero offset). Off: no coronationDay key. Date only.
+      "HARIMU_AURELLE_CORONATION_DAY_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
