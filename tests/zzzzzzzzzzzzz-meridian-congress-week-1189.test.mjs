@@ -81,10 +81,11 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), F, '#1189 is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 58); // recounted after origin/dev b2d3b3d5 (GRAY 57); #1189 is last
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), F, '#1191 Coronation Day is last');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 59); // recounted after origin/dev 5eeebe48 (GRAY 58); #1191 Coronation Day is last
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
