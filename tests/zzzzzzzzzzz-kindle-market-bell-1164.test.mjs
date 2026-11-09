@@ -1,5 +1,5 @@
 /** #1164: Kindle next Market Bell on a fixed 30-real-day cycle from the Varkand Chair anchor (#1085).
- *  Flag HARIMU_KINDLE_MARKET_BELL_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no marketBell key. #1165, #1169, #1170, and #1175 follow it.
+ *  Flag HARIMU_KINDLE_MARKET_BELL_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no marketBell key. #1165, #1169, #1170, #1175, #1178, and #1179 follow it.
  *  Holds no market event, moves no prices, and adds no bonus. Forgehaven's Exchange hosts it; the read stores the date only.
  *  The zzzzzzzzzzz- name sorts after zzzzzzzzzz-fulmara-exchange-bell-1150 so Node's --test-shard
  *  round-robin does not move earlier files between Postgres shards.
@@ -94,9 +94,9 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-5), key, '#1165, #1169, #1170, and #1175 follow this flag');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-5), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-7), key, '#1165, #1169, #1170, #1175, #1178, and #1179 follow this flag');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-7), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), key);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

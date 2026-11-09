@@ -27,6 +27,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.resolutions?{resolutions:snapshot.resolutions.map(row=>({id:row.id,title:row.title,status:row.status,shares:{for:row.shares.for,against:row.shares.against,abstain:row.shares.abstain}}))}:{}), // #1130: title, status, share totals (readGovernment adds them only while the flag is on)
   ...(snapshot.exchangeBell?{exchangeBell:snapshot.exchangeBell}:{}), // #1150: next Exchange Bell (readGovernment adds it only while the flag is on)
   ...(snapshot.grandRegatta?{grandRegatta:snapshot.grandRegatta}:{}), // #1178: next Grand Regatta (readGovernment adds it only while the flag is on)
+  ...(snapshot.charterDay?{charterDay:snapshot.charterDay}:{}), // #1179: next Charter Day (readGovernment adds it only while the flag is on)
   ...(snapshot.sanctum?{sanctum:snapshot.sanctum}:{}), // #1107: Oracle term, Elders, Stillday, Great Pilgrimage (readGovernment adds it only while the flag is on)
   ...(snapshot.feastOfFirstLight?{feastOfFirstLight:snapshot.feastOfFirstLight}:{}), // #1137: next Feast of First Light (readGovernment adds it only while the flag is on)
   ...(snapshot.contracts?{contracts:snapshot.contracts.map(row=>({title:row.title,sharePercent:row.sharePercent}))}:{}), // #1139: title and whole-number profit share (readGovernment adds them only while the flag is on)

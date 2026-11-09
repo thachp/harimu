@@ -155,6 +155,7 @@ const flagOffPins = {
   HARIMU_FULMARA_COUNCIL_ENABLED: 'zzzzz-fulmara-council-1102.test.mjs', // #1102 flag off: no grandCouncil key
   HARIMU_FULMARA_RESOLUTIONS_ENABLED: 'zzzzzzzz-fulmara-resolutions-1130.test.mjs', // #1130 flag off: no resolutions key
   HARIMU_FULMARA_EXCHANGE_BELL_ENABLED: 'zzzzzzzzzz-fulmara-exchange-bell-1150.test.mjs', // #1150 flag off: no exchangeBell key
+  HARIMU_FULMARA_CHARTER_DAY_ENABLED: 'zzzzzzzzzzzzz-fulmara-charter-day-1179.test.mjs', // #1179 flag off: no charterDay key
   HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'zzzzz-ilmar-sanctum-1107.test.mjs', // #1107 flag off: no sanctum key
   HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED: 'zzzzzzzzz-ilmar-feast-first-light-1137.test.mjs', // #1137 flag off: no feastOfFirstLight key
   HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED: 'zzzzzzzzz-ilmar-prism-contracts-1139.test.mjs', // #1139 flag off: no contracts key
