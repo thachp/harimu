@@ -16,15 +16,18 @@
 .panel-v2 ul.panel-v2-rows{list-style:none;margin:0;padding:0;display:grid}.panel-v2 .panel-v2-rows li{margin:0;padding:0}
 .panel-v2-rows li+li{border-top:1px solid rgba(255,255,255,.08)}
 /* :not(.market-item) lifts these above .game-inspector-body button:not(.market-item), the panel's generic button rule */
-.panel-v2 .panel-v2-rows button:not(.market-item),.panel-v2 button.panel-v2-primary:not(.market-item){display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:10px 4px;text-align:left;background:none;border:0;border-radius:0;color:inherit;cursor:pointer;font-size:calc(13px * var(--text-scale, 1));line-height:1.35}
+.panel-v2 .panel-v2-rows button:not(.market-item),.panel-v2 button.panel-v2-primary:not(.market-item),.panel-v2 button.panel-v2-secondary:not(.market-item){display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;padding:10px 4px;text-align:left;background:none;border:0;border-radius:0;color:inherit;cursor:pointer;font-size:calc(13px * var(--text-scale, 1));line-height:1.35}
 .panel-v2 .panel-v2-rows button:not(.market-item):hover{background:rgba(255,255,255,.05)}
 .panel-v2-rows button>span{display:grid;min-width:0}
 .panel-v2-rows strong,.panel-v2-rows small{overflow-wrap:break-word}
 .panel-v2-rows small{opacity:.7}
 .panel-v2-rows button:focus-visible,.panel-v2-primary:focus-visible{outline:2px solid #d6b45c;outline-offset:2px}
 .panel-v2 button.panel-v2-primary:not(.market-item){padding:10px 14px;border:1px solid #d6b45c;border-radius:6px;background:transparent;color:#f1d58a;font-weight:600}
+/* #392: World atlas Explore is the gold CTA, so Inspect national institutions drops to this quieter button. */
+.panel-v2 button.panel-v2-secondary:not(.market-item){padding:10px 14px;border:1px solid #3b6670;border-radius:6px;background:#1a4650;color:#e1f2ef;font-weight:600}
+.panel-v2-secondary:focus-visible{outline:2px solid #d6b45c;outline-offset:2px}
 /* #392 S6: a long primary label wraps to more lines; it is never truncated */
-.panel-v2 button.panel-v2-primary>span{min-width:0;white-space:normal;overflow-wrap:break-word;text-overflow:clip}
+.panel-v2 button.panel-v2-primary>span,.panel-v2 button.panel-v2-secondary>span{min-width:0;white-space:normal;overflow-wrap:break-word;text-overflow:clip}
 .panel-v2 .panel-v2-rows button[aria-pressed=true]{background:rgba(214,180,92,.12);box-shadow:inset 3px 0 #d6b45c}
 
 /* #392 S9 family cards (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): portrait, name, relation; four across on a desktop panel, wrapping on narrow ones, never scrolls sideways. */
@@ -34,4 +37,4 @@
 .household-v2-family strong{font-size:calc(13px * var(--text-scale, 1));overflow-wrap:normal;word-break:normal}
 .household-v2-family small{font-size:calc(11px * var(--text-scale, 1));color:#b9cfd3}
 /* #392 S7 follow-up: City rows and the Household primary carry the same decorative icon as the City pills (UI_V2_CITY), in the pills' gold. */
-.panel-v2 .panel-v2-icon{display:inline-flex;flex:none;color:#e2c36b}.panel-v2 .panel-v2-rows button>span:nth-child(2){flex:1}.panel-v2 button.panel-v2-primary>span:nth-child(2){flex:1}
+.panel-v2 .panel-v2-icon{display:inline-flex;flex:none;color:#e2c36b}.panel-v2 .panel-v2-rows button>span:nth-child(2){flex:1}.panel-v2 button.panel-v2-primary>span:nth-child(2),.panel-v2 button.panel-v2-secondary>span:nth-child(2){flex:1}

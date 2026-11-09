@@ -26,8 +26,8 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK, previe
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 35);
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 35/);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 36);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 36/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key));
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
   assert.match(await read('lib/world-atlas.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_WORLD_ATLAS/);
@@ -131,7 +131,7 @@ test('styles meet AA and show focus', async () => {
 
 test('the world panel mounts the atlas without deciding the flag; flag off renders nothing', async () => {
   const page = await read('app/page.tsx');
-  assert.match(page, /<WorldAtlas nations=\{worldNations\} nation=\{selected\} clock=\{guestActive \? null : simulation\?\.clock \?\? null\} disputes=\{simulation \? \{ wars: simulation\.wars, embargoes: simulation\.embargoes, warProposals: simulation\.warProposals \} : null\} \/>/);
+  assert.match(page, /<WorldAtlas nations=\{worldNations\} nation=\{selected\} clock=\{guestActive \? null : simulation\?\.clock \?\? null\} disputes=\{simulation \? \{ wars: simulation\.wars, embargoes: simulation\.embargoes, warProposals: simulation\.warProposals \} : null\} onView=\{changeView\} \/>/);
   assert.match(page, /viewMode==='world' \? worldPanel/);
   const { build } = await import('esbuild');
   const out = await build({ entryPoints: [new URL('../app/world-atlas.tsx', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
