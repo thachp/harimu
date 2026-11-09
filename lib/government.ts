@@ -14,7 +14,8 @@ import { MERIDIAN_TURBINE_DAY_CYCLE_DAYS, MERIDIAN_TURBINE_DAY_HOST, meridianNex
 import { MERIDIAN_CONGRESS_WEEK_INTERVAL_DAYS, meridianNextCongressWeekAt } from './meridian-congress-week.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
-import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
+import { ILMAR_GREAT_PILGRIMAGE_CYCLE_DAYS, ilmarNextGreatPilgrimageAt } from './ilmar-great-pilgrimage.ts';
+import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt as ilmarSanctumNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-contracts.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
@@ -72,6 +73,8 @@ export type GovernmentSnapshot = {
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
   feastOfFirstLight?: { nextAt: number; cycleDays: 15 };
+  /** #1196 Ilmar: next Great Pilgrimage on a 30-real-day cycle. Present only while HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED is on. Holds the next date only. */
+  greatPilgrimage?: { nextAt: number; cycleDays: 30 };
   /** #1139 Ilmar: Prism contracts, each with a title and a whole-number profit share. Present only while HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED is on. */
   contracts?: IlmarPrismContract[];
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
@@ -647,7 +650,7 @@ export function withIlmarSanctum(snapshot: GovernmentSnapshot, nowMs: number, en
   if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
   return { ...snapshot, sanctum: {
     oracleTerm: ILMAR_ORACLE_TERM, councilOfEldersSeats: ILMAR_COUNCIL_OF_ELDERS_SEATS,
-    isStillday: ilmarIsStillday(nowMs), nextStilldayAt: ilmarNextStilldayAt(nowMs), nextGreatPilgrimageAt: ilmarNextGreatPilgrimageAt(nowMs),
+    isStillday: ilmarIsStillday(nowMs), nextStilldayAt: ilmarNextStilldayAt(nowMs), nextGreatPilgrimageAt: ilmarSanctumNextGreatPilgrimageAt(nowMs),
   } };
 }
 
@@ -756,6 +759,27 @@ export function ilmarFeastOfFirstLightSnapshot(nowMs: number, enabled: boolean):
     },
     availableBudgetMinor: 0,
     influenceSummary: 'This read names the next Feast of First Light. It chooses no Oracle and lists no clergy.',
+  }, nowMs, true);
+}
+
+/** #1196. Flag off, or any nation but Ilmar: the same snapshot, and no greatPilgrimage key. Holds the next date only. */
+export function withIlmarGreatPilgrimage(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, greatPilgrimage: { nextAt: ilmarNextGreatPilgrimageAt(nowMs), cycleDays: ILMAR_GREAT_PILGRIMAGE_CYCLE_DAYS } };
+}
+
+/** Ilmar read while only the Great Pilgrimage flag is on. No sanctum, feast, or contracts key. Flag off returns null, which is today's read. */
+export function ilmarGreatPilgrimageSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarGreatPilgrimage({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [{ name: 'Great Pilgrimage', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Great Pilgrimage', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Great Pilgrimage falls once per game year, every 30 real days. This read names the next date. It counts no pilgrims, names no route or shrine, quotes no Oracle, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Great Pilgrimage. It counts no pilgrims and names no shrine.',
   }, nowMs, true);
 }
 
