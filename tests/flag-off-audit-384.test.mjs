@@ -186,6 +186,7 @@ const flagOffPins = {
   HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED: 'zzzzzzzzzzzz-fulmara-dock-strike-remembrance-1187.test.mjs', // #1187 flag off: no dockStrikeRemembrance key
   HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'zzzzzzz-hoarvale-honors-1136.test.mjs', // #1136 flag off: no honorsListDay key
   HARIMU_HOARVALE_AURORA_NIGHT_ENABLED: 'zzzzzzzzzz-hoarvale-aurora-night-1160.test.mjs', // #1160 flag off: no auroraNight key
+  HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED: 'zzzzzzzzzzzzzzz-hoarvale-election-night-1219.test.mjs', // #1219 flag off: no electionNight key
   HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
 };
 

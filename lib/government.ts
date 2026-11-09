@@ -29,6 +29,7 @@ import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCou
 import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
+import { hoarvaleNextElectionNightAt } from './hoarvale-election-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
@@ -116,6 +117,7 @@ export type GovernmentSnapshot = {
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
   /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
   auroraNight?: { nextAt: number; cycleDays: 30 };
+  electionNight?: { nextAt: number }; // #1219: next date only, while HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED is on
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
@@ -220,6 +222,20 @@ export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: n
 export function withHoarvaleAuroraNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
   return { ...snapshot, auroraNight: { nextAt: hoarvaleNextAuroraNightAt(nowMs), cycleDays: HOARVALE_AURORA_NIGHT_CYCLE_DAYS } };
+}
+
+/** #1219. Flag off, or any nation but Hoarvale: the same snapshot, and no electionNight key. */
+export function withHoarvaleElectionNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, electionNight: { nextAt: hoarvaleNextElectionNightAt(nowMs) } };
+}
+/** Flag-only Hoarvale read. No moot, honors, or aurora key. Flag off returns null. */
+export function hoarvaleElectionNightSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withHoarvaleElectionNight({ nationId: 'hoarvale', mode: 'rule-bound simulation',
+    roles: [{ name: 'Election Night', controller: 'AI/SI role · deterministic rules' }],
+    decision: { title: 'Election Night', topic: 'infrastructure', proposedSpendMinor: 0, reason: 'This read names the next Election Night.' },
+    availableBudgetMinor: 0, influenceSummary: 'This read names the next Election Night.' }, nowMs, true);
 }
 
 /** #1151. Flag off, or any nation but Varkand: the same snapshot, and no musterDay key. Musters no troops, changes no Alert Level. */
