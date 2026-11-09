@@ -1,3 +1,4 @@
+import { AURELLE_CHARTER_FAIR_CYCLE_DAYS, aurelleNextCharterFairAt } from './aurelle-charter-fair.ts';
 import { AURELLE_CORONATION_DAY_CYCLE_DAYS, aurelleNextCoronationDayAt } from './aurelle-coronation-day.ts';
 import { AURELLE_HEARTH_NIGHT_CYCLE_DAYS, aurelleNextHearthNightAt } from './aurelle-hearth-night.ts';
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
@@ -31,6 +32,7 @@ import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './h
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
+import { VARKAND_ROTATION_DAY_CYCLE_DAYS, varkandNextRotationDayAt } from './varkand-rotation-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS, fulmaraNextDockStrikeRemembranceAt } from './fulmara-dock-strike-remembrance.ts';
 import { FULMARA_GRAND_REGATTA_HOST_CITY, FULMARA_GRAND_REGATTA_INTERVAL_DAYS, fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
@@ -119,6 +121,8 @@ export type GovernmentSnapshot = {
   /** #1208 Hoarvale: next Opening of the Moot (the next term start). Present only while HARIMU_HOARVALE_MOOT_OPENING_ENABLED is on. The next date only. */
   mootOpening?: { nextAt: number };
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
+  /** #1207 Varkand: next Rotation Day (the existing 60-real-day Chair term). Present only while HARIMU_VARKAND_ROTATION_DAY_ENABLED is on. Date only. `canceled` is present only while a stored Red Alert holds. */
+  rotationDay?: { nextAt: number; cycleDays: 60; canceled?: true };
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
@@ -139,6 +143,8 @@ export type GovernmentSnapshot = {
   hearthNight?: { nextAt: number; cycleDays: 30 };
   /** #1191 Aurelle: next Coronation Day (once per game year = 30 real days). Present only while HARIMU_AURELLE_CORONATION_DAY_ENABLED is on. Date only: no rite text, Privy Council roster, or Crown debasement figures. */
   coronationDay?: { nextAt: number; cycleDays: 30 };
+  /** #1197 Aurelle: next Charter Fair (once per game year = 30 real days). Present only while HARIMU_AURELLE_CHARTER_FAIR_ENABLED is on. Date only: no charter list, guild name, or trade right. */
+  charterFair?: { nextAt: number; cycleDays: 30 };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
 
@@ -249,6 +255,30 @@ export function withVarkandMusterDay(snapshot: GovernmentSnapshot, nowMs: number
   return { ...snapshot, musterDay: {
     nextAt: varkandNextMusterDayAt(nowMs), intervalDays: VARKAND_MUSTER_DAY_INTERVAL_DAYS as 30, mustersTroops: false,
   } };
+}
+
+/** #1207. Flag off, or any nation but Varkand: the same snapshot, and no rotationDay key. Date only. */
+export function withVarkandRotationDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean, canceled = false): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  return { ...snapshot, rotationDay: {
+    nextAt: varkandNextRotationDayAt(nowMs), cycleDays: VARKAND_ROTATION_DAY_CYCLE_DAYS as 60,
+    ...(canceled ? { canceled: true as const } : {}),
+  } };
+}
+
+/** Varkand read while only the Rotation Day flag is on. No directorate, plebiscite, or musterDay key. Flag off returns null, which is today's read. */
+export function varkandRotationDaySnapshot(nowMs: number, enabled: boolean, canceled = false): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVarkandRotationDay({
+    nationId: 'varkand', mode: 'rule-bound simulation',
+    roles: [{ name: 'Directorate', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Rotation Day', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Rotation Day is when the Chair passes on. This read names the next date. It names no Chair and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The Chair rotates on the existing term. This read does not name a Chair.',
+  }, nowMs, true, canceled);
 }
 
 /** #1165. Flag off, or any nation but Confluence: the same snapshot, and no canalFestival key. Holds no festival, harvest yield, or bonus. */
@@ -430,6 +460,12 @@ export function withAurelleHearthNight(snapshot: GovernmentSnapshot, nowMs: numb
 export function withAurelleCoronationDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
   return { ...snapshot, coronationDay: { nextAt: aurelleNextCoronationDayAt(nowMs), cycleDays: AURELLE_CORONATION_DAY_CYCLE_DAYS as 30 } };
+}
+
+/** #1197. Flag off, or any nation but Aurelle: the same snapshot, and no charterFair key. Date only. */
+export function withAurelleCharterFair(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
+  return { ...snapshot, charterFair: { nextAt: aurelleNextCharterFairAt(nowMs), cycleDays: AURELLE_CHARTER_FAIR_CYCLE_DAYS } };
 }
 
 /** #1122. Flag off, or any nation but Veldwood: the same snapshot, and no voteDayCalendar key. */

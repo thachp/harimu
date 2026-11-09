@@ -58,6 +58,7 @@ import { firstLoopStep } from '@/lib/first-loop';
 import { starterCopyFor } from '@/lib/starter-copy';
 import { CitizenshipDialog } from './citizenship-dialog';
 import { GameShell } from './game-shell';
+import { citizenHudResources, resourceBarEnabled } from '@/lib/resource-bar';
 import { WalletPanel, type WalletRewards } from './wallet-panel';
 import { ShiftQualityStep } from './shift-quality-step';
 import { qualityWorkOrderId, harvestQuestions, type QualityInput, type QualityQuestion } from '@/lib/shift-quality';
@@ -516,6 +517,8 @@ type CitizenSnapshot = {
   simulation?: SimulationState;
   aurellePlan?: AurellePlanView | null;
   korundPlan?: KorundPlanView | null;
+  /** #490: Confluence Current. Absent when that wage ledger is off or this nation has none. */
+  nationWorkPlan?: { walletMinor: number; currency: { code: string; name: string } } | null;
   confluencePriceBoard?: PriceBoard | null; // #487; absent = flag off or not allowlisted
   demoGovernment?: { period: number; counts: Record<string, number> };
   demoReceipts?: string[];
@@ -615,6 +618,7 @@ export default function Home() {
   const [aurelleCommand, setAurelleCommand] = useState<AurelleCommand | null>(null);
   const aurelleIntent = useRef<AurelleCommand | null>(null);
   const [korundPlan, setKorundPlan] = useState<KorundPlanView | null>(null);
+  const [nationWorkPlan, setNationWorkPlan] = useState<CitizenSnapshot['nationWorkPlan']>(null);
   const [priceBoard, setPriceBoard] = useState<PriceBoard | null | undefined>(undefined); // #487: undefined renders nothing
   const [korundCommand, setKorundCommand] = useState<KorundCommand | null>(null);
   const korundIntent = useRef<KorundCommand | null>(null);
@@ -863,7 +867,7 @@ export default function Home() {
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
     setEconomy(null); setRewardsView(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setCycleStartAt(null); setVerification(null); setWorkShifts([]); setShiftDay(null);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
-    setKorundPlan(null); korundIntent.current = null; setKorundCommand(null);
+    setKorundPlan(null); korundIntent.current = null; setKorundCommand(null); setNationWorkPlan(null);
     setPlanNote(''); setCompletedPlanIds([]); setPlanSaved(false); setHorizon('week'); setCommittedDecision(null);
     setRecentAction(null); setWorkError(null); setGovernmentError(null); setDecisionError(null); setEnrollmentError(null);
     setWorkPending(false); setGovernmentPending(false); setDecisionPending(false); setEnrollmentPending(false);
@@ -960,8 +964,9 @@ export default function Home() {
     workLock.current = true; setWorkPending(true); setWorkError(null);
     try {
       const response = await fetchIdempotent(fetch, '/api/citizen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'nation-claim-work', shiftId }) });
-      const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number };
+      const result = await response.json() as { error?: string; shifts?: WorkShift[]; capacity?: number; nationWorkPlan?: CitizenSnapshot['nationWorkPlan'] };
       if (result.shifts) setWorkShifts(result.shifts);
+      if ('nationWorkPlan' in result) setNationWorkPlan(result.nationWorkPlan ?? null);
       if (typeof result.capacity === 'number') setCapacity(result.capacity);
       if (!response.ok) setWorkError(result.error ?? 'Your shift could not be collected. Try again.');
     } catch { setWorkError('Your shift could not be collected. Try again.'); }
@@ -988,11 +993,12 @@ export default function Home() {
         // Claims and refreshes are idempotent, so a dropped or slow request is retried as-is (#53).
         // Starting a shift has no request id, so it is never retried automatically.
         const response = action === 'commit-work' ? await fetch('/api/citizen', init) : await fetchIdempotent(fetch, '/api/citizen', init);
-        const result = await response.json() as { error?: string; shifts?: WorkShift[]; shiftDay?: { started: number; cap: number; resetsAt: string } | null; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; profile?: CitizenSnapshot['profile'] };
+        const result = await response.json() as { error?: string; shifts?: WorkShift[]; shiftDay?: { started: number; cap: number; resetsAt: string } | null; capacity?: number; economy?: Economy; market?: MarketState; playerMarket?: PlayerMarketState; government?: GovernmentSnapshot | null; simulation?: SimulationState; korundPlan?: KorundPlanView | null; aurellePlan?: AurellePlanView | null; nationWorkPlan?: CitizenSnapshot['nationWorkPlan']; profile?: CitizenSnapshot['profile'] };
       if (epoch !== citizenEpoch.current) return;
         if (result.simulation) setSimulation(result.simulation);
         if ('korundPlan' in result) setKorundPlan(result.korundPlan ?? null);
         if ('aurellePlan' in result) setAurellePlan(result.aurellePlan ?? null);
+        if ('nationWorkPlan' in result) setNationWorkPlan(result.nationWorkPlan ?? null);
         if (result.shifts) { setWorkShifts(result.shifts); setSnapshotRequestedAt(requestedAt); }
         if ('shiftDay' in result) setShiftDay(result.shiftDay ?? null);
         if (result.economy) setEconomy(result.economy);
@@ -1368,6 +1374,7 @@ export default function Home() {
     setKorundPlan(snapshot.korundPlan ?? null);
     setPriceBoard(snapshot.confluencePriceBoard);
     setAurellePlan(snapshot.aurellePlan ?? null);
+    setNationWorkPlan(snapshot.nationWorkPlan ?? null);
     if (snapshot.simulation) setSimulation(snapshot.simulation);
     setVerification(snapshot.verification ?? null);
     setWorkShifts(snapshot.shifts ?? []);
@@ -1829,7 +1836,7 @@ export default function Home() {
 
   const populationFact = selected.populationBand && !(selected.populationBand === 'coming-soon' && openNations?.includes(selected.id)) ? <dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd> : null;
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
-    <WorldAtlas nations={worldNations} nation={selected} clock={guestActive ? null : simulation?.clock ?? null} />
+    <WorldAtlas nations={worldNations} nation={selected} clock={guestActive ? null : simulation?.clock ?? null} disputes={simulation ? { wars: simulation.wars, embargoes: simulation.embargoes, warProposals: simulation.warProposals } : null} />
     {guestAllowed && (firstVisitGuideOpen
       ? tourOpen ? <GlobeTour onFocus={setTourFocusNation} onClose={finishTour} /> : <FirstVisitGuide stage={firstVisitStage} onStageChange={setFirstVisitStage} onShortlist={setShortlistIds} onStartTour={() => setTourOpen(true)} onTryGuest={startGuestDemo} onDismiss={() => { stopTour(); setFirstVisitGuideOpen(false); }} />
       : <button type="button" className="secondary-action" onClick={() => { setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); }}>Restart first-visit guide</button>)}
@@ -1972,7 +1979,7 @@ export default function Home() {
   return <>
     {clerkConfigured && <ClerkCitizenSession retryKey={sessionRetry} onHydrate={hydrateCitizen} onStatus={setCitizenSessionStatus} onIdentity={changeCitizenIdentity} onWelcomeBack={setWelcomeBack} />}
     <GameShell visitorSession={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} openNations={previewOpenNations(openNations, clerkConfigured, citizenSessionStatus)} marketOpen={marketShown} mapOverlays={overlaysFlag} armyMap={armyMapFlag} wcNote={currentCityAccount?.spaWcNote} countdown={guestActive || !citizenNation ? undefined : { nationId: citizenNation.id, cycleStartAt, election, wars: simulation?.wars ?? null }} nextDeadline={guestActive ? undefined : nextDeadline} guestDemo={guestActive} nationFocusRevision={nationFocusRevision} cameraTourNationId={tourOpen && guestAllowed ? tourFocusNation : null} onUserCamera={stopTour} shortlistIds={shortlistIds} worldAges={worldAges} faithFestivalHud={faithFestivalHud} worldClock={guestActive ? undefined : simulation?.clock} holidayName={faithApi.faith?.holiday?.name ?? null} view={viewMode} citizenNation={citizenNation} identityHold={identityHoldNow} viewedNationHeld={viewedNationHeld(identityHoldNow, locationSearch, fallbackNationIds)} nation={viewMode === 'world' || viewMode === 'nation' || viewMode === 'country' || foreignCivic ? selected : citizenNation ?? selected} nations={worldNations} capacity={capacity}
-      currencyCode={citizenNation?.id === 'aurelle' ? 'CRN' : citizenNation?.id === 'korund' ? 'LN' : 'SPK'} walletMinor={citizenNation?.id === 'aurelle' ? aurellePlan?.walletMinor : citizenNation?.id === 'korund' ? korundPlan?.walletMinor : economy?.walletMinor} crownMint={citizenNation?.id === 'aurelle' ? aurellePlan?.mint : undefined} korundCoupons={citizenNation?.id === 'korund' && korundPlan ? { couponFoodRemaining: korundPlan.couponFoodRemaining, couponExpiresAt: korundPlan.couponExpiresAt } : undefined} inventory={citizenNation?.id === 'aurelle' ? (aurellePlan ? {food:aurellePlan.foodQuantity,materials:0,knowledge:0} : undefined) : citizenNation?.id === 'korund' ? (korundPlan ? { food: korundPlan.foodQuantity, materials: 0, knowledge: 0 } : undefined) : economy ? {food:goods('food'),materials:goods('materials'),knowledge:goods('knowledge')} : undefined}
+      {...citizenHudResources({ nationId: citizenNation?.id, economy, aurellePlan, korundPlan, nationWorkPlan }, resourceBarEnabled())} crownMint={citizenNation?.id === 'aurelle' ? aurellePlan?.mint : undefined} korundCoupons={citizenNation?.id === 'korund' && korundPlan ? { couponFoodRemaining: korundPlan.couponFoodRemaining, couponExpiresAt: korundPlan.couponExpiresAt } : undefined}
       shiftSummary={activeShift ? {title:activeShift.orderName,endsAt:Date.parse(activeShift.completesAt)/1000,expiredText:shiftExpiredText} : undefined}
       localDemo={!clerkConfigured} noticeKind={workError || governmentError ? 'error' : 'success'} notice={guestActive ? undefined : workError ?? governmentError ?? recentAction ?? undefined} countryMap={countryMap} currentCityName={viewMode === 'nation' ? selected.capital : activeCity?.name} panel={guestActive ? <GuestDemo nationId={selected.id} view={viewMode as GuestDemoView} state={guestState} onAction={actInGuestDemo} onView={changeView} onExit={leaveGuestDemo} /> : gamePanel}
       contextItems={guestActive ? [] : contextItems} contextTitle={guestActive ? 'Guest examples' : contextTitle}
