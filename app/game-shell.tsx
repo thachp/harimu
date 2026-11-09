@@ -17,6 +17,7 @@ import './game-shell.css';
 import './clock-zoom.css';
 import './resource-bar.css';
 import './zoom-path.css';
+import './nation-accent.css';
 import { NationCrest } from './nation-crest';
 import { NationSymbol } from './nation-symbol';
 import { nationIsPreview } from '@/lib/nation-discovery';
@@ -26,6 +27,7 @@ import { countryWord, railCurrent, railKeyTarget, railLevels, uiV2RailEnabled } 
 import { clockZoomEnabled, isClockZoomLevel } from '@/lib/clock-zoom';
 import { resourceBarEnabled, resourceBarItems } from '@/lib/resource-bar';
 import { zoomPathCrumbs, zoomPathEnabled } from '@/lib/zoom-path';
+import { nationAccentApplies, nationAccentEnabled, nationChromeAccent } from '@/lib/nation-accent';
 import { cityStripHidden } from '@/lib/ui-v2-city';
 import { uiV2MobileEnabled } from '@/lib/ui-v2-mobile';
 import { contextStripStatus } from '@/lib/context-strip-copy'; // #379: a visitor's strip says "Visitor preview", not "Citizen snapshot"
@@ -225,6 +227,7 @@ export function GameShell({ openNations, worldClock, worldAges = false, faithFes
   };
   const breadcrumbs = <nav className="game-location-banner game-breadcrumbs" aria-label="Current location"><button type="button" onClick={() => navigate('world')}>World</button>{view !== 'world' && <><span>›</span><button type="button" onClick={() => navigate('country')}>{shownNationName}</button></>}{view === 'nation' && <><span>›</span><span>{nation.capital ?? 'Capital'}</span></>}{!['world','country','nation'].includes(view) && <><span>›</span><button type="button" onClick={() => navigate('square')}>{viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City'}</button>{view !== 'square' && <><span>›</span><span>{sceneTitle}</span></>}</>}</nav>;
   const zoomOn = zoomPathEnabled();
+  const chrome = nationAccentEnabled() && nationAccentApplies(view) ? nationChromeAccent(nation.id) : null;
   const zoomCrumbs = zoomOn ? zoomPathCrumbs({ view, nationLabel: shownNationName, cityLabel: viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City', nationId: viewedNationHeld ? undefined : nation.id, visitor }) : null;
   const zoomTrail = zoomCrumbs ? <nav className="game-zoom-path" aria-label="Zoom path">{zoomCrumbs.flatMap((crumb, index) => [index > 0 ? <span key={`${crumb.view}-sep`} className="game-zoom-path-sep" aria-hidden="true">&gt;</span> : null, crumb.current ? <span key={crumb.view} aria-current="page">{crumb.label}</span> : <a key={crumb.view} href={crumb.href} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return; event.preventDefault(); navigate(crumb.view); }}>{crumb.label}</a>])}</nav> : null;
   // #189: in Country the stage scrolls, so the location row and shift chip sit in its flow instead of floating over the heading and controls.
@@ -234,7 +237,7 @@ export function GameShell({ openNations, worldClock, worldAges = false, faithFes
   const walletAmount = walletMinor === undefined ? 'Loading' : (walletMinor / 100).toFixed(2);
   const walletHelp = parity ? `Your CRN wallet holds national money. Current mint parity is ${parity.words} Tessera per Crown, the Royal Mint official rate of ${parity.rate}.${parity.moved ? ' The parity has moved since the last mint change.' : ''} Amounts update after completed transactions; loading means the citizen snapshot has not arrived.` : dividend ? veldwoodWalletHelp(currencyCode, dividend) : korundWalletHelp(currencyCode, korundRations);
   const walletName = parity ? `Wallet, ${walletMinor === undefined ? 'loading' : `${walletAmount} Crowns`}. Current mint parity is ${parity.words} Tessera per Crown.${parity.moved ? ' The parity has moved since the last mint change.' : ''}` : dividend ? veldwoodWalletName(walletMinor, currencyCode, dividend) : korundWalletName(walletMinor, currencyCode, korundRations);
-  return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}${railOn ? ' game-rail-on' : ''}${cityStripHidden(view) ? ' game-city-v2' : ''}${uiV2MobileEnabled() ? ' game-mobile-v2' : ''}${clockZoom ? ' game-clock-zoom' : ''}${zoomTrail ? ` game-zoom-on game-zoom-${view}` : ''}`}>
+  return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}${railOn ? ' game-rail-on' : ''}${cityStripHidden(view) ? ' game-city-v2' : ''}${uiV2MobileEnabled() ? ' game-mobile-v2' : ''}${clockZoom ? ' game-clock-zoom' : ''}${zoomTrail ? ` game-zoom-on game-zoom-${view}` : ''}`} data-nation-accent={chrome ? nation.id : undefined} data-accent-text={chrome?.textRole} style={chrome ? { '--crest-accent': chrome.rule, '--crest-accent-text': chrome.text } as React.CSSProperties : undefined}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
     <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{zoomTrail ?? (railOn ? null : breadcrumbs)}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} visitor={visitor} overlays={mapOverlays} armyMap={armyMap} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
     <header className={topbarV2 ? 'game-hud game-hud-v2' : 'game-hud'} data-nation-skin={nationSkin(citizenNation?.id) ?? undefined} {...hudHelpHandlers}>
