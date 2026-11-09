@@ -11,7 +11,10 @@
  *  Rows with no clock are not invented: Aurelle Heir's Naming, Veldwood Glade Festival, Veldwood Initiative Night.
  *  [ASSUMPTION] Ties: every festival at the earliest instant is listed, in docs roster order (content/world/cultures.mdx), then in the nation row's order.
  *  Election Night and Opening of the Moot share that instant (both offsets are 0, #1208/#1219). The list keeps row order, so Opening of the Moot comes before Election Night.
- *  Dates only: no bonus, holiday effect, or Red Alert cancellation is applied. */
+ *  Dates only: no bonus or holiday effect is applied here.
+ *  #1239: while HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED holds a stored Red Alert (same gate as #1220),
+ *  the caller may pass canceled celebration names so nextFestival skips Muster Day, Rotation Day, and Lantern Watch.
+ *  Mandate Plebiscite stays. Flag off, or Green/Amber: identical to today. */
 import { flagOn } from './flag-pack.mjs';
 import { aurelleNextCharterFairAt } from './aurelle-charter-fair.ts';
 import { aurelleNextCoronationDayAt } from './aurelle-coronation-day.ts';
@@ -100,10 +103,13 @@ export const worldFestivalSources: readonly WorldFestivalSource[] = [
   f('fulmara', 'Dock Strike remembrance', 'FULMARA_DOCK_STRIKE_REMEMBRANCE', fulmaraNextDockStrikeRemembranceAt),
 ];
 
-/** Earliest next festival among the sources whose flag is on. Null when none is on or no date is a safe integer. */
-export function worldNextFestival(nowMs: number, env: unknown, sources: readonly WorldFestivalSource[] = worldFestivalSources): WorldNextFestival | null {
+/** Earliest next festival among the sources whose flag is on. Null when none is on or no date is a safe integer.
+ *  `canceledNames` (#1239): celebration names to skip (e.g. Varkand Muster Day / Rotation Day / Lantern Watch at Red). Pure: the caller decides the set. */
+export function worldNextFestival(nowMs: number, env: unknown, sources: readonly WorldFestivalSource[] = worldFestivalSources, canceledNames: ReadonlySet<string> | readonly string[] = []): WorldNextFestival | null {
+  const skip = canceledNames instanceof Set ? canceledNames : new Set(canceledNames);
   let best: number | null = null, festivals: WorldFestival[] = [];
   for (const source of sources) {
+    if (skip.has(source.name)) continue;
     if (!flagOn(env, source.flag)) continue;
     const at = source.nextAt(nowMs, env);
     if (!Number.isSafeInteger(at)) continue;
@@ -113,9 +119,10 @@ export function worldNextFestival(nowMs: number, env: unknown, sources: readonly
   return best === null ? null : { at: Math.floor(best / 1000), festivals };
 }
 
-/** The `simulation.clock` addition. Flag off (or no festival flag on): an empty object, so the clock is identical to today. */
-export function worldAtlasClockFields(nowSeconds: number, env: unknown): { nextFestival?: WorldNextFestival } {
+/** The `simulation.clock` addition. Flag off (or no festival flag on): an empty object, so the clock is identical to today.
+ *  `canceledNames` is forwarded to worldNextFestival (#1239). */
+export function worldAtlasClockFields(nowSeconds: number, env: unknown, canceledNames: ReadonlySet<string> | readonly string[] = []): { nextFestival?: WorldNextFestival } {
   if (!worldAtlasReadsEnabled(env)) return {};
-  const nextFestival = worldNextFestival(nowSeconds * 1000, env);
+  const nextFestival = worldNextFestival(nowSeconds * 1000, env, worldFestivalSources, canceledNames);
   return nextFestival ? { nextFestival } : {};
 }
