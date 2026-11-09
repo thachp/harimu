@@ -32,6 +32,7 @@ import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './h
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { VARKAND_ROTATION_DAY_CYCLE_DAYS, varkandNextRotationDayAt } from './varkand-rotation-day.ts';
+import { varkandCelebrationsCanceled } from './varkand-red-alert-cancels.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS, fulmaraNextDockStrikeRemembranceAt } from './fulmara-dock-strike-remembrance.ts';
 import { FULMARA_GRAND_REGATTA_HOST_CITY, FULMARA_GRAND_REGATTA_INTERVAL_DAYS, fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
@@ -117,7 +118,7 @@ export type GovernmentSnapshot = {
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
   /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
   auroraNight?: { nextAt: number; cycleDays: 30 };
-  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
+  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false; canceled?: true }; // #1151; #1220 `canceled` only at a stored Red Alert
   /** #1207 Varkand: next Rotation Day (the existing 60-real-day Chair term). Present only while HARIMU_VARKAND_ROTATION_DAY_ENABLED is on. Date only. `canceled` is present only while a stored Red Alert holds. */
   rotationDay?: { nextAt: number; cycleDays: 60; canceled?: true };
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
@@ -240,6 +241,20 @@ export function withVarkandRotationDay(snapshot: GovernmentSnapshot, nowMs: numb
     nextAt: varkandNextRotationDayAt(nowMs), cycleDays: VARKAND_ROTATION_DAY_CYCLE_DAYS as 60,
     ...(canceled ? { canceled: true as const } : {}),
   } };
+}
+
+/** #1220. Flag off, or the Alert Level is not Red: the same snapshot. Red marks celebration rows already on the read.
+ *  Does not add a row, move a date, or mark the Mandate Plebiscite. */
+export function withVarkandRedAlertCancels(snapshot: GovernmentSnapshot, enabled: boolean, level: string | null | undefined): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand' || !varkandCelebrationsCanceled(level)) return snapshot;
+  const musterNeeds = snapshot.musterDay != null && snapshot.musterDay.canceled !== true;
+  const rotationNeeds = snapshot.rotationDay != null && snapshot.rotationDay.canceled !== true;
+  if (!musterNeeds && !rotationNeeds) return snapshot;
+  return {
+    ...snapshot,
+    ...(musterNeeds && snapshot.musterDay ? { musterDay: { ...snapshot.musterDay, canceled: true as const } } : {}),
+    ...(rotationNeeds && snapshot.rotationDay ? { rotationDay: { ...snapshot.rotationDay, canceled: true as const } } : {}),
+  };
 }
 
 /** Varkand read while only the Rotation Day flag is on. No directorate, plebiscite, or musterDay key. Flag off returns null, which is today's read. */

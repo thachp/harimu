@@ -152,17 +152,20 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, las
   assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), F, '#1207 Rotation Day is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), F);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 63); // GRAY 63, #1207 Rotation Day is last
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), F, '#1207 Rotation Day is last');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), F);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 64); // GRAY 64, #1220 red alert cancels is last
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
