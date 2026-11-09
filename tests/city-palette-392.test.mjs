@@ -92,6 +92,27 @@ test('each capital has a full token set, and flag off returns the current global
   assert.ok(varkand.sunIntensity < kindle.sunIntensity && varkand.sunIntensity < aurelle.sunIntensity);
 });
 
+test('capital grounds stay at least deltaE 6 apart, and the kept capitals do not move', () => {
+  const toLinear = v => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  const lab = ([r, g, b]) => {
+    const R = toLinear(r), G = toLinear(g), B = toLinear(b);
+    const x = (.4124 * R + .3576 * G + .1805 * B) / .95047, y = .2126 * R + .7152 * G + .0722 * B, z = (.0193 * R + .1192 * G + .9505 * B) / 1.08883;
+    const f = t => t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116;
+    return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+  };
+  const dE = (a, b) => Math.hypot(...lab(a).map((v, i) => v - lab(b)[i]));
+  const grounds = Object.fromEntries(ids.map(id => [id, parse(capitalProfiles[id].scene.ground)]));
+  assert.equal(capitalProfiles.kindle.scene.ground, 0xb6714d);
+  assert.equal(capitalProfiles.aurelle.scene.ground, 0x7f7e7e);
+  assert.equal(capitalProfiles.varkand.scene.ground, 0x8b6969);
+  const suns = { kindle: '#ffd794', confluence: '#fde2b2', meridian: '#ffdba3', korund: '#ffe097', aurelle: '#ffe296', ilmar: '#ffe29c', hoarvale: '#fae3b7', varkand: '#ffc69a', veldwood: '#ffe095', fulmara: '#e5e7d3' };
+  for (const [id, sun] of Object.entries(suns)) assert.equal(capitalProfiles[id].scene.sun, sun, id);
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+    const d = dE(grounds[ids[i]], grounds[ids[j]]);
+    assert.ok(d >= 6, `${ids[i]}/${ids[j]} deltaE ${d.toFixed(2)}`);
+  }
+});
+
 test('the viewport swaps city lights only, keeps shadows, and does not animate them', async () => {
   const viewport = await read('app/game-viewport.tsx');
   assert.match(viewport, /const paletteOn = mode === 'city' && cityPaletteEnabled\(\)/);
