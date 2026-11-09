@@ -192,7 +192,9 @@
       "HARIMU_VARKAND_LANTERN_WATCH_ENABLED": "true",
       "HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED": "true",
       // #1219: Hoarvale next Election Night (the election that ends the current Moot term, zero offset). Off: no electionNight key. Date only.
-      "HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED": "true"
+      "HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED": "true",
+      // #1241: Brasswell Port is a Kindle resident city (home, enroll, travel-by-id). Not an Assembly district and not a country-map pin. Off: the city is absent.
+      "HARIMU_KINDLE_BRASSWELL_PORT_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

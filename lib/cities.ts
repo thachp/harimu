@@ -1,6 +1,9 @@
 /** #123 (ARC ruling on #264): a city's role from the docs Cities table on each nation page; the capital's role is 'capital'. */
+import { flagOn } from './flag-pack.mjs';
 export type CityRole = 'capital' | 'frontier' | string;
 export type City = { id: string; nationId: string; name: string; capital: boolean; role: CityRole; description: string; spa?: true };
+/** #1241: Kindle resident port. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
+export const BRASSWELL_PORT_FLAG = 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED';
 // Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
 const roles: Record<string, string> = {"Tarrek Foundry": "Industry", "Kolt Savanna": "Farming", "Lanu Terraces": "Farming", "Oalin Harbor": "Port / fisheries", "Tsenga SEZ": "Trade zone", "Holv Gorge": "Energy / industry", "Strova Mines": "Mining", "Gren Plateau": "Farming", "Windrest": "Silk / crafts", "Highmere": "Farming / fief", "Lume Mesa": "Pilgrimage", "Glassen": "Industry (Sunglass)", "Fjeldmark": "Frostcore / logistics", "Isling Springs": "Spa / tourism", "Voren Light": "Port / signals", "Moorhald": "Farming / peat", "Ashglade": "Timber / crafts", "Fernhollow": "Farming", "Vendezzo": "Shipyard", "Malvara Rods": "Energy (Stormcells)"};
 // Canonical city names and visual lore, GDD nation pages /world/nations/ (read 2026-10-13).
@@ -29,11 +32,22 @@ const spaAdditions: readonly City[] = [
   { id: 'emberwell', nationId: 'kindle', name: 'Emberwell', capital: false, role: 'Health / tourism', description: 'Lava-warmed basalt bathhouses on the northern rim of the volcanic plateau.', spa: true },
   { id: 'shen-springs', nationId: 'meridian', name: 'Shen Springs', capital: false, role: 'Health / tourism', description: 'Hot-spring terraces and white bathhouses in the northern foothills.', spa: true },
 ];
+/** #1241: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not an Assembly district (citiesForNation stays capital + two) and no country-map pin.
+ *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Lighthouse of the Spark landmark stays off this line, as Emberwell's description omits The Ember Pools. */
+const brasswellPort: City = { id: 'brasswell-port', nationId: 'kindle', name: 'Brasswell Port', capital: false, role: 'Port / trade', description: 'Brass cranes and shade-awning docks on black sand along the eastern coast.' };
+let boundEnv: unknown;
+/** Routes pass the Worker env. Unset: node tests use process.env. A bound env wins, including "false". */
+export function bindBrasswellPortEnv(env: unknown) { boundEnv = env; }
+function brasswellPortEnabled(): boolean {
+  if (boundEnv !== undefined) return flagOn(boundEnv, BRASSWELL_PORT_FLAG);
+  try { return typeof process !== 'undefined' && flagOn(process.env, BRASSWELL_PORT_FLAG); } catch { return false; }
+}
+const portResidents = (): readonly City[] => brasswellPortEnabled() ? [brasswellPort] : [];
 const byId = (nationId: string, cityId: string) => (city: City) => city.nationId === nationId && city.id === cityId;
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
-/** Catalog cities plus spa additions a citizen may call home (#798). */
-export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId)]; }
-export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)); }
+/** Catalog cities plus spa additions a citizen may call home (#798), plus Brasswell Port when its flag is on (#1241). */
+export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId)]; }
+export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
 
 /** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its
