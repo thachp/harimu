@@ -1,7 +1,8 @@
 /** #1193: World atlas reads. Flag HARIMU_WORLD_ATLAS_READS_ENABLED in HARIMU_GRAY_PACK. Flag off: no nextFestival key on simulation.clock.
  *  nextFestival is the earliest date among the nation holiday clocks whose own flags are on, with every festival at that instant.
  *  #1214: Aurelle Coronation Day and Charter Fair join worldFestivalSources (no new flag; GRAY unchanged at 62).
- *  #1228: Hoarvale Opening of the Moot joins worldFestivalSources on its own flag (no new flag; GRAY unchanged). */
+ *  #1228: Hoarvale Opening of the Moot joins worldFestivalSources on its own flag (no new flag; GRAY unchanged).
+ *  #1231: Kindle Ballot Night joins on HARIMU_KINDLE_ELECTION_CLOCK_ENABLED (no new flag; GRAY unchanged). A missing cycle start skips it. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -21,6 +22,7 @@ import { worldAtlasClockFields, worldAtlasReadsEnabled, worldFestivalSources, wo
 import { aurelleNextCharterFairAt } from '../lib/aurelle-charter-fair.ts';
 import { aurelleNextCoronationDayAt } from '../lib/aurelle-coronation-day.ts';
 import { aurelleNextHearthNightAt } from '../lib/aurelle-hearth-night.ts';
+import { kindleElectionClock } from '../lib/kindle-election.ts';
 import { fulmaraNextGrandRegattaAt } from '../lib/fulmara-grand-regatta.ts';
 import { meridianNextCongressWeekAt } from '../lib/meridian-congress-week.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
@@ -41,14 +43,15 @@ test('pure: earliest enabled source wins, ties list every festival in source ord
 });
 
 test('pure: the real sources are docs-named, one clock each, all ten nations, Stilldays left out', () => {
-  assert.equal(worldFestivalSources.length, 30);
+  assert.equal(worldFestivalSources.length, 31);
   assert.deepEqual([...new Set(worldFestivalSources.map(s => s.nationId))], ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']);
   assert.equal(worldFestivalSources.some(s => /stillday/i.test(s.name)), false);
   for (const s of worldFestivalSources) assert.match(s.flag, /^HARIMU_[A-Z_]+_ENABLED$/);
   const now = Date.UTC(2026, 10, 9);
   const next = worldNextFestival(now, allOn);
-  const each = worldFestivalSources.map(s => s.nextAt(now));
-  assert.equal(next.at, Math.min(...each) / 1000);
+  const each = worldFestivalSources.map(s => s.nextAt(now, allOn));
+  const dated = each.filter(at => Number.isSafeInteger(at));
+  assert.equal(next.at, Math.min(...dated) / 1000);
   assert.ok(next.at * 1000 > now, 'next is in the future');
   assert.deepEqual(next.festivals, worldFestivalSources.filter((s, i) => each[i] === next.at * 1000).map(({ nationId, name }) => ({ nationId, name })));
   const regattaOnly = worldNextFestival(now, { HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'true' });
@@ -336,4 +339,81 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
   assert.match(readFileSync('tests/helpers/local-runtime.mjs', 'utf8'), /lib\/world-atlas-reads\.ts/);
+});
+
+test('#1231: Ballot Night is skipped when its flag is off or the cycle start is unset or invalid', async t => {
+  const K = 'HARIMU_KINDLE_ELECTION_CLOCK_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Ballot Night');
+  assert.equal(source.nationId, 'kindle');
+  assert.equal(source.flag, K, 'the nextFestival candidate uses the existing election clock flag');
+  assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'kindle').map(s => s.name), ['Ballot Night', "Founders' Forge Day", 'Market Bell'], 'docs §7 Kindle holiday order');
+  assert.equal(worldFestivalSources.find(s => s.name === "Founders' Forge Day").flag, 'HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED');
+  assert.equal(worldFestivalSources.find(s => s.name === 'Market Bell').flag, 'HARIMU_KINDLE_MARKET_BELL_ENABLED');
+  const now = Date.UTC(2026, 10, 9);
+  const start = 1_700_000_000;
+  const cycle = { HARIMU_KINDLE_CYCLE_START_AT: String(start) };
+  assert.equal(Number.isSafeInteger(source.nextAt(now)), false, 'no env: no date');
+  assert.equal(Number.isSafeInteger(source.nextAt(now, { [K]: 'true' })), false, 'flag on, cycle unset');
+  for (const raw of ['', 'nope', '0', '-1', '1.5']) assert.equal(Number.isSafeInteger(source.nextAt(now, { [K]: 'true', HARIMU_KINDLE_CYCLE_START_AT: raw })), false, raw);
+  const picks = env => (worldNextFestival(now, env)?.festivals ?? []).filter(item => item.name === 'Ballot Night');
+  assert.deepEqual(picks({}), []);
+  assert.deepEqual(picks({ [K]: 'false', ...cycle }), [], 'flag off skips it');
+  assert.deepEqual(picks({ [K]: 'true' }), [], 'unset cycle start skips it');
+  assert.deepEqual(picks({ [K]: 'true', HARIMU_KINDLE_CYCLE_START_AT: 'x' }), [], 'invalid cycle start skips it');
+  assert.equal(worldNextFestival(now, { [K]: 'false', ...cycle }), null);
+  assert.equal(worldNextFestival(now, { [K]: 'true' }), null, 'unset cycle start skips the only source');
+  assert.equal(worldNextFestival(Number.MAX_SAFE_INTEGER, { [K]: 'true', ...cycle }), null, 'a held clock skips the source');
+  const night = kindleElectionClock(start, now).nextBallotNightAt;
+  const later = { nationId: 'fulmara', name: 'Later Fair', flag: 'HARIMU_LATER_FAIR_ENABLED', nextAt: () => night + DAY };
+  assert.deepEqual(worldNextFestival(now, { [K]: 'false', HARIMU_LATER_FAIR_ENABLED: 'true', ...cycle }, [later, source]), { at: (night + DAY) / 1000, festivals: [{ nationId: 'fulmara', name: 'Later Fair' }] });
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='kindle' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  const read = async () => {
+    const clock = (await r.call('world')).data.simulation.clock;
+    const government = (await r.call('citizen', 'alice')).data.government;
+    return { clock, government, picked: (clock.nextFestival?.festivals ?? []).some(item => item.name === 'Ballot Night') };
+  };
+  let { clock, government, picked } = await read();
+  assert.equal(picked, false);
+  assert.equal('nextFestival' in clock, false, 'flag off: nextFestival absent');
+  assert.equal(government == null || !('electionClock' in government), true, 'flag off: no electionClock');
+  r.setFixtureEnv(K, 'true');
+  ({ clock, government, picked } = await read());
+  assert.equal(picked, false, 'flag on, cycle unset: skipped');
+  assert.equal('nextFestival' in clock, false);
+  assert.equal(government == null || !('electionClock' in government), true, 'flag on, cycle unset: no electionClock');
+  r.setFixtureEnv('HARIMU_KINDLE_CYCLE_START_AT', 'nope');
+  ({ clock, government, picked } = await read());
+  assert.equal(picked, false, 'invalid cycle start: skipped');
+  assert.equal('nextFestival' in clock, false);
+  assert.equal(government == null || !('electionClock' in government), true);
+});
+
+test('#1231: Ballot Night wins nextFestival when it is the earliest, on the government date', async t => {
+  const K = 'HARIMU_KINDLE_ELECTION_CLOCK_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Ballot Night');
+  const now = Date.UTC(2026, 10, 9);
+  const start = 1_700_000_000;
+  const env = { [K]: 'true', HARIMU_KINDLE_CYCLE_START_AT: String(start) };
+  const night = kindleElectionClock(start, now).nextBallotNightAt;
+  assert.equal(source.nextAt(now, env), night, 'the source date is the election clock nextBallotNightAt');
+  const on = worldNextFestival(now, env);
+  assert.deepEqual(on, { at: night / 1000, festivals: [{ nationId: 'kindle', name: 'Ballot Night' }] });
+  const later = { nationId: 'fulmara', name: 'Later Fair', flag: 'HARIMU_LATER_FAIR_ENABLED', nextAt: () => night + DAY };
+  assert.deepEqual(worldNextFestival(now, { ...env, HARIMU_LATER_FAIR_ENABLED: 'true' }, [source, later]), { at: night / 1000, festivals: [{ nationId: 'kindle', name: 'Ballot Night' }] }, 'it wins when it is the earliest');
+  const sooner = { nationId: 'fulmara', name: 'Sooner Fair', flag: 'HARIMU_SOONER_FAIR_ENABLED', nextAt: () => night - DAY };
+  assert.deepEqual(worldNextFestival(now, { ...env, HARIMU_SOONER_FAIR_ENABLED: 'true' }, [source, sooner]).festivals.map(item => item.name), ['Sooner Fair']);
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='kindle' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  r.setFixtureEnv(K, 'true');
+  r.setFixtureEnv('HARIMU_KINDLE_CYCLE_START_AT', String(start));
+  const clock = (await r.call('world')).data.simulation.clock;
+  const government = (await r.call('citizen', 'alice')).data.government;
+  const at = kindleElectionClock(start, clock.nowSeconds * 1000).nextBallotNightAt;
+  assert.equal((clock.nextFestival.festivals).some(item => item.name === 'Ballot Night'), true, 'it wins when it is the earliest');
+  assert.deepEqual(clock.nextFestival, { at: at / 1000, festivals: [{ nationId: 'kindle', name: 'Ballot Night' }] });
+  assert.equal(clock.nextFestival.at * 1000, government.electionClock.nextBallotNightAt, 'the atlas date equals the Kindle government read');
+  assert.equal(government.electionClock.nextBallotNightAt, at);
 });
