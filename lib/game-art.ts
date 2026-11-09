@@ -59,15 +59,15 @@ const caps = { ground: relLum(parseHex(citySceneGlobals.groundAlt)), road: relLu
 // Each channel is an existing palette or crest hex. lum is a fraction of today's tile. tint moves the cream lights toward that hex. gain multiplies the sun (desktop 3.2, low graphics 1.5).
 const sceneRecipes: Record<string, Recipe> = {
   kindle: { ground: 'field', road: 'trim', water: 'roof', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.62, .82, .4], lum: [.86, .96, .88], tint: [.38, .2, .6], gain: 1, groundMix: ['accent', .35], waterMix: ['accent', .42] },
-  confluence: { ground: 'stone', road: 'accent', water: 'field', sun: 'mark', sky: 'accent', hemi: 'field', sat: [.36, .55, .52], lum: [.9, .94, 1], tint: [.16, .18, .52], gain: .98, roadMix: ['trim', .35] },
-  meridian: { ground: 'stone', road: 'field', water: 'roof', sun: 'field', sky: 'accent', hemi: 'roof', sat: [.32, .58, .3], lum: [.88, .94, .92], tint: [.32, .14, .5], gain: .97 },
+  confluence: { ground: 'stone', road: 'accent', water: 'field', sun: 'mark', sky: 'accent', hemi: 'field', sat: [.44, .55, .52], lum: [.78, .94, 1], tint: [.16, .18, .52], gain: .98, groundMix: ['accent', .55], roadMix: ['trim', .35] },
+  meridian: { ground: 'mark', road: 'field', water: 'roof', sun: 'field', sky: 'accent', hemi: 'roof', sat: [.6, .58, .3], lum: [.82, .94, .92], tint: [.32, .14, .5], gain: .97, groundMix: ['field', .55] },
   korund: { ground: 'field', road: 'accent', water: 'roof', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.46, .7, .24], lum: [.82, .94, .86], tint: [.3, .14, .54], gain: .94 },
   aurelle: { ground: 'stone', road: 'accent', water: 'field', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.1, .84, .5], lum: [.98, .96, 1], tint: [.42, .26, .44], gain: .98, groundMix: ['wall', .7] },
-  ilmar: { ground: 'wall', road: 'trim', water: 'accent', sun: 'trim', sky: 'mark', hemi: 'accent', sat: [.22, .78, .4], lum: [.96, .96, .9], tint: [.28, .16, .38], gain: 1, groundMix: ['stone', .4] },
-  hoarvale: { ground: 'wall', road: 'accent', water: 'field', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.12, .22, .46], lum: [.94, .98, 1], tint: [.18, .28, .5], gain: .96, groundMix: ['stone', .45] },
+  ilmar: { ground: 'accent', road: 'trim', water: 'accent', sun: 'trim', sky: 'mark', hemi: 'accent', sat: [.5, .78, .4], lum: [.84, .96, .9], tint: [.28, .16, .38], gain: 1, groundMix: ['mark', .28] },
+  hoarvale: { ground: 'field', road: 'accent', water: 'field', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.6, .22, .46], lum: [.78, .98, 1], tint: [.18, .28, .5], gain: .96, groundMix: ['stone', .7] },
   varkand: { ground: 'field', road: 'stone', water: 'field', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.4, .48, .22], lum: [.64, .78, .62], tint: [.48, .12, .7], gain: .86, groundMix: ['accent', .42], roadMix: ['accent', .4], waterMix: ['accent', .28] },
   veldwood: { ground: 'field', road: 'accent', water: 'roof', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.52, .74, .32], lum: [.76, .94, .82], tint: [.3, .14, .52], gain: .98 },
-  fulmara: { ground: 'stone', road: 'trim', water: 'accent', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.34, .5, .48], lum: [.88, .94, .88], tint: [.24, .14, .52], gain: 1, waterMix: ['field', .4] },
+  fulmara: { ground: 'accent', road: 'trim', water: 'accent', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.42, .5, .48], lum: [.8, .94, .88], tint: [.24, .14, .52], gain: 1, groundMix: ['stone', .4], waterMix: ['field', .4] },
 };
 function pick(palette: Palette, crest: { field: string; mark: string; accent: string }, name: Chan, extra?: Mix): RGB {
   const one = (n: Chan): RGB => n === 'field' || n === 'mark' || n === 'accent' ? parseHex(crest[n]) : parseHex(palette[n]);
