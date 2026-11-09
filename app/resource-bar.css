@@ -1,0 +1,14 @@
+/* #392: citizen resource bar. Tokens are the S2 chip (ground #071820, chip #0d2530, gold #f1d58a, paper #f3ecd6)
+   and the S1 crest edge (#d0ad54). Flag off: every rule starts at .game-resource-bar, which the shell adds only while the flag is on. */
+.harimu-game .game-resource-bar.game-resources{--s2-ground:#071820;--s2-chip:#0d2530;--s2-paper:#f3ecd6;--s2-gold:#f1d58a;--crest-edge:#d0ad54;min-width:0;max-width:100%;flex:1 1 auto;flex-wrap:wrap;justify-content:flex-end;align-items:center;align-self:center;gap:6px}
+.harimu-game .game-resource-bar.game-resources>*{flex:0 1 auto;min-width:0;border:0;background:transparent}
+.harimu-game .game-resource-bar.game-resources>.game-hud-help>summary,.harimu-game .game-resource-bar.game-resources>.game-wallet-button{display:flex;flex-direction:row;align-items:center;column-gap:6px;row-gap:0;min-width:0;min-height:36px;height:auto;padding:4px 8px;border:0;border-radius:8px;background:var(--s2-chip);color:var(--s2-paper);box-shadow:inset 0 0 0 1px var(--crest-edge);grid-template-columns:none}
+.harimu-game .game-resource-bar svg{grid-row:auto;flex:none;width:16px;height:16px;color:var(--s2-gold)}
+.harimu-game .game-resource-bar strong{color:var(--s2-paper);font-size:calc(13px * var(--text-scale, 1));font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2;margin:0}
+.harimu-game .game-resource-bar .game-hud-help>summary>span,.harimu-game .game-resource-bar .game-wallet-button>span{color:var(--s2-gold);font-size:calc(11px * var(--text-scale, 1));letter-spacing:.04em;text-transform:uppercase;margin:0;line-height:1.2}
+.harimu-game .game-resource-bar>.game-hud-help:hover>summary,.harimu-game .game-resource-bar>.game-wallet-button:hover,.harimu-game .game-resource-bar>.game-hud-help[open]>summary{box-shadow:inset 0 0 0 1px var(--s2-gold)}
+.harimu-game .game-resource-bar>.game-hud-help>summary:focus-visible,.harimu-game .game-resource-bar>.game-wallet-button:focus-visible{outline:2px solid var(--s2-paper);outline-offset:2px}
+.harimu-game .game-resource-bar>.game-resource-note{display:flex;flex-wrap:wrap;align-items:center;min-height:36px;padding:4px 8px;border-radius:8px;background:var(--s2-chip);color:var(--s2-gold);box-shadow:inset 0 0 0 1px var(--crest-edge)}
+.harimu-game .game-resource-bar>.game-resource-note:empty{display:none}
+@media(min-width:761px){.harimu-game .game-resource-bar.game-resources{flex-wrap:nowrap}}
+@media(max-width:760px){.harimu-game .game-resource-bar.game-resources{order:3;width:100%;height:auto;min-height:calc(36px * var(--text-scale, 1));justify-content:flex-start;border-top:1px solid var(--crest-edge);padding-top:4px}}
