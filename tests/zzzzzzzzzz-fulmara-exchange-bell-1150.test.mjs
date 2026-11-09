@@ -1,5 +1,5 @@
 /** #1150: Fulmara next Exchange Bell on a fixed 30-real-day cycle from the Varkand Chair anchor (#1085).
- *  Flag HARIMU_FULMARA_EXCHANGE_BELL_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no exchangeBell key. #1160/#1164/#1165/#1169/#1170/#1175 follow it; #1178 is last.
+ *  Flag HARIMU_FULMARA_EXCHANGE_BELL_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no exchangeBell key. #1160/#1164/#1165/#1169/#1170/#1175/#1178/#1179/#1184 follow it; #1183 is last.
  *  The zzzzzzzzzz- name sorts after zzzzzzzzz-ilmar-prism-contracts-1139 so Node's --test-shard
  *  round-robin does not move earlier files between Postgres shards.
  *  [ASSUMPTION] Docs §7.10 name the holiday and give no interval. Cadence is one game year (30 real days). */
@@ -108,9 +108,9 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars.HARIMU_FULMARA_EXCHANGE_BELL_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_EXCHANGE_BELL_ENABLED, 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_FULMARA_EXCHANGE_BELL_ENABLED, 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED', '#1160/#1164/#1165/#1169/#1170/#1175 follow this flag; #1178 is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-12), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED', '#1160/#1164/#1165/#1169/#1170/#1175/#1178/#1179/#1184/#1183 follow this flag; #1187 is last');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-12), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-12), 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED'), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED'), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_FULMARA_EXCHANGE_BELL_ENABLED: 'false' }, 'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED'), false, 'a direct string wins');

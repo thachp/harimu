@@ -2,6 +2,7 @@ import { AURELLE_HEARTH_NIGHT_CYCLE_DAYS, aurelleNextHearthNightAt } from './aur
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
 import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
+import { CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS, confluenceNextCongressLanternsAt } from './confluence-congress-lanterns.ts';
 import { CONFLUENCE_QUOTA_DAY_CYCLE_DAYS, confluenceNextQuotaDayAt } from './confluence-quota-day.ts';
 import { kindleElectionClock, type KindleElectionClock } from './kindle-election.ts';
 import { KORUND_CHAIRMAN_BIRTHDAY_CYCLE_DAYS, korundNextChairmanBirthdayAt } from './korund-chairman-birthday.ts';
@@ -16,7 +17,9 @@ import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-cont
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
+import { FULMARA_CHARTER_DAY_CYCLE_DAYS, fulmaraNextCharterDayAt } from './fulmara-charter-day.ts';
 import { FULMARA_EXCHANGE_BELL_CYCLE_DAYS, fulmaraNextExchangeBellAt } from './fulmara-exchange-bell.ts';
+import { FULMARA_FAIR_WIND_BLESSING_CYCLE_DAYS, fulmaraNextFairWindBlessingAt } from './fulmara-fair-wind-blessing.ts';
 import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
@@ -59,6 +62,10 @@ export type GovernmentSnapshot = {
   resolutions?: FulmaraResolution[];
   /** #1150 Fulmara: next Exchange Bell on a 30-real-day cycle. Present only while HARIMU_FULMARA_EXCHANGE_BELL_ENABLED is on. Opens no trading session. */
   exchangeBell?: { nextAt: number; cycleDays: 30 };
+  /** #1179 Fulmara: next Charter Day (once per game year = 30 real days). Present only while HARIMU_FULMARA_CHARTER_DAY_ENABLED is on. Date only: no charter text, shareholder vote, dividend, or bonus. */
+  charterDay?: { nextAt: number; cycleDays: 30 };
+  /** #1184 Fulmara: next Fair-Wind Blessing on a 30-real-day cycle. Present only while HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED is on. Holds the next date only. */
+  fairWindBlessing?: { nextAt: number; cycleDays: 30 };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
@@ -71,6 +78,8 @@ export type GovernmentSnapshot = {
   assemblyElection?: { cycleStartedAt: number; nextElectionAt: number; intervalDays: 150; ballotOpen: false; leadershipHeedsResult: false };
   /** #1169 Confluence: next Quota Day (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED is on. States no quota, target, or bonus. */
   quotaDay?: { nextAt: number; cycleDays: 30 };
+  /** #1183 Confluence: next Congress Lanterns (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED is on. Date only: no lantern count, delegate list, or Party text. */
+  congressLanterns?: { nextAt: number; cycleDays: 30 };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   /** #1133 Meridian: next Exam Day. Present only while HARIMU_MERIDIAN_EXAM_DAY_ENABLED is on. */
@@ -418,6 +427,48 @@ export function withFulmaraExchangeBell(snapshot: GovernmentSnapshot, nowMs: num
   return { ...snapshot, exchangeBell: { nextAt: fulmaraNextExchangeBellAt(nowMs), cycleDays: FULMARA_EXCHANGE_BELL_CYCLE_DAYS } };
 }
 
+/** #1179. Flag off, or any nation but Fulmara: the same snapshot, and no charterDay key. Date only. */
+export function withFulmaraCharterDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, charterDay: { nextAt: fulmaraNextCharterDayAt(nowMs), cycleDays: FULMARA_CHARTER_DAY_CYCLE_DAYS as 30 } };
+}
+
+/** Fulmara read while only the Charter Day flag is on. No grandCouncil, resolutions, or exchangeBell key. Flag off returns null, which is today's read. */
+export function fulmaraCharterDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraCharterDay({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Charter Day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Charter Day', topic: 'work', proposedSpendMinor: 0,
+      reason: 'Charter Day falls once each game year. This read names the next Charter Day. It holds no charter text, shareholder vote, dividend, or bonus, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Charter Day and nothing else.',
+  }, nowMs, true);
+}
+
+/** #1184. Flag off, or any nation but Fulmara: the same snapshot, and no fairWindBlessing key. Holds the next date only. */
+export function withFulmaraFairWindBlessing(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, fairWindBlessing: { nextAt: fulmaraNextFairWindBlessingAt(nowMs), cycleDays: FULMARA_FAIR_WIND_BLESSING_CYCLE_DAYS } };
+}
+
+/** Fulmara read while only the Fair-Wind Blessing flag is on. No grandCouncil, resolutions, or exchangeBell key. Flag off returns null, which is today's read. */
+export function fulmaraFairWindBlessingSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraFairWindBlessing({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Fair-Wind Blessing', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Fair-Wind Blessing', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Fair-Wind Blessing of the convoys falls every 30 real days. This read names the next date. It holds no blessing text, lists no convoy, states no Toll Coupon figure, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Fair-Wind Blessing. It lists no convoy and states no Toll Coupon figure.',
+  }, nowMs, true);
+}
+
 /** Fulmara read while only the Exchange Bell flag is on. No grandCouncil or resolutions key. Flag off returns null, which is today's read. */
 export function fulmaraExchangeBellSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
   if (!enabled) return null;
@@ -593,6 +644,12 @@ export function withConfluenceAssemblyElection(snapshot: GovernmentSnapshot, now
 export function withConfluenceQuotaDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
   return { ...snapshot, quotaDay: { nextAt: confluenceNextQuotaDayAt(nowMs), cycleDays: CONFLUENCE_QUOTA_DAY_CYCLE_DAYS as 30 } };
+}
+
+/** #1183. Flag off, or any nation but Confluence: the same snapshot, and no congressLanterns key. Date only. */
+export function withConfluenceCongressLanterns(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
+  return { ...snapshot, congressLanterns: { nextAt: confluenceNextCongressLanternsAt(nowMs), cycleDays: CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS } };
 }
 
 /** Confluence read while the flag is on. Confluence has no other government snapshot, so this is the smallest one that carries the party block. Flag off returns null, which is today's read. */

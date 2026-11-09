@@ -13,6 +13,7 @@ import { ActionButton } from './action-button';
 import { firstActionReason, pendingActionReason } from '@/lib/action-reasons';
 import { CountryScene } from './country-scene';
 import { NationOverview } from './nation-overview';
+import { WorldAtlas } from './world-atlas';
 import { nationOverviewEnabled } from '@/lib/nation-overview';
 import { HomeMoveCard } from './home-move-card'; // #781
 import { capitalCityForNation, cityForNation, residentCitiesForNation } from '@/lib/cities';
@@ -1828,6 +1829,7 @@ export default function Home() {
 
   const populationFact = selected.populationBand && !(selected.populationBand === 'coming-soon' && openNations?.includes(selected.id)) ? <dd className="population-band" data-band={selected.populationBand}>{populationBandLabel[selected.populationBand]}</dd> : null;
   const worldPanel = <section className="game-national-context" aria-label="Nation exploration and citizenship">
+    <WorldAtlas nations={worldNations} nation={selected} clock={guestActive ? null : simulation?.clock ?? null} />
     {guestAllowed && (firstVisitGuideOpen
       ? tourOpen ? <GlobeTour onFocus={setTourFocusNation} onClose={finishTour} /> : <FirstVisitGuide stage={firstVisitStage} onStageChange={setFirstVisitStage} onShortlist={setShortlistIds} onStartTour={() => setTourOpen(true)} onTryGuest={startGuestDemo} onDismiss={() => { stopTour(); setFirstVisitGuideOpen(false); }} />
       : <button type="button" className="secondary-action" onClick={() => { setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); }}>Restart first-visit guide</button>)}
