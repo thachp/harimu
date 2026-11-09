@@ -20,6 +20,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.marketBell?{marketBell:snapshot.marketBell}:{}), // #1164: next Market Bell (readGovernment adds it only while the flag is on)
   ...(snapshot.honorsListDay?{honorsListDay:snapshot.honorsListDay}:{}), // #1136: next Honors List Day (readGovernment adds it only while the flag is on)
   ...(snapshot.auroraNight?{auroraNight:snapshot.auroraNight}:{}), // #1160: next Aurora Night (readGovernment adds it only while the flag is on)
+  ...(snapshot.mootOpening?{mootOpening:snapshot.mootOpening}:{}), // #1208: next Opening of the Moot (readGovernment adds it only while the flag is on)
   ...(snapshot.federalCouncil?{federalCouncil:snapshot.federalCouncil}:{}), // #1098: next Council election and Speaker seat (readGovernment adds it only while the flag is on)
   ...(snapshot.voteDayCalendar?{voteDayCalendar:snapshot.voteDayCalendar}:{}), // #1122: next Vote Day (readGovernment adds it only while the flag is on)
   ...(snapshot.dividendDay?{dividendDay:snapshot.dividendDay}:{}), // #1159: next Dividend Day (readGovernment adds it only while the flag is on)
