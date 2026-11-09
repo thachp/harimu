@@ -16,6 +16,7 @@ import { MERIDIAN_CONGRESS_WEEK_INTERVAL_DAYS, meridianNextCongressWeekAt } from
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_GREAT_PILGRIMAGE_CYCLE_DAYS, ilmarNextGreatPilgrimageAt } from './ilmar-great-pilgrimage.ts';
+import { ILMAR_ASSEMBLY_ELECTION_DAY_CYCLE_DAYS, ilmarNextAssemblyElectionDayAt } from './ilmar-assembly-election-day.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt as ilmarSanctumNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-contracts.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
@@ -29,7 +30,10 @@ import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCou
 import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
+import { hoarvaleNextElectionNightAt } from './hoarvale-election-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
+import { VARKAND_LANTERN_WATCH_CYCLE_DAYS, varkandNextLanternWatchAt } from './varkand-lantern-watch.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { VARKAND_ROTATION_DAY_CYCLE_DAYS, varkandNextRotationDayAt } from './varkand-rotation-day.ts';
 import { varkandCelebrationsCanceled } from './varkand-red-alert-cancels.ts';
@@ -78,6 +82,8 @@ export type GovernmentSnapshot = {
   feastOfFirstLight?: { nextAt: number; cycleDays: 15 };
   /** #1196 Ilmar: next Great Pilgrimage on a 30-real-day cycle. Present only while HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED is on. Holds the next date only. */
   greatPilgrimage?: { nextAt: number; cycleDays: 30 };
+  /** #1212 Ilmar: next Assembly Election day on a 120-real-day cycle. Present only while HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED is on. Holds the next date only. */
+  assemblyElectionDay?: { nextAt: number; cycleDays: 120 };
   /** #1139 Ilmar: Prism contracts, each with a title and a whole-number profit share. Present only while HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED is on. */
   contracts?: IlmarPrismContract[];
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
@@ -118,9 +124,14 @@ export type GovernmentSnapshot = {
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
   /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
   auroraNight?: { nextAt: number; cycleDays: 30 };
+  /** #1208 Hoarvale: next Opening of the Moot (the next term start). Present only while HARIMU_HOARVALE_MOOT_OPENING_ENABLED is on. The next date only. */
+  mootOpening?: { nextAt: number };
+  electionNight?: { nextAt: number }; // #1219: next date only, while HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED is on
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false; canceled?: true }; // #1151; #1220 `canceled` only at a stored Red Alert
   /** #1207 Varkand: next Rotation Day (the existing 60-real-day Chair term). Present only while HARIMU_VARKAND_ROTATION_DAY_ENABLED is on. Date only. `canceled` is present only while a stored Red Alert holds. */
   rotationDay?: { nextAt: number; cycleDays: 60; canceled?: true };
+  /** #1211 Varkand: next Lantern Watch (once per 30 real days). Present only while HARIMU_VARKAND_LANTERN_WATCH_ENABLED is on. Date only. #1220 adds `canceled` at a stored Red Alert. */
+  lanternWatch?: { nextAt: number; cycleDays: 30; canceled?: true };
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
@@ -226,6 +237,40 @@ export function withHoarvaleAuroraNight(snapshot: GovernmentSnapshot, nowMs: num
   return { ...snapshot, auroraNight: { nextAt: hoarvaleNextAuroraNightAt(nowMs), cycleDays: HOARVALE_AURORA_NIGHT_CYCLE_DAYS } };
 }
 
+/** #1208. Flag off, or any nation but Hoarvale: the same snapshot, and no mootOpening key. The next date only. */
+export function withHoarvaleMootOpening(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, mootOpening: { nextAt: hoarvaleNextMootOpeningAt(nowMs) } };
+}
+
+/** Hoarvale read while only the Opening of the Moot flag is on. No moot, honorsListDay, or auroraNight key. Flag off returns null, which is today's read. */
+export function hoarvaleMootOpeningSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withHoarvaleMootOpening({
+    nationId: 'hoarvale', mode: 'rule-bound simulation',
+    roles: [{ name: 'Opening of the Moot', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Opening of the Moot', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Opening of the Moot is the start of the next Moot term. This read names the next date. It quotes no rite and names no members.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Opening of the Moot. It quotes no rite and names no members.',
+  }, nowMs, true);
+}
+/** #1219. Flag off, or any nation but Hoarvale: the same snapshot, and no electionNight key. */
+export function withHoarvaleElectionNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, electionNight: { nextAt: hoarvaleNextElectionNightAt(nowMs) } };
+}
+/** Flag-only Hoarvale read. No moot, honors, or aurora key. Flag off returns null. */
+export function hoarvaleElectionNightSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withHoarvaleElectionNight({ nationId: 'hoarvale', mode: 'rule-bound simulation',
+    roles: [{ name: 'Election Night', controller: 'AI/SI role · deterministic rules' }],
+    decision: { title: 'Election Night', topic: 'infrastructure', proposedSpendMinor: 0, reason: 'This read names the next Election Night.' },
+    availableBudgetMinor: 0, influenceSummary: 'This read names the next Election Night.' }, nowMs, true);
+}
+
 /** #1151. Flag off, or any nation but Varkand: the same snapshot, and no musterDay key. Musters no troops, changes no Alert Level. */
 export function withVarkandMusterDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
@@ -249,11 +294,13 @@ export function withVarkandRedAlertCancels(snapshot: GovernmentSnapshot, enabled
   if (!enabled || snapshot.nationId !== 'varkand' || !varkandCelebrationsCanceled(level)) return snapshot;
   const musterNeeds = snapshot.musterDay != null && snapshot.musterDay.canceled !== true;
   const rotationNeeds = snapshot.rotationDay != null && snapshot.rotationDay.canceled !== true;
-  if (!musterNeeds && !rotationNeeds) return snapshot;
+  const lanternNeeds = snapshot.lanternWatch != null && snapshot.lanternWatch.canceled !== true;
+  if (!musterNeeds && !rotationNeeds && !lanternNeeds) return snapshot;
   return {
     ...snapshot,
     ...(musterNeeds && snapshot.musterDay ? { musterDay: { ...snapshot.musterDay, canceled: true as const } } : {}),
     ...(rotationNeeds && snapshot.rotationDay ? { rotationDay: { ...snapshot.rotationDay, canceled: true as const } } : {}),
+    ...(lanternNeeds && snapshot.lanternWatch ? { lanternWatch: { ...snapshot.lanternWatch, canceled: true as const } } : {}),
   };
 }
 
@@ -270,6 +317,12 @@ export function varkandRotationDaySnapshot(nowMs: number, enabled: boolean, canc
     availableBudgetMinor: 0,
     influenceSummary: 'The Chair rotates on the existing term. This read does not name a Chair.',
   }, nowMs, true, canceled);
+}
+
+/** #1211. Flag off, or any nation but Varkand: the same snapshot, and no lanternWatch key. Date only. */
+export function withVarkandLanternWatch(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  return { ...snapshot, lanternWatch: { nextAt: varkandNextLanternWatchAt(nowMs), cycleDays: VARKAND_LANTERN_WATCH_CYCLE_DAYS } };
 }
 
 /** #1165. Flag off, or any nation but Confluence: the same snapshot, and no canalFestival key. Holds no festival, harvest yield, or bonus. */
@@ -580,6 +633,21 @@ export function varkandPlebisciteSnapshot(nowMs: number, enabled: boolean): Gove
   }, nowMs, true);
 }
 
+/** Varkand read while only the Lantern Watch flag is on. No directorate, plebiscite, or musterDay key. Flag off returns null, which is today's read. */
+export function varkandLanternWatchSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVarkandLanternWatch({
+    nationId: 'varkand', mode: 'rule-bound simulation',
+    roles: [{ name: 'Lantern Watch', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Lantern Watch', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Lantern Watch falls every 30 real days. This read names the next date only and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Lantern Watch date only.',
+  }, nowMs, true);
+}
+
 /** Varkand government read while the flag is on. Flag off returns null, which is today's read. */
 export function varkandGovernmentSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
   if (!enabled) return null;
@@ -831,6 +899,27 @@ export function ilmarGreatPilgrimageSnapshot(nowMs: number, enabled: boolean): G
     },
     availableBudgetMinor: 0,
     influenceSummary: 'This read names the next Great Pilgrimage. It counts no pilgrims and names no shrine.',
+  }, nowMs, true);
+}
+
+/** #1212. Flag off, or any nation but Ilmar: the same snapshot, and no assemblyElectionDay key. Holds the next date only. */
+export function withIlmarAssemblyElectionDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, assemblyElectionDay: { nextAt: ilmarNextAssemblyElectionDayAt(nowMs), cycleDays: ILMAR_ASSEMBLY_ELECTION_DAY_CYCLE_DAYS } };
+}
+
+/** Ilmar read while only the Assembly Election day flag is on. No sanctum, feast, contracts, or greatPilgrimage key. Flag off returns null, which is today's read. */
+export function ilmarAssemblyElectionDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarAssemblyElectionDay({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [{ name: 'Assembly Election day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Assembly Election day', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Assembly of the Faithful elects every 120 real days. This read names the next Assembly Election day. It names no candidates, opens no ballot, lists no results, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Assembly Election day. It names no candidates and opens no ballot.',
   }, nowMs, true);
 }
 

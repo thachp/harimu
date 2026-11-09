@@ -2,7 +2,7 @@
  *  Flag HARIMU_VARKAND_ROTATION_DAY_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no rotationDay key.
  *  The block is the next date only. `canceled` is present only while a stored Red Alert holds (#1081).
  *  The zzzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzzz-aurelle-coronation-day-1191 so --test-shard
- *  does not move earlier files. After merging origin/dev 4b36d367 (GRAY 62), Rotation Day is GRAY 63. */
+ *  does not move earlier files. After merging origin/dev 74a29631 (GRAY 65), Rotation Day is GRAY 63; #1212 is last at 66. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -93,14 +93,11 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key, 'GRAY 63; #1220 red alert cancels is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), 'HARIMU_WORLD_ATLAS_READS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 64);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-6), key, 'GRAY 63; #1208, #1211, then #1212 follow this flag');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-6), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-7), 'HARIMU_WORLD_ATLAS_READS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 68);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

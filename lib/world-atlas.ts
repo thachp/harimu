@@ -2,6 +2,9 @@
  *  NEXT_PUBLIC_HARIMU_WORLD_ATLAS is a HARIMU_UI_PACK key ("true" in preview, "false" in production).
  *  Layout bundles that omit the define have no `process`. A missing flag is off. Only the exact string "true" enables it.
  *  Each row is a value the nation list, the selected nation, the world clock, or the simulation already carries. A missing read is left out. */
+import { displayTimestamp } from './display-preferences.ts';
+import { gameDayAt } from './topbar-countdown.ts';
+import { spokenRemaining } from './veldwood-wallet-dividend.ts';
 import { ageHudLine, worldAgeAt } from './world-age.ts';
 
 export function worldAtlasFlag(): string | undefined {
@@ -22,8 +25,11 @@ export type WorldAtlasNation = {
   currency?: string | null;
   stability?: number | null;
 };
-/** Epoch and now are unix seconds from the world clock (`simulation.clock`). Absent until that read arrives. */
-export type WorldAtlasClock = { epochSeconds?: number | null; nowSeconds?: number | null } | null;
+/** Epoch and now are unix seconds from the world clock (`simulation.clock`). Absent until that read arrives.
+ *  `nextFestival` is the world read's own field (#1205): `at` is unix seconds, and `festivals` is every festival at that instant.
+ *  Missing or null means the row is left out. Names are shown as returned. */
+export type WorldAtlasNextFestival = { at?: number | null; festivals?: readonly { nationId?: string | null; name?: string | null }[] | null } | null;
+export type WorldAtlasClock = { epochSeconds?: number | null; nowSeconds?: number | null; nextFestival?: WorldAtlasNextFestival } | null;
 /** Wars, embargoes and war proposals already on `simulation`. Each field is attached only while its own flag is on:
  *  `wars` while HARIMU_WAR_ENABLED, `embargoes` while HARIMU_EMBARGO_ENABLED,
  *  `warProposals` while HARIMU_WAR_ENABLED and HARIMU_WAR_ASSEMBLY_ENABLED. A missing field is that source off, or not loaded. */
@@ -65,10 +71,33 @@ function openDisputes(disputes: WorldAtlasDisputes | undefined, nation: WorldAtl
   return value;
 }
 
+/** The festival names and instant on `clock.nextFestival`. The date is the UTC stamp other records use; the day is the clock chip's Day count.
+ *  A spoken remainder ("in 3 days") is added only when that helper can say one. No name, or no usable instant: nothing, never a stand-in. */
+function nextFestivalLine(clock: WorldAtlasClock | undefined): string | null {
+  const next = clock?.nextFestival;
+  if (next == null) return null;
+  const at = next.at;
+  if (typeof at !== 'number' || !Number.isSafeInteger(at)) return null;
+  const names = (Array.isArray(next.festivals) ? next.festivals : []).map(item => text(item?.name)).filter((name): name is string => name !== null);
+  if (names.length === 0) return null;
+  const dated = displayTimestamp(at * 1000);
+  if (dated === 'Time unavailable') return null;
+  const parts = [names.join(' · '), dated];
+  const epoch = clock?.epochSeconds;
+  if (typeof epoch === 'number' && Number.isFinite(epoch)) parts.push(`Day ${gameDayAt(epoch, at)}`);
+  const now = clock?.nowSeconds;
+  if (typeof now === 'number' && Number.isFinite(now)) {
+    const relative = spokenRemaining((at - now) * 1000);
+    if (relative) parts.push(`in ${relative}`);
+  }
+  return parts.join(' · ');
+}
+
 /** Rows for the atlas. Nation count is the length of the nation read. World age uses the clock's own Age line.
  *  Open disputes counts wars, embargoes and war proposals already on the simulation, and only the sources whose field is present.
+ *  Next festival is the names and instant on `clock.nextFestival`, or left out when that field is missing or null.
  *  Population, capital, government, economy, currency and stability are the selected nation's fields.
- *  There is no named epoch, language, law count, or world festival on these reads, so those rows are not built. */
+ *  There is no named epoch, language, or law count on these reads, so those rows are not built. */
 export function worldAtlasStats(input: { nations: readonly unknown[]; nation?: WorldAtlasNation | null; clock?: WorldAtlasClock; disputes?: WorldAtlasDisputes }): WorldAtlasStat[] {
   const stats: WorldAtlasStat[] = [];
   if (input.nations.length > 0) stats.push({ label: 'Nations', value: String(input.nations.length) });
@@ -79,6 +108,8 @@ export function worldAtlasStats(input: { nations: readonly unknown[]; nation?: W
   }
   const disputes = openDisputes(input.disputes, input.nation);
   if (disputes) stats.push({ label: 'Open disputes', value: disputes });
+  const festival = nextFestivalLine(input.clock);
+  if (festival) stats.push({ label: 'Next festival', value: festival });
   const nation = input.nation;
   if (nation) {
     const population = text(nation.population), capital = text(nation.capital), government = text(nation.government), economy = text(nation.economy), currency = text(nation.currency);

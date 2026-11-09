@@ -186,6 +186,13 @@
       "HARIMU_WORLD_ATLAS_READS_ENABLED": "true",
       // #1207: Varkand next Rotation Day (existing Chair term = 60 real days). Off: no rotationDay key. Date only. Canceled only while a stored Red Alert holds.
       "HARIMU_VARKAND_ROTATION_DAY_ENABLED": "true",
+      // #1208: Hoarvale next Opening of the Moot (start of the next Moot term, zero offset). Off: no mootOpening key. Date only.
+      "HARIMU_HOARVALE_MOOT_OPENING_ENABLED": "true",
+      // #1211: Varkand next Lantern Watch (once per 30 real days, no offset). Off: no lanternWatch key. Date only.
+      "HARIMU_VARKAND_LANTERN_WATCH_ENABLED": "true",
+      "HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED": "true",
+      // #1219: Hoarvale next Election Night (the election that ends the current Moot term, zero offset). Off: no electionNight key. Date only.
+      "HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED": "true",
       // #1220: Varkand celebrations on the government read are marked canceled at a stored Red Alert. Off: the read is unchanged. Dates stay put. The Mandate Plebiscite is not marked.
       "HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED": "true"
     },
@@ -389,7 +396,8 @@
       "NEXT_PUBLIC_HARIMU_SELECTED_NATION_GLOW": "true",
       "NEXT_PUBLIC_HARIMU_RESOURCE_BAR": "true",
       "NEXT_PUBLIC_HARIMU_ZOOM_PATH": "true",
-      "NEXT_PUBLIC_HARIMU_NATION_ACCENT": "true"
+      "NEXT_PUBLIC_HARIMU_NATION_ACCENT": "true",
+      "NEXT_PUBLIC_HARIMU_CITY_PALETTE": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
