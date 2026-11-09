@@ -39,6 +39,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.assemblyElection?{assemblyElection:snapshot.assemblyElection}:{}), // #1123: Confluence People's Assembly window (readGovernment adds it only while the flag is on)
   ...(snapshot.canalFestival?{canalFestival:snapshot.canalFestival}:{}), // #1165: next Canal Festival (readGovernment adds it only while the flag is on)
   ...(snapshot.quotaDay?{quotaDay:snapshot.quotaDay}:{}), // #1169: next Quota Day (readGovernment adds it only while the flag is on)
+  ...(snapshot.congressLanterns?{congressLanterns:snapshot.congressLanterns}:{}), // #1183: next Congress Lanterns (readGovernment adds it only while the flag is on)
   ...(snapshot.planCalendar?{planCalendar:snapshot.planCalendar}:{}), // #1116: Korund Plan Day and Quota Rally (readGovernment adds it only while the flag is on)
   ...(snapshot.chairmanBirthday?{chairmanBirthday:snapshot.chairmanBirthday}:{}), // #1147: next Chairman's Birthday (readGovernment adds it only while the flag is on)
   ...(snapshot.peoplesCongress?{peoplesCongress:snapshot.peoplesCongress}:{}), // #1170: next People's Congress (readGovernment adds it only while the flag is on)

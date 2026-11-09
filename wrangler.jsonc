@@ -169,7 +169,9 @@
       // #1179: Fulmara next Charter Day (once per game year = 30 real days, zero offset). Off: no charterDay key. Date only.
       "HARIMU_FULMARA_CHARTER_DAY_ENABLED": "true",
       // #1184: Fulmara next Fair-Wind Blessing (once per game year = 30 real days, no offset). Off: no fairWindBlessing key. Holds the next date only.
-      "HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED": "true"
+      "HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED": "true",
+      // #1183: Confluence next Congress Lanterns (once per game year = 30 real days, no offset). Off: no congressLanterns key. Date only.
+      "HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

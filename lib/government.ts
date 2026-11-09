@@ -2,6 +2,7 @@ import { AURELLE_HEARTH_NIGHT_CYCLE_DAYS, aurelleNextHearthNightAt } from './aur
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
 import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
 import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_PILLARS, CONFLUENCE_TERM_LIMIT_CONGRESSES, confluenceNextPartyCongressAt } from './confluence-party.ts';
+import { CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS, confluenceNextCongressLanternsAt } from './confluence-congress-lanterns.ts';
 import { CONFLUENCE_QUOTA_DAY_CYCLE_DAYS, confluenceNextQuotaDayAt } from './confluence-quota-day.ts';
 import { kindleElectionClock, type KindleElectionClock } from './kindle-election.ts';
 import { KORUND_CHAIRMAN_BIRTHDAY_CYCLE_DAYS, korundNextChairmanBirthdayAt } from './korund-chairman-birthday.ts';
@@ -76,6 +77,8 @@ export type GovernmentSnapshot = {
   assemblyElection?: { cycleStartedAt: number; nextElectionAt: number; intervalDays: 150; ballotOpen: false; leadershipHeedsResult: false };
   /** #1169 Confluence: next Quota Day (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED is on. States no quota, target, or bonus. */
   quotaDay?: { nextAt: number; cycleDays: 30 };
+  /** #1183 Confluence: next Congress Lanterns (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED is on. Date only: no lantern count, delegate list, or Party text. */
+  congressLanterns?: { nextAt: number; cycleDays: 30 };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   /** #1133 Meridian: next Exam Day. Present only while HARIMU_MERIDIAN_EXAM_DAY_ENABLED is on. */
@@ -615,6 +618,12 @@ export function withConfluenceAssemblyElection(snapshot: GovernmentSnapshot, now
 export function withConfluenceQuotaDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
   return { ...snapshot, quotaDay: { nextAt: confluenceNextQuotaDayAt(nowMs), cycleDays: CONFLUENCE_QUOTA_DAY_CYCLE_DAYS as 30 } };
+}
+
+/** #1183. Flag off, or any nation but Confluence: the same snapshot, and no congressLanterns key. Date only. */
+export function withConfluenceCongressLanterns(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'confluence') return snapshot;
+  return { ...snapshot, congressLanterns: { nextAt: confluenceNextCongressLanternsAt(nowMs), cycleDays: CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS } };
 }
 
 /** Confluence read while the flag is on. Confluence has no other government snapshot, so this is the smallest one that carries the party block. Flag off returns null, which is today's read. */
