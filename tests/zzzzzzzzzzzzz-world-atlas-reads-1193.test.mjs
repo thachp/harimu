@@ -2,18 +2,21 @@
  *  nextFestival is the earliest date among the nation holiday clocks whose own flags are on, with every festival at that instant.
  *  #1214: Aurelle Coronation Day and Charter Fair join worldFestivalSources (no new flag; GRAY unchanged at 62).
  *  #1228: Hoarvale Opening of the Moot joins worldFestivalSources on its own flag (no new flag; GRAY unchanged).
- *  #1231: Kindle Ballot Night joins on HARIMU_KINDLE_ELECTION_CLOCK_ENABLED (no new flag; GRAY unchanged). A missing cycle start skips it. */
+ *  #1231: Kindle Ballot Night joins on HARIMU_KINDLE_ELECTION_CLOCK_ENABLED (no new flag; GRAY unchanged). A missing cycle start skips it.
+ *  #1236/#1237: Varkand Lantern Watch and Ilmar Assembly Election join on their existing flags (no new flag; GRAY unchanged). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { displayTimestamp } from '../lib/display-preferences.ts';
-import { hoarvaleMootAt, hoarvaleMootOpeningSnapshot, ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot, varkandGovernmentSnapshot, varkandRotationDaySnapshot } from '../lib/government.ts';
+import { hoarvaleMootAt, hoarvaleMootOpeningSnapshot, ilmarAssemblyElectionDaySnapshot, ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot, varkandGovernmentSnapshot, varkandLanternWatchSnapshot, varkandRotationDaySnapshot } from '../lib/government.ts';
+import { ilmarNextAssemblyElectionDayAt } from '../lib/ilmar-assembly-election-day.ts';
 import { ilmarNextGreatPilgrimageAt } from '../lib/ilmar-great-pilgrimage.ts';
 import { ilmarNextGreatPilgrimageAt as sanctumNextGreatPilgrimageAt } from '../lib/ilmar-sanctum.ts';
 import { hoarvaleNextMootOpeningAt } from '../lib/hoarvale-moot-opening.ts';
 import { gameDayAt } from '../lib/topbar-countdown.ts';
 import { varkandChairAt } from '../lib/varkand-directorate.ts';
+import { varkandNextLanternWatchAt } from '../lib/varkand-lantern-watch.ts';
 import { varkandNextRotationDayAt } from '../lib/varkand-rotation-day.ts';
 import { spokenRemaining } from '../lib/veldwood-wallet-dividend.ts';
 import { ageHudLine, worldAgeAt } from '../lib/world-age.ts';
@@ -43,7 +46,7 @@ test('pure: earliest enabled source wins, ties list every festival in source ord
 });
 
 test('pure: the real sources are docs-named, one clock each, all ten nations, Stilldays left out', () => {
-  assert.equal(worldFestivalSources.length, 31);
+  assert.equal(worldFestivalSources.length, 33);
   assert.deepEqual([...new Set(worldFestivalSources.map(s => s.nationId))], ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']);
   assert.equal(worldFestivalSources.some(s => /stillday/i.test(s.name)), false);
   for (const s of worldFestivalSources) assert.match(s.flag, /^HARIMU_[A-Z_]+_ENABLED$/);
@@ -416,4 +419,77 @@ test('#1231: Ballot Night wins nextFestival when it is the earliest, on the gove
   assert.deepEqual(clock.nextFestival, { at: at / 1000, festivals: [{ nationId: 'kindle', name: 'Ballot Night' }] });
   assert.equal(clock.nextFestival.at * 1000, government.electionClock.nextBallotNightAt, 'the atlas date equals the Kindle government read');
   assert.equal(government.electionClock.nextBallotNightAt, at);
+});
+
+test('#1237: Lantern Watch is skipped while its flag is off and equals the Varkand government date when on', async t => {
+  const L = 'HARIMU_VARKAND_LANTERN_WATCH_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Lantern Watch');
+  assert.equal(source.nationId, 'varkand');
+  assert.equal(source.flag, L, 'the nextFestival candidate uses the existing Lantern Watch flag');
+  assert.equal(source.nextAt, varkandNextLanternWatchAt);
+  assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'varkand').map(s => s.name), ['Muster Day', 'Rotation Day', 'Mandate Plebiscite', 'Lantern Watch'], 'docs Varkand holiday order');
+  const now = Date.UTC(2026, 10, 9);
+  const picks = env => (worldNextFestival(now, env)?.festivals ?? []).filter(item => item.name === 'Lantern Watch');
+  assert.deepEqual(picks({}), [], 'flag off skips it');
+  assert.deepEqual(picks({ [L]: 'false' }), []);
+  assert.equal(worldNextFestival(now, { [L]: 'false' }), null);
+  assert.equal(varkandLanternWatchSnapshot(now, false), null, 'flag off: no government clock');
+  const at = varkandNextLanternWatchAt(now);
+  assert.equal(source.nextAt(now), varkandLanternWatchSnapshot(now, true).lanternWatch.nextAt, 'same date as the government read');
+  assert.deepEqual(worldNextFestival(now, { [L]: 'true' }), { at: at / 1000, festivals: [{ nationId: 'varkand', name: 'Lantern Watch' }] });
+  const later = { nationId: 'kindle', name: 'Later Fair', flag: 'HARIMU_LATER_FAIR_ENABLED', nextAt: () => at + DAY };
+  assert.deepEqual(worldNextFestival(now, { [L]: 'true', HARIMU_LATER_FAIR_ENABLED: 'true' }, [later, source]), { at: at / 1000, festivals: [{ nationId: 'varkand', name: 'Lantern Watch' }] }, 'it wins when it is the earliest');
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='varkand' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  let clock = (await r.call('world')).data.simulation.clock;
+  let government = (await r.call('citizen', 'alice')).data.government;
+  assert.equal((clock.nextFestival?.festivals ?? []).some(item => item.name === 'Lantern Watch'), false);
+  assert.equal('nextFestival' in clock, false, 'flag off: nextFestival absent');
+  assert.equal(government == null || !('lanternWatch' in government), true, 'flag off: no lanternWatch');
+  r.setFixtureEnv(L, 'true');
+  clock = (await r.call('world')).data.simulation.clock;
+  government = (await r.call('citizen', 'alice')).data.government;
+  const readAt = government.lanternWatch.nextAt;
+  assert.equal(readAt, varkandNextLanternWatchAt(clock.nowSeconds * 1000));
+  assert.deepEqual(clock.nextFestival, { at: readAt / 1000, festivals: [{ nationId: 'varkand', name: 'Lantern Watch' }] });
+  assert.equal(clock.nextFestival.at * 1000, readAt, 'the atlas date equals the Varkand government read');
+});
+
+test('#1236: Assembly Election is skipped while its flag is off and equals the Ilmar government date when on', async t => {
+  const A = 'HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED';
+  const S = 'HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Assembly Election');
+  assert.equal(source.nationId, 'ilmar');
+  assert.equal(source.flag, A, 'the nextFestival candidate uses the existing Assembly Election flag');
+  assert.equal(source.nextAt, ilmarNextAssemblyElectionDayAt);
+  assert.equal(worldFestivalSources.some(s => s.flag === S), false, 'Stilldays stay on the sanctum flag');
+  assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'ilmar').map(s => s.name), ['Feast of First Light', 'Assembly Election', 'Great Pilgrimage'], 'docs Ilmar holiday order; Stilldays stay out');
+  const now = Date.UTC(2026, 10, 9);
+  const picks = env => (worldNextFestival(now, env)?.festivals ?? []).filter(item => item.name === 'Assembly Election');
+  assert.deepEqual(picks({}), [], 'flag off skips it');
+  assert.deepEqual(picks({ [A]: 'false' }), []);
+  assert.deepEqual(picks({ [S]: 'true' }), [], 'sanctum on does not pick Assembly Election');
+  assert.equal(worldNextFestival(now, { [A]: 'false' }), null);
+  assert.equal(ilmarAssemblyElectionDaySnapshot(now, false), null, 'flag off: no government clock');
+  const at = ilmarNextAssemblyElectionDayAt(now);
+  assert.equal(source.nextAt(now), ilmarAssemblyElectionDaySnapshot(now, true).assemblyElectionDay.nextAt, 'same date as the government read');
+  assert.deepEqual(worldNextFestival(now, { [A]: 'true' }), { at: at / 1000, festivals: [{ nationId: 'ilmar', name: 'Assembly Election' }] });
+  const later = { nationId: 'kindle', name: 'Later Fair', flag: 'HARIMU_LATER_FAIR_ENABLED', nextAt: () => at + DAY };
+  assert.deepEqual(worldNextFestival(now, { [A]: 'true', HARIMU_LATER_FAIR_ENABLED: 'true' }, [later, source]), { at: at / 1000, festivals: [{ nationId: 'ilmar', name: 'Assembly Election' }] }, 'it wins when it is the earliest');
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='ilmar' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  let clock = (await r.call('world')).data.simulation.clock;
+  let government = (await r.call('citizen', 'alice')).data.government;
+  assert.equal((clock.nextFestival?.festivals ?? []).some(item => item.name === 'Assembly Election'), false);
+  assert.equal('nextFestival' in clock, false, 'flag off: nextFestival absent');
+  assert.equal(government == null || !('assemblyElectionDay' in government), true, 'flag off: no assemblyElectionDay');
+  r.setFixtureEnv(A, 'true');
+  clock = (await r.call('world')).data.simulation.clock;
+  government = (await r.call('citizen', 'alice')).data.government;
+  const readAt = government.assemblyElectionDay.nextAt;
+  assert.equal(readAt, ilmarNextAssemblyElectionDayAt(clock.nowSeconds * 1000));
+  assert.deepEqual(clock.nextFestival, { at: readAt / 1000, festivals: [{ nationId: 'ilmar', name: 'Assembly Election' }] });
+  assert.equal(clock.nextFestival.at * 1000, readAt, 'the atlas date equals the Ilmar government read');
 });
