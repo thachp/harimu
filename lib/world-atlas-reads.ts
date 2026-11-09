@@ -3,10 +3,12 @@
  *  Next festival: the earliest upcoming date among the nation holiday clocks already on the government reads. Each one counts only while its own flag is on.
  *  [ASSUMPTION] A "festival" is an entry in a nation page's "Holidays & festivals" row (harimu-docs content/world/nations/*.mdx) that has a clock helper.
  *  Ilmar Stilldays are left out: the docs call them weekly rest, so they would always be next. Rows without a clock (Kindle Ballot Night, Aurelle
- *  Coronation Day, Hoarvale Opening of the Moot, Varkand Lantern Watch, Veldwood Glade Festival, ...) are not invented here.
+ *  Heir's Naming, Hoarvale Opening of the Moot, Varkand Lantern Watch, Veldwood Glade Festival, ...) are not invented here.
  *  [ASSUMPTION] Ties: every festival at the earliest instant is listed, in docs roster order (content/world/cultures.mdx), then in the nation row's order.
  *  Dates only: no bonus, holiday effect, or Red Alert cancellation is applied. */
 import { flagOn } from './flag-pack.mjs';
+import { aurelleNextCharterFairAt } from './aurelle-charter-fair.ts';
+import { aurelleNextCoronationDayAt } from './aurelle-coronation-day.ts';
 import { aurelleNextHearthNightAt } from './aurelle-hearth-night.ts';
 import { confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { confluenceNextCongressLanternsAt } from './confluence-congress-lanterns.ts';
@@ -57,7 +59,9 @@ export const worldFestivalSources: readonly WorldFestivalSource[] = [
   f('korund', 'Quota Rally', 'KORUND_PLAN_CALENDAR', korundNextQuotaRallyAt),
   f('korund', "Chairman's Birthday", 'KORUND_CHAIRMAN_BIRTHDAY', korundNextChairmanBirthdayAt),
   f('korund', "People's Congress", 'KORUND_PEOPLES_CONGRESS', korundNextPeoplesCongressAt),
+  f('aurelle', 'Coronation Day', 'AURELLE_CORONATION_DAY', aurelleNextCoronationDayAt),
   f('aurelle', 'Hearth Night', 'AURELLE_HEARTH_NIGHT', aurelleNextHearthNightAt),
+  f('aurelle', 'Charter Fair', 'AURELLE_CHARTER_FAIR', aurelleNextCharterFairAt),
   f('ilmar', 'Feast of First Light', 'ILMAR_FEAST_OF_FIRST_LIGHT', ilmarNextFeastOfFirstLightAt),
   f('ilmar', 'Great Pilgrimage', 'ILMAR_GREAT_PILGRIMAGE', ilmarNextGreatPilgrimageAt),
   f('hoarvale', 'Honors List Day', 'HOARVALE_HONORS_LIST_DAY', hoarvaleNextHonorsListDayAt),
