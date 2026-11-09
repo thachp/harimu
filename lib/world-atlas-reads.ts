@@ -19,7 +19,7 @@ import { fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
 import { hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
-import { ilmarNextGreatPilgrimageAt } from './ilmar-sanctum.ts';
+import { ilmarNextGreatPilgrimageAt } from './ilmar-great-pilgrimage.ts';
 import { kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 import { kindleNextMarketBellAt } from './kindle-market-bell.ts';
 import { korundNextChairmanBirthdayAt } from './korund-chairman-birthday.ts';
@@ -59,7 +59,7 @@ export const worldFestivalSources: readonly WorldFestivalSource[] = [
   f('korund', "People's Congress", 'KORUND_PEOPLES_CONGRESS', korundNextPeoplesCongressAt),
   f('aurelle', 'Hearth Night', 'AURELLE_HEARTH_NIGHT', aurelleNextHearthNightAt),
   f('ilmar', 'Feast of First Light', 'ILMAR_FEAST_OF_FIRST_LIGHT', ilmarNextFeastOfFirstLightAt),
-  f('ilmar', 'Great Pilgrimage', 'ILMAR_SANCTUM_CALENDAR', ilmarNextGreatPilgrimageAt),
+  f('ilmar', 'Great Pilgrimage', 'ILMAR_GREAT_PILGRIMAGE', ilmarNextGreatPilgrimageAt),
   f('hoarvale', 'Honors List Day', 'HOARVALE_HONORS_LIST_DAY', hoarvaleNextHonorsListDayAt),
   f('hoarvale', 'Aurora Night', 'HOARVALE_AURORA_NIGHT', hoarvaleNextAuroraNightAt),
   f('varkand', 'Muster Day', 'VARKAND_MUSTER_DAY', varkandNextMusterDayAt),

@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
+import { ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot } from '../lib/government.ts';
+import { ilmarNextGreatPilgrimageAt } from '../lib/ilmar-great-pilgrimage.ts';
+import { ilmarNextGreatPilgrimageAt as sanctumNextGreatPilgrimageAt } from '../lib/ilmar-sanctum.ts';
 import { worldAtlasClockFields, worldAtlasReadsEnabled, worldFestivalSources, worldNextFestival } from '../lib/world-atlas-reads.ts';
 import { fulmaraNextGrandRegattaAt } from '../lib/fulmara-grand-regatta.ts';
 import { meridianNextCongressWeekAt } from '../lib/meridian-congress-week.ts';
@@ -64,6 +67,57 @@ test('GET /api/world: flag off leaves simulation.clock unchanged; flag on adds n
   assert.deepEqual(Object.keys(rest).sort(), Object.keys(off).sort(), 'only nextFestival is added');
   r.setFixtureEnv('HARIMU_FULMARA_GRAND_REGATTA_ENABLED', 'false');
   assert.equal('nextFestival' in (await r.call('world')).data.simulation.clock, false, 'no festival flag on: absent');
+});
+
+test('#1215: Great Pilgrimage counts only while its own flag is on', async t => {
+  const P = 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED';
+  const S = 'HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Great Pilgrimage');
+  assert.equal(source.nationId, 'ilmar');
+  assert.equal(source.flag, P, 'the nextFestival candidate uses the pilgrimage flag, not the sanctum calendar');
+  assert.equal(source.nextAt, ilmarNextGreatPilgrimageAt);
+  assert.notEqual(source.nextAt, sanctumNextGreatPilgrimageAt);
+  assert.equal(worldFestivalSources.find(s => s.name === 'Feast of First Light').flag, 'HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED');
+  assert.equal(worldFestivalSources.some(s => s.flag === S), false, 'other sanctum calendar items stay on the sanctum flag');
+  const now = Date.UTC(2026, 10, 9);
+  const picks = env => (worldNextFestival(now, env)?.festivals ?? []).filter(item => item.name === 'Great Pilgrimage');
+  assert.deepEqual(picks({ [S]: 'true' }), [], 'pilgrimage off, sanctum on: nextFestival never picks it');
+  assert.equal('greatPilgrimage' in ilmarSanctumSnapshot(now, true), false);
+  assert.equal(ilmarGreatPilgrimageSnapshot(now, flagOn({ [S]: 'true' }, P)), null);
+  const on = worldNextFestival(now, { [P]: 'true' });
+  assert.deepEqual(on, { at: ilmarNextGreatPilgrimageAt(now) / 1000, festivals: [{ nationId: 'ilmar', name: 'Great Pilgrimage' }] });
+  assert.equal(ilmarGreatPilgrimageSnapshot(now, flagOn({ [P]: 'true' }, P)).greatPilgrimage.nextAt, ilmarNextGreatPilgrimageAt(now));
+  assert.equal('sanctum' in ilmarGreatPilgrimageSnapshot(now, true), false);
+  assert.deepEqual(picks({}), []);
+  assert.equal(worldNextFestival(now, {}), null, 'both off');
+  assert.equal(ilmarGreatPilgrimageSnapshot(now, false), null);
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='ilmar' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  const read = async () => {
+    const clock = (await r.call('world')).data.simulation.clock;
+    const government = (await r.call('citizen', 'alice')).data.government;
+    return { clock, government, picked: (clock.nextFestival?.festivals ?? []).some(item => item.name === 'Great Pilgrimage') };
+  };
+  let { clock, government, picked } = await read();
+  assert.equal(picked, false);
+  assert.equal('nextFestival' in clock, false, 'both off: nextFestival absent');
+  assert.equal(government == null || !('greatPilgrimage' in government), true, 'both off: no greatPilgrimage');
+  r.setFixtureEnv(S, 'true');
+  ({ clock, government, picked } = await read());
+  assert.equal(picked, false, 'pilgrimage off, sanctum on: nextFestival never picks it');
+  assert.equal('nextFestival' in clock, false);
+  assert.equal('greatPilgrimage' in government, false, 'pilgrimage off, sanctum on: no greatPilgrimage');
+  assert.equal('sanctum' in government, true);
+  r.setFixtureEnv(S, 'false');
+  r.setFixtureEnv(P, 'true');
+  ({ clock, government, picked } = await read());
+  const at = ilmarNextGreatPilgrimageAt(clock.nowSeconds * 1000);
+  assert.equal(picked, true, 'pilgrimage on, sanctum off: nextFestival picks it');
+  assert.deepEqual(clock.nextFestival, { at: at / 1000, festivals: [{ nationId: 'ilmar', name: 'Great Pilgrimage' }] });
+  assert.equal(government.greatPilgrimage.nextAt, at);
+  assert.equal(government.greatPilgrimage.cycleDays, 30);
+  assert.equal('sanctum' in government, false);
 });
 
 test('the flag is preview true and production false inside HARIMU_GRAY_PACK, last, and a direct string wins', () => {
