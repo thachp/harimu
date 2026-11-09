@@ -1,6 +1,7 @@
 /** #392 (from S7/#808): City side-panel rows match the map place pills.
  *  NEXT_PUBLIC_HARIMU_CITY_PLACE_ROWS is a HARIMU_UI_PACK key, preview on, production off.
- *  Flag off keeps the Household primary and the destination-card rows. */
+ *  Flag off keeps the Household primary and the destination-card rows.
+ *  Flag on keeps that primary after the place rows. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -46,7 +47,7 @@ test('pills and rows share cityPlaceIds: building order, labels, and the locatio
 });
 
 let panelMod;
-const render = async (places, icons = false, market = true, visitor = false) => {
+const render = async (places, icons = false, market = true, visitor = false, destinations) => {
   if (!panelMod) {
     const { build } = await import('esbuild');
     const out = await build({ entryPoints: [new URL('../app/scene-panels-v2.tsx', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
@@ -56,7 +57,7 @@ const render = async (places, icons = false, market = true, visitor = false) => 
     panelMod = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
   }
   const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
-  const props = { cityName: 'Forgehaven', city: { capital: true }, nation, destinations: cityDestinations('kindle', market), onView: () => {}, places, icons, visitor };
+  const props = { cityName: 'Forgehaven', city: { capital: true }, nation, destinations: destinations ?? cityDestinations('kindle', market), onView: () => {}, places, icons, visitor };
   return renderToStaticMarkup(React.createElement(panelMod.CitySummary, props));
 };
 const labels = html => [...html.matchAll(/<strong>([^<]*)<\/strong>/g)].map(m => m[1]);
@@ -83,7 +84,11 @@ test('flag on: five pill places, pill order, pill icons, keyboard buttons with a
   assert.match(pill, /square: UsersThree, home: House, workplace: Hammer, market: Storefront, government: Bank/);
   assert.match(pill, /icons\[location as CityPlaceId\]/);
   assert.match(pill, /icons\[id === 'household' \? 'home' : id\]/);
-  assert.doesNotMatch(html, /panel-v2-primary/);
+  assert.match(html, /class="panel-v2-primary"/);
+  assert.ok(html.indexOf('</ul>') < html.indexOf('panel-v2-primary'), 'rows first, then the Household primary');
+  assert.match(html, />Household</);
+  assert.doesNotMatch(html, /aria-label="Household:/, 'Your household and Household are already different names');
+  assert.doesNotMatch(html, /Open household/i);
   const buttons = [...html.matchAll(/<li><button type="button"(?! disabled)[^>]*>([\s\S]*?)<\/button><\/li>/g)];
   assert.equal(buttons.length, 5);
   for (const [, inner] of buttons) {
@@ -98,4 +103,22 @@ test('flag on: five pill places, pill order, pill icons, keyboard buttons with a
   assert.equal((hidden.match(/<li><button/g) ?? []).length, 4);
   const guest = await render(true, false, true, true);
   assert.equal(labels(guest)[1], 'Household');
+});
+
+test('flag on: the Household primary is present, and a matching row keeps the card detail in its name', async () => {
+  const html = await render(true, true);
+  assert.match(html, /<button type="button" class="panel-v2-primary"/);
+  assert.ok(html.indexOf('</ul>') < html.indexOf('panel-v2-primary'), 'keyboard order is rows, then the CTA');
+  assert.equal((html.match(/>Household</g) ?? []).length, 1);
+  assert.ok(labels(html).includes('Your household'));
+  assert.doesNotMatch(html.slice(html.indexOf('panel-v2-primary')), /tabindex="-1"/);
+  const guest = await render(true, false, true, true);
+  assert.match(guest, /aria-label="Household: Belongings and recovery"/);
+  assert.match(guest, /<strong>Household<\/strong><small>Food, belongings and recovery\.<\/small>/);
+  assert.match(guest, /class="panel-v2-primary"/);
+  assert.ok(guest.indexOf('</ul>') < guest.indexOf('panel-v2-primary'));
+  const noHome = cityDestinations('kindle', true).filter(card => card.id !== 'household');
+  assert.doesNotMatch(await render(true, false, true, false, noHome), /panel-v2-primary/);
+  assert.doesNotMatch(await render(false, false, true, false, noHome), /panel-v2-primary/);
+  assert.doesNotMatch(await render(true, false, true, true, noHome), /panel-v2-primary/);
 });

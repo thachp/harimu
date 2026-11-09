@@ -30,6 +30,7 @@ import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './v
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { VARKAND_ROTATION_DAY_CYCLE_DAYS, varkandNextRotationDayAt } from './varkand-rotation-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
@@ -117,6 +118,8 @@ export type GovernmentSnapshot = {
   honorsListDay?: { nextAt: number; intervalDays: 30; awardsTitles: false };
   /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
   auroraNight?: { nextAt: number; cycleDays: 30 };
+  /** #1208 Hoarvale: next Opening of the Moot (the next term start). Present only while HARIMU_HOARVALE_MOOT_OPENING_ENABLED is on. The next date only. */
+  mootOpening?: { nextAt: number };
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   /** #1207 Varkand: next Rotation Day (the existing 60-real-day Chair term). Present only while HARIMU_VARKAND_ROTATION_DAY_ENABLED is on. Date only. `canceled` is present only while a stored Red Alert holds. */
   rotationDay?: { nextAt: number; cycleDays: 60; canceled?: true };
@@ -223,6 +226,27 @@ export function withHoarvaleHonorsListDay(snapshot: GovernmentSnapshot, nowMs: n
 export function withHoarvaleAuroraNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
   return { ...snapshot, auroraNight: { nextAt: hoarvaleNextAuroraNightAt(nowMs), cycleDays: HOARVALE_AURORA_NIGHT_CYCLE_DAYS } };
+}
+
+/** #1208. Flag off, or any nation but Hoarvale: the same snapshot, and no mootOpening key. The next date only. */
+export function withHoarvaleMootOpening(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, mootOpening: { nextAt: hoarvaleNextMootOpeningAt(nowMs) } };
+}
+
+/** Hoarvale read while only the Opening of the Moot flag is on. No moot, honorsListDay, or auroraNight key. Flag off returns null, which is today's read. */
+export function hoarvaleMootOpeningSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withHoarvaleMootOpening({
+    nationId: 'hoarvale', mode: 'rule-bound simulation',
+    roles: [{ name: 'Opening of the Moot', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Opening of the Moot', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Opening of the Moot is the start of the next Moot term. This read names the next date. It quotes no rite and names no members.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Opening of the Moot. It quotes no rite and names no members.',
+  }, nowMs, true);
 }
 
 /** #1151. Flag off, or any nation but Varkand: the same snapshot, and no musterDay key. Musters no troops, changes no Alert Level. */
