@@ -3,7 +3,7 @@
  *  [ASSUMPTION] Docs §7.5 name Coronation Day and give no interval. Cadence is one game year, zero offset.
  *  The read is a date only: no rite text, Privy Council roster, or Crown debasement figures.
  *  The zzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzz-fulmara-charter-day-1179 so --test-shard
- *  does not move earlier files. Opened from origin/dev 34dcd4e, where Charter Day was last (GRAY 54). */
+ *  does not move earlier files. Merged origin/dev 5eeebe48 (GRAY 58, #1189 last). Coronation Day is GRAY 59. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -93,11 +93,11 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key, 'GRAY 55, after #1179 Charter Day');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key, 'GRAY 59, after #1189 Congress Week');
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), 'HARIMU_FULMARA_CHARTER_DAY_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 55);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 59);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

@@ -1,0 +1,21 @@
+/* #392 zoom path. Tokens are the S2 chip (ground #071820, chip #0d2530, gold #f1d58a, paper #f3ecd6)
+   and the S1 crest edge (#d0ad54). The nav lives in the stage overlay or the country header, both below the HUD,
+   so it does not cover the resource bar, the clock chip, the zoom rail, the camera bar or the citizen dock.
+   Flag off: every rule starts at .game-zoom-path or .game-zoom-on, which the shell adds only while the flag is on. */
+.game-zoom-path{--s2-ground:#071820;--s2-chip:#0d2530;--s2-paper:#f3ecd6;--s2-gold:#f1d58a;--crest-edge:#d0ad54;position:static;z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;max-width:100%;margin:0;padding:4px 8px;background:var(--s2-chip);color:var(--s2-paper);border:1px solid var(--crest-edge);border-radius:8px;pointer-events:auto;font-size:calc(12px * var(--text-scale, 1));line-height:1.3}
+.game-zoom-path a,.game-zoom-path [aria-current=page]{display:inline-flex;align-items:center;min-height:32px;padding:2px 4px;color:var(--s2-paper);text-decoration:none}
+.game-zoom-path [aria-current=page]{color:var(--s2-gold)}
+.game-zoom-path a:hover{color:var(--s2-gold)}
+.game-zoom-path a:focus-visible{outline:2px solid var(--s2-paper);outline-offset:2px}
+.game-zoom-path-sep{color:var(--s2-gold)}
+@media(max-width:760px){.harimu-game .game-zoom-path a{min-width:44px;min-height:44px;justify-content:center}}
+@media(prefers-reduced-motion:no-preference){
+  html:not([data-harimu-reduced-motion]) .game-zoom-on.game-zoom-world .game-stage{animation:zoom-path-world 280ms ease}
+  html:not([data-harimu-reduced-motion]) .game-zoom-on.game-zoom-country .game-stage{animation:zoom-path-country 280ms ease}
+  html:not([data-harimu-reduced-motion]) .game-zoom-on.game-zoom-square .game-stage{animation:zoom-path-square 280ms ease}
+}
+@keyframes zoom-path-world{from{opacity:.45}to{opacity:1}}
+@keyframes zoom-path-country{from{opacity:.45}to{opacity:1}}
+@keyframes zoom-path-square{from{opacity:.45}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.game-zoom-on .game-stage{animation:none}}
+html[data-harimu-reduced-motion] .game-zoom-on .game-stage{animation:none}

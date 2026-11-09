@@ -168,6 +168,14 @@
       "HARIMU_FULMARA_GRAND_REGATTA_ENABLED": "true",
       // #1179: Fulmara next Charter Day (once per game year = 30 real days, zero offset). Off: no charterDay key. Date only.
       "HARIMU_FULMARA_CHARTER_DAY_ENABLED": "true",
+      // #1184: Fulmara next Fair-Wind Blessing (once per game year = 30 real days, no offset). Off: no fairWindBlessing key. Holds the next date only.
+      "HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED": "true",
+      // #1183: Confluence next Congress Lanterns (once per game year = 30 real days, no offset). Off: no congressLanterns key. Date only.
+      "HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED": "true",
+      // #1187: Fulmara next Dock Strike remembrance (once per game year = 30 real days). Off: no dockStrikeRemembrance key. Holds no remembrance.
+      "HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED": "true",
+      // #1189: Meridian next Congress Week (every 5 game years = 150 real days). Off: no congressWeek key. Date only.
+      "HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED": "true",
       // #1191: Aurelle next Coronation Day (once per game year = 30 real days, zero offset). Off: no coronationDay key. Date only.
       "HARIMU_AURELLE_CORONATION_DAY_ENABLED": "true"
     },
@@ -367,7 +375,10 @@
       "NEXT_PUBLIC_HARIMU_NATION_OVERVIEW": "true",
       "NEXT_PUBLIC_HARIMU_GLOBE_RIM": "true",
       "NEXT_PUBLIC_HARIMU_CITY_PLACE_ROWS": "true",
-      "NEXT_PUBLIC_HARIMU_WORLD_ATLAS": "true"
+      "NEXT_PUBLIC_HARIMU_WORLD_ATLAS": "true",
+      "NEXT_PUBLIC_HARIMU_SELECTED_NATION_GLOW": "true",
+      "NEXT_PUBLIC_HARIMU_RESOURCE_BAR": "true",
+      "NEXT_PUBLIC_HARIMU_ZOOM_PATH": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
