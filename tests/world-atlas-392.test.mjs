@@ -4,6 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { expandFlagPacks, FLAG_PACKS, varsForProcessEnv } from '../lib/flag-pack.mjs';
+import { displayTimestamp } from '../lib/display-preferences.ts';
+import { gameDayAt } from '../lib/topbar-countdown.ts';
 import { ageHudLine, worldAgeAt } from '../lib/world-age.ts';
 import { worldAtlasEnabled, worldAtlasStats } from '../lib/world-atlas.ts';
 
@@ -48,6 +50,73 @@ test('rows use the nation read and the world clock, and a missing read is omitte
   assert.deepEqual(noClock.map(row => row.label), ['Nations', 'Capital']);
 });
 
+test('open disputes counts only sources whose field is present', () => {
+  const nations = [{ id: 'kindle' }, { id: 'korund' }];
+  const row = rows => worldAtlasStats({ nations, disputes: rows }).find(item => item.label === 'Open disputes');
+  assert.equal(row(null), undefined, 'not loaded');
+  assert.equal(row({}), undefined, 'all three source flags off');
+  assert.equal(row({ wars: undefined, embargoes: undefined, warProposals: undefined }), undefined);
+  assert.equal(row({ wars: { wars: [] } }).value, 'None', 'one source on and nothing open');
+  assert.equal(row({ wars: { wars: [{ status: 'ended', attacker: 'kindle', defender: 'korund' }] } }).value, 'None');
+  assert.equal(row({ embargoes: { embargoes: [{ status: 'in-force', actor: 'korund', target: 'aurelle' }] } }).value, '1 · 1 embargo');
+  const mixed = row({
+    wars: { wars: [
+      { status: 'active', attacker: 'korund', defender: 'aurelle' },
+      { status: 'mobilizing', attacker: 'kindle', defender: 'korund' },
+      { status: 'ended', attacker: 'kindle', defender: 'aurelle' },
+    ] },
+    embargoes: { embargoes: [
+      { status: 'in-force', actor: 'kindle', target: 'aurelle' },
+      { status: 'in-force', actor: 'aurelle', target: 'korund' },
+      { status: 'proposed', actor: 'kindle', target: 'korund' },
+      { status: 'lifted', actor: 'korund', target: 'kindle' },
+    ] },
+    warProposals: [
+      { status: 'proposed', defender: 'aurelle' },
+      { status: 'approved', defender: 'korund' },
+      { status: 'rejected', defender: 'aurelle' },
+    ],
+  });
+  assert.equal(mixed.value, '5 · 2 wars · 2 embargoes · 1 proposal');
+  const kindle = worldAtlasStats({
+    nations, nation: { id: 'kindle', shortName: 'Kindle', capital: 'Forgehaven' }, clock: { epochSeconds: 1_700_000_000, nowSeconds: 1_700_000_000 },
+    disputes: {
+      wars: { wars: [{ status: 'active', attacker: 'kindle', defender: 'korund' }] },
+      embargoes: { embargoes: [{ status: 'in-force', actor: 'aurelle', target: 'korund' }, { status: 'in-force', actor: 'korund', target: 'aurelle' }] },
+    },
+  });
+  assert.deepEqual(kindle.map(item => item.label), ['Nations', 'World age', 'Open disputes', 'Capital']);
+  assert.equal(kindle.find(item => item.label === 'Open disputes').value, '3 · 1 war · 2 embargoes · Kindle in 1');
+  assert.equal(kindle.find(item => item.label === 'World age').value, ageHudLine(worldAgeAt(1_700_000_000_000, 1_700_000_000_000)));
+  const other = row({ wars: { wars: [{ status: 'active', attacker: 'kindle', defender: 'korund' }] } });
+  const wide = worldAtlasStats({ nations, nation: { id: 'confluence', shortName: 'Confluence' }, disputes: { wars: { wars: [{ status: 'active', attacker: 'kindle', defender: 'korund' }] } } });
+  assert.equal(other.value, '1 · 1 war');
+  assert.equal(wide.find(item => item.label === 'Open disputes').value, '1 · 1 war');
+  assert.equal(worldAtlasStats({ nations: [], disputes: { warProposals: [{ status: 'proposed', defender: 'korund' }] }, nation: { id: 'korund' } }).find(item => item.label === 'Open disputes').value, '1 · 1 proposal · Korund in 1');
+  assert.equal(worldAtlasStats({ nations: [], disputes: { warProposals: [{ status: 'proposed', defender: 'korund' }] }, nation: { id: 'kindle' } }).find(item => item.label === 'Open disputes').value, '1 · 1 proposal · Kindle in 1');
+});
+
+test('next festival shows the names and instant on the read, and is omitted when missing or null', () => {
+  const epoch = 1_700_000_000, now = epoch, at = epoch + 3 * 86400;
+  const when = [displayTimestamp(at * 1000), `Day ${gameDayAt(epoch, at)}`, 'in 3 days'].join(' · ');
+  const rows = worldAtlasStats({
+    nations: [{ id: 'fulmara' }], nation: { id: 'fulmara', capital: 'Harbor' },
+    clock: { epochSeconds: epoch, nowSeconds: now, nextFestival: { at, festivals: [{ nationId: 'fulmara', name: 'Grand Regatta' }] } },
+    disputes: { wars: { wars: [] } },
+  });
+  assert.deepEqual(rows.map(row => row.label), ['Nations', 'World age', 'Open disputes', 'Next festival', 'Capital']);
+  assert.equal(rows.find(row => row.label === 'World age').value, ageHudLine(worldAgeAt(epoch * 1000, now * 1000)));
+  assert.equal(rows.find(row => row.label === 'Open disputes').value, 'None');
+  assert.equal(rows.find(row => row.label === 'Next festival').value, `Grand Regatta · ${when}`);
+  const tied = worldAtlasStats({ nations: [], clock: { epochSeconds: epoch, nowSeconds: now, nextFestival: { at, festivals: [{ nationId: 'aurelle', name: 'Coronation Day' }, { nationId: 'aurelle', name: 'Charter Fair' }] } } });
+  assert.equal(tied.find(row => row.label === 'Next festival').value, `Coronation Day · Charter Fair · ${when}`);
+  const bare = { nations: [{ id: 'fulmara' }], clock: { epochSeconds: epoch, nowSeconds: now } };
+  assert.equal(worldAtlasStats(bare).some(row => row.label === 'Next festival'), false);
+  assert.equal(worldAtlasStats({ ...bare, clock: { ...bare.clock, nextFestival: null } }).some(row => row.label === 'Next festival'), false);
+  assert.equal(worldAtlasStats({ nations: [], clock: { epochSeconds: epoch, nowSeconds: now, nextFestival: { at, festivals: [] } } }).some(row => row.label === 'Next festival'), false);
+  assert.equal(worldAtlasStats({ nations: [], clock: { epochSeconds: epoch, nowSeconds: now, nextFestival: { at: null, festivals: [{ name: 'Grand Regatta' }] } } }).some(row => row.label === 'Next festival'), false);
+});
+
 test('styles meet AA and show focus', async () => {
   const css = await read('app/world-atlas.css');
   assert.ok(contrast('#f3ecd6', '#071820') >= 4.5, 'paper on the dark teal ground');
@@ -57,11 +126,12 @@ test('styles meet AA and show focus', async () => {
   assert.match(css, /color:#f1d58a/);
   assert.match(css, /#d0ad54/);
   assert.match(css, /\.world-atlas :focus-visible\{outline:2px solid #f3ecd6/);
+  assert.match(css, /\.world-atlas-stats\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
 });
 
 test('the world panel mounts the atlas without deciding the flag; flag off renders nothing', async () => {
   const page = await read('app/page.tsx');
-  assert.match(page, /<WorldAtlas nations=\{worldNations\} nation=\{selected\} clock=\{guestActive \? null : simulation\?\.clock \?\? null\} \/>/);
+  assert.match(page, /<WorldAtlas nations=\{worldNations\} nation=\{selected\} clock=\{guestActive \? null : simulation\?\.clock \?\? null\} disputes=\{simulation \? \{ wars: simulation\.wars, embargoes: simulation\.embargoes, warProposals: simulation\.warProposals \} : null\} \/>/);
   assert.match(page, /viewMode==='world' \? worldPanel/);
   const { build } = await import('esbuild');
   const out = await build({ entryPoints: [new URL('../app/world-atlas.tsx', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
@@ -70,7 +140,7 @@ test('the world panel mounts the atlas without deciding the flag; flag off rende
   const code = out.outputFiles[0].text.replace(/from "([^".][^"]*)"/g, (_, m) => `from "${import.meta.resolve(m)}"`);
   const mod = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
   const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
-  const off = renderToStaticMarkup(React.createElement(mod.WorldAtlas, { nations: [{ id: 'kindle' }], nation: kindle, clock: { epochSeconds: 1, nowSeconds: 1 } }));
+  const off = renderToStaticMarkup(React.createElement(mod.WorldAtlas, { nations: [{ id: 'kindle' }], nation: kindle, clock: { epochSeconds: 1, nowSeconds: 1, nextFestival: { at: 1 + 3 * 86400, festivals: [{ nationId: 'kindle', name: 'Market Bell' }] } }, disputes: { wars: { wars: [{ status: 'active', attacker: 'kindle', defender: 'korund' }] } } }));
   assert.equal(off, '');
   const on = renderToStaticMarkup(React.createElement(mod.WorldAtlas, { nations: [{ id: 'kindle' }, { id: 'aurelle' }], nation: kindle, clock: null, enabled: true }));
   assert.match(on, /<h2>World atlas<\/h2>/);
@@ -79,7 +149,27 @@ test('the world panel mounts the atlas without deciding the flag; flag off rende
   assert.match(on, /<dt>Population<\/dt><dd>1\.42m<\/dd>/);
   assert.match(on, /<dt>Stability<\/dt><dd>78 \/ 100<\/dd>/);
   assert.doesNotMatch(on, /World age|Epoch|Languages|Active laws|Open disputes|Next festival|The Founding/);
+  const disputesOn = renderToStaticMarkup(React.createElement(mod.WorldAtlas, {
+    nations: [{ id: 'kindle' }], nation: { id: 'kindle', shortName: 'Kindle' }, clock: null, enabled: true,
+    disputes: { wars: { wars: [{ status: 'active', attacker: 'kindle', defender: 'korund' }] }, embargoes: { embargoes: [{ status: 'in-force', actor: 'aurelle', target: 'korund' }, { status: 'in-force', actor: 'korund', target: 'aurelle' }] } },
+  }));
+  assert.match(disputesOn, /<dt>Open disputes<\/dt><dd>3 · 1 war · 2 embargoes · Kindle in 1<\/dd>/);
+  assert.match(disputesOn, /<section class="world-atlas" aria-label="World atlas">/);
+  assert.doesNotMatch(disputesOn, /<dt>Epoch<\/dt>|<dt>Era<\/dt>|<dt>Next festival<\/dt>/);
   const clockOn = renderToStaticMarkup(React.createElement(mod.WorldAtlas, { nations: [{ id: 'kindle' }], nation: {}, clock: { epochSeconds: 1_700_000_000, nowSeconds: 1_700_000_000 }, enabled: true }));
   assert.match(clockOn, /World age/);
   assert.match(clockOn, /Age 1, year 1 of 12/);
+  assert.doesNotMatch(clockOn, /<dt>Next festival<\/dt>/);
+  const at = 1_700_000_000 + 3 * 86400;
+  const festivalOn = renderToStaticMarkup(React.createElement(mod.WorldAtlas, {
+    nations: [{ id: 'fulmara' }], nation: { capital: 'Harbor' }, enabled: true,
+    clock: { epochSeconds: 1_700_000_000, nowSeconds: 1_700_000_000, nextFestival: { at, festivals: [{ nationId: 'fulmara', name: 'Grand Regatta' }] } },
+    disputes: { wars: { wars: [] } },
+  }));
+  assert.match(festivalOn, /<section class="world-atlas" aria-label="World atlas">/);
+  const festivalValue = festivalOn.match(/<dt>Next festival<\/dt><dd>([^<]*)<\/dd>/)?.[1];
+  assert.equal(festivalValue, `Grand Regatta · ${displayTimestamp(at * 1000)} · Day ${gameDayAt(1_700_000_000, at)} · in 3 days`);
+  assert.match(festivalOn, /<dt>World age<\/dt>/);
+  assert.match(festivalOn, /<dt>Open disputes<\/dt><dd>None<\/dd>/);
+  assert.doesNotMatch(festivalOn, /<dt>Epoch<\/dt>|<dt>Era<\/dt>|<dt>Languages<\/dt>|<dt>Active laws<\/dt>/);
 });

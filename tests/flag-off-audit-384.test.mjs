@@ -176,17 +176,20 @@ const flagOffPins = {
   HARIMU_AURELLE_HEARTH_NIGHT_ENABLED: 'zzzzzzzzzz-aurelle-hearth-night-1146.test.mjs', // #1146 flag off: no hearthNight key
   HARIMU_AURELLE_CORONATION_DAY_ENABLED: 'zzzzzzzzzzzzzz-aurelle-coronation-day-1191.test.mjs', // #1191 flag off: no coronationDay key
   HARIMU_AURELLE_CHARTER_FAIR_ENABLED: 'zzzzzzzzzzzzzz-aurelle-charter-fair-1197.test.mjs', // #1197 flag off: no charterFair key
+  HARIMU_VARKAND_ROTATION_DAY_ENABLED: 'zzzzzzzzzzzzzzz-varkand-rotation-day-1207.test.mjs', // #1207 flag off: no rotationDay key
   HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED: 'zzzzzz-confluence-assembly-election-1123.test.mjs', // #1123 flag off: no assemblyElection key
   HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED: 'zzzzzzzzzzzz-confluence-quota-day-1169.test.mjs', // #1169 flag off: no quotaDay key
   HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'zzzzzzz-kindle-election-1117.test.mjs', // #1117 flag off: no electionClock key
   HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED: 'zzzzzzzzz-kindle-founders-forge-1145.test.mjs', // #1145 flag off: no foundersForgeDay key
   HARIMU_KINDLE_MARKET_BELL_ENABLED: 'zzzzzzzzzzz-kindle-market-bell-1164.test.mjs', // #1164 flag off: no marketBell key
   HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'zzzzzzzzz-varkand-muster-day-1151.test.mjs', // #1151 flag off: no musterDay key
+  HARIMU_VARKAND_LANTERN_WATCH_ENABLED: 'zzzzzzzzzzzzzzz-varkand-lantern-watch-1211.test.mjs', // #1211 flag off: no lanternWatch key
   HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'zzzzzzzzz-confluence-canal-festival-1165.test.mjs', // #1165 flag off: no canalFestival key
   HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'zzzzzzzzzzz-fulmara-grand-regatta-1178.test.mjs', // #1178 flag off: no grandRegatta key
   HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED: 'zzzzzzzzzzzz-fulmara-dock-strike-remembrance-1187.test.mjs', // #1187 flag off: no dockStrikeRemembrance key
   HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'zzzzzzz-hoarvale-honors-1136.test.mjs', // #1136 flag off: no honorsListDay key
   HARIMU_HOARVALE_AURORA_NIGHT_ENABLED: 'zzzzzzzzzz-hoarvale-aurora-night-1160.test.mjs', // #1160 flag off: no auroraNight key
+  HARIMU_HOARVALE_MOOT_OPENING_ENABLED: 'zzzzzzzzzzzzzzz-hoarvale-moot-opening-1208.test.mjs', // #1208 flag off: no mootOpening key
   HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
 };
 

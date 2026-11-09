@@ -1,11 +1,24 @@
 /** #1193: World atlas reads. Flag HARIMU_WORLD_ATLAS_READS_ENABLED in HARIMU_GRAY_PACK. Flag off: no nextFestival key on simulation.clock.
  *  nextFestival is the earliest date among the nation holiday clocks whose own flags are on, with every festival at that instant.
- *  GRAY 62 on tip 4bbd52ee (GRAY 61, #1197 Charter Fair) + 1. */
+ *  #1214: Aurelle Coronation Day and Charter Fair join worldFestivalSources (no new flag; GRAY unchanged at 62). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
+import { displayTimestamp } from '../lib/display-preferences.ts';
+import { ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot, varkandGovernmentSnapshot, varkandRotationDaySnapshot } from '../lib/government.ts';
+import { ilmarNextGreatPilgrimageAt } from '../lib/ilmar-great-pilgrimage.ts';
+import { ilmarNextGreatPilgrimageAt as sanctumNextGreatPilgrimageAt } from '../lib/ilmar-sanctum.ts';
+import { gameDayAt } from '../lib/topbar-countdown.ts';
+import { varkandChairAt } from '../lib/varkand-directorate.ts';
+import { varkandNextRotationDayAt } from '../lib/varkand-rotation-day.ts';
+import { spokenRemaining } from '../lib/veldwood-wallet-dividend.ts';
+import { ageHudLine, worldAgeAt } from '../lib/world-age.ts';
+import { worldAtlasStats } from '../lib/world-atlas.ts';
 import { worldAtlasClockFields, worldAtlasReadsEnabled, worldFestivalSources, worldNextFestival } from '../lib/world-atlas-reads.ts';
+import { aurelleNextCharterFairAt } from '../lib/aurelle-charter-fair.ts';
+import { aurelleNextCoronationDayAt } from '../lib/aurelle-coronation-day.ts';
+import { aurelleNextHearthNightAt } from '../lib/aurelle-hearth-night.ts';
 import { fulmaraNextGrandRegattaAt } from '../lib/fulmara-grand-regatta.ts';
 import { meridianNextCongressWeekAt } from '../lib/meridian-congress-week.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
@@ -26,7 +39,7 @@ test('pure: earliest enabled source wins, ties list every festival in source ord
 });
 
 test('pure: the real sources are docs-named, one clock each, all ten nations, Stilldays left out', () => {
-  assert.equal(worldFestivalSources.length, 27);
+  assert.equal(worldFestivalSources.length, 29);
   assert.deepEqual([...new Set(worldFestivalSources.map(s => s.nationId))], ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']);
   assert.equal(worldFestivalSources.some(s => /stillday/i.test(s.name)), false);
   for (const s of worldFestivalSources) assert.match(s.flag, /^HARIMU_[A-Z_]+_ENABLED$/);
@@ -40,6 +53,29 @@ test('pure: the real sources are docs-named, one clock each, all ten nations, St
   assert.deepEqual(regattaOnly, { at: fulmaraNextGrandRegattaAt(now) / 1000, festivals: [{ nationId: 'fulmara', name: 'Grand Regatta' }] });
   const pack = worldNextFestival(now, { HARIMU_GRAY_PACK: JSON.stringify({ HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED: 'true' }) });
   assert.equal(pack.at, meridianNextCongressWeekAt(now) / 1000, 'a festival flag in the pack counts');
+  const aurelle = worldFestivalSources.filter(s => s.nationId === 'aurelle').map(s => s.name);
+  assert.deepEqual(aurelle, ['Coronation Day', 'Hearth Night', 'Charter Fair'], 'docs §7.5 Aurelle holiday order; Heir\'s Naming stays out');
+  // Identity pins: Aurelle clocks share Chair-anchor timestamps, so value checks alone can't prove wiring.
+  const byName = name => worldFestivalSources.find(s => s.nationId === 'aurelle' && s.name === name);
+  assert.equal(byName('Coronation Day').nextAt, aurelleNextCoronationDayAt);
+  assert.equal(byName('Coronation Day').flag, 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(byName('Hearth Night').nextAt, aurelleNextHearthNightAt);
+  assert.equal(byName('Hearth Night').flag, 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED');
+  assert.equal(byName('Charter Fair').nextAt, aurelleNextCharterFairAt);
+  assert.equal(byName('Charter Fair').flag, 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
+});
+
+test('#1214: Coronation Day and Charter Fair are absent when their own flag is off and can win earliest when on', () => {
+  const now = Date.UTC(2026, 10, 9);
+  assert.equal(worldNextFestival(now, { HARIMU_AURELLE_CORONATION_DAY_ENABLED: 'false', HARIMU_AURELLE_CHARTER_FAIR_ENABLED: 'false' }), null);
+  assert.equal(worldNextFestival(now, {}), null);
+  const coronation = worldNextFestival(now, { HARIMU_AURELLE_CORONATION_DAY_ENABLED: 'true' });
+  assert.deepEqual(coronation, { at: aurelleNextCoronationDayAt(now) / 1000, festivals: [{ nationId: 'aurelle', name: 'Coronation Day' }] });
+  const fair = worldNextFestival(now, { HARIMU_AURELLE_CHARTER_FAIR_ENABLED: 'true' });
+  assert.deepEqual(fair, { at: aurelleNextCharterFairAt(now) / 1000, festivals: [{ nationId: 'aurelle', name: 'Charter Fair' }] });
+  // Same Chair-family cadence: when both are on they tie and keep docs order.
+  const both = worldNextFestival(now, { HARIMU_AURELLE_CORONATION_DAY_ENABLED: 'true', HARIMU_AURELLE_CHARTER_FAIR_ENABLED: 'true' });
+  assert.deepEqual(both, { at: aurelleNextCoronationDayAt(now) / 1000, festivals: [{ nationId: 'aurelle', name: 'Coronation Day' }, { nationId: 'aurelle', name: 'Charter Fair' }] });
 });
 
 test('clock fields: flag off is an empty object; flag on with no festival flag adds nothing', () => {
@@ -66,23 +102,148 @@ test('GET /api/world: flag off leaves simulation.clock unchanged; flag on adds n
   assert.equal('nextFestival' in (await r.call('world')).data.simulation.clock, false, 'no festival flag on: absent');
 });
 
-test('the flag is preview true and production false inside HARIMU_GRAY_PACK, last, and a direct string wins', () => {
+test('atlas row: a present nextFestival is shown from the read; missing or null leaves the row out', () => {
+  const nowMs = Date.UTC(2026, 10, 9);
+  const next = worldNextFestival(nowMs, { HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'true' });
+  assert.ok(next, 'a real source is on');
+  const epoch = Math.floor(nowMs / 1000) - 86_400, nowSeconds = Math.floor(nowMs / 1000);
+  const shown = worldAtlasStats({ nations: [{ id: 'kindle' }], clock: { epochSeconds: epoch, nowSeconds, nextFestival: next } });
+  const row = shown.find(item => item.label === 'Next festival');
+  const relative = spokenRemaining((next.at - nowSeconds) * 1000);
+  const expected = [next.festivals.map(festival => festival.name).join(' · '), displayTimestamp(next.at * 1000), `Day ${gameDayAt(epoch, next.at)}`, ...(relative ? [`in ${relative}`] : [])].join(' · ');
+  assert.equal(row.value, expected);
+  assert.match(row.value, /Grand Regatta/);
+  assert.equal(shown.find(item => item.label === 'World age').value, ageHudLine(worldAgeAt(epoch * 1000, nowSeconds * 1000)));
+  assert.equal(shown.some(item => item.label === 'Epoch' || item.label === 'Era'), false);
+  const missing = worldAtlasStats({ nations: [{ id: 'kindle' }], clock: { epochSeconds: epoch, nowSeconds } });
+  const absent = worldAtlasStats({ nations: [{ id: 'kindle' }], clock: { epochSeconds: epoch, nowSeconds, nextFestival: null } });
+  assert.equal(missing.some(item => item.label === 'Next festival'), false);
+  assert.equal(absent.some(item => item.label === 'Next festival'), false);
+  assert.deepEqual(missing.map(item => item.label), absent.map(item => item.label));
+  assert.deepEqual(missing.map(item => item.label), ['Nations', 'World age']);
+});
+
+test('#1215: Great Pilgrimage counts only while its own flag is on', async t => {
+  const P = 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED';
+  const S = 'HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Great Pilgrimage');
+  assert.equal(source.nationId, 'ilmar');
+  assert.equal(source.flag, P, 'the nextFestival candidate uses the pilgrimage flag, not the sanctum calendar');
+  assert.equal(source.nextAt, ilmarNextGreatPilgrimageAt);
+  assert.notEqual(source.nextAt, sanctumNextGreatPilgrimageAt);
+  assert.equal(worldFestivalSources.find(s => s.name === 'Feast of First Light').flag, 'HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED');
+  assert.equal(worldFestivalSources.some(s => s.flag === S), false, 'other sanctum calendar items stay on the sanctum flag');
+  const now = Date.UTC(2026, 10, 9);
+  const picks = env => (worldNextFestival(now, env)?.festivals ?? []).filter(item => item.name === 'Great Pilgrimage');
+  assert.deepEqual(picks({ [S]: 'true' }), [], 'pilgrimage off, sanctum on: nextFestival never picks it');
+  assert.equal('greatPilgrimage' in ilmarSanctumSnapshot(now, true), false);
+  assert.equal(ilmarGreatPilgrimageSnapshot(now, flagOn({ [S]: 'true' }, P)), null);
+  const on = worldNextFestival(now, { [P]: 'true' });
+  assert.deepEqual(on, { at: ilmarNextGreatPilgrimageAt(now) / 1000, festivals: [{ nationId: 'ilmar', name: 'Great Pilgrimage' }] });
+  assert.equal(ilmarGreatPilgrimageSnapshot(now, flagOn({ [P]: 'true' }, P)).greatPilgrimage.nextAt, ilmarNextGreatPilgrimageAt(now));
+  assert.equal('sanctum' in ilmarGreatPilgrimageSnapshot(now, true), false);
+  assert.deepEqual(picks({}), []);
+  assert.equal(worldNextFestival(now, {}), null, 'both off');
+  assert.equal(ilmarGreatPilgrimageSnapshot(now, false), null);
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='ilmar' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  const read = async () => {
+    const clock = (await r.call('world')).data.simulation.clock;
+    const government = (await r.call('citizen', 'alice')).data.government;
+    return { clock, government, picked: (clock.nextFestival?.festivals ?? []).some(item => item.name === 'Great Pilgrimage') };
+  };
+  let { clock, government, picked } = await read();
+  assert.equal(picked, false);
+  assert.equal('nextFestival' in clock, false, 'both off: nextFestival absent');
+  assert.equal(government == null || !('greatPilgrimage' in government), true, 'both off: no greatPilgrimage');
+  r.setFixtureEnv(S, 'true');
+  ({ clock, government, picked } = await read());
+  assert.equal(picked, false, 'pilgrimage off, sanctum on: nextFestival never picks it');
+  assert.equal('nextFestival' in clock, false);
+  assert.equal('greatPilgrimage' in government, false, 'pilgrimage off, sanctum on: no greatPilgrimage');
+  assert.equal('sanctum' in government, true);
+  r.setFixtureEnv(S, 'false');
+  r.setFixtureEnv(P, 'true');
+  ({ clock, government, picked } = await read());
+  const at = ilmarNextGreatPilgrimageAt(clock.nowSeconds * 1000);
+  assert.equal(picked, true, 'pilgrimage on, sanctum off: nextFestival picks it');
+  assert.deepEqual(clock.nextFestival, { at: at / 1000, festivals: [{ nationId: 'ilmar', name: 'Great Pilgrimage' }] });
+  assert.equal(government.greatPilgrimage.nextAt, at);
+  assert.equal(government.greatPilgrimage.cycleDays, 30);
+  assert.equal('sanctum' in government, false);
+});
+
+test('#1223: Rotation Day counts only while its own flag is on', async t => {
+  const R = 'HARIMU_VARKAND_ROTATION_DAY_ENABLED';
+  const D = 'HARIMU_VARKAND_DIRECTORATE_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Rotation Day');
+  assert.equal(source.nationId, 'varkand');
+  assert.equal(source.flag, R, 'the nextFestival candidate uses the rotation day flag, not the directorate');
+  assert.equal(source.nextAt, varkandNextRotationDayAt);
+  assert.notEqual(source.nextAt, varkandChairAt);
+  assert.equal(worldFestivalSources.find(s => s.name === 'Muster Day').flag, 'HARIMU_VARKAND_MUSTER_DAY_ENABLED');
+  assert.equal(worldFestivalSources.some(s => s.flag === D), false, 'other directorate calendar items stay on the directorate flag');
+  const now = Date.UTC(2026, 10, 9);
+  assert.equal(source.nextAt(now), varkandChairAt(now).nextRotationAt, 'the dedicated helper keeps the chair term instant');
+  const picks = env => (worldNextFestival(now, env)?.festivals ?? []).filter(item => item.name === 'Rotation Day');
+  assert.deepEqual(picks({ [D]: 'true' }), [], 'rotation day off, directorate on: nextFestival never picks it');
+  assert.equal('rotationDay' in varkandGovernmentSnapshot(now, true), false);
+  assert.equal(varkandRotationDaySnapshot(now, flagOn({ [D]: 'true' }, R)), null);
+  const on = worldNextFestival(now, { [R]: 'true' });
+  assert.deepEqual(on, { at: varkandNextRotationDayAt(now) / 1000, festivals: [{ nationId: 'varkand', name: 'Rotation Day' }] });
+  assert.equal(varkandRotationDaySnapshot(now, flagOn({ [R]: 'true' }, R)).rotationDay.nextAt, varkandNextRotationDayAt(now));
+  assert.equal('directorate' in varkandRotationDaySnapshot(now, true), false);
+  assert.deepEqual(picks({}), []);
+  assert.equal(worldNextFestival(now, {}), null, 'both off');
+  assert.equal(varkandRotationDaySnapshot(now, false), null);
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='varkand' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  const read = async () => {
+    const clock = (await r.call('world')).data.simulation.clock;
+    const government = (await r.call('citizen', 'alice')).data.government;
+    return { clock, government, picked: (clock.nextFestival?.festivals ?? []).some(item => item.name === 'Rotation Day') };
+  };
+  let { clock, government, picked } = await read();
+  assert.equal(picked, false);
+  assert.equal('nextFestival' in clock, false, 'both off: nextFestival absent');
+  assert.equal(government == null || !('rotationDay' in government), true, 'both off: no rotationDay');
+  r.setFixtureEnv(D, 'true');
+  ({ clock, government, picked } = await read());
+  assert.equal(picked, false, 'rotation day off, directorate on: nextFestival never picks it');
+  assert.equal('nextFestival' in clock, false);
+  assert.equal('rotationDay' in government, false, 'rotation day off, directorate on: no rotationDay');
+  assert.equal('directorate' in government, true);
+  r.setFixtureEnv(D, 'false');
+  r.setFixtureEnv(R, 'true');
+  ({ clock, government, picked } = await read());
+  const at = varkandNextRotationDayAt(clock.nowSeconds * 1000);
+  assert.equal(picked, true, 'rotation day on, directorate off: nextFestival picks it');
+  assert.deepEqual(clock.nextFestival, { at: at / 1000, festivals: [{ nationId: 'varkand', name: 'Rotation Day' }] });
+  assert.equal(at, varkandChairAt(clock.nowSeconds * 1000).nextRotationAt);
+  assert.equal(government.rotationDay.nextAt, at);
+  assert.equal(government.rotationDay.cycleDays, 60);
+  assert.equal('directorate' in government, false);
+});
+
+test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and a direct string wins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[F], undefined, 'not its own text binding');
   assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), F, '#1193 precedes #1212');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), F);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), 'HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 63); // GRAY 62; #1212 follows as 63
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-5), F, '#1207 Rotation Day, then #1208');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-5), F);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 66); // GRAY 66; #1212 Ilmar Assembly Election day is last
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
