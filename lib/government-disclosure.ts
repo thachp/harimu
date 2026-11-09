@@ -16,6 +16,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.mandatePlebiscite?{mandatePlebiscite:snapshot.mandatePlebiscite}:{}), // #1094: next Mandate Plebiscite (readGovernment adds it only while the flag is on)
   ...(snapshot.moot?{moot:{electedAt:snapshot.moot.electedAt,dissolvesBy:snapshot.moot.dissolvesBy,primeMinisterInvestedAt:snapshot.moot.primeMinisterInvestedAt,investitureDeadline:snapshot.moot.investitureDeadline,reservePowersAvailable:snapshot.moot.reservePowersAvailable}}:{}), // #1096: Moot term (readGovernment adds it only while the flag is on)
   ...(snapshot.musterDay?{musterDay:snapshot.musterDay}:{}), // #1151: next Muster Day (readGovernment adds it only while the flag is on)
+  ...(snapshot.rotationDay?{rotationDay:snapshot.rotationDay}:{}), // #1207: next Rotation Day (readGovernment adds it only while the flag is on)
   ...(snapshot.foundersForgeDay?{foundersForgeDay:snapshot.foundersForgeDay}:{}), // #1145: next Founders' Forge Day (readGovernment adds it only while the flag is on)
   ...(snapshot.marketBell?{marketBell:snapshot.marketBell}:{}), // #1164: next Market Bell (readGovernment adds it only while the flag is on)
   ...(snapshot.honorsListDay?{honorsListDay:snapshot.honorsListDay}:{}), // #1136: next Honors List Day (readGovernment adds it only while the flag is on)
