@@ -28,9 +28,9 @@ import { korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calen
 import { meridianNextCongressWeekAt } from './meridian-congress-week.ts';
 import { meridianNextExamDayAt } from './meridian-exam-day.ts';
 import { meridianNextTurbineDayAt } from './meridian-turbine-day.ts';
-import { varkandChairAt } from './varkand-directorate.ts';
 import { varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
+import { varkandNextRotationDayAt } from './varkand-rotation-day.ts';
 import { veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
 import { veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 
@@ -63,7 +63,7 @@ export const worldFestivalSources: readonly WorldFestivalSource[] = [
   f('hoarvale', 'Honors List Day', 'HOARVALE_HONORS_LIST_DAY', hoarvaleNextHonorsListDayAt),
   f('hoarvale', 'Aurora Night', 'HOARVALE_AURORA_NIGHT', hoarvaleNextAuroraNightAt),
   f('varkand', 'Muster Day', 'VARKAND_MUSTER_DAY', varkandNextMusterDayAt),
-  f('varkand', 'Rotation Day', 'VARKAND_DIRECTORATE', nowMs => varkandChairAt(nowMs).nextRotationAt),
+  f('varkand', 'Rotation Day', 'VARKAND_ROTATION_DAY', varkandNextRotationDayAt),
   f('varkand', 'Mandate Plebiscite', 'VARKAND_PLEBISCITE', varkandNextPlebisciteAt),
   f('veldwood', 'Vote Day', 'VELDWOOD_VOTE_DAY', veldwoodNextVoteDayAt),
   f('veldwood', 'Dividend Day', 'VELDWOOD_DIVIDEND_DAY', veldwoodNextDividendDayAt),
