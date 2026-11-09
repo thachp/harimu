@@ -1,6 +1,6 @@
 /** #1197: Aurelle next Charter Fair, once per 30 real days from the Varkand Chair anchor.
  *  No offset. The helper takes nowMs only and returns the next date only.
- *  Flag HARIMU_AURELLE_CHARTER_FAIR_ENABLED, last in HARIMU_GRAY_PACK.
+ *  Flag HARIMU_AURELLE_CHARTER_FAIR_ENABLED in HARIMU_GRAY_PACK; #1193 world atlas reads follows.
  *  Flag off: no charterFair key. Date only: no charter list, guild name, or trade right.
  *  The block is separate from Hearth Night and the crown calendar. The zzzzzzzzzzzzzz- name sorts after
  *  zzzzzzzzzzzzz- files so --test-shard does not move earlier files. */
@@ -91,16 +91,17 @@ test('flag off leaves the Aurelle snapshot unchanged, and other nations gain no 
   assert.equal('charterFair' in publicGovernmentSnapshot(simulateGovernment({ ...baseInput, nationId: 'korund' })), false);
 });
 
-test('the flag is preview true and production false, last inside HARIMU_GRAY_PACK, and a direct string wins', () => {
+test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and a direct string wins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined, 'not its own text binding');
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key, '#1193 follows');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_WORLD_ATLAS_READS_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
