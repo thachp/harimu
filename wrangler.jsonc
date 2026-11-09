@@ -166,6 +166,8 @@
       "HARIMU_MERIDIAN_TURBINE_DAY_ENABLED": "true",
       // #1178: Fulmara next Grand Regatta (once per game year = 30 real days). Off: no grandRegatta key. Holds no race.
       "HARIMU_FULMARA_GRAND_REGATTA_ENABLED": "true",
+      // #1179: Fulmara next Charter Day (once per game year = 30 real days, zero offset). Off: no charterDay key. Date only.
+      "HARIMU_FULMARA_CHARTER_DAY_ENABLED": "true",
       // #1184: Fulmara next Fair-Wind Blessing (once per game year = 30 real days, no offset). Off: no fairWindBlessing key. Holds the next date only.
       "HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED": "true"
     },
