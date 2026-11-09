@@ -14,6 +14,7 @@ import { MapOverlaysControl } from './map-overlays';
 import { nationPlaces, projectOwnershipCells, WORLD_GRID } from '../lib/globe-mapping';
 import { mapFitRules, nationOpenings } from '../lib/nation-openings';
 import { globeLight, globeRimEnabled } from '../lib/globe-rim';
+import { glowShowsHalo, nationGlowPose, selectedNationGlowEnabled, GLOW_GOLD, GLOW_HALO } from '../lib/selected-nation-glow';
 
 export type GameViewportProps = {
   mode: 'world' | 'city'; nationId: string;
@@ -87,6 +88,35 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       const surface = world.group.children[0] as THREE.Mesh;
       (surface.material as THREE.MeshStandardMaterial).roughness = lit.roughness;
     }
+    // #392: flag off keeps the marker's box highlight. Flag on draws a still gold coast ring on the selected nation only.
+    const glow = mode === 'world' && selectedNationGlowEnabled();
+    const motionReduced = () => document.documentElement.hasAttribute('data-harimu-reduced-motion') || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+    let glowEdge: THREE.Mesh | null = null, glowHalo: THREE.Mesh | null = null;
+    const placeGlow = (position: THREE.Vector3, on: boolean) => {
+      if (!glowEdge || !glowHalo) return;
+      if (!on) { glowEdge.visible = false; glowHalo.visible = false; return; }
+      const pose = nationGlowPose(position);
+      if (!pose) return;
+      const axis = new THREE.Vector3(pose.axis[0], pose.axis[1], pose.axis[2]);
+      for (const mesh of [glowEdge, glowHalo]) {
+        mesh.position.set(pose.center[0], pose.center[1], pose.center[2]);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis);
+      }
+      glowEdge.visible = true;
+      glowHalo.visible = glowShowsHalo(motionReduced());
+    };
+    if (glow) {
+      const pose = nationGlowPose({ x: 0, y: 0, z: 1 });
+      if (pose) {
+        const edgeMat = new THREE.MeshBasicMaterial({ color: GLOW_GOLD, transparent: true, opacity: 1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+        const haloMat = new THREE.MeshBasicMaterial({ color: GLOW_HALO, transparent: true, opacity: pose.haloOpacity, depthWrite: false });
+        glowEdge = new THREE.Mesh(new THREE.TorusGeometry(pose.ringRadius, pose.edgeTube, 6, 96), edgeMat);
+        glowHalo = new THREE.Mesh(new THREE.TorusGeometry(pose.ringRadius, pose.haloTube, 6, 64), haloMat);
+        glowEdge.name = 'selected-nation-edge'; glowHalo.name = 'selected-nation-halo';
+        glowEdge.visible = false; glowHalo.visible = false;
+        world.group.add(glowEdge, glowHalo);
+      }
+    }
     sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
     sun.shadow.camera.top = 22; sun.shadow.camera.bottom = -22; sun.shadow.bias = -.001;
     scene.add(sun);
@@ -118,7 +148,11 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       if (chip) button.insertBefore(chip, button.firstChild); // #79: symbol chip beside the nation name (flagged)
       if (mode === 'city' && cityPills && 'location' in anchor.selection && anchor.selection.location) pillCleanups.push(dressCityPill(button, anchor.selection.location)); // #392 S7: icon pill + leader dot (flagged)
       Object.assign(button.style, { position: 'absolute', pointerEvents: 'auto', transform: 'translate(-50%, -100%)' });
-      button.addEventListener('click', () => { highlight.setFromObject(anchor.object); highlight.visible = true; render(); callback.current(anchor.selection); });
+      button.addEventListener('click', () => {
+        if (glow) { highlight.visible = false; placeGlow(anchor.object.position, true); }
+        else { highlight.setFromObject(anchor.object); highlight.visible = true; }
+        render(); callback.current(anchor.selection);
+      });
       labelLayer.appendChild(button);
       return { ...anchor, button };
     });
@@ -179,6 +213,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
         projectOwnershipCells({ width: Number(owned.dataset.width), height: Number(owned.dataset.height) }, spans.map(s => [Number(s.dataset.x), Number(s.dataset.y)]), world.group, camera, { w, h }, new THREE.Vector3(), facing)
           .forEach((spot, i) => { spans[i].hidden = spot.hidden; spans[i].style.left = `${spot.left}px`; spans[i].style.top = `${spot.top}px`; }); }
       if (highlight.visible) highlight.update();
+      if (glowEdge && glowHalo) glowHalo.visible = glowEdge.visible && glowShowsHalo(motionReduced());
       renderer.render(scene, camera);
     };
     const changeZoom = (delta: number) => { userCamera.current?.(); zoom = clampZoom(zoom + delta); setCameraLabel(`${Math.round(zoom * 100)}%`); render(); };
@@ -201,12 +236,21 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       if (select) labels.forEach(({ selection, button }) => {
         const active = selection.kind === 'nation' && selection.nationId === id;
         button.setAttribute('aria-pressed', String(active));
-        button.style.outline = active ? '2px solid #f7d080' : '';
+        if (glow) { button.classList.toggle('viewport-nation-selected', active); button.style.outline = ''; }
+        else { button.classList.remove('viewport-nation-selected'); button.style.outline = active ? '2px solid #f7d080' : ''; }
       });
-      if (select) { highlight.setFromObject(anchor.object); highlight.visible = true; }
+      if (select) {
+        if (glow) { highlight.visible = false; placeGlow(anchor.object.position, true); }
+        else { highlight.setFromObject(anchor.object); highlight.visible = true; }
+      }
       render();
     };
     controls.current = { zoom: changeZoom, pan, reset: () => { userCamera.current?.(); target.set(0, 0, 0); zoom = 1; setCameraLabel('100%'); highlight.visible = false; render(); }, focus, focusNation };
+    const onMotion = () => render();
+    const motionQuery = glow ? window.matchMedia?.('(prefers-reduced-motion: reduce)') : null;
+    motionQuery?.addEventListener?.('change', onMotion);
+    const motionWatch = new MutationObserver(onMotion);
+    if (glow) motionWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-harimu-reduced-motion'] });
     const resize = () => { renderer.setPixelRatio(mapEffects(liveMapView(), quality).pixelRatio); renderer.setSize(Math.max(1, container.clientWidth), Math.max(1, container.clientHeight), false); render(); };
     const observer = new ResizeObserver(resize); observer.observe(container); resize();
     const layerWatch = new MutationObserver(render); const viewportEl = container.closest('.game-viewport'); if (viewportEl) layerWatch.observe(viewportEl, { childList: true }); // #82: place the Ownership layer when it mounts
@@ -251,7 +295,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
     canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', cancel);
     canvas.addEventListener('wheel', wheel, { passive: false });
     return () => {
-      cancelled = true; controls.current = null; observer.disconnect(); layerWatch.disconnect(); if (frame) cancelAnimationFrame(frame);
+      cancelled = true; controls.current = null; observer.disconnect(); layerWatch.disconnect(); motionWatch.disconnect(); motionQuery?.removeEventListener?.('change', onMotion); if (frame) cancelAnimationFrame(frame);
       canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', up); canvas.removeEventListener('pointercancel', cancel); canvas.removeEventListener('wheel', wheel);
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();

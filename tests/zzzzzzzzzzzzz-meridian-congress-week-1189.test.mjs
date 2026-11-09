@@ -84,7 +84,7 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), F, '#1189 is last');
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), F);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 54); // [ASSUMPTION] tip+1; recount after #1194 (~58)
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 58); // recounted after origin/dev b2d3b3d5 (GRAY 57); #1189 is last
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);

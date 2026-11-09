@@ -103,10 +103,11 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), F, '#1189 Congress Week is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 54); // [ASSUMPTION] tip+1
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-6), F, '#1179, #1184, #1183, #1187, and #1189 follow this flag');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-6), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 58);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
