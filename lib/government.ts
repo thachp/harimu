@@ -16,6 +16,7 @@ import { MERIDIAN_CONGRESS_WEEK_INTERVAL_DAYS, meridianNextCongressWeekAt } from
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_GREAT_PILGRIMAGE_CYCLE_DAYS, ilmarNextGreatPilgrimageAt } from './ilmar-great-pilgrimage.ts';
+import { ILMAR_ASSEMBLY_ELECTION_DAY_CYCLE_DAYS, ilmarNextAssemblyElectionDayAt } from './ilmar-assembly-election-day.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt as ilmarSanctumNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-contracts.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
@@ -76,6 +77,8 @@ export type GovernmentSnapshot = {
   feastOfFirstLight?: { nextAt: number; cycleDays: 15 };
   /** #1196 Ilmar: next Great Pilgrimage on a 30-real-day cycle. Present only while HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED is on. Holds the next date only. */
   greatPilgrimage?: { nextAt: number; cycleDays: 30 };
+  /** #1212 Ilmar: next Assembly Election day on a 120-real-day cycle. Present only while HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED is on. Holds the next date only. */
+  assemblyElectionDay?: { nextAt: number; cycleDays: 120 };
   /** #1139 Ilmar: Prism contracts, each with a title and a whole-number profit share. Present only while HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED is on. */
   contracts?: IlmarPrismContract[];
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
@@ -789,6 +792,27 @@ export function ilmarGreatPilgrimageSnapshot(nowMs: number, enabled: boolean): G
     },
     availableBudgetMinor: 0,
     influenceSummary: 'This read names the next Great Pilgrimage. It counts no pilgrims and names no shrine.',
+  }, nowMs, true);
+}
+
+/** #1212. Flag off, or any nation but Ilmar: the same snapshot, and no assemblyElectionDay key. Holds the next date only. */
+export function withIlmarAssemblyElectionDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, assemblyElectionDay: { nextAt: ilmarNextAssemblyElectionDayAt(nowMs), cycleDays: ILMAR_ASSEMBLY_ELECTION_DAY_CYCLE_DAYS } };
+}
+
+/** Ilmar read while only the Assembly Election day flag is on. No sanctum, feast, contracts, or greatPilgrimage key. Flag off returns null, which is today's read. */
+export function ilmarAssemblyElectionDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarAssemblyElectionDay({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [{ name: 'Assembly Election day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Assembly Election day', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Assembly of the Faithful elects every 120 real days. This read names the next Assembly Election day. It names no candidates, opens no ballot, lists no results, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Assembly Election day. It names no candidates and opens no ballot.',
   }, nowMs, true);
 }
 
