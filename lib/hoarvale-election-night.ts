@@ -1,6 +1,6 @@
 /** #1219. Pure integer ms. [ASSUMPTION] Docs §7.7 and #1096 give no offset, so Election Night is
  *  dissolvesBy from hoarvaleMootAt. An exact boundary rolls forward. Before the anchor the term clamps to 0. */
-import { MOOT_TERM_SECONDS, hoarvaleMootAt } from './government.ts';
+import { MOOT_TERM_SECONDS, hoarvaleMootAt } from './hoarvale-moot.ts';
 /** [ASSUMPTION] Zero milliseconds between the term boundary and Election Night. */
 export const HOARVALE_ELECTION_NIGHT_OFFSET_MS = 0;
 

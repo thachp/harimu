@@ -1,5 +1,5 @@
 'use client';
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { nationCrest } from '../lib/nation-crests';
 import { nationMark } from '../lib/nation-themes';
 import { useDisplayTimestamp } from './display-preferences';
@@ -54,15 +54,18 @@ export function congressWhenName(dateLabel: string, relative: string | null): st
   return relative ? `Next Party Congress, ${dateLabel}, ${relative}.` : `Next Party Congress, ${dateLabel}.`;
 }
 
-export function MeridianPartyCongress({ nationId, partyState, nowMs = Date.now() }: {
+export function MeridianPartyCongress({ nationId, partyState, nowMs }: {
   nationId: string;
   partyState?: PartyState | null;
   nowMs?: number;
 }) {
   const formatTime = useDisplayTimestamp();
+  // A caller (the congress tests) passes nowMs. The Civic panel does not: sample the clock once, the same way the dock does, so render stays pure.
+  const [sampledNow] = useState(() => nowMs ?? Date.now());
+  const now = nowMs ?? sampledNow;
   if (!meridianPartyCongressEnabled() || nationId !== 'meridian' || partyState == null || typeof partyState !== 'object') return null;
   const dated = congressDate(partyState.nextCongressAt, formatTime);
-  const relative = dated ? congressRelative(partyState.nextCongressAt as number, nowMs) : null;
+  const relative = dated ? congressRelative(partyState.nextCongressAt as number, now) : null;
   const seats = typeof partyState.standingCommitteeSeats === 'number' && Number.isSafeInteger(partyState.standingCommitteeSeats) && partyState.standingCommitteeSeats > 0
     ? partyState.standingCommitteeSeats : null;
   const supermajority = partyState.termLimitsSuspendable === true && typeof partyState.suspendSupermajority === 'string' && partyState.suspendSupermajority.trim()
