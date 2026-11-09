@@ -1,3 +1,4 @@
+import { AURELLE_CHARTER_FAIR_CYCLE_DAYS, aurelleNextCharterFairAt } from './aurelle-charter-fair.ts';
 import { AURELLE_CORONATION_DAY_CYCLE_DAYS, aurelleNextCoronationDayAt } from './aurelle-coronation-day.ts';
 import { AURELLE_HEARTH_NIGHT_CYCLE_DAYS, aurelleNextHearthNightAt } from './aurelle-hearth-night.ts';
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
@@ -136,6 +137,8 @@ export type GovernmentSnapshot = {
   hearthNight?: { nextAt: number; cycleDays: 30 };
   /** #1191 Aurelle: next Coronation Day (once per game year = 30 real days). Present only while HARIMU_AURELLE_CORONATION_DAY_ENABLED is on. Date only: no rite text, Privy Council roster, or Crown debasement figures. */
   coronationDay?: { nextAt: number; cycleDays: 30 };
+  /** #1197 Aurelle: next Charter Fair (once per game year = 30 real days). Present only while HARIMU_AURELLE_CHARTER_FAIR_ENABLED is on. Date only: no charter list, guild name, or trade right. */
+  charterFair?: { nextAt: number; cycleDays: 30 };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
 
@@ -406,6 +409,12 @@ export function withAurelleHearthNight(snapshot: GovernmentSnapshot, nowMs: numb
 export function withAurelleCoronationDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
   return { ...snapshot, coronationDay: { nextAt: aurelleNextCoronationDayAt(nowMs), cycleDays: AURELLE_CORONATION_DAY_CYCLE_DAYS as 30 } };
+}
+
+/** #1197. Flag off, or any nation but Aurelle: the same snapshot, and no charterFair key. Date only. */
+export function withAurelleCharterFair(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
+  return { ...snapshot, charterFair: { nextAt: aurelleNextCharterFairAt(nowMs), cycleDays: AURELLE_CHARTER_FAIR_CYCLE_DAYS } };
 }
 
 /** #1122. Flag off, or any nation but Veldwood: the same snapshot, and no voteDayCalendar key. */
