@@ -1,0 +1,15 @@
+/* #392 nation accent (NEXT_PUBLIC_HARIMU_NATION_ACCENT). The shell sets data-nation-accent and the two variables
+   only while the flag is on, on world, nation and city, and only for a nation that has a crest accent.
+   Flag off: this sheet matches nothing, so the dark teal header and the gold rules stay as they are.
+   Focus rings are not restyled. The zoom-path ring stays the paper focus rule; the globe label keeps #80d8ce. */
+.harimu-game[data-nation-accent] .game-inspector-title{border-bottom-color:var(--crest-accent)}
+.harimu-game[data-nation-accent] .nation-overview-stats{border-block-color:var(--crest-accent)}
+.harimu-game[data-nation-accent] .game-inspector-title>.nation-crest svg>path:first-child,
+.harimu-game[data-nation-accent] .nation-overview-head>.nation-crest svg>path:first-child{stroke:var(--crest-accent)}
+.harimu-game[data-nation-accent] .game-zoom-path [aria-current=page]{color:var(--crest-accent-text)}
+.harimu-game[data-nation-accent][data-accent-text=gold] .game-zoom-path [aria-current=page]{box-shadow:inset 0 -2px 0 var(--crest-accent)}
+.harimu-game[data-nation-accent] .viewport-world-label.viewport-nation-selected{border-color:var(--crest-accent);box-shadow:0 0 0 1px #071217,0 0 12px color-mix(in srgb,var(--crest-accent) 53%,transparent)}
+@media (prefers-reduced-motion: reduce){
+  .harimu-game[data-nation-accent] .viewport-world-label.viewport-nation-selected{box-shadow:0 0 0 1px #071217,0 0 0 2px var(--crest-accent)}
+}
+html[data-harimu-reduced-motion] .harimu-game[data-nation-accent] .viewport-world-label.viewport-nation-selected{box-shadow:0 0 0 1px #071217,0 0 0 2px var(--crest-accent)}
