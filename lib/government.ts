@@ -1,3 +1,4 @@
+import { AURELLE_CHARTER_FAIR_CYCLE_DAYS, aurelleNextCharterFairAt } from './aurelle-charter-fair.ts';
 import { AURELLE_HEARTH_NIGHT_CYCLE_DAYS, aurelleNextHearthNightAt } from './aurelle-hearth-night.ts';
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
 import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
@@ -124,6 +125,8 @@ export type GovernmentSnapshot = {
   crownCalendar?: { reignStartedAt: number; nextGreatCouncilWindowAt: number; reignDisplayDays: number };
   /** #1146 Aurelle: next Hearth Night (once per game year = 30 real days). Present only while HARIMU_AURELLE_HEARTH_NIGHT_ENABLED is on. Blesses no houses. */
   hearthNight?: { nextAt: number; cycleDays: 30 };
+  /** #1197 Aurelle: next Charter Fair (once per game year = 30 real days). Present only while HARIMU_AURELLE_CHARTER_FAIR_ENABLED is on. Date only: no charter list, guild name, or trade right. */
+  charterFair?: { nextAt: number; cycleDays: 30 };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
 };
 
@@ -365,6 +368,12 @@ export function withAurelleCrownCalendar(snapshot: GovernmentSnapshot, nowMs: nu
 export function withAurelleHearthNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
   return { ...snapshot, hearthNight: { nextAt: aurelleNextHearthNightAt(nowMs), cycleDays: AURELLE_HEARTH_NIGHT_CYCLE_DAYS as 30 } };
+}
+
+/** #1197. Flag off, or any nation but Aurelle: the same snapshot, and no charterFair key. Date only. */
+export function withAurelleCharterFair(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
+  return { ...snapshot, charterFair: { nextAt: aurelleNextCharterFairAt(nowMs), cycleDays: AURELLE_CHARTER_FAIR_CYCLE_DAYS } };
 }
 
 /** #1122. Flag off, or any nation but Veldwood: the same snapshot, and no voteDayCalendar key. */

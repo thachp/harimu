@@ -108,10 +108,10 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-5), key, '#1178, #1179, #1184, then #1183 is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-5), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-6), key, '#1178, #1179, #1184, #1183, then #1197 is last');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-6), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
