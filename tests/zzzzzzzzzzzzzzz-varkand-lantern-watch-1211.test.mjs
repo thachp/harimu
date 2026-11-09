@@ -1,6 +1,6 @@
 /** #1211: Varkand next Lantern Watch, once per 30 real days from the Chair anchor.
  *  No offset. The helper takes nowMs only and returns the next date only.
- *  Flag HARIMU_VARKAND_LANTERN_WATCH_ENABLED, last in HARIMU_GRAY_PACK.
+ *  Flag HARIMU_VARKAND_LANTERN_WATCH_ENABLED, GRAY 65 in HARIMU_GRAY_PACK; #1212 follows.
  *  Flag off: no lanternWatch key. Date only: no host, Red Alert cancellation, or holiday effect.
  *  The block is separate from Muster Day, Rotation Day, and the Plebiscite. The zzzzzzzzzzzzzzz- name
  *  sorts after zzzzzzzzzzzzzz- files so --test-shard does not move earlier files. */
@@ -80,18 +80,19 @@ test('flag off leaves the Varkand snapshot unchanged, and other nations gain no 
   assert.equal(readFileSync('lib/varkand-lantern-watch.ts', 'utf8').includes('varkand-alert'), false);
 });
 
-test('the flag is preview true and production false, last inside HARIMU_GRAY_PACK, and a direct string wins', () => {
+test('the flag is preview true and production false, GRAY 65 inside HARIMU_GRAY_PACK, and a direct string wins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined, 'not its own text binding');
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_HOARVALE_MOOT_OPENING_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 65);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_HOARVALE_MOOT_OPENING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 66);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

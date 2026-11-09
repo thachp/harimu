@@ -167,6 +167,7 @@ const flagOffPins = {
   HARIMU_MERIDIAN_TURBINE_DAY_ENABLED: 'zzzzzzzzzzzz-meridian-turbine-day-1175.test.mjs', // #1175 flag off: no turbineDay key
   HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED: 'zzzzzzzzzzzzz-meridian-congress-week-1189.test.mjs', // #1189 flag off: no congressWeek key
   HARIMU_WORLD_ATLAS_READS_ENABLED: 'zzzzzzzzzzzzz-world-atlas-reads-1193.test.mjs', // #1193 flag off: no nextFestival key
+  HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED: 'zzzzzzzzzzzzzzz-ilmar-assembly-election-day-1212.test.mjs', // #1212 flag off: no assemblyElectionDay key
   HARIMU_KORUND_PLAN_CALENDAR_ENABLED: 'zzzzz-korund-plan-calendar-1116.test.mjs', // #1116 flag off: no planCalendar key
   HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED: 'zzzzzzzzzz-korund-chairman-birthday-1147.test.mjs', // #1147 flag off: no chairmanBirthday key
   HARIMU_KORUND_PEOPLES_CONGRESS_ENABLED: 'zzzzzzzzzz-korund-peoples-congress-1170.test.mjs', // #1170 flag off: no peoplesCongress key

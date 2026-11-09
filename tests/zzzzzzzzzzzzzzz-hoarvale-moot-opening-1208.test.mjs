@@ -1,5 +1,5 @@
 /** #1208: next Opening of the Moot is the next Moot term start (#1096), not a 30-day cycle.
- *  HARIMU_HOARVALE_MOOT_OPENING_ENABLED is last in HARIMU_GRAY_PACK. Flag off: no mootOpening key.
+ *  HARIMU_HOARVALE_MOOT_OPENING_ENABLED is GRAY 64 in HARIMU_GRAY_PACK. Flag off: no mootOpening key.
  *  [ASSUMPTION] No offset between the term start and the Opening. Date only: no rite text, no member names. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -70,10 +70,10 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined, 'not its own text binding'); assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 65);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 66);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
