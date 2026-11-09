@@ -8,6 +8,7 @@ import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { worldAtlasClockFields, worldAtlasReadsEnabled, worldFestivalSources, worldNextFestival } from '../lib/world-atlas-reads.ts';
 import { aurelleNextCharterFairAt } from '../lib/aurelle-charter-fair.ts';
 import { aurelleNextCoronationDayAt } from '../lib/aurelle-coronation-day.ts';
+import { aurelleNextHearthNightAt } from '../lib/aurelle-hearth-night.ts';
 import { fulmaraNextGrandRegattaAt } from '../lib/fulmara-grand-regatta.ts';
 import { meridianNextCongressWeekAt } from '../lib/meridian-congress-week.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
@@ -44,6 +45,14 @@ test('pure: the real sources are docs-named, one clock each, all ten nations, St
   assert.equal(pack.at, meridianNextCongressWeekAt(now) / 1000, 'a festival flag in the pack counts');
   const aurelle = worldFestivalSources.filter(s => s.nationId === 'aurelle').map(s => s.name);
   assert.deepEqual(aurelle, ['Coronation Day', 'Hearth Night', 'Charter Fair'], 'docs §7.5 Aurelle holiday order; Heir\'s Naming stays out');
+  // Identity pins: Aurelle clocks share Chair-anchor timestamps, so value checks alone can't prove wiring.
+  const byName = name => worldFestivalSources.find(s => s.nationId === 'aurelle' && s.name === name);
+  assert.equal(byName('Coronation Day').nextAt, aurelleNextCoronationDayAt);
+  assert.equal(byName('Coronation Day').flag, 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(byName('Hearth Night').nextAt, aurelleNextHearthNightAt);
+  assert.equal(byName('Hearth Night').flag, 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED');
+  assert.equal(byName('Charter Fair').nextAt, aurelleNextCharterFairAt);
+  assert.equal(byName('Charter Fair').flag, 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
 });
 
 test('#1214: Coronation Day and Charter Fair are absent when their own flag is off and can win earliest when on', () => {
