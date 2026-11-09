@@ -1,4 +1,4 @@
-/** #1219: next Election Night ends the current Moot term. Last in HARIMU_GRAY_PACK. Flag off: no electionNight key. */
+/** #1219: next Election Night ends the current Moot term. Near last in HARIMU_GRAY_PACK (#1244 Ring Moot follows). Flag off: no electionNight key. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -40,8 +40,8 @@ test('pins, and the read is unchanged with the flag off', async t => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined); assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key); assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 67);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key); assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 68);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false);
   const r = await localRuntime(); t.after(() => r.close());
   const gov = await r.importModule('lib/government-state.ts');
