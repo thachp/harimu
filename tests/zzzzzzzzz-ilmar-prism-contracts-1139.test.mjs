@@ -84,9 +84,9 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars.HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED, 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED, 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-10), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED', '#1147, #1159, #1150, #1160, #1164, #1165, #1169, #1170, and #1183 follow this flag');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-10), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-10), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-12), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED', '#1147, #1159, #1150, #1160, #1164, #1165, #1169, #1170, #1175, #1178, and #1183 follow this flag');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-12), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-12), 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED'), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED'), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED: 'false' }, 'HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED'), false, 'a direct string wins');
