@@ -10,6 +10,7 @@ import { KORUND_PEOPLES_CONGRESS_CYCLE_DAYS, korundNextPeoplesCongressAt } from 
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
 import { MERIDIAN_TURBINE_DAY_CYCLE_DAYS, MERIDIAN_TURBINE_DAY_HOST, meridianNextTurbineDayAt } from './meridian-turbine-day.ts';
+import { MERIDIAN_CONGRESS_WEEK_INTERVAL_DAYS, meridianNextCongressWeekAt } from './meridian-congress-week.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
@@ -86,6 +87,8 @@ export type GovernmentSnapshot = {
   examDay?: { nextAt: number; cycleDays: 30 };
   /** #1175 Meridian: next Turbine Day on a 30-real-day cycle. Present only while HARIMU_MERIDIAN_TURBINE_DAY_ENABLED is on. Holds no grid output, power figure, or bonus. Shen Springs hosts it. */
   turbineDay?: { nextAt: number; cycleDays: 30; host: 'Shen Springs' };
+  /** #1189 Meridian: next Congress Week (every 5 game years = 150 real days). Present only while HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED is on. Date only — no agenda, roster, or SEZ text. */
+  congressWeek?: { nextAt: number; intervalDays: 150; holdsCongress: false };
   /** #1116 Korund: current Five-Year Plan start, next Plan Day and next quarterly Quota Rally. Present only while HARIMU_KORUND_PLAN_CALENDAR_ENABLED is on. */
   planCalendar?: { currentPlanStartedAt: number; nextPlanDayAt: number; nextQuotaRallyAt: number; planIntervalDays: 150; quotaRalliesPerPlan: 4 };
   /** #1147 Korund: next Chairman's Birthday. Present only while HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED is on. Names no Chairman and awards no medal. */
@@ -571,6 +574,29 @@ export function meridianTurbineDaySnapshot(nowMs: number, enabled: boolean): Gov
     },
     availableBudgetMinor: 0,
     influenceSummary: 'Shen Springs hosts Turbine Day. This read does not report grid output or a power figure.',
+  }, nowMs, true);
+}
+
+/** #1189. Flag off, or any nation but Meridian: the same snapshot, and no congressWeek key. Date only. */
+export function withMeridianCongressWeek(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
+  return { ...snapshot, congressWeek: {
+    nextAt: meridianNextCongressWeekAt(nowMs), intervalDays: MERIDIAN_CONGRESS_WEEK_INTERVAL_DAYS, holdsCongress: false,
+  } };
+}
+
+/** Meridian read while only the Congress Week flag is on. No partyState, examDay, or turbineDay key. Flag off returns null, which is today's read. */
+export function meridianCongressWeekSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withMeridianCongressWeek({
+    nationId: 'meridian', mode: 'rule-bound simulation',
+    roles: [{ name: 'Congress Week', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Congress Week', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Congress Week falls every 150 real days (5 game years). This read names the next date only and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Congress Week date only.',
   }, nowMs, true);
 }
 
