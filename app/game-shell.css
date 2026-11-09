@@ -56,6 +56,9 @@ body:has(.harimu-game){overflow:auto}
 .game-notice{top:calc(var(--hud-height) + 90px)}
 @media(max-width:760px){.game-notice{top:210px}}
 .viewport-world-label:focus-visible{outline:2px solid #80d8ce;outline-offset:3px}
+/* #392 selected nation. Gold is --gold (#d3aa5b); the second stroke is the crest edge (#d0ad54). Double border is the non-color cue. The globe ring does not animate. */
+.viewport-world-label.viewport-nation-selected{border:3px double #d3aa5b;box-shadow:0 0 0 1px #071217,0 0 12px #d3aa5b88}
+@media (prefers-reduced-motion: reduce){.viewport-world-label.viewport-nation-selected{box-shadow:0 0 0 1px #071217,0 0 0 2px #d0ad54}}
 @media(max-width:760px){.viewport-world-label{min-height:44px}}
 /* Compact help supports hover, keyboard focus and touch. */
 .game-hud{z-index:6}
