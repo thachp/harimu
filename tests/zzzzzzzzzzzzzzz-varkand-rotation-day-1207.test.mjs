@@ -2,7 +2,7 @@
  *  Flag HARIMU_VARKAND_ROTATION_DAY_ENABLED, packed last in HARIMU_GRAY_PACK. Flag off: no rotationDay key.
  *  The block is the next date only. `canceled` is present only while a stored Red Alert holds (#1081).
  *  The zzzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzzz-aurelle-coronation-day-1191 so --test-shard
- *  does not move earlier files. Built on dev 7f41f2c9 (GRAY 59, #1191 last). Rotation Day is GRAY 60. */
+ *  does not move earlier files. After merging origin/dev 4b36d367 (GRAY 62), Rotation Day is GRAY 63. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -93,11 +93,11 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key, 'GRAY 60 on dev 7f41f2c9, after #1191 Coronation Day');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key, 'GRAY 63, after #1193 world atlas reads');
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), 'HARIMU_WORLD_ATLAS_READS_ENABLED');
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 60);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 63);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

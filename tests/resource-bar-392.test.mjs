@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import { expandFlagPacks, FLAG_PACKS, varsForProcessEnv } from '../lib/flag-pack.mjs';
-import { resourceBarEnabled, resourceBarItems } from '../lib/resource-bar.ts';
+import { citizenHudResources, resourceBarEnabled, resourceBarItems } from '../lib/resource-bar.ts';
 
 const read = f => readFile(new URL(`../${f}`, import.meta.url), 'utf8');
 const key = 'NEXT_PUBLIC_HARIMU_RESOURCE_BAR';
@@ -43,6 +43,14 @@ test('chips use the citizen and household reads, and a missing read is omitted',
   assert.deepEqual(korund.map(item => `${item.value} ${item.label}`), ['4 WC', '0.00 LN', '0 Food']);
   const other = resourceBarItems({ nationId: 'hoarvale', capacity: 9, currencyCode: 'SPK', walletMinor: 100, inventory: { food: 5, materials: 5, knowledge: 5 } });
   assert.deepEqual(other.map(item => item.id), ['wc']);
+  const confluence = resourceBarItems({ nationId: 'confluence', capacity: 11, currencyCode: 'CUR', walletMinor: 250, inventory: { food: 4, materials: 1, knowledge: 1 } });
+  assert.deepEqual(confluence.map(item => `${item.value} ${item.label}`), ['11 WC', '2.50 CUR']);
+  assert.equal(confluence.find(item => item.id === 'wallet').name, 'Wallet, 2.50 CUR');
+  assert.deepEqual(resourceBarItems({ nationId: 'confluence', capacity: 11, currencyCode: 'SPK', walletMinor: 250 }).map(item => item.id), ['wc'], 'Spark is not Confluence Current');
+  assert.deepEqual(resourceBarItems({ nationId: 'confluence', capacity: 11, currencyCode: 'CUR' }).map(item => item.id), ['wc'], 'a missing Current balance is omitted');
+  for (const id of ['meridian', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']) {
+    assert.deepEqual(resourceBarItems({ nationId: id, capacity: 6, currencyCode: 'CUR', walletMinor: 100, inventory: { food: 1, materials: 1, knowledge: 1 } }).map(item => item.id), ['wc'], id);
+  }
   const waiting = resourceBarItems({ nationId: 'kindle', capacity: 18, currencyCode: 'SPK', walletMinor: undefined, inventory: undefined });
   assert.deepEqual(waiting.map(item => item.id), ['wc']);
   assert.deepEqual(resourceBarItems({ nationId: 'kindle', capacity: Number.NaN, inventory: { food: Number.NaN, materials: 1, knowledge: null } }).map(item => item.id), ['materials']);
@@ -95,9 +103,44 @@ test('flag on shows real chips with accessible names; flag off and visitors stay
   assert.doesNotMatch(bar, /Mat\.|Know\./);
   const held = await render('true', { citizenNation: { id: 'hoarvale', name: 'Hoarvale' }, currencyCode: 'SPK', walletMinor: 100, inventory: { food: 5, materials: 5, knowledge: 5 }, capacity: 9 });
   assert.deepEqual(names(barOf(held)), ['Work capacity, 9 WC']);
+  const current = await render('true', { citizenNation: { id: 'confluence', name: 'Confluence' }, currencyCode: 'CUR', walletMinor: 250, inventory: { food: 4, materials: 1, knowledge: 1 }, capacity: 11 });
+  assert.deepEqual(names(barOf(current)), ['Work capacity, 11 WC', 'Wallet, 2.50 CUR']);
+  assert.doesNotMatch(barOf(current), /Food|Mat\.|Know\.|SPK|Loading/);
+  const sparkOff = await render('false', { citizenNation: { id: 'confluence', name: 'Confluence' }, currencyCode: null, walletMinor: undefined, inventory: { food: 4, materials: 1, knowledge: 1 }, capacity: 11 });
+  const offResources = sparkOff.match(/<div class="game-resources"[\s\S]*?(?=<div class="game-account")/)[0];
+  assert.equal(sparkOff.includes('game-resource-bar'), false);
+  assert.doesNotMatch(offResources, />SPK<|>CUR<|<strong>Loading<\/strong>/);
+  assert.match(offResources, /<strong>4<\/strong><span>Food<\/span>/);
+  const currentOff = await render('false', { citizenNation: { id: 'confluence', name: 'Confluence' }, currencyCode: 'CUR', walletMinor: 250, inventory: { food: 4, materials: 1, knowledge: 1 }, capacity: 11 });
+  assert.match(currentOff, /<strong>2\.50<\/strong>/);
+  assert.match(currentOff, />CUR</);
+  assert.doesNotMatch(currentOff, /SPK/);
   const visitorOff = await render('false', { citizenNation: undefined, localDemo: false });
   const visitorOn = await render('true', { citizenNation: undefined, localDemo: false });
   assert.equal(visitorOn, visitorOff);
   assert.match(visitorOn, /Resources unlock after citizenship/);
   assert.equal(visitorOn.includes('game-resource-bar'), false);
+});
+
+test('the page reads citizen ledgers and does not invent Aurelle or Korund stock', async () => {
+  const page = await read('app/page.tsx');
+  assert.match(page, /citizenHudResources\(\{ nationId: citizenNation\?\.id, economy, aurellePlan, korundPlan, nationWorkPlan \}, resourceBarEnabled\(\)\)/);
+  assert.doesNotMatch(page, /materials:\s*0|knowledge:\s*0/);
+  assert.doesNotMatch(page, /citizenNation\?\.id === 'korund' \? 'LN' : 'SPK'/);
+  const economy = { walletMinor: 650, inventory: [{ item: 'food', quantity: 8 }, { item: 'materials', quantity: 2 }, { item: 'knowledge', quantity: 1 }] };
+  const plans = { aurellePlan: { walletMinor: 800, foodQuantity: 3 }, korundPlan: { walletMinor: 0, foodQuantity: 0 }, nationWorkPlan: { walletMinor: 250, currency: { code: 'CUR' } } };
+  assert.deepEqual(citizenHudResources({ nationId: 'kindle', economy, ...plans }, true), { currencyCode: 'SPK', walletMinor: 650, inventory: { food: 8, materials: 2, knowledge: 1 } });
+  assert.deepEqual(citizenHudResources({ nationId: 'aurelle', economy, ...plans }, true), { currencyCode: 'CRN', walletMinor: 800, inventory: { food: 3 } });
+  assert.deepEqual(citizenHudResources({ nationId: 'korund', economy, ...plans }, true), { currencyCode: 'LN', walletMinor: 0, inventory: { food: 0 } });
+  assert.deepEqual(citizenHudResources({ nationId: 'confluence', economy, ...plans }, true), { currencyCode: 'CUR', walletMinor: 250, inventory: undefined });
+  assert.deepEqual(citizenHudResources({ nationId: 'confluence', economy, nationWorkPlan: { walletMinor: 250, currency: { code: 'SPK' } } }, true).currencyCode, null);
+  assert.deepEqual(citizenHudResources({ nationId: 'veldwood', economy }, true), { currencyCode: null, walletMinor: undefined, inventory: undefined });
+  const aurelleOff = citizenHudResources({ nationId: 'aurelle', economy, ...plans }, false);
+  assert.equal(aurelleOff.currencyCode, 'CRN');
+  assert.deepEqual(aurelleOff.inventory, { food: 3, materials: 0, knowledge: 0 });
+  const heldOff = citizenHudResources({ nationId: 'hoarvale', economy }, false);
+  assert.equal(heldOff.currencyCode, null);
+  assert.equal(heldOff.walletMinor, undefined);
+  assert.deepEqual(heldOff.inventory, { food: 8, materials: 2, knowledge: 1 });
+  assert.deepEqual(citizenHudResources({ economy }, false), { currencyCode: 'SPK', walletMinor: 650, inventory: { food: 8, materials: 2, knowledge: 1 } });
 });

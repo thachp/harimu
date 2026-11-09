@@ -34,6 +34,7 @@ import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 import { korundRationCutCities, korundRationRecoveryCities, korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from './korund-coupons'; // #967, #983
 import { nextDividendDayAt } from './veldwood-wallet-dividend.ts'; // #1063
+import { worldAtlasClockFields, type WorldNextFestival } from './world-atlas-reads.ts'; // #1193
 
 export const tickSeconds = 7200;
 export const maximumCatchupTicks = 3;
@@ -70,6 +71,8 @@ export type WorldClock = {
   mode: 'request-driven durable simulation';
   /** #1063: next Veldwood Dividend Day, unix seconds. Derived from the epoch. Absent when the clock is not a safe integer. */
   dividendDayAt?: number;
+  /** #1193 (HARIMU_WORLD_ATLAS_READS_ENABLED): the world's next festival, unix seconds, with every festival at that instant. Absent when off. */
+  nextFestival?: WorldNextFestival;
 };
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
@@ -129,7 +132,7 @@ export async function runWorldChains(chains: WorldRunner[][]): Promise<void> {
 }
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { armyBattles?: boolean; winterMarch?: boolean; religiousHarmony?: boolean; reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; riskScoring?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; peaceRevert?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { atlasEnv?: unknown; armyBattles?: boolean; winterMarch?: boolean; religiousHarmony?: boolean; reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; riskScoring?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; peaceRevert?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
@@ -194,14 +197,14 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   // preview flags on waited for all of them in a row (about 80 round trips, ~30 s on preview). Runners that touch separate state run as concurrent chains (see
   // worldRunnerChains); inside a chain the old order is kept. Every runner is idempotent per tick or time as before.
   await runWorldChains(worldRunnerChains(db, now, options));
-  return readWorldSimulation(db, now, { war: options.war, warAssembly: options.warAssembly, warEndings: options.warEndings, warWeariness: options.warWeariness, warWearinessLosses: options.warWearinessLosses, diplomacy: options.diplomacy, embargo: options.embargo, reserve: options.reserve });
+  return readWorldSimulation(db, now, { war: options.war, warAssembly: options.warAssembly, warEndings: options.warEndings, warWeariness: options.warWeariness, warWearinessLosses: options.warWearinessLosses, diplomacy: options.diplomacy, embargo: options.embargo, reserve: options.reserve, atlasEnv: options.atlasEnv });
 
 }
 
 /** #205: the same snapshot advanceWorld returns, computed without any write. Due-but-unprocessed ticks show as
  *  pendingTicks; the next write path (or GET /api/world) processes them. */
 /** #309: `war` (HARIMU_WAR_ENABLED) adds the derived war state; with it off nothing is queried or returned. */
-export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { war?: boolean; warAssembly?: boolean; warEndings?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; diplomacy?: boolean; embargo?: boolean; reserve?: boolean } = {}): Promise<SimulationState> {
+export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { atlasEnv?: unknown; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; diplomacy?: boolean; embargo?: boolean; reserve?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #668: every read here is independent, so they share one round of round trips instead of queueing (the flag-gated war, treaty, embargo and reserve reads included).
   const none = Promise.resolve(undefined);
@@ -227,7 +230,7 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
   const dividendDayAt = nextDividendDayAt(epoch, now);
   return {clock:{compression:12,epochSeconds:epoch,nowSeconds:now,gameDay:Math.floor(Math.max(0,now-epoch)*12/86400)+1,
     latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation',
-    ...(dividendDayAt == null ? {} : { dividendDayAt })},
+    ...(dividendDayAt == null ? {} : { dividendDayAt }), ...worldAtlasClockFields(now, options.atlasEnv)}, // #1193: atlasEnv is the Worker env; flag off adds nothing
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
     supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
