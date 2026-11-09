@@ -89,8 +89,9 @@ test('the flag is preview true and production false, last inside HARIMU_GRAY_PAC
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 62);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_HOARVALE_MOOT_OPENING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 65);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
@@ -102,7 +103,7 @@ test('flag off: the Varkand government read is unchanged; flag on adds lanternWa
   const gov = await r.importModule('lib/government-state.ts');
   const seconds = Math.floor(r.now / 1000);
   const expected = block(varkandNextLanternWatchAt(seconds * 1000));
-  const opts = { readOnly: true, varkandDirectorate: true, varkandPlebiscite: true, varkandMusterDay: true };
+  const opts = { readOnly: true, varkandDirectorate: true, varkandPlebiscite: true, varkandMusterDay: true, varkandRotationDay: true };
   assert.equal(await gov.readGovernment(r.db, 'varkand', seconds, 'alice', { readOnly: true }), null);
   assert.equal(await gov.readGovernment(r.db, 'varkand', seconds, 'alice', { readOnly: true, varkandLanternWatch: false }), null);
   const off = await gov.readGovernment(r.db, 'varkand', seconds, 'alice', opts);
@@ -114,6 +115,8 @@ test('flag off: the Varkand government read is unchanged; flag on adds lanternWa
   assert.deepEqual(on.directorate, off.directorate);
   assert.deepEqual(on.mandatePlebiscite, off.mandatePlebiscite);
   assert.deepEqual(on.musterDay, off.musterDay);
+  assert.deepEqual(on.rotationDay, off.rotationDay);
+  assert.equal('lanternWatch' in off.rotationDay, false);
   const rest = { ...on };
   delete rest.lanternWatch;
   assert.deepEqual(rest, off);
@@ -127,16 +130,18 @@ test('flag off: the Varkand government read is unchanged; flag on adds lanternWa
     assert.equal(other == null || !('lanternWatch' in other), true, nationId);
   }
   await r.db.prepare("UPDATE citizens SET nation_id='varkand' WHERE clerk_user_id='alice'").run();
-  r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({ HARIMU_VARKAND_DIRECTORATE_ENABLED: 'true', HARIMU_VARKAND_PLEBISCITE_ENABLED: 'true', HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'true' }));
+  const varkandPack = { HARIMU_VARKAND_DIRECTORATE_ENABLED: 'true', HARIMU_VARKAND_PLEBISCITE_ENABLED: 'true', HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'true', HARIMU_VARKAND_ROTATION_DAY_ENABLED: 'true' };
+  r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify(varkandPack));
   const before = (await r.call('citizen', 'alice')).data.government;
   assert.equal('lanternWatch' in before, false, 'flag off');
   assert.equal(JSON.stringify(before.directorate), JSON.stringify(off.directorate));
-  r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({ HARIMU_VARKAND_DIRECTORATE_ENABLED: 'true', HARIMU_VARKAND_PLEBISCITE_ENABLED: 'true', HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'true', [key]: 'true' }));
+  r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({ ...varkandPack, [key]: 'true' }));
   const packed = (await r.call('citizen', 'alice')).data.government;
   assert.deepEqual(packed.lanternWatch, expected);
   assert.deepEqual(packed.directorate, before.directorate);
   assert.deepEqual(packed.mandatePlebiscite, before.mandatePlebiscite);
   assert.deepEqual(packed.musterDay, before.musterDay);
+  assert.deepEqual(packed.rotationDay, before.rotationDay);
   for (const word of banned) assert.equal(JSON.stringify(packed.lanternWatch).includes(word), false, word);
   r.setFixtureEnv(key, 'false');
   assert.equal('lanternWatch' in (await r.call('citizen', 'alice')).data.government, false, 'a direct false wins over the pack');

@@ -184,6 +184,12 @@
       "HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED": "false",
       // #1197: Aurelle next Charter Fair (once per game year = 30 real days, no offset). Off: no charterFair key. Date only.
       "HARIMU_AURELLE_CHARTER_FAIR_ENABLED": "false",
+      // #1193: World atlas reads (simulation.clock.nextFestival from the enabled nation holiday clocks). Off: no nextFestival key. Dates only.
+      "HARIMU_WORLD_ATLAS_READS_ENABLED": "false",
+      // #1207: Varkand next Rotation Day (existing Chair term = 60 real days). Off: no rotationDay key. Date only. Canceled only while a stored Red Alert holds.
+      "HARIMU_VARKAND_ROTATION_DAY_ENABLED": "false",
+      // #1208: Hoarvale next Opening of the Moot (start of the next Moot term, zero offset). Off: no mootOpening key. Date only.
+      "HARIMU_HOARVALE_MOOT_OPENING_ENABLED": "false",
       // #1211: Varkand next Lantern Watch (once per 30 real days, no offset). Off: no lanternWatch key. Date only.
       "HARIMU_VARKAND_LANTERN_WATCH_ENABLED": "false"
     },
