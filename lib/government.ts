@@ -32,6 +32,7 @@ import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { hoarvaleNextElectionNightAt } from './hoarvale-election-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { hoarvaleMootAt, type HoarvaleMoot } from './hoarvale-moot.ts';
 import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
 import { VARKAND_LANTERN_WATCH_CYCLE_DAYS, varkandNextLanternWatchAt } from './varkand-lantern-watch.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
@@ -197,26 +198,8 @@ export function withAssentCountdown(bill: HoarvaleBill, now: number): HoarvaleBi
 }
 export const hoarvaleBills = (now: number): HoarvaleBill[] => HOARVALE_BILLS.map(bill => ({ id: bill.id, title: bill.title, passedAt: bill.passedAt, ...billAssent(bill.passedAt, bill.dissolvedAt, now) }));
 
-/** #1096, docs §7.7 Government row: the Moot sits at most 120 real days; reserve powers only when no PM is invested within 7 real days.
- *  Integer seconds. Pure, so no migration. [ASSUMPTION] Terms run back to back from the Unix epoch (the Varkand #1085 anchor),
- *  so every election is a full-term one. [ASSUMPTION] No investiture is stored yet, so the rule-bound Moot invests its PM
- *  one real day after the election; hoarvaleMoot still takes any investedAt, so a later stored vote plugs in. */
-export const MOOT_TERM_SECONDS = 120 * 86_400;
-export const INVESTITURE_DEADLINE_SECONDS = 7 * 86_400;
-export const MOOT_INVESTITURE_VOTE_SECONDS = 86_400;
-export type HoarvaleMoot = { electedAt: number; dissolvesBy: number; primeMinisterInvestedAt: number | null; investitureDeadline: number; reservePowersAvailable: boolean };
-export function hoarvaleMoot(electedAt: number, investedAt: number | null, now: number): HoarvaleMoot {
-  const invested = investedAt != null && Number.isSafeInteger(investedAt) && investedAt >= electedAt && investedAt <= now ? investedAt : null;
-  const investitureDeadline = electedAt + INVESTITURE_DEADLINE_SECONDS;
-  return { electedAt, dissolvesBy: electedAt + MOOT_TERM_SECONDS, primeMinisterInvestedAt: invested, investitureDeadline,
-    reservePowersAvailable: invested === null && now >= investitureDeadline };
-}
-/** The current term at `now` (seconds). At exactly dissolvesBy the next term has begun. */
-export function hoarvaleMootAt(now: number): HoarvaleMoot {
-  const t = Number.isSafeInteger(now) && now > 0 ? now : 0;
-  const electedAt = Math.floor(t / MOOT_TERM_SECONDS) * MOOT_TERM_SECONDS;
-  return hoarvaleMoot(electedAt, electedAt + MOOT_INVESTITURE_VOTE_SECONDS, t);
-}
+export { MOOT_TERM_SECONDS, INVESTITURE_DEADLINE_SECONDS, MOOT_INVESTITURE_VOTE_SECONDS, hoarvaleMoot, hoarvaleMootAt } from './hoarvale-moot.ts';
+export type { HoarvaleMoot } from './hoarvale-moot.ts';
 /** #1096. Flag off, or any nation but Hoarvale: the same snapshot, and no moot key. */
 export function withHoarvaleMoot(snapshot: GovernmentSnapshot, now: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;

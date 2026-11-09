@@ -504,8 +504,12 @@ test('#1240: Election Night is skipped while its flag is off and equals the Hoar
   assert.equal(source.nationId, 'hoarvale');
   assert.equal(source.flag, E, 'the nextFestival candidate uses the existing Election Night flag');
   assert.equal(source.nextAt, hoarvaleNextElectionNightAt);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 67, 'no new flag and no GRAY change');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), E);
+  // #1240 adds no GRAY flag. Later flags (#1220 red-alert cancels) may follow Election Night, so the pack length and the last slot are not this test's.
+  const gray = FLAG_PACKS.HARIMU_GRAY_PACK;
+  assert.equal(gray.includes(E), true, 'Election Night reuses the government flag already in GRAY');
+  assert.equal(gray.filter(flag => flag === E).length, 1, 'that flag is unchanged');
+  assert.equal(gray.includes('HARIMU_ATLAS_ELECTION_NIGHT_ENABLED'), false, 'no new flag and no GRAY change');
+  for (const flag of new Set(worldFestivalSources.map(item => item.flag))) assert.equal(gray.includes(flag), true, `${flag} is an existing GRAY flag`);
   assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'hoarvale').map(s => s.name), ['Opening of the Moot', 'Honors List Day', 'Aurora Night', 'Election Night'], 'docs Hoarvale holiday order');
   const now = Date.UTC(2026, 10, 9);
   const prior = worldFestivalSources.filter(s => s.flag !== E);
