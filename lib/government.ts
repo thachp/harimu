@@ -30,6 +30,7 @@ import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCou
 import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
+import { hoarvaleNextElectionNightAt } from './hoarvale-election-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
 import { VARKAND_LANTERN_WATCH_CYCLE_DAYS, varkandNextLanternWatchAt } from './varkand-lantern-watch.ts';
@@ -124,6 +125,7 @@ export type GovernmentSnapshot = {
   auroraNight?: { nextAt: number; cycleDays: 30 };
   /** #1208 Hoarvale: next Opening of the Moot (the next term start). Present only while HARIMU_HOARVALE_MOOT_OPENING_ENABLED is on. The next date only. */
   mootOpening?: { nextAt: number };
+  electionNight?: { nextAt: number }; // #1219: next date only, while HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED is on
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   /** #1207 Varkand: next Rotation Day (the existing 60-real-day Chair term). Present only while HARIMU_VARKAND_ROTATION_DAY_ENABLED is on. Date only. `canceled` is present only while a stored Red Alert holds. */
   rotationDay?: { nextAt: number; cycleDays: 60; canceled?: true };
@@ -253,6 +255,19 @@ export function hoarvaleMootOpeningSnapshot(nowMs: number, enabled: boolean): Go
     availableBudgetMinor: 0,
     influenceSummary: 'This read names the next Opening of the Moot. It quotes no rite and names no members.',
   }, nowMs, true);
+}
+/** #1219. Flag off, or any nation but Hoarvale: the same snapshot, and no electionNight key. */
+export function withHoarvaleElectionNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
+  return { ...snapshot, electionNight: { nextAt: hoarvaleNextElectionNightAt(nowMs) } };
+}
+/** Flag-only Hoarvale read. No moot, honors, or aurora key. Flag off returns null. */
+export function hoarvaleElectionNightSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withHoarvaleElectionNight({ nationId: 'hoarvale', mode: 'rule-bound simulation',
+    roles: [{ name: 'Election Night', controller: 'AI/SI role · deterministic rules' }],
+    decision: { title: 'Election Night', topic: 'infrastructure', proposedSpendMinor: 0, reason: 'This read names the next Election Night.' },
+    availableBudgetMinor: 0, influenceSummary: 'This read names the next Election Night.' }, nowMs, true);
 }
 
 /** #1151. Flag off, or any nation but Varkand: the same snapshot, and no musterDay key. Musters no troops, changes no Alert Level. */
