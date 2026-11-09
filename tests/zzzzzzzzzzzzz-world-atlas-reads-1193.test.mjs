@@ -5,9 +5,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
+import { displayTimestamp } from '../lib/display-preferences.ts';
 import { ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot } from '../lib/government.ts';
 import { ilmarNextGreatPilgrimageAt } from '../lib/ilmar-great-pilgrimage.ts';
 import { ilmarNextGreatPilgrimageAt as sanctumNextGreatPilgrimageAt } from '../lib/ilmar-sanctum.ts';
+import { gameDayAt } from '../lib/topbar-countdown.ts';
+import { spokenRemaining } from '../lib/veldwood-wallet-dividend.ts';
+import { ageHudLine, worldAgeAt } from '../lib/world-age.ts';
+import { worldAtlasStats } from '../lib/world-atlas.ts';
 import { worldAtlasClockFields, worldAtlasReadsEnabled, worldFestivalSources, worldNextFestival } from '../lib/world-atlas-reads.ts';
 import { aurelleNextCharterFairAt } from '../lib/aurelle-charter-fair.ts';
 import { aurelleNextCoronationDayAt } from '../lib/aurelle-coronation-day.ts';
@@ -93,6 +98,27 @@ test('GET /api/world: flag off leaves simulation.clock unchanged; flag on adds n
   assert.deepEqual(Object.keys(rest).sort(), Object.keys(off).sort(), 'only nextFestival is added');
   r.setFixtureEnv('HARIMU_FULMARA_GRAND_REGATTA_ENABLED', 'false');
   assert.equal('nextFestival' in (await r.call('world')).data.simulation.clock, false, 'no festival flag on: absent');
+});
+
+test('atlas row: a present nextFestival is shown from the read; missing or null leaves the row out', () => {
+  const nowMs = Date.UTC(2026, 10, 9);
+  const next = worldNextFestival(nowMs, { HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'true' });
+  assert.ok(next, 'a real source is on');
+  const epoch = Math.floor(nowMs / 1000) - 86_400, nowSeconds = Math.floor(nowMs / 1000);
+  const shown = worldAtlasStats({ nations: [{ id: 'kindle' }], clock: { epochSeconds: epoch, nowSeconds, nextFestival: next } });
+  const row = shown.find(item => item.label === 'Next festival');
+  const relative = spokenRemaining((next.at - nowSeconds) * 1000);
+  const expected = [next.festivals.map(festival => festival.name).join(' · '), displayTimestamp(next.at * 1000), `Day ${gameDayAt(epoch, next.at)}`, ...(relative ? [`in ${relative}`] : [])].join(' · ');
+  assert.equal(row.value, expected);
+  assert.match(row.value, /Grand Regatta/);
+  assert.equal(shown.find(item => item.label === 'World age').value, ageHudLine(worldAgeAt(epoch * 1000, nowSeconds * 1000)));
+  assert.equal(shown.some(item => item.label === 'Epoch' || item.label === 'Era'), false);
+  const missing = worldAtlasStats({ nations: [{ id: 'kindle' }], clock: { epochSeconds: epoch, nowSeconds } });
+  const absent = worldAtlasStats({ nations: [{ id: 'kindle' }], clock: { epochSeconds: epoch, nowSeconds, nextFestival: null } });
+  assert.equal(missing.some(item => item.label === 'Next festival'), false);
+  assert.equal(absent.some(item => item.label === 'Next festival'), false);
+  assert.deepEqual(missing.map(item => item.label), absent.map(item => item.label));
+  assert.deepEqual(missing.map(item => item.label), ['Nations', 'World age']);
 });
 
 test('#1215: Great Pilgrimage counts only while its own flag is on', async t => {
