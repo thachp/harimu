@@ -182,6 +182,7 @@ const flagOffPins = {
   HARIMU_KINDLE_FOUNDERS_FORGE_DAY_ENABLED: 'zzzzzzzzz-kindle-founders-forge-1145.test.mjs', // #1145 flag off: no foundersForgeDay key
   HARIMU_KINDLE_MARKET_BELL_ENABLED: 'zzzzzzzzzzz-kindle-market-bell-1164.test.mjs', // #1164 flag off: no marketBell key
   HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'zzzzzzzzz-varkand-muster-day-1151.test.mjs', // #1151 flag off: no musterDay key
+  HARIMU_VARKAND_LANTERN_WATCH_ENABLED: 'zzzzzzzzzzzzzzz-varkand-lantern-watch-1211.test.mjs', // #1211 flag off: no lanternWatch key
   HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'zzzzzzzzz-confluence-canal-festival-1165.test.mjs', // #1165 flag off: no canalFestival key
   HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'zzzzzzzzzzz-fulmara-grand-regatta-1178.test.mjs', // #1178 flag off: no grandRegatta key
   HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED: 'zzzzzzzzzzzz-fulmara-dock-strike-remembrance-1187.test.mjs', // #1187 flag off: no dockStrikeRemembrance key
