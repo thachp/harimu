@@ -4,12 +4,13 @@
  *  [ASSUMPTION] A "festival" is an entry in a nation page's "Holidays & festivals" row (harimu-docs content/world/nations/*.mdx) whose government read has a clock.
  *  Clock-backed, in that row's order: Kindle Ballot Night, Founders' Forge Day, Market Bell; Confluence Congress Lanterns, Canal Festival, Quota Day;
  *  Meridian Congress Week, Exam Day, Turbine Day; Korund Plan Day, Quota Rally, Chairman's Birthday, People's Congress; Aurelle Coronation Day, Hearth Night, Charter Fair;
- *  Ilmar Feast of First Light, Assembly Election, Great Pilgrimage; Hoarvale Opening of the Moot, Honors List Day, Aurora Night;
+ *  Ilmar Feast of First Light, Assembly Election, Great Pilgrimage; Hoarvale Opening of the Moot, Honors List Day, Aurora Night, Election Night;
  *  Varkand Muster Day, Rotation Day, Mandate Plebiscite, Lantern Watch; Veldwood Vote Day, Dividend Day;
  *  Fulmara Exchange Bell, Grand Regatta, Charter Day, Fair-Wind Blessing, Dock Strike remembrance.
  *  Ilmar Stilldays have a clock on sanctum.nextStilldayAt but stay out: the docs call them weekly rest, so they would always be next, and they share the sanctum flag.
- *  Rows with no clock are not invented: Aurelle Heir's Naming, Hoarvale Election Night, Veldwood Glade Festival, Veldwood Initiative Night.
+ *  Rows with no clock are not invented: Aurelle Heir's Naming, Veldwood Glade Festival, Veldwood Initiative Night.
  *  [ASSUMPTION] Ties: every festival at the earliest instant is listed, in docs roster order (content/world/cultures.mdx), then in the nation row's order.
+ *  Election Night and Opening of the Moot share that instant (both offsets are 0, #1208/#1219). The list keeps row order, so Opening of the Moot comes before Election Night.
  *  Dates only: no bonus, holiday effect, or Red Alert cancellation is applied. */
 import { flagOn } from './flag-pack.mjs';
 import { aurelleNextCharterFairAt } from './aurelle-charter-fair.ts';
@@ -25,6 +26,7 @@ import { fulmaraNextExchangeBellAt } from './fulmara-exchange-bell.ts';
 import { fulmaraNextFairWindBlessingAt } from './fulmara-fair-wind-blessing.ts';
 import { fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
 import { hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
+import { hoarvaleNextElectionNightAt } from './hoarvale-election-night.ts';
 import { hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
 import { ilmarNextAssemblyElectionDayAt } from './ilmar-assembly-election-day.ts';
@@ -84,6 +86,7 @@ export const worldFestivalSources: readonly WorldFestivalSource[] = [
   f('hoarvale', 'Opening of the Moot', 'HOARVALE_MOOT_OPENING', hoarvaleNextMootOpeningAt),
   f('hoarvale', 'Honors List Day', 'HOARVALE_HONORS_LIST_DAY', hoarvaleNextHonorsListDayAt),
   f('hoarvale', 'Aurora Night', 'HOARVALE_AURORA_NIGHT', hoarvaleNextAuroraNightAt),
+  f('hoarvale', 'Election Night', 'HOARVALE_ELECTION_NIGHT', hoarvaleNextElectionNightAt),
   f('varkand', 'Muster Day', 'VARKAND_MUSTER_DAY', varkandNextMusterDayAt),
   f('varkand', 'Rotation Day', 'VARKAND_ROTATION_DAY', varkandNextRotationDayAt),
   f('varkand', 'Mandate Plebiscite', 'VARKAND_PLEBISCITE', varkandNextPlebisciteAt),
