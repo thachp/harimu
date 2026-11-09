@@ -1,4 +1,5 @@
 import { AURELLE_CHARTER_FAIR_CYCLE_DAYS, aurelleNextCharterFairAt } from './aurelle-charter-fair.ts';
+import { AURELLE_CORONATION_DAY_CYCLE_DAYS, aurelleNextCoronationDayAt } from './aurelle-coronation-day.ts';
 import { AURELLE_HEARTH_NIGHT_CYCLE_DAYS, aurelleNextHearthNightAt } from './aurelle-hearth-night.ts';
 import { AURELLE_REIGN_DISPLAY_DAYS, aurelleNextGreatCouncilWindowAt, aurelleReignStartedAt } from './aurelle-crown-calendar.ts';
 import { CONFLUENCE_ASSEMBLY_INTERVAL_DAYS, confluenceLastAssemblyElectionAt, confluenceNextAssemblyElectionAt } from './confluence-assembly-election.ts';
@@ -11,9 +12,11 @@ import { KORUND_PEOPLES_CONGRESS_CYCLE_DAYS, korundNextPeoplesCongressAt } from 
 import { KORUND_PLAN_INTERVAL_DAYS, KORUND_QUOTA_RALLIES_PER_PLAN, korundCurrentPlanStartedAt, korundNextPlanDayAt, korundNextQuotaRallyAt } from './korund-plan-calendar.ts';
 import { MERIDIAN_EXAM_DAY_CYCLE_DAYS, meridianNextExamDayAt } from './meridian-exam-day.ts';
 import { MERIDIAN_TURBINE_DAY_CYCLE_DAYS, MERIDIAN_TURBINE_DAY_HOST, meridianNextTurbineDayAt } from './meridian-turbine-day.ts';
+import { MERIDIAN_CONGRESS_WEEK_INTERVAL_DAYS, meridianNextCongressWeekAt } from './meridian-congress-week.ts';
 import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERIDIAN_STANDING_COMMITTEE_SEATS, MERIDIAN_TERM_LIMIT_SUSPEND_SUPERMAJORITY, meridianNextPartyCongressAt } from './meridian-party.ts';
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
-import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
+import { ILMAR_GREAT_PILGRIMAGE_CYCLE_DAYS, ilmarNextGreatPilgrimageAt } from './ilmar-great-pilgrimage.ts';
+import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt as ilmarSanctumNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-contracts.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
@@ -29,6 +32,7 @@ import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './h
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
+import { FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS, fulmaraNextDockStrikeRemembranceAt } from './fulmara-dock-strike-remembrance.ts';
 import { FULMARA_GRAND_REGATTA_HOST_CITY, FULMARA_GRAND_REGATTA_INTERVAL_DAYS, fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 import { KINDLE_MARKET_BELL_CYCLE_DAYS, kindleNextMarketBellAt } from './kindle-market-bell.ts';
@@ -70,6 +74,8 @@ export type GovernmentSnapshot = {
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
   feastOfFirstLight?: { nextAt: number; cycleDays: 15 };
+  /** #1196 Ilmar: next Great Pilgrimage on a 30-real-day cycle. Present only while HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED is on. Holds the next date only. */
+  greatPilgrimage?: { nextAt: number; cycleDays: 30 };
   /** #1139 Ilmar: Prism contracts, each with a title and a whole-number profit share. Present only while HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED is on. */
   contracts?: IlmarPrismContract[];
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
@@ -86,6 +92,8 @@ export type GovernmentSnapshot = {
   examDay?: { nextAt: number; cycleDays: 30 };
   /** #1175 Meridian: next Turbine Day on a 30-real-day cycle. Present only while HARIMU_MERIDIAN_TURBINE_DAY_ENABLED is on. Holds no grid output, power figure, or bonus. Shen Springs hosts it. */
   turbineDay?: { nextAt: number; cycleDays: 30; host: 'Shen Springs' };
+  /** #1189 Meridian: next Congress Week (every 5 game years = 150 real days). Present only while HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED is on. Date only — no agenda, roster, or SEZ text. */
+  congressWeek?: { nextAt: number; intervalDays: 150; holdsCongress: false };
   /** #1116 Korund: current Five-Year Plan start, next Plan Day and next quarterly Quota Rally. Present only while HARIMU_KORUND_PLAN_CALENDAR_ENABLED is on. */
   planCalendar?: { currentPlanStartedAt: number; nextPlanDayAt: number; nextQuotaRallyAt: number; planIntervalDays: 150; quotaRalliesPerPlan: 4 };
   /** #1147 Korund: next Chairman's Birthday. Present only while HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED is on. Names no Chairman and awards no medal. */
@@ -113,6 +121,8 @@ export type GovernmentSnapshot = {
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
   grandRegatta?: { nextAt: number; intervalDays: 30; hostCity: 'Corvel Isles'; holdsRegatta: false };
+  /** #1187 Fulmara: next Dock Strike remembrance (once per game year = 30 real days). Present only while HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED is on. Date only. */
+  dockStrikeRemembrance?: { nextAt: number; intervalDays: 30; holdsRemembrance: false };
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1164 Kindle: next Market Bell on a 30-real-day cycle. Present only while HARIMU_KINDLE_MARKET_BELL_ENABLED is on. Holds no market event, price move, or bonus. */
   marketBell?: { nextAt: number; cycleDays: 30 };
@@ -125,6 +135,8 @@ export type GovernmentSnapshot = {
   crownCalendar?: { reignStartedAt: number; nextGreatCouncilWindowAt: number; reignDisplayDays: number };
   /** #1146 Aurelle: next Hearth Night (once per game year = 30 real days). Present only while HARIMU_AURELLE_HEARTH_NIGHT_ENABLED is on. Blesses no houses. */
   hearthNight?: { nextAt: number; cycleDays: 30 };
+  /** #1191 Aurelle: next Coronation Day (once per game year = 30 real days). Present only while HARIMU_AURELLE_CORONATION_DAY_ENABLED is on. Date only: no rite text, Privy Council roster, or Crown debasement figures. */
+  coronationDay?: { nextAt: number; cycleDays: 30 };
   /** #1197 Aurelle: next Charter Fair (once per game year = 30 real days). Present only while HARIMU_AURELLE_CHARTER_FAIR_ENABLED is on. Date only: no charter list, guild name, or trade right. */
   charterFair?: { nextAt: number; cycleDays: 30 };
   founding?: { active: boolean; endsAt: number | null; dayOfPeriod: number | null };
@@ -251,6 +263,29 @@ export function fulmaraGrandRegattaSnapshot(nowMs: number, enabled: boolean): Go
   }, nowMs, true);
 }
 
+/** #1187. Flag off, or any nation but Fulmara: the same snapshot, and no dockStrikeRemembrance key. Date only. */
+export function withFulmaraDockStrikeRemembrance(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, dockStrikeRemembrance: {
+    nextAt: fulmaraNextDockStrikeRemembranceAt(nowMs), intervalDays: FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS as 30, holdsRemembrance: false,
+  } };
+}
+
+/** Fulmara read while only the Dock Strike remembrance flag is on. Flag off returns null, which is today's read. */
+export function fulmaraDockStrikeRemembranceSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraDockStrikeRemembrance({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Dock Strike remembrance', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Dock Strike remembrance', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Dock Strike remembrance falls every 30 real days. This read names the next date only and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Dock Strike remembrance date only.',
+  }, nowMs, true);
+}
+
 /** #1145. Flag off, or any nation but Kindle: the same snapshot, and no foundersForgeDay key. Opens no fair. */
 export function withKindleFoundersForgeDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'kindle') return snapshot;
@@ -368,6 +403,12 @@ export function withAurelleCrownCalendar(snapshot: GovernmentSnapshot, nowMs: nu
 export function withAurelleHearthNight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
   return { ...snapshot, hearthNight: { nextAt: aurelleNextHearthNightAt(nowMs), cycleDays: AURELLE_HEARTH_NIGHT_CYCLE_DAYS as 30 } };
+}
+
+/** #1191. Flag off, or any nation but Aurelle: the same snapshot, and no coronationDay key. Date only. */
+export function withAurelleCoronationDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'aurelle') return snapshot;
+  return { ...snapshot, coronationDay: { nextAt: aurelleNextCoronationDayAt(nowMs), cycleDays: AURELLE_CORONATION_DAY_CYCLE_DAYS as 30 } };
 }
 
 /** #1197. Flag off, or any nation but Aurelle: the same snapshot, and no charterFair key. Date only. */
@@ -557,6 +598,29 @@ export function meridianTurbineDaySnapshot(nowMs: number, enabled: boolean): Gov
   }, nowMs, true);
 }
 
+/** #1189. Flag off, or any nation but Meridian: the same snapshot, and no congressWeek key. Date only. */
+export function withMeridianCongressWeek(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'meridian') return snapshot;
+  return { ...snapshot, congressWeek: {
+    nextAt: meridianNextCongressWeekAt(nowMs), intervalDays: MERIDIAN_CONGRESS_WEEK_INTERVAL_DAYS, holdsCongress: false,
+  } };
+}
+
+/** Meridian read while only the Congress Week flag is on. No partyState, examDay, or turbineDay key. Flag off returns null, which is today's read. */
+export function meridianCongressWeekSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withMeridianCongressWeek({
+    nationId: 'meridian', mode: 'rule-bound simulation',
+    roles: [{ name: 'Congress Week', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Congress Week', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Congress Week falls every 150 real days (5 game years). This read names the next date only and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Congress Week date only.',
+  }, nowMs, true);
+}
+
 /** Meridian read while only the Exam Day flag is on. No partyState key. Flag off returns null, which is today's read. */
 export function meridianExamDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
   if (!enabled) return null;
@@ -595,7 +659,7 @@ export function withIlmarSanctum(snapshot: GovernmentSnapshot, nowMs: number, en
   if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
   return { ...snapshot, sanctum: {
     oracleTerm: ILMAR_ORACLE_TERM, councilOfEldersSeats: ILMAR_COUNCIL_OF_ELDERS_SEATS,
-    isStillday: ilmarIsStillday(nowMs), nextStilldayAt: ilmarNextStilldayAt(nowMs), nextGreatPilgrimageAt: ilmarNextGreatPilgrimageAt(nowMs),
+    isStillday: ilmarIsStillday(nowMs), nextStilldayAt: ilmarNextStilldayAt(nowMs), nextGreatPilgrimageAt: ilmarSanctumNextGreatPilgrimageAt(nowMs),
   } };
 }
 
@@ -704,6 +768,27 @@ export function ilmarFeastOfFirstLightSnapshot(nowMs: number, enabled: boolean):
     },
     availableBudgetMinor: 0,
     influenceSummary: 'This read names the next Feast of First Light. It chooses no Oracle and lists no clergy.',
+  }, nowMs, true);
+}
+
+/** #1196. Flag off, or any nation but Ilmar: the same snapshot, and no greatPilgrimage key. Holds the next date only. */
+export function withIlmarGreatPilgrimage(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, greatPilgrimage: { nextAt: ilmarNextGreatPilgrimageAt(nowMs), cycleDays: ILMAR_GREAT_PILGRIMAGE_CYCLE_DAYS } };
+}
+
+/** Ilmar read while only the Great Pilgrimage flag is on. No sanctum, feast, or contracts key. Flag off returns null, which is today's read. */
+export function ilmarGreatPilgrimageSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarGreatPilgrimage({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [{ name: 'Great Pilgrimage', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Great Pilgrimage', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'The Great Pilgrimage falls once per game year, every 30 real days. This read names the next date. It counts no pilgrims, names no route or shrine, quotes no Oracle, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Great Pilgrimage. It counts no pilgrims and names no shrine.',
   }, nowMs, true);
 }
 

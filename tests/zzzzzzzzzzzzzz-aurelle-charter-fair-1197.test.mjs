@@ -8,11 +8,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { AURELLE_CHARTER_FAIR_CYCLE_DAYS, AURELLE_CHARTER_FAIR_CYCLE_MS, aurelleNextCharterFairAt } from '../lib/aurelle-charter-fair.ts';
+import { aurelleNextCoronationDayAt } from '../lib/aurelle-coronation-day.ts';
 import { aurelleNextHearthNightAt } from '../lib/aurelle-hearth-night.ts';
 import { realDaysPerGameYear } from '../lib/election-calendars.ts';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { publicGovernmentSnapshot } from '../lib/government-disclosure.ts';
-import { simulateGovernment, withAurelleCharterFair, withAurelleCrownCalendar, withAurelleHearthNight } from '../lib/government.ts';
+import { simulateGovernment, withAurelleCharterFair, withAurelleCoronationDay, withAurelleCrownCalendar, withAurelleHearthNight } from '../lib/government.ts';
 import { VARKAND_CHAIR_ANCHOR_MS } from '../lib/varkand-directorate.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
 
@@ -71,6 +72,12 @@ test('flag off leaves the Aurelle snapshot unchanged, and other nations gain no 
   const withCrown = withAurelleCharterFair(crowned, cycle, true);
   assert.equal(withCrown.crownCalendar.nextGreatCouncilWindowAt, crowned.crownCalendar.nextGreatCouncilWindowAt);
   assert.deepEqual(withCrown.charterFair, block(2 * cycle));
+  const coronation = withAurelleCoronationDay(aurelle, cycle, true);
+  const withFair = withAurelleCharterFair(coronation, cycle, true);
+  assert.deepEqual(withFair.coronationDay, coronation.coronationDay);
+  assert.deepEqual(withFair.charterFair, block(2 * cycle));
+  assert.equal(withFair.decision, aurelle.decision);
+  assert.equal('charterFair' in coronation, false);
   for (const nationId of ['kindle', 'korund', 'meridian', 'varkand', 'veldwood', 'ilmar', 'hoarvale', 'fulmara', 'confluence']) {
     const snapshot = ['kindle', 'korund', 'hoarvale'].includes(nationId)
       ? simulateGovernment({ ...baseInput, nationId, ...(nationId === 'hoarvale' ? { hoarvaleAssent: true, now: 0 } : {}) })
@@ -93,7 +100,7 @@ test('the flag is preview true and production false, last inside HARIMU_GRAY_PAC
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
@@ -116,6 +123,13 @@ test('flag off: the Aurelle government read is unchanged; flag on adds charterFa
   const hearthOnly = await gov.readGovernment(r.db, 'aurelle', seconds, 'alice', { readOnly: true, aurelleHearthNight: true });
   assert.equal('charterFair' in hearthOnly, false, 'Hearth Night does not add charterFair');
   assert.deepEqual(hearthOnly.hearthNight, hearthExpected);
+  const coronationOnly = await gov.readGovernment(r.db, 'aurelle', seconds, 'alice', { readOnly: true, aurelleCoronationDay: true });
+  assert.equal('charterFair' in coronationOnly, false, 'Coronation Day alone does not add charterFair');
+  const bothDays = await gov.readGovernment(r.db, 'aurelle', seconds, 'alice', { readOnly: true, aurelleCoronationDay: true, aurelleCharterFair: true });
+  assert.deepEqual(bothDays.coronationDay, coronationOnly.coronationDay);
+  assert.deepEqual(bothDays.charterFair, expected);
+  assert.deepEqual(bothDays.decision, off.decision);
+  assert.equal(bothDays.coronationDay.nextAt, aurelleNextCoronationDayAt(seconds * 1000));
   const together = await gov.readGovernment(r.db, 'aurelle', seconds, 'alice', { readOnly: true, aurelleCrownCalendar: true, aurelleHearthNight: true, aurelleCharterFair: true });
   assert.deepEqual(together.charterFair, expected);
   assert.deepEqual(together.hearthNight, hearthExpected);
