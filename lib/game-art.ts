@@ -1,14 +1,104 @@
 import * as THREE from 'three';
 import { cityInstitutions, cityPlaceIds, cityPlaceLabel } from './city-places.ts';
+import { nationCrests } from './nation-crests.ts';
 
 export type CityLocation = 'square' | 'home' | 'workplace' | 'market' | 'government';
 export type WorldBuilding = { location: CityLocation; label: string; position: THREE.Vector3; object: THREE.Object3D };
 export type WorldArt = { group: THREE.Group; selectables: THREE.Object3D[]; buildings: WorldBuilding[]; bounds: number };
 
 type Palette = { wall: number; roof: number; trim: number; stone: number };
-type CapitalProfile = { capital: string; institution: string; palette: Palette; angle: number; spacing: number; riverX: number; landmark: 'fountain' | 'spire' | 'forum' | 'beacon' };
+type CapitalBase = { capital: string; institution: string; palette: Palette; angle: number; spacing: number; riverX: number; landmark: 'fountain' | 'spire' | 'forum' | 'beacon' };
+/** #392: muted city ground, road, water and lights, mixed from that capital's palette and crest. */
+export type CityScene = { ground: number; road: number; water: number; sky: string; hemisphereGround: string; sun: string; sunIntensity: number };
+type CapitalProfile = CapitalBase & { scene: CityScene };
+type RGB = [number, number, number];
+type Chan = 'wall' | 'roof' | 'trim' | 'stone' | 'field' | 'mark' | 'accent';
+type Mix = readonly [Chan, number];
+type Recipe = { ground: Chan; road: Chan; water: Chan; sun: Chan; sky: Chan; hemi: Chan; sat: readonly [number, number, number]; lum: readonly [number, number, number]; tint: readonly [number, number, number]; gain: number; groundMix?: Mix; roadMix?: Mix; waterMix?: Mix };
+
+/** Shared city colors. Flag off paints these and no others. */
+export const citySceneGlobals = {
+  ground: 0x75845b, groundAlt: 0x839165, road: 0xb5a17a, plaza: 0xa3997e, water: 0x527f85, waterAlt: 0x58888d,
+  sky: '#fff3d6', hemisphereGround: '#334b4d', hemisphere: 2.2, sun: '#ffe2ac',
+} as const;
+
+const toLin = (c: number) => { const s = c / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+const fromLin = (v: number) => { const s = v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055; return Math.min(255, Math.max(0, s * 255)); };
+const relLum = ([r, g, b]: RGB) => 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
+const parseHex = (hex: number | string): RGB => { const n = typeof hex === 'string' ? Number.parseInt(hex.slice(1), 16) : hex; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const packHex = ([r, g, b]: RGB) => (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+const cssHex = (rgb: RGB) => `#${packHex(rgb).toString(16).padStart(6, '0')}`;
+const mixRgb = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const desat = ([r, g, b]: RGB, sat: number): RGB => { const mean = (r + g + b) / 3; return [mean + (r - mean) * sat, mean + (g - mean) * sat, mean + (b - mean) * sat]; };
+const setLum = (rgb: RGB, target: number): RGB => {
+  const lin: RGB = [toLin(rgb[0]), toLin(rgb[1]), toLin(rgb[2])];
+  const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2], scale = L < 1e-6 ? 0 : target / L;
+  return [fromLin(lin[0] * scale), fromLin(lin[1] * scale), fromLin(lin[2] * scale)];
+};
+const fitLum = (rgb: RGB, cap: number): RGB => {
+  let t = cap, out: RGB = [0, 0, 0];
+  for (let i = 0; i < 12; i++) { const next = setLum(rgb, t); out = [Math.round(next[0]), Math.round(next[1]), Math.round(next[2])]; if (relLum(out) <= cap + 0.002) break; t *= 0.985; }
+  return out;
+};
+const overContrast = (ink: RGB, plate: RGB, ground: RGB, alpha: number) => {
+  const mixed: RGB = [Math.round(plate[0] * alpha + ground[0] * (1 - alpha)), Math.round(plate[1] * alpha + ground[1] * (1 - alpha)), Math.round(plate[2] * alpha + ground[2] * (1 - alpha))];
+  const [hi, lo] = [relLum(ink), relLum(mixed)].sort((a, b) => b - a);
+  return (hi + 0.05) / (lo + 0.05);
+};
+const labelInk = parseHex('#d6eceb'), labelPlate = parseHex('#0b2735'), pillInk = parseHex('#f3ecd6'), pillPlate = parseHex('#0b2631');
+/** Darken until the translucent city label and pill stay at least as strong as they are over today's tile. */
+const holdContrast = (rgb: RGB, floorHex: number): RGB => {
+  const floor = parseHex(floorHex);
+  let out: RGB = [Math.round(rgb[0]), Math.round(rgb[1]), Math.round(rgb[2])];
+  const ok = (color: RGB) => overContrast(labelInk, labelPlate, color, 0xec / 255) >= overContrast(labelInk, labelPlate, floor, 0xec / 255) - 0.01
+    && overContrast(pillInk, pillPlate, color, 0xf2 / 255) >= overContrast(pillInk, pillPlate, floor, 0xf2 / 255) - 0.01;
+  for (let i = 0; i < 18 && !ok(out); i++) { const next = setLum(out, relLum(out) * 0.96); out = [Math.round(next[0]), Math.round(next[1]), Math.round(next[2])]; }
+  return out;
+};
+const caps = { ground: relLum(parseHex(citySceneGlobals.groundAlt)), road: relLum(parseHex(citySceneGlobals.road)), water: relLum(parseHex(citySceneGlobals.water)), sun: relLum(parseHex(citySceneGlobals.sun)), sky: relLum(parseHex(citySceneGlobals.sky)), hemi: relLum(parseHex(citySceneGlobals.hemisphereGround)) };
+// Each channel is an existing palette or crest hex. lum is a fraction of today's tile. tint moves the cream lights toward that hex. gain multiplies the sun (desktop 3.2, low graphics 1.5).
+const sceneRecipes: Record<string, Recipe> = {
+  kindle: { ground: 'field', road: 'trim', water: 'roof', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.62, .82, .4], lum: [.86, .96, .88], tint: [.38, .2, .6], gain: 1, groundMix: ['accent', .35], waterMix: ['accent', .42] },
+  confluence: { ground: 'stone', road: 'accent', water: 'field', sun: 'mark', sky: 'accent', hemi: 'field', sat: [.36, .55, .52], lum: [.9, .94, 1], tint: [.16, .18, .52], gain: .98, roadMix: ['trim', .35] },
+  meridian: { ground: 'stone', road: 'field', water: 'roof', sun: 'field', sky: 'accent', hemi: 'roof', sat: [.32, .58, .3], lum: [.88, .94, .92], tint: [.32, .14, .5], gain: .97 },
+  korund: { ground: 'field', road: 'accent', water: 'roof', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.46, .7, .24], lum: [.82, .94, .86], tint: [.3, .14, .54], gain: .94 },
+  aurelle: { ground: 'stone', road: 'accent', water: 'field', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.1, .84, .5], lum: [.98, .96, 1], tint: [.42, .26, .44], gain: .98, groundMix: ['wall', .7] },
+  ilmar: { ground: 'wall', road: 'trim', water: 'accent', sun: 'trim', sky: 'mark', hemi: 'accent', sat: [.22, .78, .4], lum: [.96, .96, .9], tint: [.28, .16, .38], gain: 1, groundMix: ['stone', .4] },
+  hoarvale: { ground: 'wall', road: 'accent', water: 'field', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.12, .22, .46], lum: [.94, .98, 1], tint: [.18, .28, .5], gain: .96, groundMix: ['stone', .45] },
+  varkand: { ground: 'field', road: 'stone', water: 'field', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.4, .48, .22], lum: [.64, .78, .62], tint: [.48, .12, .7], gain: .86, groundMix: ['accent', .42], roadMix: ['accent', .4], waterMix: ['accent', .28] },
+  veldwood: { ground: 'field', road: 'accent', water: 'roof', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.52, .74, .32], lum: [.76, .94, .82], tint: [.3, .14, .52], gain: .98 },
+  fulmara: { ground: 'stone', road: 'trim', water: 'accent', sun: 'accent', sky: 'mark', hemi: 'field', sat: [.34, .5, .48], lum: [.88, .94, .88], tint: [.24, .14, .52], gain: 1, waterMix: ['field', .4] },
+};
+function pick(palette: Palette, crest: { field: string; mark: string; accent: string }, name: Chan, extra?: Mix): RGB {
+  const one = (n: Chan): RGB => n === 'field' || n === 'mark' || n === 'accent' ? parseHex(crest[n]) : parseHex(palette[n]);
+  return extra ? mixRgb(one(name), one(extra[0]), extra[1]) : one(name);
+}
+const mute = (rgb: RGB, sat: number, cap: number, scale: number, floor: number) => holdContrast(fitLum(desat(rgb, sat), cap * scale), floor);
+function shadeCityColor(hex: number, t: number) {
+  if (t === 1) return hex;
+  const [r, g, b] = parseHex(hex), scale = (c: number) => Math.round(fromLin(toLin(c) * t));
+  return (scale(r) << 16) | (scale(g) << 8) | scale(b);
+}
+function citySceneFor(id: string, palette: Palette): CityScene {
+  const crest = nationCrests[id as keyof typeof nationCrests] ?? nationCrests.kindle, recipe = sceneRecipes[id] ?? sceneRecipes.kindle;
+  const cream = parseHex(citySceneGlobals.sun), sky = parseHex(citySceneGlobals.sky), hemi = parseHex(citySceneGlobals.hemisphereGround);
+  return {
+    ground: packHex(mute(pick(palette, crest, recipe.ground, recipe.groundMix), recipe.sat[0], caps.ground, recipe.lum[0], citySceneGlobals.groundAlt)),
+    road: packHex(mute(pick(palette, crest, recipe.road, recipe.roadMix), recipe.sat[1], caps.road, recipe.lum[1], citySceneGlobals.road)),
+    water: packHex(mute(pick(palette, crest, recipe.water, recipe.waterMix), recipe.sat[2], caps.water, recipe.lum[2], citySceneGlobals.water)),
+    sun: cssHex(fitLum(mixRgb(cream, pick(palette, crest, recipe.sun), recipe.tint[0]), caps.sun)),
+    sky: cssHex(fitLum(mixRgb(sky, pick(palette, crest, recipe.sky), recipe.tint[1]), caps.sky)),
+    hemisphereGround: cssHex(fitLum(mixRgb(hemi, pick(palette, crest, recipe.hemi), recipe.tint[2]), caps.hemi)),
+    sunIntensity: recipe.gain,
+  };
+}
+function attachCityScenes(profiles: Record<string, CapitalBase>): Record<string, CapitalProfile> {
+  const out: Record<string, CapitalProfile> = {};
+  for (const [id, profile] of Object.entries(profiles)) out[id] = { ...profile, scene: citySceneFor(id, profile.palette) };
+  return out;
+}
 // Visual interpretations of the fictional capitals, not authoritative city maps.
-export const capitalProfiles: Record<string, CapitalProfile> = {
+export const capitalProfiles: Record<string, CapitalProfile> = attachCityScenes({
   kindle: { capital: 'Forgehaven', institution: cityInstitutions.kindle, palette: { wall: 0xa76643, roof: 0x343e43, trim: 0xcda65b, stone: 0x555c5d }, angle: 0, spacing: 1, riverX: 8, landmark: 'fountain' },
   confluence: { capital: 'Meetwater', institution: cityInstitutions.confluence, palette: { wall: 0x9abcc4, roof: 0x315e78, trim: 0x579ab5, stone: 0x6b8389 }, angle: .1, spacing: .94, riverX: -8, landmark: 'forum' },
   meridian: { capital: 'Steamgate', institution: cityInstitutions.meridian, palette: { wall: 0xad969f, roof: 0x574659, trim: 0xb88cac, stone: 0x716975 }, angle: -.12, spacing: .92, riverX: 8, landmark: 'beacon' },
@@ -19,7 +109,7 @@ export const capitalProfiles: Record<string, CapitalProfile> = {
   varkand: { capital: 'Watchfast', institution: cityInstitutions.varkand, palette: { wall: 0x7e8a78, roof: 0x364a43, trim: 0xa6a078, stone: 0x535f59 }, angle: -.08, spacing: 1.02, riverX: -8, landmark: 'spire' },
   veldwood: { capital: 'Ringhall', institution: cityInstitutions.veldwood, palette: { wall: 0xb1a981, roof: 0x426b42, trim: 0x96b66d, stone: 0x7e8d70 }, angle: .22, spacing: .84, riverX: 8, landmark: 'forum' },
   fulmara: { capital: 'Arcport', institution: cityInstitutions.fulmara, palette: { wall: 0xc5b4d1, roof: 0x574075, trim: 0xb598d3, stone: 0x8a8098 }, angle: -.22, spacing: .98, riverX: -8, landmark: 'beacon' },
-};
+});
 const materials = new Map<number, THREE.MeshStandardMaterial>();
 function material(color: number) {
   let value = materials.get(color);
@@ -62,7 +152,7 @@ function facade(group: THREE.Group, p: Palette, w: number, h: number, d: number)
   }
 }
 
-export function createCityWorld(nationId: string, cityName?: string, options: { marketOpen?: boolean } = {}): WorldArt {
+export function createCityWorld(nationId: string, cityName?: string, options: { marketOpen?: boolean; cityPalette?: boolean } = {}): WorldArt {
   materials.clear(); // Each world owns its materials; renderer may dispose the previous world.
   const key = nationId.toLowerCase(); const profile = capitalProfiles[key] ?? capitalProfiles.kindle; const p = profile.palette;
   const displayedCity = cityName?.trim() || profile.capital;
@@ -75,7 +165,10 @@ export function createCityWorld(nationId: string, cityName?: string, options: { 
     const road = Math.abs(x + 0.5) < 1 || Math.abs(z + 0.5) < 1;
     const plaza = Math.abs(x + 0.5) < 2 && Math.abs(z + 0.5) < 2;
     const water = edge > 10.5 || river;
-    const color = water ? ((x + z) % 2 ? 0x527f85 : 0x58888d) : plaza ? 0xa3997e : road ? 0xb5a17a : ((x * 7 + z * 11) % 3 ? 0x75845b : 0x839165);
+    const scene = options.cityPalette ? profile.scene : null, g = citySceneGlobals;
+    const color = scene
+      ? (water ? shadeCityColor(scene.water, (x + z) % 2 ? 0.92 : 1) : plaza ? shadeCityColor(scene.road, 0.9) : road ? scene.road : shadeCityColor(scene.ground, (x * 7 + z * 11) % 3 ? 0.94 : 1))
+      : (water ? ((x + z) % 2 ? g.water : g.waterAlt) : plaza ? g.plaza : road ? g.road : ((x * 7 + z * 11) % 3 ? g.ground : g.groundAlt));
     const tile = box(group, x + 0.5, water ? -0.21 : -0.12, z + 0.5, 0.995, water ? 0.12 : 0.3, 0.995, color);
     tile.userData = { kind: 'tile', x, z, label: water ? 'River and coast' : road ? 'City street' : 'City square tile', detail: 'Square terrain cell' }; selectables.push(tile);
   }
