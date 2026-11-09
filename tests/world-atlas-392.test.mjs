@@ -4,6 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { expandFlagPacks, FLAG_PACKS, varsForProcessEnv } from '../lib/flag-pack.mjs';
+import { displayTimestamp } from '../lib/display-preferences.ts';
+import { gameDayAt } from '../lib/topbar-countdown.ts';
 import { ageHudLine, worldAgeAt } from '../lib/world-age.ts';
 import { worldAtlasEnabled, worldAtlasStats } from '../lib/world-atlas.ts';
 
@@ -94,6 +96,27 @@ test('open disputes counts only sources whose field is present', () => {
   assert.equal(worldAtlasStats({ nations: [], disputes: { warProposals: [{ status: 'proposed', defender: 'korund' }] }, nation: { id: 'kindle' } }).find(item => item.label === 'Open disputes').value, '1 · 1 proposal · Kindle in 1');
 });
 
+test('next festival shows the names and instant on the read, and is omitted when missing or null', () => {
+  const epoch = 1_700_000_000, now = epoch, at = epoch + 3 * 86400;
+  const when = [displayTimestamp(at * 1000), `Day ${gameDayAt(epoch, at)}`, 'in 3 days'].join(' · ');
+  const rows = worldAtlasStats({
+    nations: [{ id: 'fulmara' }], nation: { id: 'fulmara', capital: 'Harbor' },
+    clock: { epochSeconds: epoch, nowSeconds: now, nextFestival: { at, festivals: [{ nationId: 'fulmara', name: 'Grand Regatta' }] } },
+    disputes: { wars: { wars: [] } },
+  });
+  assert.deepEqual(rows.map(row => row.label), ['Nations', 'World age', 'Open disputes', 'Next festival', 'Capital']);
+  assert.equal(rows.find(row => row.label === 'World age').value, ageHudLine(worldAgeAt(epoch * 1000, now * 1000)));
+  assert.equal(rows.find(row => row.label === 'Open disputes').value, 'None');
+  assert.equal(rows.find(row => row.label === 'Next festival').value, `Grand Regatta · ${when}`);
+  const tied = worldAtlasStats({ nations: [], clock: { epochSeconds: epoch, nowSeconds: now, nextFestival: { at, festivals: [{ nationId: 'aurelle', name: 'Coronation Day' }, { nationId: 'aurelle', name: 'Charter Fair' }] } } });
+  assert.equal(tied.find(row => row.label === 'Next festival').value, `Coronation Day · Charter Fair · ${when}`);
+  const bare = { nations: [{ id: 'fulmara' }], clock: { epochSeconds: epoch, nowSeconds: now } };
+  assert.equal(worldAtlasStats(bare).some(row => row.label === 'Next festival'), false);
+  assert.equal(worldAtlasStats({ ...bare, clock: { ...bare.clock, nextFestival: null } }).some(row => row.label === 'Next festival'), false);
+  assert.equal(worldAtlasStats({ nations: [], clock: { epochSeconds: epoch, nowSeconds: now, nextFestival: { at, festivals: [] } } }).some(row => row.label === 'Next festival'), false);
+  assert.equal(worldAtlasStats({ nations: [], clock: { epochSeconds: epoch, nowSeconds: now, nextFestival: { at: null, festivals: [{ name: 'Grand Regatta' }] } } }).some(row => row.label === 'Next festival'), false);
+});
+
 test('styles meet AA and show focus', async () => {
   const css = await read('app/world-atlas.css');
   assert.ok(contrast('#f3ecd6', '#071820') >= 4.5, 'paper on the dark teal ground');
@@ -117,7 +140,7 @@ test('the world panel mounts the atlas without deciding the flag; flag off rende
   const code = out.outputFiles[0].text.replace(/from "([^".][^"]*)"/g, (_, m) => `from "${import.meta.resolve(m)}"`);
   const mod = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
   const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
-  const off = renderToStaticMarkup(React.createElement(mod.WorldAtlas, { nations: [{ id: 'kindle' }], nation: kindle, clock: { epochSeconds: 1, nowSeconds: 1 }, disputes: { wars: { wars: [{ status: 'active', attacker: 'kindle', defender: 'korund' }] } } }));
+  const off = renderToStaticMarkup(React.createElement(mod.WorldAtlas, { nations: [{ id: 'kindle' }], nation: kindle, clock: { epochSeconds: 1, nowSeconds: 1, nextFestival: { at: 1 + 3 * 86400, festivals: [{ nationId: 'kindle', name: 'Market Bell' }] } }, disputes: { wars: { wars: [{ status: 'active', attacker: 'kindle', defender: 'korund' }] } } }));
   assert.equal(off, '');
   const on = renderToStaticMarkup(React.createElement(mod.WorldAtlas, { nations: [{ id: 'kindle' }, { id: 'aurelle' }], nation: kindle, clock: null, enabled: true }));
   assert.match(on, /<h2>World atlas<\/h2>/);
@@ -136,4 +159,17 @@ test('the world panel mounts the atlas without deciding the flag; flag off rende
   const clockOn = renderToStaticMarkup(React.createElement(mod.WorldAtlas, { nations: [{ id: 'kindle' }], nation: {}, clock: { epochSeconds: 1_700_000_000, nowSeconds: 1_700_000_000 }, enabled: true }));
   assert.match(clockOn, /World age/);
   assert.match(clockOn, /Age 1, year 1 of 12/);
+  assert.doesNotMatch(clockOn, /<dt>Next festival<\/dt>/);
+  const at = 1_700_000_000 + 3 * 86400;
+  const festivalOn = renderToStaticMarkup(React.createElement(mod.WorldAtlas, {
+    nations: [{ id: 'fulmara' }], nation: { capital: 'Harbor' }, enabled: true,
+    clock: { epochSeconds: 1_700_000_000, nowSeconds: 1_700_000_000, nextFestival: { at, festivals: [{ nationId: 'fulmara', name: 'Grand Regatta' }] } },
+    disputes: { wars: { wars: [] } },
+  }));
+  assert.match(festivalOn, /<section class="world-atlas" aria-label="World atlas">/);
+  const festivalValue = festivalOn.match(/<dt>Next festival<\/dt><dd>([^<]*)<\/dd>/)?.[1];
+  assert.equal(festivalValue, `Grand Regatta · ${displayTimestamp(at * 1000)} · Day ${gameDayAt(1_700_000_000, at)} · in 3 days`);
+  assert.match(festivalOn, /<dt>World age<\/dt>/);
+  assert.match(festivalOn, /<dt>Open disputes<\/dt><dd>None<\/dd>/);
+  assert.doesNotMatch(festivalOn, /<dt>Epoch<\/dt>|<dt>Era<\/dt>|<dt>Languages<\/dt>|<dt>Active laws<\/dt>/);
 });
