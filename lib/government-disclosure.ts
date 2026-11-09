@@ -38,6 +38,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.feastOfFirstLight?{feastOfFirstLight:snapshot.feastOfFirstLight}:{}), // #1137: next Feast of First Light (readGovernment adds it only while the flag is on)
   ...(snapshot.greatPilgrimage?{greatPilgrimage:snapshot.greatPilgrimage}:{}), // #1196: next Great Pilgrimage (readGovernment adds it only while the flag is on)
   ...(snapshot.assemblyElectionDay?{assemblyElectionDay:snapshot.assemblyElectionDay}:{}), // #1212: next Assembly Election day (readGovernment adds it only while the flag is on)
+  ...(snapshot.clearing?{clearing:snapshot.clearing}:{}), // #1245: next Clearing (readGovernment adds it only while the flag is on)
   ...(snapshot.contracts?{contracts:snapshot.contracts.map(row=>({title:row.title,sharePercent:row.sharePercent}))}:{}), // #1139: title and whole-number profit share (readGovernment adds them only while the flag is on)
   ...(snapshot.party?{party:snapshot.party}:{}), // #1113: Four Pillars and the next Party Congress (readGovernment adds it only while the flag is on)
   ...(snapshot.partyState?{partyState:snapshot.partyState}:{}), // #1114: Meridian Party Congress schedule (readGovernment adds it only while the flag is on)
