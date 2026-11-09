@@ -183,7 +183,9 @@
       // #1196: Ilmar next Great Pilgrimage (once per game year = 30 real days, no offset). Off: no greatPilgrimage key. Holds the next date only.
       "HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED": "false",
       // #1197: Aurelle next Charter Fair (once per game year = 30 real days, no offset). Off: no charterFair key. Date only.
-      "HARIMU_AURELLE_CHARTER_FAIR_ENABLED": "false"
+      "HARIMU_AURELLE_CHARTER_FAIR_ENABLED": "false",
+      // #1193: World atlas reads (simulation.clock.nextFestival from the enabled nation holiday clocks). Off: no nextFestival key. Dates only.
+      "HARIMU_WORLD_ATLAS_READS_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
