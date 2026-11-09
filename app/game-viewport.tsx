@@ -5,6 +5,7 @@ import {useDisplayPreferences} from './display-preferences';
 import {graphicsOptions} from '../lib/display-preferences';
 import * as THREE from 'three';
 import { createCityWorld, createRegionWorld, globeFocusRotation, globeAnchorVisible } from '../lib/game-art';
+import { cityLight, cityPaletteEnabled } from '../lib/city-palette';
 import { clampCamera, clampZoom, readCameraSnapshot, saveCameraSnapshot, locationSelection, locationLabel, placeLabels, type LocationId, type ViewportSelection } from '../lib/game-viewport';
 import { MOBILE_MAP_QUERY, cityPanDelta, controlPan, mapEffects, mobileTopdownMapFlag, orientWorldGroup, overlayFacing, placeMapCamera, selectMapView, type PanDir } from '../lib/mobile-topdown-map';
 import { nationSymbolElement } from './nation-symbol';
@@ -73,7 +74,9 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(mode === 'world' ? '#101d29' : '#172c31');
     const cityFog = new THREE.Fog('#172c31', 35, 85);
-    const world = mode === 'city' ? createCityWorld(nationId, cityName, { marketOpen }) : createRegionWorld(JSON.parse(nationSignature));
+    // #392: city only. Flag off keeps the shared ground and cream lights. Flag on swaps this capital's tokens once.
+    const paletteOn = mode === 'city' && cityPaletteEnabled();
+    const world = mode === 'city' ? createCityWorld(nationId, cityName, { marketOpen, cityPalette: paletteOn }) : createRegionWorld(JSON.parse(nationSignature));
     scene.add(world.group);
     const hemisphere = new THREE.HemisphereLight('#fff3d6', '#334b4d', 2.2);
     scene.add(hemisphere);
@@ -87,6 +90,10 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       sun.color.set(lit.sunColor); sun.intensity = lit.sunIntensity; sun.position.set(lit.sunPosition[0], lit.sunPosition[1], lit.sunPosition[2]);
       const surface = world.group.children[0] as THREE.Mesh;
       (surface.material as THREE.MeshStandardMaterial).roughness = lit.roughness;
+    }
+    if (paletteOn) {
+      const lit = cityLight(true, nationId, opening.sun);
+      hemisphere.color.set(lit.sky); hemisphere.groundColor.set(lit.ground); sun.color.set(lit.sunColor);
     }
     // #392: flag off keeps the marker's box highlight. Flag on draws a still gold coast ring on the selected nation only.
     const glow = mode === 'world' && selectedNationGlowEnabled();
@@ -171,6 +178,7 @@ export function GameViewport({ mode, nationId, visitor = false, cityName, market
       const effects = mapEffects(view, quality);
       scene.fog = effects.fog && mode === 'city' ? cityFog : null;
       renderer.shadowMap.enabled = effects.shadows; sun.castShadow = effects.shadows; sun.intensity = rim ? globeLight(true, effects.sun).sunIntensity : effects.sun;
+      if (paletteOn) sun.intensity = cityLight(true, nationId, effects.sun).sunIntensity;
       const atmosphere = world.group.getObjectByName('atmosphere'); if (atmosphere) atmosphere.visible = effects.atmosphere;
       container.dataset.mapCamera = view;
       const ratio = w / h;

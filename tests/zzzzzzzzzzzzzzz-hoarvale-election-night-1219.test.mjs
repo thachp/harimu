@@ -41,7 +41,7 @@ test('pins, and the read is unchanged with the flag off', async t => {
   assert.equal(preview.vars[key], undefined); assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key); assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 63);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 67);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false);
   const r = await localRuntime(); t.after(() => r.close());
   const gov = await r.importModule('lib/government-state.ts');
@@ -49,10 +49,13 @@ test('pins, and the read is unchanged with the flag off', async t => {
   const read = extra => gov.readGovernment(r.db, 'hoarvale', seconds, 'alice', { readOnly: true, ...extra });
   assert.equal(await read({}), null);
   assert.equal((await read({ hoarvaleElectionNight: true })).electionNight.nextAt, expected);
-  const shared = { hoarvaleAssent: true, hoarvaleMoot: true, hoarvaleHonorsListDay: true, hoarvaleAuroraNight: true };
+  const both = await read({ hoarvaleMootOpening: true, hoarvaleElectionNight: true });
+  assert.equal(both.mootOpening.nextAt, expected); assert.equal(both.electionNight.nextAt, expected);
+  const shared = { hoarvaleAssent: true, hoarvaleMoot: true, hoarvaleHonorsListDay: true, hoarvaleAuroraNight: true, hoarvaleMootOpening: true };
   const off = await read(shared), on = await read({ ...shared, hoarvaleElectionNight: true });
   const { electionNight, ...rest } = on;
-  assert.equal('electionNight' in off, false); assert.equal(electionNight.nextAt, expected); assert.deepEqual(rest, off);
+  assert.equal('electionNight' in off, false); assert.equal(off.mootOpening.nextAt, expected);
+  assert.equal(electionNight.nextAt, expected); assert.deepEqual(rest, off);
   await r.db.prepare("UPDATE citizens SET nation_id='hoarvale' WHERE clerk_user_id='alice'").run();
   assert.equal((await r.call('citizen', 'alice')).data.government, null);
   r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({ [key]: 'true' }));
