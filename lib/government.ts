@@ -31,6 +31,7 @@ import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
+import { VARKAND_LANTERN_WATCH_CYCLE_DAYS, varkandNextLanternWatchAt } from './varkand-lantern-watch.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { VARKAND_ROTATION_DAY_CYCLE_DAYS, varkandNextRotationDayAt } from './varkand-rotation-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
@@ -123,6 +124,8 @@ export type GovernmentSnapshot = {
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
   /** #1207 Varkand: next Rotation Day (the existing 60-real-day Chair term). Present only while HARIMU_VARKAND_ROTATION_DAY_ENABLED is on. Date only. `canceled` is present only while a stored Red Alert holds. */
   rotationDay?: { nextAt: number; cycleDays: 60; canceled?: true };
+  /** #1211 Varkand: next Lantern Watch (once per 30 real days). Present only while HARIMU_VARKAND_LANTERN_WATCH_ENABLED is on. Date only: no host, Red Alert cancellation, or holiday effect. */
+  lanternWatch?: { nextAt: number; cycleDays: 30 };
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
@@ -279,6 +282,12 @@ export function varkandRotationDaySnapshot(nowMs: number, enabled: boolean, canc
     availableBudgetMinor: 0,
     influenceSummary: 'The Chair rotates on the existing term. This read does not name a Chair.',
   }, nowMs, true, canceled);
+}
+
+/** #1211. Flag off, or any nation but Varkand: the same snapshot, and no lanternWatch key. Date only. */
+export function withVarkandLanternWatch(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  return { ...snapshot, lanternWatch: { nextAt: varkandNextLanternWatchAt(nowMs), cycleDays: VARKAND_LANTERN_WATCH_CYCLE_DAYS } };
 }
 
 /** #1165. Flag off, or any nation but Confluence: the same snapshot, and no canalFestival key. Holds no festival, harvest yield, or bonus. */
@@ -586,6 +595,21 @@ export function varkandPlebisciteSnapshot(nowMs: number, enabled: boolean): Gove
     },
     availableBudgetMinor: 0,
     influenceSummary: 'Citizens are asked to approve the Directorate\'s Order every 150 real days. This read does not collect votes.',
+  }, nowMs, true);
+}
+
+/** Varkand read while only the Lantern Watch flag is on. No directorate, plebiscite, or musterDay key. Flag off returns null, which is today's read. */
+export function varkandLanternWatchSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVarkandLanternWatch({
+    nationId: 'varkand', mode: 'rule-bound simulation',
+    roles: [{ name: 'Lantern Watch', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Lantern Watch', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Lantern Watch falls every 30 real days. This read names the next date only and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Lantern Watch date only.',
   }, nowMs, true);
 }
 
