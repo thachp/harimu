@@ -37,12 +37,16 @@ export function WorldInstitutionsButton({ onView, enabled = uiV2PanelEnabled() }
 }
 
 /** City, top of the panel (flag on): "Status: Capital" first on a capital only (from the city catalog), the Household destination is promoted to the primary action (as in the concept), the other destinations are the rows.
- *  NEXT_PUBLIC_HARIMU_CITY_PLACE_ROWS: those rows become the map's five places, in pill order, with the pill icons. Flag off keeps the rows above. */
+ *  NEXT_PUBLIC_HARIMU_CITY_PLACE_ROWS: those rows become the map's five places, in pill order, with the pill icons. The Household primary stays (same destination card). Flag off keeps the rows above. */
 export type CityTierUnlockView = { tierName: string; districtSlots: number; unlocks: readonly string[] }; // #979
 export function CitySummary({ cityName, city, nation, destinations, onView, tierUnlocks, festivalNote, populationNote, specialtyRole, specialtyNote, captureNote, captureHistory, civicUnitNote, governorNote, governorAi = false, spaWcNote, visitor = false, enabled = uiV2PanelEnabled(), icons = uiV2CityEnabled(), places = cityPlaceRowsEnabled() }: { cityName: string; city?: { capital?: boolean } | null; nation: Nation; destinations: CityDestination[]; onView: (view: View) => void; tierUnlocks?: CityTierUnlockView | null; festivalNote?: string | null; populationNote?: string | null; specialtyRole?: string | null; specialtyNote?: string | null; captureNote?: string | null; captureHistory?: CityCaptureHistory | null; civicUnitNote?: string | null; governorNote?: string | null; governorAi?: boolean; spaWcNote?: string | null; visitor?: boolean; enabled?: boolean; icons?: boolean; places?: boolean }) {
   if (!enabled) return null;
   const home = destinations.find(card => card.id === 'household');
   const aligned = places ? cityPlaces(nation.id, cityName.trim() || nation.capital, destinations.some(card => card.id === 'market'), visitor) : null;
+  // #392: the gold primary stays with the place rows. It is the destination card (no card: no primary, including a player with no household). Same view as the household row.
+  // A visitor's row is also "Household"; the card's existing detail then keeps the two names apart. No new copy.
+  const householdPlace = aligned?.find(place => place.view === 'household');
+  const primary = home ? { label: home.label, icon: icons ? cityPlaceIcon(home.id) : undefined, onSelect: () => onView(home.id), ...(householdPlace?.label === home.label ? { ariaLabel: `${home.label}: ${home.detail}` } : {}) } : undefined;
   const tierStats = tierUnlocks ? [{ label: 'Tier', value: tierUnlocks.tierName }, { label: 'Districts', value: String(tierUnlocks.districtSlots) }, { label: 'Unlocks', value: tierUnlocks.unlocks.join(', ') }] : [];
   const populationStats = populationNote ? [{ label: 'Population', value: populationNote }] : []; // #1014 read-only note
   const festivalStats = festivalNote ? [{ label: 'Festivals', value: festivalNote }] : []; // #984 read-only note
@@ -53,7 +57,7 @@ export function CitySummary({ cityName, city, nation, destinations, onView, tier
   const governorStats = governorNote ? [{ label: 'Governor', value: governorAi ? <>{governorNote} <AiBadge /></> : governorNote }] : []; // #1007 read-only
   const panel = <PanelV2 title={cityName} subtitle={nation.name} rowsLabel="City destinations" stats={[...[cityStatusStat(city)].filter(stat => stat !== null), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...captureStats, ...historyStats, ...civicUnitStats, ...governorStats, { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
     rows={aligned ? aligned.map(place => ({ id: place.id, label: place.label, detail: place.detail, icon: cityPlaceIcon(place.id), onSelect: () => onView(place.view) })) : destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? cityPlaceIcon(card.id) : undefined, onSelect: () => onView(card.id) }))}
-    primary={aligned ? undefined : home ? { label: home.label, icon: icons ? cityPlaceIcon(home.id) : undefined, onSelect: () => onView(home.id) } : undefined} />; // S7 follow-up: with the City pills on, rows carry the pill's icon. #392 place rows: the five pills, same order and icons.
+    primary={primary} />; // S7 follow-up: with the City pills on, rows carry the pill's icon. #392 place rows: the five pills, same order and icons, then the Household primary.
   return spaWcNote ? <>{panel}<p>{spaWcNote}</p></> : panel; // #798: absent unless the API sends it
 }
 
