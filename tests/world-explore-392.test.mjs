@@ -99,9 +99,14 @@ test('flag on shows crest, motto and one gold Explore; flag off is the atlas wit
 
 test('styles meet AA, show a focus ring, and wrap inside the panel', async () => {
   const css = await read('app/world-atlas.css');
+  const onGold = contrast('#071820', '#d0ad54'), onHover = contrast('#071820', '#f1d58a');
   assert.ok(contrast('#f3ecd6', '#071820') >= 4.5, 'motto and name on the dark teal ground');
-  assert.ok(contrast('#f1d58a', '#0d2530') >= 4.5, 'gold Explore label on the button');
+  assert.ok(onGold >= 4.5, `dark teal on the filled atlas gold is ${onGold.toFixed(2)}:1`);
+  assert.ok(onHover >= 4.5, `dark teal on the brighter hover gold is ${onHover.toFixed(2)}:1`);
   assert.ok(contrast('#e1f2ef', '#1a4650') >= 4.5, 'demoted institutions label');
+  assert.match(css, /button\.world-atlas-primary:not\(\.market-item\)\{[^}]*background:#d0ad54;color:#071820/);
+  assert.match(css, /button\.world-atlas-primary:not\(\.market-item\):hover:not\(:disabled\)\{[^}]*background:#f1d58a/);
+  assert.match(css, /button\.world-atlas-primary:focus-visible\{outline:2px solid #f3ecd6;outline-offset:2px\}/);
   assert.match(css, /\.world-atlas :focus-visible\{outline:2px solid #f3ecd6/);
   assert.match(css, /\.world-atlas-name\{[^}]*overflow-wrap:anywhere/);
   assert.match(css, /\.world-atlas-motto\{[^}]*overflow-wrap:anywhere/);
