@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { bookState, economyFixture } from './market-board-fixtures.mjs';
 import { fontsBeforeShots } from './layout-standalone.mjs';
+import { gameTimerCjsExports } from './game-timer-stub.mjs';
 const require = createRequire(import.meta.url);
 const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
 const root = new URL('../', import.meta.url);
@@ -39,7 +40,7 @@ async function load(rel) {
     if (name.endsWith('.module.css')) return { __esModule: true, default: new Proxy({}, { get: (_, k) => String(k) }) };
     if (name.endsWith('.css')) return {};
     if (name === './game-viewport') return { __esModule: true, default: () => null };
-    if (name === './game-timer') return { GameTimer: () => null };
+    if (name === './game-timer') return gameTimerCjsExports({ GameTimer: () => null });
     if (name === './square-chat') return { SquareChat: () => null };
     if (name === '@clerk/nextjs') return { useClerk: () => ({ mountUserButton() {}, unmountUserButton() {} }) };
     if (name.startsWith('@/lib/')) return requireLib(new URL(`lib/${name.slice(6)}.ts`, root).pathname);
