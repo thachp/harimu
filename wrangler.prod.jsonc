@@ -177,7 +177,9 @@
       // #1187: Fulmara next Dock Strike remembrance (once per game year = 30 real days). Off: no dockStrikeRemembrance key. Holds no remembrance.
       "HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED": "false",
       // #1189: Meridian next Congress Week (every 5 game years = 150 real days). Off: no congressWeek key. Date only.
-      "HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED": "false"
+      "HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED": "false",
+      // #1193: World atlas reads (simulation.clock.nextFestival from the enabled nation holiday clocks). Off: no nextFestival key. Dates only.
+      "HARIMU_WORLD_ATLAS_READS_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
