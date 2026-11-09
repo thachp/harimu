@@ -1,6 +1,6 @@
 /** #1193: World atlas reads. Flag HARIMU_WORLD_ATLAS_READS_ENABLED in HARIMU_GRAY_PACK. Flag off: no nextFestival key on simulation.clock.
  *  nextFestival is the earliest date among the nation holiday clocks whose own flags are on, with every festival at that instant.
- *  [ASSUMPTION] GRAY 59 = tip 5eeebe48 (58) + 1; recount after #1199/#1200/#1203. */
+ *  GRAY 62 on tip 4bbd52ee (GRAY 61, #1197 Charter Fair) + 1. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -75,7 +75,11 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, las
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), F, '#1193 is last');
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), F);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 59); // [ASSUMPTION] GRAY 59
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 62); // GRAY 62
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);

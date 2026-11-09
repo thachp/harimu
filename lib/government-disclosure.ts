@@ -32,6 +32,7 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.dockStrikeRemembrance?{dockStrikeRemembrance:snapshot.dockStrikeRemembrance}:{}), // #1187: next Dock Strike remembrance (readGovernment adds it only while the flag is on)
   ...(snapshot.sanctum?{sanctum:snapshot.sanctum}:{}), // #1107: Oracle term, Elders, Stillday, Great Pilgrimage (readGovernment adds it only while the flag is on)
   ...(snapshot.feastOfFirstLight?{feastOfFirstLight:snapshot.feastOfFirstLight}:{}), // #1137: next Feast of First Light (readGovernment adds it only while the flag is on)
+  ...(snapshot.greatPilgrimage?{greatPilgrimage:snapshot.greatPilgrimage}:{}), // #1196: next Great Pilgrimage (readGovernment adds it only while the flag is on)
   ...(snapshot.contracts?{contracts:snapshot.contracts.map(row=>({title:row.title,sharePercent:row.sharePercent}))}:{}), // #1139: title and whole-number profit share (readGovernment adds them only while the flag is on)
   ...(snapshot.party?{party:snapshot.party}:{}), // #1113: Four Pillars and the next Party Congress (readGovernment adds it only while the flag is on)
   ...(snapshot.partyState?{partyState:snapshot.partyState}:{}), // #1114: Meridian Party Congress schedule (readGovernment adds it only while the flag is on)
@@ -47,6 +48,8 @@ export function publicGovernmentSnapshot(snapshot:GovernmentSnapshot|null):Gover
   ...(snapshot.peoplesCongress?{peoplesCongress:snapshot.peoplesCongress}:{}), // #1170: next People's Congress (readGovernment adds it only while the flag is on)
   ...(snapshot.crownCalendar?{crownCalendar:snapshot.crownCalendar}:{}), // #1118: Aurelle reign start and next Great Council window (readGovernment adds it only while the flag is on)
   ...(snapshot.hearthNight?{hearthNight:snapshot.hearthNight}:{}), // #1146: next Hearth Night (readGovernment adds it only while the flag is on)
+  ...(snapshot.coronationDay?{coronationDay:snapshot.coronationDay}:{}), // #1191: next Coronation Day (readGovernment adds it only while the flag is on)
+  ...(snapshot.charterFair?{charterFair:snapshot.charterFair}:{}), // #1197: next Charter Fair (readGovernment adds it only while the flag is on)
   ...(snapshot.electionClock?{electionClock:{termEndsAt:snapshot.electionClock.termEndsAt,nextBallotNightAt:snapshot.electionClock.nextBallotNightAt,termDays:snapshot.electionClock.termDays,maxConsecutiveTerms:snapshot.electionClock.maxConsecutiveTerms}}:{}), // #1117: term end and next Ballot Night (readGovernment adds it only while the flag is on)
   ...(snapshot.review?{review:{periodStart:snapshot.review.periodStart,reviewedAt:snapshot.review.reviewedAt,petitionCount:snapshot.review.petitionCount,active:snapshot.review.active,expiresAt:snapshot.review.expiresAt}}:{}),
   ...(snapshot.petitions?{petitions:snapshot.petitions.map(petition=>({requestId:petition.requestId,topic:petition.topic,submittedAt:petition.submittedAt,status:petition.status,reviewedAt:petition.reviewedAt,reason:open?petition.reason:petition.reason.startsWith('Legacy prototype petition')?'Legacy prototype petition has no eligibility receipt and is not counted in new reviews.':petition.status==='pending'?'Awaiting the next recorded review.':petition.status==='accepted'?'Accepted as the reviewed policy priority.':'Deferred because another priority took precedence.'}))}:{})};

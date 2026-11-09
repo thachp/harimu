@@ -178,6 +178,12 @@
       "HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED": "false",
       // #1189: Meridian next Congress Week (every 5 game years = 150 real days). Off: no congressWeek key. Date only.
       "HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED": "false",
+      // #1191: Aurelle next Coronation Day (once per game year = 30 real days, zero offset). Off: no coronationDay key. Date only.
+      "HARIMU_AURELLE_CORONATION_DAY_ENABLED": "false",
+      // #1196: Ilmar next Great Pilgrimage (once per game year = 30 real days, no offset). Off: no greatPilgrimage key. Holds the next date only.
+      "HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED": "false",
+      // #1197: Aurelle next Charter Fair (once per game year = 30 real days, no offset). Off: no charterFair key. Date only.
+      "HARIMU_AURELLE_CHARTER_FAIR_ENABLED": "false",
       // #1193: World atlas reads (simulation.clock.nextFestival from the enabled nation holiday clocks). Off: no nextFestival key. Dates only.
       "HARIMU_WORLD_ATLAS_READS_ENABLED": "false"
     },
@@ -378,7 +384,8 @@
       "NEXT_PUBLIC_HARIMU_WORLD_ATLAS": "false",
       "NEXT_PUBLIC_HARIMU_SELECTED_NATION_GLOW": "false",
       "NEXT_PUBLIC_HARIMU_RESOURCE_BAR": "false",
-      "NEXT_PUBLIC_HARIMU_ZOOM_PATH": "false"
+      "NEXT_PUBLIC_HARIMU_ZOOM_PATH": "false",
+      "NEXT_PUBLIC_HARIMU_NATION_ACCENT": "false"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",

@@ -81,10 +81,13 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), F, '#1193 follows');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 59); // #1193 world atlas reads is last (GRAY 59 [ASSUMPTION])
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-5), F, '#1191 Coronation Day, #1196 Great Pilgrimage, #1197 Charter Fair, then #1193');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-5), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_WORLD_ATLAS_READS_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
