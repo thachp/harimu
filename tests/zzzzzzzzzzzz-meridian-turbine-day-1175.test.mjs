@@ -1,5 +1,5 @@
 /** #1175: Meridian next Turbine Day on a fixed 30-real-day cycle from the Varkand Chair anchor (#1085).
- *  Flag HARIMU_MERIDIAN_TURBINE_DAY_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no turbineDay key. #1178 Grand Regatta is last.
+ *  Flag HARIMU_MERIDIAN_TURBINE_DAY_ENABLED, packed in HARIMU_GRAY_PACK. #1178 and #1184 follow it. Flag off: no turbineDay key.
  *  Holds no grid output, power figure, or bonus. Shen Springs hosts it; the read stores the date and that city.
  *  The zzzzzzzzzzzz- name sorts after zzzzzzzzzzz-kindle-market-bell-1164 so Node's --test-shard
  *  round-robin does not move earlier files between Postgres shards.
@@ -108,11 +108,12 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key, '#1178 Grand Regatta, then #1179 Charter Day');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_FULMARA_CHARTER_DAY_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), key, '#1178, #1179, and #1184 follow this flag');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_FULMARA_GRAND_REGATTA_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_FULMARA_CHARTER_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
