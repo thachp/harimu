@@ -17,6 +17,7 @@ import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-cont
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
 import { VARKAND_PLEBISCITE_CYCLE_DAYS, varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { FULMARA_COUNCIL_TERM_DAYS, FULMARA_LODESTAR_TERM_DAYS, fulmaraNextCouncilOfTenElectionAt, fulmaraNextLodestarElectionAt, fulmaraTribuneSessionEndsAt } from './fulmara-council.ts';
+import { FULMARA_CHARTER_DAY_CYCLE_DAYS, fulmaraNextCharterDayAt } from './fulmara-charter-day.ts';
 import { FULMARA_EXCHANGE_BELL_CYCLE_DAYS, fulmaraNextExchangeBellAt } from './fulmara-exchange-bell.ts';
 import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
@@ -59,6 +60,8 @@ export type GovernmentSnapshot = {
   resolutions?: FulmaraResolution[];
   /** #1150 Fulmara: next Exchange Bell on a 30-real-day cycle. Present only while HARIMU_FULMARA_EXCHANGE_BELL_ENABLED is on. Opens no trading session. */
   exchangeBell?: { nextAt: number; cycleDays: 30 };
+  /** #1179 Fulmara: next Charter Day (once per game year = 30 real days). Present only while HARIMU_FULMARA_CHARTER_DAY_ENABLED is on. Date only: no charter text, shareholder vote, dividend, or bonus. */
+  charterDay?: { nextAt: number; cycleDays: 30 };
   /** #1107 Ilmar: Oracle life term, 12 Elders, Stillday, and the next Great Pilgrimage. Present only while HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED is on. */
   sanctum?: { oracleTerm: 'life'; councilOfEldersSeats: 12; isStillday: boolean; nextStilldayAt: number; nextGreatPilgrimageAt: number };
   /** #1137 Ilmar: next Feast of First Light. Present only while HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED is on. */
@@ -393,6 +396,27 @@ export function withFulmaraResolutions(snapshot: GovernmentSnapshot, enabled: bo
 export function withFulmaraExchangeBell(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
   return { ...snapshot, exchangeBell: { nextAt: fulmaraNextExchangeBellAt(nowMs), cycleDays: FULMARA_EXCHANGE_BELL_CYCLE_DAYS } };
+}
+
+/** #1179. Flag off, or any nation but Fulmara: the same snapshot, and no charterDay key. Date only. */
+export function withFulmaraCharterDay(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, charterDay: { nextAt: fulmaraNextCharterDayAt(nowMs), cycleDays: FULMARA_CHARTER_DAY_CYCLE_DAYS as 30 } };
+}
+
+/** Fulmara read while only the Charter Day flag is on. No grandCouncil, resolutions, or exchangeBell key. Flag off returns null, which is today's read. */
+export function fulmaraCharterDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraCharterDay({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Charter Day', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Charter Day', topic: 'work', proposedSpendMinor: 0,
+      reason: 'Charter Day falls once each game year. This read names the next Charter Day. It holds no charter text, shareholder vote, dividend, or bonus, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Charter Day and nothing else.',
+  }, nowMs, true);
 }
 
 /** Fulmara read while only the Exchange Bell flag is on. No grandCouncil or resolutions key. Flag off returns null, which is today's read. */
