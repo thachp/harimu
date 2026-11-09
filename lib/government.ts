@@ -28,6 +28,7 @@ import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './h
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
+import { FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS, fulmaraNextDockStrikeRemembranceAt } from './fulmara-dock-strike-remembrance.ts';
 import { FULMARA_GRAND_REGATTA_HOST_CITY, FULMARA_GRAND_REGATTA_INTERVAL_DAYS, fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
 import { KINDLE_FOUNDERS_FORGE_INTERVAL_DAYS, kindleNextFoundersForgeDayAt } from './kindle-founders-forge-day.ts';
 import { KINDLE_MARKET_BELL_CYCLE_DAYS, kindleNextMarketBellAt } from './kindle-market-bell.ts';
@@ -112,6 +113,8 @@ export type GovernmentSnapshot = {
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
   grandRegatta?: { nextAt: number; intervalDays: 30; hostCity: 'Corvel Isles'; holdsRegatta: false };
+  /** #1187 Fulmara: next Dock Strike remembrance (once per game year = 30 real days). Present only while HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED is on. Date only. */
+  dockStrikeRemembrance?: { nextAt: number; intervalDays: 30; holdsRemembrance: false };
   foundersForgeDay?: { nextAt: number; intervalDays: 30; opensFair: false }; // #1145
   /** #1164 Kindle: next Market Bell on a 30-real-day cycle. Present only while HARIMU_KINDLE_MARKET_BELL_ENABLED is on. Holds no market event, price move, or bonus. */
   marketBell?: { nextAt: number; cycleDays: 30 };
@@ -245,6 +248,29 @@ export function fulmaraGrandRegattaSnapshot(nowMs: number, enabled: boolean): Go
     },
     availableBudgetMinor: 0,
     influenceSummary: 'Corvel Isles hosts the Grand Regatta. This read does not hold a race or award a prize.',
+  }, nowMs, true);
+}
+
+/** #1187. Flag off, or any nation but Fulmara: the same snapshot, and no dockStrikeRemembrance key. Date only. */
+export function withFulmaraDockStrikeRemembrance(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
+  return { ...snapshot, dockStrikeRemembrance: {
+    nextAt: fulmaraNextDockStrikeRemembranceAt(nowMs), intervalDays: FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS as 30, holdsRemembrance: false,
+  } };
+}
+
+/** Fulmara read while only the Dock Strike remembrance flag is on. Flag off returns null, which is today's read. */
+export function fulmaraDockStrikeRemembranceSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withFulmaraDockStrikeRemembrance({
+    nationId: 'fulmara', mode: 'rule-bound simulation',
+    roles: [{ name: 'Dock Strike remembrance', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Dock Strike remembrance', topic: 'work', proposedSpendMinor: 0,
+      reason: 'The Dock Strike remembrance falls every 30 real days. This read names the next date only and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Dock Strike remembrance date only.',
   }, nowMs, true);
 }
 
