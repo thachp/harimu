@@ -1,5 +1,5 @@
 /** #1175: Meridian next Turbine Day on a fixed 30-real-day cycle from the Varkand Chair anchor (#1085).
- *  Flag HARIMU_MERIDIAN_TURBINE_DAY_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no turbineDay key. #1178 Grand Regatta follows; #1183 is last.
+ *  Flag HARIMU_MERIDIAN_TURBINE_DAY_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no turbineDay key. #1178, #1179, and #1184 follow; #1183 is last.
  *  Holds no grid output, power figure, or bonus. Shen Springs hosts it; the read stores the date and that city.
  *  The zzzzzzzzzzzz- name sorts after zzzzzzzzzzz-kindle-market-bell-1164 so Node's --test-shard
  *  round-robin does not move earlier files between Postgres shards.
@@ -108,9 +108,9 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), key, '#1178, #1179, then #1183 is last');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-5), key, '#1178, #1179, #1184, then #1183 is last');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-5), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), key);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
