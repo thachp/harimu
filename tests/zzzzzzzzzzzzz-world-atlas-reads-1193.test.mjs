@@ -1,14 +1,17 @@
 /** #1193: World atlas reads. Flag HARIMU_WORLD_ATLAS_READS_ENABLED in HARIMU_GRAY_PACK. Flag off: no nextFestival key on simulation.clock.
  *  nextFestival is the earliest date among the nation holiday clocks whose own flags are on, with every festival at that instant.
- *  #1214: Aurelle Coronation Day and Charter Fair join worldFestivalSources (no new flag; GRAY unchanged at 62). */
+ *  #1214: Aurelle Coronation Day and Charter Fair join worldFestivalSources (no new flag; GRAY unchanged at 62).
+ *  #1228: Hoarvale Opening of the Moot joins worldFestivalSources on its own flag (no new flag; GRAY unchanged).
+ *  #1231: Kindle Ballot Night joins on HARIMU_KINDLE_ELECTION_CLOCK_ENABLED (no new flag; GRAY unchanged). A missing cycle start skips it. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { displayTimestamp } from '../lib/display-preferences.ts';
-import { ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot, varkandGovernmentSnapshot, varkandRotationDaySnapshot } from '../lib/government.ts';
+import { hoarvaleMootAt, hoarvaleMootOpeningSnapshot, ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot, varkandGovernmentSnapshot, varkandRotationDaySnapshot } from '../lib/government.ts';
 import { ilmarNextGreatPilgrimageAt } from '../lib/ilmar-great-pilgrimage.ts';
 import { ilmarNextGreatPilgrimageAt as sanctumNextGreatPilgrimageAt } from '../lib/ilmar-sanctum.ts';
+import { hoarvaleNextMootOpeningAt } from '../lib/hoarvale-moot-opening.ts';
 import { gameDayAt } from '../lib/topbar-countdown.ts';
 import { varkandChairAt } from '../lib/varkand-directorate.ts';
 import { varkandNextRotationDayAt } from '../lib/varkand-rotation-day.ts';
@@ -40,7 +43,7 @@ test('pure: earliest enabled source wins, ties list every festival in source ord
 });
 
 test('pure: the real sources are docs-named, one clock each, all ten nations, Stilldays left out', () => {
-  assert.equal(worldFestivalSources.length, 30);
+  assert.equal(worldFestivalSources.length, 31);
   assert.deepEqual([...new Set(worldFestivalSources.map(s => s.nationId))], ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']);
   assert.equal(worldFestivalSources.some(s => /stillday/i.test(s.name)), false);
   for (const s of worldFestivalSources) assert.match(s.flag, /^HARIMU_[A-Z_]+_ENABLED$/);
@@ -227,6 +230,92 @@ test('#1223: Rotation Day counts only while its own flag is on', async t => {
   assert.equal(government.rotationDay.nextAt, at);
   assert.equal(government.rotationDay.cycleDays, 60);
   assert.equal('directorate' in government, false);
+});
+
+test('#1228: Opening of the Moot is ignored while its own flag is off', async t => {
+  const O = 'HARIMU_HOARVALE_MOOT_OPENING_ENABLED';
+  const M = 'HARIMU_HOARVALE_MOOT_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Opening of the Moot');
+  assert.equal(source.nationId, 'hoarvale');
+  assert.equal(source.flag, O, 'the nextFestival candidate uses the opening flag, not the moot term');
+  assert.equal(source.nextAt, hoarvaleNextMootOpeningAt);
+  assert.notEqual(source.nextAt, hoarvaleMootAt);
+  assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'hoarvale').map(s => s.name), ['Opening of the Moot', 'Honors List Day', 'Aurora Night'], 'docs holiday order; Election Night stays out');
+  assert.equal(worldFestivalSources.find(s => s.name === 'Honors List Day').flag, 'HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED');
+  assert.equal(worldFestivalSources.find(s => s.name === 'Aurora Night').flag, 'HARIMU_HOARVALE_AURORA_NIGHT_ENABLED');
+  assert.equal(worldFestivalSources.some(s => s.flag === M), false, 'the moot term flag does not gate a festival');
+  const now = Date.UTC(2026, 10, 9);
+  assert.equal(source.nextAt(now), hoarvaleMootAt(Math.floor(now / 1000)).dissolvesBy * 1000, 'the dedicated helper keeps the moot term instant');
+  const picks = env => (worldNextFestival(now, env)?.festivals ?? []).filter(item => item.name === 'Opening of the Moot');
+  assert.deepEqual(picks({ [M]: 'true' }), [], 'opening off, moot on: nextFestival never picks it');
+  assert.deepEqual(picks({ [O]: 'false' }), []);
+  assert.deepEqual(picks({}), []);
+  assert.equal(worldNextFestival(now, {}), null, 'every festival flag off');
+  assert.equal(worldNextFestival(now, { [M]: 'true', [O]: 'false' }), null);
+  assert.equal(hoarvaleMootOpeningSnapshot(now, flagOn({ [M]: 'true' }, O)), null);
+  assert.equal(hoarvaleMootOpeningSnapshot(now, false), null);
+  const later = { nationId: 'kindle', name: 'Later Fair', flag: 'HARIMU_LATER_FAIR_ENABLED', nextAt: () => source.nextAt(now) + DAY };
+  assert.deepEqual(worldNextFestival(now, { HARIMU_LATER_FAIR_ENABLED: 'true', [O]: 'false' }, [later, source]), { at: (source.nextAt(now) + DAY) / 1000, festivals: [{ nationId: 'kindle', name: 'Later Fair' }] });
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='hoarvale' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  const read = async () => {
+    const clock = (await r.call('world')).data.simulation.clock;
+    const government = (await r.call('citizen', 'alice')).data.government;
+    return { clock, government, picked: (clock.nextFestival?.festivals ?? []).some(item => item.name === 'Opening of the Moot') };
+  };
+  let { clock, government, picked } = await read();
+  assert.equal(picked, false);
+  assert.equal('nextFestival' in clock, false, 'both off: nextFestival absent');
+  assert.equal(government == null || !('mootOpening' in government), true, 'both off: no mootOpening');
+  r.setFixtureEnv(M, 'true');
+  r.setFixtureEnv('HARIMU_HOARVALE_ASSENT_ENABLED', 'true');
+  ({ clock, government, picked } = await read());
+  assert.equal(picked, false, 'opening off, moot on: nextFestival never picks it');
+  assert.equal('nextFestival' in clock, false);
+  assert.equal('mootOpening' in government, false, 'opening off, moot on: no mootOpening');
+  assert.equal('moot' in government, true);
+});
+
+test('#1228: Opening of the Moot wins nextFestival while its own flag is on', async t => {
+  const O = 'HARIMU_HOARVALE_MOOT_OPENING_ENABLED';
+  const M = 'HARIMU_HOARVALE_MOOT_ENABLED';
+  const source = worldFestivalSources.find(s => s.name === 'Opening of the Moot');
+  assert.equal(source.nextAt, hoarvaleNextMootOpeningAt);
+  const now = Date.UTC(2026, 10, 9);
+  const mootAt = hoarvaleMootAt(Math.floor(now / 1000)).dissolvesBy * 1000;
+  assert.equal(source.nextAt(now), mootAt, 'same instant as the government Moot field');
+  assert.equal(hoarvaleMootOpeningSnapshot(now, flagOn({ [M]: 'true' }, O)), null);
+  const on = worldNextFestival(now, { [O]: 'true' });
+  assert.deepEqual(on, { at: hoarvaleNextMootOpeningAt(now) / 1000, festivals: [{ nationId: 'hoarvale', name: 'Opening of the Moot' }] });
+  assert.equal(hoarvaleMootOpeningSnapshot(now, flagOn({ [O]: 'true' }, O)).mootOpening.nextAt, hoarvaleNextMootOpeningAt(now));
+  assert.equal('moot' in hoarvaleMootOpeningSnapshot(now, true), false);
+  const later = { nationId: 'kindle', name: 'Later Fair', flag: 'HARIMU_LATER_FAIR_ENABLED', nextAt: () => source.nextAt(now) + DAY };
+  assert.deepEqual(worldNextFestival(now, { [O]: 'true', HARIMU_LATER_FAIR_ENABLED: 'true' }, [later, source]), { at: mootAt / 1000, festivals: [{ nationId: 'hoarvale', name: 'Opening of the Moot' }] });
+  const r = await localRuntime(); t.after(() => r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='hoarvale' WHERE clerk_user_id='alice'").run();
+  r.setFixtureEnv(F, 'true');
+  r.setFixtureEnv(M, 'false');
+  r.setFixtureEnv(O, 'true');
+  const read = async () => {
+    const clock = (await r.call('world')).data.simulation.clock;
+    const government = (await r.call('citizen', 'alice')).data.government;
+    return { clock, government, picked: (clock.nextFestival?.festivals ?? []).some(item => item.name === 'Opening of the Moot') };
+  };
+  let { clock, government, picked } = await read();
+  const at = hoarvaleNextMootOpeningAt(clock.nowSeconds * 1000);
+  assert.equal(picked, true, 'opening on, moot off: nextFestival picks it');
+  assert.deepEqual(clock.nextFestival, { at: at / 1000, festivals: [{ nationId: 'hoarvale', name: 'Opening of the Moot' }] });
+  assert.equal(at, hoarvaleMootAt(clock.nowSeconds).dissolvesBy * 1000);
+  assert.equal(government.mootOpening.nextAt, at);
+  assert.equal('moot' in government, false);
+  r.setFixtureEnv('HARIMU_HOARVALE_ASSENT_ENABLED', 'true');
+  r.setFixtureEnv(M, 'true');
+  ({ clock, government, picked } = await read());
+  assert.equal(picked, true, 'opening on: nextFestival still picks it when the moot term is also on');
+  assert.equal(clock.nextFestival.at, government.moot.dissolvesBy);
+  assert.equal(government.mootOpening.nextAt, government.moot.dissolvesBy * 1000);
+  assert.equal(government.mootOpening.nextAt, at);
 });
 
 test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and a direct string wins', () => {
