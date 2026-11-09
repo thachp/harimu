@@ -30,6 +30,7 @@ import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './v
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { VARKAND_LANTERN_WATCH_CYCLE_DAYS, varkandNextLanternWatchAt } from './varkand-lantern-watch.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS, fulmaraNextDockStrikeRemembranceAt } from './fulmara-dock-strike-remembrance.ts';
@@ -117,6 +118,8 @@ export type GovernmentSnapshot = {
   /** #1160 Hoarvale: next Aurora Night. Present only while HARIMU_HOARVALE_AURORA_NIGHT_ENABLED is on. Holds no festival and adds no rest bonus. */
   auroraNight?: { nextAt: number; cycleDays: 30 };
   musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
+  /** #1211 Varkand: next Lantern Watch (once per 30 real days). Present only while HARIMU_VARKAND_LANTERN_WATCH_ENABLED is on. Date only: no host, Red Alert cancellation, or holiday effect. */
+  lanternWatch?: { nextAt: number; cycleDays: 30 };
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
@@ -228,6 +231,12 @@ export function withVarkandMusterDay(snapshot: GovernmentSnapshot, nowMs: number
   return { ...snapshot, musterDay: {
     nextAt: varkandNextMusterDayAt(nowMs), intervalDays: VARKAND_MUSTER_DAY_INTERVAL_DAYS as 30, mustersTroops: false,
   } };
+}
+
+/** #1211. Flag off, or any nation but Varkand: the same snapshot, and no lanternWatch key. Date only. */
+export function withVarkandLanternWatch(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand') return snapshot;
+  return { ...snapshot, lanternWatch: { nextAt: varkandNextLanternWatchAt(nowMs), cycleDays: VARKAND_LANTERN_WATCH_CYCLE_DAYS } };
 }
 
 /** #1165. Flag off, or any nation but Confluence: the same snapshot, and no canalFestival key. Holds no festival, harvest yield, or bonus. */
@@ -535,6 +544,21 @@ export function varkandPlebisciteSnapshot(nowMs: number, enabled: boolean): Gove
     },
     availableBudgetMinor: 0,
     influenceSummary: 'Citizens are asked to approve the Directorate\'s Order every 150 real days. This read does not collect votes.',
+  }, nowMs, true);
+}
+
+/** Varkand read while only the Lantern Watch flag is on. No directorate, plebiscite, or musterDay key. Flag off returns null, which is today's read. */
+export function varkandLanternWatchSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVarkandLanternWatch({
+    nationId: 'varkand', mode: 'rule-bound simulation',
+    roles: [{ name: 'Lantern Watch', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Lantern Watch', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Lantern Watch falls every 30 real days. This read names the next date only and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Lantern Watch date only.',
   }, nowMs, true);
 }
 
