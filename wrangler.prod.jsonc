@@ -179,7 +179,9 @@
       // #1189: Meridian next Congress Week (every 5 game years = 150 real days). Off: no congressWeek key. Date only.
       "HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED": "false",
       // #1191: Aurelle next Coronation Day (once per game year = 30 real days, zero offset). Off: no coronationDay key. Date only.
-      "HARIMU_AURELLE_CORONATION_DAY_ENABLED": "false"
+      "HARIMU_AURELLE_CORONATION_DAY_ENABLED": "false",
+      // #1196: Ilmar next Great Pilgrimage (once per game year = 30 real days, no offset). Off: no greatPilgrimage key. Holds the next date only.
+      "HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",

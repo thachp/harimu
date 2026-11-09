@@ -159,6 +159,7 @@ const flagOffPins = {
   HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED: 'zzzzzzzzzzzzz-fulmara-fair-wind-blessing-1184.test.mjs', // #1184 flag off: no fairWindBlessing key
   HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'zzzzz-ilmar-sanctum-1107.test.mjs', // #1107 flag off: no sanctum key
   HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED: 'zzzzzzzzz-ilmar-feast-first-light-1137.test.mjs', // #1137 flag off: no feastOfFirstLight key
+  HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED: 'zzzzzzzzzzzzz-ilmar-great-pilgrimage-1196.test.mjs', // #1196 flag off: no greatPilgrimage key
   HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED: 'zzzzzzzzz-ilmar-prism-contracts-1139.test.mjs', // #1139 flag off: no contracts key
   HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED: 'zzzzzz-confluence-party-1113.test.mjs', // #1113 flag off: no party key
   HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED: 'zzzzz-meridian-party-1114.test.mjs', // #1114 flag off: no partyState key
