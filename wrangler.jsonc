@@ -199,6 +199,8 @@
       "HARIMU_KINDLE_BRASSWELL_PORT_ENABLED": "true",
       // #1243: Aurelle next Kite Festival (each game spring, once per game year = 30 real days, offset 0). Off: no kiteFestival key. Date only.
       "HARIMU_AURELLE_KITE_FESTIVAL_ENABLED": "true",
+      // #1244: Veldwood next midsummer Ring Moot (once per game year = 30 real days, midsummer offset 11.25 days). Off: no ringMoot key. Date only.
+      "HARIMU_VELDWOOD_RING_MOOT_ENABLED": "true",
       // #1245: Ilmar next Clearing (Lumen Canon new year, once per game year = 30 real days, offset 0). Off: no clearing key. Date only.
       "HARIMU_ILMAR_CLEARING_ENABLED": "true"
     },
@@ -404,7 +406,8 @@
       "NEXT_PUBLIC_HARIMU_ZOOM_PATH": "true",
       "NEXT_PUBLIC_HARIMU_NATION_ACCENT": "true",
       "NEXT_PUBLIC_HARIMU_CITY_PALETTE": "true",
-      "NEXT_PUBLIC_HARIMU_WORLD_EXPLORE": "true"
+      "NEXT_PUBLIC_HARIMU_WORLD_EXPLORE": "true",
+      "NEXT_PUBLIC_HARIMU_WORLD_CREST_STRIP": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
