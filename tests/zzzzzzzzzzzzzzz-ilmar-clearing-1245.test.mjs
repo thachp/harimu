@@ -1,7 +1,7 @@
 /** #1245: Ilmar next Clearing (Lumen Canon new year). Once per game year = realDaysPerGameYear (30 real days), offset 0.
- *  Flag HARIMU_ILMAR_CLEARING_ENABLED, at(-3) in HARIMU_GRAY_PACK (GRAY 74; #1260 Long Light is last, #1242 Dunmorrow is at(-2)). Flag off: no clearing key. Date only.
+ *  Flag HARIMU_ILMAR_CLEARING_ENABLED, at(-4) in HARIMU_GRAY_PACK (GRAY 75; #1260 Long Light is last, #1259 Corvel Isles is at(-2), #1242 Dunmorrow is at(-3)). Flag off: no clearing key. Date only.
  *  [ASSUMPTION] "new-year" is the game-year boundary. [ASSUMPTION] Ilmar's government read only, own flag only.
- *  Accepted on #1245. Not on the world atlas nextFestival list. */
+ *  Accepted on #1245. On the world atlas nextFestival list (#1268). Date only. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -105,23 +105,24 @@ test('flag off leaves the snapshot unchanged, and other nations gain no clearing
   assert.deepEqual(withIlmarClearing(sanctumOnly, day, true).clearing, block(ILMAR_CLEARING_CYCLE_MS));
 });
 
-test('the flag is preview true and production false, at(-3) in HARIMU_GRAY_PACK, and a direct string wins', () => {
+test('the flag is preview true and production false, at(-4) in HARIMU_GRAY_PACK, and a direct string wins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined, 'not its own text binding');
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-8), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 74);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 75);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
   assert.match(readFileSync('tests/helpers/local-runtime.mjs', 'utf8'), /lib\/ilmar-clearing\.ts/);
-  assert.doesNotMatch(readFileSync('lib/world-atlas-reads.ts', 'utf8'), /ilmarNextClearingAt|HARIMU_ILMAR_CLEARING_ENABLED/);
+  assert.match(readFileSync('lib/world-atlas-reads.ts', 'utf8'), /ilmarNextClearingAt/);
+  assert.match(readFileSync('lib/world-atlas-reads.ts', 'utf8'), /ILMAR_CLEARING/); // #1267: atlas source on the existing flag
 });
 
 test('flag off: the Ilmar government read is unchanged; flag on names the next date; Sanctum on with Clearing off adds no key', async t => {

@@ -3,12 +3,14 @@
  *  Next festival: the earliest upcoming date among the nation holiday clocks already on the government reads. Each one counts only while its own flag is on.
  *  [ASSUMPTION] A "festival" is an entry in a nation page's "Holidays & festivals" row (harimu-docs content/world/nations/*.mdx) whose government read has a clock.
  *  Clock-backed, in that row's order: Kindle Ballot Night, Founders' Forge Day, Market Bell; Confluence Congress Lanterns, Canal Festival, Quota Day;
- *  Meridian Congress Week, Exam Day, Turbine Day; Korund Plan Day, Quota Rally, Chairman's Birthday, People's Congress; Aurelle Coronation Day, Hearth Night, Charter Fair;
- *  Ilmar Feast of First Light, Assembly Election, Great Pilgrimage; Hoarvale Opening of the Moot, Honors List Day, Aurora Night, Election Night;
- *  Varkand Muster Day, Rotation Day, Mandate Plebiscite, Lantern Watch; Veldwood Vote Day, Dividend Day;
+ *  Meridian Congress Week, Exam Day, Turbine Day; Korund Plan Day, Quota Rally, Chairman's Birthday, People's Congress; Aurelle Coronation Day, Hearth Night, Charter Fair, Kite Festival;
+ *  Ilmar Feast of First Light, Assembly Election, Great Pilgrimage, Clearing; Hoarvale Opening of the Moot, Honors List Day, Aurora Night, Election Night;
+ *  Varkand Muster Day, Rotation Day, Mandate Plebiscite, Lantern Watch; Veldwood Vote Day, Dividend Day, Ring Moot;
  *  Fulmara Exchange Bell, Grand Regatta, Charter Day, Fair-Wind Blessing, Dock Strike remembrance.
  *  Ilmar Stilldays have a clock on sanctum.nextStilldayAt but stay out: the docs call them weekly rest, so they would always be next, and they share the sanctum flag.
  *  Rows with no clock are not invented: Aurelle Heir's Naming, Veldwood Glade Festival, Veldwood Initiative Night.
+ *  [ASSUMPTION] Kite Festival (§17.1), Ring Moot (§17.1), and Clearing (§14.1) have government clocks and are not in the nation holiday row.
+ *  Each is listed after that nation's clocked row, so a tie keeps the row and then the new clock. Hearth Night (#1146) was already a source.
  *  [ASSUMPTION] Ties: every festival at the earliest instant is listed, in docs roster order (content/world/cultures.mdx), then in the nation row's order.
  *  Election Night and Opening of the Moot share that instant (both offsets are 0, #1208/#1219). The list keeps row order, so Opening of the Moot comes before Election Night.
  *  Dates only: no bonus or holiday effect is applied here.
@@ -19,6 +21,7 @@ import { flagOn } from './flag-pack.mjs';
 import { aurelleNextCharterFairAt } from './aurelle-charter-fair.ts';
 import { aurelleNextCoronationDayAt } from './aurelle-coronation-day.ts';
 import { aurelleNextHearthNightAt } from './aurelle-hearth-night.ts';
+import { aurelleNextKiteFestivalAt } from './aurelle-kite-festival.ts';
 import { confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { confluenceNextCongressLanternsAt } from './confluence-congress-lanterns.ts';
 import { confluenceNextQuotaDayAt } from './confluence-quota-day.ts';
@@ -33,6 +36,7 @@ import { hoarvaleNextElectionNightAt } from './hoarvale-election-night.ts';
 import { hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
 import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
 import { ilmarNextAssemblyElectionDayAt } from './ilmar-assembly-election-day.ts';
+import { ilmarNextClearingAt } from './ilmar-clearing.ts';
 import { ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ilmarNextGreatPilgrimageAt } from './ilmar-great-pilgrimage.ts';
 import { kindleElectionClock } from './kindle-election.ts';
@@ -49,6 +53,7 @@ import { varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { varkandNextPlebisciteAt } from './varkand-plebiscite.ts';
 import { varkandNextRotationDayAt } from './varkand-rotation-day.ts';
 import { veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
+import { veldwoodNextRingMootAt } from './veldwood-ring-moot.ts';
 import { veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 
 export const WORLD_ATLAS_READS_FLAG = 'HARIMU_WORLD_ATLAS_READS_ENABLED';
@@ -83,9 +88,11 @@ export const worldFestivalSources: readonly WorldFestivalSource[] = [
   f('aurelle', 'Coronation Day', 'AURELLE_CORONATION_DAY', aurelleNextCoronationDayAt),
   f('aurelle', 'Hearth Night', 'AURELLE_HEARTH_NIGHT', aurelleNextHearthNightAt),
   f('aurelle', 'Charter Fair', 'AURELLE_CHARTER_FAIR', aurelleNextCharterFairAt),
+  f('aurelle', 'Kite Festival', 'AURELLE_KITE_FESTIVAL', aurelleNextKiteFestivalAt),
   f('ilmar', 'Feast of First Light', 'ILMAR_FEAST_OF_FIRST_LIGHT', ilmarNextFeastOfFirstLightAt),
   f('ilmar', 'Assembly Election', 'ILMAR_ASSEMBLY_ELECTION_DAY', ilmarNextAssemblyElectionDayAt),
   f('ilmar', 'Great Pilgrimage', 'ILMAR_GREAT_PILGRIMAGE', ilmarNextGreatPilgrimageAt),
+  f('ilmar', 'Clearing', 'ILMAR_CLEARING', ilmarNextClearingAt),
   f('hoarvale', 'Opening of the Moot', 'HOARVALE_MOOT_OPENING', hoarvaleNextMootOpeningAt),
   f('hoarvale', 'Honors List Day', 'HOARVALE_HONORS_LIST_DAY', hoarvaleNextHonorsListDayAt),
   f('hoarvale', 'Aurora Night', 'HOARVALE_AURORA_NIGHT', hoarvaleNextAuroraNightAt),
@@ -96,6 +103,7 @@ export const worldFestivalSources: readonly WorldFestivalSource[] = [
   f('varkand', 'Lantern Watch', 'VARKAND_LANTERN_WATCH', varkandNextLanternWatchAt),
   f('veldwood', 'Vote Day', 'VELDWOOD_VOTE_DAY', veldwoodNextVoteDayAt),
   f('veldwood', 'Dividend Day', 'VELDWOOD_DIVIDEND_DAY', veldwoodNextDividendDayAt),
+  f('veldwood', 'Ring Moot', 'VELDWOOD_RING_MOOT', veldwoodNextRingMootAt),
   f('fulmara', 'Exchange Bell', 'FULMARA_EXCHANGE_BELL', fulmaraNextExchangeBellAt),
   f('fulmara', 'Grand Regatta', 'FULMARA_GRAND_REGATTA', fulmaraNextGrandRegattaAt),
   f('fulmara', 'Charter Day', 'FULMARA_CHARTER_DAY', fulmaraNextCharterDayAt),

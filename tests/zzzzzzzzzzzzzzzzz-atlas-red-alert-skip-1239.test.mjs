@@ -41,11 +41,12 @@ test('#1239: reused cancel helper identity and celebration names match #1220', (
     assert.equal(source.nationId, 'varkand', name);
   }
   assert.equal(worldFestivalSources.find(s => s.name === 'Mandate Plebiscite').nationId, 'varkand');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 74, 'no new flag from #1239; #1260 Long Light is last, #1242 Dunmorrow at(-2)');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), CANCELS);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_ILMAR_CLEARING_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 75, 'no new flag from #1239; #1260 Long Light is last, #1259 Corvel Isles at(-2)');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), CANCELS);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_CLEARING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
   assert.equal(flagOn({ [CANCELS]: 'true' }, CANCELS), true);
 });
