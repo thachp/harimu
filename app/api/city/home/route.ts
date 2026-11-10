@@ -3,7 +3,7 @@ import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDunmorrowEnv,bindVakkHarborEnv} from '@/lib/cities'; // #1241, #1242, #1259, #1261
+import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDunmorrowEnv,bindRuelWorksEnv,bindVakkHarborEnv} from '@/lib/cities'; // #1241, #1242, #1259, #1261, #1270
 import {readCityLocation} from '@/lib/city-location';
 import {readVarkandAlert,varkandAlertEnabled} from '@/lib/varkand-alert'; // #1081
 import {homeMoveCooldownSeconds,homeMoveCurrency,homeMoveFeeMinor,moveHomeCity,nextHomeMoveAt,readPermitForCity,requestInternalPermit,requiresInternalPermit,type VarkandAlert} from '@/lib/home-move';
@@ -11,6 +11,7 @@ bindBrasswellPortEnv(env); // #1241: a home move can target the port only while 
 bindCorvelIslesEnv(env); // #1259: a home move can name Corvel Isles only while the flag is on
 bindDunmorrowEnv(env); // #1242: a home move can name Dunmorrow only while the flag is on
 bindVakkHarborEnv(env); // #1261: a home move can target Vakk Harbor only while the flag is on
+bindRuelWorksEnv(env); // #1270: a home move can name Ruel Works only while the flag is on
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 // #781: flag off is a 404 before auth and before any database read.

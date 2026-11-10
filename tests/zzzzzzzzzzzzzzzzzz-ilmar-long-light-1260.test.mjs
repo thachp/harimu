@@ -1,6 +1,6 @@
 /** #1260: Ilmar next Long Light midsummer vigil on the government read.
- *  Flag HARIMU_ILMAR_LONG_LIGHT_ENABLED, packed last in HARIMU_GRAY_PACK (GRAY 75 on origin/dev e69f0da2;
- *  #1259 Corvel Isles is at(-2), #1242 Dunmorrow is at(-3), #1245 Clearing is at(-4)). Flag off: no longLight key, including when the Sanctum or Clearing flag is on.
+ *  Flag HARIMU_ILMAR_LONG_LIGHT_ENABLED, GRAY 75 in HARIMU_GRAY_PACK. #1266 Vakk Harbor is 76 and #1270 Ruel Works is last (GRAY 77), so this flag is at(-3).
+ *  Flag off: no longLight key, including when the Sanctum or Clearing flag is on.
  *  Date only: no vigil, vows, Piety, or clergy.
  *  The zzzzzzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzzzzzz- so --test-shard does not move earlier files. */
 import assert from 'node:assert/strict';
@@ -145,17 +145,17 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_ILMAR_CLEARING_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), 'HARIMU_AURELLE_KITE_FESTIVAL_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 76);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_ILMAR_CLEARING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_AURELLE_KITE_FESTIVAL_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-10), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 77);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
