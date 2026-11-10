@@ -1,5 +1,5 @@
 /** #1244: Veldwood next midsummer Ring Moot on the government read.
- *  Flag HARIMU_VELDWOOD_RING_MOOT_ENABLED, packed last in HARIMU_GRAY_PACK (GRAY 69 on origin/dev 76290ec5).
+ *  Flag HARIMU_VELDWOOD_RING_MOOT_ENABLED, packed last in HARIMU_GRAY_PACK (GRAY 69 on origin/dev a7e879ba; #1247/#1253 added no GRAY flag).
  *  Flag off: no ringMoot key. Date only: no motions, votes, turnout, or potluck text.
  *  The zzzzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzzzz- so --test-shard does not move earlier files. */
 import assert from 'node:assert/strict';
