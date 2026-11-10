@@ -68,18 +68,18 @@ test('Dunmorrow on does not open Ruel Works', () => {
   }
 });
 
-test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
+test('the flag is at(-2) in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 77); // GRAY 77. #1266 Vakk Harbor is 76. Ruel Works is last
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), FLAG);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 78); // GRAY 78. #1266 Vakk Harbor is 76. #1270 Ruel Works is 77. #1271 Thessaly Wells is last
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);

@@ -214,7 +214,9 @@
       // #1261: Vakk Harbor is a Hoarvale resident city (home, enroll, travel-by-id). Not a country-map pin. Off: the city is absent.
       "HARIMU_HOARVALE_VAKK_HARBOR_ENABLED": "false",
       // #1270: Ruel Works is a Confluence resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No festival host line, no imports, no sea-lane effect. Off: the city is absent.
-      "HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED": "false"
+      "HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED": "false",
+      // #1271: Thessaly Wells is an Ilmar resident city (home, enroll, travel-by-id). Existing specialty and heartland capture reads apply. Not a country-map pin. No imports. Off: the city is absent and the panel is unchanged.
+      "HARIMU_ILMAR_THESSALY_WELLS_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",
