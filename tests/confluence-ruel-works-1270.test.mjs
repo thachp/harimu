@@ -77,8 +77,9 @@ test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, a
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 76); // GRAY 76 on current dev. #1263 Long Light is 75. Final once #1266 lands
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 77); // GRAY 77. #1266 Vakk Harbor is 76. Ruel Works is last
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);

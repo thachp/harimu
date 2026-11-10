@@ -10,8 +10,11 @@
 .game-inspector-body .nation-overview-stats>div{flex:1 1 70px;min-width:min-content}
 .game-inspector-body .nation-overview dt{color:#f1d58a;font-size:calc(11px * var(--text-scale, 1))}
 .game-inspector-body .nation-overview dd{margin:0;color:#f3ecd6;font-weight:600;text-align:left;overflow-wrap:anywhere}
-.game-inspector-body .nation-overview-rows{display:grid;gap:8px;margin:0}
-.game-inspector-body .nation-overview-rows>div{display:grid;grid-template-columns:minmax(min-content,7.5em) minmax(0,1fr);gap:8px;align-items:baseline}
+/* #392 UI 43. The inspector dl is two columns (minmax(90px,.8fr) minmax(0,1.2fr)). Reset it here so each fact is one full-width row. The label stays beside the value; these values wrap on words. */
+.game-inspector-body .nation-overview-rows{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0}
+.game-inspector-body .nation-overview-rows>div{display:grid;grid-template-columns:minmax(96px,110px) minmax(0,1fr);gap:8px;align-items:baseline;min-width:0}
+.game-inspector-body .nation-overview-rows dt{overflow-wrap:normal;word-break:normal}
+.game-inspector-body .nation-overview-rows dd{min-width:0;overflow-wrap:break-word;word-break:normal;hyphens:manual}
 .game-inspector-body .nation-overview-institutions{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .game-inspector-body .nation-overview button:not(.market-item){width:100%;min-height:44px;text-align:left;background:#0d2530;color:#f3ecd6;border:1px solid #d0ad54}
 .game-inspector-body .nation-overview button.nation-overview-primary:not(.market-item){color:#f1d58a;font-weight:600;text-align:center}

@@ -3,7 +3,7 @@ import {getDatabase} from '@/lib/db';
 import {startCityTravel} from '@/lib/travel';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDunmorrowEnv,bindRuelWorksEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1270 Ruel Works
+import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDunmorrowEnv,bindRuelWorksEnv,bindVakkHarborEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1261 port, #1270 Ruel Works
 import {aurelleNextHearthNightAt} from '@/lib/aurelle-hearth-night'; // #1146 clock, read only
 import {fulmaraNextGrandRegattaAt} from '@/lib/fulmara-grand-regatta'; // #1178 clock, read only
 import {spaWcBonusEnabled,spaWcNote} from '@/lib/spa-recovery'; // #798
@@ -17,6 +17,7 @@ import {seasonAt} from '@/lib/season-yield'; // #1035 shared season: null withou
 bindBrasswellPortEnv(env); // #1241: resident lookup reads the Worker env; flag off adds no city
 bindCorvelIslesEnv(env); // #1259: resident lookup reads the Worker env; flag off adds no city
 bindDunmorrowEnv(env); // #1242: resident lookup reads the Worker env; flag off adds no city
+bindVakkHarborEnv(env); // #1261: same for Vakk Harbor. Flag off adds no city.
 bindRuelWorksEnv(env); // #1270: resident lookup reads the Worker env; flag off adds no city
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
