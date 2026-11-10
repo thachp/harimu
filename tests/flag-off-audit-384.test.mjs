@@ -203,6 +203,7 @@ const flagOffPins = {
   HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED: 'zzzzzzzzzzzzzzz-hoarvale-election-night-1219.test.mjs', // #1219 flag off: no electionNight key
   HARIMU_VELDWOOD_RING_MOOT_ENABLED: 'zzzzzzzzzzzzzzzz-veldwood-ring-moot-1244.test.mjs', // #1244 flag off: no ringMoot key
   HARIMU_ILMAR_LONG_LIGHT_ENABLED: 'zzzzzzzzzzzzzzzzzz-ilmar-long-light-1260.test.mjs', // #1260 flag off: no longLight key
+  HARIMU_VELDWOOD_MARROW_MILLS_ENABLED: 'veldwood-marrow-mills-1275.test.mjs', // #1275 flag off: no resident city
   HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
 };
 
