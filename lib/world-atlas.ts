@@ -4,6 +4,7 @@
  *  Each row is a value the nation list, the selected nation, the world clock, or the simulation already carries. A missing read is left out. */
 import { displayTimestamp } from './display-preferences.ts';
 import { gameDayAt } from './topbar-countdown.ts';
+import { exploreNationLabels } from './ui-v2-nation.ts';
 import { spokenRemaining } from './veldwood-wallet-dividend.ts';
 import { ageHudLine, worldAgeAt } from './world-age.ts';
 
@@ -15,9 +16,22 @@ export function worldAtlasEnabled(value: string | undefined = worldAtlasFlag()):
   return value === 'true';
 }
 
+/** #392: selected-nation crest, motto and Explore button on the atlas. HARIMU_UI_PACK entry 36.
+ *  Preview "true", production "false". A missing flag is off. Only the exact string "true" enables it. */
+export const WORLD_EXPLORE_FLAG = 'NEXT_PUBLIC_HARIMU_WORLD_EXPLORE';
+export function worldExploreFlag(): string | undefined {
+  try { return process.env.NEXT_PUBLIC_HARIMU_WORLD_EXPLORE; }
+  catch { return undefined; }
+}
+export function worldExploreEnabled(value: string | undefined = worldExploreFlag()): boolean {
+  return value === 'true';
+}
+
 export type WorldAtlasNation = {
   id?: string | null;
+  name?: string | null;
   shortName?: string | null;
+  motto?: string | null;
   population?: string | null;
   capital?: string | null;
   government?: string | null;
@@ -39,8 +53,26 @@ export type WorldAtlasDisputes = {
   warProposals?: readonly { status?: string; defender?: string }[] | null;
 } | null;
 export type WorldAtlasStat = { label: string; value: string };
+export type WorldAtlasCard = {
+  id: string | null;
+  name: string | null;
+  motto: string | null;
+  explore: { label: string; ariaLabel: string } | null;
+};
 
 const text = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;
+
+/** Selected nation on the atlas. Motto is the nation's own, or null (never a stand-in). The button is Content's Explore label. */
+export function worldAtlasCard(nation: WorldAtlasNation | null | undefined): WorldAtlasCard | null {
+  if (!nation) return null;
+  const id = text(nation.id);
+  const shortName = text(nation.shortName);
+  const name = shortName ?? text(nation.name);
+  const motto = text(nation.motto);
+  const explore = shortName ? exploreNationLabels(shortName) : null;
+  if (!id && !name && !motto && !explore) return null;
+  return { id, name, motto, explore };
+}
 
 const parties: Record<string, string> = { kindle: 'Kindle', korund: 'Korund', aurelle: 'Aurelle' };
 const same = (value: unknown, id: string) => value === id;
