@@ -19,6 +19,7 @@ import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } f
 import { ILMAR_GREAT_PILGRIMAGE_CYCLE_DAYS, ilmarNextGreatPilgrimageAt } from './ilmar-great-pilgrimage.ts';
 import { ILMAR_ASSEMBLY_ELECTION_DAY_CYCLE_DAYS, ilmarNextAssemblyElectionDayAt } from './ilmar-assembly-election-day.ts';
 import { ILMAR_CLEARING_CYCLE_DAYS, ilmarNextClearingAt } from './ilmar-clearing.ts';
+import { ILMAR_LONG_LIGHT_CYCLE_DAYS, ilmarNextLongLightAt } from './ilmar-long-light.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt as ilmarSanctumNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-contracts.ts';
 import { varkandChairAt, varkandCommands, type VarkandCommand } from './varkand-directorate.ts';
@@ -92,6 +93,8 @@ export type GovernmentSnapshot = {
   assemblyElectionDay?: { nextAt: number; cycleDays: 120 };
   /** #1245 Ilmar: next Clearing (Lumen Canon new year) on a 30-real-day cycle. Present only while HARIMU_ILMAR_CLEARING_ENABLED is on. Holds the next date only. */
   clearing?: { nextAt: number; cycleDays: 30 };
+  /** #1260 Ilmar: next Long Light midsummer vigil (once per game year = 30 real days, midsummer offset). Present only while HARIMU_ILMAR_LONG_LIGHT_ENABLED is on. Date only. */
+  longLight?: { nextAt: number; cycleDays: 30 };
   /** #1139 Ilmar: Prism contracts, each with a title and a whole-number profit share. Present only while HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED is on. */
   contracts?: IlmarPrismContract[];
   /** #1113 Confluence: Four Pillars and the next Party Congress. Present only while HARIMU_CONFLUENCE_PARTY_SCHEDULE_ENABLED is on. */
@@ -948,6 +951,26 @@ export function ilmarClearingSnapshot(nowMs: number, enabled: boolean): Governme
   }, nowMs, true);
 }
 
+/** #1260. Flag off, or any nation but Ilmar: the same snapshot, and no longLight key. Holds the next date only. */
+export function withIlmarLongLight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, longLight: { nextAt: ilmarNextLongLightAt(nowMs), cycleDays: ILMAR_LONG_LIGHT_CYCLE_DAYS as 30 } };
+}
+
+/** Ilmar read while only the Long Light flag is on. No sanctum, feast, contracts, greatPilgrimage, or assemblyElectionDay key. Flag off returns null, which is today's read. */
+export function ilmarLongLightSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarLongLight({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [{ name: 'Long Light', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Long Light', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Long Light is the Lumen Canon midsummer vigil, once per game year. This read names the next Long Light. It holds no vigil, records no vows, changes no Piety, and lists no clergy.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Long Light. It holds no vigil and lists no clergy.',
+  }, nowMs, true);
+}
 /** Veldwood read while only the Dividend Day flag is on. No federalCouncil or voteDayCalendar key. Flag off returns null, which is today's read. */
 export function veldwoodDividendDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
   if (!enabled) return null;
