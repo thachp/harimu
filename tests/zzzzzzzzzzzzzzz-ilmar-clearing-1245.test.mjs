@@ -121,7 +121,8 @@ test('the flag is preview true and production false, inside HARIMU_GRAY_PACK, an
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
   assert.match(readFileSync('tests/helpers/local-runtime.mjs', 'utf8'), /lib\/ilmar-clearing\.ts/);
-  assert.doesNotMatch(readFileSync('lib/world-atlas-reads.ts', 'utf8'), /ilmarNextClearingAt|HARIMU_ILMAR_CLEARING_ENABLED/);
+  assert.match(readFileSync('lib/world-atlas-reads.ts', 'utf8'), /ilmarNextClearingAt/);
+  assert.match(readFileSync('lib/world-atlas-reads.ts', 'utf8'), /ILMAR_CLEARING/); // #1267: atlas source on the existing flag
 });
 
 test('flag off: the Ilmar government read is unchanged; flag on names the next date; Sanctum on with Clearing off adds no key', async t => {
