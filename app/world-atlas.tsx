@@ -1,5 +1,6 @@
 'use client';
 import { worldAtlasCard, worldAtlasEnabled, worldAtlasStats, worldExploreEnabled, type WorldAtlasClock, type WorldAtlasDisputes, type WorldAtlasNation } from '@/lib/world-atlas';
+import { ExplorePrimaryButton } from './explore-primary';
 import { NationCrest } from './nation-crest';
 import './world-atlas.css';
 
@@ -27,6 +28,6 @@ export function WorldAtlas({ nations, nation = null, clock = null, disputes = nu
       </div>}
     </div>}
     {stats.length > 0 && <dl className="world-atlas-stats">{stats.map(stat => <div key={stat.label}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>}
-    {card?.explore && onView && <button type="button" className="world-atlas-primary" aria-label={card.explore.ariaLabel} onClick={() => onView('country')}>{card.explore.label}</button>}
+    {card?.explore && onView && <ExplorePrimaryButton label={card.explore.label} ariaLabel={card.explore.ariaLabel} onClick={() => onView('country')} />}
   </section>;
 }
