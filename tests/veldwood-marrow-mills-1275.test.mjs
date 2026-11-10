@@ -2,7 +2,7 @@
  *  Flag off: residentCitiesForNation, cityForNation, enroll, home, travel and the city panel match today,
  *  including when Ring Moot is on alone and when Dunmorrow is on alone. Not a country-map pin. citiesForNation('veldwood') stays capital plus two.
  *  No festival host, imports, or sea-lane effect.
- *  Provisional GRAY 76 (last on origin/dev 2dc1dc32). Expected to land around 79 after #1266, #1272 and #1273. */
+ *  GRAY 79 (last). #1266 Vakk Harbor is 76, #1272 Ruel Works is 77, #1273 Thessaly Wells is 78. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -63,8 +63,10 @@ test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, a
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 76); // provisional GRAY 76 on origin/dev 2dc1dc32; expected ~79 after #1266, #1272, #1273
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 79); // GRAY 79 last after #1266 (76), #1272 (77) and #1273 (78)
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);
