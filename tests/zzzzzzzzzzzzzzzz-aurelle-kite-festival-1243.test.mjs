@@ -1,5 +1,5 @@
 /** #1243: Aurelle next Kite Festival, once per game year from the Varkand Chair anchor. Offset 0 is game spring.
- *  Flag HARIMU_AURELLE_KITE_FESTIVAL_ENABLED in HARIMU_GRAY_PACK (#1244 Ring Moot follows). Flag off: no kiteFestival key. Date only. */
+ *  Flag HARIMU_AURELLE_KITE_FESTIVAL_ENABLED in HARIMU_GRAY_PACK. Ring Moot and Clearing follow it. Flag off: no kiteFestival key. Date only. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -96,15 +96,15 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 71);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 72);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
