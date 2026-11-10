@@ -38,6 +38,17 @@
 .panel-v2 button.panel-v2-primary>span,.panel-v2 button.panel-v2-secondary>span{min-width:0;white-space:normal;overflow-wrap:break-word;text-overflow:clip}
 .panel-v2 .panel-v2-rows button[aria-pressed=true]{background:rgba(214,180,92,.12);box-shadow:inset 3px 0 #d6b45c}
 
+/* #392 UI 44 city identity. Only CitySummary sets panel-v2-city. Title and tagline share a row; chips span under them.
+   The tagline wraps on words (break-word). Gold #f1d58a on the inspector ground #0b2029. */
+.panel-v2.panel-v2-city .panel-v2-city-head{display:grid;grid-template-columns:auto minmax(0,max-content) minmax(0,1fr);align-items:center;column-gap:12px;row-gap:10px}
+.panel-v2.panel-v2-city .panel-v2-city-head>.panel-v2-header-stats{grid-column:1 / -1}
+.panel-v2.panel-v2-city .panel-v2-city-mark{display:flex;flex:none;width:44px;height:44px;color:#f1d58a}
+.panel-v2.panel-v2-city .panel-v2-city-mark svg{width:44px;height:44px}
+.panel-v2.panel-v2-city .panel-v2-city-head>div{min-width:0}
+.panel-v2.panel-v2-city p.panel-v2-city-tagline{margin:0;color:#f1d58a;font-family:Georgia,serif;font-style:italic;font-size:calc(13px * var(--text-scale, 1));font-weight:500;line-height:1.35;opacity:1;overflow-wrap:break-word;word-break:normal;hyphens:manual}
+.panel-v2.panel-v2-city .panel-v2-city-action{display:grid;gap:6px;min-width:0}
+.panel-v2.panel-v2-city p.panel-v2-city-kicker{margin:0;color:#f1d58a;font-size:calc(12px * var(--text-scale, 1));font-weight:600;letter-spacing:.04em;line-height:1.3}
+
 /* #392 S9 family cards (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): portrait, name, relation; four across on a desktop panel, wrapping on narrow ones, never scrolls sideways. */
 .household-v2 ul.household-v2-family{display:grid;grid-template-columns:repeat(auto-fill,minmax(calc(72px * var(--text-scale, 1)),1fr));gap:8px;margin:10px 0 0;padding:0;list-style:none}
 .household-v2-family li{margin:0;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;padding:8px;border:1px solid rgba(214,180,92,.35);border-radius:8px;background:rgba(11,38,49,.6);text-align:center}
