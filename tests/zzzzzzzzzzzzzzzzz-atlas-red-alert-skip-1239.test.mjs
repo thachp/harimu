@@ -41,8 +41,9 @@ test('#1239: reused cancel helper identity and celebration names match #1220', (
     assert.equal(source.nationId, 'varkand', name);
   }
   assert.equal(worldFestivalSources.find(s => s.name === 'Mandate Plebiscite').nationId, 'varkand');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 71, '#1239 adds no flag; GRAY is 71 and #1242 Dunmorrow is last');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), CANCELS);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 72, 'no new flag from #1239; #1244 Ring Moot is last');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), CANCELS);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
   assert.equal(flagOn({ [CANCELS]: 'true' }, CANCELS), true);
 });
 
