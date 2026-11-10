@@ -105,18 +105,18 @@ test('flag off leaves the snapshot unchanged, and other nations gain no clearing
   assert.deepEqual(withIlmarClearing(sanctumOnly, day, true).clearing, block(ILMAR_CLEARING_CYCLE_MS));
 });
 
-test('the flag is preview true and production false, at(-4) in HARIMU_GRAY_PACK, and a direct string wins', () => {
+test('the flag is preview true and production false, at(-5) in HARIMU_GRAY_PACK, and a direct string wins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined, 'not its own text binding');
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 75);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-5), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-5), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-10), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-10), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 76);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
