@@ -13,6 +13,8 @@ export const CORVEL_ISLES_REGATTA_NOTE = 'Hosts the Grand Regatta';
 export const DUNMORROW_FLAG = 'HARIMU_AURELLE_DUNMORROW_ENABLED';
 /** #1270: Confluence resident industry city. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const RUEL_WORKS_FLAG = 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED';
+/** #1282: Varkand resident military base. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
+export const DUNKAR_PASS_FLAG = 'HARIMU_VARKAND_DUNKAR_PASS_ENABLED';
 /** #1242: the one city-panel line. The next date is the #1146 clock, shown only when that flag is also on. */
 export const DUNMORROW_HEARTH_NOTE = 'Hosts Hearth Night';
 // Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
@@ -58,17 +60,23 @@ const vakkHarbor: City = { id: 'vakk-harbor', nationId: 'hoarvale', name: 'Vakk 
 /** #1270: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not on the country map (that map is three fixed pins) and citiesForNation stays capital plus two.
  *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Great Waterwheel landmark stays off this line, as Emberwell's description omits The Ember Pools. */
 const ruelWorks: City = { id: 'ruel-works', nationId: 'confluence', name: 'Ruel Works', capital: false, role: 'Industry', description: 'Timber-and-tile workshops along mill canals on the eastern river fork.' };
+/** #1282: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not on the country map (that map is three fixed pins) and citiesForNation stays capital plus two.
+ *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Fog Gate landmark stays off this line, as Emberwell's description omits The Ember Pools.
+ *  Garrison duty, key defense, and war value stay out: this is a resident city only. */
+const dunkarPass: City = { id: 'dunkar-pass', nationId: 'varkand', name: 'Dunkar Pass', capital: false, role: 'Military base', description: 'Fortified pass with searchlights on the eastern mountain pass.' };
 let boundEnv: unknown;
 let corvelBound: unknown;
 let dunmorrowBound: unknown;
 let vakkEnv: unknown;
 let ruelWorksBound: unknown;
+let dunkarPassBound: unknown;
 /** Routes pass the Worker env. Unset: node tests use process.env. A bound env wins, including "false". */
 export function bindBrasswellPortEnv(env: unknown) { boundEnv = env; }
 export function bindCorvelIslesEnv(env: unknown) { corvelBound = env; }
 export function bindDunmorrowEnv(env: unknown) { dunmorrowBound = env; }
 export function bindVakkHarborEnv(env: unknown) { vakkEnv = env; }
 export function bindRuelWorksEnv(env: unknown) { ruelWorksBound = env; }
+export function bindDunkarPassEnv(env: unknown) { dunkarPassBound = env; }
 function brasswellPortEnabled(): boolean {
   if (boundEnv !== undefined) return flagOn(boundEnv, BRASSWELL_PORT_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, BRASSWELL_PORT_FLAG); } catch { return false; }
@@ -89,16 +97,21 @@ function ruelWorksEnabled(): boolean {
   if (ruelWorksBound !== undefined) return flagOn(ruelWorksBound, RUEL_WORKS_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, RUEL_WORKS_FLAG); } catch { return false; }
 }
+function dunkarPassEnabled(): boolean {
+  if (dunkarPassBound !== undefined) return flagOn(dunkarPassBound, DUNKAR_PASS_FLAG);
+  try { return typeof process !== 'undefined' && flagOn(process.env, DUNKAR_PASS_FLAG); } catch { return false; }
+}
 const portResidents = (): readonly City[] => brasswellPortEnabled() ? [brasswellPort] : [];
 const corvelResidents = (): readonly City[] => corvelIslesEnabled() ? [corvelIsles] : [];
 const dunmorrowResidents = (): readonly City[] => dunmorrowEnabled() ? [dunmorrow] : [];
 const vakkResidents = (): readonly City[] => vakkHarborEnabled() ? [vakkHarbor] : [];
 const ruelWorksResidents = (): readonly City[] => ruelWorksEnabled() ? [ruelWorks] : [];
+const dunkarPassResidents = (): readonly City[] => dunkarPassEnabled() ? [dunkarPass] : [];
 const byId = (nationId: string, cityId: string) => (city: City) => city.nationId === nationId && city.id === cityId;
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
-/** Catalog cities plus spa additions (#798), plus Brasswell (#1241), Dunmorrow (#1242), Corvel Isles (#1259), Vakk Harbor (#1261), and Ruel Works (#1270) when each flag is on. */
-export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...vakkResidents().filter(city => city.nationId === nationId), ...ruelWorksResidents().filter(city => city.nationId === nationId)]; }
-export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? vakkResidents().find(byId(nationId, cityId)) ?? ruelWorksResidents().find(byId(nationId, cityId)); }
+/** Catalog cities plus spa additions (#798), plus Brasswell (#1241), Dunmorrow (#1242), Corvel Isles (#1259), Vakk Harbor (#1261), Ruel Works (#1270), and Dunkar Pass (#1282) when each flag is on. */
+export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...vakkResidents().filter(city => city.nationId === nationId), ...ruelWorksResidents().filter(city => city.nationId === nationId), ...dunkarPassResidents().filter(city => city.nationId === nationId)]; }
+export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? vakkResidents().find(byId(nationId, cityId)) ?? ruelWorksResidents().find(byId(nationId, cityId)) ?? dunkarPassResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
 
 /** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its

@@ -57,12 +57,12 @@ test('the flag is in HARIMU_GRAY_PACK, preview true and production false, and th
   assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), FLAG);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 77); // GRAY 77: Vakk Harbor is 76; Ruel Works is last
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-5), FLAG);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-5), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 78); // GRAY 78: Vakk Harbor is 76; Ruel Works is 77; Dunkar Pass is last
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);
