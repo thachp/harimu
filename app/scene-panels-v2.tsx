@@ -10,19 +10,21 @@ import { uiV2CityEnabled } from '@/lib/ui-v2-city';
 import { cityPlaceRowsEnabled, cityPlaces } from '@/lib/city-places';
 import { cityPlaceIcon } from './city-pill';
 import { captureHistoryLine, treatyReturnLine, type CityCaptureHistory } from '@/lib/city-capture-history'; // #1028, #1078
+import { worldExploreEnabled } from '@/lib/world-atlas'; // #392 Explore card is the gold CTA
 
 /** #392 S3: the World and City side-panel pieces that change with NEXT_PUBLIC_HARIMU_UI_V2_PANEL. Each piece reads the build-time flag itself, so
  *  page.tsx never decides it (tests/ui-v2-panel.test.mjs renders these flag off and on, and pins that page.tsx passes no `enabled`). Existing copy only. */
 type Nation = { id: string; name: string; government: string; capital: string; currency: string; economy: string; religion: string };
 type View = 'country' | 'square' | 'nation' | CityDestination['id'];
 
-/** World, top of the panel: summary header, stats, chevron rows and the primary action (flag on); nothing (flag off). */
-export function WorldSummary({ nation, population, onView, enabled = uiV2PanelEnabled() }: { nation: Nation; population: ReactNode; onView: (view: View) => void; enabled?: boolean }) {
+/** World, top of the panel: summary header, stats, chevron rows and the primary action (flag on); nothing (flag off).
+ *  NEXT_PUBLIC_HARIMU_WORLD_EXPLORE demotes that primary to a secondary button so the atlas Explore action is the only gold CTA. */
+export function WorldSummary({ nation, population, onView, enabled = uiV2PanelEnabled(), explore = worldExploreEnabled() }: { nation: Nation; population: ReactNode; onView: (view: View) => void; enabled?: boolean; explore?: boolean }) {
   if (!enabled) return null;
   return <PanelV2 title={nation.name} subtitle={nation.government} rowsLabel="Game locations"
     stats={[...(population ? [{ label: 'Population', value: population }] : []), { label: 'Capital', value: nation.capital }, { label: 'Currency', value: nation.currency }]}
     rows={[{ id: 'country', label: `${countryWord()} travel`, onSelect: () => onView('country') }, { id: 'square', label: 'Open City', onSelect: () => onView('square') }]}
-    primary={{ label: 'Inspect national institutions', onSelect: () => onView('nation') }} />;
+    primary={{ label: 'Inspect national institutions', onSelect: () => onView('nation'), ...(explore ? { tone: 'secondary' as const } : {}) }} />;
 }
 
 /** World facts: the full list (flag off); with the summary on, the facts it does not show (Economy, Religion), so nothing is lost. */

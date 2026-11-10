@@ -195,6 +195,8 @@
       "HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED": "true",
       // #1220: Varkand celebrations on the government read are marked canceled at a stored Red Alert. Off: the read is unchanged. Dates stay put. The Mandate Plebiscite is not marked.
       "HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED": "true",
+      // #1241: Brasswell Port is a Kindle resident city (home, enroll, travel-by-id). Not an Assembly district and not a country-map pin. Off: the city is absent.
+      "HARIMU_KINDLE_BRASSWELL_PORT_ENABLED": "true",
       // #1245: Ilmar next Clearing (Lumen Canon new year, once per game year = 30 real days, offset 0). Off: no clearing key. Date only.
       "HARIMU_ILMAR_CLEARING_ENABLED": "true"
     },
@@ -399,7 +401,8 @@
       "NEXT_PUBLIC_HARIMU_RESOURCE_BAR": "true",
       "NEXT_PUBLIC_HARIMU_ZOOM_PATH": "true",
       "NEXT_PUBLIC_HARIMU_NATION_ACCENT": "true",
-      "NEXT_PUBLIC_HARIMU_CITY_PALETTE": "true"
+      "NEXT_PUBLIC_HARIMU_CITY_PALETTE": "true",
+      "NEXT_PUBLIC_HARIMU_WORLD_EXPLORE": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
