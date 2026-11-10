@@ -43,8 +43,9 @@ test('the flag is last in HARIMU_CITY_PACK, preview true and production false, a
   assert.equal(flagOn({ HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, [HOST]: 'false' }, HOST), false, 'a direct string wins');
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.includes(HOST), false, 'the host note is not a GRAY flag');
   assert.equal(preview.vars.HARIMU_GRAY_PACK[HOST], undefined);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 78);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 80);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_MERIDIAN_DAO_WORKS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED');
   const route = readFileSync('app/api/city/route.ts', 'utf8');
   assert.ok(route.includes("const regattaHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='fulmara'&&cityId==='corvel-isles'&&flagOn(env,CORVEL_ISLES_FLAG)&&flagOn(env,'HARIMU_FULMARA_GRAND_REGATTA_ENABLED')?{grandRegattaNote:CORVEL_ISLES_REGATTA_NOTE,grandRegattaNextAt:fulmaraNextGrandRegattaAt(nowSeconds*1000)}:{};"));
   assert.ok(route.includes("const hearthHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='aurelle'&&cityId==='dunmorrow'&&flagOn(env,DUNMORROW_FLAG)&&flagOn(env,'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED')?{hearthNightNote:DUNMORROW_HEARTH_NOTE,hearthNightNextAt:aurelleNextHearthNightAt(nowSeconds*1000)}:{};"));
