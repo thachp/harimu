@@ -1,23 +1,36 @@
 'use client';
 import { Bank, Coins, UsersThree } from '@phosphor-icons/react';
 import { NationCrest } from './nation-crest';
+import { ExplorePrimaryButton } from './explore-primary';
 import { HeaderStatChips } from './panel-v2';
 import { nationOverviewFields, type NationOverviewGovernment, type NationOverviewNation } from '@/lib/nation-overview';
 import { nationHeaderStats, nationHeaderStatsEnabled } from '@/lib/nation-header-stats';
+import { nationActionsEnabled } from '@/lib/nation-actions';
 import './nation-overview.css';
 
 const headerIcon = { stability: UsersThree, capital: Bank, currency: Coins } as const;
 
+function NationActions({ explore, onExplore, onInstitutions }: { explore: string | null; onExplore: () => void; onInstitutions?: () => void }) {
+  const primary = explore ? <ExplorePrimaryButton label={explore} ariaLabel={`${explore}: open the city`} onClick={onExplore} chevron /> : null;
+  const secondary = onInstitutions ? <button type="button" className="nation-overview-secondary" onClick={onInstitutions}>View institutions</button> : null;
+  if (!primary && !secondary) return null;
+  return <div className="nation-overview-actions">{primary}{secondary}</div>;
+}
+
 /** #1166: the nation-view side panel. Every value comes from the nation record or that nation's government read.
- *  #392 UI 41: with NEXT_PUBLIC_HARIMU_NATION_HEADER_STATS, Stability, Capital and Currency move into header chips and the old trio is not repeated. Flag off keeps this panel as it is. */
-export function NationOverview({ nation, government = null, onExplore, onCivic }: {
+ *  #392 UI 41: with NEXT_PUBLIC_HARIMU_NATION_HEADER_STATS, Stability, Capital and Currency move into header chips and the old trio is not repeated. Flag off keeps this panel as it is.
+ *  #392 UI 42: with NEXT_PUBLIC_HARIMU_NATION_ACTIONS, Explore {capital} is the shared gold primary with a trailing chevron.
+ *  View institutions is rendered only when the caller passes the institutions destination. Flag off keeps the outlined Explore button. */
+export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions }: {
   nation: NationOverviewNation;
   government?: NationOverviewGovernment;
   onExplore: () => void;
   onCivic: () => void;
+  onInstitutions?: () => void;
 }) {
   const fields = nationOverviewFields(nation, government);
   const headerOn = nationHeaderStatsEnabled();
+  const actionsOn = nationActionsEnabled();
   const chips = headerOn ? nationHeaderStats(fields).map(stat => { const Icon = headerIcon[stat.id]; return { ...stat, icon: <Icon size={16} /> }; }) : [];
   const stats = [
     fields.stability !== null ? ['Stability', `${fields.stability} / 100`] as const : null,
@@ -42,6 +55,6 @@ export function NationOverview({ nation, government = null, onExplore, onCivic }
     {!headerOn && stats.length > 0 && <dl className="nation-overview-stats">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     {rows.length > 0 && <dl className="nation-overview-rows">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     {fields.institutions.length > 0 && <ul className="nation-overview-institutions" aria-label="Institutions">{fields.institutions.map(item => <li key={item.id}><button type="button" onClick={onCivic}>{item.name}</button></li>)}</ul>}
-    {fields.explore && <button type="button" className="nation-overview-primary" aria-label={`${fields.explore}: open the city`} onClick={onExplore}>{fields.explore}</button>}
+    {actionsOn ? <NationActions explore={fields.explore} onExplore={onExplore} onInstitutions={onInstitutions} /> : fields.explore && <button type="button" className="nation-overview-primary" aria-label={`${fields.explore}: open the city`} onClick={onExplore}>{fields.explore}</button>}
   </section>;
 }
