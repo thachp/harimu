@@ -5,7 +5,7 @@
  *  #1231: Kindle Ballot Night joins on HARIMU_KINDLE_ELECTION_CLOCK_ENABLED (no new flag; GRAY unchanged). A missing cycle start skips it.
  *  #1236/#1237: Varkand Lantern Watch and Ilmar Assembly Election join on their existing flags (no new flag; GRAY unchanged).
  *  #1240: Hoarvale Election Night joins on HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED (no new flag; GRAY unchanged). It shares Opening of the Moot's instant; a tie lists both, Opening first.
- *  #1267: Kite Festival, Ring Moot, and Clearing join on their existing flags (no new flag of its own). Hearth Night was already a source. #1270 Ruel Works is 77, #1271 Thessaly Wells is 78, #1282 Dunkar Pass is last (GRAY 79). */
+ *  #1267: Kite Festival, Ring Moot, and Clearing join on their existing flags (no new flag of its own). Hearth Night was already a source. #1266 Vakk Harbor is 76, #1270 Ruel Works is 77, #1271 Thessaly Wells is 78, #1275 Marrow Mills is 79, #1279 Dao Works is last (GRAY 80). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -334,17 +334,17 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-18), F, '#1207 Rotation Day, then #1208');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-18), F);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-17), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-17), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-18), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-17), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-19), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-20), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-21), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-22), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 79); // GRAY 79; #1245 Clearing is 72, #1242 Dunmorrow is 73, #1259 Corvel Isles is 74, #1260 Long Light is 75, #1266 Vakk Harbor is 76, #1270 Ruel Works is 77, #1271 Thessaly Wells is 78; Dunkar Pass is last
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-20), F, '#1207 Rotation Day, then #1208');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-20), F);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-19), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-19), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-20), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-19), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-21), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-22), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-23), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-24), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 81); // GRAY 81; #1245 Clearing is 72, #1242 Dunmorrow is 73, #1259 Corvel Isles is 74, #1260 Long Light is 75, #1266 Vakk Harbor is 76, #1270 Ruel Works is 77, #1271 Thessaly Wells is 78, #1275 Marrow Mills is 79, #1279 Dao Works is 80; Dunkar Pass is last
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
@@ -618,14 +618,13 @@ test('#1267: Kite Festival, Ring Moot, and Clearing are skipped while their flag
   assert.equal(ring.nextAt, veldwoodNextRingMootAt);
   assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'veldwood').map(s => s.name), ['Vote Day', 'Dividend Day', 'Ring Moot']);
   const gray = FLAG_PACKS.HARIMU_GRAY_PACK;
-  assert.equal(gray.length, 79, '#1267 and #1268 add no flag; #1270 Ruel Works is 77; #1271 Thessaly Wells is 78; #1282 Dunkar Pass is last');
-  assert.equal(gray.at(-1), 'HARIMU_VARKAND_DUNKAR_PASS_ENABLED', 'Dunkar Pass is last on this head');
-  assert.equal(gray.at(-2), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED', 'Thessaly Wells is 78');
-  assert.equal(gray.at(-3), 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED');
-  assert.equal(gray.at(-4), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
-  assert.equal(gray.at(-5), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
-  assert.equal(gray.at(-6), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
-  assert.equal(gray.at(-7), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
+  assert.equal(gray.length, 81, '#1268 adds no flag; #1275 Marrow Mills is 79, #1279 Dao Works is 80; Dunkar Pass is last');
+  assert.equal(gray.at(-2), 'HARIMU_MERIDIAN_DAO_WORKS_ENABLED');
+  assert.equal(gray.at(-3), 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED');
+  assert.equal(gray.at(-4), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
+  assert.equal(gray.at(-7), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(gray.at(-8), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
+  assert.equal(gray.at(-9), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
   for (const flag of added) assert.equal(gray.filter(item => item === flag).length, 1, flag);
   const now = Date.UTC(2026, 10, 9);
   const names = env => (worldNextFestival(now, env)?.festivals ?? []).map(item => item.name);

@@ -48,7 +48,9 @@
       "HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED": "true",
       "HARIMU_CITY_CAPTURE_HISTORY_ENABLED": "true",
       "HARIMU_SPA_WC_BONUS_ENABLED": "true",
-      "HARIMU_SEASON_SEA_LANES_ENABLED": "true"
+      "HARIMU_SEASON_SEA_LANES_ENABLED": "true",
+      // #1285: city panel "Hosts …" line for Isling Springs, Shen Springs and Lanu Terraces. Off: those keys are absent and the panel is unchanged. Also needs that city's festival flag.
+      "HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED": "true"
     },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",
@@ -215,6 +217,10 @@
       "HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED": "true",
       // #1271: Thessaly Wells is an Ilmar resident city (home, enroll, travel-by-id). Existing specialty and heartland capture reads apply. Not a country-map pin. No imports. Off: the city is absent and the panel is unchanged.
       "HARIMU_ILMAR_THESSALY_WELLS_ENABLED": "true",
+      // #1275: Marrow Mills is a Veldwood resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No festival host line, no imports, no sea-lane effect. Off: the city is absent.
+      "HARIMU_VELDWOOD_MARROW_MILLS_ENABLED": "true",
+      // #1279: Dao Works is a Meridian resident city (home, enroll, travel-by-id). Not a country-map pin. Off: the city is absent.
+      "HARIMU_MERIDIAN_DAO_WORKS_ENABLED": "true",
       // #1282: Dunkar Pass is a Varkand resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No garrison duty, key defense, or war-value hooks. Off: the city is absent.
       "HARIMU_VARKAND_DUNKAR_PASS_ENABLED": "true"
     },
@@ -425,7 +431,8 @@
       "NEXT_PUBLIC_HARIMU_CITY_HEADER_STATS": "true",
       "NEXT_PUBLIC_HARIMU_NATION_HEADER_STATS": "true",
       "NEXT_PUBLIC_HARIMU_NATION_ACTIONS": "true",
-      "NEXT_PUBLIC_HARIMU_CITY_IDENTITY": "true"
+      "NEXT_PUBLIC_HARIMU_CITY_IDENTITY": "true",
+      "NEXT_PUBLIC_HARIMU_NATION_MOTTO": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",

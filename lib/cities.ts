@@ -5,6 +5,8 @@ export type City = { id: string; nationId: string; name: string; capital: boolea
 /** #1241 Kindle port, #1261 Hoarvale port. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const BRASSWELL_PORT_FLAG = 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED';
 export const VAKK_HARBOR_FLAG = 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED';
+/** #1279: Meridian resident city. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
+export const DAO_WORKS_FLAG = 'HARIMU_MERIDIAN_DAO_WORKS_ENABLED';
 /** #1259: Fulmara resident port. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const CORVEL_ISLES_FLAG = 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED';
 /** #1259: the one city-panel line. The next date is the #1178 clock, shown only when that flag is also on. */
@@ -15,6 +17,8 @@ export const DUNMORROW_FLAG = 'HARIMU_AURELLE_DUNMORROW_ENABLED';
 export const RUEL_WORKS_FLAG = 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED';
 /** #1271: Ilmar resident oasis town. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const THESSALY_WELLS_FLAG = 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED';
+/** #1275: Veldwood resident industry / boats city. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
+export const MARROW_MILLS_FLAG = 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED';
 /** #1282: Varkand resident military base. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const DUNKAR_PASS_FLAG = 'HARIMU_VARKAND_DUNKAR_PASS_ENABLED';
 /** #1242: the one city-panel line. The next date is the #1146 clock, shown only when that flag is also on. */
@@ -66,6 +70,12 @@ const ruelWorks: City = { id: 'ruel-works', nationId: 'confluence', name: 'Ruel 
  *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Seven Wells landmark stays off this line, as Brasswell's description omitted the Lighthouse of the Spark.
  *  [ASSUMPTION] the capture line is the existing heartland sentence. Farming / oasis is not a port or trade zone, so cityHasImports stays false. */
 const thessalyWells: City = { id: 'thessaly-wells', nationId: 'ilmar', name: 'Thessaly Wells', capital: false, role: 'Farming / oasis', description: 'Date palms around shaded courtyards in the eastern oasis belt.' };
+/** #1275: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not on the country map (that map is three fixed pins) and citiesForNation stays capital plus two.
+ *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Boat Hall landmark stays off this line, as Brasswell's description omitted the Lighthouse of the Spark. */
+const marrowMills: City = { id: 'marrow-mills', nationId: 'veldwood', name: 'Marrow Mills', capital: false, role: 'Industry / boats', description: 'Heartwood boat halls on the river in the eastern river valley.' };
+/** #1279: same resident path as the #798 spa additions (home, enroll, travel-by-id). No country-map pin. citiesForNation stays capital plus two.
+ *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Red Foundry stays off this line, as Brasswell omitted the Lighthouse of the Spark. */
+const daoWorks: City = { id: 'dao-works', nationId: 'meridian', name: 'Dao Works', capital: false, role: 'Heavy industry', description: 'Slate factory blocks with slogan banners on the western plain.' };
 /** #1282: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not on the country map (that map is three fixed pins) and citiesForNation stays capital plus two.
  *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Fog Gate landmark stays off this line, as Emberwell's description omits The Ember Pools.
  *  Garrison duty, key defense, and war value stay out: this is a resident city only. */
@@ -76,6 +86,8 @@ let dunmorrowBound: unknown;
 let vakkEnv: unknown;
 let ruelWorksBound: unknown;
 let thessalyBound: unknown;
+let marrowMillsBound: unknown;
+let daoEnv: unknown;
 let dunkarPassBound: unknown;
 /** Routes pass the Worker env. Unset: node tests use process.env. A bound env wins, including "false". */
 export function bindBrasswellPortEnv(env: unknown) { boundEnv = env; }
@@ -84,6 +96,8 @@ export function bindDunmorrowEnv(env: unknown) { dunmorrowBound = env; }
 export function bindVakkHarborEnv(env: unknown) { vakkEnv = env; }
 export function bindRuelWorksEnv(env: unknown) { ruelWorksBound = env; }
 export function bindThessalyWellsEnv(env: unknown) { thessalyBound = env; }
+export function bindMarrowMillsEnv(env: unknown) { marrowMillsBound = env; }
+export function bindDaoWorksEnv(env: unknown) { daoEnv = env; }
 export function bindDunkarPassEnv(env: unknown) { dunkarPassBound = env; }
 function brasswellPortEnabled(): boolean {
   if (boundEnv !== undefined) return flagOn(boundEnv, BRASSWELL_PORT_FLAG);
@@ -109,6 +123,14 @@ function thessalyWellsEnabled(): boolean {
   if (thessalyBound !== undefined) return flagOn(thessalyBound, THESSALY_WELLS_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, THESSALY_WELLS_FLAG); } catch { return false; }
 }
+function marrowMillsEnabled(): boolean {
+  if (marrowMillsBound !== undefined) return flagOn(marrowMillsBound, MARROW_MILLS_FLAG);
+  try { return typeof process !== 'undefined' && flagOn(process.env, MARROW_MILLS_FLAG); } catch { return false; }
+}
+function daoWorksEnabled(): boolean {
+  if (daoEnv !== undefined) return flagOn(daoEnv, DAO_WORKS_FLAG);
+  try { return typeof process !== 'undefined' && flagOn(process.env, DAO_WORKS_FLAG); } catch { return false; }
+}
 function dunkarPassEnabled(): boolean {
   if (dunkarPassBound !== undefined) return flagOn(dunkarPassBound, DUNKAR_PASS_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, DUNKAR_PASS_FLAG); } catch { return false; }
@@ -119,12 +141,14 @@ const dunmorrowResidents = (): readonly City[] => dunmorrowEnabled() ? [dunmorro
 const vakkResidents = (): readonly City[] => vakkHarborEnabled() ? [vakkHarbor] : [];
 const ruelWorksResidents = (): readonly City[] => ruelWorksEnabled() ? [ruelWorks] : [];
 const thessalyResidents = (): readonly City[] => thessalyWellsEnabled() ? [thessalyWells] : [];
+const marrowMillsResidents = (): readonly City[] => marrowMillsEnabled() ? [marrowMills] : [];
+const daoResidents = (): readonly City[] => daoWorksEnabled() ? [daoWorks] : [];
 const dunkarPassResidents = (): readonly City[] => dunkarPassEnabled() ? [dunkarPass] : [];
 const byId = (nationId: string, cityId: string) => (city: City) => city.nationId === nationId && city.id === cityId;
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
-/** Catalog cities plus spa additions (#798), plus Brasswell (#1241), Dunmorrow (#1242), Corvel Isles (#1259), Vakk Harbor (#1261), Ruel Works (#1270), Thessaly Wells (#1271), and Dunkar Pass (#1282) when each flag is on. */
-export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...vakkResidents().filter(city => city.nationId === nationId), ...ruelWorksResidents().filter(city => city.nationId === nationId), ...thessalyResidents().filter(city => city.nationId === nationId), ...dunkarPassResidents().filter(city => city.nationId === nationId)]; }
-export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? vakkResidents().find(byId(nationId, cityId)) ?? ruelWorksResidents().find(byId(nationId, cityId)) ?? thessalyResidents().find(byId(nationId, cityId)) ?? dunkarPassResidents().find(byId(nationId, cityId)); }
+/** Catalog cities plus spa additions (#798), plus Brasswell (#1241), Dunmorrow (#1242), Corvel Isles (#1259), Vakk Harbor (#1261), Ruel Works (#1270), Thessaly Wells (#1271), Marrow Mills (#1275), Dao Works (#1279), and Dunkar Pass (#1282) when each flag is on. */
+export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...vakkResidents().filter(city => city.nationId === nationId), ...ruelWorksResidents().filter(city => city.nationId === nationId), ...thessalyResidents().filter(city => city.nationId === nationId), ...marrowMillsResidents().filter(city => city.nationId === nationId), ...daoResidents().filter(city => city.nationId === nationId), ...dunkarPassResidents().filter(city => city.nationId === nationId)]; }
+export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? vakkResidents().find(byId(nationId, cityId)) ?? ruelWorksResidents().find(byId(nationId, cityId)) ?? thessalyResidents().find(byId(nationId, cityId)) ?? marrowMillsResidents().find(byId(nationId, cityId)) ?? daoResidents().find(byId(nationId, cityId)) ?? dunkarPassResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
 
 /** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its

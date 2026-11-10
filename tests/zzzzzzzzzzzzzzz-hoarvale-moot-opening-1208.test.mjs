@@ -70,10 +70,10 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined, 'not its own text binding'); assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-16), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-16), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-16), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 79);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-18), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-18), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-18), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 81);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

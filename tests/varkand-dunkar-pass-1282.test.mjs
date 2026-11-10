@@ -122,10 +122,12 @@ test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, a
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 79); // GRAY 79. #1271 Thessaly Wells is 78. Dunkar Pass is last
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_MERIDIAN_DAO_WORKS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 81); // GRAY 81. #1279 Dao Works is 80. Dunkar Pass is last
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);
