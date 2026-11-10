@@ -197,6 +197,8 @@
       "HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED": "true",
       // #1241: Brasswell Port is a Kindle resident city (home, enroll, travel-by-id). Not an Assembly district and not a country-map pin. Off: the city is absent.
       "HARIMU_KINDLE_BRASSWELL_PORT_ENABLED": "true",
+      // #1243: Aurelle next Kite Festival (each game spring, once per game year = 30 real days, offset 0). Off: no kiteFestival key. Date only.
+      "HARIMU_AURELLE_KITE_FESTIVAL_ENABLED": "true",
       // #1242: Dunmorrow is an Aurelle resident city (home, enroll, travel-by-id). With Hearth Night also on, its city panel reads "Hosts Hearth Night" and that clock's next date. Not a country-map pin. Off: the city is absent and the panel is unchanged.
       "HARIMU_AURELLE_DUNMORROW_ENABLED": "true"
     },

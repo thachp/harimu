@@ -329,17 +329,17 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-9), F, '#1207 Rotation Day, then #1208');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-9), F);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-8), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-8), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-10), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-11), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-12), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-13), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 70); // GRAY 70; #1242 Dunmorrow is last, #1241 Brasswell Port is 69th
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-10), F, '#1207 Rotation Day, then #1208');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-10), F);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-10), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-11), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-12), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-13), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-14), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 71); // GRAY 71; #1243 Kite Festival is 70th, #1242 Dunmorrow is last
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
