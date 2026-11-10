@@ -191,6 +191,7 @@ const flagOffPins = {
   HARIMU_VARKAND_LANTERN_WATCH_ENABLED: 'zzzzzzzzzzzzzzz-varkand-lantern-watch-1211.test.mjs', // #1211 flag off: no lanternWatch key
   HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'zzzzzzzzz-confluence-canal-festival-1165.test.mjs', // #1165 flag off: no canalFestival key
   HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'zzzzzzzzzzz-fulmara-grand-regatta-1178.test.mjs', // #1178 flag off: no grandRegatta key
+  HARIMU_FULMARA_CORVEL_ISLES_ENABLED: 'fulmara-corvel-isles-1259.test.mjs', // #1259 flag off: no resident city, no panel line
   HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED: 'zzzzzzzzzzzz-fulmara-dock-strike-remembrance-1187.test.mjs', // #1187 flag off: no dockStrikeRemembrance key
   HARIMU_HOARVALE_HONORS_LIST_DAY_ENABLED: 'zzzzzzz-hoarvale-honors-1136.test.mjs', // #1136 flag off: no honorsListDay key
   HARIMU_HOARVALE_AURORA_NIGHT_ENABLED: 'zzzzzzzzzz-hoarvale-aurora-night-1160.test.mjs', // #1160 flag off: no auroraNight key
