@@ -199,6 +199,8 @@
       "HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED": "false",
       // #1241: Brasswell Port is a Kindle resident city (home, enroll, travel-by-id). Not an Assembly district and not a country-map pin. Off: the city is absent.
       "HARIMU_KINDLE_BRASSWELL_PORT_ENABLED": "false",
+      // #1243: Aurelle next Kite Festival (each game spring, once per game year = 30 real days, offset 0). Off: no kiteFestival key. Date only.
+      "HARIMU_AURELLE_KITE_FESTIVAL_ENABLED": "false",
       // #1245: Ilmar next Clearing (Lumen Canon new year, once per game year = 30 real days, offset 0). Off: no clearing key. Date only.
       "HARIMU_ILMAR_CLEARING_ENABLED": "false"
     },
