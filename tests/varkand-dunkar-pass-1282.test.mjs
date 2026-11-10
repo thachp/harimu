@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { bindDunkarPassEnv, bindRuelWorksEnv, bindThessalyWellsEnv, citiesForNation, cityCaptureNote, cityCivicUnitNote, cityForNation, cityHasImports, cityImportsNote, citySpecialtyFields, DUNKAR_PASS_FLAG, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, RUEL_WORKS_FLAG, THESSALY_WELLS_FLAG } from '../lib/cities.ts';
+import { bindDunkarPassEnv, bindRuelWorksEnv, bindThessalyWellsEnv, bindVakkHarborEnv, citiesForNation, cityCaptureNote, cityCivicUnitNote, cityForNation, cityHasImports, cityImportsNote, citySpecialtyFields, DUNKAR_PASS_FLAG, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, RUEL_WORKS_FLAG, THESSALY_WELLS_FLAG, VAKK_HARBOR_FLAG } from '../lib/cities.ts';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { seasonLengthMs, seasonOrder } from '../lib/game-season.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
@@ -17,7 +17,7 @@ const LANTERN = 'HARIMU_VARKAND_LANTERN_WATCH_ENABLED';
 const MUSTER = 'HARIMU_VARKAND_MUSTER_DAY_ENABLED';
 const ids = ['watchfast', 'voren-light', 'moorhald'];
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
-const clear = () => { bindDunkarPassEnv(undefined); bindRuelWorksEnv(undefined); bindThessalyWellsEnv(undefined); delete process.env[FLAG]; delete process.env[RUEL_WORKS_FLAG]; delete process.env[THESSALY_WELLS_FLAG]; delete process.env[LANTERN]; delete process.env[MUSTER]; };
+const clear = () => { bindDunkarPassEnv(undefined); bindRuelWorksEnv(undefined); bindThessalyWellsEnv(undefined); bindVakkHarborEnv(undefined); delete process.env[FLAG]; delete process.env[RUEL_WORKS_FLAG]; delete process.env[THESSALY_WELLS_FLAG]; delete process.env[VAKK_HARBOR_FLAG]; delete process.env[LANTERN]; delete process.env[MUSTER]; };
 const openVarkand = r => {
   r.setFixtureEnv('HARIMU_VARKAND_ENABLED', 'true');
   r.setFixtureEnv('HARIMU_NATION_READINESS_ENABLED', 'false');
@@ -85,6 +85,20 @@ test('Varkand Lantern Watch and Muster Day on do not open Dunkar Pass', () => {
   } finally { clear(); }
 });
 
+test('Vakk Harbor on does not open Dunkar Pass', () => {
+  clear();
+  const sibling = { [FLAG]: 'false', [VAKK_HARBOR_FLAG]: 'true' };
+  bindDunkarPassEnv(sibling);
+  bindVakkHarborEnv(sibling);
+  try {
+    assert.equal(cityForNation('hoarvale', 'vakk-harbor')?.id, 'vakk-harbor', 'the sibling flag is on');
+    assert.equal(cityForNation('varkand', 'dunkar-pass'), undefined);
+    assert.deepEqual(residentCitiesForNation('varkand').map(c => c.id), ids);
+    assert.equal(residentCitiesForNation('varkand').some(c => c.id === 'dunkar-pass'), false);
+    assert.deepEqual(citiesForNation('varkand').map(c => c.id), ids);
+  } finally { clear(); }
+});
+
 test('Thessaly Wells on does not open Dunkar Pass', () => {
   clear();
   const sibling = { [FLAG]: 'false', [THESSALY_WELLS_FLAG]: 'true' };
@@ -123,6 +137,20 @@ test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, a
 
 test('flag off: enroll, travel, home and the panel omit Dunkar Pass; flag on: resident city, and a paid home move is not_open_yet', async t => {
   const r = await localRuntime(); t.after(() => r.close());
+  r.setFixtureEnv(FLAG, 'false');
+  r.setFixtureEnv(RUEL_WORKS_FLAG, 'true');
+  r.setFixtureEnv(VAKK_HARBOR_FLAG, 'false');
+  r.setFixtureEnv(THESSALY_WELLS_FLAG, 'false');
+  const ruelFlags = (await r.call('citizen', 'alice')).data.flags;
+  assert.equal(ruelFlags.ruelWorks, true, 'Ruel Works is on');
+  assert.equal(ruelFlags.dunkarPass, undefined, 'Ruel Works does not open flags.dunkarPass');
+  r.setFixtureEnv(RUEL_WORKS_FLAG, 'false');
+  r.setFixtureEnv(VAKK_HARBOR_FLAG, 'true');
+  const vakkFlags = (await r.call('citizen', 'alice')).data.flags;
+  assert.equal(vakkFlags.vakkHarbor, true, 'Vakk Harbor is on');
+  assert.equal(vakkFlags.ruelWorks, undefined);
+  assert.equal(vakkFlags.dunkarPass, undefined, 'Vakk Harbor does not open flags.dunkarPass');
+  r.setFixtureEnv(VAKK_HARBOR_FLAG, 'false');
   r.setFixtureEnv(THESSALY_WELLS_FLAG, 'true');
   r.setFixtureEnv(LANTERN, 'true');
   r.setFixtureEnv(MUSTER, 'true');
