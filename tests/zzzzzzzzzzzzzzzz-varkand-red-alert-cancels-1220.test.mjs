@@ -1,5 +1,5 @@
 /** #1220: Varkand celebrations on the government read are marked canceled at Red Alert (docs §7.8).
- *  Flag HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, packed in HARIMU_GRAY_PACK; #1243 Kite Festival follows it. Flag off: the read is unchanged.
+ *  Flag HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, packed in HARIMU_GRAY_PACK. #1241 Brasswell Port follows it, and #1243 Kite Festival stays last. Flag off: the read is unchanged.
  *  Muster Day, Rotation Day, and Lantern Watch are the celebration rows. The Mandate Plebiscite is not marked.
  *  The Mandate Plebiscite is a vote and is not marked. Dates stay on the nowMs helpers.
  *  The zzzzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzzzz-varkand-rotation-day-1207. */
@@ -82,12 +82,12 @@ test('the flag is preview true and production false, inside HARIMU_GRAY_PACK, an
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 69);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 70);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

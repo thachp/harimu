@@ -1,5 +1,5 @@
 /* #392 World atlas. Same dark teal and gold as the nation overview (ground #071820, paper #f3ecd6, gold #f1d58a, edge #d0ad54). */
-.game-inspector-body .world-atlas{display:grid;gap:10px;margin:0 0 14px;padding:12px;background:#071820;color:#f3ecd6;border:1px solid #d0ad54}
+.game-inspector-body .world-atlas{display:grid;gap:10px;margin:0 0 14px;padding:12px;min-width:0;max-width:100%;background:#071820;color:#f3ecd6;border:1px solid #d0ad54}
 .game-inspector-body .world-atlas h2{margin:0;color:#f1d58a;font-family:Georgia,serif;font-size:calc(13px * var(--text-scale, 1));font-weight:600;letter-spacing:.14em;line-height:1.3;text-transform:uppercase}
 /* One column. The inspector dl is two columns, which splits these rows and stacks a long value a letter at a time. */
 .game-inspector-body .world-atlas-stats{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0}
@@ -8,3 +8,12 @@
 .game-inspector-body .world-atlas dt{margin:0;color:#f1d58a;font-size:calc(11px * var(--text-scale, 1));letter-spacing:.08em;line-height:1.3;text-transform:uppercase;white-space:nowrap}
 .game-inspector-body .world-atlas dd{margin:0;color:#f3ecd6;font-weight:600;text-align:right;overflow-wrap:anywhere}
 .game-inspector-body .world-atlas :focus-visible{outline:2px solid #f3ecd6;outline-offset:2px}
+/* #392 Explore card. Crest and motto sit above the existing stats. The gold button is the one primary. */
+.game-inspector-body .world-atlas-nation{display:flex;align-items:center;gap:12px;min-width:0}
+.game-inspector-body .world-atlas-nation>div{min-width:0}
+.game-inspector-body .world-atlas-name{margin:0;color:#f3ecd6;font-family:Georgia,serif;font-size:calc(18px * var(--text-scale, 1));font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+.game-inspector-body .world-atlas-motto{margin:4px 0 0;color:#f3ecd6;font-style:italic;line-height:1.4;overflow-wrap:anywhere}
+/* Filled atlas-border gold (#d0ad54) with the panel's dark teal ink. Hover uses the brighter atlas gold. The paper ring sits 2px outside the fill so it reads on both the gold and the dark panel. */
+.game-inspector-body .world-atlas button.world-atlas-primary:not(.market-item){width:100%;max-width:100%;min-height:44px;padding:10px 14px;text-align:center;background:#d0ad54;color:#071820;border:1px solid #d0ad54;border-radius:6px;font-weight:600;font-size:calc(13px * var(--text-scale, 1));line-height:1.35;white-space:normal;overflow-wrap:anywhere}
+.game-inspector-body .world-atlas button.world-atlas-primary:not(.market-item):hover:not(:disabled){background:#f1d58a;border-color:#f1d58a;color:#071820}
+.game-inspector-body .world-atlas button.world-atlas-primary:focus-visible{outline:2px solid #f3ecd6;outline-offset:2px}
