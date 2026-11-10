@@ -40,8 +40,8 @@ test('#1239: reused cancel helper identity and celebration names match #1220', (
     assert.equal(source.nationId, 'varkand', name);
   }
   assert.equal(worldFestivalSources.find(s => s.name === 'Mandate Plebiscite').nationId, 'varkand');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 68, 'no new flag; GRAY unchanged');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), CANCELS);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 70, '#1239 adds no flag; GRAY 70 after #1242');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), CANCELS);
   assert.equal(flagOn({ [CANCELS]: 'true' }, CANCELS), true);
 });
 

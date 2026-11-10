@@ -82,12 +82,12 @@ test('the flag is preview true and production false, second to last in HARIMU_GR
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 69);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 70);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
