@@ -195,6 +195,8 @@
       "HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED": "true",
       // #1220: Varkand celebrations on the government read are marked canceled at a stored Red Alert. Off: the read is unchanged. Dates stay put. The Mandate Plebiscite is not marked.
       "HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED": "true",
+      // #1241: Brasswell Port is a Kindle resident city (home, enroll, travel-by-id). Not an Assembly district and not a country-map pin. Off: the city is absent.
+      "HARIMU_KINDLE_BRASSWELL_PORT_ENABLED": "true",
       // #1244: Veldwood next midsummer Ring Moot (once per game year = 30 real days, midsummer offset 11.25 days). Off: no ringMoot key. Date only.
       "HARIMU_VELDWOOD_RING_MOOT_ENABLED": "true"
     },
