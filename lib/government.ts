@@ -18,6 +18,7 @@ import { MERIDIAN_CONGRESS_INTERVAL_DAYS, MERIDIAN_PARAMOUNT_LEADER_ROLES, MERID
 import { ILMAR_FEAST_OF_FIRST_LIGHT_CYCLE_DAYS, ilmarNextFeastOfFirstLightAt } from './ilmar-feast-of-first-light.ts';
 import { ILMAR_GREAT_PILGRIMAGE_CYCLE_DAYS, ilmarNextGreatPilgrimageAt } from './ilmar-great-pilgrimage.ts';
 import { ILMAR_ASSEMBLY_ELECTION_DAY_CYCLE_DAYS, ilmarNextAssemblyElectionDayAt } from './ilmar-assembly-election-day.ts';
+import { ILMAR_CLEARING_CYCLE_DAYS, ilmarNextClearingAt } from './ilmar-clearing.ts';
 import { ILMAR_LONG_LIGHT_CYCLE_DAYS, ilmarNextLongLightAt } from './ilmar-long-light.ts';
 import { ILMAR_COUNCIL_OF_ELDERS_SEATS, ILMAR_ORACLE_TERM, ilmarIsStillday, ilmarNextGreatPilgrimageAt as ilmarSanctumNextGreatPilgrimageAt, ilmarNextStilldayAt } from './ilmar-sanctum.ts';
 import { ilmarPrismContracts, type IlmarPrismContract } from './ilmar-prism-contracts.ts';
@@ -90,6 +91,8 @@ export type GovernmentSnapshot = {
   greatPilgrimage?: { nextAt: number; cycleDays: 30 };
   /** #1212 Ilmar: next Assembly Election day on a 120-real-day cycle. Present only while HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED is on. Holds the next date only. */
   assemblyElectionDay?: { nextAt: number; cycleDays: 120 };
+  /** #1245 Ilmar: next Clearing (Lumen Canon new year) on a 30-real-day cycle. Present only while HARIMU_ILMAR_CLEARING_ENABLED is on. Holds the next date only. */
+  clearing?: { nextAt: number; cycleDays: 30 };
   /** #1260 Ilmar: next Long Light midsummer vigil (once per game year = 30 real days, midsummer offset). Present only while HARIMU_ILMAR_LONG_LIGHT_ENABLED is on. Date only. */
   longLight?: { nextAt: number; cycleDays: 30 };
   /** #1139 Ilmar: Prism contracts, each with a title and a whole-number profit share. Present only while HARIMU_ILMAR_PRISM_CONTRACTS_ENABLED is on. */
@@ -927,6 +930,27 @@ export function ilmarAssemblyElectionDaySnapshot(nowMs: number, enabled: boolean
   }, nowMs, true);
 }
 
+/** #1245. Flag off, or any nation but Ilmar: the same snapshot, and no clearing key. Holds the next date only. */
+export function withIlmarClearing(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
+  return { ...snapshot, clearing: { nextAt: ilmarNextClearingAt(nowMs), cycleDays: ILMAR_CLEARING_CYCLE_DAYS as 30 } };
+}
+
+/** Ilmar read while only the Clearing flag is on. No sanctum, feast, contracts, greatPilgrimage, or assemblyElectionDay key. Flag off returns null, which is today's read. */
+export function ilmarClearingSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withIlmarClearing({
+    nationId: 'ilmar', mode: 'rule-bound simulation',
+    roles: [{ name: 'Clearing', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Clearing', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Clearing is the Lumen Canon new-year renewal of vows. It falls once per game year, every 30 real days. This read names the next date. It records no vows, changes no Piety, lists no clergy, and proposes no spending.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'This read names the next Clearing. It records no vows and lists no clergy.',
+  }, nowMs, true);
+}
+
 /** #1260. Flag off, or any nation but Ilmar: the same snapshot, and no longLight key. Holds the next date only. */
 export function withIlmarLongLight(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'ilmar') return snapshot;
@@ -947,7 +971,6 @@ export function ilmarLongLightSnapshot(nowMs: number, enabled: boolean): Governm
     influenceSummary: 'This read names the next Long Light. It holds no vigil and lists no clergy.',
   }, nowMs, true);
 }
-
 /** Veldwood read while only the Dividend Day flag is on. No federalCouncil or voteDayCalendar key. Flag off returns null, which is today's read. */
 export function veldwoodDividendDaySnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
   if (!enabled) return null;

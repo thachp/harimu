@@ -1,7 +1,7 @@
 /** #1260: Ilmar next Long Light midsummer vigil on the government read.
- *  Flag HARIMU_ILMAR_LONG_LIGHT_ENABLED, packed last in HARIMU_GRAY_PACK (GRAY 72 on origin/dev 43ca2f1b;
- *  provisional: lands ~75 after #1251 Clearing, #1258 Dunmorrow, and #1259 Corvel Isles).
- *  Flag off: no longLight key, including when the Sanctum calendar flag is on. Date only: no vigil, vows, Piety, or clergy.
+ *  Flag HARIMU_ILMAR_LONG_LIGHT_ENABLED, packed last in HARIMU_GRAY_PACK (GRAY 73 on origin/dev 56fddc6c;
+ *  #1245 Clearing is at(-2)). Flag off: no longLight key, including when the Sanctum or Clearing flag is on.
+ *  Date only: no vigil, vows, Piety, or clergy.
  *  The zzzzzzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzzzzzz- so --test-shard does not move earlier files. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -148,11 +148,12 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), key);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), key);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_AURELLE_KITE_FESTIVAL_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 72);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_CLEARING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_AURELLE_KITE_FESTIVAL_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 73);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
@@ -167,7 +168,9 @@ test('flag off: the Ilmar government read is unchanged; flag on adds longLight; 
   const sanctumOnly = await gov.readGovernment(r.db, 'ilmar', seconds, 'alice', { readOnly: true, ilmarSanctum: true });
   assert.equal('longLight' in sanctumOnly, false, 'Sanctum on, Long Light off: no longLight key');
   assert.equal('sanctum' in sanctumOnly, true);
-  // #1251 Clearing is not on this tip; HARIMU_ILMAR_CLEARING_ENABLED in the pack must not invent a longLight key.
+  const clearingOnly = await gov.readGovernment(r.db, 'ilmar', seconds, 'alice', { readOnly: true, ilmarClearing: true });
+  assert.equal('longLight' in clearingOnly, false, 'Clearing on, Long Light off: no longLight key');
+  assert.equal('clearing' in clearingOnly, true);
   const feastOnly = await gov.readGovernment(r.db, 'ilmar', seconds, 'alice', { readOnly: true, ilmarFeastOfFirstLight: true });
   assert.equal('longLight' in feastOnly, false, 'Feast on, Long Light off: no longLight key');
   const pilgrimageOnly = await gov.readGovernment(r.db, 'ilmar', seconds, 'alice', { readOnly: true, ilmarGreatPilgrimage: true });
@@ -187,15 +190,17 @@ test('flag off: the Ilmar government read is unchanged; flag on adds longLight; 
   assert.equal('greatPilgrimage' in on, false);
   assert.equal('assemblyElectionDay' in on, false);
   assert.equal('contracts' in on, false);
+  assert.equal('clearing' in on, false, 'Long Light alone does not add the Clearing key');
   const together = await gov.readGovernment(r.db, 'ilmar', seconds, 'alice', {
     readOnly: true, ilmarSanctum: true, ilmarFeastOfFirstLight: true, ilmarGreatPilgrimage: true,
-    ilmarAssemblyElectionDay: true, ilmarPrismContracts: true, ilmarLongLight: true,
+    ilmarAssemblyElectionDay: true, ilmarPrismContracts: true, ilmarClearing: true, ilmarLongLight: true,
   });
   assert.deepEqual(together.longLight, expected);
   assert.equal(together.sanctum.nextStilldayAt, sanctumOnly.sanctum.nextStilldayAt);
   assert.equal(together.feastOfFirstLight.nextAt, feastOnly.feastOfFirstLight.nextAt);
   assert.equal(together.greatPilgrimage.nextAt, pilgrimageOnly.greatPilgrimage.nextAt);
   assert.equal(together.assemblyElectionDay.nextAt, electionOnly.assemblyElectionDay.nextAt);
+  assert.equal(together.clearing.nextAt, clearingOnly.clearing.nextAt);
   for (const nationId of ['kindle', 'korund', 'aurelle', 'meridian', 'varkand', 'veldwood', 'fulmara', 'confluence']) {
     const other = await gov.readGovernment(r.db, nationId, seconds, 'bob', { readOnly: true, ilmarLongLight: true });
     assert.equal(other == null || !('longLight' in other), true, nationId);
@@ -219,17 +224,19 @@ test('flag off: the Ilmar government read is unchanged; flag on adds longLight; 
   r.setFixtureEnv(key, undefined);
   const bothFlags = (await r.call('citizen', 'alice')).data.government;
   assert.deepEqual(bothFlags.longLight, expected);
+  assert.equal('clearing' in bothFlags, true);
   assert.equal(bothFlags.sanctum.nextStilldayAt, sanctumOnly.sanctum.nextStilldayAt);
   assert.equal(bothFlags.feastOfFirstLight.nextAt, feastOnly.feastOfFirstLight.nextAt);
   assert.equal(bothFlags.greatPilgrimage.nextAt, pilgrimageOnly.greatPilgrimage.nextAt);
   assert.equal(bothFlags.assemblyElectionDay.nextAt, electionOnly.assemblyElectionDay.nextAt);
-  // Sanctum + Clearing pack bits on, Long Light off: no longLight key (Clearing itself is not wired on this tip).
+  // Sanctum + Clearing pack bits on, Long Light off: no longLight key. Clearing is wired (#1251 landed).
   r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({
     HARIMU_ILMAR_SANCTUM_CALENDAR_ENABLED: 'true', HARIMU_ILMAR_CLEARING_ENABLED: 'true',
   }));
   const sanctumClearingOff = (await r.call('citizen', 'alice')).data.government;
   assert.equal('longLight' in sanctumClearingOff, false, 'Sanctum/Clearing flags on, Long Light flag off: no longLight key');
   assert.equal('sanctum' in sanctumClearingOff, true);
+  assert.equal('clearing' in sanctumClearingOff, true);
   const other = (await r.call('citizen', 'bob')).data.government;
   assert.equal(other == null || !('longLight' in other), true);
 });
