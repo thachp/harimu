@@ -3,7 +3,7 @@ import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunmorrowEnv,bindMarrowMillsEnv,bindRuelWorksEnv,bindThessalyWellsEnv,bindVakkHarborEnv} from '@/lib/cities'; // #1241, #1242, #1259, #1261, #1270, #1271, #1275, #1279
+import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunkarPassEnv,bindDunmorrowEnv,bindMarrowMillsEnv,bindRuelWorksEnv,bindThessalyWellsEnv,bindVakkHarborEnv} from '@/lib/cities'; // #1241, #1242, #1259, #1261, #1270, #1271, #1275, #1279, #1282
 import {readCityLocation} from '@/lib/city-location';
 import {readVarkandAlert,varkandAlertEnabled} from '@/lib/varkand-alert'; // #1081
 import {homeMoveCooldownSeconds,homeMoveCurrency,homeMoveFeeMinor,moveHomeCity,nextHomeMoveAt,readPermitForCity,requestInternalPermit,requiresInternalPermit,type VarkandAlert} from '@/lib/home-move';
@@ -15,6 +15,7 @@ bindRuelWorksEnv(env); // #1270: a home move can name Ruel Works only while the 
 bindThessalyWellsEnv(env); // #1271: a home move can name Thessaly Wells only while the flag is on
 bindMarrowMillsEnv(env); // #1275: a home move can name Marrow Mills only while the flag is on
 bindDaoWorksEnv(env); // #1279: a home move can name Dao Works only while the flag is on
+bindDunkarPassEnv(env); // #1282: a home move can name Dunkar Pass only while the flag is on
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 // #781: flag off is a 404 before auth and before any database read.

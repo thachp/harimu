@@ -220,7 +220,9 @@
       // #1275: Marrow Mills is a Veldwood resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No festival host line, no imports, no sea-lane effect. Off: the city is absent.
       "HARIMU_VELDWOOD_MARROW_MILLS_ENABLED": "true",
       // #1279: Dao Works is a Meridian resident city (home, enroll, travel-by-id). Not a country-map pin. Off: the city is absent.
-      "HARIMU_MERIDIAN_DAO_WORKS_ENABLED": "true"
+      "HARIMU_MERIDIAN_DAO_WORKS_ENABLED": "true",
+      // #1282: Dunkar Pass is a Varkand resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No garrison duty, key defense, or war-value hooks. Off: the city is absent.
+      "HARIMU_VARKAND_DUNKAR_PASS_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
