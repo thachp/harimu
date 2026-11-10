@@ -11,11 +11,17 @@ export function HeaderStatChips({ stats }: { stats?: PanelStat[] | null }) {
   if (!stats?.length) return null;
   return <dl className="panel-v2-header-stats">{stats.map(stat => <div key={stat.id ?? stat.label}><dt>{stat.icon && <span className="panel-v2-icon" aria-hidden="true">{stat.icon}</span>}{stat.spoken && <span className="panel-v2-header-spoken">{stat.spoken}</span>}<span aria-hidden={stat.spoken ? true : undefined}>{stat.label}</span></dt><dd>{stat.value}{stat.detail ? <small>{stat.detail}</small> : null}</dd></div>)}</dl>;
 }
-export function PanelV2({ title, subtitle, stats, rows, rowsLabel, primary, headerStats }: { title: string; subtitle?: string; stats: PanelStat[]; rows: PanelRow[]; rowsLabel: string; primary?: { label: string; ariaLabel?: string; icon?: ReactNode; onSelect: () => void; tone?: 'primary' | 'secondary' }; headerStats?: PanelStat[] }) {
-  return <section className="panel-v2" aria-label={title}>
-    <header className="panel-v2-summary"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><HeaderStatChips stats={headerStats} /></header>
+type PanelPrimary = { label: string; ariaLabel?: string; icon?: ReactNode; onSelect: () => void; tone?: 'primary' | 'secondary' };
+function panelPrimary(primary: PanelPrimary) {
+  return <button type="button" className={primary.tone === 'secondary' ? 'panel-v2-secondary' : 'panel-v2-primary'} aria-label={primary.ariaLabel} onClick={primary.onSelect}>{primary.icon && <span className="panel-v2-icon" aria-hidden="true">{primary.icon}</span>}<span>{primary.label}</span><CaretRight size={18} aria-hidden="true" /></button>;
+}
+/** #392 UI 44: City identity adds an optional mark, tagline, and kicker. Other panels omit them, so their markup stays as it is. */
+export function PanelV2({ title, subtitle, stats, rows, rowsLabel, primary, headerStats, mark, tagline, primaryKicker }: { title: string; subtitle?: string; stats: PanelStat[]; rows: PanelRow[]; rowsLabel: string; primary?: PanelPrimary; headerStats?: PanelStat[]; mark?: ReactNode; tagline?: string | null; primaryKicker?: string | null }) {
+  const city = Boolean(mark || tagline || primaryKicker);
+  return <section className={city ? 'panel-v2 panel-v2-city' : 'panel-v2'} aria-label={title}>
+    <header className={mark || tagline ? 'panel-v2-summary panel-v2-city-head' : 'panel-v2-summary'}>{mark ? <span className="panel-v2-city-mark" aria-hidden="true">{mark}</span> : null}<div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{tagline ? <p className="panel-v2-city-tagline">{tagline}</p> : null}<HeaderStatChips stats={headerStats} /></header>
     {stats.length > 0 && <dl className={stats.some(stat => stat.icon) ? 'panel-v2-stats panel-v2-facts' : 'panel-v2-stats'}>{stats.map(stat => <div key={stat.label}><dt>{stat.icon && <span className="panel-v2-icon" aria-hidden="true">{stat.icon}</span>}{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>}
     {rows.length > 0 && <ul className="panel-v2-rows" aria-label={rowsLabel}>{rows.map(row => <li key={row.id}><button type="button" aria-pressed={row.pressed} onClick={row.onSelect}>{row.icon && <span className="panel-v2-icon" aria-hidden="true">{row.icon}</span>}<span><strong>{row.label}</strong>{row.detail && <small>{row.detail}</small>}</span><CaretRight size={18} aria-hidden="true" /></button></li>)}</ul>}
-    {primary && <button type="button" className={primary.tone === 'secondary' ? 'panel-v2-secondary' : 'panel-v2-primary'} aria-label={primary.ariaLabel} onClick={primary.onSelect}>{primary.icon && <span className="panel-v2-icon" aria-hidden="true">{primary.icon}</span>}<span>{primary.label}</span><CaretRight size={18} aria-hidden="true" /></button>}
+    {primary ? primaryKicker ? <div className="panel-v2-city-action"><p className="panel-v2-city-kicker">{primaryKicker}</p>{panelPrimary(primary)}</div> : panelPrimary(primary) : null}
   </section>;
 }

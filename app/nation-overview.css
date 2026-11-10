@@ -25,3 +25,8 @@
 .game-inspector-body .nation-overview button.nation-overview-secondary:not(.market-item):hover:not(:disabled){background:#235d66;border-color:#75b7b4;color:#e1f2ef}
 .game-inspector-body .nation-overview .nation-overview-actions>button.world-atlas-primary:not(.market-item),.game-inspector-body .nation-overview .nation-overview-actions>button.nation-overview-secondary:not(.market-item){display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:1 1 0;width:auto;min-width:0;max-width:100%;min-height:44px}
 @media (max-width:390px){.game-inspector-body .nation-overview .nation-overview-actions>button.world-atlas-primary:not(.market-item),.game-inspector-body .nation-overview .nation-overview-actions>button.nation-overview-secondary:not(.market-item){flex-basis:100%;width:100%}}
+/* #392 UI 45. The motto sits to the right of the title, in the same gold italic as the City tagline. It wraps on words.
+   break-word, never inside a letter. Flag off keeps .nation-overview-motto in the title column. */
+.game-inspector-body .nation-overview-head-tagline{display:grid;grid-template-columns:auto minmax(0,max-content) minmax(0,1fr);align-items:center;column-gap:12px;row-gap:10px}
+.game-inspector-body .nation-overview-head-tagline>.panel-v2-header-stats{grid-column:1 / -1}
+.game-inspector-body .nation-overview p.nation-overview-tagline{margin:0;color:#f1d58a;font-family:Georgia,serif;font-style:italic;font-size:calc(13px * var(--text-scale, 1));font-weight:500;line-height:1.35;text-align:right;overflow-wrap:break-word;word-break:normal;hyphens:manual}

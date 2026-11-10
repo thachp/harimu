@@ -91,8 +91,8 @@ test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, a
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 77); // GRAY 77: #1261 Vakk Harbor is 76, #1279 Dao Works is last
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 80); // GRAY 80: #1275 Marrow Mills is 79, #1279 Dao Works is last
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);

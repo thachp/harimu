@@ -3,9 +3,12 @@ import {getDatabase} from '@/lib/db';
 import {startCityTravel} from '@/lib/travel';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunmorrowEnv,bindVakkHarborEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1261 port, #1279 Dao Works
+import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunmorrowEnv,bindMarrowMillsEnv,bindRuelWorksEnv,bindThessalyWellsEnv,bindVakkHarborEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1261 port, #1270 Ruel Works, #1271 Thessaly Wells, #1275 Marrow Mills, #1279 Dao Works
 import {aurelleNextHearthNightAt} from '@/lib/aurelle-hearth-night'; // #1146 clock, read only
+import {confluenceNextCanalFestivalAt} from '@/lib/confluence-canal-festival'; // #1165 clock, read only
 import {fulmaraNextGrandRegattaAt} from '@/lib/fulmara-grand-regatta'; // #1178 clock, read only
+import {hoarvaleNextAuroraNightAt} from '@/lib/hoarvale-aurora-night'; // #1160 clock, read only
+import {meridianNextTurbineDayAt} from '@/lib/meridian-turbine-day'; // #1175 clock, read only
 import {spaWcBonusEnabled,spaWcNote} from '@/lib/spa-recovery'; // #798
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
@@ -18,6 +21,9 @@ bindBrasswellPortEnv(env); // #1241: resident lookup reads the Worker env; flag 
 bindCorvelIslesEnv(env); // #1259: resident lookup reads the Worker env; flag off adds no city
 bindDunmorrowEnv(env); // #1242: resident lookup reads the Worker env; flag off adds no city
 bindVakkHarborEnv(env); // #1261: same for Vakk Harbor. Flag off adds no city.
+bindRuelWorksEnv(env); // #1270: resident lookup reads the Worker env; flag off adds no city
+bindThessalyWellsEnv(env); // #1271: resident lookup reads the Worker env; flag off adds no city
+bindMarrowMillsEnv(env); // #1275: resident lookup reads the Worker env; flag off adds no city
 bindDaoWorksEnv(env); // #1279: same for Dao Works. Flag off adds no city.
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -64,7 +70,7 @@ export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads,...hearthHost(ctx.nationId,location.currentCityId,ctx.now),...regattaHost(ctx.nationId,location.currentCityId,ctx.now)}));
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads,...hearthHost(ctx.nationId,location.currentCityId,ctx.now),...regattaHost(ctx.nationId,location.currentCityId,ctx.now),...festivalHost(ctx.nationId,location.currentCityId,ctx.now)}));
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
@@ -86,13 +92,23 @@ export async function POST(request:Request){
  if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads,...hearthHost(ctx.nationId,current.currentCityId,ctx.now),...regattaHost(ctx.nationId,current.currentCityId,ctx.now)}));
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads,...hearthHost(ctx.nationId,current.currentCityId,ctx.now),...regattaHost(ctx.nationId,current.currentCityId,ctx.now),...festivalHost(ctx.nationId,current.currentCityId,ctx.now)}));
 }
 const spaField=(nationId:string,homeCityId:string,currentCityId:string)=>spaWcBonusEnabled(env)&&cityForNation(nationId,homeCityId)?.spa&&currentCityId===homeCityId?{spaWcNote}:{};
 /** #1259: one read-only line on Corvel Isles. Both flags on, else no keys. The date is the #1178 clock (same nextAt as the government read). */
 const regattaHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='fulmara'&&cityId==='corvel-isles'&&flagOn(env,CORVEL_ISLES_FLAG)&&flagOn(env,'HARIMU_FULMARA_GRAND_REGATTA_ENABLED')?{grandRegattaNote:CORVEL_ISLES_REGATTA_NOTE,grandRegattaNextAt:fulmaraNextGrandRegattaAt(nowSeconds*1000)}:{};
 /** #1242: one read-only line on Dunmorrow. Both flags on, else no keys. The date is the #1146 clock (same nextAt as the government read). */
 const hearthHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='aurelle'&&cityId==='dunmorrow'&&flagOn(env,DUNMORROW_FLAG)&&flagOn(env,'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED')?{hearthNightNote:DUNMORROW_HEARTH_NOTE,hearthNightNextAt:aurelleNextHearthNightAt(nowSeconds*1000)}:{};
+/** #1285: catalog cities that already host a festival. No new city flag. Both HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and that festival's flag, else no keys. The date is that festival's clock (same nextAt as the government read). */
+const festivalHosts=[
+ {nationId:'hoarvale',cityId:'isling-springs',festivalFlag:'HARIMU_HOARVALE_AURORA_NIGHT_ENABLED',note:'Hosts Aurora Night',nextAt:hoarvaleNextAuroraNightAt},
+ {nationId:'meridian',cityId:'shen-springs',festivalFlag:'HARIMU_MERIDIAN_TURBINE_DAY_ENABLED',note:'Hosts Turbine Day',nextAt:meridianNextTurbineDayAt},
+ {nationId:'confluence',cityId:'lanu-terraces',festivalFlag:'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED',note:'Hosts the Canal Festival',nextAt:confluenceNextCanalFestivalAt},
+] as const;
+const festivalHost=(nationId:string,cityId:string,nowSeconds:number)=>{
+ const row=festivalHosts.find(host=>host.nationId===nationId&&host.cityId===cityId);
+ return row&&flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')&&flagOn(env,row.festivalFlag)?{festivalHostNote:row.note,festivalHostNextAt:row.nextAt(nowSeconds*1000)}:{};
+};
 /** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads.
  *  #1078: HARIMU_WAR_PEACE_REVERT_ENABLED off does not read city_treaty_returns, so the history object stays the capture alone. */
 async function cityReads(db:Awaited<ReturnType<typeof getDatabase>>,userId:string,nationId:string,cityId:string,now:number){
