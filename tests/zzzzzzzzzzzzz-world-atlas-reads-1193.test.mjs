@@ -334,17 +334,17 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-14), F, '#1207 Rotation Day, then #1208');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-14), F);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-13), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-13), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-14), F);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-13), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-15), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-16), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-17), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-18), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 75); // GRAY 75; #1260 Long Light is last, #1259 Corvel Isles at(-2)
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-15), F, '#1207 Rotation Day, then #1208');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-15), F);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-14), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-14), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-15), F);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-14), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-16), 'HARIMU_AURELLE_CHARTER_FAIR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-17), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-18), 'HARIMU_AURELLE_CORONATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-19), 'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 76); // provisional GRAY 76; #1275 Marrow Mills is last, #1260 Long Light at(-2)
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
@@ -618,10 +618,11 @@ test('#1267: Kite Festival, Ring Moot, and Clearing are skipped while their flag
   assert.equal(ring.nextAt, veldwoodNextRingMootAt);
   assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'veldwood').map(s => s.name), ['Vote Day', 'Dividend Day', 'Ring Moot']);
   const gray = FLAG_PACKS.HARIMU_GRAY_PACK;
-  assert.equal(gray.length, 75, '#1268 adds no flag; #1260 Long Light is last, #1259 Corvel Isles at(-2)');
-  assert.equal(gray.at(-1), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
-  assert.equal(gray.at(-2), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
-  assert.equal(gray.at(-3), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
+  assert.equal(gray.length, 76, '#1268 adds no flag; #1275 Marrow Mills is last, #1260 Long Light at(-2)');
+  assert.equal(gray.at(-1), 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED');
+  assert.equal(gray.at(-2), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(gray.at(-3), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
+  assert.equal(gray.at(-4), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
   for (const flag of added) assert.equal(gray.filter(item => item === flag).length, 1, flag);
   const now = Date.UTC(2026, 10, 9);
   const names = env => (worldNextFestival(now, env)?.festivals ?? []).map(item => item.name);

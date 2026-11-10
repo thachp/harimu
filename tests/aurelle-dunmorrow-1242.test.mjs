@@ -38,15 +38,15 @@ test('flag off: no resident city; flag on: religious center and heartland; catal
   clear();
 });
 
-test('the flag is at(-3) in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
+test('the flag is at(-4) in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), FLAG);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 75); // GRAY 75: #1242 Dunmorrow at(-3), #1259 Corvel Isles at(-2), #1260 Long Light is last
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), FLAG);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 76); // provisional GRAY 76: #1242 Dunmorrow at(-4), #1275 Marrow Mills is last
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);

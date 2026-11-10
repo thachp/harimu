@@ -10,6 +10,8 @@ export const CORVEL_ISLES_FLAG = 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED';
 export const CORVEL_ISLES_REGATTA_NOTE = 'Hosts the Grand Regatta';
 /** #1242: Aurelle resident religious center. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const DUNMORROW_FLAG = 'HARIMU_AURELLE_DUNMORROW_ENABLED';
+/** #1275: Veldwood resident industry / boats city. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
+export const MARROW_MILLS_FLAG = 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED';
 /** #1242: the one city-panel line. The next date is the #1146 clock, shown only when that flag is also on. */
 export const DUNMORROW_HEARTH_NOTE = 'Hosts Hearth Night';
 // Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
@@ -49,13 +51,18 @@ const corvelIsles: City = { id: 'corvel-isles', nationId: 'fulmara', name: 'Corv
 /** #1242: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not on the country map (that map is three fixed pins) and citiesForNation stays capital + two.
  *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Hearth of the Houses landmark stays off this line, as Emberwell's description omits The Ember Pools. */
 const dunmorrow: City = { id: 'dunmorrow', nationId: 'aurelle', name: 'Dunmorrow', capital: false, role: 'Religious center', description: 'Kinward name-stone halls in white stone along the eastern gorge.' };
+/** #1275: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not on the country map (that map is three fixed pins) and citiesForNation stays capital plus two.
+ *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Boat Hall landmark stays off this line, as Brasswell's description omitted the Lighthouse of the Spark. */
+const marrowMills: City = { id: 'marrow-mills', nationId: 'veldwood', name: 'Marrow Mills', capital: false, role: 'Industry / boats', description: 'Heartwood boat halls on the river in the eastern river valley.' };
 let boundEnv: unknown;
 let corvelBound: unknown;
 let dunmorrowBound: unknown;
+let marrowMillsBound: unknown;
 /** Routes pass the Worker env. Unset: node tests use process.env. A bound env wins, including "false". */
 export function bindBrasswellPortEnv(env: unknown) { boundEnv = env; }
 export function bindCorvelIslesEnv(env: unknown) { corvelBound = env; }
 export function bindDunmorrowEnv(env: unknown) { dunmorrowBound = env; }
+export function bindMarrowMillsEnv(env: unknown) { marrowMillsBound = env; }
 function brasswellPortEnabled(): boolean {
   if (boundEnv !== undefined) return flagOn(boundEnv, BRASSWELL_PORT_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, BRASSWELL_PORT_FLAG); } catch { return false; }
@@ -68,14 +75,19 @@ function dunmorrowEnabled(): boolean {
   if (dunmorrowBound !== undefined) return flagOn(dunmorrowBound, DUNMORROW_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, DUNMORROW_FLAG); } catch { return false; }
 }
+function marrowMillsEnabled(): boolean {
+  if (marrowMillsBound !== undefined) return flagOn(marrowMillsBound, MARROW_MILLS_FLAG);
+  try { return typeof process !== 'undefined' && flagOn(process.env, MARROW_MILLS_FLAG); } catch { return false; }
+}
 const portResidents = (): readonly City[] => brasswellPortEnabled() ? [brasswellPort] : [];
 const corvelResidents = (): readonly City[] => corvelIslesEnabled() ? [corvelIsles] : [];
 const dunmorrowResidents = (): readonly City[] => dunmorrowEnabled() ? [dunmorrow] : [];
+const marrowMillsResidents = (): readonly City[] => marrowMillsEnabled() ? [marrowMills] : [];
 const byId = (nationId: string, cityId: string) => (city: City) => city.nationId === nationId && city.id === cityId;
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
-/** Catalog cities plus spa additions a citizen may call home (#798), plus Brasswell Port when its flag is on (#1241), plus Dunmorrow when its flag is on (#1242), plus Corvel Isles when its flag is on (#1259). */
-export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId)]; }
-export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)); }
+/** Catalog cities plus spa additions a citizen may call home (#798), plus Brasswell Port when its flag is on (#1241), plus Dunmorrow when its flag is on (#1242), plus Corvel Isles when its flag is on (#1259), plus Marrow Mills when its flag is on (#1275). */
+export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...marrowMillsResidents().filter(city => city.nationId === nationId)]; }
+export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? marrowMillsResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
 
 /** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its

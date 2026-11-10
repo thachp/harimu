@@ -16,7 +16,7 @@ import { NationOverview } from './nation-overview';
 import { WorldAtlas } from './world-atlas';
 import { nationOverviewEnabled } from '@/lib/nation-overview';
 import { HomeMoveCard } from './home-move-card'; // #781
-import { bindBrasswellPortEnv, bindCorvelIslesEnv, bindDunmorrowEnv, BRASSWELL_PORT_FLAG, capitalCityForNation, cityForNation, CORVEL_ISLES_FLAG, DUNMORROW_FLAG, residentCitiesForNation } from '@/lib/cities';
+import { bindBrasswellPortEnv, bindCorvelIslesEnv, bindDunmorrowEnv, bindMarrowMillsEnv, BRASSWELL_PORT_FLAG, capitalCityForNation, cityForNation, CORVEL_ISLES_FLAG, DUNMORROW_FLAG, MARROW_MILLS_FLAG, residentCitiesForNation } from '@/lib/cities';
 import type { CityLocation, CoResident } from '@/lib/city-location';
 import { NationComparison } from './nation-comparison';
 import { createGuestDemo, guestDemoAction, type GuestDemoAction } from '@/lib/guest-demo';
@@ -487,7 +487,7 @@ function ClerkAccountControl() {
 type CitizenSnapshot = {
   /** #872: present only when a flag-opened nation is playable for this account (nationPlayable). */
   openNations?: string[];
-  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; armyMap?: boolean; civicRank?: boolean; kindleBudget?: boolean; enrollHomeCity?: boolean; brasswellPort?: boolean; dunmorrow?: boolean; corvelIsles?: boolean };
+  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; armyMap?: boolean; civicRank?: boolean; kindleBudget?: boolean; enrollHomeCity?: boolean; brasswellPort?: boolean; dunmorrow?: boolean; corvelIsles?: boolean; marrowMills?: boolean };
   civicRank?: CivicRank;
   firstWeek?: { completed: string[] } | null;
   profile: {
@@ -1385,7 +1385,7 @@ export default function Home() {
     if ('cycleStartAt' in snapshot) setCycleStartAt(typeof snapshot.cycleStartAt === 'number' ? snapshot.cycleStartAt : null); // #969
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
-    if (snapshot.flags) { bindBrasswellPortEnv({ [BRASSWELL_PORT_FLAG]: snapshot.flags.brasswellPort === true ? 'true' : 'false' }); bindDunmorrowEnv({ [DUNMORROW_FLAG]: snapshot.flags.dunmorrow === true ? 'true' : 'false' }); bindCorvelIslesEnv({ [CORVEL_ISLES_FLAG]: snapshot.flags.corvelIsles === true ? 'true' : 'false' }); setBudgetFlag(snapshot.flags.kindleBudget === true); setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setArmyMapFlag(snapshot.flags.armyMap === true); setEnrollHomeCity(snapshot.flags.enrollHomeCity === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle. #1241, #1242, and #1259: each resident list follows its own flag; absent while off
+    if (snapshot.flags) { bindBrasswellPortEnv({ [BRASSWELL_PORT_FLAG]: snapshot.flags.brasswellPort === true ? 'true' : 'false' }); bindDunmorrowEnv({ [DUNMORROW_FLAG]: snapshot.flags.dunmorrow === true ? 'true' : 'false' }); bindCorvelIslesEnv({ [CORVEL_ISLES_FLAG]: snapshot.flags.corvelIsles === true ? 'true' : 'false' }); bindMarrowMillsEnv({ [MARROW_MILLS_FLAG]: snapshot.flags.marrowMills === true ? 'true' : 'false' }); setBudgetFlag(snapshot.flags.kindleBudget === true); setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setArmyMapFlag(snapshot.flags.armyMap === true); setEnrollHomeCity(snapshot.flags.enrollHomeCity === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle. #1241, #1242, #1259, and #1275: each resident list follows its own flag; absent while off
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
