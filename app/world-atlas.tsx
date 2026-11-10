@@ -1,5 +1,5 @@
 'use client';
-import { Bank, Clock, Coins, Confetti, Crown, Globe, Grains, Scales, Users } from '@phosphor-icons/react';
+import { Bank, Clock, Coins, Confetti, Crown, Globe, Grains, Scales, ShieldCheck, Users } from '@phosphor-icons/react';
 import { worldAtlasCard, worldAtlasEnabled, worldAtlasStats, worldExploreEnabled, type WorldAtlasClock, type WorldAtlasDisputes, type WorldAtlasNation } from '@/lib/world-atlas';
 import { worldAtlasExploreKicker, worldAtlasIdentityEnabled, worldAtlasIdentityTagline, WORLD_ATLAS_IDENTITY_KICKER, WORLD_ATLAS_IDENTITY_TITLE } from '@/lib/world-atlas-identity';
 import { worldAtlasIconsEnabled, worldAtlasStatIcon, type WorldAtlasIconKey } from '@/lib/world-atlas-icons';
@@ -7,7 +7,7 @@ import { ExplorePrimaryButton } from './explore-primary';
 import { NationCrest } from './nation-crest';
 import './world-atlas.css';
 
-const factIcons: Record<WorldAtlasIconKey, typeof Crown> = { Globe, Clock, Scales, Users, Bank, Crown, Grains, Coins, Confetti };
+const factIcons: Record<WorldAtlasIconKey, typeof Crown> = { Globe, Clock, Scales, Users, Bank, Crown, Grains, Coins, Confetti, ShieldCheck };
 
 export function WorldAtlasFactIcon({ label }: { label: string }) {
   const mark = worldAtlasStatIcon(label);

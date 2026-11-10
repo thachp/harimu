@@ -18,11 +18,11 @@ export const WORLD_ATLAS_STAT_ICONS = {
   'Open disputes': 'Scales',
   'Next festival': 'Confetti',
   Population: 'Users',
-  Capital: 'Bank',
-  Government: 'Crown',
+  Capital: 'Crown',
+  Government: 'Bank',
   Economy: 'Grains',
   Currency: 'Coins',
-  Stability: 'Scales',
+  Stability: 'ShieldCheck',
 } as const;
 export type WorldAtlasIconKey = (typeof WORLD_ATLAS_STAT_ICONS)[keyof typeof WORLD_ATLAS_STAT_ICONS];
 

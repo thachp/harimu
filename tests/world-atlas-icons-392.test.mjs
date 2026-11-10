@@ -51,13 +51,18 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 4
 test('existing stat labels map to icon keys and an unknown label maps to null', () => {
   const labels = worldAtlasStats(full).map(row => row.label);
   assert.deepEqual(labels, Object.keys(WORLD_ATLAS_STAT_ICONS));
-  assert.deepEqual(labels.map(worldAtlasStatIcon), ['Globe', 'Clock', 'Scales', 'Confetti', 'Users', 'Bank', 'Crown', 'Grains', 'Coins', 'Scales']);
-  assert.equal(WORLD_ATLAS_STAT_ICONS.Capital, 'Bank');
-  assert.equal(WORLD_ATLAS_STAT_ICONS.Government, 'Crown');
+  assert.deepEqual(labels.map(worldAtlasStatIcon), ['Globe', 'Clock', 'Scales', 'Confetti', 'Users', 'Crown', 'Bank', 'Grains', 'Coins', 'ShieldCheck']);
+  assert.equal(WORLD_ATLAS_STAT_ICONS.Capital, 'Crown');
+  assert.equal(WORLD_ATLAS_STAT_ICONS.Government, 'Bank');
   assert.equal(WORLD_ATLAS_STAT_ICONS.Economy, 'Grains');
   assert.equal(WORLD_ATLAS_STAT_ICONS.Currency, 'Coins');
-  assert.equal(WORLD_ATLAS_STAT_ICONS.Stability, 'Scales');
+  assert.equal(WORLD_ATLAS_STAT_ICONS.Stability, 'ShieldCheck');
   for (const label of ['Faith', 'Treasury', 'Law', 'capital', 'Epoch', '']) assert.equal(worldAtlasStatIcon(label), null, label);
+});
+
+test('known labels use distinct icons', () => {
+  const keys = Object.values(WORLD_ATLAS_STAT_ICONS);
+  assert.equal(new Set(keys).size, keys.length);
 });
 
 const bundle = async (icons, atlas = 'true') => {
