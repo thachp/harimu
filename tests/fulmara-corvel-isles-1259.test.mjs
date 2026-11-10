@@ -51,17 +51,18 @@ test('flag off: no resident city; flag on: port resident, imports, heartland; ca
   clear();
 });
 
-test('the flag is GRAY 74 in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
+test('the flag is at(-3) in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-2), FLAG);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-2), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 75); // GRAY 75: #1245 Clearing is 72, #1242 Dunmorrow is 73, #1259 Corvel Isles is 74, #1271 Thessaly Wells is last
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), FLAG);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 76); // GRAY 76: #1245 Clearing is 72, #1242 Dunmorrow is 73, #1259 Corvel Isles is 74, #1260 Long Light is 75, #1271 Thessaly Wells is last
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);
