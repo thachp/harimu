@@ -1,5 +1,6 @@
 import { crestEdge, crestInset, crestShield, crestViewBox, nationCrest, nationCrestLabel, uiV2CrestEnabled } from '../lib/nation-crests';
 import { nationMark } from '../lib/nation-themes';
+import { NationSymbol } from './nation-symbol';
 /** #392 S1: the nation crest (shield + documented emblem motif, placeholder vector). Reuses the #79 mark for its pattern and name. `size` is in px at 100% text and scales with --text-scale.
  *  Decorative for assistive tech (QA2 #534): the nation name beside it already says which nation, so the svg is aria-hidden; sighted users get the label as a tooltip. Standalone use (S2/S3, no nation name beside it) passes `labelled` to expose role=img with the label instead.
  *  Renders nothing unless NEXT_PUBLIC_HARIMU_UI_V2_CREST is "true" (or `force`, for previews and tests), and nothing for ids without a crest. */
@@ -13,4 +14,11 @@ export function NationCrest({ id, size = 36, force = false, labelled = false }: 
       <path d={crest.d} fill="none" stroke={crest.mark} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   </span>;
+}
+/** #392 UI 39: crest when this nation has one. Otherwise the mark the current strip already shows. No stand-in art.
+ *  The crest is decorative: the nation name is the adjacent text in the same button, so the wrapper is aria-hidden. */
+export function WorldStripMark({ id, chips }: { id: string; chips: boolean }) {
+  if (nationCrest(id) && nationMark(id)) return <span className="world-strip-crest" aria-hidden="true"><NationCrest id={id} size={30} force /></span>;
+  if (chips) return <NationCrest id={id} size={30} force />;
+  return <NationSymbol id={id} />;
 }
