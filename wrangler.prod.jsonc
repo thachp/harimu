@@ -207,6 +207,8 @@
       "HARIMU_ILMAR_CLEARING_ENABLED": "false",
       // #1242: Dunmorrow is an Aurelle resident city (home, enroll, travel-by-id). With Hearth Night also on, its city panel reads "Hosts Hearth Night" and that clock's next date. Not a country-map pin. Off: the city is absent and the panel is unchanged.
       "HARIMU_AURELLE_DUNMORROW_ENABLED": "false",
+      // #1259: Corvel Isles is a Fulmara resident city (home, enroll, travel-by-id). With the Grand Regatta also on, its city panel reads "Hosts the Grand Regatta" and that clock's next date. Not a country-map pin. Off: the city is absent and the panel is unchanged.
+      "HARIMU_FULMARA_CORVEL_ISLES_ENABLED": "false",
       // #1270: Ruel Works is a Confluence resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No festival host line, no imports, no sea-lane effect. Off: the city is absent.
       "HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED": "false"
     },

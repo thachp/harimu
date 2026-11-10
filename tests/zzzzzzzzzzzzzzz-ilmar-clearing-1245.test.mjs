@@ -1,7 +1,7 @@
 /** #1245: Ilmar next Clearing (Lumen Canon new year). Once per game year = realDaysPerGameYear (30 real days), offset 0.
  *  Flag HARIMU_ILMAR_CLEARING_ENABLED, packed in HARIMU_GRAY_PACK. Flag off: no clearing key. Date only.
  *  [ASSUMPTION] "new-year" is the game-year boundary. [ASSUMPTION] Ilmar's government read only, own flag only.
- *  Accepted on #1245. Not on the world atlas nextFestival list. */
+ *  Accepted on #1245. On the world atlas nextFestival list (#1268). Date only. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -111,12 +111,12 @@ test('the flag is preview true and production false, inside HARIMU_GRAY_PACK, an
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-8), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 74);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-9), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 75);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

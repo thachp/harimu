@@ -3,11 +3,12 @@ import {authenticatedUserId} from '@/lib/auth';
 import {getDatabase} from '@/lib/db';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {bindBrasswellPortEnv,bindDunmorrowEnv,bindRuelWorksEnv} from '@/lib/cities'; // #1241, #1242, #1270
+import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDunmorrowEnv,bindRuelWorksEnv} from '@/lib/cities'; // #1241, #1242, #1259, #1270
 import {readCityLocation} from '@/lib/city-location';
 import {readVarkandAlert,varkandAlertEnabled} from '@/lib/varkand-alert'; // #1081
 import {homeMoveCooldownSeconds,homeMoveCurrency,homeMoveFeeMinor,moveHomeCity,nextHomeMoveAt,readPermitForCity,requestInternalPermit,requiresInternalPermit,type VarkandAlert} from '@/lib/home-move';
 bindBrasswellPortEnv(env); // #1241: a home move can target the port only while the flag is on
+bindCorvelIslesEnv(env); // #1259: a home move can name Corvel Isles only while the flag is on
 bindDunmorrowEnv(env); // #1242: a home move can name Dunmorrow only while the flag is on
 bindRuelWorksEnv(env); // #1270: a home move can name Ruel Works only while the flag is on
 export const dynamic='force-dynamic';
