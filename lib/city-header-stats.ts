@@ -26,19 +26,23 @@ export function formatCityPopulation(value: unknown): string | null {
   return /^\d+$/.test(text) ? Number(text).toLocaleString('en-US') : text;
 }
 
-/** "Crown (CRN) · gold-backed" → name "Crown" and detail "CRN · gold-backed". A bare symbol ("CRN") is the value, with no detail. Empty is missing. */
+/** Shared by the City and Nation header chips.
+ *  "Crown (CRN) · gold-backed" → name "Crown" and detail "CRN · gold-backed".
+ *  "Labor Note (LN) + ration coupons" has no " · ", so the code and the words after it are the detail: "LN + ration coupons".
+ *  A bare symbol ("CRN") is the value, with no detail. Empty is missing. */
 export function cityCurrencyParts(value: unknown): { value: string; detail?: string } | null {
   if (typeof value !== 'string') return null;
   const [headRaw, ...rest] = value.split(' · ');
   const head = headRaw.trim();
   const tail = rest.join(' · ').trim();
   if (!head) return null;
-  const named = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(head);
+  const named = /^(.*?)\s*\(([^)]+)\)\s*(.*)$/.exec(head);
   if (!named) return { value: head, ...(tail ? { detail: tail } : {}) };
-  const name = named[1].trim(), symbol = named[2].trim();
+  const name = named[1].trim(), symbol = named[2].trim(), after = named[3].trim();
   const shown = name || symbol;
   if (!shown) return null;
-  const detail = [name ? symbol : '', tail].filter(Boolean).join(' · ');
+  const codeLine = [name ? symbol : '', after].filter(Boolean).join(' ');
+  const detail = [codeLine, tail].filter(Boolean).join(' · ');
   return { value: shown, ...(detail ? { detail } : {}) };
 }
 export function cityCurrencyChip(value: unknown): string | null {

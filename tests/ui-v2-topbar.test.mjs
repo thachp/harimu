@@ -40,7 +40,7 @@ test('every S2 CSS rule is scoped to .game-hud-v2, so flag off is untouched', as
 
 test('the restyle adds no copy: no new text content in the S2 block, and the Account button keeps its own label', async () => {
   const css = await read('app/game-shell.css'), block = s2Block(css).replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const m of block.matchAll(/content:\s*([^;}]+)/g)) assert.equal(m[1].trim(), "''", `S2 CSS must not inject text: ${m[1]}`);
+  for (const m of block.matchAll(/(^|[;{\s])content\s*:\s*([^;}]+)/g)) assert.equal(m[2].trim(), "''", `S2 CSS must not inject text: ${m[2]}`);
   assert.match(await read('app/account-menu.tsx'), />Account<\/button>/);
 });
 
