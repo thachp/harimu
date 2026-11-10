@@ -48,7 +48,9 @@
       "HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED": "true",
       "HARIMU_CITY_CAPTURE_HISTORY_ENABLED": "true",
       "HARIMU_SPA_WC_BONUS_ENABLED": "true",
-      "HARIMU_SEASON_SEA_LANES_ENABLED": "true"
+      "HARIMU_SEASON_SEA_LANES_ENABLED": "true",
+      // #1285: city panel "Hosts …" line for Isling Springs, Shen Springs and Lanu Terraces. Off: those keys are absent and the panel is unchanged. Also needs that city's festival flag.
+      "HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED": "true"
     },
     // #742: AI kill switch (operator control, not a feature flag). "" = off; "all" or a comma list of nation ids switches that narrative to templates (no model call, no AI spend). Unknown values fail closed to "all".
     "HARIMU_AI_TEMPLATES_ONLY": "",

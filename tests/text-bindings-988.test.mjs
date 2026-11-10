@@ -26,7 +26,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 78); // GRAY 78. #1266 Vakk Harbor is 76. #1270 Ruel Works is 77. #1271 Thessaly Wells is last. #1095 recruit term stays in HARIMU_ARMY_PACK
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.length, 9); // #1053 quartermaster, #1054 peace revert, #1095 recruit term stay inside the pack
-  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 12); // #1034 sea lanes and #1028 capture history stay inside the pack
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 13); // #1034 sea lanes and #1028 capture history stay inside the pack. #1285 festival host note is last
   assert.equal(FLAG_PACKS.HARIMU_AURELLE_PACK.length, 6);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 41); // #1039 phone map, #1040 two-tap, #1041 world Age, #1042 citizen game age, #1048 faith festival HUD, #1050 Aurelle mint parity, #1055 Korund wallet rations, #1063 Veldwood dividend countdown, #1076 nation fact rows, #1082 Varkand dispatch, #1088 Veldwood ballot booklet, #1089 Hoarvale assent, #1091 Ilmar glass edicts, #1100 Fulmara share ticker, #1104 countdown dual time, #1064 Hoarvale seal, #1124 Ilmar prism shares, #1152 Meridian party congress, #1158 clock chip and zoom controls, #1166 nation overview, #1174 globe rim, #392 city place rows, #392 world atlas, #392 selected nation glow, #392 resource bar, #392 zoom path, #392 nation accent, #392 city palette, #392 world explore, #392 crest strip, #392 city header stats, #392 nation header stats, #392 nation actions, #392 city identity stay inside the pack
   const on = { HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, HARIMU_ARMY_PACK: preview.vars.HARIMU_ARMY_PACK, HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_AURELLE_PACK: preview.vars.HARIMU_AURELLE_PACK };
@@ -47,6 +47,19 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(flagOn(on, 'HARIMU_CITY_CIVIC_UNIT_NOTE_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CITY_IMPORTS_NOTE_ENABLED'), true);
   assert.equal(flagOn(on, 'HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED'), true);
+  assert.equal(preview.vars.HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED, undefined, 'the festival host note is not its own binding');
+  assert.equal(prod.vars.HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED, undefined);
+  assert.equal(preview.vars.HARIMU_CITY_PACK.HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_CITY_PACK.HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK }, 'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED'), true);
+  assert.equal(flagOn({ HARIMU_CITY_PACK: prod.vars.HARIMU_CITY_PACK }, 'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED'), false);
+  assert.equal(expandFlagPacks(preview.vars).HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED, 'true');
+  assert.equal(expandFlagPacks(prod.vars).HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED, 'false');
+  assert.equal(flagOn({ HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED: 'false' }, 'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED'), false, 'a direct string wins over the pack');
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.at(-1), 'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_CITY_PACK).at(-1), 'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED');
+  assert.equal(Object.keys(prod.vars.HARIMU_CITY_PACK).at(-1), 'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.at(-2), 'HARIMU_SEASON_SEA_LANES_ENABLED');
   assert.equal(flagOn(on, 'HARIMU_CITY_CAPTURE_HISTORY_ENABLED'), true);
   assert.equal(expandFlagPacks(prod.vars).HARIMU_CITY_CAPTURE_HISTORY_ENABLED, 'false');
   assert.equal(expandFlagPacks(prod.vars).HARIMU_CITY_TIER_POPULATION_NOTE_ENABLED, 'false');
