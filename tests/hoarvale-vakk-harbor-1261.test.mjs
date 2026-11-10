@@ -82,17 +82,17 @@ test('Brasswell Port on with Vakk Harbor off: Hoarvale lists still exclude vakk-
   assert.equal(refused.data.reason, 'not_in_nation');
 });
 
-test('the flag is preview true and production false, at(-3) in HARIMU_GRAY_PACK, and the map stays three pins', () => {
+test('the flag is preview true and production false, at(-4) in HARIMU_GRAY_PACK, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-3), FLAG);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-3), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 78);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-4), FLAG);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-4), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 79);
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);

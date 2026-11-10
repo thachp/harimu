@@ -1,5 +1,5 @@
 /** #1245: Ilmar next Clearing (Lumen Canon new year). Once per game year = realDaysPerGameYear (30 real days), offset 0.
- *  Flag HARIMU_ILMAR_CLEARING_ENABLED, at(-7) in HARIMU_GRAY_PACK (GRAY 78; Dunkar Pass last, Ruel Works 77, Vakk Harbor 76). Flag off: no clearing key. Date only.
+ *  Flag HARIMU_ILMAR_CLEARING_ENABLED, at(-8) in HARIMU_GRAY_PACK (GRAY 79; #1260 Long Light is 75, #1266 Vakk Harbor is 76, #1270 Ruel Works is 77, #1271 Thessaly Wells is 78; Dunkar Pass is last, #1259 Corvel Isles is at(-6), #1242 Dunmorrow is at(-7)). Flag off: no clearing key. Date only.
  *  [ASSUMPTION] "new-year" is the game-year boundary. [ASSUMPTION] Ilmar's government read only, own flag only.
  *  Accepted on #1245. On the world atlas nextFestival list (#1268). Date only. */
 import assert from 'node:assert/strict';
@@ -105,18 +105,18 @@ test('flag off leaves the snapshot unchanged, and other nations gain no clearing
   assert.deepEqual(withIlmarClearing(sanctumOnly, day, true).clearing, block(ILMAR_CLEARING_CYCLE_MS));
 });
 
-test('the flag is preview true and production false, at(-7) in HARIMU_GRAY_PACK, and a direct string wins', () => {
+test('the flag is preview true and production false, at(-8) in HARIMU_GRAY_PACK, and a direct string wins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined, 'not its own text binding');
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-7), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-7), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-12), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-12), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 78);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-8), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-8), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-13), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-13), 'HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 79);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

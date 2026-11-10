@@ -1,5 +1,5 @@
 /** #1239: atlas nextFestival skips Varkand celebrations canceled at Red Alert (#1220/#1227).
- *  No new flag. Recounted on this head: GRAY 78, Dunkar Pass last; #1270 Ruel Works is 77 (at -2).
+ *  No new flag. Recounted on this head: GRAY 79, Dunkar Pass last; #1271 Thessaly Wells is 78 (at -2).
  *  Architect ruling: SKIP (do not mark canceled) in simulation.clock.nextFestival.
  *  Skipped names match #1220: Muster Day, Rotation Day, Lantern Watch. Mandate Plebiscite stays.
  *  Gate: HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED on AND HARIMU_VARKAND_ALERT_ENABLED on AND stored level red.
@@ -41,14 +41,15 @@ test('#1239: reused cancel helper identity and celebration names match #1220', (
     assert.equal(source.nationId, 'varkand', name);
   }
   assert.equal(worldFestivalSources.find(s => s.name === 'Mandate Plebiscite').nationId, 'varkand');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 78, '#1239 adds no flag');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-11), CANCELS);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), 'HARIMU_ILMAR_CLEARING_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 79, 'no new flag from #1239; #1260 Long Light is 75, #1266 Vakk Harbor is 76, #1270 Ruel Works is 77, #1271 Thessaly Wells is 78; Dunkar Pass is last');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-12), CANCELS);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-9), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_ILMAR_CLEARING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_VARKAND_DUNKAR_PASS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
   assert.equal(flagOn({ [CANCELS]: 'true' }, CANCELS), true);
 });
 

@@ -7,15 +7,17 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { bindDunkarPassEnv, bindRuelWorksEnv, citiesForNation, cityCaptureNote, cityCivicUnitNote, cityForNation, cityHasImports, cityImportsNote, citySpecialtyFields, DUNKAR_PASS_FLAG, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, RUEL_WORKS_FLAG } from '../lib/cities.ts';
-import { FLAG_PACKS } from '../lib/flag-pack.mjs';
+import { bindDunkarPassEnv, bindRuelWorksEnv, bindThessalyWellsEnv, citiesForNation, cityCaptureNote, cityCivicUnitNote, cityForNation, cityHasImports, cityImportsNote, citySpecialtyFields, DUNKAR_PASS_FLAG, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, RUEL_WORKS_FLAG, THESSALY_WELLS_FLAG } from '../lib/cities.ts';
+import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { seasonLengthMs, seasonOrder } from '../lib/game-season.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
 
 const FLAG = DUNKAR_PASS_FLAG;
+const LANTERN = 'HARIMU_VARKAND_LANTERN_WATCH_ENABLED';
+const MUSTER = 'HARIMU_VARKAND_MUSTER_DAY_ENABLED';
 const ids = ['watchfast', 'voren-light', 'moorhald'];
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
-const clear = () => { bindDunkarPassEnv(undefined); bindRuelWorksEnv(undefined); delete process.env[FLAG]; delete process.env[RUEL_WORKS_FLAG]; };
+const clear = () => { bindDunkarPassEnv(undefined); bindRuelWorksEnv(undefined); bindThessalyWellsEnv(undefined); delete process.env[FLAG]; delete process.env[RUEL_WORKS_FLAG]; delete process.env[THESSALY_WELLS_FLAG]; delete process.env[LANTERN]; delete process.env[MUSTER]; };
 const openVarkand = r => {
   r.setFixtureEnv('HARIMU_VARKAND_ENABLED', 'true');
   r.setFixtureEnv('HARIMU_NATION_READINESS_ENABLED', 'false');
@@ -68,6 +70,35 @@ test('Ruel Works on does not open Dunkar Pass', () => {
   } finally { clear(); }
 });
 
+test('Varkand Lantern Watch and Muster Day on do not open Dunkar Pass', () => {
+  clear();
+  const sibling = { [FLAG]: 'false', [LANTERN]: 'true', [MUSTER]: 'true' };
+  bindDunkarPassEnv(sibling);
+  try {
+    assert.equal(flagOn(sibling, LANTERN), true);
+    assert.equal(flagOn(sibling, MUSTER), true);
+    assert.equal(flagOn(sibling, FLAG), false);
+    assert.equal(cityForNation('varkand', 'dunkar-pass'), undefined);
+    assert.deepEqual(residentCitiesForNation('varkand').map(c => c.id), ids);
+    assert.equal(residentCitiesForNation('varkand').some(c => c.id === 'dunkar-pass'), false);
+    assert.deepEqual(citiesForNation('varkand').map(c => c.id), ids);
+  } finally { clear(); }
+});
+
+test('Thessaly Wells on does not open Dunkar Pass', () => {
+  clear();
+  const sibling = { [FLAG]: 'false', [THESSALY_WELLS_FLAG]: 'true' };
+  bindDunkarPassEnv(sibling);
+  bindThessalyWellsEnv(sibling);
+  try {
+    assert.equal(cityForNation('ilmar', 'thessaly-wells')?.id, 'thessaly-wells', 'the resident-city sibling flag is on');
+    assert.equal(cityForNation('varkand', 'dunkar-pass'), undefined);
+    assert.deepEqual(residentCitiesForNation('varkand').map(c => c.id), ids);
+    assert.equal(residentCitiesForNation('varkand').some(c => c.id === 'dunkar-pass'), false);
+    assert.deepEqual(citiesForNation('varkand').map(c => c.id), ids);
+  } finally { clear(); }
+});
+
 test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
@@ -77,9 +108,10 @@ test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, a
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-1), FLAG);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 78); // GRAY 78. #1270 Ruel Works is 77. Dunkar Pass is last
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 79); // GRAY 79. #1271 Thessaly Wells is 78. Dunkar Pass is last
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);
@@ -91,6 +123,13 @@ test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, a
 
 test('flag off: enroll, travel, home and the panel omit Dunkar Pass; flag on: resident city, and a paid home move is not_open_yet', async t => {
   const r = await localRuntime(); t.after(() => r.close());
+  r.setFixtureEnv(THESSALY_WELLS_FLAG, 'true');
+  r.setFixtureEnv(LANTERN, 'true');
+  r.setFixtureEnv(MUSTER, 'true');
+  r.setFixtureEnv(FLAG, 'false');
+  const siblingFlags = (await r.call('citizen', 'alice')).data.flags;
+  assert.equal(siblingFlags.thessalyWells, true, 'the shipped resident-city sibling is on');
+  assert.equal(siblingFlags.dunkarPass, undefined, 'Lantern Watch, Muster Day, and Thessaly Wells do not open Dunkar Pass');
   await r.db.prepare("UPDATE citizens SET nation_id='varkand' WHERE clerk_user_id='alice'").run();
   const offPanel = await r.call('city', 'alice');
   assert.equal(offPanel.data.currentCityId, 'watchfast');

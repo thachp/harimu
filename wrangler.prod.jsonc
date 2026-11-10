@@ -215,6 +215,8 @@
       "HARIMU_HOARVALE_VAKK_HARBOR_ENABLED": "false",
       // #1270: Ruel Works is a Confluence resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No festival host line, no imports, no sea-lane effect. Off: the city is absent.
       "HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED": "false",
+      // #1271: Thessaly Wells is an Ilmar resident city (home, enroll, travel-by-id). Existing specialty and heartland capture reads apply. Not a country-map pin. No imports. Off: the city is absent and the panel is unchanged.
+      "HARIMU_ILMAR_THESSALY_WELLS_ENABLED": "false",
       // #1282: Dunkar Pass is a Varkand resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No garrison duty, key defense, or war-value hooks. Off: the city is absent.
       "HARIMU_VARKAND_DUNKAR_PASS_ENABLED": "false"
     },
