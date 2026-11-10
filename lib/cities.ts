@@ -5,6 +5,8 @@ export type City = { id: string; nationId: string; name: string; capital: boolea
 /** #1241 Kindle port, #1261 Hoarvale port. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const BRASSWELL_PORT_FLAG = 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED';
 export const VAKK_HARBOR_FLAG = 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED';
+/** #1279: Meridian resident city. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
+export const DAO_WORKS_FLAG = 'HARIMU_MERIDIAN_DAO_WORKS_ENABLED';
 /** #1259: Fulmara resident port. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const CORVEL_ISLES_FLAG = 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED';
 /** #1259: the one city-panel line. The next date is the #1178 clock, shown only when that flag is also on. */
@@ -53,15 +55,20 @@ const dunmorrow: City = { id: 'dunmorrow', nationId: 'aurelle', name: 'Dunmorrow
 /** #1261: same resident path as the #798 spa additions and #1241 (home, enroll, travel-by-id). No country-map pin.
  *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Old Lighthouse stays off this line, as Brasswell omitted the Lighthouse of the Spark. */
 const vakkHarbor: City = { id: 'vakk-harbor', nationId: 'hoarvale', name: 'Vakk Harbor', capital: false, role: 'Port / fisheries', description: 'Timber wharves and fish-drying racks on the western fjord coast.' };
+/** #1279: same resident path as the #798 spa additions (home, enroll, travel-by-id). No country-map pin. citiesForNation stays capital plus two.
+ *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Red Foundry stays off this line, as Brasswell omitted the Lighthouse of the Spark. */
+const daoWorks: City = { id: 'dao-works', nationId: 'meridian', name: 'Dao Works', capital: false, role: 'Heavy industry', description: 'Slate factory blocks with slogan banners on the western plain.' };
 let boundEnv: unknown;
 let corvelBound: unknown;
 let dunmorrowBound: unknown;
 let vakkEnv: unknown;
+let daoEnv: unknown;
 /** Routes pass the Worker env. Unset: node tests use process.env. A bound env wins, including "false". */
 export function bindBrasswellPortEnv(env: unknown) { boundEnv = env; }
 export function bindCorvelIslesEnv(env: unknown) { corvelBound = env; }
 export function bindDunmorrowEnv(env: unknown) { dunmorrowBound = env; }
 export function bindVakkHarborEnv(env: unknown) { vakkEnv = env; }
+export function bindDaoWorksEnv(env: unknown) { daoEnv = env; }
 function brasswellPortEnabled(): boolean {
   if (boundEnv !== undefined) return flagOn(boundEnv, BRASSWELL_PORT_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, BRASSWELL_PORT_FLAG); } catch { return false; }
@@ -78,15 +85,20 @@ function vakkHarborEnabled(): boolean {
   if (vakkEnv !== undefined) return flagOn(vakkEnv, VAKK_HARBOR_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, VAKK_HARBOR_FLAG); } catch { return false; }
 }
+function daoWorksEnabled(): boolean {
+  if (daoEnv !== undefined) return flagOn(daoEnv, DAO_WORKS_FLAG);
+  try { return typeof process !== 'undefined' && flagOn(process.env, DAO_WORKS_FLAG); } catch { return false; }
+}
 const portResidents = (): readonly City[] => brasswellPortEnabled() ? [brasswellPort] : [];
 const corvelResidents = (): readonly City[] => corvelIslesEnabled() ? [corvelIsles] : [];
 const dunmorrowResidents = (): readonly City[] => dunmorrowEnabled() ? [dunmorrow] : [];
 const vakkResidents = (): readonly City[] => vakkHarborEnabled() ? [vakkHarbor] : [];
+const daoResidents = (): readonly City[] => daoWorksEnabled() ? [daoWorks] : [];
 const byId = (nationId: string, cityId: string) => (city: City) => city.nationId === nationId && city.id === cityId;
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
-/** Catalog cities plus spa additions (#798), plus Brasswell (#1241), Dunmorrow (#1242), Corvel Isles (#1259), and Vakk Harbor (#1261) when each flag is on. */
-export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...vakkResidents().filter(city => city.nationId === nationId)]; }
-export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? vakkResidents().find(byId(nationId, cityId)); }
+/** Catalog cities plus spa additions (#798), plus Brasswell (#1241), Dunmorrow (#1242), Corvel Isles (#1259), Vakk Harbor (#1261), and Dao Works (#1279) when each flag is on. */
+export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...vakkResidents().filter(city => city.nationId === nationId), ...daoResidents().filter(city => city.nationId === nationId)]; }
+export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? vakkResidents().find(byId(nationId, cityId)) ?? daoResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
 
 /** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its
