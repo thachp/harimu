@@ -1,5 +1,6 @@
 /** #1285: city-panel host notes for Isling Springs, Shen Springs and Lanu Terraces.
- *  HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED is last in HARIMU_CITY_PACK (preview true, production false).
+ *  HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED is last in HARIMU_CITY_PACK (preview true, production false)
+ *  and is not in HARIMU_GRAY_PACK. GRAY's length is not pinned: later resident-city flags append there.
  *  The note is present only when that flag and the city's festival flag are both on. Either flag off: neither key, and the panel matches the flag-off panel.
  *  No other city gets a note. Dunmorrow and Corvel keep their own notes. */
 import assert from 'node:assert/strict';
@@ -27,7 +28,7 @@ const absent = data => {
 };
 const clockNow = r => Math.floor(r.now / 1000) * 1000;
 
-test('the flag is last in HARIMU_CITY_PACK, preview true and production false, and GRAY is unchanged', () => {
+test('the flag is last in HARIMU_CITY_PACK, preview true and production false, and is not in HARIMU_GRAY_PACK', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[HOST], undefined, 'not its own binding');
   assert.equal(prod.vars[HOST], undefined);
@@ -43,9 +44,7 @@ test('the flag is last in HARIMU_CITY_PACK, preview true and production false, a
   assert.equal(flagOn({ HARIMU_CITY_PACK: preview.vars.HARIMU_CITY_PACK, [HOST]: 'false' }, HOST), false, 'a direct string wins');
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.includes(HOST), false, 'the host note is not a GRAY flag');
   assert.equal(preview.vars.HARIMU_GRAY_PACK[HOST], undefined);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 80);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_MERIDIAN_DAO_WORKS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK[HOST], undefined);
   const route = readFileSync('app/api/city/route.ts', 'utf8');
   assert.ok(route.includes("const regattaHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='fulmara'&&cityId==='corvel-isles'&&flagOn(env,CORVEL_ISLES_FLAG)&&flagOn(env,'HARIMU_FULMARA_GRAND_REGATTA_ENABLED')?{grandRegattaNote:CORVEL_ISLES_REGATTA_NOTE,grandRegattaNextAt:fulmaraNextGrandRegattaAt(nowSeconds*1000)}:{};"));
   assert.ok(route.includes("const hearthHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='aurelle'&&cityId==='dunmorrow'&&flagOn(env,DUNMORROW_FLAG)&&flagOn(env,'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED')?{hearthNightNote:DUNMORROW_HEARTH_NOTE,hearthNightNextAt:aurelleNextHearthNightAt(nowSeconds*1000)}:{};"));
