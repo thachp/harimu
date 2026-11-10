@@ -32,10 +32,12 @@ import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { hoarvaleNextElectionNightAt } from './hoarvale-election-night.ts';
 import { HOARVALE_HONORS_LIST_INTERVAL_DAYS, hoarvaleNextHonorsListDayAt } from './hoarvale-honors-list-day.ts';
+import { hoarvaleMootAt, type HoarvaleMoot } from './hoarvale-moot.ts';
 import { hoarvaleNextMootOpeningAt } from './hoarvale-moot-opening.ts';
 import { VARKAND_LANTERN_WATCH_CYCLE_DAYS, varkandNextLanternWatchAt } from './varkand-lantern-watch.ts';
 import { VARKAND_MUSTER_DAY_INTERVAL_DAYS, varkandNextMusterDayAt } from './varkand-muster-day.ts';
 import { VARKAND_ROTATION_DAY_CYCLE_DAYS, varkandNextRotationDayAt } from './varkand-rotation-day.ts';
+import { varkandCelebrationsCanceled } from './varkand-red-alert-cancels.ts';
 import { CONFLUENCE_CANAL_FESTIVAL_HOST_CITY, CONFLUENCE_CANAL_FESTIVAL_INTERVAL_DAYS, confluenceNextCanalFestivalAt } from './confluence-canal-festival.ts';
 import { FULMARA_DOCK_STRIKE_REMEMBRANCE_INTERVAL_DAYS, fulmaraNextDockStrikeRemembranceAt } from './fulmara-dock-strike-remembrance.ts';
 import { FULMARA_GRAND_REGATTA_HOST_CITY, FULMARA_GRAND_REGATTA_INTERVAL_DAYS, fulmaraNextGrandRegattaAt } from './fulmara-grand-regatta.ts';
@@ -126,11 +128,11 @@ export type GovernmentSnapshot = {
   /** #1208 Hoarvale: next Opening of the Moot (the next term start). Present only while HARIMU_HOARVALE_MOOT_OPENING_ENABLED is on. The next date only. */
   mootOpening?: { nextAt: number };
   electionNight?: { nextAt: number }; // #1219: next date only, while HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED is on
-  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false }; // #1151
+  musterDay?: { nextAt: number; intervalDays: 30; mustersTroops: false; canceled?: true }; // #1151; #1220 `canceled` only at a stored Red Alert
   /** #1207 Varkand: next Rotation Day (the existing 60-real-day Chair term). Present only while HARIMU_VARKAND_ROTATION_DAY_ENABLED is on. Date only. `canceled` is present only while a stored Red Alert holds. */
   rotationDay?: { nextAt: number; cycleDays: 60; canceled?: true };
-  /** #1211 Varkand: next Lantern Watch (once per 30 real days). Present only while HARIMU_VARKAND_LANTERN_WATCH_ENABLED is on. Date only: no host, Red Alert cancellation, or holiday effect. */
-  lanternWatch?: { nextAt: number; cycleDays: 30 };
+  /** #1211 Varkand: next Lantern Watch (once per 30 real days). Present only while HARIMU_VARKAND_LANTERN_WATCH_ENABLED is on. Date only. #1220 adds `canceled` at a stored Red Alert. */
+  lanternWatch?: { nextAt: number; cycleDays: 30; canceled?: true };
   /** #1165 Confluence: next Canal Festival (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED is on. Holds no festival. */
   canalFestival?: { nextAt: number; intervalDays: 30; hostCity: 'Lanu Terraces'; holdsFestival: false };
   /** #1178 Fulmara: next Grand Regatta (once per game year = 30 real days). Present only while HARIMU_FULMARA_GRAND_REGATTA_ENABLED is on. Holds no race. */
@@ -196,26 +198,8 @@ export function withAssentCountdown(bill: HoarvaleBill, now: number): HoarvaleBi
 }
 export const hoarvaleBills = (now: number): HoarvaleBill[] => HOARVALE_BILLS.map(bill => ({ id: bill.id, title: bill.title, passedAt: bill.passedAt, ...billAssent(bill.passedAt, bill.dissolvedAt, now) }));
 
-/** #1096, docs §7.7 Government row: the Moot sits at most 120 real days; reserve powers only when no PM is invested within 7 real days.
- *  Integer seconds. Pure, so no migration. [ASSUMPTION] Terms run back to back from the Unix epoch (the Varkand #1085 anchor),
- *  so every election is a full-term one. [ASSUMPTION] No investiture is stored yet, so the rule-bound Moot invests its PM
- *  one real day after the election; hoarvaleMoot still takes any investedAt, so a later stored vote plugs in. */
-export const MOOT_TERM_SECONDS = 120 * 86_400;
-export const INVESTITURE_DEADLINE_SECONDS = 7 * 86_400;
-export const MOOT_INVESTITURE_VOTE_SECONDS = 86_400;
-export type HoarvaleMoot = { electedAt: number; dissolvesBy: number; primeMinisterInvestedAt: number | null; investitureDeadline: number; reservePowersAvailable: boolean };
-export function hoarvaleMoot(electedAt: number, investedAt: number | null, now: number): HoarvaleMoot {
-  const invested = investedAt != null && Number.isSafeInteger(investedAt) && investedAt >= electedAt && investedAt <= now ? investedAt : null;
-  const investitureDeadline = electedAt + INVESTITURE_DEADLINE_SECONDS;
-  return { electedAt, dissolvesBy: electedAt + MOOT_TERM_SECONDS, primeMinisterInvestedAt: invested, investitureDeadline,
-    reservePowersAvailable: invested === null && now >= investitureDeadline };
-}
-/** The current term at `now` (seconds). At exactly dissolvesBy the next term has begun. */
-export function hoarvaleMootAt(now: number): HoarvaleMoot {
-  const t = Number.isSafeInteger(now) && now > 0 ? now : 0;
-  const electedAt = Math.floor(t / MOOT_TERM_SECONDS) * MOOT_TERM_SECONDS;
-  return hoarvaleMoot(electedAt, electedAt + MOOT_INVESTITURE_VOTE_SECONDS, t);
-}
+export { MOOT_TERM_SECONDS, INVESTITURE_DEADLINE_SECONDS, MOOT_INVESTITURE_VOTE_SECONDS, hoarvaleMoot, hoarvaleMootAt } from './hoarvale-moot.ts';
+export type { HoarvaleMoot } from './hoarvale-moot.ts';
 /** #1096. Flag off, or any nation but Hoarvale: the same snapshot, and no moot key. */
 export function withHoarvaleMoot(snapshot: GovernmentSnapshot, now: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'hoarvale') return snapshot;
@@ -285,6 +269,22 @@ export function withVarkandRotationDay(snapshot: GovernmentSnapshot, nowMs: numb
     nextAt: varkandNextRotationDayAt(nowMs), cycleDays: VARKAND_ROTATION_DAY_CYCLE_DAYS as 60,
     ...(canceled ? { canceled: true as const } : {}),
   } };
+}
+
+/** #1220. Flag off, or the Alert Level is not Red: the same snapshot. Red marks celebration rows already on the read.
+ *  Does not add a row, move a date, or mark the Mandate Plebiscite. */
+export function withVarkandRedAlertCancels(snapshot: GovernmentSnapshot, enabled: boolean, level: string | null | undefined): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'varkand' || !varkandCelebrationsCanceled(level)) return snapshot;
+  const musterNeeds = snapshot.musterDay != null && snapshot.musterDay.canceled !== true;
+  const rotationNeeds = snapshot.rotationDay != null && snapshot.rotationDay.canceled !== true;
+  const lanternNeeds = snapshot.lanternWatch != null && snapshot.lanternWatch.canceled !== true;
+  if (!musterNeeds && !rotationNeeds && !lanternNeeds) return snapshot;
+  return {
+    ...snapshot,
+    ...(musterNeeds && snapshot.musterDay ? { musterDay: { ...snapshot.musterDay, canceled: true as const } } : {}),
+    ...(rotationNeeds && snapshot.rotationDay ? { rotationDay: { ...snapshot.rotationDay, canceled: true as const } } : {}),
+    ...(lanternNeeds && snapshot.lanternWatch ? { lanternWatch: { ...snapshot.lanternWatch, canceled: true as const } } : {}),
+  };
 }
 
 /** Varkand read while only the Rotation Day flag is on. No directorate, plebiscite, or musterDay key. Flag off returns null, which is today's read. */
