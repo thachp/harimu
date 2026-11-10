@@ -34,6 +34,9 @@ import { runKorundRaids } from './korund-underground'; // #295
 import { stabilityStatements, stabilityNations, readPublicStability, isMissingStabilityTable, type PublicStability } from './stability';
 import { korundRationCutCities, korundRationRecoveryCities, korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from './korund-coupons'; // #967, #983
 import { nextDividendDayAt } from './veldwood-wallet-dividend.ts'; // #1063
+import { flagOn } from './flag-pack.mjs'; // #1239: gate the atlas Red Alert skip without a new flag
+import { readVarkandAlert, varkandAlertEnabled } from './varkand-alert'; // #1239: stored Alert Level for atlas nextFestival skip
+import { varkandAtlasCanceledFestivalNames } from './varkand-red-alert-cancels.ts'; // #1239: same celebration names #1220 marks canceled
 import { worldAtlasClockFields, type WorldNextFestival } from './world-atlas-reads.ts'; // #1193
 
 export const tickSeconds = 7200;
@@ -208,7 +211,11 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #668: every read here is independent, so they share one round of round trips instead of queueing (the flag-gated war, treaty, embargo and reserve reads included).
   const none = Promise.resolve(undefined);
-  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,embargoes,reserve,warProposals,warEndings] = await Promise.all([
+  // #1239: read the stored Alert Level only while both Red Alert cancel and Alert flags are on (same gate as #1220). Otherwise nextFestival matches today.
+  const atlasCancelsOn = options.atlasEnv != null
+    && flagOn(options.atlasEnv, 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED')
+    && varkandAlertEnabled(options.atlasEnv);
+  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,embargoes,reserve,warProposals,warEndings,atlasAlert] = await Promise.all([
     db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>(),
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')
@@ -224,13 +231,15 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     options.reserve ? readReserveBoard(db,now) : none,
     options.war && options.warAssembly ? readWarProposals(db) : none, // #427: the Assembly's pending and recent votes, read-only
     options.war && options.warEndings ? readWarEndings(db) : none, // #427 slice 2: pending and recent endings, read-only
+    atlasCancelsOn ? readVarkandAlert(db) : none, // #1239
   ]);
   const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now/tickSeconds)*tickSeconds;
   const due = Math.max(0,Math.floor((now-epoch)/tickSeconds));
   const dividendDayAt = nextDividendDayAt(epoch, now);
+  const canceledNames = atlasAlert ? varkandAtlasCanceledFestivalNames(atlasAlert.level) : []; // #1239: empty at green/amber or when the read was skipped
   return {clock:{compression:12,epochSeconds:epoch,nowSeconds:now,gameDay:Math.floor(Math.max(0,now-epoch)*12/86400)+1,
     latestTick:latest?.tick ?? 0,pendingTicks:Math.max(0,due-(latest?.tick ?? 0)),cadenceSeconds:tickSeconds,mode:'request-driven durable simulation',
-    ...(dividendDayAt == null ? {} : { dividendDayAt }), ...worldAtlasClockFields(now, options.atlasEnv)}, // #1193: atlasEnv is the Worker env; flag off adds nothing
+    ...(dividendDayAt == null ? {} : { dividendDayAt }), ...worldAtlasClockFields(now, options.atlasEnv, canceledNames)}, // #1193/#1239: atlasEnv is the Worker env; flag off adds nothing; canceledNames skips Red Alert celebrations
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
     supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
