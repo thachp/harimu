@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { bindVakkHarborEnv, citiesForNation, cityCaptureNote, cityForNation, cityHasImports, cityImportsNote, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, VAKK_HARBOR_FLAG } from '../lib/cities.ts';
+import { bindBrasswellPortEnv, bindVakkHarborEnv, BRASSWELL_PORT_FLAG, citiesForNation, cityCaptureNote, cityForNation, cityHasImports, cityImportsNote, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, VAKK_HARBOR_FLAG } from '../lib/cities.ts';
 import { FLAG_PACKS } from '../lib/flag-pack.mjs';
 import { seasonLengthMs, seasonOrder } from '../lib/game-season.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
@@ -14,7 +14,7 @@ const FLAG = VAKK_HARBOR_FLAG;
 const PORT_NOTE = 'Port market: foreign imports arrive here.';
 const hoarvaleIds = ['rimehall', 'fjeldmark', 'isling-springs'];
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
-const clear = () => { bindVakkHarborEnv(undefined); delete process.env[FLAG]; };
+const clear = () => { bindVakkHarborEnv(undefined); bindBrasswellPortEnv(undefined); delete process.env[FLAG]; delete process.env[BRASSWELL_PORT_FLAG]; };
 const openHoarvale = r => {
   r.setFixtureEnv('HARIMU_HOARVALE_ENABLED', 'true');
   r.setFixtureEnv('HARIMU_NATION_READINESS_ENABLED', 'false');
@@ -49,6 +49,37 @@ test('flag off: no resident city; flag on: port resident, imports, heartland; ca
   bindVakkHarborEnv({ HARIMU_GRAY_PACK: { [FLAG]: 'true' }, [FLAG]: 'false' });
   assert.equal(cityForNation('hoarvale', 'vakk-harbor'), undefined, 'a direct string wins');
   clear();
+});
+
+test('Brasswell Port on with Vakk Harbor off: Hoarvale lists still exclude vakk-harbor', async t => {
+  const shared = { [BRASSWELL_PORT_FLAG]: 'true', [FLAG]: 'false' };
+  bindBrasswellPortEnv(shared);
+  bindVakkHarborEnv(shared);
+  try {
+    assert.equal(cityForNation('hoarvale', 'vakk-harbor'), undefined);
+    assert.deepEqual(residentCitiesForNation('hoarvale').map(c => c.id), hoarvaleIds);
+    assert.deepEqual(citiesForNation('hoarvale').map(c => c.id), hoarvaleIds);
+    assert.equal(cityForNation('kindle', 'brasswell-port')?.id, 'brasswell-port', 'the Brasswell flag is on');
+  } finally { clear(); }
+
+  const r = await localRuntime(); t.after(() => r.close());
+  r.setFixtureEnv(BRASSWELL_PORT_FLAG, 'true');
+  r.setFixtureEnv(FLAG, 'false');
+  await r.db.prepare("UPDATE citizens SET nation_id='hoarvale' WHERE clerk_user_id='alice'").run();
+  const panel = await r.call('city', 'alice');
+  assert.equal(panel.data.currentCityId, 'rimehall');
+  assert.equal(JSON.stringify(panel.data).includes('vakk'), false);
+  const flags = (await r.call('citizen', 'alice')).data.flags;
+  assert.equal(flags.brasswellPort, true);
+  assert.equal(flags.vakkHarbor, undefined);
+  assert.equal((await r.call('city', 'alice', { action: 'travel', cityId: 'vakk-harbor' })).status, 400);
+  openHoarvale(r);
+  r.setFixtureEnv(BRASSWELL_PORT_FLAG, 'true');
+  r.setFixtureEnv(FLAG, 'false');
+  assert.equal((await r.call('city-home', 'alice', { cityId: 'vakk-harbor', requestId: randomUUID() })).data.reason, 'not_your_nation');
+  const refused = await r.call('citizen', 'harbor', { action: 'enroll', nationId: 'hoarvale', expectedNationId: null, cityId: 'vakk-harbor' });
+  assert.equal(refused.status, 403);
+  assert.equal(refused.data.reason, 'not_in_nation');
 });
 
 test('the flag is preview true and production false, last in HARIMU_GRAY_PACK, and the map stays three pins', () => {
