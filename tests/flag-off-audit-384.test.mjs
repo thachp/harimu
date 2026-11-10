@@ -195,6 +195,7 @@ const flagOffPins = {
   HARIMU_HOARVALE_MOOT_OPENING_ENABLED: 'zzzzzzzzzzzzzzz-hoarvale-moot-opening-1208.test.mjs', // #1208 flag off: no mootOpening key
   HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED: 'zzzzzzzzzzzzzzz-hoarvale-election-night-1219.test.mjs', // #1219 flag off: no electionNight key
   HARIMU_VELDWOOD_RING_MOOT_ENABLED: 'zzzzzzzzzzzzzzzz-veldwood-ring-moot-1244.test.mjs', // #1244 flag off: no ringMoot key
+  HARIMU_ILMAR_LONG_LIGHT_ENABLED: 'zzzzzzzzzzzzzzzzzz-ilmar-long-light-1260.test.mjs', // #1260 flag off: no longLight key
   HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
 };
 
