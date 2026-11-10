@@ -4,6 +4,11 @@
 .panel-v2-summary>div{flex:1 1 0;min-width:min-content}
 .panel-v2-summary h2{font-family:var(--font-serif,Georgia,serif);font-size:1.5rem;line-height:1.15;overflow-wrap:break-word;margin:0}
 .panel-v2 .panel-v2-summary p{margin:2px 0 0;opacity:.8;overflow-wrap:break-word}
+/* #392 city header stats. Under the city name. Wraps inside the panel; no sideways scroller. Text is cream and gold on #071820 (AA). */
+.panel-v2 dl.panel-v2-header-stats,.game-inspector-body .panel-v2 dl.panel-v2-header-stats{display:flex;flex:1 0 100%;flex-wrap:wrap;gap:8px;width:100%;min-width:0;max-width:100%;margin:0;padding:0;border:0;grid-template-columns:none;overflow-x:visible}
+.panel-v2 .panel-v2-header-stats>div,.game-inspector-body .panel-v2 .panel-v2-header-stats>div{flex:1 1 6.25rem;min-width:min(100%,6.25rem);max-width:100%;margin:0;padding:6px 8px;border:1px solid var(--crest-accent,#d6b45c);border-radius:6px;background:#071820}
+.panel-v2 .panel-v2-header-stats dt,.game-inspector-body .panel-v2 .panel-v2-header-stats dt{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:0;color:#f1d58a;font-size:calc(11px * var(--text-scale, 1));font-weight:600;line-height:1.3;text-align:left;overflow-wrap:anywhere;white-space:normal}
+.panel-v2 .panel-v2-header-stats dd,.game-inspector-body .panel-v2 .panel-v2-header-stats dd{margin:2px 0 0;color:#f3ecd6;font-size:calc(13px * var(--text-scale, 1));font-weight:600;line-height:1.3;text-align:left;overflow-wrap:anywhere;white-space:normal}
 .panel-v2 dl.panel-v2-stats{display:flex;flex-wrap:wrap;gap:8px 18px;margin:0;padding:10px 0;border-block:1px solid rgba(214,180,92,.25)}
 .panel-v2-stats>div{flex:1 1 auto;min-width:min-content}
 .panel-v2 .panel-v2-stats dt{font-size:calc(11px * var(--text-scale, 1));margin:0}
