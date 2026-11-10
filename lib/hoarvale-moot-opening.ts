@@ -4,7 +4,7 @@
  *  The next Opening is the start of the next Moot term after nowMs, from hoarvaleMootAt (MOOT_TERM_SECONDS). This file does not restate the 120-day cadence.
  *  At an exact term boundary the following term is next, because hoarvaleMootAt treats dissolvesBy as the start of the new term.
  *  Before the anchor, hoarvaleMootAt clamps to 0, so the next Opening is one term after the anchor. Takes nowMs only. */
-import { MOOT_TERM_SECONDS, hoarvaleMootAt } from './government.ts';
+import { MOOT_TERM_SECONDS, hoarvaleMootAt } from './hoarvale-moot.ts';
 
 /** [ASSUMPTION] Zero milliseconds between the term start and the Opening. */
 export const HOARVALE_MOOT_OPENING_OFFSET_MS = 0;

@@ -9,6 +9,7 @@
  *  Used by hud-layout-check.mjs (npm run test:layout). Screenshots: LAYOUT_SHOTS_DIR=docs/screenshots/528 (PHONE_TAP_BEFORE=1 names them "before"). */
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
+import { ensureGameTimerExports } from './game-timer-stub.mjs';
 import { readFile } from 'node:fs/promises';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -31,7 +32,7 @@ async function bundle() {
     bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', target: 'es2022', logLevel: 'silent',
     define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_HARIMU_SEASON_CLOCK': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_FESTIVAL_CALENDAR': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_EMBLEM': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SYMBOLS': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_TOPBAR': '"false"' , 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_PANEL': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_RAIL': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_WORLD': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_NATION': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CITY': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_MOBILE': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_MOD_CONSOLE': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_SKIN': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_WIRE_BYLINES': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_RARE_MARKER': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN': '\"false\"', 'process.env.NEXT_PUBLIC_HARIMU_MOBILE_TWO_TAP': '"false"'}, alias: { '@': root.replace(/\/$/, '') }, loader: { '.css': 'empty' },
     plugins: [{ name: 'stubs', setup(b) {
-      const stubs = { './game-viewport': 'export default function V(){return null}', './game-timer': 'export function GameTimer(){return null}', './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useClerk=()=>({mountUserButton(){},unmountUserButton(){}})' };
+      const stubs = { './game-viewport': 'export default function V(){return null}', './game-timer': ensureGameTimerExports('export function GameTimer(){return null}'), './square-chat': 'export function SquareChat(){return null}', '@clerk/nextjs': 'export const useClerk=()=>({mountUserButton(){},unmountUserButton(){}})' };
       b.onResolve({ filter: /^(\.\/game-viewport|\.\/game-timer|\.\/square-chat|@clerk\/nextjs)$/ }, a => ({ path: a.path, namespace: 'stub' }));
       b.onResolve({ filter: /\.module\.css$/ }, () => ({ path: 'css-module', namespace: 'stub' }));
       b.onLoad({ filter: /.*/, namespace: 'stub' }, a => ({ contents: a.path === 'css-module' ? 'export default new Proxy({}, { get: (_, k) => String(k) })' : stubs[a.path], loader: 'jsx', resolveDir: root }));
