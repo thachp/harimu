@@ -90,6 +90,10 @@ test('crest strip keeps AA name contrast, the selected accent, a focus ring and 
   assert.ok(accentContrast('#80d8ce', '#102934') >= 3, 'focus ring on the chip');
   assert.ok(accentContrast('#8bd2c5', '#24515a') >= 3, 'selected accent on the chip');
   assert.match(block, /@media\(max-width:760px\)\{\.game-crest-strip \.game-context-items\{[^}]*overflow:visible/);
+  assert.match(block, /\.game-crest-strip \.game-context-items>button\{[^}]*flex:1 1 0/);
+  assert.match(block, /@media\(min-width:761px\)\{\s*\.game-crest-strip\{grid-template-columns:max-content minmax\(0,1fr\)\}/);
+  assert.match(block, /\.game-crest-strip>\.game-context-heading>span\{white-space:nowrap\}/);
+  assert.match(await read('app/nation-crest.tsx'), /<NationCrest id=\{id\} size=\{36\} force \/>/);
   const shell = await read('app/game-shell.tsx');
   assert.match(shell, /worldChips \? <NationCrest id=\{item\.id\} size=\{30\} force \/> : <NationSymbol id=\{item\.id\} \/>/);
   assert.equal((shell.match(/uiV2WorldEnabled\(\)/g) || []).length, 1);
