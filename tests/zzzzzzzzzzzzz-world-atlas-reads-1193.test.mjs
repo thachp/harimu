@@ -4,13 +4,14 @@
  *  #1228: Hoarvale Opening of the Moot joins worldFestivalSources on its own flag (no new flag; GRAY unchanged).
  *  #1231: Kindle Ballot Night joins on HARIMU_KINDLE_ELECTION_CLOCK_ENABLED (no new flag; GRAY unchanged). A missing cycle start skips it.
  *  #1236/#1237: Varkand Lantern Watch and Ilmar Assembly Election join on their existing flags (no new flag; GRAY unchanged).
- *  #1240: Hoarvale Election Night joins on HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED (no new flag; GRAY unchanged). It shares Opening of the Moot's instant; a tie lists both, Opening first. */
+ *  #1240: Hoarvale Election Night joins on HARIMU_HOARVALE_ELECTION_NIGHT_ENABLED (no new flag; GRAY unchanged). It shares Opening of the Moot's instant; a tie lists both, Opening first.
+ *  #1267: Kite Festival, Ring Moot, and Clearing join on their existing flags (no new flag; GRAY stays 73, Dunmorrow last). Hearth Night was already a source. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { displayTimestamp } from '../lib/display-preferences.ts';
-import { hoarvaleElectionNightSnapshot, hoarvaleMootAt, hoarvaleMootOpeningSnapshot, ilmarAssemblyElectionDaySnapshot, ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot, varkandGovernmentSnapshot, varkandLanternWatchSnapshot, varkandRotationDaySnapshot } from '../lib/government.ts';
+import { hoarvaleElectionNightSnapshot, hoarvaleMootAt, hoarvaleMootOpeningSnapshot, ilmarAssemblyElectionDaySnapshot, ilmarClearingSnapshot, ilmarGreatPilgrimageSnapshot, ilmarSanctumSnapshot, varkandGovernmentSnapshot, varkandLanternWatchSnapshot, varkandRotationDaySnapshot, veldwoodRingMootSnapshot, withAurelleKiteFestival } from '../lib/government.ts';
 import { ilmarNextAssemblyElectionDayAt } from '../lib/ilmar-assembly-election-day.ts';
 import { ilmarNextGreatPilgrimageAt } from '../lib/ilmar-great-pilgrimage.ts';
 import { ilmarNextGreatPilgrimageAt as sanctumNextGreatPilgrimageAt } from '../lib/ilmar-sanctum.ts';
@@ -27,6 +28,10 @@ import { worldAtlasClockFields, worldAtlasReadsEnabled, worldFestivalSources, wo
 import { aurelleNextCharterFairAt } from '../lib/aurelle-charter-fair.ts';
 import { aurelleNextCoronationDayAt } from '../lib/aurelle-coronation-day.ts';
 import { aurelleNextHearthNightAt } from '../lib/aurelle-hearth-night.ts';
+import { aurelleNextKiteFestivalAt } from '../lib/aurelle-kite-festival.ts';
+import { ilmarNextClearingAt } from '../lib/ilmar-clearing.ts';
+import { veldwoodNextDividendDayAt } from '../lib/veldwood-dividend-day.ts';
+import { veldwoodNextRingMootAt } from '../lib/veldwood-ring-moot.ts';
 import { kindleElectionClock } from '../lib/kindle-election.ts';
 import { fulmaraNextGrandRegattaAt } from '../lib/fulmara-grand-regatta.ts';
 import { meridianNextCongressWeekAt } from '../lib/meridian-congress-week.ts';
@@ -48,7 +53,7 @@ test('pure: earliest enabled source wins, ties list every festival in source ord
 });
 
 test('pure: the real sources are docs-named, one clock each, all ten nations, Stilldays left out', () => {
-  assert.equal(worldFestivalSources.length, 34);
+  assert.equal(worldFestivalSources.length, 37);
   assert.deepEqual([...new Set(worldFestivalSources.map(s => s.nationId))], ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']);
   assert.equal(worldFestivalSources.some(s => /stillday/i.test(s.name)), false);
   for (const s of worldFestivalSources) assert.match(s.flag, /^HARIMU_[A-Z_]+_ENABLED$/);
@@ -64,7 +69,7 @@ test('pure: the real sources are docs-named, one clock each, all ten nations, St
   const pack = worldNextFestival(now, { HARIMU_GRAY_PACK: JSON.stringify({ HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED: 'true' }) });
   assert.equal(pack.at, meridianNextCongressWeekAt(now) / 1000, 'a festival flag in the pack counts');
   const aurelle = worldFestivalSources.filter(s => s.nationId === 'aurelle').map(s => s.name);
-  assert.deepEqual(aurelle, ['Coronation Day', 'Hearth Night', 'Charter Fair'], 'docs §7.5 Aurelle holiday order; Heir\'s Naming stays out');
+  assert.deepEqual(aurelle, ['Coronation Day', 'Hearth Night', 'Charter Fair', 'Kite Festival'], 'docs §7.5 Aurelle holiday order, then Kite Festival; Heir\'s Naming stays out');
   // Identity pins: Aurelle clocks share Chair-anchor timestamps, so value checks alone can't prove wiring.
   const byName = name => worldFestivalSources.find(s => s.nationId === 'aurelle' && s.name === name);
   assert.equal(byName('Coronation Day').nextAt, aurelleNextCoronationDayAt);
@@ -466,7 +471,7 @@ test('#1236: Assembly Election is skipped while its flag is off and equals the I
   assert.equal(source.flag, A, 'the nextFestival candidate uses the existing Assembly Election flag');
   assert.equal(source.nextAt, ilmarNextAssemblyElectionDayAt);
   assert.equal(worldFestivalSources.some(s => s.flag === S), false, 'Stilldays stay on the sanctum flag');
-  assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'ilmar').map(s => s.name), ['Feast of First Light', 'Assembly Election', 'Great Pilgrimage'], 'docs Ilmar holiday order; Stilldays stay out');
+  assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'ilmar').map(s => s.name), ['Feast of First Light', 'Assembly Election', 'Great Pilgrimage', 'Clearing'], 'docs Ilmar holiday order, then Clearing; Stilldays stay out');
   const now = Date.UTC(2026, 10, 9);
   const picks = env => (worldNextFestival(now, env)?.festivals ?? []).filter(item => item.name === 'Assembly Election');
   assert.deepEqual(picks({}), [], 'flag off skips it');
@@ -591,4 +596,84 @@ test('#1240: a tie with Opening of the Moot lists both in Hoarvale row order', (
   });
   const prior = worldFestivalSources.filter(s => s.flag !== E);
   assert.equal(JSON.stringify(worldNextFestival(inside, { [O]: 'true', [H]: 'true', [A]: 'true', [E]: 'false' })), JSON.stringify(worldNextFestival(inside, { [O]: 'true', [H]: 'true', [A]: 'true' }, prior)));
+});
+
+test('#1267: Kite Festival, Ring Moot, and Clearing are skipped while their flags are off and follow source order when on', () => {
+  const K = 'HARIMU_AURELLE_KITE_FESTIVAL_ENABLED';
+  const H = 'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED';
+  const C = 'HARIMU_ILMAR_CLEARING_ENABLED';
+  const R = 'HARIMU_VELDWOOD_RING_MOOT_ENABLED';
+  const D = 'HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED';
+  const added = [K, C, R];
+  const by = (nationId, name) => worldFestivalSources.find(s => s.nationId === nationId && s.name === name);
+  const kite = by('aurelle', 'Kite Festival');
+  const clearing = by('ilmar', 'Clearing');
+  const ring = by('veldwood', 'Ring Moot');
+  assert.equal(worldFestivalSources.filter(s => s.name === 'Hearth Night').length, 1, 'Hearth Night was already a source');
+  assert.equal(kite.flag, K);
+  assert.equal(kite.nextAt, aurelleNextKiteFestivalAt);
+  assert.equal(clearing.flag, C);
+  assert.equal(clearing.nextAt, ilmarNextClearingAt);
+  assert.equal(ring.flag, R);
+  assert.equal(ring.nextAt, veldwoodNextRingMootAt);
+  assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'veldwood').map(s => s.name), ['Vote Day', 'Dividend Day', 'Ring Moot']);
+  const gray = FLAG_PACKS.HARIMU_GRAY_PACK;
+  assert.equal(gray.length, 74, '#1268 adds no flag; #1259 Corvel Isles is last');
+  assert.equal(gray.at(-1), 'HARIMU_FULMARA_CORVEL_ISLES_ENABLED', 'Corvel Isles stays last');
+  assert.equal(gray.at(-2), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
+  for (const flag of added) assert.equal(gray.filter(item => item === flag).length, 1, flag);
+  const now = Date.UTC(2026, 10, 9);
+  const names = env => (worldNextFestival(now, env)?.festivals ?? []).map(item => item.name);
+  for (const flag of added) {
+    assert.deepEqual(names({}), []);
+    assert.deepEqual(names({ [flag]: 'false' }), []);
+    assert.equal(worldNextFestival(now, { [flag]: 'false' }), null);
+  }
+  assert.equal(kite.nextAt(now), withAurelleKiteFestival({ nationId: 'aurelle' }, now, true).kiteFestival.nextAt);
+  assert.equal('kiteFestival' in withAurelleKiteFestival({ nationId: 'aurelle' }, now, false), false);
+  assert.equal(clearing.nextAt(now), ilmarClearingSnapshot(now, true).clearing.nextAt);
+  assert.equal(ilmarClearingSnapshot(now, false), null);
+  assert.equal(ring.nextAt(now), veldwoodRingMootSnapshot(now, true).ringMoot.nextAt);
+  assert.equal(veldwoodRingMootSnapshot(now, false), null);
+  const year = aurelleNextKiteFestivalAt(now);
+  assert.equal(year, aurelleNextHearthNightAt(now));
+  assert.equal(year, ilmarNextClearingAt(now));
+  assert.equal(year, veldwoodNextDividendDayAt(now));
+  assert.notEqual(year, veldwoodNextRingMootAt(now));
+  assert.deepEqual(worldNextFestival(now, { [K]: 'true' }), { at: year / 1000, festivals: [{ nationId: 'aurelle', name: 'Kite Festival' }] });
+  assert.deepEqual(worldNextFestival(now, { [C]: 'true' }), { at: year / 1000, festivals: [{ nationId: 'ilmar', name: 'Clearing' }] });
+  assert.deepEqual(worldNextFestival(now, { [R]: 'true' }), { at: veldwoodNextRingMootAt(now) / 1000, festivals: [{ nationId: 'veldwood', name: 'Ring Moot' }] });
+  assert.deepEqual(names({ [H]: 'true', [K]: 'false' }), ['Hearth Night'], 'Kite Festival stays out of the tie while its flag is off');
+  assert.deepEqual(names({ [H]: 'true', [K]: 'true', [C]: 'false' }), ['Hearth Night', 'Kite Festival']);
+  assert.deepEqual(worldNextFestival(now, { [H]: 'true', [K]: 'true', [C]: 'true', [D]: 'true' }), {
+    at: year / 1000,
+    festivals: [
+      { nationId: 'aurelle', name: 'Hearth Night' },
+      { nationId: 'aurelle', name: 'Kite Festival' },
+      { nationId: 'ilmar', name: 'Clearing' },
+      { nationId: 'veldwood', name: 'Dividend Day' },
+    ],
+  });
+  const same = { nationId: 'fulmara', name: 'Same Bell', flag: 'HARIMU_SAME_BELL_ENABLED', nextAt: () => year };
+  assert.deepEqual(worldNextFestival(now, { [H]: 'true', [K]: 'true', [C]: 'true', HARIMU_SAME_BELL_ENABLED: 'true' }, [...worldFestivalSources, same]).festivals.map(item => item.name), ['Hearth Night', 'Kite Festival', 'Clearing', 'Same Bell']);
+  const earliest = Math.min(year, veldwoodNextRingMootAt(now));
+  const sooner = { nationId: 'kindle', name: 'Sooner Fair', flag: 'HARIMU_SOONER_FAIR_ENABLED', nextAt: () => earliest - DAY };
+  assert.deepEqual(worldNextFestival(now, { [K]: 'true', [C]: 'true', [R]: 'true', HARIMU_SOONER_FAIR_ENABLED: 'true' }, [sooner, ...worldFestivalSources]).festivals, [{ nationId: 'kindle', name: 'Sooner Fair' }]);
+  const beforeMid = 0;
+  assert.ok(veldwoodNextRingMootAt(beforeMid) < aurelleNextKiteFestivalAt(beforeMid));
+  assert.deepEqual(worldNextFestival(beforeMid, { [K]: 'true', [C]: 'true', [R]: 'true' }).festivals, [{ nationId: 'veldwood', name: 'Ring Moot' }]);
+  const afterMid = veldwoodNextRingMootAt(beforeMid);
+  assert.ok(aurelleNextKiteFestivalAt(afterMid) < veldwoodNextRingMootAt(afterMid));
+  assert.equal(aurelleNextKiteFestivalAt(afterMid), ilmarNextClearingAt(afterMid));
+  assert.deepEqual(worldNextFestival(afterMid, { [K]: 'true', [C]: 'true', [R]: 'true' }).festivals, [{ nationId: 'aurelle', name: 'Kite Festival' }, { nationId: 'ilmar', name: 'Clearing' }]);
+  const prior = worldFestivalSources.filter(s => !added.includes(s.flag));
+  assert.equal(prior.length, 34);
+  const off = Object.fromEntries(added.map(flag => [flag, 'false']));
+  for (const env of [{}, off, { ...allOn, ...off }, { HARIMU_FULMARA_GRAND_REGATTA_ENABLED: 'true', ...off }, { [H]: 'true', ...off }]) {
+    assert.equal(JSON.stringify(worldNextFestival(now, env)), JSON.stringify(worldNextFestival(now, env, prior)), 'flags off: nextFestival matches the list from before these sources');
+  }
+  const seconds = Math.floor(now / 1000);
+  const atlasOff = { ...allOn, [F]: 'true', ...off };
+  const fromPrior = worldNextFestival(now, atlasOff, prior);
+  assert.equal(JSON.stringify(worldAtlasClockFields(seconds, atlasOff)), JSON.stringify(fromPrior ? { nextFestival: fromPrior } : {}));
 });

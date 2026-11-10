@@ -1,6 +1,7 @@
 /* #1166: Nation overview. Tokens match the S2 chip (ground #071820, paper #f3ecd6, gold #f1d58a) and the S1 crest edge. */
 .game-inspector-body .nation-overview{display:grid;gap:12px;margin:0 0 12px;padding:12px;background:#071820;color:#f3ecd6;border:1px solid #d0ad54;border-radius:0}
 .game-inspector-body .nation-overview-head{display:flex;align-items:center;gap:12px;min-width:0}
+.game-inspector-body .nation-overview-head-chips{flex-wrap:wrap}
 .game-inspector-body .nation-overview-head>div{min-width:0}
 .game-inspector-body .nation-overview h2{margin:0;color:#f3ecd6;font-family:Georgia,serif;font-size:calc(22px * var(--text-scale, 1));line-height:1.2}
 .game-inspector-body .nation-overview-kicker{margin:2px 0 0;color:#f1d58a;font-size:calc(11px * var(--text-scale, 1));letter-spacing:.12em;text-transform:uppercase}
