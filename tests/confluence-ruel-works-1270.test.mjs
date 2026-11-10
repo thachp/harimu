@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { bindRuelWorksEnv, citiesForNation, cityCaptureNote, cityCivicUnitNote, cityForNation, cityHasImports, cityImportsNote, citySpecialtyFields, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, RUEL_WORKS_FLAG } from '../lib/cities.ts';
+import { bindDunmorrowEnv, bindRuelWorksEnv, citiesForNation, cityCaptureNote, cityCivicUnitNote, cityForNation, cityHasImports, cityImportsNote, citySpecialtyFields, DUNMORROW_FLAG, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, RUEL_WORKS_FLAG } from '../lib/cities.ts';
 import { FLAG_PACKS } from '../lib/flag-pack.mjs';
 import { seasonLengthMs, seasonOrder } from '../lib/game-season.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
@@ -48,6 +48,24 @@ test('flag off: no resident city; flag on: Industry, heartland, no imports; cata
   bindRuelWorksEnv({ HARIMU_GRAY_PACK: { [FLAG]: 'true' }, [FLAG]: 'false' });
   assert.equal(cityForNation('confluence', 'ruel-works'), undefined, 'a direct string wins');
   clear();
+});
+
+test('Dunmorrow on does not open Ruel Works', () => {
+  clear();
+  bindDunmorrowEnv(undefined);
+  const sibling = { [FLAG]: 'false', [DUNMORROW_FLAG]: 'true' };
+  bindRuelWorksEnv(sibling);
+  bindDunmorrowEnv(sibling);
+  try {
+    assert.equal(cityForNation('aurelle', 'dunmorrow')?.id, 'dunmorrow', 'the sibling flag is on');
+    assert.equal(cityForNation('confluence', 'ruel-works'), undefined);
+    assert.deepEqual(residentCitiesForNation('confluence').map(c => c.id), ids);
+    assert.equal(residentCitiesForNation('confluence').some(c => c.id === 'ruel-works'), false);
+    assert.deepEqual(citiesForNation('confluence').map(c => c.id), ids);
+  } finally {
+    clear();
+    bindDunmorrowEnv(undefined);
+  }
 });
 
 test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {

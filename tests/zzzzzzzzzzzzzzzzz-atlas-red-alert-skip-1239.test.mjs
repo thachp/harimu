@@ -1,5 +1,5 @@
 /** #1239: atlas nextFestival skips Varkand celebrations canceled at Red Alert (#1220/#1227).
- *  No new flag. Recounted after origin/dev e9677548: GRAY 70, #1243 Kite Festival last, red-alert cancels at -3.
+ *  No new flag. Recounted on current dev: GRAY 76, Ruel Works last; #1263 Long Light is 75 (at -2).
  *  Architect ruling: SKIP (do not mark canceled) in simulation.clock.nextFestival.
  *  Skipped names match #1220: Muster Day, Rotation Day, Lantern Watch. Mandate Plebiscite stays.
  *  Gate: HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED on AND HARIMU_VARKAND_ALERT_ENABLED on AND stored level red.
