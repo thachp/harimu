@@ -32,3 +32,5 @@
 .game-inspector-body .world-atlas.world-atlas-icons .world-atlas-stats>div{align-items:center}
 .game-inspector-body .world-atlas.world-atlas-icons .world-atlas-stats dt{display:flex;align-items:center;gap:6px;min-width:min-content}
 .game-inspector-body .world-atlas.world-atlas-icons .world-atlas-stats dt svg{flex:none;width:18px;height:18px;color:#d0ad54}
+/* #392 UI 51. The scale class is on the atlas only while the fact-icon flag is also on. Width and height follow the text scale. flex:none stays, and the label keeps min-content so a fact name stays on one line. */
+.game-inspector-body .world-atlas.world-atlas-icons.world-atlas-icon-scale .world-atlas-stats dt svg{flex:none;width:calc(18px * var(--text-scale, 1));height:calc(18px * var(--text-scale, 1))}
