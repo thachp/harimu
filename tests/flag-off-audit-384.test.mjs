@@ -177,6 +177,7 @@ const flagOffPins = {
   HARIMU_AURELLE_CORONATION_DAY_ENABLED: 'zzzzzzzzzzzzzz-aurelle-coronation-day-1191.test.mjs', // #1191 flag off: no coronationDay key
   HARIMU_AURELLE_CHARTER_FAIR_ENABLED: 'zzzzzzzzzzzzzz-aurelle-charter-fair-1197.test.mjs', // #1197 flag off: no charterFair key
   HARIMU_VARKAND_ROTATION_DAY_ENABLED: 'zzzzzzzzzzzzzzz-varkand-rotation-day-1207.test.mjs', // #1207 flag off: no rotationDay key
+  HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED: 'zzzzzzzzzzzzzzzz-varkand-red-alert-cancels-1220.test.mjs', // #1220 flag off: the government read is unchanged
   HARIMU_CONFLUENCE_ASSEMBLY_ELECTION_ENABLED: 'zzzzzz-confluence-assembly-election-1123.test.mjs', // #1123 flag off: no assemblyElection key
   HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED: 'zzzzzzzzzzzz-confluence-quota-day-1169.test.mjs', // #1169 flag off: no quotaDay key
   HARIMU_KINDLE_ELECTION_CLOCK_ENABLED: 'zzzzzzz-kindle-election-1117.test.mjs', // #1117 flag off: no electionClock key

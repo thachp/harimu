@@ -1,10 +1,141 @@
 /** In-process fixtures only. No HTTP listener, Clerk session, credential or live D1 access. */
+import { createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdtemp, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { access, copyFile, link, mkdtemp, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
+
+// Placeholder used only while rewriting imports. Compiled modules use relative
+// specifiers for fixture files, so one compile can be hardlinked into every
+// fixture directory. Node keys the ESM cache by URL, and a hardlink keeps a
+// distinct URL per fixture, so each fixture still gets its own clock and env.
+const FIXTURE_PREFIX = '/harimu-fixture-root';
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
+let compiledCachePromise;
+
+function compiledDestination(sourcePath) {
+  return sourcePath.replace(/\.ts$/, '.mjs');
+}
+
+function runtimeTarget(specifier, sourcePath) {
+  const bare = specifier.replace(/\.tsx?$/, '');
+  if (specifier === 'cloudflare:workers') return join(FIXTURE_PREFIX, 'fixture-env.mjs');
+  if (specifier.endsWith('.mjs')) return specifier.startsWith('@/') ? resolve(repoRoot, specifier.slice(2)) : resolve(repoRoot, dirname(sourcePath), specifier);
+  if (specifier === '@/lib/ballot-privacy' || specifier === './ballot-privacy') return join(FIXTURE_PREFIX, 'lib/fixture-ballot-privacy.mjs');
+  if (specifier === '@/lib/verification') return join(FIXTURE_PREFIX, 'lib/fixture-verification.mjs');
+  if (specifier.startsWith('@/')) return join(FIXTURE_PREFIX, `${bare.slice(2)}.mjs`);
+  if (specifier.startsWith('.')) return resolve(FIXTURE_PREFIX, dirname(sourcePath), `${bare}.mjs`);
+  throw new Error(`Unexpected external runtime dependency: ${specifier}`);
+}
+
+function importSpecifier(target, destRel) {
+  const destFile = join(FIXTURE_PREFIX, destRel);
+  if (target === FIXTURE_PREFIX || target.startsWith(`${FIXTURE_PREFIX}/`)) {
+    let spec = relative(dirname(destFile), target);
+    if (!spec.startsWith('.')) spec = `./${spec}`;
+    return spec;
+  }
+  return pathToFileURL(target).href;
+}
+
+function rewriteRuntimeSource(source, sourcePath) {
+  const destRel = compiledDestination(sourcePath);
+  const rewritten = source.replace(/from (['"])([^'"]+)\1/g, (_match, _quote, specifier) => `from ${JSON.stringify(importSpecifier(runtimeTarget(specifier, sourcePath), destRel))}`);
+  const output = ts.transpileModule(rewritten, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return `import { Date } from ${JSON.stringify(importSpecifier(join(FIXTURE_PREFIX, 'fixture-clock.mjs'), destRel))};\n${output}`;
+}
+
+async function cacheIsReady(cacheRoot) {
+  try { await access(join(cacheRoot, 'READY')); return true; }
+  catch { return false; }
+}
+
+function processAlive(pid) {
+  if (!pid) return false;
+  try { process.kill(pid, 0); return true; }
+  catch { return false; }
+}
+
+async function writeCompiledModules(cacheRoot, sources) {
+  await Promise.all(sources.map(async ({ sourcePath, source }) => {
+    const rel = compiledDestination(sourcePath);
+    const dest = join(cacheRoot, rel);
+    await mkdir(dirname(dest), { recursive: true });
+    await writeFile(dest, rewriteRuntimeSource(source, sourcePath));
+  }));
+  const readyTmp = join(cacheRoot, 'READY.tmp');
+  await writeFile(readyTmp, '1');
+  await rename(readyTmp, join(cacheRoot, 'READY'));
+}
+
+// Every localRuntime() used to transpile the whole server graph into a fresh
+// temp directory. That compile is identical for every fixture (the clock, env
+// and privacy stubs are the only per-call files), and it dominated Node CI.
+// The compiled graph is stored once per source hash and hardlinked after that.
+async function locateCompiledCache(modules) {
+  const sources = await Promise.all(modules.map(async sourcePath => ({ sourcePath, source: await readFile(join(repoRoot, sourcePath), 'utf8') })));
+  const hash = createHash('sha256');
+  hash.update('harimu-local-runtime-v1\0');
+  hash.update(repoRoot);
+  for (const { sourcePath, source } of sources) hash.update(`\0${sourcePath}\0${source}`);
+  const cacheRoot = join(tmpdir(), 'harimu-local-runtime', hash.digest('hex'));
+  const lockPath = join(cacheRoot, 'LOCK');
+  for (let attempt = 0; attempt < 400; attempt++) {
+    if (await cacheIsReady(cacheRoot)) return cacheRoot;
+    let handle;
+    try {
+      await mkdir(cacheRoot, { recursive: true });
+      handle = await open(lockPath, 'wx');
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      await new Promise(resolveWait => setTimeout(resolveWait, 50));
+      try {
+        const pid = Number(await readFile(lockPath, 'utf8'));
+        if (!processAlive(pid)) await rm(lockPath, { force: true });
+      } catch { /* the lock disappeared, or another process still owns it */ }
+      continue;
+    }
+    try {
+      await handle.writeFile(String(process.pid));
+      if (!(await cacheIsReady(cacheRoot))) await writeCompiledModules(cacheRoot, sources);
+      return cacheRoot;
+    } finally {
+      await handle.close();
+      await rm(lockPath, { force: true });
+    }
+  }
+  throw new Error('Timed out preparing the localRuntime compile cache');
+}
+
+function ensureCompiledCache(modules) {
+  if (!compiledCachePromise) compiledCachePromise = locateCompiledCache(modules);
+  return compiledCachePromise;
+}
+
+// The module list names a few files twice. The old writer overwrote the same
+// output; a second hardlink to that path throws EEXIST.
+function uniqueModules(modules) {
+  const seen = new Set();
+  const unique = [];
+  for (const sourcePath of modules) if (!seen.has(sourcePath)) { seen.add(sourcePath); unique.push(sourcePath); }
+  return unique;
+}
+
+async function linkCompiledModules(cacheRoot, directory, modules) {
+  await Promise.all(modules.map(async sourcePath => {
+    const rel = compiledDestination(sourcePath);
+    const dest = join(directory, rel);
+    await mkdir(dirname(dest), { recursive: true });
+    try {
+      await link(join(cacheRoot, rel), dest);
+    } catch (error) {
+      if (error.code !== 'EXDEV') throw error;
+      await copyFile(join(cacheRoot, rel), dest);
+    }
+  }));
+}
 
 class Statement {
   constructor(db, sql, params = []) { this.db = db; this.sql = sql; this.params = params; }
@@ -31,7 +162,7 @@ class LocalD1 {
 }
 
 export async function localRuntime({accountElection=false,accountElectionBindings,ballotPrivacyReady=false,presidentialCalendar=false,backend=process.env.HARIMU_TEST_STORAGE??'sqlite'}={}) {
-  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const root = repoRoot;
   const directory = await mkdtemp(join(tmpdir(), 'harimu-two-account-'));
   const path = join(directory, 'fixture.sqlite');
   const modules = [
@@ -40,7 +171,7 @@ export async function localRuntime({accountElection=false,accountElectionBinding
     'lib/preview-election.ts','lib/ballot-privacy.ts','lib/instant-runoff.ts','lib/elections.ts','lib/election-calendars.ts','lib/kindle-certification-copy.ts','lib/kindle-certification-rules.ts','app/api/election/route.ts',
     'lib/collective-petitions.ts','lib/cabinet-response-ai.ts','lib/cabinet-cron.ts','app/api/petitions/route.ts',
     'lib/mvp-job-types.ts', 'lib/game-season.ts', 'lib/season-yield.ts', 'app/api/jobs/types/route.ts', 'lib/postgres/readiness.ts', 'lib/db.ts', 'lib/economy.ts', 'lib/income-tax.ts', 'lib/economy-rules.ts', 'lib/market.ts', 'lib/market-orders.ts', 'lib/wallet.ts',
-    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-soft-cap.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/varkand-directorate.ts', 'lib/varkand-plebiscite.ts', 'lib/veldwood-council.ts', 'lib/veldwood-vote-day.ts', 'lib/veldwood-dividend-day.ts', 'lib/veldwood-ring-moot.ts', 'lib/fulmara-council.ts', 'lib/fulmara-resolutions.ts', 'lib/fulmara-exchange-bell.ts', 'lib/ilmar-sanctum.ts', 'lib/ilmar-feast-of-first-light.ts', 'lib/ilmar-great-pilgrimage.ts', 'lib/ilmar-assembly-election-day.ts', 'lib/ilmar-prism-contracts.ts', 'lib/confluence-assembly-election.ts', 'lib/confluence-party.ts', 'lib/confluence-quota-day.ts', 'lib/confluence-congress-lanterns.ts', 'lib/meridian-party.ts', 'lib/meridian-exam-day.ts', 'lib/meridian-turbine-day.ts', 'lib/meridian-congress-week.ts', 'lib/fulmara-charter-day.ts', 'lib/fulmara-fair-wind-blessing.ts', 'lib/fulmara-grand-regatta.ts', 'lib/fulmara-dock-strike-remembrance.ts', 'lib/korund-plan-calendar.ts', 'lib/korund-chairman-birthday.ts', 'lib/korund-peoples-congress.ts', 'lib/aurelle-crown-calendar.ts', 'lib/aurelle-coronation-day.ts', 'lib/aurelle-charter-fair.ts', 'lib/aurelle-hearth-night.ts', 'lib/kindle-election.ts', 'lib/hoarvale-aurora-night.ts', 'lib/hoarvale-honors-list-day.ts', 'lib/hoarvale-moot-opening.ts', 'lib/hoarvale-election-night.ts', 'lib/kindle-founders-forge-day.ts', 'lib/kindle-market-bell.ts', 'lib/varkand-lantern-watch.ts', 'lib/varkand-muster-day.ts', 'lib/varkand-rotation-day.ts', 'lib/confluence-canal-festival.ts', 'lib/hoarvale-assent.ts', 'lib/government.ts',
+    'lib/player-market.ts', 'lib/work-shifts.ts', 'lib/shift-soft-cap.ts', 'lib/shift-quality.ts', 'lib/shift-quality-key.ts', 'lib/varkand-directorate.ts', 'lib/varkand-plebiscite.ts', 'lib/veldwood-council.ts', 'lib/veldwood-vote-day.ts', 'lib/veldwood-dividend-day.ts', 'lib/veldwood-ring-moot.ts', 'lib/fulmara-council.ts', 'lib/fulmara-resolutions.ts', 'lib/fulmara-exchange-bell.ts', 'lib/ilmar-sanctum.ts', 'lib/ilmar-feast-of-first-light.ts', 'lib/ilmar-great-pilgrimage.ts', 'lib/ilmar-assembly-election-day.ts', 'lib/ilmar-prism-contracts.ts', 'lib/confluence-assembly-election.ts', 'lib/confluence-party.ts', 'lib/confluence-quota-day.ts', 'lib/confluence-congress-lanterns.ts', 'lib/meridian-party.ts', 'lib/meridian-exam-day.ts', 'lib/meridian-turbine-day.ts', 'lib/meridian-congress-week.ts', 'lib/fulmara-charter-day.ts', 'lib/fulmara-fair-wind-blessing.ts', 'lib/fulmara-grand-regatta.ts', 'lib/fulmara-dock-strike-remembrance.ts', 'lib/korund-plan-calendar.ts', 'lib/korund-chairman-birthday.ts', 'lib/korund-peoples-congress.ts', 'lib/aurelle-crown-calendar.ts', 'lib/aurelle-coronation-day.ts', 'lib/aurelle-charter-fair.ts', 'lib/aurelle-hearth-night.ts', 'lib/kindle-election.ts', 'lib/hoarvale-aurora-night.ts', 'lib/hoarvale-honors-list-day.ts', 'lib/hoarvale-moot.ts', 'lib/hoarvale-moot-opening.ts', 'lib/hoarvale-election-night.ts', 'lib/kindle-founders-forge-day.ts', 'lib/kindle-market-bell.ts', 'lib/varkand-lantern-watch.ts', 'lib/varkand-muster-day.ts', 'lib/varkand-rotation-day.ts', 'lib/varkand-red-alert-cancels.ts', 'lib/confluence-canal-festival.ts', 'lib/hoarvale-assent.ts', 'lib/government.ts',
     'lib/korund-plan-stats.ts', 'lib/national-news.ts', 'app/api/news/route.ts', 'lib/government-state.ts', 'lib/policy-ledger.ts', 'lib/government-disclosure.ts', 'lib/square-chat.ts','lib/chat-shadow-mute.ts', 'lib/diplomatic-hall.ts', 'lib/founding-period.ts', 'lib/founding-period-copy.ts', 'lib/aurelle-succession.ts', 'lib/aurelle-succession-rules.ts', 'app/api/aurelle-succession/route.ts', 'lib/diplomatic-hall-copy.ts', 'app/api/diplomatic-hall/route.ts', 'lib/command-request.ts',
     'lib/verification.ts',
     'lib/religious-harmony.ts','lib/holy-sites.ts','app/api/faith/holy-sites/route.ts','lib/topbar-countdown.ts','lib/veldwood-wallet-dividend.ts','lib/world-simulation.ts','lib/world-atlas-reads.ts','lib/stability.ts','lib/population-bands.ts','lib/nation-discovery.ts',
@@ -107,25 +238,8 @@ export async function readVerification(userId) {
   return validate(userId, enabled ? { async read(id) { const value = evidence.get(id); if (value instanceof Error) throw value; return value ?? null; } } : undefined, Date.now());
 }
 `);
-  for (const sourcePath of modules) {
-    let source = await readFile(join(root, sourcePath), 'utf8');
-    source = source.replace(/from (['"])([^'"]+)\1/g, (match, quote, specifier) => {
-      let target;
-      const bare = specifier.replace(/\.tsx?$/, '');
-      if (specifier === 'cloudflare:workers') target = envPath;
-      else if (specifier.endsWith('.mjs')) target = specifier.startsWith('@/') ? resolve(root, specifier.slice(2)) : resolve(root, dirname(sourcePath), specifier);
-      else if (specifier === '@/lib/ballot-privacy'||specifier === './ballot-privacy') target=privacyPath;
-      else if (specifier === '@/lib/verification') target = verificationPath;
-      else if (specifier.startsWith('@/')) target = join(directory, `${bare.slice(2)}.mjs`);
-      else if (specifier.startsWith('.')) target = resolve(directory, dirname(sourcePath), `${bare}.mjs`);
-      else throw new Error(`Unexpected external runtime dependency: ${specifier}`);
-      return `from ${JSON.stringify(pathToFileURL(target).href)}`;
-    });
-    const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-    const destination = join(directory, sourcePath.replace(/\.ts$/, '.mjs'));
-    await mkdir(dirname(destination), { recursive: true });
-    await writeFile(destination, `import { Date } from ${JSON.stringify(pathToFileURL(clockPath).href)};\n${output}`);
-  }
+  const compiledModules = uniqueModules(modules);
+  await linkCompiledModules(await ensureCompiledCache(compiledModules), directory, compiledModules);
   const cabinetAi=await import(pathToFileURL(join(directory,'lib/cabinet-response-ai.mjs')).href);
   const notableService=await import(pathToFileURL(join(directory,'lib/notables.mjs')).href);
   const notables=await import(pathToFileURL(join(directory,'app/api/notables/route.mjs')).href);
