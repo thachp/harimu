@@ -1,6 +1,6 @@
 /** #1275: Marrow Mills, Veldwood resident city behind HARIMU_VELDWOOD_MARROW_MILLS_ENABLED.
  *  Flag off: residentCitiesForNation, cityForNation, enroll, home, travel and the city panel match today,
- *  including when Ring Moot and Dunmorrow are on. Not a country-map pin. citiesForNation('veldwood') stays capital plus two.
+ *  including when Ring Moot is on alone and when Dunmorrow is on alone. Not a country-map pin. citiesForNation('veldwood') stays capital plus two.
  *  No festival host, imports, or sea-lane effect.
  *  Provisional GRAY 76 (last on origin/dev 2dc1dc32). Expected to land around 79 after #1266, #1272 and #1273. */
 import assert from 'node:assert/strict';
@@ -15,7 +15,6 @@ import { localRuntime } from './helpers/local-runtime.mjs';
 const FLAG = MARROW_MILLS_FLAG;
 const RING_MOOT = 'HARIMU_VELDWOOD_RING_MOOT_ENABLED';
 const DUNMORROW = 'HARIMU_AURELLE_DUNMORROW_ENABLED';
-const siblingsOn = { HARIMU_GRAY_PACK: { [RING_MOOT]: 'true', [DUNMORROW]: 'true' } };
 const ids = ['ringhall', 'ashglade', 'fernhollow'];
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
 const clear = () => bindMarrowMillsEnv(undefined);
@@ -130,18 +129,18 @@ test('flag off: enroll, travel, home and the panel omit Marrow Mills; flag on: r
   assert.equal(JSON.stringify(hidden.data).includes('marrow-mills'), false);
 });
 
-test('flag off: Ring Moot and Dunmorrow on still omit Marrow Mills from lists, enroll, home, travel and flags', async t => {
+async function assertMarrowOmittedWhileSiblingOn(t, sibling, label) {
   clear();
-  bindMarrowMillsEnv(siblingsOn);
+  bindMarrowMillsEnv({ HARIMU_GRAY_PACK: { [sibling]: 'true' } });
   try {
     assert.deepEqual(citiesForNation('veldwood').map(c => c.id), ids, 'catalog is unchanged');
-    assert.deepEqual(residentCitiesForNation('veldwood').map(c => c.id), ids, 'Ring Moot and Dunmorrow on, Marrow Mills off: no marrow-mills');
+    assert.deepEqual(residentCitiesForNation('veldwood').map(c => c.id), ids, `${label} on, Marrow Mills off: no marrow-mills`);
     assert.equal(cityForNation('veldwood', 'marrow-mills'), undefined);
   } finally { clear(); }
 
   const r = await localRuntime(); t.after(() => r.close());
-  r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({ [RING_MOOT]: 'true', [DUNMORROW]: 'true' }));
-  assert.equal((await r.call('citizen', 'alice')).data.flags.marrowMills, undefined, 'Ring Moot and Dunmorrow on, Marrow Mills off: no flags.marrowMills');
+  r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({ [sibling]: 'true' }));
+  assert.equal((await r.call('citizen', 'alice')).data.flags.marrowMills, undefined, `${label} on, Marrow Mills off: no flags.marrowMills`);
   assert.equal(JSON.stringify((await r.call('city', 'alice')).data).includes('marrow-mills'), false);
   openVeldwood(r);
   const grove = await r.call('citizen', 'grove', { action: 'enroll', nationId: 'veldwood', expectedNationId: null });
@@ -157,4 +156,12 @@ test('flag off: Ring Moot and Dunmorrow on still omit Marrow Mills from lists, e
   assert.equal(JSON.stringify(capital.data).includes('marrow-mills'), false);
   assert.equal((await r.call('citizen', 'grove')).data.flags.marrowMills, undefined);
   assert.deepEqual(citiesForNation('veldwood').map(c => c.id), ids);
+}
+
+test('flag off: Ring Moot on still omits Marrow Mills from lists, enroll, home, travel and flags', async t => {
+  await assertMarrowOmittedWhileSiblingOn(t, RING_MOOT, 'Ring Moot');
+});
+
+test('flag off: Dunmorrow on still omits Marrow Mills from lists, enroll, home, travel and flags', async t => {
+  await assertMarrowOmittedWhileSiblingOn(t, DUNMORROW, 'Dunmorrow');
 });
