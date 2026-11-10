@@ -29,6 +29,7 @@ import { FULMARA_FAIR_WIND_BLESSING_CYCLE_DAYS, fulmaraNextFairWindBlessingAt } 
 import { fulmaraResolutions, type FulmaraResolution } from './fulmara-resolutions.ts';
 import { VELDWOOD_COUNCIL_TERM_DAYS, VELDWOOD_SPEAKER_ROTATION_DAYS, veldwoodCouncilSpeakerSeat, veldwoodNextCouncilElectionAt } from './veldwood-council.ts';
 import { VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS, veldwoodNextDividendDayAt } from './veldwood-dividend-day.ts';
+import { VELDWOOD_RING_MOOT_CYCLE_DAYS, veldwoodNextRingMootAt } from './veldwood-ring-moot.ts';
 import { VELDWOOD_VOTE_DAY_CYCLE_DAYS, veldwoodNextVoteDayAt } from './veldwood-vote-day.ts';
 import { HOARVALE_AURORA_NIGHT_CYCLE_DAYS, hoarvaleNextAuroraNightAt } from './hoarvale-aurora-night.ts';
 import { hoarvaleNextElectionNightAt } from './hoarvale-election-night.ts';
@@ -64,6 +65,8 @@ export type GovernmentSnapshot = {
   voteDayCalendar?: { nextAt: number; cycleDays: 15 };
   /** #1159 Veldwood: next Dividend Day (once per game year = 30 real days). Present only while HARIMU_VELDWOOD_DIVIDEND_DAY_ENABLED is on. Pays no dividend and states no amount. */
   dividendDay?: { nextAt: number; cycleDays: 30 };
+  /** #1244 Veldwood: next midsummer Ring Moot (once per game year = 30 real days, midsummer offset). Present only while HARIMU_VELDWOOD_RING_MOOT_ENABLED is on. Date only. */
+  ringMoot?: { nextAt: number; cycleDays: 30 };
   /** #1102 Fulmara: Council of Ten, Lodestar and the Tribune session. Present only while HARIMU_FULMARA_COUNCIL_ENABLED is on. */
   grandCouncil?: {
     councilOfTenNextElectionAt: number; councilOfTenTermDays: 30;
@@ -516,6 +519,12 @@ export function withVeldwoodDividendDay(snapshot: GovernmentSnapshot, nowMs: num
   return { ...snapshot, dividendDay: { nextAt: veldwoodNextDividendDayAt(nowMs), cycleDays: VELDWOOD_DIVIDEND_DAY_CYCLE_DAYS as 30 } };
 }
 
+/** #1244. Flag off, or any nation but Veldwood: the same snapshot, and no ringMoot key. Date only. */
+export function withVeldwoodRingMoot(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
+  if (!enabled || snapshot.nationId !== 'veldwood') return snapshot;
+  return { ...snapshot, ringMoot: { nextAt: veldwoodNextRingMootAt(nowMs), cycleDays: VELDWOOD_RING_MOOT_CYCLE_DAYS as 30 } };
+}
+
 /** #1102. Flag off, or any nation but Fulmara: the same snapshot, and no grandCouncil key. */
 export function withFulmaraCouncil(snapshot: GovernmentSnapshot, nowMs: number, enabled: boolean): GovernmentSnapshot {
   if (!enabled || snapshot.nationId !== 'fulmara') return snapshot;
@@ -927,6 +936,21 @@ export function veldwoodDividendDaySnapshot(nowMs: number, enabled: boolean): Go
     },
     availableBudgetMinor: 0,
     influenceSummary: 'The Common Fund pays a yearly Citizen Dividend. This read names the date only.',
+  }, nowMs, true);
+}
+
+/** Veldwood read while only the Ring Moot flag is on. No federalCouncil, voteDayCalendar, or dividendDay key. Flag off returns null, which is today's read. */
+export function veldwoodRingMootSnapshot(nowMs: number, enabled: boolean): GovernmentSnapshot | null {
+  if (!enabled) return null;
+  return withVeldwoodRingMoot({
+    nationId: 'veldwood', mode: 'rule-bound simulation',
+    roles: [{ name: 'Ring Moot', controller: 'AI/SI role · deterministic rules' }],
+    decision: {
+      title: 'Ring Moot', topic: 'infrastructure', proposedSpendMinor: 0,
+      reason: 'Ring Moot is the midsummer federation gathering, once per game year. This read names the next Ring Moot. It opens no vote, lists no motions, and states no turnout.',
+    },
+    availableBudgetMinor: 0,
+    influenceSummary: 'The federation gathers at midsummer for Ring Moot. This read names the date only.',
   }, nowMs, true);
 }
 
