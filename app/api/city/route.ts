@@ -3,7 +3,7 @@ import {getDatabase} from '@/lib/db';
 import {startCityTravel} from '@/lib/travel';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {bindBrasswellPortEnv,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port
+import {bindBrasswellPortEnv,bindVakkHarborEnv,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1261 port
 import {spaWcBonusEnabled,spaWcNote} from '@/lib/spa-recovery'; // #798
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
@@ -13,6 +13,7 @@ import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
 import {seaLanesStormNote} from '@/lib/game-season'; // #1034
 import {seasonAt} from '@/lib/season-yield'; // #1035 shared season: null without a clock
 bindBrasswellPortEnv(env); // #1241: resident lookup reads the Worker env; flag off adds no city
+bindVakkHarborEnv(env); // #1261: same for Vakk Harbor. Flag off adds no city.
 export const dynamic='force-dynamic';
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'private, no-store'}});
 async function context(request:Request){

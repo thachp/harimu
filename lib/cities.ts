@@ -2,8 +2,9 @@
 import { flagOn } from './flag-pack.mjs';
 export type CityRole = 'capital' | 'frontier' | string;
 export type City = { id: string; nationId: string; name: string; capital: boolean; role: CityRole; description: string; spa?: true };
-/** #1241: Kindle resident port. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
+/** #1241 Kindle port, #1261 Hoarvale port. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
 export const BRASSWELL_PORT_FLAG = 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED';
+export const VAKK_HARBOR_FLAG = 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED';
 // Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
 const roles: Record<string, string> = {"Tarrek Foundry": "Industry", "Kolt Savanna": "Farming", "Lanu Terraces": "Farming", "Oalin Harbor": "Port / fisheries", "Tsenga SEZ": "Trade zone", "Holv Gorge": "Energy / industry", "Strova Mines": "Mining", "Gren Plateau": "Farming", "Windrest": "Silk / crafts", "Highmere": "Farming / fief", "Lume Mesa": "Pilgrimage", "Glassen": "Industry (Sunglass)", "Fjeldmark": "Frostcore / logistics", "Isling Springs": "Spa / tourism", "Voren Light": "Port / signals", "Moorhald": "Farming / peat", "Ashglade": "Timber / crafts", "Fernhollow": "Farming", "Vendezzo": "Shipyard", "Malvara Rods": "Energy (Stormcells)"};
 // Canonical city names and visual lore, GDD nation pages /world/nations/ (read 2026-10-13).
@@ -35,17 +36,24 @@ const spaAdditions: readonly City[] = [
 /** #1241: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not an Assembly district (citiesForNation stays capital + two) and no country-map pin.
  *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Lighthouse of the Spark landmark stays off this line, as Emberwell's description omits The Ember Pools. */
 const brasswellPort: City = { id: 'brasswell-port', nationId: 'kindle', name: 'Brasswell Port', capital: false, role: 'Port / trade', description: 'Brass cranes and shade-awning docks on black sand along the eastern coast.' };
+/** #1261: same resident path as the #798 spa additions and #1241 (home, enroll, travel-by-id). No country-map pin.
+ *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Old Lighthouse stays off this line, as Brasswell omitted the Lighthouse of the Spark. */
+const vakkHarbor: City = { id: 'vakk-harbor', nationId: 'hoarvale', name: 'Vakk Harbor', capital: false, role: 'Port / fisheries', description: 'Timber wharves and fish-drying racks on the western fjord coast.' };
 let boundEnv: unknown;
+let vakkEnv: unknown;
 /** Routes pass the Worker env. Unset: node tests use process.env. A bound env wins, including "false". */
 export function bindBrasswellPortEnv(env: unknown) { boundEnv = env; }
-function brasswellPortEnabled(): boolean {
-  if (boundEnv !== undefined) return flagOn(boundEnv, BRASSWELL_PORT_FLAG);
-  try { return typeof process !== 'undefined' && flagOn(process.env, BRASSWELL_PORT_FLAG); } catch { return false; }
+export function bindVakkHarborEnv(env: unknown) { vakkEnv = env; }
+function flagEnabled(env: unknown, name: string): boolean {
+  if (env !== undefined) return flagOn(env, name);
+  try { return typeof process !== 'undefined' && flagOn(process.env, name); } catch { return false; }
 }
-const portResidents = (): readonly City[] => brasswellPortEnabled() ? [brasswellPort] : [];
+function brasswellPortEnabled(): boolean { return flagEnabled(boundEnv, BRASSWELL_PORT_FLAG); }
+function vakkHarborEnabled(): boolean { return flagEnabled(vakkEnv, VAKK_HARBOR_FLAG); }
+const portResidents = (): readonly City[] => [...(brasswellPortEnabled() ? [brasswellPort] : []), ...(vakkHarborEnabled() ? [vakkHarbor] : [])];
 const byId = (nationId: string, cityId: string) => (city: City) => city.nationId === nationId && city.id === cityId;
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
-/** Catalog cities plus spa additions a citizen may call home (#798), plus Brasswell Port when its flag is on (#1241). */
+/** Catalog cities plus spa additions a citizen may call home (#798), plus resident ports when their flags are on (#1241, #1261). */
 export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId)]; }
 export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }

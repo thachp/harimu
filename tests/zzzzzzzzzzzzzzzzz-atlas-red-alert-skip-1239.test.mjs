@@ -1,5 +1,5 @@
 /** #1239: atlas nextFestival skips Varkand celebrations canceled at Red Alert (#1220/#1227).
- *  No new flag. Recounted after origin/dev e9677548: GRAY 70, #1243 Kite Festival last, red-alert cancels at -3.
+ *  No new flag. Pack length and the red-alert slot are asserted below; this file adds no flag.
  *  Architect ruling: SKIP (do not mark canceled) in simulation.clock.nextFestival.
  *  Skipped names match #1220: Muster Day, Rotation Day, Lantern Watch. Mandate Plebiscite stays.
  *  Gate: HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED on AND HARIMU_VARKAND_ALERT_ENABLED on AND stored level red.
@@ -41,9 +41,9 @@ test('#1239: reused cancel helper identity and celebration names match #1220', (
     assert.equal(source.nationId, 'varkand', name);
   }
   assert.equal(worldFestivalSources.find(s => s.name === 'Mandate Plebiscite').nationId, 'varkand');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 72, '#1239 adds no flag');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), CANCELS);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 73, '#1239 adds no flag');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), CANCELS);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
   assert.equal(flagOn({ [CANCELS]: 'true' }, CANCELS), true);
 });
 
