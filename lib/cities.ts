@@ -12,6 +12,8 @@ export const CORVEL_ISLES_REGATTA_NOTE = 'Hosts the Grand Regatta';
 export const DUNMORROW_FLAG = 'HARIMU_AURELLE_DUNMORROW_ENABLED';
 /** #1242: the one city-panel line. The next date is the #1146 clock, shown only when that flag is also on. */
 export const DUNMORROW_HEARTH_NOTE = 'Hosts Hearth Night';
+/** #1271: Ilmar resident oasis town. Preview "true" / production "false" inside HARIMU_GRAY_PACK. A direct string still wins. */
+export const THESSALY_WELLS_FLAG = 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED';
 // Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
 const roles: Record<string, string> = {"Tarrek Foundry": "Industry", "Kolt Savanna": "Farming", "Lanu Terraces": "Farming", "Oalin Harbor": "Port / fisheries", "Tsenga SEZ": "Trade zone", "Holv Gorge": "Energy / industry", "Strova Mines": "Mining", "Gren Plateau": "Farming", "Windrest": "Silk / crafts", "Highmere": "Farming / fief", "Lume Mesa": "Pilgrimage", "Glassen": "Industry (Sunglass)", "Fjeldmark": "Frostcore / logistics", "Isling Springs": "Spa / tourism", "Voren Light": "Port / signals", "Moorhald": "Farming / peat", "Ashglade": "Timber / crafts", "Fernhollow": "Farming", "Vendezzo": "Shipyard", "Malvara Rods": "Energy (Stormcells)"};
 // Canonical city names and visual lore, GDD nation pages /world/nations/ (read 2026-10-13).
@@ -49,13 +51,19 @@ const corvelIsles: City = { id: 'corvel-isles', nationId: 'fulmara', name: 'Corv
 /** #1242: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not on the country map (that map is three fixed pins) and citiesForNation stays capital + two.
  *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Hearth of the Houses landmark stays off this line, as Emberwell's description omits The Ember Pools. */
 const dunmorrow: City = { id: 'dunmorrow', nationId: 'aurelle', name: 'Dunmorrow', capital: false, role: 'Religious center', description: 'Kinward name-stone halls in white stone along the eastern gorge.' };
+/** #1271: same resident path as the #798 spa additions (home, enroll, travel-by-id). Not a country-map pin (that map is three fixed pins) and citiesForNation stays capital plus two.
+ *  [ASSUMPTION] one-line description joins the docs Look and Region columns; the Seven Wells landmark stays off this line, as Brasswell's description omitted the Lighthouse of the Spark.
+ *  [ASSUMPTION] the capture line is the existing heartland sentence. Farming / oasis is not a port or trade zone, so cityHasImports stays false. */
+const thessalyWells: City = { id: 'thessaly-wells', nationId: 'ilmar', name: 'Thessaly Wells', capital: false, role: 'Farming / oasis', description: 'Date palms around shaded courtyards in the eastern oasis belt.' };
 let boundEnv: unknown;
 let corvelBound: unknown;
 let dunmorrowBound: unknown;
+let thessalyBound: unknown;
 /** Routes pass the Worker env. Unset: node tests use process.env. A bound env wins, including "false". */
 export function bindBrasswellPortEnv(env: unknown) { boundEnv = env; }
 export function bindCorvelIslesEnv(env: unknown) { corvelBound = env; }
 export function bindDunmorrowEnv(env: unknown) { dunmorrowBound = env; }
+export function bindThessalyWellsEnv(env: unknown) { thessalyBound = env; }
 function brasswellPortEnabled(): boolean {
   if (boundEnv !== undefined) return flagOn(boundEnv, BRASSWELL_PORT_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, BRASSWELL_PORT_FLAG); } catch { return false; }
@@ -68,14 +76,19 @@ function dunmorrowEnabled(): boolean {
   if (dunmorrowBound !== undefined) return flagOn(dunmorrowBound, DUNMORROW_FLAG);
   try { return typeof process !== 'undefined' && flagOn(process.env, DUNMORROW_FLAG); } catch { return false; }
 }
+function thessalyWellsEnabled(): boolean {
+  if (thessalyBound !== undefined) return flagOn(thessalyBound, THESSALY_WELLS_FLAG);
+  try { return typeof process !== 'undefined' && flagOn(process.env, THESSALY_WELLS_FLAG); } catch { return false; }
+}
 const portResidents = (): readonly City[] => brasswellPortEnabled() ? [brasswellPort] : [];
 const corvelResidents = (): readonly City[] => corvelIslesEnabled() ? [corvelIsles] : [];
 const dunmorrowResidents = (): readonly City[] => dunmorrowEnabled() ? [dunmorrow] : [];
+const thessalyResidents = (): readonly City[] => thessalyWellsEnabled() ? [thessalyWells] : [];
 const byId = (nationId: string, cityId: string) => (city: City) => city.nationId === nationId && city.id === cityId;
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
-/** Catalog cities plus spa additions a citizen may call home (#798), plus Brasswell Port when its flag is on (#1241), plus Dunmorrow when its flag is on (#1242), plus Corvel Isles when its flag is on (#1259). */
-export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId)]; }
-export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)); }
+/** Catalog cities plus spa additions a citizen may call home (#798), plus Brasswell Port when its flag is on (#1241), plus Dunmorrow when its flag is on (#1242), plus Corvel Isles when its flag is on (#1259), plus Thessaly Wells when its flag is on (#1271). */
+export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...thessalyResidents().filter(city => city.nationId === nationId)]; }
+export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? thessalyResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
 
 /** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its
