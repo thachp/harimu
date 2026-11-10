@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { bindDunkarPassEnv, bindRuelWorksEnv, bindThessalyWellsEnv, bindVakkHarborEnv, citiesForNation, cityCaptureNote, cityCivicUnitNote, cityForNation, cityHasImports, cityImportsNote, citySpecialtyFields, DUNKAR_PASS_FLAG, HEARTLAND_CAPTURE_NOTE, residentCitiesForNation, RUEL_WORKS_FLAG, THESSALY_WELLS_FLAG, VAKK_HARBOR_FLAG } from '../lib/cities.ts';
+import { bindDaoWorksEnv, bindDunkarPassEnv, bindMarrowMillsEnv, bindRuelWorksEnv, bindThessalyWellsEnv, bindVakkHarborEnv, citiesForNation, cityCaptureNote, cityCivicUnitNote, cityForNation, cityHasImports, cityImportsNote, citySpecialtyFields, DAO_WORKS_FLAG, DUNKAR_PASS_FLAG, HEARTLAND_CAPTURE_NOTE, MARROW_MILLS_FLAG, residentCitiesForNation, RUEL_WORKS_FLAG, THESSALY_WELLS_FLAG, VAKK_HARBOR_FLAG } from '../lib/cities.ts';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { seasonLengthMs, seasonOrder } from '../lib/game-season.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
@@ -17,7 +17,7 @@ const LANTERN = 'HARIMU_VARKAND_LANTERN_WATCH_ENABLED';
 const MUSTER = 'HARIMU_VARKAND_MUSTER_DAY_ENABLED';
 const ids = ['watchfast', 'voren-light', 'moorhald'];
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
-const clear = () => { bindDunkarPassEnv(undefined); bindRuelWorksEnv(undefined); bindThessalyWellsEnv(undefined); bindVakkHarborEnv(undefined); delete process.env[FLAG]; delete process.env[RUEL_WORKS_FLAG]; delete process.env[THESSALY_WELLS_FLAG]; delete process.env[VAKK_HARBOR_FLAG]; delete process.env[LANTERN]; delete process.env[MUSTER]; };
+const clear = () => { bindDunkarPassEnv(undefined); bindRuelWorksEnv(undefined); bindThessalyWellsEnv(undefined); bindVakkHarborEnv(undefined); bindDaoWorksEnv(undefined); bindMarrowMillsEnv(undefined); delete process.env[FLAG]; delete process.env[RUEL_WORKS_FLAG]; delete process.env[THESSALY_WELLS_FLAG]; delete process.env[VAKK_HARBOR_FLAG]; delete process.env[DAO_WORKS_FLAG]; delete process.env[MARROW_MILLS_FLAG]; delete process.env[LANTERN]; delete process.env[MUSTER]; };
 const openVarkand = r => {
   r.setFixtureEnv('HARIMU_VARKAND_ENABLED', 'true');
   r.setFixtureEnv('HARIMU_NATION_READINESS_ENABLED', 'false');
@@ -99,6 +99,34 @@ test('Vakk Harbor on does not open Dunkar Pass', () => {
   } finally { clear(); }
 });
 
+test('Dao Works on does not open Dunkar Pass', () => {
+  clear();
+  const sibling = { [FLAG]: 'false', [DAO_WORKS_FLAG]: 'true' };
+  bindDunkarPassEnv(sibling);
+  bindDaoWorksEnv(sibling);
+  try {
+    assert.equal(cityForNation('meridian', 'dao-works')?.id, 'dao-works', 'the sibling flag is on');
+    assert.equal(cityForNation('varkand', 'dunkar-pass'), undefined);
+    assert.deepEqual(residentCitiesForNation('varkand').map(c => c.id), ids);
+    assert.equal(residentCitiesForNation('varkand').some(c => c.id === 'dunkar-pass'), false);
+    assert.deepEqual(citiesForNation('varkand').map(c => c.id), ids);
+  } finally { clear(); }
+});
+
+test('Marrow Mills on does not open Dunkar Pass', () => {
+  clear();
+  const sibling = { [FLAG]: 'false', [MARROW_MILLS_FLAG]: 'true' };
+  bindDunkarPassEnv(sibling);
+  bindMarrowMillsEnv(sibling);
+  try {
+    assert.equal(cityForNation('veldwood', 'marrow-mills')?.id, 'marrow-mills', 'the sibling flag is on');
+    assert.equal(cityForNation('varkand', 'dunkar-pass'), undefined);
+    assert.deepEqual(residentCitiesForNation('varkand').map(c => c.id), ids);
+    assert.equal(residentCitiesForNation('varkand').some(c => c.id === 'dunkar-pass'), false);
+    assert.deepEqual(citiesForNation('varkand').map(c => c.id), ids);
+  } finally { clear(); }
+});
+
 test('Thessaly Wells on does not open Dunkar Pass', () => {
   clear();
   const sibling = { [FLAG]: 'false', [THESSALY_WELLS_FLAG]: 'true' };
@@ -153,6 +181,17 @@ test('flag off: enroll, travel, home and the panel omit Dunkar Pass; flag on: re
   assert.equal(vakkFlags.ruelWorks, undefined);
   assert.equal(vakkFlags.dunkarPass, undefined, 'Vakk Harbor does not open flags.dunkarPass');
   r.setFixtureEnv(VAKK_HARBOR_FLAG, 'false');
+  r.setFixtureEnv(DAO_WORKS_FLAG, 'true');
+  const daoFlags = (await r.call('citizen', 'alice')).data.flags;
+  assert.equal(daoFlags.daoWorks, true, 'Dao Works is on');
+  assert.equal(daoFlags.dunkarPass, undefined, 'Dao Works does not open flags.dunkarPass');
+  r.setFixtureEnv(DAO_WORKS_FLAG, 'false');
+  r.setFixtureEnv(MARROW_MILLS_FLAG, 'true');
+  const marrowFlags = (await r.call('citizen', 'alice')).data.flags;
+  assert.equal(marrowFlags.marrowMills, true, 'Marrow Mills is on');
+  assert.equal(marrowFlags.daoWorks, undefined);
+  assert.equal(marrowFlags.dunkarPass, undefined, 'Marrow Mills does not open flags.dunkarPass');
+  r.setFixtureEnv(MARROW_MILLS_FLAG, 'false');
   r.setFixtureEnv(THESSALY_WELLS_FLAG, 'true');
   r.setFixtureEnv(LANTERN, 'true');
   r.setFixtureEnv(MUSTER, 'true');
