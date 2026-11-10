@@ -4,6 +4,7 @@
    Focus rings are not restyled. The zoom-path ring stays the paper focus rule; the globe label keeps #80d8ce. */
 .harimu-game[data-nation-accent] .game-inspector-title{border-bottom-color:var(--crest-accent)}
 .harimu-game[data-nation-accent] .nation-overview-stats{border-block-color:var(--crest-accent)}
+.harimu-game[data-nation-accent] .panel-v2-header-stats>div{border-color:var(--crest-accent)}
 .harimu-game[data-nation-accent] .game-inspector-title>.nation-crest svg>path:first-child,
 .harimu-game[data-nation-accent] .nation-overview-head>.nation-crest svg>path:first-child{stroke:var(--crest-accent)}
 .harimu-game[data-nation-accent] .game-zoom-path [aria-current=page]{color:var(--crest-accent-text)}

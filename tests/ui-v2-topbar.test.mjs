@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { uiV2TopbarEnabled, topBarEmblemEnabled } from '../lib/nation-emblem.ts';
 const read = p => readFile(new URL(`../${p}`, import.meta.url), 'utf8');
+/** S2 is the block that starts at its marker and stops at the next comment. #1257 appends the crest strip after it; those rules are not S2. */
+const s2Block = css => { const start = css.indexOf('/* #392 S2:'), next = css.indexOf('/*', css.indexOf('*/', start) + 2); return css.slice(start, next < 0 ? undefined : next); };
 
 test('the flag is off unless it is exactly "true", and wrangler has it on in preview and off in production', async () => {
   assert.equal(uiV2TopbarEnabled('true'), true);
@@ -30,14 +32,14 @@ test('flag off keeps the exact old header class; v2 only adds game-hud-v2', asyn
 test('every S2 CSS rule is scoped to .game-hud-v2, so flag off is untouched', async () => {
   const css = await read('app/game-shell.css'), start = css.indexOf('/* #392 S2:');
   assert.ok(start > 0, 'S2 marker present');
-  const block = css.slice(start).replace(/\/\*[\s\S]*?\*\//g, '');
+  const block = s2Block(css).replace(/\/\*[\s\S]*?\*\//g, '');
   const rules = [...block.matchAll(/(?:^|\})\s*(@media[^{]*\{)?\s*([^{}@]+)\{/g)].map(m => m[2].trim()).filter(Boolean);
   assert.ok(rules.length >= 8, `found ${rules.length} rules`);
   for (const sel of rules) for (const part of sel.split(',')) assert.match(part.trim(), /^\.game-hud-v2\b/, `unscoped selector: ${part.trim()}`);
 });
 
 test('the restyle adds no copy: no new text content in the S2 block, and the Account button keeps its own label', async () => {
-  const css = await read('app/game-shell.css'), block = css.slice(css.indexOf('/* #392 S2:')).replace(/\/\*[\s\S]*?\*\//g, '');
+  const css = await read('app/game-shell.css'), block = s2Block(css).replace(/\/\*[\s\S]*?\*\//g, '');
   for (const m of block.matchAll(/content:\s*([^;}]+)/g)) assert.equal(m[1].trim(), "''", `S2 CSS must not inject text: ${m[1]}`);
   assert.match(await read('app/account-menu.tsx'), />Account<\/button>/);
 });
