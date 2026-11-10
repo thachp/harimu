@@ -42,10 +42,9 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 3
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 38);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 39);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(37), key, 'entry 38');
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(-1), key);
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 38/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 39/);
   assert.match(await read('tests/text-bindings-988.test.mjs'), /#392 city header stats/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key));
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
@@ -61,6 +60,7 @@ test('chips use real nation and city fields, group a count, and hide a missing o
   assert.equal(formatCityPopulation('1.42m'), '1.42m');
   for (const missing of [null, undefined, '', '  ', Number.NaN, -1]) assert.equal(formatCityPopulation(missing), null);
   assert.deepEqual(cityCurrencyParts('Crown (CRN) · gold-backed'), { value: 'Crown', detail: 'CRN · gold-backed' });
+  assert.deepEqual(cityCurrencyParts('Labor Note (LN) + ration coupons'), { value: 'Labor Note', detail: 'LN + ration coupons' });
   assert.deepEqual(cityCurrencyParts('Spark (SPK) · free float'), { value: 'Spark', detail: 'SPK · free float' });
   assert.equal(cityCurrencyChip('CRN'), 'CRN');
   assert.equal(cityCurrencyChip(' (CRN)'), 'CRN');
