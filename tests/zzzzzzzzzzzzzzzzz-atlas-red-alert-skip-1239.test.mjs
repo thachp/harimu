@@ -41,10 +41,11 @@ test('#1239: reused cancel helper identity and celebration names match #1220', (
     assert.equal(source.nationId, 'varkand', name);
   }
   assert.equal(worldFestivalSources.find(s => s.name === 'Mandate Plebiscite').nationId, 'varkand');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 73, 'no new flag from #1239; #1260 Long Light is last');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), CANCELS);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_ILMAR_CLEARING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 74, 'no new flag from #1239; #1260 Long Light is last, #1242 Dunmorrow at(-2)');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), CANCELS);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_VELDWOOD_RING_MOOT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_ILMAR_CLEARING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_AURELLE_DUNMORROW_ENABLED');
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
   assert.equal(flagOn({ [CANCELS]: 'true' }, CANCELS), true);
 });
