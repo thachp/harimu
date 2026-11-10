@@ -434,7 +434,8 @@
       "NEXT_PUBLIC_HARIMU_CITY_IDENTITY": "false",
       "NEXT_PUBLIC_HARIMU_NATION_MOTTO": "false",
       "NEXT_PUBLIC_HARIMU_WORLD_ATLAS_IDENTITY": "false",
-      "NEXT_PUBLIC_HARIMU_CITY_OPEN_HOUSEHOLD": "false"
+      "NEXT_PUBLIC_HARIMU_CITY_OPEN_HOUSEHOLD": "false",
+      "NEXT_PUBLIC_HARIMU_CITY_TAGLINE_BESIDE": "false"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",

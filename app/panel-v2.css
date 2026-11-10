@@ -46,6 +46,10 @@
 .panel-v2.panel-v2-city .panel-v2-city-mark svg{width:44px;height:44px}
 .panel-v2.panel-v2-city .panel-v2-city-head>div{min-width:0}
 .panel-v2.panel-v2-city p.panel-v2-city-tagline{margin:0;color:#f1d58a;font-family:Georgia,serif;font-style:italic;font-size:calc(13px * var(--text-scale, 1));font-weight:500;line-height:1.35;opacity:1;overflow-wrap:break-word;word-break:normal;hyphens:manual}
+/* #392 UI 48. Same grid as the Nation motto (UI 45): the description sits in the right column, gold italic, wrapping on words.
+   break-word, never inside a letter. At 390px it takes the row under the title. Flag off keeps the UI 44 head. */
+.panel-v2.panel-v2-city .panel-v2-city-head-beside p.panel-v2-city-tagline{text-align:right}
+@media (max-width:390px){.panel-v2.panel-v2-city .panel-v2-city-head-beside{grid-template-columns:auto minmax(0,1fr)}.panel-v2.panel-v2-city .panel-v2-city-head-beside>p.panel-v2-city-tagline{grid-column:1 / -1}}
 .panel-v2.panel-v2-city .panel-v2-city-action{display:grid;gap:6px;min-width:0}
 .panel-v2.panel-v2-city p.panel-v2-city-kicker{margin:0;color:#f1d58a;font-size:calc(12px * var(--text-scale, 1));font-weight:600;letter-spacing:.04em;line-height:1.3}
 
