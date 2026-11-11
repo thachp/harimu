@@ -7,7 +7,7 @@ import type { LocationId } from '../lib/game-viewport';
 /** #392 S7: the same icons the top tabs and the rail use, one per cityPlaceIds entry. */
 const icons: { [K in CityPlaceId]: typeof UsersThree } = { square: UsersThree, home: House, workplace: Hammer, market: Storefront, government: Bank };
 /** The pill icon for a City place (decorative). Rows use the same component. */
-export function cityPlaceIcon(id: CityPlaceId | 'household') { const Icon = icons[id === 'household' ? 'home' : id]; return <Icon size={16} weight="bold" />; }
+export function cityPlaceIcon(id: CityPlaceId | 'household', size: 16 | '1em' = 16) { const Icon = icons[id === 'household' ? 'home' : id]; return <Icon size={size} weight="bold" />; }
 
 /** Dresses a City label button (built with the DOM API) as the concept's icon pill with a leader dot under it. The icon and dot are decorative
  *  (aria-hidden); the button keeps its existing text and "Select …" name, focus ring and click. Returns the cleanup for the icon's React root. */
