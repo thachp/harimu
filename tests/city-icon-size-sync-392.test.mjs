@@ -158,9 +158,11 @@ test('painted size at 100% text matches 16 and 18, and 150% scales only the city
     assert.ok(at150.carets.every(box => box.w === 27 && box.h === 27));
     assert.deepEqual(at150.glyph, { w: 44, h: 44 });
     assert.equal(at150.color, at100.color);
-    const { mkdirSync } = await import('node:fs');
-    mkdirSync('/opt/cursor/artifacts', { recursive: true });
-    await page.locator('.panel-v2').screenshot({ path: '/opt/cursor/artifacts/city-icon-size-sync-aurelle-highspire-390-scale-1.5.png' });
+    try {
+      const { mkdirSync } = await import('node:fs');
+      mkdirSync('/opt/cursor/artifacts', { recursive: true });
+      await page.locator('.panel-v2').screenshot({ path: '/opt/cursor/artifacts/city-icon-size-sync-aurelle-highspire-390-scale-1.5.png' });
+    } catch { /* the artifact dir is optional; a missing or unwritable path must not fail the size checks */ }
     await page.close();
   } finally {
     await browser.close();
