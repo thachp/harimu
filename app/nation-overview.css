@@ -30,3 +30,10 @@
 .game-inspector-body .nation-overview-head-tagline{display:grid;grid-template-columns:auto minmax(0,max-content) minmax(0,1fr);align-items:center;column-gap:12px;row-gap:10px}
 .game-inspector-body .nation-overview-head-tagline>.panel-v2-header-stats{grid-column:1 / -1}
 .game-inspector-body .nation-overview p.nation-overview-tagline{margin:0;color:#f1d58a;font-family:Georgia,serif;font-style:italic;font-size:calc(13px * var(--text-scale, 1));font-weight:500;line-height:1.35;text-align:right;overflow-wrap:break-word;word-break:normal;hyphens:manual}
+/* #392 UI 53. The class is on the action row only while the nation action icons flag is on and that row is shown.
+   The Explore button centers its bank mark, the label and the chevron. View institutions leads with a gold book. A long capital name wraps on words. */
+.game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.world-atlas-primary:not(.market-item){overflow-wrap:normal;word-break:normal}
+.game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.world-atlas-primary:not(.market-item) .world-atlas-primary-label{min-width:0;text-align:center;overflow-wrap:normal;word-break:normal}
+.game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.world-atlas-primary:not(.market-item) svg,.game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.nation-overview-secondary:not(.market-item) svg{flex:none;width:calc(18px * var(--text-scale, 1));height:calc(18px * var(--text-scale, 1))}
+.game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.nation-overview-secondary:not(.market-item){display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.nation-overview-secondary:not(.market-item) svg{color:#d0ad54}

@@ -31,9 +31,9 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 4
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 49);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 50);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(39), key, 'entry 40');
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 49/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 50/);
   assert.match(await read('tests/text-bindings-988.test.mjs'), /#392 nation actions/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key));
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
@@ -53,7 +53,7 @@ const bundle = async (actions) => {
   const { build } = await import('esbuild');
   const out = await build({ entryPoints: [new URL('../app/nation-overview.tsx', import.meta.url).pathname], bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic',
     packages: 'external', loader: { '.css': 'empty' }, logLevel: 'silent', alias: { '@': new URL('..', import.meta.url).pathname.replace(/\/$/, '') },
-    define: { 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_HEADER_STATS': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_ACTIONS': JSON.stringify(actions) } });
+    define: { 'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_HEADER_STATS': '"false"', 'process.env.NEXT_PUBLIC_HARIMU_NATION_ACTIONS': JSON.stringify(actions), 'process.env.NEXT_PUBLIC_HARIMU_NATION_ACTION_ICONS': 'undefined' } });
   const code = out.outputFiles[0].text.replace(/from "([^".][^"]*)"/g, (_, m) => `from "${import.meta.resolve(m)}"`);
   return import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 };
