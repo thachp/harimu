@@ -58,3 +58,14 @@
 .game-inspector-body .nation-overview-institution-name{min-width:0;flex:1 1 auto;text-align:left;overflow-wrap:break-word;word-break:normal;hyphens:manual}
 .game-inspector-body .nation-overview button.nation-overview-institution-row:not(.market-item) svg{flex:none;width:calc(18px * var(--text-scale, 1));height:calc(18px * var(--text-scale, 1));color:#d0ad54}
 .game-inspector-body .nation-overview-institutions.nation-overview-institution-rows.nation-overview-institution-rows-sync button.nation-overview-institution-row:not(.market-item) svg{flex:none;font-size:calc(18px * var(--text-scale, 1));width:1em;height:1em;color:#d0ad54}
+/* #392 UI 58. The class is on the header only while the word-wrap flag is on and the motto or the header chips are shown.
+   The motto uses normal wrapping. When it cannot sit beside the title without breaking a word, flex-wrap gives it the full row under the title.
+   Header chips use normal wrapping. min-content keeps the longest word on one line and lets the chip row wrap to fewer chips. */
+.game-inspector-body .nation-overview-head-tagline.nation-overview-header-word-wrap{display:flex;flex-wrap:wrap;align-items:center;column-gap:12px;row-gap:10px}
+.game-inspector-body .nation-overview-head-tagline.nation-overview-header-word-wrap>.nation-crest{flex:none}
+.game-inspector-body .nation-overview-head-tagline.nation-overview-header-word-wrap>div{flex:0 1 auto;min-width:min(100%,max-content);max-width:100%}
+.game-inspector-body .nation-overview-head-tagline.nation-overview-header-word-wrap>div :is(h2,.nation-overview-kicker){overflow-wrap:normal;word-break:normal;hyphens:none}
+.game-inspector-body .nation-overview-head-tagline.nation-overview-header-word-wrap>p.nation-overview-tagline{flex:1 1 12ch;min-width:min(100%,max(12ch,min-content));max-width:100%;overflow-wrap:normal;word-break:normal;hyphens:none}
+.game-inspector-body .nation-overview-head.nation-overview-header-word-wrap>.panel-v2-header-stats{flex:1 0 100%;width:100%;min-width:0}
+.game-inspector-body .nation-overview-head.nation-overview-header-word-wrap .panel-v2-header-stats>div{flex:1 1 auto;min-width:min-content;max-width:100%}
+.game-inspector-body .nation-overview-head.nation-overview-header-word-wrap .panel-v2-header-stats :is(dt,dd,small){overflow-wrap:normal;word-break:normal;hyphens:none}
