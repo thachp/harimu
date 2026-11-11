@@ -448,7 +448,8 @@
       "NEXT_PUBLIC_HARIMU_NATION_HEADER_WORD_WRAP": "true",
       "NEXT_PUBLIC_HARIMU_NATION_HEADER_CHIP_CAP": "true",
       "NEXT_PUBLIC_HARIMU_ICON_SIZE_SCALE_GATE": "true",
-      "NEXT_PUBLIC_HARIMU_CITY_ICON_SIZE_SYNC": "true"
+      "NEXT_PUBLIC_HARIMU_CITY_ICON_SIZE_SYNC": "true",
+      "NEXT_PUBLIC_HARIMU_CITY_HEADER_WORD_WRAP": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
