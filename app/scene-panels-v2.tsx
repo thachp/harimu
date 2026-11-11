@@ -1,6 +1,6 @@
 'use client';
 import type { ReactNode } from 'react';
-import { Buildings, Coins, UsersThree } from '@phosphor-icons/react';
+import { Bread, Buildings, Coins, Cube, House, UsersThree } from '@phosphor-icons/react';
 import { PanelV2 } from './panel-v2';
 import { AiBadge } from './ai-disclosure';
 import { cityStatusStat, uiV2PanelEnabled } from '@/lib/ui-v2-panel';
@@ -8,6 +8,7 @@ import { countryWord } from '@/lib/ui-v2-rail';
 import type { CityDestination } from '@/lib/city-destinations';
 import { itemCount, uiV2HouseholdEnabled } from '@/lib/ui-v2-household';
 import { householdIdentityEnabled, householdIdentityMotto, householdIdentitySubtitle, householdIdentityTitle } from '@/lib/household-identity';
+import { householdFactIcon, householdFactIconsEnabled } from '@/lib/household-fact-icons';
 import { NationCrest } from './nation-crest';
 import { uiV2CityEnabled } from '@/lib/ui-v2-city';
 import { cityPlaceRowsEnabled, cityPlaces } from '@/lib/city-places';
@@ -101,7 +102,7 @@ export function CitySummary({ cityName, city, nation, destinations, onView, tier
 
 /** #392 S9 (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): the Household panel head, existing data only. Wallet, Food, Residence, and Pantry (food and materials from the
  *  inventory); family cards with the four existing Vale portraits. Names and relations are the household's own from the original planning view (137d9d4);
- *  no needs or mood are shown because no per-member data exists. The portraits are decorative (alt=""): each card's name is its text. #392 UI 66: with NEXT_PUBLIC_HARIMU_HOUSEHOLD_IDENTITY, the nation's crest, a citizen's "Your household" (a visitor's "Household", #379), residence and nation, and the nation's motto. Flag off keeps the head above. */
+ *  no needs or mood are shown because no per-member data exists. The portraits are decorative (alt=""): each card's name is its text. #392 UI 66: with NEXT_PUBLIC_HARIMU_HOUSEHOLD_IDENTITY, the nation's crest, a citizen's "Your household" (a visitor's "Household", #379), residence and nation, and the nation's motto. Flag off keeps the head above. #392 UI 67: with NEXT_PUBLIC_HARIMU_HOUSEHOLD_FACT_ICONS, those four facts get a decorative gold icon. Flag off keeps them bare. */
 // TODO(#392): the Vale family is shared across every nation; per-nation households need their own data.
 export const valeFamily = [
   { id: 'citizen', name: 'You', relation: 'Citizen', image: '/assets/household/leora-vale.webp' },
@@ -109,15 +110,17 @@ export const valeFamily = [
   { id: 'apprentice', name: 'Mika Vale', relation: 'Daughter', image: '/assets/household/mika-vale.webp' },
   { id: 'child', name: 'Niko Vale', relation: 'Son', image: '/assets/household/niko-vale.webp' },
 ] as const;
-export function HouseholdSummary({ nation, walletMinor, inventory, pantry = true, residence, visitor = false, identity = householdIdentityEnabled(), enabled = uiV2HouseholdEnabled() }: { nation: Pick<Nation, 'name' | 'currency' | 'id'> & { motto?: string | null }; walletMinor?: number | null; inventory?: readonly { item: string; quantity: number }[] | null; pantry?: boolean; residence?: string | null; visitor?: boolean; identity?: boolean; enabled?: boolean }) {
+const factMarks = { Coins, Bread, House, Cube } as const;
+export function HouseholdSummary({ nation, walletMinor, inventory, pantry = true, residence, visitor = false, identity = householdIdentityEnabled(), factIcons = householdFactIconsEnabled(), enabled = uiV2HouseholdEnabled() }: { nation: Pick<Nation, 'name' | 'currency' | 'id'> & { motto?: string | null }; walletMinor?: number | null; inventory?: readonly { item: string; quantity: number }[] | null; pantry?: boolean; residence?: string | null; visitor?: boolean; identity?: boolean; factIcons?: boolean; enabled?: boolean }) {
   if (!enabled) return null;
   // #861: Food and Pantry show only the nation's own stock (inventory missing: both hide; pantry false: no materials count, Pantry hides).
   const food = itemCount(inventory, 'food'), materials = itemCount(inventory, 'materials');
   const title = identity ? householdIdentityTitle(visitor) : 'Household';
   const subtitle = identity ? householdIdentitySubtitle(residence, nation.name) : nation.name;
+  const factIcon = (label: string) => { const name = factIcons ? householdFactIcon(label) : null; const Icon = name ? factMarks[name] : null; return Icon ? <Icon size="1em" /> : null; };
   return <div className="household-v2">
     <PanelV2 title={title} subtitle={subtitle} household={identity ? { lead: nation.id ? <NationCrest id={nation.id} size={44} /> : null, motto: householdIdentityMotto(nation.motto) } : undefined} rowsLabel="Household" rows={[]}
-      stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}` }]), ...(inventory ? [{ label: 'Food', value: String(food) }] : []), ...(residence ? [{ label: 'Residence', value: residence }] : []), ...(inventory && pantry ? [{ label: 'Pantry', value: `${food} food · ${materials} materials` }] : [])]} />
+      stats={[...(walletMinor == null ? [] : [{ label: 'Wallet', value: `${(walletMinor / 100).toFixed(2)} ${nation.currency}`, icon: factIcon('Wallet') }]), ...(inventory ? [{ label: 'Food', value: String(food), icon: factIcon('Food') }] : []), ...(residence ? [{ label: 'Residence', value: residence, icon: factIcon('Residence') }] : []), ...(inventory && pantry ? [{ label: 'Pantry', value: `${food} food · ${materials} materials`, icon: factIcon('Pantry') }] : [])]} />
     <ul className="household-v2-family" aria-label="Household members">{valeFamily.map(member => <li key={member.id}>{/* eslint-disable-line @next/next/no-img-element -- 48px decorative static portraits; no Next image loader on this deploy */}<img src={member.image} alt="" width={48} height={48} loading="lazy" /><strong>{member.name}</strong><small>{member.relation}</small></li>)}</ul>
   </div>;
 }
