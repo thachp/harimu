@@ -1,6 +1,7 @@
 'use client';
-import { Bank, Clock, Coins, Confetti, Crown, Globe, Grains, Scales, ShieldCheck, Users } from '@phosphor-icons/react';
+import { Bank, Clock, Coins, Compass, Confetti, Crown, Globe, Grains, Scales, ShieldCheck, Users } from '@phosphor-icons/react';
 import { worldAtlasCard, worldAtlasEnabled, worldAtlasStats, worldExploreEnabled, type WorldAtlasClock, type WorldAtlasDisputes, type WorldAtlasNation } from '@/lib/world-atlas';
+import { worldAtlasExploreIconsEnabled } from '@/lib/world-atlas-explore-icons';
 import { worldAtlasExploreKicker, worldAtlasIdentityEnabled, worldAtlasIdentityTagline, WORLD_ATLAS_IDENTITY_KICKER, WORLD_ATLAS_IDENTITY_TITLE } from '@/lib/world-atlas-identity';
 import { worldAtlasIconScaleEnabled } from '@/lib/world-atlas-icon-scale';
 import { worldAtlasIconsEnabled, worldAtlasStatIcon, type WorldAtlasIconKey } from '@/lib/world-atlas-icons';
@@ -21,8 +22,9 @@ export function WorldAtlasFactIcon({ label }: { label: string }) {
  *  #392 UI 46: NEXT_PUBLIC_HARIMU_WORLD_ATLAS_IDENTITY restyles this atlas. The heading becomes the large title with the atlas name as the kicker.
  *  A shown motto is the gold italic line. "Explore the world" sits above the existing Explore button. Atlas off still renders nothing.
  *  #392 UI 50: NEXT_PUBLIC_HARIMU_WORLD_ATLAS_ICONS paints a decorative gold mark before a known fact label. An unmapped label is unchanged.
- *  #392 UI 51: NEXT_PUBLIC_HARIMU_WORLD_ATLAS_ICON_SCALE sizes those marks with the text scale. The class is added only while the fact-icon flag is also on. */
-export function WorldAtlas({ nations, nation = null, clock = null, disputes = null, onView, enabled = worldAtlasEnabled(), explore = worldExploreEnabled(), identity = worldAtlasIdentityEnabled(), icons = worldAtlasIconsEnabled(), iconScale = worldAtlasIconScaleEnabled() }: {
+ *  #392 UI 51: NEXT_PUBLIC_HARIMU_WORLD_ATLAS_ICON_SCALE sizes those marks with the text scale. The class is added only while the fact-icon flag is also on.
+ *  #392 UI 52: NEXT_PUBLIC_HARIMU_WORLD_ATLAS_EXPLORE_ICONS adds a compass before the explore kicker and a bank mark plus chevron on the Explore button. Both appear only on a control that already renders. */
+export function WorldAtlas({ nations, nation = null, clock = null, disputes = null, onView, enabled = worldAtlasEnabled(), explore = worldExploreEnabled(), identity = worldAtlasIdentityEnabled(), icons = worldAtlasIconsEnabled(), iconScale = worldAtlasIconScaleEnabled(), exploreIcons = worldAtlasExploreIconsEnabled() }: {
   nations: readonly unknown[];
   nation?: WorldAtlasNation | null;
   clock?: WorldAtlasClock;
@@ -33,18 +35,23 @@ export function WorldAtlas({ nations, nation = null, clock = null, disputes = nu
   identity?: boolean;
   icons?: boolean;
   iconScale?: boolean;
+  exploreIcons?: boolean;
 }) {
   if (!enabled) return null;
   const stats = worldAtlasStats({ nations, nation, clock, disputes });
   const card = explore ? worldAtlasCard(nation) : null;
   const tagline = identity ? worldAtlasIdentityTagline(nations) : null;
   const exploreButton = card?.explore && onView
-    ? <ExplorePrimaryButton label={card.explore.label} ariaLabel={card.explore.ariaLabel} onClick={() => onView('country')} />
+    ? <ExplorePrimaryButton label={card.explore.label} ariaLabel={card.explore.ariaLabel} onClick={() => onView('country')} {...(exploreIcons ? { chevron: true, leadingIcon: <Bank size={18} aria-hidden="true" /> } : {})} />
     : null;
   const exploreKicker = identity ? worldAtlasExploreKicker(Boolean(exploreButton)) : null;
   const atlasClass = identity ? 'world-atlas world-atlas-identity' : 'world-atlas';
   const atlasMarked = icons ? `${atlasClass} world-atlas-icons${iconScale ? ' world-atlas-icon-scale' : ''}` : atlasClass;
-  return <section className={atlasMarked} aria-label="World atlas">
+  const atlasShown = exploreIcons && exploreButton ? `${atlasMarked} world-atlas-explore-icons` : atlasMarked;
+  const exploreKickerNode = exploreKicker
+    ? <p className="world-atlas-explore-kicker">{exploreIcons ? <Compass size={18} aria-hidden="true" /> : null}{exploreKicker}</p>
+    : null;
+  return <section className={atlasShown} aria-label="World atlas">
     {identity
       ? <div className="world-atlas-identity-head"><h2>{WORLD_ATLAS_IDENTITY_TITLE}</h2><p className="world-atlas-identity-kicker">{WORLD_ATLAS_IDENTITY_KICKER}</p>{tagline && <p className="world-atlas-identity-tagline">{tagline}</p>}</div>
       : <h2>World atlas</h2>}
@@ -56,6 +63,6 @@ export function WorldAtlas({ nations, nation = null, clock = null, disputes = nu
       </div>}
     </div>}
     {stats.length > 0 && <dl className="world-atlas-stats">{stats.map(stat => <div key={stat.label}><dt>{icons ? <WorldAtlasFactIcon label={stat.label} /> : null}{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>}
-    {exploreButton && (exploreKicker ? <div className="world-atlas-identity-action"><p className="world-atlas-explore-kicker">{exploreKicker}</p>{exploreButton}</div> : exploreButton)}
+    {exploreButton && (exploreKickerNode ? <div className="world-atlas-identity-action">{exploreKickerNode}{exploreButton}</div> : exploreButton)}
   </section>;
 }
