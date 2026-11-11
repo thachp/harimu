@@ -450,7 +450,8 @@
       "NEXT_PUBLIC_HARIMU_ICON_SIZE_SCALE_GATE": "false",
       "NEXT_PUBLIC_HARIMU_CITY_ICON_SIZE_SYNC": "false",
       "NEXT_PUBLIC_HARIMU_CITY_HEADER_WORD_WRAP": "false",
-      "NEXT_PUBLIC_HARIMU_NATION_HEADER_ICON_SIZE_SYNC": "false"
+      "NEXT_PUBLIC_HARIMU_NATION_HEADER_ICON_SIZE_SYNC": "false",
+      "NEXT_PUBLIC_HARIMU_CITY_CAPITAL_ROW_DEDUPE": "false"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "false",
