@@ -37,3 +37,8 @@
 .game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.world-atlas-primary:not(.market-item) svg,.game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.nation-overview-secondary:not(.market-item) svg{flex:none;width:calc(18px * var(--text-scale, 1));height:calc(18px * var(--text-scale, 1))}
 .game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.nation-overview-secondary:not(.market-item){display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .game-inspector-body .nation-overview-actions.nation-overview-action-icons>button.nation-overview-secondary:not(.market-item) svg{color:#d0ad54}
+/* #392 UI 54. The class is on the action row only while the nation actions stack flag is on and that row is shown.
+   Each button keeps the width of its longest word, so the row wraps before a word is clipped. Words wrap on spaces.
+   A wrapped button grows to the full row. Explore stays first. */
+.game-inspector-body .nation-overview .nation-overview-actions.nation-overview-actions-stack>button.world-atlas-primary:not(.market-item),.game-inspector-body .nation-overview .nation-overview-actions.nation-overview-actions-stack>button.nation-overview-secondary:not(.market-item){flex:1 1 auto;width:auto;min-width:min-content;max-width:100%;min-height:44px;overflow-wrap:normal;word-break:normal}
+.game-inspector-body .nation-overview .nation-overview-actions.nation-overview-actions-stack>button.world-atlas-primary:not(.market-item) .world-atlas-primary-label{min-width:min-content;overflow-wrap:normal;word-break:normal}
