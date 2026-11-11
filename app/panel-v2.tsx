@@ -17,12 +17,13 @@ function panelPrimary(primary: PanelPrimary, cityIconSizeSync = false) {
 }
 /** #392 UI 44: City identity adds an optional mark, tagline, and kicker. #392 UI 48: taglineBeside places that tagline to the right of the title. Other panels omit them, so their markup stays as it is.
  *  #392 UI 61: CitySummary passes cityIconSizeSync. Other panels omit it, so their carets stay size 18.
- *  #392 UI 62: CitySummary passes cityHeaderWordWrap. Other panels omit it, so their header stats stay as they are. */
-export function PanelV2({ title, subtitle, stats, rows, rowsLabel, primary, headerStats, mark, tagline, primaryKicker, taglineBeside = false, cityIconSizeSync = false, cityHeaderWordWrap = false }: { title: string; subtitle?: string; stats: PanelStat[]; rows: PanelRow[]; rowsLabel: string; primary?: PanelPrimary; headerStats?: PanelStat[]; mark?: ReactNode; tagline?: string | null; primaryKicker?: string | null; taglineBeside?: boolean; cityIconSizeSync?: boolean; cityHeaderWordWrap?: boolean }) {
+ *  #392 UI 62: CitySummary passes cityHeaderWordWrap. Other panels omit it, so their header stats stay as they are.
+ *  #392 UI 65: CitySummary passes cityHeaderHyphenKeep. Other panels omit it, so their header chips stay as they are. */
+export function PanelV2({ title, subtitle, stats, rows, rowsLabel, primary, headerStats, mark, tagline, primaryKicker, taglineBeside = false, cityIconSizeSync = false, cityHeaderWordWrap = false, cityHeaderHyphenKeep = false }: { title: string; subtitle?: string; stats: PanelStat[]; rows: PanelRow[]; rowsLabel: string; primary?: PanelPrimary; headerStats?: PanelStat[]; mark?: ReactNode; tagline?: string | null; primaryKicker?: string | null; taglineBeside?: boolean; cityIconSizeSync?: boolean; cityHeaderWordWrap?: boolean; cityHeaderHyphenKeep?: boolean }) {
   const city = Boolean(mark || tagline || primaryKicker);
   const head = mark || tagline ? 'panel-v2-summary panel-v2-city-head' : 'panel-v2-summary';
   const section = city ? 'panel-v2 panel-v2-city' : 'panel-v2';
-  const sectionClass = `${cityIconSizeSync ? `${section} panel-v2-city-icon-size-sync` : section}${city && cityHeaderWordWrap ? ' panel-v2-city-header-word-wrap' : ''}`;
+  const sectionClass = `${cityIconSizeSync ? `${section} panel-v2-city-icon-size-sync` : section}${city && cityHeaderWordWrap ? ' panel-v2-city-header-word-wrap' : ''}${city && cityHeaderHyphenKeep ? ' panel-v2-city-header-hyphen-keep' : ''}`;
   return <section className={sectionClass} aria-label={title}>
     <header className={taglineBeside && tagline ? `${head} panel-v2-city-head-beside` : head}>{mark ? <span className="panel-v2-city-mark" aria-hidden="true">{mark}</span> : null}<div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{tagline ? <p className="panel-v2-city-tagline">{tagline}</p> : null}<HeaderStatChips stats={headerStats} /></header>
     {stats.length > 0 && <dl className={stats.some(stat => stat.icon) ? 'panel-v2-stats panel-v2-facts' : 'panel-v2-stats'}>{stats.map(stat => <div key={stat.label}><dt>{stat.icon && <span className="panel-v2-icon" aria-hidden="true">{stat.icon}</span>}{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>}

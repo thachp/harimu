@@ -61,6 +61,9 @@
    calc-size repeats that cap where min-content inside min() is dropped. */
 .panel-v2.panel-v2-city.panel-v2-city-header-word-wrap .panel-v2-header-stats>div{flex:1 1 auto;min-width:min(100%,min-content);min-width:calc-size(min-content,min(100%,size));max-width:100%}
 .panel-v2.panel-v2-city.panel-v2-city-header-word-wrap .panel-v2-header-stats :is(dt,dd,small){overflow-wrap:normal;word-break:normal;hyphens:none}
+/* #392 UI 65. The class is on the City panel only while city header hyphen keep is on.
+   A chip detail stays on one line, so a hard hyphen stays with its token. The chip still wraps as a flex item. */
+.panel-v2.panel-v2-city.panel-v2-city-header-hyphen-keep .panel-v2-header-stats small{white-space:nowrap}
 
 /* #392 S9 family cards (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): portrait, name, relation; four across on a desktop panel, wrapping on narrow ones, never scrolls sideways. */
 .household-v2 ul.household-v2-family{display:grid;grid-template-columns:repeat(auto-fill,minmax(calc(72px * var(--text-scale, 1)),1fr));gap:8px;margin:10px 0 0;padding:0;list-style:none}
