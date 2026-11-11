@@ -40,3 +40,7 @@
 .game-inspector-body .world-atlas.world-atlas-explore-icons button.world-atlas-primary:not(.market-item){display:flex;align-items:center;justify-content:center;gap:8px;overflow-wrap:normal;word-break:normal}
 .game-inspector-body .world-atlas.world-atlas-explore-icons button.world-atlas-primary:not(.market-item) .world-atlas-primary-label{min-width:0;text-align:center;overflow-wrap:normal;word-break:normal}
 .game-inspector-body .world-atlas.world-atlas-explore-icons button.world-atlas-primary:not(.market-item) svg{flex:none;width:calc(18px * var(--text-scale, 1));height:calc(18px * var(--text-scale, 1))}
+/* #392 UI 56. The class is on the atlas only while icon size sync is on. Font-size is the size. Width and height are 1em so they match the SVG attributes. */
+.game-inspector-body .world-atlas.world-atlas-icons.world-atlas-icon-scale.world-atlas-icon-size-sync .world-atlas-stats dt svg{flex:none;font-size:calc(18px * var(--text-scale, 1));width:1em;height:1em}
+.game-inspector-body .world-atlas.world-atlas-explore-icons.world-atlas-icon-size-sync p.world-atlas-explore-kicker svg{flex:none;font-size:calc(18px * var(--text-scale, 1));width:1em;height:1em}
+.game-inspector-body .world-atlas.world-atlas-explore-icons.world-atlas-icon-size-sync button.world-atlas-primary:not(.market-item) svg{flex:none;font-size:calc(18px * var(--text-scale, 1));width:1em;height:1em}

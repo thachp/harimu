@@ -442,7 +442,8 @@
       "NEXT_PUBLIC_HARIMU_WORLD_ATLAS_EXPLORE_ICONS": "true",
       "NEXT_PUBLIC_HARIMU_NATION_ACTION_ICONS": "true",
       "NEXT_PUBLIC_HARIMU_NATION_ACTIONS_STACK": "true",
-      "NEXT_PUBLIC_HARIMU_NATION_ACTIONS_NARROW_STACK": "true"
+      "NEXT_PUBLIC_HARIMU_NATION_ACTIONS_NARROW_STACK": "true",
+      "NEXT_PUBLIC_HARIMU_ICON_SIZE_SYNC": "true"
     },
     // #969: top-bar countdown to the nation's next scheduled event (docs §23.1). "true" in preview, "false" in production.
     "NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN": "true",
