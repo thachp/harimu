@@ -37,12 +37,12 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 5
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 51);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 52);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(50), key, 'entry 51');
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(-1), key);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(-1), 'NEXT_PUBLIC_HARIMU_NATION_ACTIONS_NARROW_STACK', 'entry 52 follows the stack flag');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(49), NATION_ACTION_ICONS_FLAG, 'nation action icons stay entry 50');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(39), NATION_ACTIONS_FLAG, 'nation actions stay entry 40');
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 51/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 52/);
   assert.match(await read('tests/text-bindings-988.test.mjs'), /#392 nation actions stack/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key));
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
@@ -67,6 +67,7 @@ const defineFor = (stack, actions = 'true', icons = 'false') => ({
   'process.env.NEXT_PUBLIC_HARIMU_NATION_ACTIONS': JSON.stringify(actions),
   'process.env.NEXT_PUBLIC_HARIMU_NATION_ACTION_ICONS': JSON.stringify(icons),
   'process.env.NEXT_PUBLIC_HARIMU_NATION_ACTIONS_STACK': stack === undefined ? 'undefined' : JSON.stringify(stack),
+  'process.env.NEXT_PUBLIC_HARIMU_NATION_ACTIONS_NARROW_STACK': 'undefined',
 });
 
 test('the stack class appears only with both flags; flag off markup is unchanged', async () => {
