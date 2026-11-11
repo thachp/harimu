@@ -8,18 +8,20 @@ import { nationHeaderStats, nationHeaderStatsEnabled } from '@/lib/nation-header
 import { nationActionsEnabled } from '@/lib/nation-actions';
 import { nationActionIconsEnabled } from '@/lib/nation-action-icons';
 import { nationActionsStackEnabled } from '@/lib/nation-actions-stack';
+import { nationActionsNarrowStackEnabled } from '@/lib/nation-actions-narrow-stack';
 import { nationMottoEnabled } from '@/lib/nation-motto';
 import './nation-overview.css';
 
 const headerIcon = { stability: UsersThree, capital: Bank, currency: Coins } as const;
 
-function NationActions({ explore, onExplore, onInstitutions, actionIcons, actionsStack }: { explore: string | null; onExplore: () => void; onInstitutions?: () => void; actionIcons: boolean; actionsStack: boolean }) {
+function NationActions({ explore, onExplore, onInstitutions, actionIcons, actionsStack, actionsNarrowStack }: { explore: string | null; onExplore: () => void; onInstitutions?: () => void; actionIcons: boolean; actionsStack: boolean; actionsNarrowStack: boolean }) {
   const primary = explore ? <ExplorePrimaryButton label={explore} ariaLabel={`${explore}: open the city`} onClick={onExplore} chevron {...(actionIcons ? { leadingIcon: <Bank size={18} aria-hidden="true" /> } : {})} /> : null;
   const secondary = onInstitutions ? <button type="button" className="nation-overview-secondary" onClick={onInstitutions}>{actionIcons ? <BookOpen size={18} aria-hidden="true" /> : null}View institutions</button> : null;
   if (!primary && !secondary) return null;
   const row = ['nation-overview-actions'];
   if (actionIcons) row.push('nation-overview-action-icons');
   if (actionsStack) row.push('nation-overview-actions-stack');
+  if (actionsStack && actionsNarrowStack) row.push('nation-overview-actions-narrow-stack');
   return <div className={row.join(' ')}>{primary}{secondary}</div>;
 }
 
@@ -29,8 +31,9 @@ function NationActions({ explore, onExplore, onInstitutions, actionIcons, action
  *  View institutions is rendered only when the caller passes the institutions destination. Flag off keeps the outlined Explore button.
  *  #392 UI 45: with NEXT_PUBLIC_HARIMU_NATION_MOTTO, the nation motto sits to the right of the title. A blank motto stays hidden. Flag off keeps it under the name.
  *  #392 UI 53: with NEXT_PUBLIC_HARIMU_NATION_ACTION_ICONS, and only while that action row is on, Explore {capital} leads with a bank mark and keeps the chevron. View institutions leads with a book. A missing flag leaves the row as it is.
- *  #392 UI 54: with NEXT_PUBLIC_HARIMU_NATION_ACTIONS_STACK, and only while that action row is on, the two buttons size from their words and wrap onto a full-width row before a word is clipped. A missing flag leaves the row as it is. */
-export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions, actionIcons = nationActionIconsEnabled(), actionsStack = nationActionsStackEnabled() }: {
+ *  #392 UI 54: with NEXT_PUBLIC_HARIMU_NATION_ACTIONS_STACK, and only while that action row is on, the two buttons size from their words and wrap onto a full-width row before a word is clipped. A missing flag leaves the row as it is.
+ *  #392 UI 55: with NEXT_PUBLIC_HARIMU_NATION_ACTIONS_NARROW_STACK, and only while the UI 54 stack flag is also on, the two actions each take a full row at 390px. A missing flag leaves the row as it is. */
+export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions, actionIcons = nationActionIconsEnabled(), actionsStack = nationActionsStackEnabled(), actionsNarrowStack = nationActionsNarrowStackEnabled() }: {
   nation: NationOverviewNation;
   government?: NationOverviewGovernment;
   onExplore: () => void;
@@ -38,6 +41,7 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
   onInstitutions?: () => void;
   actionIcons?: boolean;
   actionsStack?: boolean;
+  actionsNarrowStack?: boolean;
 }) {
   const fields = nationOverviewFields(nation, government);
   const headerOn = nationHeaderStatsEnabled();
@@ -68,6 +72,6 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
     {!headerOn && stats.length > 0 && <dl className="nation-overview-stats">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     {rows.length > 0 && <dl className="nation-overview-rows">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     {fields.institutions.length > 0 && <ul className="nation-overview-institutions" aria-label="Institutions">{fields.institutions.map(item => <li key={item.id}><button type="button" onClick={onCivic}>{item.name}</button></li>)}</ul>}
-    {actionsOn ? <NationActions explore={fields.explore} onExplore={onExplore} onInstitutions={onInstitutions} actionIcons={actionIcons} actionsStack={actionsStack} /> : fields.explore && <button type="button" className="nation-overview-primary" aria-label={`${fields.explore}: open the city`} onClick={onExplore}>{fields.explore}</button>}
+    {actionsOn ? <NationActions explore={fields.explore} onExplore={onExplore} onInstitutions={onInstitutions} actionIcons={actionIcons} actionsStack={actionsStack} actionsNarrowStack={actionsNarrowStack} /> : fields.explore && <button type="button" className="nation-overview-primary" aria-label={`${fields.explore}: open the city`} onClick={onExplore}>{fields.explore}</button>}
   </section>;
 }
