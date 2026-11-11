@@ -13,6 +13,7 @@ import { iconSizeSyncEnabled } from '@/lib/icon-size-sync';
 import { nationInstitutionRowsEnabled } from '@/lib/nation-institution-rows';
 import { nationMottoEnabled } from '@/lib/nation-motto';
 import { nationHeaderWordWrapEnabled } from '@/lib/nation-header-word-wrap';
+import { nationHeaderChipCapEnabled } from '@/lib/nation-header-chip-cap';
 import './nation-overview.css';
 
 const headerIcon = { stability: UsersThree, capital: Bank, currency: Coins } as const;
@@ -46,8 +47,9 @@ function InstitutionList({ items, onCivic, rows, iconSizeSync }: { items: readon
  *  #392 UI 55: with NEXT_PUBLIC_HARIMU_NATION_ACTIONS_NARROW_STACK, and only while the UI 54 stack flag is also on, the two actions each take a full row at 390px. A missing flag leaves the row as it is.
  *  #392 UI 56: with NEXT_PUBLIC_HARIMU_ICON_SIZE_SYNC, and only while the action icons are on, those marks use size 1em. Flag off keeps size 18.
  *  #392 UI 57: with NEXT_PUBLIC_HARIMU_NATION_INSTITUTION_ROWS, each government role is a full-width row with a trailing caret. Flag off keeps the plain buttons.
- *  #392 UI 58: with NEXT_PUBLIC_HARIMU_NATION_HEADER_WORD_WRAP, and only while the motto or the header chips are also on, those strings wrap on word boundaries. A missing flag leaves the header as it is. */
-export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions, actionIcons = nationActionIconsEnabled(), actionsStack = nationActionsStackEnabled(), actionsNarrowStack = nationActionsNarrowStackEnabled(), iconSizeSync = iconSizeSyncEnabled(), institutionRows = nationInstitutionRowsEnabled(), headerWordWrap = nationHeaderWordWrapEnabled() }: {
+ *  #392 UI 58: with NEXT_PUBLIC_HARIMU_NATION_HEADER_WORD_WRAP, and only while the motto or the header chips are also on, those strings wrap on word boundaries. A missing flag leaves the header as it is.
+ *  #392 UI 59: with NEXT_PUBLIC_HARIMU_NATION_HEADER_CHIP_CAP, and only while the word-wrap flag is also on and header chips are shown, each chip minimum width is min(100%, min-content). A missing flag leaves those chips as they are. */
+export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions, actionIcons = nationActionIconsEnabled(), actionsStack = nationActionsStackEnabled(), actionsNarrowStack = nationActionsNarrowStackEnabled(), iconSizeSync = iconSizeSyncEnabled(), institutionRows = nationInstitutionRowsEnabled(), headerWordWrap = nationHeaderWordWrapEnabled(), headerChipCap = nationHeaderChipCapEnabled() }: {
   nation: NationOverviewNation;
   government?: NationOverviewGovernment;
   onExplore: () => void;
@@ -59,6 +61,7 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
   iconSizeSync?: boolean;
   institutionRows?: boolean;
   headerWordWrap?: boolean;
+  headerChipCap?: boolean;
 }) {
   const fields = nationOverviewFields(nation, government);
   const headerOn = nationHeaderStatsEnabled();
@@ -66,6 +69,7 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
   const mottoAside = nationMottoEnabled() ? fields.motto : null;
   const chips = headerOn ? nationHeaderStats(fields).map(stat => { const Icon = headerIcon[stat.id]; return { ...stat, icon: <Icon size={16} /> }; }) : [];
   const headerWordWrapOn = headerWordWrap && (Boolean(mottoAside) || chips.length > 0);
+  const headerChipCapOn = headerChipCap && headerWordWrapOn && chips.length > 0;
   const stats = [
     fields.stability !== null ? ['Stability', `${fields.stability} / 100`] as const : null,
     fields.capital ? ['Capital', fields.capital] as const : null,
@@ -77,7 +81,7 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
     fields.faith ? ['Faith', fields.faith] as const : null,
   ].filter(row => row !== null);
   return <section className="nation-overview" aria-label={fields.name ? `${fields.name} overview` : 'Nation overview'}>
-    <header className={['nation-overview-head', chips.length > 0 ? 'nation-overview-head-chips' : '', mottoAside ? 'nation-overview-head-tagline' : '', headerWordWrapOn ? 'nation-overview-header-word-wrap' : ''].filter(Boolean).join(' ')}>
+    <header className={['nation-overview-head', chips.length > 0 ? 'nation-overview-head-chips' : '', mottoAside ? 'nation-overview-head-tagline' : '', headerWordWrapOn ? 'nation-overview-header-word-wrap' : '', headerChipCapOn ? 'nation-overview-header-chip-cap' : ''].filter(Boolean).join(' ')}>
       <NationCrest id={nation.id} size={56} force labelled />
       <div>
         {fields.name && <h2>{fields.name}</h2>}
