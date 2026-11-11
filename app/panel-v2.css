@@ -56,6 +56,11 @@
    Header and place marks use 16px. Row and primary carets use 18px. Font-size carries the text scale. Width and height are 1em. */
 .game-inspector-body .panel-v2.panel-v2-city-icon-size-sync .panel-v2-icon svg{flex:none;font-size:calc(16px * var(--text-scale, 1));width:1em;height:1em}
 .game-inspector-body .panel-v2.panel-v2-city-icon-size-sync .panel-v2-rows button:not(.market-item)>svg,.game-inspector-body .panel-v2.panel-v2-city-icon-size-sync button.panel-v2-primary:not(.market-item)>svg,.game-inspector-body .panel-v2.panel-v2-city-icon-size-sync button.panel-v2-secondary:not(.market-item)>svg{flex:none;font-size:calc(18px * var(--text-scale, 1));width:1em;height:1em}
+/* #392 UI 62. The class is on the City panel only while city header word wrap is on.
+   Header stat labels, values and details keep each word whole. Each chip's minimum width is min(100%, min-content), so a long word stays inside the panel.
+   calc-size repeats that cap where min-content inside min() is dropped. */
+.panel-v2.panel-v2-city.panel-v2-city-header-word-wrap .panel-v2-header-stats>div{flex:1 1 auto;min-width:min(100%,min-content);min-width:calc-size(min-content,min(100%,size));max-width:100%}
+.panel-v2.panel-v2-city.panel-v2-city-header-word-wrap .panel-v2-header-stats :is(dt,dd,small){overflow-wrap:normal;word-break:normal;hyphens:none}
 
 /* #392 S9 family cards (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): portrait, name, relation; four across on a desktop panel, wrapping on narrow ones, never scrolls sideways. */
 .household-v2 ul.household-v2-family{display:grid;grid-template-columns:repeat(auto-fill,minmax(calc(72px * var(--text-scale, 1)),1fr));gap:8px;margin:10px 0 0;padding:0;list-style:none}
