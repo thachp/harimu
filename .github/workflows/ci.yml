@@ -89,7 +89,12 @@ jobs:
 
   validation:
     runs-on: ubuntu-latest
+    # actions: write saves the Playwright browser cache. Contents stay read-only.
+    permissions:
+      contents: read
+      actions: write
     # 35 min: playwright install can stall ~13 min on runners (run 39971034691) on top of ~8 min test:layout.
+    # #1303: each --with-deps try is capped so a dead apt mirror cannot use this whole budget.
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
@@ -112,7 +117,40 @@ jobs:
 
       # #186: rendered HUD layout check (real GameShell markup + shipped CSS in headless Chromium).
       # Kept out of `npm test` so local/unit runs stay browser-free.
-      - run: npx playwright install --with-deps chromium
+      # #1303: `playwright install --with-deps` runs apt. A DNS failure for azure.archive.ubuntu.com
+      # took ~10 min and failed the job (run 43053560133) even though the layout tests pass.
+      - name: Configure apt retries
+        run: printf '%s\n' 'Acquire::Retries "5";' 'Acquire::http::Timeout "15";' 'Acquire::https::Timeout "15";' | sudo tee /etc/apt/apt.conf.d/80-retries >/dev/null
+
+      - name: Playwright version from lockfile
+        id: playwright
+        run: |
+          version=$(node -p "const p=require('./package-lock.json').packages; (p['node_modules/@playwright/test']||p['node_modules/playwright']).version")
+          test -n "$version"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+
+      # Cap every --with-deps invocation at 3 minutes. The browser-only fallback below is not capped.
+      - name: Cap Playwright --with-deps installs
+        run: |
+          real=$(command -v npx)
+          dir="${RUNNER_TEMP}/bin"
+          mkdir -p "$dir"
+          printf '%s\n' '#!/bin/bash' \
+            'if [ "${1:-}" = playwright ] && [ "${2:-}" = install ] && [ "${3:-}" = --with-deps ]; then' \
+            "  exec timeout --kill-after=20s 180 $(printf '%q' "$real") \"\$@\"" \
+            'fi' \
+            "exec $(printf '%q' "$real") \"\$@\"" > "$dir/npx"
+          chmod +x "$dir/npx"
+          echo "$dir" >> "$GITHUB_PATH"
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium || (echo "::warning::playwright install --with-deps attempt 1 failed; retrying" && sleep 10 && npx playwright install --with-deps chromium) || (echo "::warning::playwright install --with-deps attempt 2 failed; retrying" && sleep 20 && npx playwright install --with-deps chromium) || (echo "::warning::apt deps unavailable after 3 attempts; installing Chromium without system packages" && npx playwright install chromium)
       - run: npm run test:layout
 
   # #884: AI eval gate. Offline (fixture model outputs through each feature's real validator; no model call,
