@@ -29,7 +29,7 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK, previe
   assert.equal(preview.vars.HARIMU_UI_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_UI_PACK[key], 'false');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 56);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 57);
 });
 
 test('multi-day and under one hour use the world season at the deadline, and a missing epoch uses 12×', () => {
