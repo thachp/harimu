@@ -37,19 +37,18 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 4
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 49);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 50);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(48), key, 'entry 49');
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(-1), key);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(47), WORLD_ATLAS_ICON_SCALE_FLAG, 'icon scale stays entry 48');
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 49/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 50/);
   assert.match(await read('tests/text-bindings-988.test.mjs'), /#392 world atlas explore icons/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key));
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
   assert.match(await read('lib/world-atlas-explore-icons.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_WORLD_ATLAS_EXPLORE_ICONS/);
   assert.match(await read('app/world-atlas.tsx'), /exploreIcons = worldAtlasExploreIconsEnabled\(\)/);
   assert.doesNotMatch(await read('app/page.tsx'), /WORLD_ATLAS_EXPLORE_ICONS|worldAtlasExploreIconsEnabled/);
-  assert.match(await read('app/nation-overview.tsx'), /<ExplorePrimaryButton label=\{explore\} ariaLabel=\{`\$\{explore\}: open the city`\} onClick=\{onExplore\} chevron \/>/);
-  assert.doesNotMatch(await read('app/nation-overview.tsx'), /leadingIcon|WORLD_ATLAS_EXPLORE_ICONS|worldAtlasExploreIconsEnabled/);
+  assert.match(await read('app/nation-overview.tsx'), /<ExplorePrimaryButton label=\{explore\} ariaLabel=\{`\$\{explore\}: open the city`\} onClick=\{onExplore\} chevron/);
+  assert.doesNotMatch(await read('app/nation-overview.tsx'), /WORLD_ATLAS_EXPLORE_ICONS|worldAtlasExploreIconsEnabled/);
 });
 
 const bundle = async (file, define) => {
@@ -150,6 +149,7 @@ test('the Nation overview Explore button stays the label plus its chevron', asyn
     'process.env.NEXT_PUBLIC_HARIMU_NATION_MOTTO': '"false"',
     'process.env.NEXT_PUBLIC_HARIMU_UI_V2_CREST': '"false"',
     'process.env.NEXT_PUBLIC_HARIMU_WORLD_ATLAS_EXPLORE_ICONS': '"true"',
+    'process.env.NEXT_PUBLIC_HARIMU_NATION_ACTION_ICONS': 'undefined',
   });
   const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
   const caret = renderToStaticMarkup(React.createElement(CaretRight, { size: 18, 'aria-hidden': 'true' }));
