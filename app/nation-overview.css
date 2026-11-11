@@ -69,3 +69,7 @@
 .game-inspector-body .nation-overview-head.nation-overview-header-word-wrap>.panel-v2-header-stats{flex:1 0 100%;width:100%;min-width:0}
 .game-inspector-body .nation-overview-head.nation-overview-header-word-wrap .panel-v2-header-stats>div{flex:1 1 auto;min-width:min-content;max-width:100%}
 .game-inspector-body .nation-overview-head.nation-overview-header-word-wrap .panel-v2-header-stats :is(dt,dd,small){overflow-wrap:normal;word-break:normal;hyphens:none}
+/* #392 UI 59. The class is on the header only while the chip-cap flag and the word-wrap class are both on, and header chips are shown.
+   Each chip's minimum width is min(100%, min-content), the same cap the motto uses, so one chip stays inside the panel.
+   calc-size repeats that cap where min-content inside min() is dropped. Words still wrap on spaces. */
+.game-inspector-body .nation-overview-head.nation-overview-header-word-wrap.nation-overview-header-chip-cap .panel-v2-header-stats>div{min-width:min(100%,min-content);min-width:calc-size(min-content,min(100%,size))}
