@@ -1,5 +1,5 @@
 'use client';
-import { Bank, BookOpen, Coins, UsersThree } from '@phosphor-icons/react';
+import { Bank, BookOpen, CaretRight, Coins, UsersThree } from '@phosphor-icons/react';
 import { NationCrest } from './nation-crest';
 import { ExplorePrimaryButton } from './explore-primary';
 import { HeaderStatChips } from './panel-v2';
@@ -10,6 +10,7 @@ import { nationActionIconsEnabled } from '@/lib/nation-action-icons';
 import { nationActionsStackEnabled } from '@/lib/nation-actions-stack';
 import { nationActionsNarrowStackEnabled } from '@/lib/nation-actions-narrow-stack';
 import { iconSizeSyncEnabled } from '@/lib/icon-size-sync';
+import { nationInstitutionRowsEnabled } from '@/lib/nation-institution-rows';
 import { nationMottoEnabled } from '@/lib/nation-motto';
 import './nation-overview.css';
 
@@ -28,6 +29,12 @@ function NationActions({ explore, onExplore, onInstitutions, actionIcons, action
   return <div className={row.join(' ')}>{primary}{secondary}</div>;
 }
 
+function InstitutionList({ items, onCivic, rows, iconSizeSync }: { items: readonly { id: string; name: string }[]; onCivic: () => void; rows: boolean; iconSizeSync: boolean }) {
+  if (!rows) return <ul className="nation-overview-institutions" aria-label="Institutions">{items.map(item => <li key={item.id}><button type="button" onClick={onCivic}>{item.name}</button></li>)}</ul>;
+  const list = ['nation-overview-institutions', 'nation-overview-institution-rows', iconSizeSync ? 'nation-overview-institution-rows-sync' : ''].filter(Boolean).join(' ');
+  return <ul className={list} aria-label="Institutions">{items.map(item => <li key={item.id}><button type="button" className="nation-overview-institution-row" onClick={onCivic}><span className="nation-overview-institution-name">{item.name}</span><CaretRight size={iconSizeSync ? '1em' : 18} aria-hidden="true" /></button></li>)}</ul>;
+}
+
 /** #1166: the nation-view side panel. Every value comes from the nation record or that nation's government read.
  *  #392 UI 41: with NEXT_PUBLIC_HARIMU_NATION_HEADER_STATS, Stability, Capital and Currency move into header chips and the old trio is not repeated. Flag off keeps this panel as it is.
  *  #392 UI 42: with NEXT_PUBLIC_HARIMU_NATION_ACTIONS, Explore {capital} is the shared gold primary with a trailing chevron.
@@ -36,8 +43,9 @@ function NationActions({ explore, onExplore, onInstitutions, actionIcons, action
  *  #392 UI 53: with NEXT_PUBLIC_HARIMU_NATION_ACTION_ICONS, and only while that action row is on, Explore {capital} leads with a bank mark and keeps the chevron. View institutions leads with a book. A missing flag leaves the row as it is.
  *  #392 UI 54: with NEXT_PUBLIC_HARIMU_NATION_ACTIONS_STACK, and only while that action row is on, the two buttons size from their words and wrap onto a full-width row before a word is clipped. A missing flag leaves the row as it is.
  *  #392 UI 55: with NEXT_PUBLIC_HARIMU_NATION_ACTIONS_NARROW_STACK, and only while the UI 54 stack flag is also on, the two actions each take a full row at 390px. A missing flag leaves the row as it is.
- *  #392 UI 56: with NEXT_PUBLIC_HARIMU_ICON_SIZE_SYNC, and only while the action icons are on, those marks use size 1em. Flag off keeps size 18. */
-export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions, actionIcons = nationActionIconsEnabled(), actionsStack = nationActionsStackEnabled(), actionsNarrowStack = nationActionsNarrowStackEnabled(), iconSizeSync = iconSizeSyncEnabled() }: {
+ *  #392 UI 56: with NEXT_PUBLIC_HARIMU_ICON_SIZE_SYNC, and only while the action icons are on, those marks use size 1em. Flag off keeps size 18.
+ *  #392 UI 57: with NEXT_PUBLIC_HARIMU_NATION_INSTITUTION_ROWS, each government role is a full-width row with a trailing caret. Flag off keeps the plain buttons. */
+export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions, actionIcons = nationActionIconsEnabled(), actionsStack = nationActionsStackEnabled(), actionsNarrowStack = nationActionsNarrowStackEnabled(), iconSizeSync = iconSizeSyncEnabled(), institutionRows = nationInstitutionRowsEnabled() }: {
   nation: NationOverviewNation;
   government?: NationOverviewGovernment;
   onExplore: () => void;
@@ -47,6 +55,7 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
   actionsStack?: boolean;
   actionsNarrowStack?: boolean;
   iconSizeSync?: boolean;
+  institutionRows?: boolean;
 }) {
   const fields = nationOverviewFields(nation, government);
   const headerOn = nationHeaderStatsEnabled();
@@ -76,7 +85,7 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
     </header>
     {!headerOn && stats.length > 0 && <dl className="nation-overview-stats">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     {rows.length > 0 && <dl className="nation-overview-rows">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
-    {fields.institutions.length > 0 && <ul className="nation-overview-institutions" aria-label="Institutions">{fields.institutions.map(item => <li key={item.id}><button type="button" onClick={onCivic}>{item.name}</button></li>)}</ul>}
+    {fields.institutions.length > 0 && <InstitutionList items={fields.institutions} onCivic={onCivic} rows={institutionRows} iconSizeSync={iconSizeSync} />}
     {actionsOn ? <NationActions explore={fields.explore} onExplore={onExplore} onInstitutions={onInstitutions} actionIcons={actionIcons} actionsStack={actionsStack} actionsNarrowStack={actionsNarrowStack} iconSizeSync={iconSizeSync} /> : fields.explore && <button type="button" className="nation-overview-primary" aria-label={`${fields.explore}: open the city`} onClick={onExplore}>{fields.explore}</button>}
   </section>;
 }
