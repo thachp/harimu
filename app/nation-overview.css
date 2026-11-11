@@ -73,3 +73,6 @@
    Each chip's minimum width is min(100%, min-content), the same cap the motto uses, so one chip stays inside the panel.
    calc-size repeats that cap where min-content inside min() is dropped. Words still wrap on spaces. */
 .game-inspector-body .nation-overview-head.nation-overview-header-word-wrap.nation-overview-header-chip-cap .panel-v2-header-stats>div{min-width:min(100%,min-content);min-width:calc-size(min-content,min(100%,size))}
+/* #392 UI 63. The class is on the nation header only while header icon size sync is on and header chips are shown.
+   Chip marks use 16px at text scale 1. Font-size carries the text scale. Width and height are 1em. */
+.game-inspector-body .nation-overview-head.nation-overview-header-icon-size-sync .panel-v2-icon svg{flex:none;font-size:calc(16px * var(--text-scale, 1));width:1em;height:1em}
