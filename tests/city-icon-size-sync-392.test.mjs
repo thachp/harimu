@@ -159,10 +159,11 @@ test('painted size at 100% text matches 16 and 18, and 150% scales only the city
     assert.deepEqual(at150.glyph, { w: 44, h: 44 });
     assert.equal(at150.color, at100.color);
     try {
-      const { mkdirSync } = await import('node:fs');
-      mkdirSync('/opt/cursor/artifacts', { recursive: true });
-      await page.locator('.panel-v2').screenshot({ path: '/opt/cursor/artifacts/city-icon-size-sync-aurelle-highspire-390-scale-1.5.png' });
-    } catch { /* the artifact dir is optional; a missing or unwritable path must not fail the size checks */ }
+      const [{ mkdirSync }, { tmpdir }, { join }] = await Promise.all([import('node:fs'), import('node:os'), import('node:path')]);
+      const dir = process.env.HARIMU_TEST_ARTIFACTS_DIR || join(tmpdir(), 'harimu-city-icon-size-sync-392');
+      mkdirSync(dir, { recursive: true });
+      await page.locator('.panel-v2').screenshot({ path: join(dir, 'aurelle-highspire-390-scale-1.5.png') });
+    } catch { /* a missing or unwritable artifact dir must not fail the size checks */ }
     await page.close();
   } finally {
     await browser.close();
