@@ -71,5 +71,11 @@
 .household-v2-family img{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #d6b45c}
 .household-v2-family strong{font-size:calc(13px * var(--text-scale, 1));overflow-wrap:normal;word-break:normal}
 .household-v2-family small{font-size:calc(11px * var(--text-scale, 1));color:#b9cfd3}
+/* #392 UI 66. Household identity only. Crest, title and the nation's motto. The City panel is unchanged. Head text keeps each word whole. */
+.household-v2 .panel-v2-summary.household-v2-head{display:grid;grid-template-columns:auto minmax(0,max-content) minmax(0,1fr);align-items:center;column-gap:12px;row-gap:8px;min-width:0;max-width:100%}
+.household-v2 .household-v2-head>div,.household-v2 .household-v2-head>p.household-v2-motto{min-width:0;max-width:100%}
+.household-v2 .household-v2-head>p.household-v2-motto{grid-column:3;margin:0;color:#f1d58a;font-family:Georgia,serif;font-style:italic;font-size:calc(13px * var(--text-scale, 1));font-weight:500;line-height:1.35;text-align:right;opacity:1}
+.household-v2 .panel-v2-summary.household-v2-head :is(h2,p){overflow-wrap:normal;word-break:normal;hyphens:none}
+@media (max-width:390px){.household-v2 .panel-v2-summary.household-v2-head{grid-template-columns:auto minmax(0,1fr)}.household-v2 .household-v2-head>p.household-v2-motto{grid-column:1 / -1}}
 /* #392 S7 follow-up: City rows and the Household primary carry the same decorative icon as the City pills (UI_V2_CITY), in the pills' gold. */
 .panel-v2 .panel-v2-icon,.nation-overview .panel-v2-icon{display:inline-flex;flex:none;color:#e2c36b}.panel-v2 .panel-v2-rows button>span:nth-child(2){flex:1}.panel-v2 button.panel-v2-primary>span:nth-child(2),.panel-v2 button.panel-v2-secondary>span:nth-child(2){flex:1}
