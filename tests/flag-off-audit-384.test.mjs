@@ -47,6 +47,7 @@ const flagOffPins = {
   HARIMU_HOARVALE_ENABLED: 'nation-openings.test.mjs',
   HARIMU_VARKAND_ENABLED: 'nation-openings.test.mjs',
   HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED: 'varkand-recruit-term-1095.test.mjs',
+  HARIMU_WAR_EVACUATION_ENABLED: 'war-evacuation-1324.test.mjs', // #1324 flag off: capture moves no one and shows no notice
   HARIMU_VELDWOOD_ENABLED: 'nation-openings.test.mjs',
   HARIMU_FULMARA_ENABLED: 'nation-openings.test.mjs',
   HARIMU_GRAY_MARKET_ENABLED: 'gray-market-43.test.mjs',
@@ -111,6 +112,7 @@ const flagOffPins = {
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_AURELLE_TSR_VIEW_ENABLED: 'aurelle-tsr-view-999.test.mjs', // #999 flag off: no crownRateMilli, no line
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
+  HARIMU_LAND_TILES_ENABLED: 'land-tiles-467.test.mjs', // #467 flag off (and on): tables only, square purchase and capture() unchanged
   HARIMU_TARGETED_SANCTIONS_ENABLED: 'goods-sanctions-601.test.mjs',
   HARIMU_WAR_ENABLED: 'war-actions.test.mjs',
   HARIMU_WAR_WEARINESS_ENABLED: 'war-weariness.test.mjs',
@@ -193,6 +195,7 @@ const flagOffPins = {
   HARIMU_MERIDIAN_DAO_WORKS_ENABLED: 'meridian-dao-works-1279.test.mjs', // #1279 flag off: no resident city
   HARIMU_VARKAND_DUNKAR_PASS_ENABLED: 'varkand-dunkar-pass-1282.test.mjs', // #1282 flag off: no resident city
   HARIMU_BETTER_AUTH_ENABLED: 'better-auth-1318.test.mjs', // #1318 flag off: /api/auth is 404 and the database stays closed
+  HARIMU_WORLD_ID_ENABLED: 'world-id-469.test.mjs', // #469 flag off: /api/world-id is 404 and nothing is fetched
   HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'zzzzzzzzz-varkand-muster-day-1151.test.mjs', // #1151 flag off: no musterDay key
   HARIMU_VARKAND_LANTERN_WATCH_ENABLED: 'zzzzzzzzzzzzzzz-varkand-lantern-watch-1211.test.mjs', // #1211 flag off: no lanternWatch key
   HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'zzzzzzzzz-confluence-canal-festival-1165.test.mjs', // #1165 flag off: no canalFestival key

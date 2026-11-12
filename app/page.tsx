@@ -80,6 +80,7 @@ import { EconomyPanel } from './economy-panel';
 import { FaithView } from './faith-view';
 import { MilitaryPanel } from './military-panel';
 import { SiegePanel } from './siege-panel'; // #620
+import { EvacuationNotice } from './evacuation-notice'; // #1324
 import { AurelleRisingPanel } from './aurelle-rising';
 import { simulateGovernment, type GovernmentSnapshot, type PetitionTopic } from '@/lib/government';
 import { PlayerMarket } from './player-market';
@@ -530,6 +531,8 @@ type CitizenSnapshot = {
   demoGovernment?: { period: number; counts: Record<string, number> };
   demoReceipts?: string[];
   demoStarterGranted?: boolean;
+  /** #1324: #421 evacuation lines. Absent unless both war flags are on and this citizen was moved. */
+  evacuation?: { lines: string[] } | null;
 };
 
 type EnrollmentReview = { nationId: string; expectedNationId: string | null };
@@ -616,6 +619,7 @@ function ClerkCitizenSession({
 export default function Home() {
   const formatTime=useDisplayTimestamp();
   const [simulation, setSimulation] = useState<SimulationState | null>(null);
+  const [evacuation, setEvacuation] = useState<readonly string[] | null>(null); // #1324
   const [worldAges, setWorldAges] = useState(false); // #1041: GET /api/world worldAges, from flagOn(HARIMU_UI_PACK)
   const [faithFestivalHud, setFaithFestivalHud] = useState(false); // #1048: GET /api/world faithFestivalHud, from flagOn(HARIMU_UI_PACK)
   const [walletOpen, setWalletOpen] = useState(false);
@@ -870,7 +874,7 @@ export default function Home() {
     setCitizenSessionKey(value => value + 1);
     cityTravelLock.current = false; setCityTravelPending(false); setCityAccount(null); setCityError('');
     workLock.current = false; enrollmentLock.current = false; setEnrollmentExpectedNation(review?.expectedNationId ?? null);
-    setCitizenNationId(null); seededNationId.current = null; setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null);
+    setCitizenNationId(null); seededNationId.current = null; setCitizenshipStatus(null); setPendingEnrollment(review?.nationId ?? null); setEvacuation(null);
     setCapacity(0); setInfluence(0); setWaterSecurity(0); setWardStability(0);
     setEconomy(null); setRewardsView(null); setMarket(null); setPlayerMarket(null); setGovernment(null); setCollectivePetitions(null);setElection(null); setCycleStartAt(null); setVerification(null); setWorkShifts([]); setShiftDay(null);
     setAurellePlan(null); aurelleIntent.current = null; setAurelleCommand(null);
@@ -1383,6 +1387,7 @@ export default function Home() {
     setAurellePlan(snapshot.aurellePlan ?? null);
     setNationWorkPlan(snapshot.nationWorkPlan ?? null);
     if (snapshot.simulation) setSimulation(snapshot.simulation);
+    setEvacuation(snapshot.evacuation?.lines ?? null); // #1324: flag off omits the key, so the notice clears
     setVerification(snapshot.verification ?? null);
     setWorkShifts(snapshot.shifts ?? []);
     setShiftDay(snapshot.shiftDay ?? null); // #1047: absent while the cap flag is off
@@ -1748,6 +1753,7 @@ export default function Home() {
       {citizenSessionStatus==='error' ? <button type="button" onClick={()=>setSessionRetry(value=>value+1)}>Retry loading citizen</button> : <button type="button" onClick={() => changeView('world')}>Explore nations</button>}
       {clerkConfigured && citizenSessionStatus === 'anonymous' && <SignInButton mode="modal"><button type="button">Sign in</button></SignInButton>}
     </div> : <>
+      {evacuation && <EvacuationNotice lines={evacuation} />}
       {citizenNation.id !== 'aurelle' && aurelleCommand && <div role="alert"><p>A previous Aurelle action needs confirmation.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && aurelleIntent.current) void runAurelleCommand(aurelleIntent.current); }}>Confirm previous Aurelle action</ActionButton></div>}
       {citizenNation.id !== 'korund' && korundCommand && <div role="alert"><p>A previous Korund action needs confirmation. Its original currency and ledger are preserved.</p><ActionButton type="button" reason={pendingActionReason(workPending)} onClick={() => { if (!workPending && korundIntent.current) void runKorundCommand(korundIntent.current); }}>Confirm previous Korund action</ActionButton></div>}
       {nationPlanPanelNation(citizenNation.id, viewMode) && dailyLoop}

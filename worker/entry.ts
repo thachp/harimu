@@ -19,6 +19,7 @@ import { runCityTierGrowth } from '../lib/city-tier'; // #952
 import { readVerification } from '../lib/verification';
 import { presenceSocketPath, presenceUpgrade, type PresenceEnv } from '../lib/city-presence';
 import { createAuth, isBetterAuthPath, type BetterAuthEnv } from '../lib/better-auth';
+import { handleWorldIdRequest, isWorldIdPath, type WorldIdEnv } from '../lib/world-id';
 export { CityPresence } from './city-presence';
 
 const worker = {
@@ -32,6 +33,8 @@ const worker = {
       try { return await auth.handler(request); }
       finally { await auth.close(); }
     }
+    // #469: /api/world-id/* is the inert World ID adapter. Flag or secret off is 404 and does not fetch.
+    if (isWorldIdPath(url.pathname)) return handleWorldIdRequest(request, env as unknown as WorldIdEnv);
     return vinext.fetch(request, workerEnv as never, ctx as never);
   },
   // #247: Cron Trigger (wrangler.jsonc "triggers.crons"). AI Cabinet petition responses; a no-op unless enabled.
