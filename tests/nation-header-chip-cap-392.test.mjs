@@ -34,10 +34,10 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 5
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 68);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 69);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(55), key, 'entry 56');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(54), NATION_HEADER_WORD_WRAP_FLAG, 'word wrap stays entry 55');
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 68/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 69/);
   assert.match(await read('tests/text-bindings-988.test.mjs'), /#392 nation header chip cap/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key));
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));

@@ -1,0 +1,2 @@
+/* #1315 M1. .military-v2 exists only while NEXT_PUBLIC_HARIMU_MILITARY is the exact string "true". */ .military-v2{min-width:0}
+.military-v2 h2,.military-v2 h3,.military-v2 h4,.military-v2 p,.military-v2 li,.military-v2 strong,.military-v2 small{overflow-wrap:normal;word-break:normal;hyphens:none}

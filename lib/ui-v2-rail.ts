@@ -7,7 +7,7 @@ export function countryWord(on: boolean = uiV2RailEnabled()): 'Nation' | 'Countr
 export const railLevels = [{ id: 'world', name: 'World' }, { id: 'country', name: 'Nation' }, { id: 'square', name: 'City' }] as const;
 export type RailLevelId = typeof railLevels[number]['id'];
 /** The level the current view sits in: World; Nation for the country map and the nation institutions; City for the square and every place inside it. */
-export function railLevelOf(view: string): RailLevelId { return view === 'world' ? 'world' : view === 'country' || view === 'nation' ? 'country' : 'square'; }
+export function railLevelOf(view: string): RailLevelId { return view === 'world' ? 'world' : view === 'country' || view === 'nation' || view === 'military' ? 'country' : 'square'; }
 /** aria-current for a rail level: "page" when the view is that level itself, "location" when the view is a place inside it (e.g. Household inside City). */
 export function railCurrent(level: RailLevelId, view: string): 'page' | 'location' | undefined { return railLevelOf(view) !== level ? undefined : view === level ? 'page' : 'location'; }
 /** Arrow keys, Home and End move focus between the rail's buttons (Tab still enters and leaves the rail). Returns the index to focus, or null. */

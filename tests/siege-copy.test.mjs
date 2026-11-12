@@ -86,5 +86,5 @@ test('system lines carry no byline or AI badge: strip, rules and private notices
 });
 test('wired only through app/siege-panel.tsx (#620): nothing else in app/, components/ or lib/ imports siege-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('siege-copy.ts')&&f!=='app/siege-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/\bsiege-copy\b/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('siege-copy.ts')&&f!=='app/siege-panel.tsx'&&f!=='app/military-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/\bsiege-copy\b/, f);
 });

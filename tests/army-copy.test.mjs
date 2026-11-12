@@ -74,7 +74,7 @@ test('no string here repeats a string from another lib module, and no on-chain, 
 });
 test('wired only by #738: the army card and army rules import army-copy; nothing else does', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('army-copy.ts')&&!['app/army-card.tsx','lib/army-rules.ts'].includes(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/army-copy/, f);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('army-copy.ts')&&!['app/army-card.tsx','app/military-panel.tsx','lib/army-rules.ts'].includes(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/army-copy/, f);
 });
 test('officer orders do not echo the Varkand starter line (QA3 note on #602)', () => {
   for (const l of OO) assert.doesNotMatch(l.text,/Hold the line/i,l.text);
