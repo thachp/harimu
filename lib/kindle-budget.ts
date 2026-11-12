@@ -1,5 +1,6 @@
 /** #789 (docs §12.12): read-only Kindle national budget. Treasury balance and income-tax inflow come from the real ledger (economy_funds + shift_income_tax, #86).
- *  Integer minor units (100 = 1 SPK). Nothing spends from kindle-treasury yet, so every §12.12 category reads "no spending yet"; no number is made up.
+ *  Integer minor units (100 = 1 SPK). #1350: the only spending from kindle-treasury is the #824 Dormant Savings Shield, paid from the welfare line
+ *  (docs §12.8), so Welfare shows the paid credits; every other §12.12 category reads "no spending yet" (null); no number is made up.
  *  Flag HARIMU_KINDLE_BUDGET_VIEW_ENABLED: "true" in preview, "false" in production. Read-only: SELECTs only. */
 import type { GameDatabase } from './database-contract';
 import { kindleTreasuryBalanceSql } from './economy';
@@ -12,7 +13,8 @@ export const kindleBudgetViewEnabled = (env: { HARIMU_KINDLE_BUDGET_VIEW_ENABLED
 export const budgetCategories = ['Defense', 'Infrastructure', 'Welfare', 'Culture, propaganda and faith', 'Administration', 'Reserves'] as const;
 export type KindleBudget = {
   treasuryMinor: number; todayTaxMinor: number; /** #844 follow-up: present only with HARIMU_KINDLE_SALES_TAX_ENABLED on. */ salesTaxTodayMinor?: number; gameDayStartsAt: string; ratePercent: number; rateSource: string;
-  categories: { name: (typeof budgetCategories)[number]; spentMinor: null }[];
+  /** #1350: spentMinor is cumulative since the treasury opened (the treasury balance's window), null while nothing has been spent. */
+  categories: { name: (typeof budgetCategories)[number]; spentMinor: number | null }[];
 };
 const int = (v: unknown) => { const n = Number(v ?? 0); return Number.isSafeInteger(n) ? n : 0; };
 /** Start of the current game day (12x clock: 2 real hours), as the ISO text settled_at is stored in.
@@ -21,14 +23,19 @@ const int = (v: unknown) => { const n = Number(v ?? 0); return Number.isSafeInte
  *  lib/faith.ts gameDayOf does, needs no world_clock read and works before the first tick. If the world epoch ever stops being 7200-aligned, read it here instead. */
 export const gameDayStartIso = (nowSeconds: number) => new Date(Math.floor(nowSeconds / gameDaySeconds) * gameDaySeconds * 1000).toISOString();
 
+/** #1350: Welfare spending = paid Dormant Savings Shield credits (the welfare-line debit kindleTreasuryBalanceSql subtracts); skipped rows are not spending. */
+export const kindleWelfareSpentSql = "SELECT COALESCE(SUM(credit_minor), 0) AS spent FROM savings_shield_credits WHERE status = 'paid'";
+
 export async function readKindleBudget(db: GameDatabase, nowSeconds: number, ratePercent: number, options: { salesTax?: boolean } = {}): Promise<KindleBudget> {
   const since = gameDayStartIso(nowSeconds);
-  const [balance, today] = await Promise.all([
+  const [balance, today, welfare] = await Promise.all([
     db.prepare(kindleTreasuryBalanceSql).first<{ balance: number | string }>(),
     db.prepare('SELECT COALESCE(SUM(tax_minor), 0) AS today FROM shift_income_tax WHERE settled_at >= ?').bind(since).first<{ today: number | string }>(),
+    db.prepare(kindleWelfareSpentSql).first<{ spent: number | string }>(),
   ]);
+  const welfareMinor = int(welfare?.spent);
   const dayStart = Math.floor(nowSeconds / gameDaySeconds) * gameDaySeconds; // charged_at is unix seconds
   const sales = options.salesTax ? await db.prepare(kindleSalesTaxSinceSql).bind(dayStart, dayStart).first<{ total: number | string }>() : null;
   return { treasuryMinor: int(balance?.balance), todayTaxMinor: int(today?.today), ...(sales ? { salesTaxTodayMinor: int(sales.total) } : {}), gameDayStartsAt: since, ratePercent, rateSource: incomeTaxRateSource,
-    categories: budgetCategories.map(name => ({ name, spentMinor: null })) };
+    categories: budgetCategories.map(name => ({ name, spentMinor: name === 'Welfare' && welfareMinor > 0 ? welfareMinor : null })) };
 }
