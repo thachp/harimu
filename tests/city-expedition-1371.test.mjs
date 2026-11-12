@@ -17,7 +17,7 @@ async function kindle(r, n) {
   for (let i = have; i < n; i++) await r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'kindle',?,18,0,'Good standing',?,?)").bind(`exp-${i}`, `Exp ${i}`, iso, iso).run();
 }
 
-test('the flag is last in HARIMU_GRAY_PACK at index 89, preview on and production off, and is not its own binding', () => {
+test('the expedition flag is at index 89 in HARIMU_GRAY_PACK (after party chat, before Korund map fog), preview on and production off, and is not its own binding', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_PARTY_CHAT_ENABLED'), 88);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 89);
