@@ -109,6 +109,7 @@ const flagOffPins = {
   HARIMU_GLOBAL_CHAT_ENABLED: 'global-chat-881.test.mjs',
   HARIMU_DM_CHAT_ENABLED: 'dm-chat-881.test.mjs',
   HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
+  HARIMU_CONGREGATION_CHAT_ENABLED: 'congregation-chat-1342.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_AURELLE_TSR_VIEW_ENABLED: 'aurelle-tsr-view-999.test.mjs', // #999 flag off: no crownRateMilli, no line

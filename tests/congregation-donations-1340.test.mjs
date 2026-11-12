@@ -11,7 +11,7 @@ const F = 'HARIMU_CONGREGATION_DONATIONS_ENABLED';
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 test('the flag is in HARIMU_GRAY_PACK, preview "true" and production "false"; a direct string wins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')).vars.HARIMU_GRAY_PACK, prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8')).vars.HARIMU_GRAY_PACK;
-  assert.deepEqual([preview[F], prod[F], Object.keys(preview).at(-1), Object.keys(prod).at(-1)], ['true', 'false', F, F]);
+  assert.deepEqual([preview[F], prod[F], Object.keys(preview).indexOf(F), Object.keys(prod).indexOf(F)], ['true', 'false', 84, 84]); // indexOf, not at(-1): #1342 chat follows at 85
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview }, F), true); assert.equal(flagOn({ HARIMU_GRAY_PACK: prod }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview, [F]: 'false' }, F), false);
 });
