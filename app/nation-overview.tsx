@@ -16,6 +16,7 @@ import { nationHeaderWordWrapEnabled } from '@/lib/nation-header-word-wrap';
 import { nationHeaderChipCapEnabled } from '@/lib/nation-header-chip-cap';
 import { nationHeaderIconSizeSyncEnabled } from '@/lib/nation-header-icon-size-sync';
 import { economyEnabled } from '@/lib/economy-flag';
+import { faithEnabled } from '@/lib/faith-flag';
 import { militaryEnabled } from '@/lib/military';
 import './nation-overview.css';
 
@@ -53,7 +54,7 @@ function InstitutionList({ items, onCivic, rows, iconSizeSync }: { items: readon
  *  #392 UI 58: with NEXT_PUBLIC_HARIMU_NATION_HEADER_WORD_WRAP, and only while the motto or the header chips are also on, those strings wrap on word boundaries. A missing flag leaves the header as it is.
  *  #392 UI 59: with NEXT_PUBLIC_HARIMU_NATION_HEADER_CHIP_CAP, and only while the word-wrap flag is also on and header chips are shown, each chip minimum width is min(100%, min-content). A missing flag leaves those chips as they are.
  *  #392 UI 63: with NEXT_PUBLIC_HARIMU_NATION_HEADER_ICON_SIZE_SYNC, and only while header chips are shown, those marks use size 1em. Flag off keeps size 16. */
-export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions, onMilitary, onEconomy, actionIcons = nationActionIconsEnabled(), actionsStack = nationActionsStackEnabled(), actionsNarrowStack = nationActionsNarrowStackEnabled(), iconSizeSync = iconSizeSyncEnabled(), institutionRows = nationInstitutionRowsEnabled(), headerWordWrap = nationHeaderWordWrapEnabled(), headerChipCap = nationHeaderChipCapEnabled(), headerIconSizeSync = nationHeaderIconSizeSyncEnabled() }: {
+export function NationOverview({ nation, government = null, onExplore, onCivic, onInstitutions, onMilitary, onEconomy, onFaith, actionIcons = nationActionIconsEnabled(), actionsStack = nationActionsStackEnabled(), actionsNarrowStack = nationActionsNarrowStackEnabled(), iconSizeSync = iconSizeSyncEnabled(), institutionRows = nationInstitutionRowsEnabled(), headerWordWrap = nationHeaderWordWrapEnabled(), headerChipCap = nationHeaderChipCapEnabled(), headerIconSizeSync = nationHeaderIconSizeSyncEnabled() }: {
   nation: NationOverviewNation;
   government?: NationOverviewGovernment;
   onExplore: () => void;
@@ -61,6 +62,7 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
   onInstitutions?: () => void;
   onMilitary?: () => void;
   onEconomy?: () => void;
+  onFaith?: () => void;
   actionIcons?: boolean;
   actionsStack?: boolean;
   actionsNarrowStack?: boolean;
@@ -100,7 +102,7 @@ export function NationOverview({ nation, government = null, onExplore, onCivic, 
       <HeaderStatChips stats={chips} />
     </header>
     {!headerOn && stats.length > 0 && <dl className="nation-overview-stats">{stats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
-    {rows.length > 0 && <dl className="nation-overview-rows">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+    {rows.length > 0 && <dl className="nation-overview-rows">{rows.map(([label, value]) => label === 'Faith' && faithEnabled() && onFaith ? <div key={label} className="faith-v2"><button type="button" onClick={onFaith}><dt>{label}</dt><dd>{value}</dd><CaretRight size={18} aria-hidden="true" /></button></div> : <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     {fields.institutions.length > 0 && <InstitutionList items={fields.institutions} onCivic={onCivic} rows={institutionRows} iconSizeSync={iconSizeSync} />}
     {militaryEnabled() && onMilitary ? <ul className="nation-overview-institutions nation-overview-institution-rows" aria-label="Military"><li><button type="button" className="nation-overview-institution-row" onClick={onMilitary}><span className="nation-overview-institution-name">Military</span><CaretRight size={18} aria-hidden="true" /></button></li></ul> : null}
     {economyEnabled() && onEconomy ? <ul className="nation-overview-institutions nation-overview-institution-rows" aria-label="Economy"><li><button type="button" className="nation-overview-institution-row" onClick={onEconomy}><span className="nation-overview-institution-name">Economy</span><CaretRight size={18} aria-hidden="true" /></button></li></ul> : null}

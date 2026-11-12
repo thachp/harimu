@@ -139,7 +139,7 @@ const places = [
   { id: 'market', name: 'Market', icon: Storefront },
   { id: 'government', name: 'Civic', icon: Bank },
 ] as const;
-const titles: Record<SceneView, string> = { world: 'World globe', country: 'Country map', square: 'City', neighborhood: 'Neighborhood', household: 'Household', workplace: 'Workplace', market: 'Market quarter', government: 'Government district', nation: 'Nation institutions', military: 'Military', economy: 'Economy' };
+const titles: Record<SceneView, string> = { world: 'World globe', country: 'Country map', square: 'City', neighborhood: 'Neighborhood', household: 'Household', workplace: 'Workplace', market: 'Market quarter', government: 'Government district', nation: 'Nation institutions', military: 'Military', economy: 'Economy', faith: 'Faith' };
 /** #78: the nation's emblem next to its name in the top bar (decorative glyph with an accessible name, e.g. "Kindle Republic emblem"). */
 function NationEmblemMark({ id, name }: { id: string; name: string }) {
   const emblem = nationEmblem(nationTheme(id) ?? (nationSymbolsEnabled() ? nationMark(id) : null), name);
@@ -185,7 +185,7 @@ export function GameShell({ openNations, worldClock, worldAges = false, faithFes
   const desktopGate = desktopGateEnabled(); // #1315: below 1024px, a desktop message. Off keeps today's layout.
   const worldChips = view === 'world' && uiV2WorldEnabled(); // #392 S5: crest chips in the World nation strip
   const crestStrip = view === 'world' && worldCrestStripEnabled(); // #392 UI 39: crest and short name; the detail line stays when this is off
-  const inspecting = view === 'world' || view === 'nation' || view === 'country' || view === 'military' || view === 'economy';
+  const inspecting = view === 'world' || view === 'nation' || view === 'country' || view === 'military' || view === 'economy' || view === 'faith';
   // #379: a visitor (guest, signed out, local demo, or signed in with no citizenship yet) is not a citizen. `visitorSession` comes from isVisitorSession(), which is false while the session loads or errors, so a citizen reloading a city never sees visitor wording and the scene is not rebuilt after load.
   const visitor = !citizenNation && visitorSession;
   const hasPanel = !collapsed;
@@ -244,7 +244,7 @@ export function GameShell({ openNations, worldClock, worldAges = false, faithFes
     onBlur: (event: FocusEvent) => { const id = helpOf(event.target); if (id && helpOf(event.relatedTarget ?? document.body) !== id) dispatchHelp({ type: 'blur', id }); },
     onClick: (event: MouseEvent) => { const id = helpOf(event.target); if (id && (event.target as Element).closest('summary')) { event.preventDefault(); dispatchHelp({ type: 'click', id }); } },
   };
-  const breadcrumbs = <nav className="game-location-banner game-breadcrumbs" aria-label="Current location"><button type="button" onClick={() => navigate('world')}>World</button>{view !== 'world' && <><span>›</span><button type="button" onClick={() => navigate('country')}>{shownNationName}</button></>}{view === 'nation' && <><span>›</span><span>{nation.capital ?? 'Capital'}</span></>}{!['world','country','nation','military','economy'].includes(view) && <><span>›</span><button type="button" onClick={() => navigate('square')}>{viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City'}</button>{view !== 'square' && <><span>›</span><span>{sceneTitle}</span></>}</>}</nav>;
+  const breadcrumbs = <nav className="game-location-banner game-breadcrumbs" aria-label="Current location"><button type="button" onClick={() => navigate('world')}>World</button>{view !== 'world' && <><span>›</span><button type="button" onClick={() => navigate('country')}>{shownNationName}</button></>}{view === 'nation' && <><span>›</span><span>{nation.capital ?? 'Capital'}</span></>}{!['world','country','nation','military','economy','faith'].includes(view) && <><span>›</span><button type="button" onClick={() => navigate('square')}>{viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City'}</button>{view !== 'square' && <><span>›</span><span>{sceneTitle}</span></>}</>}</nav>;
   const zoomOn = zoomPathEnabled();
   const chrome = nationAccentEnabled() && nationAccentApplies(view) ? nationChromeAccent(nation.id) : null;
   const zoomCrumbs = zoomOn ? zoomPathCrumbs({ view, nationLabel: shownNationName, cityLabel: viewedNationHeld ? 'Your city' : currentCityName ?? nation.capital ?? 'City', nationId: viewedNationHeld ? undefined : nation.id, visitor }) : null;
