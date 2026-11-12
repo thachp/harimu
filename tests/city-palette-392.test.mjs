@@ -42,9 +42,9 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK, previe
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 69);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 70);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(34), key, 'entry 35');
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 69/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 70/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key));
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
   assert.match(await read('lib/city-palette.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_CITY_PALETTE/);

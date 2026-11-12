@@ -55,11 +55,11 @@ test('flag is on only for the exact string "true", pack entry 68, preview on and
   assert.equal(expandFlagPacks(preview.vars)[key], 'true'); assert.equal(expandFlagPacks(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 69); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(67), key, 'entry 68');
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 70); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(67), key, 'entry 68');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(66), 'NEXT_PUBLIC_HARIMU_NEIGHBORHOOD', 'entry 67 stays neighborhood');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(65), 'NEXT_PUBLIC_HARIMU_CONCEPT_CHROME', 'entry 66 stays concept chrome');
   for (const file of ['tests/text-bindings-988.test.mjs', 'tests/flag-off-audit-384.test.mjs', 'tests/wrangler-prod-501b.test.mjs']) assert.match(await read(file), new RegExp(key));
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 69/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 70/);
   assert.match(await read('tests/text-bindings-988.test.mjs'), /#1315 desktop gate is in the pack/);
   assert.match(await read('lib/desktop-gate.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_DESKTOP_GATE/);
   assert.match(await read('app/game-shell.tsx'), /from '@\/lib\/desktop-gate'/);

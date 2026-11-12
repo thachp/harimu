@@ -4,9 +4,9 @@ assert.equal(sceneFromSearch(''), 'square');
 assert.equal(sceneFromSearch('?view=unknown'), 'square');
 for (const view of viewModes) {
   const url = sceneUrl('https://harimu.com/?preview=1&nation=kindle', view, 'korund');
-  assert.equal(sceneFromSearch(new URL(url).search), view === 'neighborhood' && process.env.NEXT_PUBLIC_HARIMU_NEIGHBORHOOD !== 'true' ? 'square' : view === 'military' && process.env.NEXT_PUBLIC_HARIMU_MILITARY !== 'true' ? 'nation' : view);
+  assert.equal(sceneFromSearch(new URL(url).search), view === 'neighborhood' && process.env.NEXT_PUBLIC_HARIMU_NEIGHBORHOOD !== 'true' ? 'square' : view === 'military' && process.env.NEXT_PUBLIC_HARIMU_MILITARY !== 'true' ? 'nation' : view === 'economy' && process.env.NEXT_PUBLIC_HARIMU_ECONOMY !== 'true' ? 'nation' : view);
   assert.equal(new URL(url).searchParams.get('preview'), '1');
-  assert.equal(new URL(url).searchParams.get('nation'), ['world','nation','country','military'].includes(view) ? 'korund' : null);
+  assert.equal(new URL(url).searchParams.get('nation'), ['world','nation','country','military','economy'].includes(view) ? 'korund' : null);
 }
 // Browser history restores views entirely from URLs, without a stale component override.
 const history = ['https://harimu.com/'];

@@ -1,0 +1,2 @@
+/* #1315 E1. .economy-v2 exists only while NEXT_PUBLIC_HARIMU_ECONOMY is the exact string "true". */ .economy-v2{min-width:0}
+.economy-v2 h2,.economy-v2 h3,.economy-v2 p,.economy-v2 li,.economy-v2 strong{overflow-wrap:normal;word-break:normal;hyphens:none}

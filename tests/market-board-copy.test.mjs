@@ -92,5 +92,5 @@ test('Kindle voice only: plain words, no Korund or Aurelle market, no gray marke
 });
 test('wired only into the market board (#200): nothing else in app/ or components/ imports market-board-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/market-board.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/market-board-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/market-board.tsx' && f !== 'app/economy-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/market-board-copy/, f);
 });

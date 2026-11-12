@@ -76,5 +76,5 @@ test('voice and scope: Korund only; no gray market, faith, other nation or real-
 });
 test('unwired: nothing in app/ or components/ imports ration-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/ration-copy/, f);
+  for (const f of [...walk('app'),...walk('components')]) if (/\.(t|j)sx?$/.test(f) && f !== 'app/economy-panel.tsx') assert.doesNotMatch(readFileSync(f,'utf8'),/ration-copy/, f);
 });
