@@ -1,0 +1,4 @@
+/* #1329 F1. .faith-v2 is present only while NEXT_PUBLIC_HARIMU_FAITH is the exact string "true". */ .faith-v2{min-width:0}
+.game-inspector-body .faith-v2 :is(h2,p,button,dt,dd){overflow-wrap:normal;word-break:normal;hyphens:none}
+.game-inspector-body .nation-overview-rows>div.faith-v2{display:block}.game-inspector-body .nation-overview .faith-v2>button{display:grid;grid-template-columns:minmax(96px,110px) minmax(0,1fr) auto;gap:8px;align-items:baseline;width:100%;min-width:0;margin:0;padding:0;background:transparent;color:inherit;border:0;text-align:left;font:inherit;overflow-wrap:normal;word-break:normal;hyphens:none}
+.faith-v2 dt,.faith-v2 dd{margin:0;min-width:0}
