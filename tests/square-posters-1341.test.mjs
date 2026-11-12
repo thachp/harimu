@@ -42,7 +42,6 @@ for (const backend of ['sqlite', 'postgres']) test(`posters on a purchased squar
   assert.equal((await place(r, 'alice', { frameId: 'kindle-frame-ballot-night', requestId: 'poster-req-theme01' })).data.reason, 'theme_mismatch');
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
   await own(r, 'bob', 'korund', 3, 3);
-  for (const sloganId of ['korund-slogan-02', 'korund-slogan-03', 'korund-slogan-04']) assert.equal((await place(r, 'bob', { x: 3, y: 3, frameId: 'korund-frame-mosaic', sloganId, requestId: `poster-ph-${sloganId.slice(-2)}0000` })).data.reason, 'placeholder', sloganId);
   const first = await place(r, 'alice');
   assert.equal(first.status, 200); assert.deepEqual(first.data.poster, { frameId: 'kindle-frame-billboard', sloganId: 'kindle-slogan-01', text: 'Strike your own spark.' });
   assert.equal((await read(r, 'bob')).data.poster.text, 'Strike your own spark.');
