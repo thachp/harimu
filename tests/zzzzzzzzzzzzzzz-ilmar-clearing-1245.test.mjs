@@ -1,5 +1,5 @@
 /** #1245: Ilmar next Clearing (Lumen Canon new year). Once per game year = realDaysPerGameYear (30 real days), offset 0.
- *  Flag HARIMU_ILMAR_CLEARING_ENABLED, at(-11) in HARIMU_GRAY_PACK (GRAY 82; #1260 Long Light is 75, #1266 Vakk Harbor is 76, #1270 Ruel Works is 77, #1271 Thessaly Wells is 78, #1275 Marrow Mills is 79, #1279 Dao Works is 80; Dunkar Pass is 81; Better Auth is last, #1259 Corvel Isles is at(-9), #1242 Dunmorrow is at(-10)). Flag off: no clearing key. Date only.
+ *  Flag HARIMU_ILMAR_CLEARING_ENABLED in HARIMU_GRAY_PACK (index 71). Better Auth is index 81. World ID is index 82. Flag off: no clearing key. Date only.
  *  [ASSUMPTION] "new-year" is the game-year boundary. [ASSUMPTION] Ilmar's government read only, own flag only.
  *  Accepted on #1245. On the world atlas nextFestival list (#1268). Date only. */
 import assert from 'node:assert/strict';
@@ -105,7 +105,7 @@ test('flag off leaves the snapshot unchanged, and other nations gain no clearing
   assert.deepEqual(withIlmarClearing(sanctumOnly, day, true).clearing, block(ILMAR_CLEARING_CYCLE_MS));
 });
 
-test('the flag is preview true and production false, at(-11) in HARIMU_GRAY_PACK, and a direct string wins', () => {
+test('the flag is preview true and production false, index 71 in HARIMU_GRAY_PACK, and a direct string wins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined, 'not its own text binding');
   assert.equal(prod.vars[key], undefined);

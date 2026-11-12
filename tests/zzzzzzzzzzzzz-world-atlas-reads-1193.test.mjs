@@ -344,7 +344,7 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED'), 59);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_CORONATION_DAY_ENABLED'), 58);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED'), 57);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_WORLD_ID_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, F), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [F]: 'false' }, F), false);
@@ -619,7 +619,7 @@ test('#1267: Kite Festival, Ring Moot, and Clearing are skipped while their flag
   assert.deepEqual(worldFestivalSources.filter(s => s.nationId === 'veldwood').map(s => s.name), ['Vote Day', 'Dividend Day', 'Ring Moot']);
   const gray = FLAG_PACKS.HARIMU_GRAY_PACK;
   
-  assert.equal(gray.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); assert.equal(gray.at(-1), 'HARIMU_WORLD_ID_ENABLED');
+  assert.equal(gray.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); assert.equal(gray.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
   assert.equal(gray.indexOf('HARIMU_MERIDIAN_DAO_WORKS_ENABLED'), 79);
   assert.equal(gray.indexOf('HARIMU_VELDWOOD_MARROW_MILLS_ENABLED'), 78);
   assert.equal(gray.indexOf('HARIMU_ILMAR_THESSALY_WELLS_ENABLED'), 77);

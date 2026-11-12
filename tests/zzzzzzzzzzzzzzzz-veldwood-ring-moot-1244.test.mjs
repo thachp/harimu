@@ -1,6 +1,6 @@
 /** #1244: Veldwood next midsummer Ring Moot on the government read.
  *  Flag HARIMU_VELDWOOD_RING_MOOT_ENABLED in HARIMU_GRAY_PACK. Clearing follows it.
- *  Flag HARIMU_VELDWOOD_RING_MOOT_ENABLED, packed in HARIMU_GRAY_PACK (GRAY 82; #1260 Long Light is 75, #1266 Vakk Harbor is 76, #1270 Ruel Works is 77, #1271 Thessaly Wells is 78, #1275 Marrow Mills is 79, #1279 Dao Works is 80; Dunkar Pass is 81; Better Auth is last).
+ *  Flag HARIMU_VELDWOOD_RING_MOOT_ENABLED, packed in HARIMU_GRAY_PACK (index 70). Better Auth is index 81. World ID is index 82.
  *  Flag off: no ringMoot key. Date only: no motions, votes, turnout, or potluck text.
  *  The zzzzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzzzz- so --test-shard does not move earlier files. */
 import assert from 'node:assert/strict';

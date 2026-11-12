@@ -1,6 +1,5 @@
 /** #1260: Ilmar next Long Light midsummer vigil on the government read.
- *  Flag HARIMU_ILMAR_LONG_LIGHT_ENABLED, at(-8) in HARIMU_GRAY_PACK (GRAY 82; #1266 Vakk Harbor is 76, #1270 Ruel Works is 77, #1271 Thessaly Wells is 78, #1275 Marrow Mills is 79, #1279 Dao Works is 80; Dunkar Pass is 81; Better Auth is last (GRAY 82).
- *  #1259 Corvel Isles is at(-7), #1242 Dunmorrow is at(-8), #1245 Clearing is at(-9)). Flag off: no longLight key, including when the Sanctum or Clearing flag is on.
+ *  Flag HARIMU_ILMAR_LONG_LIGHT_ENABLED in HARIMU_GRAY_PACK (index 74). Better Auth is index 81. World ID is index 82. Flag off: no longLight key, including when the Sanctum or Clearing flag is on.
  *  Date only: no vigil, vows, Piety, or clergy.
  *  The zzzzzzzzzzzzzzzzzz- name sorts after zzzzzzzzzzzzzzzzz- so --test-shard does not move earlier files. */
 import assert from 'node:assert/strict';

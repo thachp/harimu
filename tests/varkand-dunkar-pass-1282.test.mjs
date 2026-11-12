@@ -141,7 +141,7 @@ test('Thessaly Wells on does not open Dunkar Pass', () => {
   } finally { clear(); }
 });
 
-test('the flag is at(-2) in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
+test('the flag is index 80 in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
@@ -155,7 +155,7 @@ test('the flag is at(-2) in HARIMU_GRAY_PACK, preview true and production false,
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_ILMAR_THESSALY_WELLS_ENABLED'), 77);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED'), 76);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_HOARVALE_VAKK_HARBOR_ENABLED'), 75);
-   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_WORLD_ID_ENABLED');
+   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);

@@ -51,7 +51,7 @@ test('flag off: no resident city; flag on: port resident, imports, heartland; ca
   clear();
 });
 
-test('the flag is at(-9) in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
+test('the flag is index 73 in HARIMU_GRAY_PACK, preview true and production false, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
@@ -62,7 +62,7 @@ test('the flag is at(-9) in HARIMU_GRAY_PACK, preview true and production false,
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 73);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_ILMAR_LONG_LIGHT_ENABLED'), 74);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_VELDWOOD_RING_MOOT_ENABLED'), 70);
-   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_WORLD_ID_ENABLED');
+   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);

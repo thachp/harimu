@@ -82,7 +82,7 @@ test('Brasswell Port on with Vakk Harbor off: Hoarvale lists still exclude vakk-
   assert.equal(refused.data.reason, 'not_in_nation');
 });
 
-test('the flag is preview true and production false, at(-7) in HARIMU_GRAY_PACK, and the map stays three pins', () => {
+test('the flag is preview true and production false, index 75 in HARIMU_GRAY_PACK, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
