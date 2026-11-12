@@ -29,9 +29,9 @@ for (const backend of ['sqlite', 'postgres']) test(`Korund map fog (${backend})`
   const full = await r.call('world/squares', 'bob');
   const fog = await r.call('world/squares', 'alice');
   const anon = await r.call('world/squares');
-  assert.equal(full.cache, PUBLIC_SQUARES);
-  assert.equal(anon.cache, PUBLIC_SQUARES, 'signed-out GET stays the public full map');
-  assert.deepEqual(anon.data.squares, full.data.squares);
+  assert.equal(full.cache, 'private, no-store', 'flag on: a non-Korund response is not publicly cacheable');
+  assert.equal(anon.cache, 'private, no-store', 'flag on: a signed-out response is not publicly cacheable');
+  assert.deepEqual(anon.data.squares, full.data.squares, 'signed-out still receives the full map body');
   assert.equal(fog.cache, 'private, no-store');
   const owned = new Set(full.data.squares.filter(s => s.owner === 'korund').map(s => key(s.x, s.y)));
   const visible = square => owned.has(key(square.x, square.y)) || [-1, 0, 1].some(dy => [-1, 0, 1].some(dx => (dx || dy) && owned.has(key(square.x + dx, square.y + dy))));
@@ -44,14 +44,20 @@ for (const backend of ['sqlite', 'postgres']) test(`Korund map fog (${backend})`
   const owners = await r.call('world/ownership', 'alice');
   const ownersFull = await r.call('world/ownership', 'bob');
   assert.equal(owners.cache, 'private, no-store');
-  assert.equal(ownersFull.cache, 'public, max-age=60');
+  assert.equal(ownersFull.cache, 'private, no-store');
+  const anonOwn = await r.call('world/ownership');
+  assert.equal(anonOwn.cache, 'private, no-store', 'flag on: a signed-out ownership response is not publicly cacheable');
+  assert.deepEqual(anonOwn.data, ownersFull.data);
   assert.ok(owners.data.cells.every(([x, y]) => visible(at(x, y))));
   assert.ok(ownersFull.data.cells.some(([, , nation]) => nation !== 'korund'));
 
   const resources = await r.call('world/resources', 'alice');
   const resourcesFull = await r.call('world/resources', 'bob');
   assert.equal(resources.cache, 'private, no-store');
-  assert.equal(resourcesFull.cache, 'public, max-age=60');
+  assert.equal(resourcesFull.cache, 'private, no-store');
+  const anonRes = await r.call('world/resources');
+  assert.equal(anonRes.cache, 'private, no-store', 'flag on: a signed-out resources response is not publicly cacheable');
+  assert.deepEqual(anonRes.data, resourcesFull.data);
   assert.ok(resources.data.cells.every(([x, y]) => visible(at(x, y))));
   assert.ok(resourcesFull.data.cells.some(([x, y]) => !visible(at(x, y))));
 

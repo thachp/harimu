@@ -12,5 +12,5 @@ export async function GET(request: Request) {
   const db = await getDatabase();
   const { squares } = await readWorldSquares(db);
   const view = await foggedSquares(request, squares, env, db);
-  return Response.json(resourceMap(mapWidth, mapHeight, view.squares), { headers: { 'Cache-Control': view.fog ? 'private, no-store' : 'public, max-age=60' } });
+  return Response.json(resourceMap(mapWidth, mapHeight, view.squares), { headers: { 'Cache-Control': view.private ? 'private, no-store' : 'public, max-age=60' } });
 }

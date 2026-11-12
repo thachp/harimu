@@ -18,12 +18,14 @@ export function korundFogSquares<T extends Square>(squares: readonly T[]): T[] {
   });
 }
 
-/** `fog` is true only when the payload was reduced. Callers then send `Cache-Control: private, no-store`. */
-export async function foggedSquares<T extends Square>(request: Request, squares: readonly T[], env: unknown, db: GameDatabase): Promise<{ squares: readonly T[]; fog: boolean }> {
-  if (!flagOn(env, korundMapFogFlag)) return { squares, fog: false };
+/** `private` is true for every response while the flag is on, including signed-out and non-Korund,
+ *  so a shared cache never stores a body a Korund session could be served. The squares list is
+ *  reduced only for a signed-in Korund viewer. Flag off leaves both the list and the cache alone. */
+export async function foggedSquares<T extends Square>(request: Request, squares: readonly T[], env: unknown, db: GameDatabase): Promise<{ squares: readonly T[]; private: boolean }> {
+  if (!flagOn(env, korundMapFogFlag)) return { squares, private: false };
   const userId = await authenticatedUserId(request);
-  if (!userId) return { squares, fog: false };
+  if (!userId) return { squares, private: true };
   const row = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
-  if (row?.nation_id !== 'korund') return { squares, fog: false };
-  return { squares: korundFogSquares(squares), fog: true };
+  if (row?.nation_id !== 'korund') return { squares, private: true };
+  return { squares: korundFogSquares(squares), private: true };
 }
