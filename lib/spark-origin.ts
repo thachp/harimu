@@ -4,7 +4,6 @@ import type { GameDatabase } from './database-contract';
 export const sparkOrigins = ['earned', 'purchased', 'unknown'] as const;
 export type SparkOrigin = (typeof sparkOrigins)[number];
 export type SparkLots = Record<SparkOrigin, number>;
-/** Sinks and transfers spend ineligible Spark first. A portion keeps its origin and is never rewritten to earned. */
 export const sparkDrawOrder = ['unknown', 'purchased', 'earned'] as const;
 
 /** Issuance reason → origin. Absent reasons are unknown. Only `wage` is earned; `purchased-spark` is purchased. */
@@ -17,7 +16,6 @@ export const sparkCreditOrigin: Record<string, SparkOrigin> = {
 };
 
 export const originForCredit = (reason: string): SparkOrigin => sparkCreditOrigin[reason] ?? 'unknown';
-/** Only earned Spark would qualify for a later conversion. The exchange stays disabled (Decision 111). */
 export const originQualifiesForConversion = (origin: SparkOrigin): boolean => origin === 'earned';
 export const convertibleSparkMinor = (lots: SparkLots): number => Math.max(0, Math.trunc(lots.earned || 0));
 
@@ -80,7 +78,6 @@ function debits(tracked: SparkLots, parts: { origin: SparkOrigin; amount: number
   return rows;
 }
 
-/** One opening unknown row (`legacy:<user>`) for Spark already held before this credit. `beforeHoldings` excludes the credit about to be written. */
 async function trackLegacy(db: GameDatabase, userId: string, beforeHoldings: number, occurredAt: number) {
   const sourceId = `legacy:${userId}`;
   if (await seen(db, sourceId)) return;
@@ -95,7 +92,6 @@ async function writeAll(db: GameDatabase, sourceId: string, occurredAt: number, 
     VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`).bind(`${sourceId}:${row.userId}:${row.role}:${row.origin}`, row.userId, row.origin, row.delta, row.reason, sourceId, occurredAt)));
 }
 
-/** Read-side fail-closed clamp. Lots floor at 0. Tracked Spark above holdings comes off earned, then purchased, then unknown. A shortfall (legacy or missed credit) is unknown. Negative holdings read as 0. */
 export function clampSparkLots(lots: SparkLots, holdings: number): SparkLots {
   const held = Math.max(0, Math.trunc(Number(holdings) || 0));
   let earned = Math.max(0, Math.trunc(Number(lots.earned) || 0));
@@ -114,7 +110,6 @@ export function clampSparkLots(lots: SparkLots, holdings: number): SparkLots {
   return { earned, purchased, unknown };
 }
 
-/** Holdings by origin. Spark with no ledger row is unknown, including rows written before origin tracking. */
 export async function readSparkOriginBalances(db: GameDatabase, userId: string) {
   const { lots, holdings } = await position(db, userId);
   const available = clampSparkLots(lots, holdings);
@@ -130,13 +125,11 @@ export async function recordSparkIssuance(db: GameDatabase, userId: string, amou
 
 export async function recordSparkSink(db: GameDatabase, userId: string, amount: number, sourceId: string, reason: string, occurredAt: number) {
   if (!Number.isSafeInteger(amount) || amount <= 0 || await seen(db, sourceId)) return;
-  await trackLegacy(db, userId, (await position(db, userId)).holdings + amount, occurredAt);
   const pos = await position(db, userId);
   const parts = splitTransfer(withUntracked(pos.lots, pos.holdings + amount), amount);
   await writeAll(db, sourceId, occurredAt, debits(pos.lots, parts, reason, 'sink').map(row => ({ ...row, userId })));
 }
 
-/** Gross wage is earned. Income tax withheld from that wage debits earned and cannot retag it. */
 export async function recordSettledWage(db: GameDatabase, userId: string, shiftId: string, occurredAt: number) {
   const sourceId = `wage:${shiftId}`;
   if (await seen(db, sourceId)) return;
@@ -152,13 +145,12 @@ export async function recordSettledWage(db: GameDatabase, userId: string, shiftI
   ]);
 }
 
-/** `gross` moves from `fromId` to `toId`. `sinkMinor` then leaves the receiver (fee or sales tax already taken from the wallet). */
 export async function recordSparkTransfer(db: GameDatabase, fromId: string, toId: string, gross: number, sinkMinor: number, sourceId: string, occurredAt: number, reason: string, sinkReason: string) {
   if (!Number.isSafeInteger(gross) || gross <= 0 || sinkMinor < 0 || await seen(db, sourceId)) return;
-  await trackLegacy(db, fromId, (await position(db, fromId)).holdings + gross, occurredAt);
   const [fromPos, toPos] = await Promise.all([position(db, fromId), position(db, toId)]);
   const preHoldings = fromPos.holdings + gross;
-  const parts = sumLots(fromPos.lots) > preHoldings ? [{ origin: 'unknown' as const, amount: gross }] : splitTransfer(withUntracked(fromPos.lots, preHoldings), gross);
+  const open = Math.max(0, fromPos.lots.earned) + Math.max(0, fromPos.lots.purchased) + Math.max(0, fromPos.lots.unknown);
+  const parts = open === sumLots(fromPos.lots) && open === preHoldings ? splitTransfer(fromPos.lots, gross) : [{ origin: 'unknown' as const, amount: gross }];
   const received = empty();
   for (const part of parts) received[part.origin] += part.amount;
   const credited: SparkLots = { earned: toPos.lots.earned + received.earned, purchased: toPos.lots.purchased + received.purchased, unknown: toPos.lots.unknown + received.unknown };
