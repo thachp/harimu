@@ -83,7 +83,7 @@ test('the page, shell and daily loop use the flag: tab, link, prompts and naviga
   assert.match(page, /const \[marketFlag, setMarketFlag\] = useState\(false\)/, 'fails closed until the server says otherwise');
   assert.match(page, /snapshot\.flags\.market === true/);
   assert.match(page, /\{marketShown && <button type="button" onClick=\{\(\) => changeView\('market'\)\}>Take your earnings to market<\/button>\}/);
-  assert.match(page, /requestedView === 'market' && !marketShown \? 'square'/, 'no navigation reaches the Market scene');
+  assert.match(page, /\(requestedView === 'market' && !marketShown\) \|\| \(requestedView === 'neighborhood' && !neighborhoodEnabled\(\)\) \? 'square'/, 'no navigation reaches the Market scene');
   assert.match(page, /viewMode === 'market' && marketShown && !\['korund','aurelle'\]/);
   // #378: the city destination cards moved to lib/city-destinations.ts; the page passes the same #344 rule (marketShown, kept for Korund/Aurelle by marketVisible).
   assert.match(page, /cityDestinations\(\(citizenNation \?\? selected\)\.id, marketVisible\(\(citizenNation \?\? selected\)\.id, marketShown\)\)/, 'city square destinations');

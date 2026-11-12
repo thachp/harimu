@@ -16,7 +16,9 @@ import type { LocationId, ViewportSelection } from '@/lib/game-viewport';
 import './game-shell.css';
 import './clock-zoom.css';
 import './concept-chrome.css';
-import { conceptChromeEnabled } from '../lib/concept-chrome.ts';
+import './neighborhood.css';
+import { conceptChromeEnabled } from '@/lib/concept-chrome';
+import { neighborhoodEnabled } from '@/lib/neighborhood';
 import './resource-bar.css';
 import './zoom-path.css';
 import './nation-accent.css';
@@ -135,7 +137,7 @@ const places = [
   { id: 'market', name: 'Market', icon: Storefront },
   { id: 'government', name: 'Civic', icon: Bank },
 ] as const;
-const titles: Record<SceneView, string> = { world: 'World globe', country: 'Country map', square: 'City', household: 'Household', workplace: 'Workplace', market: 'Market quarter', government: 'Government district', nation: 'Nation institutions' };
+const titles: Record<SceneView, string> = { world: 'World globe', country: 'Country map', square: 'City', neighborhood: 'Neighborhood', household: 'Household', workplace: 'Workplace', market: 'Market quarter', government: 'Government district', nation: 'Nation institutions' };
 /** #78: the nation's emblem next to its name in the top bar (decorative glyph with an accessible name, e.g. "Kindle Republic emblem"). */
 function NationEmblemMark({ id, name }: { id: string; name: string }) {
   const emblem = nationEmblem(nationTheme(id) ?? (nationSymbolsEnabled() ? nationMark(id) : null), name);
@@ -177,6 +179,7 @@ export function GameShell({ openNations, worldClock, worldAges = false, faithFes
   const railOn = uiV2RailEnabled(); // #392 S4: zoom levels in a left rail, places in the top tabs; the rail replaces the breadcrumb
   const clockZoom = clockZoomEnabled(); // #1158: dark-teal / gold-crest restyle of the clock chip and World / Nation / City / Household controls
   const concept = conceptChromeEnabled(); // #1317: quiet header; calendar popover. Off keeps today's chrome.
+  const neighborhood = neighborhoodEnabled(); // #1315: Neighborhood panel. Off keeps today's City panel and navigation.
   const worldChips = view === 'world' && uiV2WorldEnabled(); // #392 S5: crest chips in the World nation strip
   const crestStrip = view === 'world' && worldCrestStripEnabled(); // #392 UI 39: crest and short name; the detail line stays when this is off
   const inspecting = view === 'world' || view === 'nation' || view === 'country';
@@ -253,7 +256,7 @@ export function GameShell({ openNations, worldClock, worldAges = false, faithFes
   const dayLine = guestDemo ? 'Sample' : worldClock ? `Day ${worldClock.gameDay} · 12×` : citizenNation ? 'Loading world' : 'World preview';
   const worldClockHelp = (<HudHelp label="World clock" open={isOpen("World clock")} help={guestDemo ? 'This disposable example has no world clock. Its sample actions complete immediately.' : 'Game days start at 1; simulation ticks count completed two-hour intervals from 0. Day 2 with tick 1 means the second game day and one completed tick. World days use 12× real-time compression: one real day is 12 game days. This preview processes simulation ticks on visits, not continuously. Work shifts always finish at their real-time deadline.'}><span className={clockZoom ? 'game-clock game-clock-chip' : 'game-clock'}>{dayLine}<small>{worldClock ? `TICK ${worldClock.latestTick} · ON VISITS` : guestDemo ? 'NO WORLD CHANGES' : citizenNation ? 'AWAITING SNAPSHOT' : '12× · ON VISITS'}</small>{holidayName && <small className="game-clock-holiday">Public holiday</small>}{seasonClockEnabled() && !guestDemo && worldClock && <SeasonReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{worldAges && !guestDemo && worldClock && <AgeReadout epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{festivalCalendarEnabled() && !guestDemo && worldClock && citizenNation && <FestivalReadout nationId={citizenNation.id} epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{faithFestivalHud && !guestDemo && worldClock && citizenNation && <FaithFestivalReadout nationId={citizenNation.id} epochSeconds={worldClock.epochSeconds} nowSeconds={worldClock.nowSeconds} />}{nextDeadline && <span className="game-next-deadline"><GameTimer compact endsAt={nextDeadline.endsAt} epochMs={worldClock ? worldClock.epochSeconds * 1000 : undefined} label={nextDeadline.label} expiredText={nextDeadline.expiredText} /></span>}</span></HudHelp>);
   const nextEvent = topbarCountdownEnabled() && countdown && <TopbarCountdown input={countdown} open={isOpen('Next event')} epochSeconds={worldClock?.epochSeconds} />;
-  return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}${railOn ? ' game-rail-on' : ''}${cityStripHidden(view) ? ' game-city-v2' : ''}${uiV2MobileEnabled() ? ' game-mobile-v2' : ''}${clockZoom ? ' game-clock-zoom' : ''}${concept ? ' game-concept-chrome' : ''}${zoomTrail ? ` game-zoom-on game-zoom-${view}` : ''}`} data-nation-accent={chrome ? nation.id : undefined} data-accent-text={chrome?.textRole} style={chrome ? { '--crest-accent': chrome.rule, '--crest-accent-text': chrome.text } as React.CSSProperties : undefined}>
+  return <main className={`harimu-game game-mode-${view === 'world' ? 'world' : 'city'} nation-${nation.id}${hasPanel ? ' has-inspector' : ' inspector-collapsed'}${railOn ? ' game-rail-on' : ''}${cityStripHidden(view) ? ' game-city-v2' : ''}${uiV2MobileEnabled() ? ' game-mobile-v2' : ''}${clockZoom ? ' game-clock-zoom' : ''}${concept ? ' game-concept-chrome' : ''}${neighborhood ? ' game-neighborhood' : ''}${zoomTrail ? ` game-zoom-on game-zoom-${view}` : ''}`} data-nation-accent={chrome ? nation.id : undefined} data-accent-text={chrome?.textRole} style={chrome ? { '--crest-accent': chrome.rule, '--crest-accent-text': chrome.text } as React.CSSProperties : undefined}>
     <a className="game-skip" href="#game-location-dock">Skip to game locations</a>
     <div className={`game-stage${view === 'country' ? ' game-country-stage' : ''}`}>{view === 'country' ? <><div className="game-country-header">{zoomTrail ?? (railOn ? null : breadcrumbs)}{shiftChip}</div>{countryMap}</> : <GameViewport marketOpen={marketVisible(resourceNation.id, marketOpen)} visitor={visitor} overlays={mapOverlays} armyMap={armyMap} mode={view === 'world' ? 'world' : 'city'} nationId={view === 'world' ? 'atlas' : nation.id} cityName={view === 'world' ? undefined : currentCityName} nations={nations} selectedNationId={nation.id} nationFocusRevision={nationFocusRevision} cameraTourNationId={cameraTourNationId} onUserCamera={onUserCamera} selectedLocation={(view === 'household' ? 'home' : ['square','workplace','market','government'].includes(view) ? view : null) as LocationId | null} onSelect={select} />}</div>
     <header className={topbarV2 ? 'game-hud game-hud-v2' : 'game-hud'} data-nation-skin={nationSkin(citizenNation?.id) ?? undefined} {...hudHelpHandlers}>

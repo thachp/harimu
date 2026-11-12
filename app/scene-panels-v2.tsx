@@ -23,13 +23,16 @@ import { cityHeaderWordWrapEnabled } from '@/lib/city-header-word-wrap';
 import { cityHeaderHyphenKeepEnabled } from '@/lib/city-header-hyphen-keep';
 import { cityCapitalRowDedupeEnabled } from '@/lib/city-capital-row-dedupe';
 import { cityPlaceIcon } from './city-pill';
+import { neighborhoodEnabled } from '@/lib/neighborhood';
+import { CityCoResidents } from './city-coresidents';
+import type { CoResident } from '@/lib/city-location';
 import { captureHistoryLine, treatyReturnLine, type CityCaptureHistory } from '@/lib/city-capture-history'; // #1028, #1078
 import { worldExploreEnabled } from '@/lib/world-atlas'; // #392 Explore card is the gold CTA
 
 /** #392 S3: the World and City side-panel pieces that change with NEXT_PUBLIC_HARIMU_UI_V2_PANEL. Each piece reads the build-time flag itself, so
  *  page.tsx never decides it (tests/ui-v2-panel.test.mjs renders these flag off and on, and pins that page.tsx passes no `enabled`). Existing copy only. */
 type Nation = { id: string; name: string; shortName?: string; government: string; capital: string; currency: string; economy: string; religion: string; population?: string | number | null };
-type View = 'country' | 'square' | 'nation' | CityDestination['id'];
+type View = 'country' | 'square' | 'nation' | 'neighborhood' | CityDestination['id'];
 
 /** World, top of the panel: summary header, stats, chevron rows and the primary action (flag on); nothing (flag off).
  *  NEXT_PUBLIC_HARIMU_WORLD_EXPLORE demotes that primary to a secondary button so the atlas Explore action is the only gold CTA. */
@@ -95,10 +98,18 @@ export function CitySummary({ cityName, city, nation, destinations, onView, tier
   // #392 UI 44. The buildings mark is the concept's city glyph, not a crest. The inspector header already shows the nation crest above this panel.
   const subtitle = identity ? cityIdentitySubtitle(city, nation) : nation.name;
   const tagline = identity ? cityIdentityTagline(city?.description) : null;
+  const neighborhoodRow = neighborhoodEnabled() ? [{ id: 'neighborhood', label: 'Neighborhood', detail: `${cityName.trim() || nation.capital} · ${nation.name}`, onSelect: () => onView('neighborhood') }] : [];
   const panel = <PanelV2 title={cityName} subtitle={subtitle} mark={identity ? <Buildings size={44} /> : undefined} tagline={tagline} taglineBeside={taglineBeside} primaryKicker={identity ? cityIdentityKicker(Boolean(primary)) : null} rowsLabel="City destinations" headerStats={headerStats} stats={[...[cityStatusStat(city)].filter(stat => stat !== null).filter(() => !headerOn), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...hearthStats, ...regattaStats, ...festivalHostStats, ...captureStats, ...historyStats, ...civicUnitStats, ...governorStats, ...(headerOn && cityCapitalRowDedupe && cityStatusStat(city) ? [] : [{ label: 'Capital', value: nation.capital }]), ...(headerOn ? [] : [{ label: 'Currency', value: nation.currency }])]}
-    rows={aligned ? aligned.map(place => ({ id: place.id, label: place.label, detail: place.detail, icon: placeIcon(place.id), onSelect: () => onView(place.view) })) : destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? placeIcon(card.id) : undefined, onSelect: () => onView(card.id) }))}
+    rows={[...(aligned ? aligned.map(place => ({ id: place.id, label: place.label, detail: place.detail, icon: placeIcon(place.id), onSelect: () => onView(place.view) })) : destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? placeIcon(card.id) : undefined, onSelect: () => onView(card.id) }))), ...neighborhoodRow]}
     primary={primary} cityIconSizeSync={cityIconSizeSync} cityHeaderWordWrap={cityHeaderWordWrap} cityHeaderHyphenKeep={cityHeaderHyphenKeep} />; // S7 follow-up: with the City pills on, rows carry the pill's icon. #392 place rows: the five pills, same order and icons, then the Household primary.
   return spaWcNote ? <>{panel}<p>{spaWcNote}</p></> : panel; // #798: absent unless the API sends it
+}
+
+/** #1315 N1. The city catalog has no neighborhood name, so the title stays Neighborhood. Who lives here is cityCoResidents. Work and Market keep the City destination copy. */
+export function NeighborhoodSummary({ cityName, nation, destinations, residents, onView, enabled = neighborhoodEnabled() }: { cityName: string; nation: { id: string; name: string }; destinations: CityDestination[]; residents?: CoResident[] | null; onView: (view: View) => void; enabled?: boolean }) {
+  if (!enabled) return null;
+  const nearby = destinations.filter(card => card.id === 'workplace' || card.id === 'market');
+  return <div className="neighborhood-v2"><PanelV2 title="Neighborhood" subtitle={`${cityName} · ${nation.name}`} household={{ lead: nation.id ? <NationCrest id={nation.id} size={44} force /> : null }} rowsLabel="City destinations" rows={nearby.map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: cityPlaceIcon(card.id), onSelect: () => onView(card.id) }))} stats={[]} /><CityCoResidents residents={residents} cityName={cityName} /></div>;
 }
 
 /** #392 S9 (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): the Household panel head, existing data only. Wallet, Food, Residence, and Pantry (food and materials from the

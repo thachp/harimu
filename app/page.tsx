@@ -24,7 +24,8 @@ import { canReadSharedWorld } from '@/lib/guest-access';
 import { readCitizenIntents, writeCitizenIntents } from '@/lib/citizen-session';
 import { countryWord } from '@/lib/ui-v2-rail';
 import { NationPanel } from './nation-panel-v2';
-import { CitySummary, GovernmentSummary, HouseholdSummary, MarketSummary, WorkSummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
+import { CitySummary, GovernmentSummary, HouseholdSummary, MarketSummary, NeighborhoodSummary, WorkSummary, WorldFacts, WorldInstitutionsButton, WorldSummary } from './scene-panels-v2';
+import { neighborhoodEnabled } from '@/lib/neighborhood';
 import { previewOpenNations } from '@/lib/nation-discovery';
 import { pioneerNote, populationBandLabel, type PopulationBand } from '@/lib/population-bands';
 import { kioskClosed, kioskRefusal, spk, tsr } from '@/lib/kiosk-text';
@@ -1296,7 +1297,7 @@ export default function Home() {
   const startAurelleAction = (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void runAurelleCommand({ action, shiftId, quantity, requestId: crypto.randomUUID() });
   function changeView(requestedView: ViewMode) {
     // #344: with the market flag off, nothing navigates to the Market scene (it falls back to the city square).
-    const nextView: ViewMode = requestedView === 'market' && !marketShown ? 'square' : requestedView;
+    const nextView: ViewMode = (requestedView === 'market' && !marketShown) || (requestedView === 'neighborhood' && !neighborhoodEnabled()) ? 'square' : requestedView;
     if (nextView !== 'world') stopTour();
     const nextNation = nationForNavigation(nextView, viewMode, selected.id, citizenNation?.id); // #527
     setSelectedId(nextNation);
@@ -1729,7 +1730,7 @@ export default function Home() {
   function leaveGuestDemo() { setGuestMode(false); setGuestState(createGuestDemo()); changeView('world'); }
   function navigateGame(view: SceneView) {
     stopTour();
-    if (guestActive && !['household','workplace','market'].includes(view)) {
+    if (guestActive && !['household','workplace','market','neighborhood'].includes(view)) {
       setGuestMode(false); setGuestState(createGuestDemo());
     }
     changeView(view);
@@ -1877,7 +1878,7 @@ export default function Home() {
   const openCapital = () => { const capital = capitalCityForNation(countryNation.id); if (capital && countryCityId !== capital.id && canCityTravel) { void travelCity(capital.id); return; } changeView('square'); };
   const countryMap = <><CountryScene key={`${citizenSessionKey}:${countryNation.id}`} nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} onTravel={cityId=>void travelCity(cityId)} pending={cityTravelPending} travelEnabled={canCityTravel} preview={!clerkConfigured || !countryOwnNation} presence={countryOwnNation ? currentCityAccount?.presence : undefined} bleed={overviewOn} /><WorldZones nationNames={Object.fromEntries(worldNations.map(n => [n.id, n.name]))} />{countryOwnNation ? <HomeMoveCard nationId={countryNation.id} currentCityId={countryCityId} homeCityId={countryHomeId} /> : null}</>;
   const countryPanel = overviewOn ? <><NationOverview nation={countryNation} government={government?.nationId === countryNation.id ? government : null} onExplore={openCapital} onCivic={() => changeView('government')} onInstitutions={() => changeView('nation')} />{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}</> : <section aria-label={`${countryWord()} travel`}><p>{countryNation.name} · three cities from the official lore.</p><p>Free, instant travel. Home stays in the capital. Jobs and markets are shared across these cities in this preview.</p>{cityError && <p role="alert">{cityError}</p>}{citizenNation && !currentCityAccount && <button type="button" onClick={()=>setCityRetry(value=>value+1)}>Refresh city account</button>}<button type="button" onClick={()=>changeView('square')}>Open City</button></section>;
-  const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='square' ? <>
+  const gamePanel = viewMode==='world' ? worldPanel : viewMode==='country' ? countryPanel : foreignCivic ? foreignCivicPanel : viewMode==='neighborhood' ? <NeighborhoodSummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} nation={citizenNation ?? selected} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} residents={currentCityAccount?.coResidents} onView={changeView} /> : viewMode==='square' ? <>
     <CitySummary cityName={activeCity?.name ?? (citizenNation ?? selected).capital} city={activeCity} nation={citizenNation ?? selected} visitor={isVisitorSession(Boolean(citizenNation), clerkConfigured, citizenSessionStatus)} destinations={cityDestinations((citizenNation ?? selected).id, marketVisible((citizenNation ?? selected).id, marketShown))} onView={changeView} tierUnlocks={currentCityAccount?.tierName && currentCityAccount.districtSlots != null && currentCityAccount.unlocks ? { tierName: currentCityAccount.tierName, districtSlots: currentCityAccount.districtSlots, unlocks: currentCityAccount.unlocks } : null} festivalNote={currentCityAccount?.festivalNote ?? null} populationNote={currentCityAccount?.populationNote ?? null} specialtyRole={currentCityAccount?.specialtyRole ?? null} specialtyNote={currentCityAccount?.specialtyNote ?? null} captureNote={currentCityAccount?.captureNote ?? null} civicUnitNote={currentCityAccount?.civicUnitNote ?? null} governorNote={currentCityAccount?.governorNote ?? null} governorAi={currentCityAccount?.governorAi ?? false} spaWcNote={currentCityAccount?.spaWcNote ?? null} hearthNightNote={currentCityAccount?.hearthNightNote ?? null} hearthNightNextAt={currentCityAccount?.hearthNightNextAt ?? null} grandRegattaNote={currentCityAccount?.grandRegattaNote ?? null} grandRegattaNextAt={currentCityAccount?.grandRegattaNextAt ?? null} festivalHostNote={currentCityAccount?.festivalHostNote ?? null} festivalHostNextAt={currentCityAccount?.festivalHostNextAt ?? null} captureHistory={currentCityAccount?.captureHistory ?? null} />
     {guestAllowed && <button type="button" onClick={() => { stopTour(); setFirstVisitStage('arrival'); setShortlistIds([]); setFirstVisitGuideOpen(true); changeView('world'); }}>Start first-visit guide</button>}
     {welcomeBack && <WelcomeBack nationId={citizenNation?.id} data={welcomeBack} now={Date.now()} onClose={() => setWelcomeBack(null)} />}{firstLoopHint}{weekTracker}{dailyLoop}
