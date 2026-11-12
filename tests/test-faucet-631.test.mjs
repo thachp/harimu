@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { testFaucetIdPrefix as faucetPrefixDirect } from '../lib/test-faucet.ts'; // #1322: direct Node load needs the .ts suffix on tessera-exchange
 
 let testFaucetGrantMinor, testFaucetIdPrefix, testFaucetLabel, testFaucetOpen;
 const FLAG = 'HARIMU_TEST_FAUCET_ENABLED', PREVIEW = 'NEXT_PUBLIC_HARIMU_DEVELOPMENT_PREVIEW';
@@ -19,6 +20,7 @@ async function setup(t, { flag, preview } = {}) {
 
 test('static: the flag is "true" in the file and deployed with it (not dashboard-managed), prod pins it "false"; the label is the same in the panel; the faucet never touches the exchange', async t => {
   await setup(t);
+  assert.equal(testFaucetIdPrefix, faucetPrefixDirect);
   const cfg = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   assert.deepEqual([...cfg.matchAll(/"HARIMU_TEST_FAUCET_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['true']);
   const { dashboardManagedVars } = await import('../scripts/wrangler-pin.mjs'); assert.ok(!dashboardManagedVars.includes(FLAG), 'the file value is deployed to preview');
