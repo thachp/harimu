@@ -61,19 +61,25 @@ async function setOwned(r, n) {
   }
 }
 
-test('the flag is last in HARIMU_GRAY_PACK (index 86, after #1342 chat), preview on and production off, and is not its own binding', () => {
+test('the flag is last in HARIMU_GRAY_PACK (index 87, after #1339 grace), preview on and production off, and is not its own binding', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_SQUARE_POSTERS_ENABLED'), 83);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CONGREGATION_DONATIONS_ENABLED'), 84);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CONGREGATION_CHAT_ENABLED'), 85);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 86);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED'), 86);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 87);
   assert.equal(preview.vars[FLAG], undefined); assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_SQUARE_PURCHASE_ENABLED, 'false'); assert.equal(prod.vars.HARIMU_SQUARE_PURCHASE_ENABLED, 'false');
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [FLAG]: 'false' }, FLAG), false, 'a direct string wins');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 86);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 86);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED'), 86);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED'), 86);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 87);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 87);
 });
 
 for (const backend of ['sqlite', 'postgres']) test(`square price follows owned land (${backend})`, async t => {

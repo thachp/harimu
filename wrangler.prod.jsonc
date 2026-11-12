@@ -235,6 +235,8 @@
       "HARIMU_CONGREGATION_DONATIONS_ENABLED": "false",
       // #1342: congregation channel (current members of one joinable congregation; Korund public congregations have none; 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). Off: the route is a 404 and nothing is read.
       "HARIMU_CONGREGATION_CHAT_ENABLED": "false",
+      // #1339: the nation-change grace period also ends on an Assembly ballot, a primary ballot, an Aurelle pledge, current party membership, or current congregation office. Off: those five sources are not consulted.
+      "HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED": "false",
       // #1349: World Registry square price rises with how much land the nation already owns (docs §15.1 [ASSUMPTION]: base × (1 + owned/1000), nearest minor unit, half up). Off: the charged and listed price stay 25.00 TSR. Does not open square purchase.
       "HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED": "false"
     },
