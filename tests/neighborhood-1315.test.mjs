@@ -63,6 +63,7 @@ test('flag is on only for the exact string "true", pack entry 67, preview on and
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(65), 'NEXT_PUBLIC_HARIMU_CONCEPT_CHROME', 'entry 66 stays concept chrome');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(64), 'NEXT_PUBLIC_HARIMU_HOUSEHOLD_FACT_VALUE_ALIGN', 'entry 65 stays household fact value align');
   assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 67/);
+  assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key)); assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
   assert.match(await read('lib/neighborhood.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_NEIGHBORHOOD/);
   assert.match(await read('lib/scene-navigation.ts'), /personalViews: readonly string\[\] = \[[^\]]*neighborhood/);
   assert.equal(viewModes.includes('neighborhood'), true); assert.equal(viewModes.includes('military'), false); assert.equal(viewModes.includes('economy'), false);

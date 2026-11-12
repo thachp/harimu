@@ -1297,7 +1297,7 @@ export default function Home() {
   const startAurelleAction = (action: AurelleAction, shiftId?: string, quantity?: 1 | 2) => void runAurelleCommand({ action, shiftId, quantity, requestId: crypto.randomUUID() });
   function changeView(requestedView: ViewMode) {
     // #344: with the market flag off, nothing navigates to the Market scene (it falls back to the city square).
-    const nextView: ViewMode = requestedView === 'market' && !marketShown || requestedView === 'neighborhood' && !neighborhoodEnabled() ? 'square' : requestedView;
+    const nextView: ViewMode = (requestedView === 'market' && !marketShown) || (requestedView === 'neighborhood' && !neighborhoodEnabled()) ? 'square' : requestedView;
     if (nextView !== 'world') stopTour();
     const nextNation = nationForNavigation(nextView, viewMode, selected.id, citizenNation?.id); // #527
     setSelectedId(nextNation);
