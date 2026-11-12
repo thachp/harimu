@@ -231,7 +231,8 @@ export async function setDefenseWindow(db: GameDatabase, command: SetDefenseWind
 export type WarNewsItem = { id: string; title: string; text: string; occurredAt: number; source: 'deterministic'; kind: 'template' | 'decree' };
 const fill = fillWarText;
 /** National news lines for one reader's nation, derived from the war records (read-only, never published as a game event): the declaration in that
- *  nation's voice (ours / against us / the world), the end of mobilization, and the end of the war. Occurred-at values are milliseconds. */
+ *  nation's voice (ours / against us / the world), the end of mobilization, and the end of the war. Occurred-at values are milliseconds.
+ *  #1379: Korund State Media omits `world` (foreign-war) items — docs §11.5 information fog, §8.6, Korund Freedoms. Kindle and Aurelle are unchanged. */
 export function warNewsItems(wars: PublicWar[], readerNation: string): WarNewsItem[] {
   if (!isWarNation(readerNation)) return [];
   const notices = noticesFor(readerNation);
@@ -241,6 +242,7 @@ export function warNewsItems(wars: PublicWar[], readerNation: string): WarNewsIt
   for (const war of wars) {
     const names = { attacker: warNationNames[war.attacker], defender: warNationNames[war.defender], casusBelli: war.casusBelli };
     const side = war.attacker === readerNation ? 'ours' as const : war.defender === readerNation ? 'against-us' as const : 'world' as const;
+    if (side === 'world' && readerNation === 'korund') continue; // #1379: foreign headlines stay off the official feed
     const notice = notices.notices[side];
     items.push({ id: `war:${war.id}:declared`, title: fill(notice.headline, names), text: fill(war.casusBelli ? notice.body : notice.bodyNoGrievance, names), occurredAt: war.declaredAt * 1000, source: 'deterministic', kind });
     if (war.endedAt === null || war.endedAt >= war.mobilizationEndsAt) {
