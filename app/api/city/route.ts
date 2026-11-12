@@ -24,6 +24,8 @@ import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '
 import {cityTreatyReturn,latestCityCapture} from '@/lib/city-capture-history'; // #1028, #1078
 import {peaceRevertEnabled} from '@/lib/war-peace-revert'; // #1078 same flag as #1054
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
+import {readVarkandAlert} from '@/lib/varkand-alert'; // #1400: same stored Alert Level as #1220
+import {varkandFestivalHostFields} from '@/lib/varkand-red-alert-cancels'; // #1400: omit Varkand host note and date at Red
 import {seaLanesStormNote} from '@/lib/game-season'; // #1034
 import {seasonAt} from '@/lib/season-yield'; // #1035 shared season: null without a clock
 bindBrasswellPortEnv(env); // #1241: resident lookup reads the Worker env; flag off adds no city
@@ -80,7 +82,7 @@ export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads,...hearthHost(ctx.nationId,location.currentCityId,ctx.now),...regattaHost(ctx.nationId,location.currentCityId,ctx.now),...festivalHost(ctx.nationId,location.currentCityId,ctx.now)}));
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads,...hearthHost(ctx.nationId,location.currentCityId,ctx.now),...regattaHost(ctx.nationId,location.currentCityId,ctx.now),...await festivalHost(ctx.db,ctx.nationId,location.currentCityId,ctx.now)}));
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
@@ -102,7 +104,7 @@ export async function POST(request:Request){
  if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads,...hearthHost(ctx.nationId,current.currentCityId,ctx.now),...regattaHost(ctx.nationId,current.currentCityId,ctx.now),...festivalHost(ctx.nationId,current.currentCityId,ctx.now)}));
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads,...hearthHost(ctx.nationId,current.currentCityId,ctx.now),...regattaHost(ctx.nationId,current.currentCityId,ctx.now),...await festivalHost(ctx.db,ctx.nationId,current.currentCityId,ctx.now)}));
 }
 const spaField=(nationId:string,homeCityId:string,currentCityId:string)=>spaWcBonusEnabled(env)&&cityForNation(nationId,homeCityId)?.spa&&currentCityId===homeCityId?{spaWcNote}:{};
 /** #1259: one read-only line on Corvel Isles. Both flags on, else no keys. The date is the #1178 clock (same nextAt as the government read). */
@@ -145,11 +147,13 @@ const stonehearthHost=(nowSeconds:number)=>{
  if(plan)return {festivalHostNote:STONEHEARTH_PLAN_NOTE,festivalHostNextAt:korundNextPlanDayAt(nowMs)};
  return {festivalHostNote:STONEHEARTH_BIRTHDAY_NOTE,festivalHostNextAt:korundNextChairmanBirthdayAt(nowMs)};
 };
-const festivalHost=(nationId:string,cityId:string,nowSeconds:number)=>{
- if(nationId==='kindle'&&cityId==='forgehaven')return forgehavenHost(nowSeconds);
- if(nationId==='korund'&&cityId==='stonehearth')return stonehearthHost(nowSeconds);
- const row=festivalHosts.find(host=>host.nationId===nationId&&host.cityId===cityId);
- return row&&flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')&&flagOn(env,row.festivalFlag)?{festivalHostNote:row.note,festivalHostNextAt:row.nextAt(nowSeconds*1000)}:{};
+const festivalHost=async(db:Awaited<ReturnType<typeof getDatabase>>,nationId:string,cityId:string,nowSeconds:number)=>{
+ const fields=nationId==='kindle'&&cityId==='forgehaven'?forgehavenHost(nowSeconds):nationId==='korund'&&cityId==='stonehearth'?stonehearthHost(nowSeconds):(()=>{
+  const row=festivalHosts.find(host=>host.nationId===nationId&&host.cityId===cityId);
+  return row&&flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')&&flagOn(env,row.festivalFlag)?{festivalHostNote:row.note,festivalHostNextAt:row.nextAt(nowSeconds*1000)}:{};
+ })();
+ if(nationId!=='varkand'||!('festivalHostNote' in fields)||!flagOn(env,'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED')||!flagOn(env,'HARIMU_VARKAND_ALERT_ENABLED'))return fields;
+ return varkandFestivalHostFields(nationId,fields,(await readVarkandAlert(db)).level,true,true); // #1400: same #1220 gate; no Varkand catalog row on origin/dev yet
 };
 /** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads.
  *  #1078: HARIMU_WAR_PEACE_REVERT_ENABLED off does not read city_treaty_returns, so the history object stays the capture alone. */
