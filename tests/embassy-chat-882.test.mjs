@@ -60,7 +60,7 @@ for (const backend of ['sqlite', 'postgres']) {
       const get = await c.read(user, peer);
       assert.equal(get.status, 403, `${user} GET ${peer}`);
       assert.equal(get.data.reason, 'nation_closed');
-      assert.match(get.data.error, /Diplomatic Hall is closed/);
+      assert.equal(get.data.error, 'Embassy chat is closed to your nation.');
       const posted = await c.post(user, peer, 'should not land');
       assert.equal(posted.status, 403);
       assert.equal(posted.data.reason, 'nation_closed');
@@ -69,11 +69,23 @@ for (const backend of ['sqlite', 'postgres']) {
       const get = await c.read(user, peer);
       assert.equal(get.status, 403, `${user} GET ${peer}`);
       assert.equal(get.data.reason, 'peer_closed');
-      assert.match(get.data.error, /not open/);
+      assert.equal(get.data.error, 'Embassy chat with that nation is not open.');
       assert.equal((await c.post(user, peer, 'should not land')).data.reason, 'peer_closed');
     }
     assert.equal(await c.count(), 0, 'closed requests write nothing');
     assert.equal((await c.post('alice', 'aurelle', 'open pair still works')).status, 200);
+    assert.equal(await c.count(), 1);
+  });
+
+  test(`#1396 ${backend}: postEmbassyChatSql writes 0 rows for a Korund citizen`, async t => {
+    const c = await setup(t);
+    const m = await c.r.importModule('lib/embassy-chat.ts');
+    const channelId = m.embassyChannelId('kindle', 'aurelle');
+    const closed = await c.r.db.prepare(m.postEmbassyChatSql).bind(...m.postEmbassyChatBinds(randomUUID(), channelId, 'should not land', c.r.now, 'kora', 'korund')).run();
+    assert.equal(closed.meta.changes, 0, 'nation_id<>korund guard');
+    assert.equal(await c.count(), 0);
+    const open = await c.r.db.prepare(m.postEmbassyChatSql).bind(...m.postEmbassyChatBinds(randomUUID(), channelId, 'open pair still writes', c.r.now, 'alice', 'kindle')).run();
+    assert.equal(open.meta.changes, 1);
     assert.equal(await c.count(), 1);
   });
 

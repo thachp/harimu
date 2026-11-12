@@ -15,10 +15,10 @@ export const isEmbassyNation = (id: unknown): id is EmbassyNation =>
 export const embassyHallNations = ['kindle', 'aurelle'] as const;
 export const embassyPairOpen = (a: string, b: string) =>
   a !== b && (embassyHallNations as readonly string[]).includes(a) && (embassyHallNations as readonly string[]).includes(b);
-/** Wording follows the Hall refusal (#600). */
+/** Own wording: must not repeat the Hall refusal line (#600). */
 export const embassyChatRefusals = {
-  nation_closed: 'The Diplomatic Hall is closed to your nation.',
-  peer_closed: 'That embassy is not open.',
+  nation_closed: 'Embassy chat is closed to your nation.',
+  peer_closed: 'Embassy chat with that nation is not open.',
 } as const;
 
 export const embassyChatSchemas = [
