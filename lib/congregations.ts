@@ -80,6 +80,12 @@ async function validMembers(db: GameDatabase, cong: { id: string; faithId: strin
     WHERE m.congregation_id=? AND m.faith_id=? AND COALESCE(l.home_city_id,?)=? ORDER BY m.joined_at,m.user_id`)
     .bind(cong.nationId, cong.id, cong.faithId, cong.cityId, cong.cityId).all<MemberRow>()).results;
 }
+/** #1342: the congregation whose channel this citizen may use now: a current (valid) membership in a joinable congregation, so never a Korund one. */
+export async function currentCongregation(db: GameDatabase, userId: string) {
+  const row = await db.prepare('SELECT congregation_id FROM congregation_members WHERE user_id=?').bind(userId).first<{ congregation_id: string }>();
+  const cong = row ? congregationCatalog().find(c => c.id === row.congregation_id && c.joinable) : undefined;
+  return cong && (await validMembers(db, cong)).some(m => m.user_id === userId) ? cong : null;
+}
 const devotionOf = async (db: GameDatabase, userId: string, now: number) => (await readFaith(db, userId, now, true)).devotion.value;
 
 /** Who holds the seat now (pure read). Returns the stored holder while valid, else the projected successor. */

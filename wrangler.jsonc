@@ -317,6 +317,8 @@
     "HARIMU_DM_CHAT_ENABLED": "true",
     // #882: embassy chat between two live nations (one channel per unordered pair, 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware).
     "HARIMU_EMBASSY_CHAT_ENABLED": "true",
+    // #1342: congregation channel (current members of one joinable congregation; Korund public congregations have none; 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). Off: the route is a 404 and nothing is read.
+    "HARIMU_CONGREGATION_CHAT_ENABLED": "true",
     // #612: Founding Period PoC (docs coups-transitions 10.6): government read field, day-30 events on the world tick, national news line. Off: no new fields, no tick writes.
     "HARIMU_FOUNDING_PERIOD_ENABLED": "true",
     // #470 slice 2: relocation support claims after a city capture (Decision 109): one flat Tessera payout per eligible Kindle defender citizen from a capped protocol pot; no exchange, cash-out or conversion. Off: the claim route is a 404 and nothing is read.
