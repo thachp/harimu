@@ -1,8 +1,9 @@
 -- #467 slice 1: off-chain land lots, tile titles, leases and first-lot records (design: issue #467 comment 6323494577). Additive; nothing reads or
 -- writes these tables yet (HARIMU_LAND_TILES_ENABLED, off in production). Tiles are virtual: a row exists only for a controlled tile. No land_title_anchors.
+-- Hotfix: no FK to world_squares. The preview migration role lacks REFERENCES on it ("permission denied for table world_squares"); a later write slice checks the square in app code.
 CREATE TABLE IF NOT EXISTS land_lots (id TEXT PRIMARY KEY, sx INTEGER NOT NULL, sy INTEGER NOT NULL, origin_tx INTEGER NOT NULL, origin_ty INTEGER NOT NULL,
  size INTEGER NOT NULL CHECK(size IN (10,20,30)), kind TEXT NOT NULL CHECK(kind IN ('residential')), created_at INTEGER NOT NULL,
- UNIQUE(sx, sy, origin_tx, origin_ty), FOREIGN KEY (sx, sy) REFERENCES world_squares(x, y));
+ UNIQUE(sx, sy, origin_tx, origin_ty));
 CREATE TABLE IF NOT EXISTS land_titles (sx INTEGER NOT NULL, sy INTEGER NOT NULL, tx INTEGER NOT NULL, ty INTEGER NOT NULL, lot_id TEXT NOT NULL REFERENCES land_lots(id),
  holder_kind TEXT NOT NULL CHECK(holder_kind IN ('citizen','nation')), holder_id TEXT NOT NULL, tenure TEXT NOT NULL CHECK(tenure IN ('freehold','state')),
  state TEXT NOT NULL CHECK(state IN ('active','frozen')), acquired_via TEXT NOT NULL CHECK(acquired_via IN ('starter','purchase','allocation','buyout','migration')),
