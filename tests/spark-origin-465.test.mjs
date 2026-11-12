@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { clampOriginLots, convertibleSparkMinor, originForCredit, originQualifiesForConversion, readSparkOriginBalances, recordSparkIssuance, sparkCreditOrigin, sparkDrawOrder, splitTransfer } from '../lib/spark-origin.ts';
+import { clampSparkLots, convertibleSparkMinor, originForCredit, originQualifiesForConversion, readSparkOriginBalances, recordSparkIssuance, sparkCreditOrigin, sparkDrawOrder, splitTransfer } from '../lib/spark-origin.ts';
 
 const uuid = () => randomUUID();
 async function claim(r, user) {
@@ -81,19 +81,31 @@ test('merchant spark is unknown, and a wash trade cannot turn purchased or unkno
   assert.equal(earnedIn, 0, 'neither leg of the wash was retagged earned');
 });
 
-test('a raced or missed sink cannot leave earned above holdings', async t => {
-  assert.deepEqual(clampOriginLots({ earned: 800, purchased: 0, unknown: -100 }, 700), { earned: 700, purchased: 0, unknown: 0 });
-  assert.deepEqual(clampOriginLots({ earned: 800, purchased: 0, unknown: 0 }, 300), { earned: 300, purchased: 0, unknown: 0 });
+test('clampSparkLots floors lots and never leaves earned above holdings', () => {
+  assert.deepEqual(clampSparkLots({ earned: 800, purchased: 0, unknown: -100 }, 700), { earned: 700, purchased: 0, unknown: 0 });
+  assert.deepEqual(clampSparkLots({ earned: 800, purchased: 0, unknown: 0 }, 300), { earned: 300, purchased: 0, unknown: 0 }, 'a missed sink spends earned');
+  assert.deepEqual(clampSparkLots({ earned: 0, purchased: 0, unknown: 0 }, 200), { earned: 0, purchased: 0, unknown: 200 }, 'a missed credit stays unknown');
+  assert.deepEqual(clampSparkLots({ earned: 750, purchased: 50, unknown: 100 }, 900), { earned: 750, purchased: 50, unknown: 100 });
+  assert.deepEqual(clampSparkLots({ earned: 100, purchased: 500, unknown: 500 }, 400), { earned: 0, purchased: 0, unknown: 400 });
+  const capped = clampSparkLots({ earned: 900, purchased: 50, unknown: 50 }, 400);
+  assert.ok(capped.earned <= 400);
+  assert.equal(capped.earned + capped.purchased + capped.unknown, 400);
+});
+
+test('two concurrent NPC buys and a sink with no origin row cannot inflate earned', async t => {
   const r = await localRuntime(); t.after(() => r.close());
   assert.equal(await claim(r, 'alice'), 800);
-  assert.equal((await r.call('citizen', 'alice', { action: 'market-trade', requestId: uuid(), side: 'sell', item: 'food', quantity: 2 })).status, 200);
+  for (let i = 0; i < 2; i++) assert.equal((await r.call('citizen', 'alice', { action: 'market-trade', requestId: uuid(), side: 'sell', item: 'food', quantity: 1 })).status, 200);
+  assert.deepEqual(await readSparkOriginBalances(r.db, 'alice'), { earned: 800, purchased: 0, unknown: 200, total: 1000 });
   const buys = await Promise.all([0, 1].map(() => r.call('citizen', 'alice', { action: 'market-trade', requestId: uuid(), side: 'buy', item: 'food', quantity: 1 })));
   assert.deepEqual(buys.map(b => b.status), [200, 200], buys.map(b => b.data.error).join(' '));
   const wallet = (await r.call('citizen', 'alice')).data.economy.walletMinor;
   assert.equal(wallet, 700);
   const raced = await readSparkOriginBalances(r.db, 'alice');
   assert.deepEqual(raced, { earned: 700, purchased: 0, unknown: 0, total: 700 });
-  assert.ok(raced.earned <= wallet);
+  assert.equal(raced.earned + raced.purchased + raced.unknown, wallet);
   await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES ('missed-sink','alice','buy','food',1,-400,3)").run();
-  assert.deepEqual(await readSparkOriginBalances(r.db, 'alice'), { earned: 300, purchased: 0, unknown: 0, total: 300 });
+  const missed = await readSparkOriginBalances(r.db, 'alice');
+  assert.deepEqual(missed, { earned: 300, purchased: 0, unknown: 0, total: 300 });
+  assert.ok(missed.earned <= 300);
 });

@@ -94,20 +94,29 @@ async function writeAll(db: GameDatabase, sourceId: string, occurredAt: number, 
     VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`).bind(`${sourceId}:${row.userId}:${row.role}:${row.origin}`, row.userId, row.origin, row.delta, row.reason, sourceId, occurredAt)));
 }
 
-/** Read-side fail-closed clamp. Lots floor at 0. Tracked Spark above holdings comes off earned first, then purchased, then unknown, so earned never exceeds holdings and the three lots sum to it (0 when holdings are negative). A missed credit still lands in unknown. */
-export function clampOriginLots(lots: SparkLots, holdings: number): SparkLots {
-  const held = Math.max(0, Math.trunc(Number.isFinite(holdings) ? holdings : 0));
-  const out: SparkLots = { earned: Math.max(0, Math.trunc(lots.earned || 0)), purchased: Math.max(0, Math.trunc(lots.purchased || 0)), unknown: Math.max(0, Math.trunc(lots.unknown || 0)) };
-  let excess = sumLots(out) - held;
-  if (excess > 0) for (const origin of ['earned', 'purchased', 'unknown'] as const) { const take = Math.min(out[origin], excess); out[origin] -= take; excess -= take; }
-  else if (excess < 0) out.unknown += -excess;
-  return out;
+/** Read-side fail-closed clamp. Lots floor at 0. Tracked Spark above holdings comes off earned, then purchased, then unknown. A shortfall (legacy or missed credit) is unknown. Negative holdings read as 0. */
+export function clampSparkLots(lots: SparkLots, holdings: number): SparkLots {
+  const held = Math.max(0, Math.trunc(Number(holdings) || 0));
+  let earned = Math.max(0, Math.trunc(Number(lots.earned) || 0));
+  let purchased = Math.max(0, Math.trunc(Number(lots.purchased) || 0));
+  let unknown = Math.max(0, Math.trunc(Number(lots.unknown) || 0));
+  let excess = earned + purchased + unknown - held;
+  if (excess > 0) {
+    const fromEarned = Math.min(excess, earned);
+    earned -= fromEarned;
+    excess -= fromEarned;
+    const fromPurchased = Math.min(excess, purchased);
+    purchased -= fromPurchased;
+    excess -= fromPurchased;
+    unknown -= Math.min(excess, unknown);
+  } else if (excess < 0) unknown += -excess;
+  return { earned, purchased, unknown };
 }
 
 /** Holdings by origin. Spark with no ledger row is unknown, including rows written before origin tracking. */
 export async function readSparkOriginBalances(db: GameDatabase, userId: string) {
   const { lots, holdings } = await position(db, userId);
-  const available = clampOriginLots(lots, holdings);
+  const available = clampSparkLots(lots, holdings);
   return { earned: available.earned, purchased: available.purchased, unknown: available.unknown, total: sumLots(available) };
 }
 
