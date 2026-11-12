@@ -38,6 +38,7 @@ const flagOffPins = {
   HARIMU_SEASON_SEA_LANES_ENABLED: 'season-sea-lanes-1034.test.mjs', // #1034 flag off: freight and city panel unchanged
   HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED: 'city-festival-host-note-1285.test.mjs', // #1285 flag off: no festivalHostNote key, panel unchanged
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
+  HARIMU_SQUARE_POSTERS_ENABLED: 'square-posters-1341.test.mjs', // #1341 flag off: no poster read or write
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
   HARIMU_LABOR_BUREAU_ENABLED: 'labor-bureau-235.test.mjs',
@@ -108,6 +109,7 @@ const flagOffPins = {
   HARIMU_GLOBAL_CHAT_ENABLED: 'global-chat-881.test.mjs',
   HARIMU_DM_CHAT_ENABLED: 'dm-chat-881.test.mjs',
   HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
+  HARIMU_CONGREGATION_CHAT_ENABLED: 'congregation-chat-1342.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_AURELLE_TSR_VIEW_ENABLED: 'aurelle-tsr-view-999.test.mjs', // #999 flag off: no crownRateMilli, no line
@@ -197,6 +199,7 @@ const flagOffPins = {
   HARIMU_BETTER_AUTH_ENABLED: 'better-auth-1318.test.mjs', // #1318 flag off: /api/auth is 404 and the database stays closed
   HARIMU_WORLD_ID_ENABLED: 'world-id-469.test.mjs', // #469 flag off: /api/world-id is 404 and nothing is fetched
   HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED: 'grace-political-actions-1339.test.mjs', // #1339 flag off: the five newer sources do not lock a nation change
+  HARIMU_CONGREGATION_DONATIONS_ENABLED: 'congregation-donations-1340.test.mjs', // #1340 flag off: POST 404 with no DB, GET has no donations key and never reads the table
   HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'zzzzzzzzz-varkand-muster-day-1151.test.mjs', // #1151 flag off: no musterDay key
   HARIMU_VARKAND_LANTERN_WATCH_ENABLED: 'zzzzzzzzzzzzzzz-varkand-lantern-watch-1211.test.mjs', // #1211 flag off: no lanternWatch key
   HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'zzzzzzzzz-confluence-canal-festival-1165.test.mjs', // #1165 flag off: no canalFestival key

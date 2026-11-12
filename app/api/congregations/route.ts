@@ -3,6 +3,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { parseCongregationCommand, readCongregations, runCongregationCommand } from '@/lib/congregations';
+import { congregationDonationsFlagOn, readCongregationDonations } from '@/lib/congregation-donations'; // #1340
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -11,7 +12,9 @@ const faithEnabled = () => (env as unknown as { HARIMU_FAITH_ENABLED?: string })
 // #224: city faith panel (headcount and Officiant per congregation). Read-only (#217/#246); signed-out callers get the public panel.
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
-  return privateJson(await readCongregations(await getDatabase(), userId ?? null, Math.floor(Date.now() / 1000), faithEnabled()));
+  const db = await getDatabase(), state = await readCongregations(db, userId ?? null, Math.floor(Date.now() / 1000), faithEnabled());
+  if (!congregationDonationsFlagOn(env)) return privateJson(state); // #1340 flag off: no donations key and no donation read
+  return privateJson({ ...state, donations: userId && state.enabled ? await readCongregationDonations(db, userId) : null });
 }
 
 // #224: join-congregation / leave-congregation (once per game day), stand-for-officiant / stand-down, officiate (once per game day).

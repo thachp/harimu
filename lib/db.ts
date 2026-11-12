@@ -15,10 +15,12 @@ import {korundQueueSchemas} from './korund-queue';
 import {korundCouponSchemas} from './korund-coupons';
 import {firstWeekGoalsSchema} from './first-week-server';
 import {worldRegistrySchemas} from './world-registry';
+import { squarePosterSchemas } from './square-posters'; // #1341
 import { tesseraExchangeSchema, tesseraExchangeIndex } from './tessera-exchange';
 import {travelSchema} from './travel';
 import {faithSchemas} from './faith';
 import {congregationSchemas} from './congregations';
+import { congregationDonationsSchemas } from './congregation-donations'; // #1340
 import {stabilitySchemas} from './stability';
 import {selectStorageBackend,assertPostgresApplicationRole,assertStorageMarker,storageMarkerIds,postgresRuntimeEnabled,productionKeepsWriteJournal} from './storage-selection';
 import type {GameDatabase} from './database-contract';
@@ -60,6 +62,7 @@ import { plankVoteSchemas } from './plank-votes'; // #831
 import { rallySchemas } from './rallies'; // #867
 import { rallySpeechSchemas } from './rally-speech-ai'; // #876
 import { cityChatSchemas } from './city-chat'; // #881
+import { congregationChatSchemas } from './congregation-chat'; // #1342
 import { globalChatSchemas } from './global-chat'; // #881 part 2
 import { dmChatSchemas } from './dm-chat'; // #881 part 3
 import { embassyChatSchemas } from './embassy-chat'; // #882
@@ -277,14 +280,14 @@ async function initialize(database: GameDatabase) {
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
     ...korundCouponSchemas.map(sql=>database.prepare(sql)),
     database.prepare(firstWeekGoalsSchema),
-    ...worldRegistrySchemas.map(sql=>database.prepare(sql)), database.prepare(tesseraExchangeSchema), database.prepare(tesseraExchangeIndex), // #210
+    ...worldRegistrySchemas.map(sql=>database.prepare(sql)), ...squarePosterSchemas.map(sql=>database.prepare(sql)), database.prepare(tesseraExchangeSchema), database.prepare(tesseraExchangeIndex), // #210, #1341
     database.prepare(travelSchema),
     ...faithSchemas.map(sql=>database.prepare(sql)),
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289
     ...aurelleCharterSchemas.map(sql=>database.prepare(sql)), // #531
     ...tesseraRewardSchemas.map(sql=>database.prepare(sql)), // #465
     ...warSchemas.map(sql=>database.prepare(sql)), ...warAssemblySchemas.map(sql=>database.prepare(sql)), ...warEndingsSchemas.map(sql=>database.prepare(sql)), ...peaceRevertSchemas.map(sql=>database.prepare(sql)), ...siegeSchemas.map(sql=>database.prepare(sql)), ...evacuationSchemas.map(sql=>database.prepare(sql)), ...warCaptureRefusalSchemas.map(sql=>database.prepare(sql)), ...relocationSupportSchemas.map(sql=>database.prepare(sql)), ...treatySchemas.map(sql=>database.prepare(sql)), ...embargoSchemas.map(sql=>database.prepare(sql)), ...goodsSanctionSchemas.map(sql=>database.prepare(sql)), ...crownDecreeSchemas.map(sql=>database.prepare(sql)), ...sparkIssuanceSchemas.map(sql=>database.prepare(sql)), ...reconciliationSchemas.map(sql=>database.prepare(sql)), ...townHallSchemas.map(sql=>database.prepare(sql)), ...debateSchemas.map(sql=>database.prepare(sql)), ...canvassSchemas.map(sql=>database.prepare(sql)), // #309, #308, #362, #431, #432, #441, #442
-    ...congregationSchemas.map(sql=>database.prepare(sql)),
+    ...congregationSchemas.map(sql=>database.prepare(sql)), ...congregationDonationsSchemas.map(sql=>database.prepare(sql)), // #224, #1340 (migration 0128)
     ...stabilitySchemas.map(sql=>database.prepare(sql)),
     ...aiNewsSchemas.map(sql=>database.prepare(sql)),
     ...aiReviewQueueSchemas.map(sql=>database.prepare(sql)), // #753
@@ -296,6 +299,7 @@ async function initialize(database: GameDatabase) {
     ...globalChatSchemas.map(sql=>database.prepare(sql)), // #881 part 2
     ...dmChatSchemas.map(sql=>database.prepare(sql)), // #881 part 3
     ...embassyChatSchemas.map(sql=>database.prepare(sql)), // #882
+    ...congregationChatSchemas.map(sql=>database.prepare(sql)), // #1342
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...conscriptionSchemas.map(sql=>database.prepare(sql)), // #738 slice 3
@@ -420,6 +424,13 @@ async function initialize(database: GameDatabase) {
     await database.batch([
       database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
       database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('party-donations-v1')"),
+    ]);
+  }
+  // #1340: balances net out congregation donations. Same atomic wallet-view swap as party-donations-v1.
+  if (!(await database.prepare("SELECT id FROM economy_migrations WHERE id = 'congregation-donations-v1'").first())) {
+    await database.batch([
+      database.prepare('DROP VIEW IF EXISTS citizen_wallet_balances'), database.prepare(walletViewSql),
+      database.prepare("INSERT OR IGNORE INTO economy_migrations (id) VALUES ('congregation-donations-v1')"),
     ]);
   }
   await database.batch(aurelleSchemas.map(sql => database.prepare(sql.replace('CREATE TABLE ', 'CREATE TABLE IF NOT EXISTS '))));

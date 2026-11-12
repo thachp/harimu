@@ -120,7 +120,7 @@ test('congregations and clergy never touch wages, production, the market or comb
   assert.deepEqual(await outcome(true), await outcome(false));
   const { readFile, readdir } = await import('node:fs/promises');
   for (const f of (await readdir(new URL('../lib/', import.meta.url))).filter(f => /^(economy|market|work|shift|order-book|wallet|npc|spoilage|world-registry|city-founding|korund|combat|war)/.test(f)))
-    assert.doesNotMatch(await readFile(new URL(`../lib/${f}`, import.meta.url), 'utf8'), /congregation|officiant/i, f);
+    assert.doesNotMatch((await readFile(new URL(`../lib/${f}`, import.meta.url), 'utf8')).replace('FROM congregation_donations WHERE clerk_user_id = c.clerk_user_id', ''), /congregation|officiant/i, f); // #1340: the wallet view nets out donations (a ledger leg, not a market effect)
 });
 
 // #292: tie at the 100 Devotion cap. Worship rows are seeded per game day (offset from the start day) so members reach the cap on known days:

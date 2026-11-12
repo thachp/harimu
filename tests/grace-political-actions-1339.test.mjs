@@ -31,14 +31,18 @@ test('the flag is last in HARIMU_GRAY_PACK, preview true and production false, a
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [FLAG]: 'false' }, FLAG), false, 'a direct string wins');
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 83);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_SQUARE_POSTERS_ENABLED'), 83);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CONGREGATION_DONATIONS_ENABLED'), 84);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CONGREGATION_CHAT_ENABLED'), 85);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 86);
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const flags = grayFlags(file);
     assert.equal(flags.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81, file);
     assert.equal(flags.indexOf('HARIMU_WORLD_ID_ENABLED'), 82, file);
-    assert.equal(flags.indexOf(FLAG), 83, file);
-    assert.equal(flags.at(-1), FLAG, file);
+    assert.equal(flags.indexOf('HARIMU_SQUARE_POSTERS_ENABLED'), 83, file);
+    assert.equal(flags.indexOf('HARIMU_CONGREGATION_DONATIONS_ENABLED'), 84, file);
+    assert.equal(flags.indexOf('HARIMU_CONGREGATION_CHAT_ENABLED'), 85, file);
+    assert.equal(flags.indexOf(FLAG), 86, file);
     assert.equal(flags.includes('HARIMU_LAND_TILES_ENABLED'), false, file);
     assert.equal(strip(readFileSync(file, 'utf8')).vars.HARIMU_GRAY_PACK[FLAG], value);
   }

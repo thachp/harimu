@@ -41,7 +41,7 @@ async function invariants(run, label) {
   const lease = (id, extra = {}) => { const v = { rent: 0, state: "'offered'", ...extra }; return `INSERT INTO land_leases VALUES ('${id}','lot-1','citizen','user-1','user-2',1,2,${v.rent},'none','home',${v.state},NULL,NULL)`; };
   await ok(lot('lot-1'));
   await refused(lot('lot-dup'), 'lot origin is unique per square');
-  await refused(lot('lot-x', 10, { sx: 999 }), 'lot square must exist in world_squares');
+  await ok(lot('lot-x', 10, { sx: 999 })); // hotfix: no FK to world_squares (preview role has no REFERENCES); a later write slice checks the square in app code
   await refused(lot('lot-s', 10, { size: 15 }), 'lot size CHECK'); await refused(lot('lot-k', 10, { kind: "'business'" }), 'lot kind CHECK');
   await ok(lot('lot-2', 10, { size: 20 })); await ok(lot('lot-3', 30, { size: 30 }));
   await ok(title(0));
@@ -77,6 +77,22 @@ test('migration 0123 (drizzle/ + db/postgres/) is additive, creates exactly the 
   await pg.exec(readFileSync('db/postgres/0011_world_squares.sql', 'utf8')); await pg.exec(pgSql);
   await invariants(sql => pg.exec(sql), 'postgres');
   await pg.close();
+});
+
+test('hotfix: 0123 has no FK to world_squares and applies as a non-owner role without REFERENCES on it (preview run 43262914496)', async () => {
+  for (const file of ['drizzle/0123_land_tiles.sql', 'db/postgres/0123_land_tiles.sql']) {
+    const sql = stripComments(readFileSync(file, 'utf8'));
+    assert.doesNotMatch(sql, /world_squares/, file); assert.equal((sql.match(/REFERENCES/g) ?? []).length, 1, `${file}: only land_titles.lot_id -> land_lots(id)`);
+  }
+  const attempt = async sql => { // DML on world_squares, CREATE on public, no REFERENCES (the role is not its owner)
+    const pg = new PGlite(); await pg.waitReady;
+    await pg.exec(readFileSync('db/postgres/0011_world_squares.sql', 'utf8'));
+    await pg.exec('CREATE ROLE mig NOLOGIN; GRANT CREATE, USAGE ON SCHEMA public TO mig; GRANT SELECT, INSERT, UPDATE, DELETE ON world_squares TO mig; SET ROLE mig');
+    try { await pg.exec(sql); } finally { await pg.close(); }
+  };
+  // The original line 5 FK reproduces the preview error under that role; the amended file applies.
+  await assert.rejects(attempt('CREATE TABLE t (sx INTEGER, sy INTEGER, FOREIGN KEY (sx, sy) REFERENCES world_squares(x, y))'), /permission denied for table world_squares/);
+  await attempt(readFileSync('db/postgres/0123_land_tiles.sql', 'utf8'));
 });
 
 test('flag off and on: no square purchase, capture() or other runtime file reads the flag or the land tables', () => {
