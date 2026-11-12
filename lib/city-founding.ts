@@ -1,4 +1,5 @@
 import type { GameDatabase } from './database-contract';
+import { flagOn } from './flag-pack.mjs';
 import { mapHeight, mapWidth, onGrid, mvpNations, type Zone } from './map-zones';
 
 /**
@@ -9,6 +10,9 @@ import { mapHeight, mapWidth, onGrid, mvpNations, type Zone } from './map-zones'
  */
 export const minCityDistance = 6;
 export const claimRadius = 2;
+/** #1371 docs §15.1 [ASSUMPTION]: an expedition is at least this many `citizens` rows of the founding nation. AI bodies that are not rows are not counted. */
+export const expeditionMinCitizens = 10;
+export const cityExpeditionEnabled = (env: unknown) => flagOn(env, 'HARIMU_CITY_EXPEDITION_ENABLED');
 export const foundingAuthorities = {
   kindle: { action: 'kindle-charter', label: 'Government charter' },
   korund: { action: 'korund-chairman-order', label: 'Chairman order' },
@@ -89,7 +93,7 @@ export function checkFoundingSite(squares: readonly Square[], x: number, y: numb
 const nationOf = (action: FoundingAction) => (Object.entries(foundingAuthorities).find(([, a]) => a.action === action)![0]) as FoundingNation;
 const box = `center_x BETWEEN ? AND ? AND center_y BETWEEN ? AND ?`;
 
-export async function foundCity(db: GameDatabase, userId: string, nationId: string | null, command: FoundingCommand, now: number, enabled: boolean): Promise<FoundingResult> {
+export async function foundCity(db: GameDatabase, userId: string, nationId: string | null, command: FoundingCommand, now: number, enabled: boolean, env?: unknown): Promise<FoundingResult> {
   const denied = foundingAuthority(nationId, command.action, enabled); if (denied) return denied;
   const nation = nationOf(command.action);
   const prior = await db.prepare('SELECT id,nation_id,name,tier,center_x,center_y,founded_by FROM world_cities WHERE request_id=?').bind(command.requestId)
@@ -104,22 +108,32 @@ export async function foundCity(db: GameDatabase, userId: string, nationId: stri
   const site = checkFoundingSite(squares, command.x, command.y); if (site) return site;
   const { x, y } = command, r = claimRadius, d = minCityDistance - 1, size = (2 * r + 1) ** 2;
   const id = `city-${nation}-${x}-${y}`;
+  const expedition = cityExpeditionEnabled(env);
   // Guarded writes in one batch (one transaction on D1 and Postgres): the city row is inserted only if the
   // whole block is still unowned Wildlands and no settlement is within range; squares change only if that row exists.
+  // Flag on: the same INSERT also requires the expedition headcount. Flag off: this statement is unchanged.
+  const headcount = expedition ? ` AND (SELECT COUNT(*) FROM citizens WHERE nation_id=?)>=${expeditionMinCitizens}` : '';
   await db.batch([
     db.prepare(`INSERT INTO world_cities (id,nation_id,name,tier,center_x,center_y,authority,founded_by,request_id,founded_at)
       SELECT ?,?,?,1,?,?,?,?,?,? WHERE
       (SELECT COUNT(*) FROM world_squares WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND zone='wildlands' AND owner IS NULL AND feature IS NULL)=?
       AND NOT EXISTS (SELECT 1 FROM world_squares WHERE feature IN ('capital','border outpost','city') AND x BETWEEN ? AND ? AND y BETWEEN ? AND ?)
-      AND NOT EXISTS (SELECT 1 FROM world_cities WHERE ${box})
+      AND NOT EXISTS (SELECT 1 FROM world_cities WHERE ${box})${headcount}
       ON CONFLICT DO NOTHING`).bind(id, nation, command.name, x, y, command.action, userId, command.requestId, now,
-      x - r, x + r, y - r, y + r, size, x - d, x + d, y - d, y + d, x - d, x + d, y - d, y + d),
+      x - r, x + r, y - r, y + r, size, x - d, x + d, y - d, y + d, x - d, x + d, y - d, y + d, ...(expedition ? [nation] : [])),
     db.prepare(`UPDATE world_squares SET owner=?, zone='frontier', feature=CASE WHEN x=? AND y=? THEN 'city' ELSE feature END
       WHERE x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND EXISTS (SELECT 1 FROM world_cities WHERE id=? AND request_id=?)`)
       .bind(nation, x, y, x - r, x + r, y - r, y + r, id, command.requestId),
   ]);
   const created = await db.prepare('SELECT id FROM world_cities WHERE request_id=?').bind(command.requestId).first<{ id: string }>();
-  if (!created) return fail(409, 'site_taken', 'Another founding claimed nearby land first; nothing was claimed.');
+  if (!created) {
+    if (expedition) {
+      const row = await db.prepare('SELECT COUNT(*) AS n FROM citizens WHERE nation_id=?').bind(nation).first<{ n: number }>();
+      const have = Number(row?.n ?? 0);
+      if (have < expeditionMinCitizens) return fail(409, 'expedition_short', `An expedition needs at least ${expeditionMinCitizens} citizens of your nation. This nation has ${have}.`);
+    }
+    return fail(409, 'site_taken', 'Another founding claimed nearby land first; nothing was claimed.');
+  }
   return { ok: true, city: { id, nationId: nation, name: command.name, tier: 1, x, y }, claimed: size };
 }
 

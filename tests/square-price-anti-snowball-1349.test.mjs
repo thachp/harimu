@@ -61,7 +61,7 @@ async function setOwned(r, n) {
   }
 }
 
-test('the flag is last in HARIMU_GRAY_PACK (index 87, after #1339 grace), preview on and production off, and is not its own binding', () => {
+test('the anti-snowball flag is at index 87 in HARIMU_GRAY_PACK (after grace, before party chat), preview on and production off, and is not its own binding', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);

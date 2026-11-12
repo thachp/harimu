@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (!command) return privateJson({ error: 'Send action, integer x/y, a 2–40 letter city name and a requestId.', reason: 'bad_request' }, 400);
   const db = await getDatabase();
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string }>();
-  const result = await foundCity(db, userId, citizen?.nation_id ?? null, command, Math.floor(Date.now() / 1000), enabled);
+  const result = await foundCity(db, userId, citizen?.nation_id ?? null, command, Math.floor(Date.now() / 1000), enabled, env);
   if (!result.ok) return privateJson({ error: result.error, reason: result.reason }, result.status);
   // #952: flag off keeps the founding body (tier 1, no tier name). Flag on names the stored tier.
   // #979: unlocks flag adds districtSlots + unlocks (and tierName) from the doc table; flag off leaves the body unchanged.

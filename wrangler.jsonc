@@ -238,7 +238,9 @@
       // #1349: World Registry square price rises with how much land the nation already owns (docs §15.1 [ASSUMPTION]: base × (1 + owned/1000), nearest minor unit, half up). Off: the charged and listed price stay 25.00 TSR. Does not open square purchase.
       "HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED": "true",
       // #1353: party channel (current party_members of one Kindle party; 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware; not gated by primaries). Off: the route is a 404 and nothing is read.
-      "HARIMU_PARTY_CHAT_ENABLED": "true"
+      "HARIMU_PARTY_CHAT_ENABLED": "true",
+      // #1371: founding a city needs an expedition of at least 10 citizens of that nation (docs §15.1). Off: founding is unchanged and does not count citizens.
+      "HARIMU_CITY_EXPEDITION_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",
