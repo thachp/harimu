@@ -79,6 +79,12 @@ const SPK: CurrencySpec = {
     { currency: 'SPK', check: 'trade_leg_missing', sql: 'SELECT t.id AS acct FROM market_trades t LEFT JOIN market_orders b ON b.id = t.buy_order_id LEFT JOIN market_orders s ON s.id = t.sell_order_id WHERE b.id IS NULL OR s.id IS NULL' },
     { currency: 'SPK', check: 'fund_negative:kindle-employer', sql: `SELECT f.id AS acct FROM economy_funds f WHERE f.id = 'kindle-employer' AND f.initial_minor - COALESCE((SELECT SUM(wage_minor) FROM shift_settlements), 0) - COALESCE((SELECT SUM(spend_minor) FROM government_policy_executions), 0) < 0` },
     { currency: 'SPK', check: 'fund_negative:kindle-merchant', sql: `SELECT f.id AS acct FROM economy_funds f WHERE f.id = 'kindle-merchant' AND f.initial_minor - COALESCE((SELECT SUM(wallet_delta) FROM citizen_economy_events), 0) < 0` },
+    // #1337: raw Spark origin lots vs holdings. The same holdings formula as lib/spark-origin `position` (wallet + open buy reservations).
+    // Citizens with no origin rows are not selected, so untracked leftover (the designed legacy default) is not flagged. Nothing here writes origin or wallet rows.
+    { currency: 'SPK', check: 'origin_lot_negative', sql: `SELECT clerk_user_id AS acct FROM spark_origin_entries GROUP BY clerk_user_id, origin HAVING SUM(delta_minor) < 0` },
+    { currency: 'SPK', check: 'origin_lots_over_holdings', sql: `SELECT o.clerk_user_id AS acct FROM (SELECT clerk_user_id, SUM(delta_minor) AS raw FROM spark_origin_entries GROUP BY clerk_user_id) o
+      WHERE o.raw > COALESCE((SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id = o.clerk_user_id), 0)
+        + COALESCE((SELECT SUM(remaining * limit_unit_minor) FROM market_open_orders WHERE citizen_id = o.clerk_user_id AND side = 'buy'), 0)` },
   ],
 };
 
