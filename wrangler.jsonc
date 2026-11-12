@@ -172,7 +172,7 @@
       "HARIMU_FULMARA_CHARTER_DAY_ENABLED": "true",
       // #1184: Fulmara next Fair-Wind Blessing (once per game year = 30 real days, no offset). Off: no fairWindBlessing key. Holds the next date only.
       "HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED": "true",
-      // #1183: Confluence next Congress Lanterns (once per game year = 30 real days, no offset). Off: no congressLanterns key. Date only.
+      // #1183/#1390: Confluence next Congress Lanterns (every Party Congress = 150 real days, same date as the #1113 Congress clock). Off: no congressLanterns key. Date only.
       "HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED": "true",
       // #1187: Fulmara next Dock Strike remembrance (once per game year = 30 real days). Off: no dockStrikeRemembrance key. Holds no remembrance.
       "HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED": "true",
