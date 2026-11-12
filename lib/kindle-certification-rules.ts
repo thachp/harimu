@@ -1,7 +1,7 @@
 /** #1016 Kindle High Court certification (docs elections §9.1 Certification: the count is automatic and the AI High Court
  *  certifies within 24 hours). Derived from the closed ballot the election read already returns. No table, no migration, no write.
- *  #1025: once certified, the same object carries a display-only transition week for 7 days (docs §9.1 Transition, Days 120–127).
- *  Fraud-flag holds, and blocking treasury spends or war declarations, stay out of scope.
+ *  #1025: once certified, the same object carries a transition week for 7 days (docs §9.1 Transition, Days 120–127).
+ *  #1363: a Kindle war declaration reads this same transition (flag on, and `transition` present) and is refused. Fraud-flag holds and treasury spends stay out of scope.
  *  The 24 hours and the 7 days are the docs figures. [ASSUMPTION] the two certification sentences and the no-winner sentence.
  *  [ASSUMPTION] the transition clock shown to citizens is second-precision UTC, and the week still shows at the exact endsAt instant. */
 import { flagOn } from './flag-pack.mjs';

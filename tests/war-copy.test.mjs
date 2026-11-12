@@ -17,7 +17,7 @@ const W = await import(pathToFileURL(out).href);
 const { declarationNotices, mobilizationStatus:M, blockedDeclaration:B, defenseWindow:D, citizenSafety:S, noticesFor, WAR_NATIONS, DECLARATION_SIDES, WAR_PLACEHOLDERS, WAR_NAME_MAX, WAR_LABEL_MAX, WAR_BODY_MAX, mobilizationEndedNotices, endedNoticesFor, warBanner:BN, activeWarBanner:AB } = W;
 
 const notices=()=>declarationNotices.flatMap(x=>Object.values(x.notices));
-const bodies=()=>[...endNotices().map(x=>x.body),BN.countdownCaption,AB.status,AB.detail,...notices().flatMap(x=>[x.body,x.bodyNoGrievance]),...M.mobilizing,...M.active,M.ended.treaty,M.ended.other,B.foundingPeriod,B.nonAggression,B.peaceLock,D.line,...D.explainer,...S.lines].map(x=>typeof x==='string'?x:x.text);
+const bodies=()=>[...endNotices().map(x=>x.body),BN.countdownCaption,AB.status,AB.detail,...notices().flatMap(x=>[x.body,x.bodyNoGrievance]),...M.mobilizing,...M.active,M.ended.treaty,M.ended.other,B.foundingPeriod,B.nonAggression,B.peaceLock,B.caretaker,D.line,...D.explainer,...S.lines].map(x=>typeof x==='string'?x:x.text);
 const endNotices=()=>mobilizationEndedNotices.flatMap(x=>Object.values(x.notices));
 const heads=()=>[...notices().map(x=>x.headline),...endNotices().map(x=>x.headline),BN.header.ours,BN.header.againstUs,BN.countdownLabel,AB.header.ours,AB.header.againstUs];
 const all=()=>[...heads(),...bodies()];
@@ -34,7 +34,7 @@ test('shape: every nation has ours / against-us / world notices, every line prop
   }
   for (const k of ['mobilizing','active']) { assert.ok(M[k].length>=2&&M[k].length<=3, k); for (const l of M[k]) assert.equal(l.proposal,true); }
   assert.equal(M.ended.treaty.proposal,true); assert.equal(M.ended.other.proposal,true);
-  for (const l of [B.foundingPeriod,B.nonAggression,B.peaceLock,D.line,...D.explainer,...S.lines]) assert.equal(l.proposal,true);
+  for (const l of [B.foundingPeriod,B.nonAggression,B.peaceLock,B.caretaker,D.line,...D.explainer,...S.lines]) assert.equal(l.proposal,true);
   for (const o of [M,B,D,S]) assert.equal(o.proposal,true);
 });
 test('bylines reuse the three press packs; Crown-speaking Aurelle lines are AI-badged', () => {
@@ -63,7 +63,7 @@ test('casusBelli: in every nation\'s declaration notices, and each has a variant
     assert.ok(nt.body.includes('{casusBelli}'), `${x.nationId}/${side}`); assert.doesNotMatch(nt.bodyNoGrievance,/\{casusBelli\}/, nt.id);
     assert.notEqual(nt.body,nt.bodyNoGrievance);
   }
-  for (const t of [...M.mobilizing,...M.active,M.ended.treaty,M.ended.other,B.foundingPeriod,B.nonAggression,B.peaceLock,...D.explainer,...S.lines].map(l=>l.text)) assert.doesNotMatch(t,/\{casusBelli\}/, t);
+  for (const t of [...M.mobilizing,...M.active,M.ended.treaty,M.ended.other,B.foundingPeriod,B.nonAggression,B.peaceLock,B.caretaker,...D.explainer,...S.lines].map(l=>l.text)) assert.doesNotMatch(t,/\{casusBelli\}/, t);
   assert.doesNotMatch(all().join(' '),/border incident|broken treat|Commons dispute|sanction/i);
 });
 test('peace lock stays number-free; {peaceLockEnds} only in the treaty ending', () => {

@@ -6,7 +6,8 @@ import type { GameDatabase } from './database-contract';
 import { isMissingRelation, isUniqueViolation, tolerate } from './db-errors';
 import { kindleSeats } from './diplomacy';
 import type { PartySeats } from './diplomacy-rules';
-import { declareWar } from './war';
+import { declareWar, kindleDeclarationCaretaker } from './war';
+import { blockedDeclaration } from './war-copy';
 import { cleanLabel, isWarNation, kindlePartyWeary, requestIdOk, warConfig, wearyKindleParties } from './war-rules';
 import { kindleVoteWeariness, type VoteWearinessOptions } from './war-weariness'; // #427 slice 3
 
@@ -51,7 +52,8 @@ const columns = 'id,request_id,defender_nation,casus_belli,declared_by,proposed_
 const publicProposal = (r: Row) => ({ id: r.id, defender: r.defender_nation, casusBelli: r.casus_belli, declaredBy: r.declared_by, proposedAt: Number(r.proposed_at), status: r.status,
   decidedAt: r.decided_at === null ? null : Number(r.decided_at), warId: r.war_id, vote: r.vote_json ? JSON.parse(r.vote_json) as WarVote : null, rejectReason: r.reject_reason });
 
-/** Kindle's President proposes; nothing is declared until the Assembly vote on the next tick. Idempotent per requestId; one pending proposal per defender. */
+/** Kindle's President proposes; nothing is declared until the Assembly vote on the next tick. Idempotent per requestId; one pending proposal per defender.
+ *  #1363: a proposal during the certified transition week is refused. The Founding Period, the pact and the peace lock stay checks at decision time. */
 export async function proposeKindleWar(db: GameDatabase, command: { defender: string; casusBelli?: string; declaredBy: string; requestId: string }, now: number) {
   if (!requestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
   if (!isWarNation(command.defender) || command.defender === 'kindle') return fail(400, 'bad_nations', 'Kindle can propose war on Korund or Aurelle.');
@@ -60,6 +62,7 @@ export async function proposeKindleWar(db: GameDatabase, command: { defender: st
   const read = () => db.prepare(`SELECT ${columns} FROM war_proposals WHERE request_id=?`).bind(command.requestId).first<Row>();
   const prior = await read();
   if (prior) return prior.defender_nation === command.defender ? { ok: true as const, replay: true as const, proposal: publicProposal(prior) } : fail(409, 'request_reused', 'That request id was already used for a different declaration.');
+  if (await kindleDeclarationCaretaker(db, now)) return fail(409, 'caretaker', blockedDeclaration.caretaker.text);
   await db.prepare('INSERT INTO war_proposals (id,request_id,defender_nation,casus_belli,declared_by,proposed_at) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING')
     .bind(`wprop-${command.requestId}`, command.requestId, command.defender, cleanLabel(command.casusBelli ?? '', warConfig.casusBelliMax), declaredBy, now).run()
     .catch(error => { if (isUniqueViolation(error)) return null; throw error; });
@@ -68,7 +71,7 @@ export async function proposeKindleWar(db: GameDatabase, command: { defender: st
 }
 
 /** World tick only (never a route, never a GET): decides each pending proposal once. Approval goes through declareWar, which re-checks the Founding Period,
- *  the pact and the peace lock (and the #426 limits when on) at decision time; a block rejects the proposal with that reason. A decision counts only on a strict rowcount of 1. */
+ *  the pact, the peace lock and (#1363) the Kindle transition week (and the #426 limits when on) at decision time; a block rejects the proposal with that reason. A decision counts only on a strict rowcount of 1. */
 export async function decideKindleWarProposals(db: GameDatabase, now: number, limits = false, wearinessOptions: VoteWearinessOptions = {}) {
   const rows = (await db.prepare(`SELECT ${columns} FROM war_proposals WHERE status='proposed' ORDER BY proposed_at,id LIMIT 20`).all<Row>()).results;
   if (!rows.length) return 0;
