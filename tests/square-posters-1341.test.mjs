@@ -14,8 +14,7 @@ const posterSql = sql => /square_poster/.test(sql);
 
 test('the flag follows World ID in the gray pack, preview on and production off, and is not its own binding', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_WORLD_ID_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 83);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
   assert.equal(preview.vars[FLAG], undefined); assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
