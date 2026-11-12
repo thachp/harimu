@@ -9,9 +9,12 @@ import json
 from contextlib import closing
 
 root = pathlib.Path(__file__).parents[1]
-source = (root / 'lib/economy.ts').read_text() + (root / 'lib/tessera-exchange.ts').read_text() + (root / 'lib/work-shifts.ts').read_text() + (root / 'lib/market.ts').read_text() + (root / 'lib/market-orders.ts').read_text() + (root / 'lib/player-market.ts').read_text() + (root / 'lib/world-simulation.ts').read_text()
+source = (root / 'lib/economy.ts').read_text() + (root / 'lib/tessera-exchange.ts').read_text() + (root / 'lib/work-shifts.ts').read_text() + (root / 'lib/market.ts').read_text() + (root / 'lib/market-orders.ts').read_text() + (root / 'lib/player-market.ts').read_text() + (root / 'lib/world-simulation.ts').read_text() + (root / 'lib/congregation-donations.ts').read_text()
 def sql(name):
     return re.search(r'export const ' + name + r' = `([^`]+)`', source).group(1)
+def schema_list(name):
+    block = re.search(r'export const ' + name + r' = \[([^\]]+)\]', source).group(1)
+    return [a or b for a, b in re.findall(r'`([^`]+)`|\'([^\']+)\'', block)]
 
 class EconomyTests(unittest.TestCase):
     def setUp(self):
@@ -22,6 +25,8 @@ class EconomyTests(unittest.TestCase):
           CREATE TABLE work_contributions(clerk_user_id TEXT, work_order_id TEXT, capacity_spent INTEGER, created_at TEXT);
           INSERT INTO citizens VALUES ('alice','kindle',4,''),('bob','kindle',4,'');
           INSERT INTO work_orders VALUES ('harvest');''')
+        for stmt in schema_list('congregationDonationsSchemas'):
+            self.db.execute(stmt)
         for name in ['worldClockSchema','worldTickSchema','worldSupplySchema','policyExecutionSchema','shiftSchema', 'activeShiftIndex', 'economySchema', 'recoverySchema', 'rewardSchema', 'fundSchema','incomeTaxSchema','tesseraExchangeSchema', 'marketItemsSchema', 'starterSchema', 'marketEventsSchema', 'listingSchema','fillSchema','cancelSchema','playerReceiptView','openLotsView','marketGoodsSchema','marketOrdersSchema','marketCancellationsSchema','marketTradesSchema','marketSpoilageSchema','marketOpenOrdersView','marketTradeFeesSchema','marketTradeFeesIndex','homeCityMovesSchema','savingsShieldCreditsSchema','playerFillSalesTaxSchema','partyDonationsSchema','marketSalesTaxSchema','walletViewSql', 'inventoryViewSql', 'merchantViewSql', 'merchantCashSql']:
             self.db.execute(sql(name))
         self.db.execute("INSERT INTO economy_funds VALUES ('kindle-employer',1000)")

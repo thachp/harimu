@@ -9,9 +9,12 @@ import unittest
 import uuid
 
 root = pathlib.Path(__file__).parents[1]
-source = ''.join((root / 'lib' / path).read_text() for path in ['market.ts', 'market-orders.ts', 'economy.ts', 'tessera-exchange.ts', 'work-shifts.ts', 'player-market.ts', 'world-simulation.ts'])
+source = ''.join((root / 'lib' / path).read_text() for path in ['market.ts', 'market-orders.ts', 'economy.ts', 'tessera-exchange.ts', 'work-shifts.ts', 'player-market.ts', 'world-simulation.ts', 'congregation-donations.ts'])
 def sql(name):
     return re.search(r'export const ' + name + r' = `([^`]+)`', source).group(1)
+def schema_list(name):
+    block = re.search(r'export const ' + name + r' = \[([^\]]+)\]', source).group(1)
+    return [a or b for a, b in re.findall(r'`([^`]+)`|\'([^\']+)\'', block)]
 
 class MarketTests(unittest.TestCase):
     def setUp(self):
@@ -22,6 +25,8 @@ class MarketTests(unittest.TestCase):
           CREATE TABLE work_contributions(clerk_user_id TEXT, work_order_id TEXT, capacity_spent INTEGER, created_at TEXT);
           INSERT INTO citizens VALUES ('alice','kindle',18,''),('bob','kindle',18,''),('carl','korund',18,''),('visitor',NULL,18,'');
           INSERT INTO work_orders VALUES ('harvest');''')
+        for stmt in schema_list('congregationDonationsSchemas'):
+            self.db.execute(stmt)
         for name in ['worldClockSchema','worldTickSchema','worldSupplySchema','policyExecutionSchema','shiftSchema','activeShiftIndex','economySchema','recoverySchema','rewardSchema','fundSchema','incomeTaxSchema','tesseraExchangeSchema',
                      'marketItemsSchema','starterSchema','marketEventsSchema','listingSchema','fillSchema','cancelSchema','playerReceiptView','openLotsView','marketGoodsSchema','marketOrdersSchema','marketCancellationsSchema','marketTradesSchema','marketSpoilageSchema','marketOpenOrdersView','marketTradeFeesSchema','marketTradeFeesIndex','homeCityMovesSchema','savingsShieldCreditsSchema','playerFillSalesTaxSchema','partyDonationsSchema','marketSalesTaxSchema','walletViewSql','inventoryViewSql','merchantViewSql','merchantCashSql']:
             self.db.execute(sql(name))
