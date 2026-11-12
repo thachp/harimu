@@ -33,12 +33,14 @@ export const foundingPeriodEnd = (shardStartedAt: number) => shardStartedAt + wa
 export const inFoundingPeriod = (shardStartedAt: number | null, now: number) => shardStartedAt === null || now < foundingPeriodEnd(shardStartedAt);
 export const peaceLockEnd = (endedAt: number) => endedAt + warConfig.peaceLockSeconds;
 
-export type DeclarationBlock = 'founding_period' | 'non_aggression' | 'peace_lock';
-/** Why a declaration is refused, in the order the reasons are checked; null when none applies. */
-export function declarationBlock(input: { now: number; shardStartedAt: number | null; nonAggression: boolean; lastTreatyEndedAt: number | null }): DeclarationBlock | null {
+export type DeclarationBlock = 'founding_period' | 'non_aggression' | 'peace_lock' | 'caretaker';
+/** Why a declaration is refused, in the order the reasons are checked; null when none applies.
+ *  #1363: `caretaker` is the Kindle transition week. Callers set it only for Kindle, and only when `kindleCertification` reports that window. It is last, so the Founding Period, a pact and the peace lock still win. Korund and Aurelle pass false. */
+export function declarationBlock(input: { now: number; shardStartedAt: number | null; nonAggression: boolean; lastTreatyEndedAt: number | null; caretaker?: boolean }): DeclarationBlock | null {
   if (inFoundingPeriod(input.shardStartedAt, input.now)) return 'founding_period';
   if (input.nonAggression) return 'non_aggression';
   if (input.lastTreatyEndedAt !== null && input.now < peaceLockEnd(input.lastTreatyEndedAt)) return 'peace_lock';
+  if (input.caretaker === true) return 'caretaker';
   return null;
 }
 /** #426: declaration rate limits and the casus belli gate (docs 13.5 / 15; ARC final ruling on #426, Oct 14 2026). Behind HARIMU_WAR_DECLARATION_LIMITS_ENABLED (default "false")

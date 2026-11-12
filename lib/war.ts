@@ -4,6 +4,7 @@ import { isMissingRelation, tolerate } from './db-errors';
 import { pendingRevertStatement, revertPeaceCaptures } from './war-peace-revert'; // #1054
 import { activeNonAggressionPact } from './diplomacy'; // #402
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
+import { kindleCertification, kindleCertificationEnabled } from './kindle-certification-rules';
 import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, declarationNextDay, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
   type DeclarationBlock, type DeclarationLimitBlock, type GrievanceInputs, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
 export * from './war-rules';
@@ -120,10 +121,24 @@ const blockedText: Record<DeclarationBlock, (defender: string) => string> = {
   founding_period: () => blockedDeclaration.foundingPeriod.text,
   non_aggression: defender => blockedDeclaration.nonAggression.text.replace('{defender}', defender.slice(0, WAR_NAME_MAX)),
   peace_lock: defender => blockedDeclaration.peaceLock.text.replace('{defender}', defender.slice(0, WAR_NAME_MAX)),
+  caretaker: () => blockedDeclaration.caretaker.text,
 };
 
+/** #1363: true while Kindle's outgoing President is a caretaker. Same flag and the same `kindleCertification` transition as #1025 (present from certification through endsAt).
+ *  Flag off, no ballot, or no transition: false. A missing elections table is not a window. A closed ballot is the confirmed count the election read publishes. */
+export async function kindleDeclarationCaretaker(db: GameDatabase, now: number): Promise<boolean> {
+  if (!kindleCertificationEnabled(env)) return false;
+  const row = await db.prepare('SELECT closes_at,closed_at FROM civic_elections ORDER BY opens_at DESC, id DESC LIMIT 1')
+    .first<{ closes_at: number; closed_at: number | null }>().catch(tolerate(isMissingRelation, null));
+  if (!row) return false;
+  const closesAt = Number(row.closes_at);
+  const closed = row.closed_at !== null || now >= closesAt;
+  const certification = kindleCertification({ status: closed ? 'closed' : 'open', closesAt, now, confirmed: closed, winnerName: null });
+  return certification?.transition !== undefined;
+}
+
 /** Server-side only (the AI leadership path calls this; no route does). Rejects during the Founding Period, under a non-aggression pact,
- *  and within 10 real days after a ceasefire or peace treaty. Idempotent per requestId. Writes one `wars` row; mobilization ends 48 real hours later. */
+ *  within 10 real days after a ceasefire or peace treaty, and (#1363) during Kindle's certified transition week. Idempotent per requestId. Writes one `wars` row; mobilization ends 48 real hours later. */
 export async function declareWar(db: GameDatabase, command: DeclareWarCommand, now: number, options: DeclareWarOptions) {
   if (!options.enabled) return fail(403, 'disabled', 'War declarations are not open yet.');
   if (!Number.isSafeInteger(now) || now < 0) throw new Error('Invalid authoritative world time.');
@@ -139,7 +154,8 @@ export async function declareWar(db: GameDatabase, command: DeclareWarCommand, n
   const started = options.shardStartedAt !== undefined ? options.shardStartedAt : await shardStartedAt(db);
   const nonAggression = await pactInForce(options.nonAggression ?? nonAggressionInForce, db, command.attacker, command.defender, now);
   const lastPeace = await db.prepare("SELECT MAX(ended_at) AS ended_at FROM wars WHERE pair_key=? AND end_kind='treaty'").bind(pair).first<{ ended_at: number | null }>();
-  const block = declarationBlock({ now, shardStartedAt: started, nonAggression, lastTreatyEndedAt: lastPeace?.ended_at == null ? null : Number(lastPeace.ended_at) });
+  const caretaker = command.attacker === 'kindle' && await kindleDeclarationCaretaker(db, now);
+  const block = declarationBlock({ now, shardStartedAt: started, nonAggression, lastTreatyEndedAt: lastPeace?.ended_at == null ? null : Number(lastPeace.ended_at), caretaker });
   if (block) return fail(409, block, blockedText[block](warNationNames[command.defender]));
   if (options.limits) { const limited = await declarationLimit(db, command.attacker, command.defender, now); if (limited) return limited; }
   const id = `war-${command.requestId}`;

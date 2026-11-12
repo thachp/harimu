@@ -1,6 +1,7 @@
 /** #1354 (docs §18.1 Global channel): Korund citizens cannot see the global channel; Varkand citizens lose it while the stored Alert Level (#1081) is Red.
  *  The radio item and trade-delegate exceptions are out of scope (as lib/diplomatic-hall.ts). Refusals are 403 with a stable reason before any chat read or write;
- *  the alert is read only for a Varkand citizen with HARIMU_VARKAND_ALERT_ENABLED on (off: Green). No new flag, no migration. SQLite + PGlite. */
+ *  the alert is read only for a Varkand citizen with HARIMU_VARKAND_ALERT_ENABLED on (off: Green). No new flag, no migration. SQLite + PGlite.
+ *  #1360: the INSERT itself also refuses a Varkand author when the flag is on and the stored level is Red, so a mid-request raise cannot slip a post in. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -75,6 +76,14 @@ for (const backend of ['sqlite', 'postgres']) {
     const res = await c.post('alice', 'mid-move'); c.r.db.prepare = prepare;
     refused(res, 'nation_closed', korundLine); assert.equal(await c.count(), 0);
   });
+
+  test(`#1360 ${backend}: the INSERT refuses Varkand at Red, so a raise to Red between the check and the write is refused`, async t => {
+    const c = await setup(t, backend); await c.setAlert('amber');
+    const prepare = c.r.db.prepare.bind(c.r.db);
+    c.r.db.prepare = sql => { if (/^INSERT INTO global_chat_messages/.test(sql)) { c.r.db.prepare = prepare; return { bind: (...a) => ({ run: async () => { await c.setAlert('red'); return prepare(sql).bind(...a).run(); } }) }; } return prepare(sql); };
+    const res = await c.post('vik', 'mid-red'); c.r.db.prepare = prepare;
+    refused(res, 'alert_closed', redLine); assert.equal(await c.count(), 0);
+  });
 }
 
 test('#1354: globalChatClosedFor', async () => {
@@ -84,5 +93,16 @@ test('#1354: globalChatClosedFor', async () => {
     assert.equal(globalChatClosedFor('varkand', 'red'), 'alert_closed');
     for (const level of ['green', 'amber']) assert.equal(globalChatClosedFor('varkand', level), null);
     for (const nation of ['kindle', 'aurelle', 'hoarvale', 'fulmara']) assert.equal(globalChatClosedFor(nation, 'red'), null, nation);
+  } finally { await r.close(); }
+});
+
+test('#1360: postGlobalChatSqlFor leaves the flag-off SQL unchanged and guards Varkand at Red only when the flag is on', async () => {
+  const r = await localRuntime(); try {
+    const { postGlobalChatSql, postGlobalChatSqlFor } = await r.importModule('lib/global-chat.ts');
+    assert.equal(postGlobalChatSqlFor(false), postGlobalChatSql);
+    assert.equal(/varkand_alert_levels/.test(postGlobalChatSql), false);
+    const on = postGlobalChatSqlFor(true);
+    assert.ok(/nation_id<>'korund'/.test(on));
+    assert.ok(/nation_id='varkand'/.test(on) && /varkand_alert_levels/.test(on) && /level='red'/.test(on));
   } finally { await r.close(); }
 });
