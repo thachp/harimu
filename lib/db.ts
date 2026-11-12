@@ -15,6 +15,7 @@ import {korundQueueSchemas} from './korund-queue';
 import {korundCouponSchemas} from './korund-coupons';
 import {firstWeekGoalsSchema} from './first-week-server';
 import {worldRegistrySchemas} from './world-registry';
+import { squarePosterSchemas } from './square-posters'; // #1341
 import { tesseraExchangeSchema, tesseraExchangeIndex } from './tessera-exchange';
 import {travelSchema} from './travel';
 import {faithSchemas} from './faith';
@@ -278,7 +279,7 @@ async function initialize(database: GameDatabase) {
     ...korundQueueSchemas.map(sql=>database.prepare(sql)),
     ...korundCouponSchemas.map(sql=>database.prepare(sql)),
     database.prepare(firstWeekGoalsSchema),
-    ...worldRegistrySchemas.map(sql=>database.prepare(sql)), database.prepare(tesseraExchangeSchema), database.prepare(tesseraExchangeIndex), // #210
+    ...worldRegistrySchemas.map(sql=>database.prepare(sql)), ...squarePosterSchemas.map(sql=>database.prepare(sql)), database.prepare(tesseraExchangeSchema), database.prepare(tesseraExchangeIndex), // #210, #1341
     database.prepare(travelSchema),
     ...faithSchemas.map(sql=>database.prepare(sql)),
     ...royalFavorSchemas.map(sql=>database.prepare(sql)), // #289

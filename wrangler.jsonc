@@ -227,6 +227,8 @@
       "HARIMU_BETTER_AUTH_ENABLED": "true",
       // #469: inert World ID adapter at /api/world-id/*. Off, or HARIMU_WORLD_ID_VERIFIER_SECRET unset: 404 and no fetch. The secret is not set here. Nullifiers are a later slice and must not link to a public profile.
       "HARIMU_WORLD_ID_ENABLED": "true",
+      // #1341: a citizen who bought a square can place one kit poster there (one frame and one slogan). Off: no poster read or write, and the registry response is unchanged.
+      "HARIMU_SQUARE_POSTERS_ENABLED": "true",
       // #1340: Kindle congregation donations (docs 14.4): a current member gives Spark to their own Kindle congregation's fund (migration 0128). Off: POST /api/congregations/donations is 404, GET /api/congregations has no donations key, and nothing reads or writes congregation_donations.
       "HARIMU_CONGREGATION_DONATIONS_ENABLED": "true"
     },
