@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { localRuntime } from './helpers/local-runtime.mjs';
-import { convertibleSparkMinor, originForCredit, originQualifiesForConversion, readSparkOriginBalances, recordSparkIssuance, sparkCreditOrigin, sparkDrawOrder, splitTransfer } from '../lib/spark-origin.ts';
+import { clampOriginLots, convertibleSparkMinor, originForCredit, originQualifiesForConversion, readSparkOriginBalances, recordSparkIssuance, sparkCreditOrigin, sparkDrawOrder, splitTransfer } from '../lib/spark-origin.ts';
 
 const uuid = () => randomUUID();
 async function claim(r, user) {
@@ -63,6 +63,7 @@ test('merchant spark is unknown, and a wash trade cannot turn purchased or unkno
   assert.deepEqual(await readSparkOriginBalances(r.db, 'alice'), { earned: 750, purchased: 0, unknown: 0, total: 750 }, 'the buy spends unknown before earned');
   await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES ('legacy-bob','bob','sell','food',-1,250,1)").run();
   await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES ('paid-bob','bob','sell','food',-1,400,1)").run();
+  // No production path mints purchased Spark; this direct issuance stands in for that reason.
   await recordSparkIssuance(r.db, 'bob', 400, 'purchase:bob', 'purchased-spark', 2);
   await recordSparkIssuance(r.db, 'bob', 400, 'purchase:bob', 'purchased-spark', 2);
   assert.deepEqual(await readSparkOriginBalances(r.db, 'bob'), { earned: 0, purchased: 400, unknown: 250, total: 650 });
@@ -78,4 +79,21 @@ test('merchant spark is unknown, and a wash trade cannot turn purchased or unkno
   assert.deepEqual(await readSparkOriginBalances(r.db, 'bob'), { earned: 0, purchased: 400, unknown: 250, total: 650 });
   const earnedIn = Number((await r.db.prepare("SELECT COUNT(*) AS n FROM spark_origin_entries WHERE reason='player-fill' AND origin='earned' AND delta_minor>0").first()).n);
   assert.equal(earnedIn, 0, 'neither leg of the wash was retagged earned');
+});
+
+test('a raced or missed sink cannot leave earned above holdings', async t => {
+  assert.deepEqual(clampOriginLots({ earned: 800, purchased: 0, unknown: -100 }, 700), { earned: 700, purchased: 0, unknown: 0 });
+  assert.deepEqual(clampOriginLots({ earned: 800, purchased: 0, unknown: 0 }, 300), { earned: 300, purchased: 0, unknown: 0 });
+  const r = await localRuntime(); t.after(() => r.close());
+  assert.equal(await claim(r, 'alice'), 800);
+  assert.equal((await r.call('citizen', 'alice', { action: 'market-trade', requestId: uuid(), side: 'sell', item: 'food', quantity: 2 })).status, 200);
+  const buys = await Promise.all([0, 1].map(() => r.call('citizen', 'alice', { action: 'market-trade', requestId: uuid(), side: 'buy', item: 'food', quantity: 1 })));
+  assert.deepEqual(buys.map(b => b.status), [200, 200], buys.map(b => b.data.error).join(' '));
+  const wallet = (await r.call('citizen', 'alice')).data.economy.walletMinor;
+  assert.equal(wallet, 700);
+  const raced = await readSparkOriginBalances(r.db, 'alice');
+  assert.deepEqual(raced, { earned: 700, purchased: 0, unknown: 0, total: 700 });
+  assert.ok(raced.earned <= wallet);
+  await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES ('missed-sink','alice','buy','food',1,-400,3)").run();
+  assert.deepEqual(await readSparkOriginBalances(r.db, 'alice'), { earned: 300, purchased: 0, unknown: 0, total: 300 });
 });
