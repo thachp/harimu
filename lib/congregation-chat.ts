@@ -3,6 +3,7 @@
  *  10 s between posts, 20 per hour, 7-day retention, own-post delete, the shared square handle and the #790 operator shadow-mute. Korund public
  *  congregations are unjoinable, so they have no channel. Flag HARIMU_CONGREGATION_CHAT_ENABLED (off in production). No UI this slice. */
 import type { GameDatabase } from './database-contract';
+import { flagOn } from './flag-pack.mjs';
 import { isShadowMuted, type MuteWindow } from './chat-shadow-mute';
 
 export const congregationChatSchemas = [
@@ -10,7 +11,7 @@ export const congregationChatSchemas = [
   `CREATE INDEX IF NOT EXISTS congregation_messages_feed ON congregation_messages(congregation_id, posted_at)`,
   `CREATE INDEX IF NOT EXISTS congregation_messages_rate ON congregation_messages(user_id, posted_at)`,
 ];
-export const congregationChatFlagOn = (b: unknown) => (b as { HARIMU_CONGREGATION_CHAT_ENABLED?: string })?.HARIMU_CONGREGATION_CHAT_ENABLED === 'true';
+export const congregationChatFlagOn = (b: unknown) => flagOn(b, 'HARIMU_CONGREGATION_CHAT_ENABLED'); // packed in HARIMU_GRAY_PACK; a direct string wins
 export const congregationChatRetentionSeconds = 604800, congregationChatGapSeconds = 10, congregationChatHourlyLimit = 20, congregationChatPageSize = 50;
 
 /** Inserts only while the poster still holds a membership row in that congregation, inside the rate limits. 0 changes: replay, limit or a membership that just ended. */
