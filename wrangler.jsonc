@@ -226,7 +226,9 @@
       // #1318: inert Better Auth at /api/auth/* and the Twilio Verify adapter. Off: that path is 404 and the database is not opened. Clerk stays the only session authority. Secrets are dashboard-only and are not set here: BETTER_AUTH_SECRET (a different value on each Worker), TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET, TWILIO_VERIFY_SERVICE_SID, and HARIMU_PHONE_HASH_SECRET (the same value on preview and production while they share a database). The base URL is the request origin.
       "HARIMU_BETTER_AUTH_ENABLED": "true",
       // #469: inert World ID adapter at /api/world-id/*. Off, or HARIMU_WORLD_ID_VERIFIER_SECRET unset: 404 and no fetch. The secret is not set here. Nullifiers are a later slice and must not link to a public profile.
-      "HARIMU_WORLD_ID_ENABLED": "true"
+      "HARIMU_WORLD_ID_ENABLED": "true",
+      // #1341: a citizen who bought a square can place one kit poster there (one frame and one slogan). Off: no poster read or write, and the registry response is unchanged.
+      "HARIMU_SQUARE_POSTERS_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

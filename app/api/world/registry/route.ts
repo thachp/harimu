@@ -4,6 +4,7 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { buySquare, parsePurchaseCommand, readTessera, squarePriceMinor } from '@/lib/world-registry';
+import { applyPoster, parsePosterCommand, postersEnabled, readSquarePoster } from '@/lib/square-posters';
 import { buyTessera, parseExchangeCommand, sparkPerTessera, kioskMinTesseraMinor, kioskMaxTesseraMinor } from '@/lib/tessera-exchange';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +18,15 @@ const exchangeEnabled = () => (env as unknown as { HARIMU_TESSERA_EXCHANGE_ENABL
 export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
-  return privateJson({ open: enabled(), priceMinor: squarePriceMinor, currency: 'TSR', tesseraMinor: await readTessera(await getDatabase(), userId),
-    kiosk: { open: exchangeEnabled(), sparkPerTessera, minTesseraMinor: kioskMinTesseraMinor, maxTesseraMinor: kioskMaxTesseraMinor } });
+  const db = await getDatabase();
+  const listing = { open: enabled(), priceMinor: squarePriceMinor, currency: 'TSR', tesseraMinor: await readTessera(db, userId),
+    kiosk: { open: exchangeEnabled(), sparkPerTessera, minTesseraMinor: kioskMinTesseraMinor, maxTesseraMinor: kioskMaxTesseraMinor } };
+  // #1341: one square's poster. Flag off leaves this payload unchanged and does not read the poster table. Not attached to GET /api/world/squares.
+  if (!postersEnabled(env)) return privateJson(listing);
+  const url = new URL(request.url), x = url.searchParams.get('x'), y = url.searchParams.get('y');
+  if (x === null && y === null) return privateJson(listing);
+  if (x === null || y === null || !/^-?\d+$/.test(x) || !/^-?\d+$/.test(y)) return privateJson({ error: 'Send integer x and y.', reason: 'bad_request' }, 400);
+  return privateJson({ ...listing, poster: await readSquarePoster(db, Number(x), Number(y), env) });
 }
 
 export async function POST(request: Request) {
@@ -28,9 +36,17 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send a buy-square or buy-tessera command.', reason: 'bad_request' }, 400); }
   // #384 L1: the travel read runs only when the command's own flag is on; flag off, the lib refuses before any DB statement.
-  if (body.action === 'buy-tessera' ? exchangeEnabled() : enabled()) { // #123: location-bound while travelling (QA1 on #264); no-op unless HARIMU_TRAVEL_ENABLED=true.
+  const posterAction = body.action === 'place-poster' || body.action === 'remove-poster';
+  if (!posterAction && (body.action === 'buy-tessera' ? exchangeEnabled() : enabled())) { // #123: location-bound while travelling (QA1 on #264); no-op unless HARIMU_TRAVEL_ENABLED=true. Poster commands are not travel-bound.
     const blocked = await travelBlock(await getDatabase(), userId, Math.floor(Date.now() / 1000), (env as unknown as { HARIMU_TRAVEL_ENABLED?: string }).HARIMU_TRAVEL_ENABLED === 'true');
     if (blocked) return privateJson({ error: blocked, reason: 'traveling' }, 409);
+  }
+  if (posterAction) { // #1341. Flag off returns before any poster statement.
+    if (!postersEnabled(env)) return privateJson({ error: 'Square posters are not open yet.', reason: 'disabled' }, 403);
+    const parsed = parsePosterCommand(body);
+    if ('status' in parsed) return privateJson({ error: parsed.error, reason: parsed.reason }, parsed.status);
+    const result = await applyPoster(await getDatabase(), userId, parsed, Math.floor(Date.now() / 1000), env);
+    return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
   }
   if (body.action === 'buy-tessera') {
     const exchange = parseExchangeCommand(body);
