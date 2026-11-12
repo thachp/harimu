@@ -36,10 +36,10 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 5
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
   assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key));
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 65);
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 66);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(57), key, 'entry 58');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(56), ICON_SIZE_SCALE_GATE_FLAG, 'scale gate stays entry 57');
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 65/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 66/);
   assert.match(await read('tests/text-bindings-988.test.mjs'), /#392 city icon size sync/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key));
   assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
