@@ -30,11 +30,11 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 6
   assert.equal(expandFlagPacks(preview.vars)[key], 'true'); assert.equal(expandFlagPacks(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
-  assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key)); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 65);
+  assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key)); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 66);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(64), key, 'entry 65');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(63), 'NEXT_PUBLIC_HARIMU_HOUSEHOLD_FACT_ICONS', 'entry 64 stays household fact icons');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(62), 'NEXT_PUBLIC_HARIMU_HOUSEHOLD_IDENTITY', 'entry 63 stays household identity');
-  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 65/); assert.match(await read('tests/text-bindings-988.test.mjs'), /#392 household fact value align/);
+  assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 66/); assert.match(await read('tests/text-bindings-988.test.mjs'), /#392 household fact value align/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key)); assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
   assert.match(await read('lib/household-fact-value-align.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_HOUSEHOLD_FACT_VALUE_ALIGN/);
   assert.match(await read('app/scene-panels-v2.tsx'), /factValueAlign = householdFactValueAlignEnabled\(\)/); assert.match(await read('app/panel-v2.tsx'), /const city = Boolean\(mark \|\| tagline \|\| primaryKicker\)/);

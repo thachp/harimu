@@ -29,10 +29,10 @@ test('flag is on only for the exact string "true", inside HARIMU_UI_PACK entry 6
   assert.equal(expandFlagPacks(preview.vars)[key], 'true'); assert.equal(expandFlagPacks(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false', 'a direct string wins');
-  assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key)); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 65);
+  assert.ok(FLAG_PACKS.HARIMU_UI_PACK.includes(key)); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 66);
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(62), key, 'entry 63');
   assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(61), 'NEXT_PUBLIC_HARIMU_CITY_HEADER_HYPHEN_KEEP', 'entry 62 stays the city header hyphen flag');
-  assert.match(bindings, /HARIMU_UI_PACK\.length, 65/); assert.match(bindings, /#392 household identity/);
+  assert.match(bindings, /HARIMU_UI_PACK\.length, 66/); assert.match(bindings, /#392 household identity/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key)); assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
   assert.match(await read('lib/household-identity.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_HOUSEHOLD_IDENTITY/);
   assert.match(await read('app/scene-panels-v2.tsx'), /identity = householdIdentityEnabled\(\)/); assert.match(await read('app/panel-v2.tsx'), /const city = Boolean\(mark \|\| tagline \|\| primaryKicker\)/);
