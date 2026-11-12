@@ -172,7 +172,7 @@
       "HARIMU_FULMARA_CHARTER_DAY_ENABLED": "true",
       // #1184: Fulmara next Fair-Wind Blessing (once per game year = 30 real days, no offset). Off: no fairWindBlessing key. Holds the next date only.
       "HARIMU_FULMARA_FAIR_WIND_BLESSING_ENABLED": "true",
-      // #1183: Confluence next Congress Lanterns (once per game year = 30 real days, no offset). Off: no congressLanterns key. Date only.
+      // #1183/#1390: Confluence next Congress Lanterns (every Party Congress = 150 real days, same date as the #1113 Congress clock). Off: no congressLanterns key. Date only.
       "HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED": "true",
       // #1187: Fulmara next Dock Strike remembrance (once per game year = 30 real days). Off: no dockStrikeRemembrance key. Holds no remembrance.
       "HARIMU_FULMARA_DOCK_STRIKE_REMEMBRANCE_ENABLED": "true",
@@ -236,7 +236,13 @@
       // #1339: the nation-change grace period also ends on an Assembly ballot, a primary ballot, an Aurelle pledge, current party membership, or current congregation office. Off: those five sources are not consulted.
       "HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED": "true",
       // #1349: World Registry square price rises with how much land the nation already owns (docs §15.1 [ASSUMPTION]: base × (1 + owned/1000), nearest minor unit, half up). Off: the charged and listed price stay 25.00 TSR. Does not open square purchase.
-      "HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED": "true"
+      "HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED": "true",
+      // #1353: party channel (current party_members of one Kindle party; 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware; not gated by primaries). Off: the route is a 404 and nothing is read.
+      "HARIMU_PARTY_CHAT_ENABLED": "true",
+      // #1371: founding a city needs an expedition of at least 10 citizens of that nation (docs §15.1). Off: founding is unchanged and does not count citizens.
+      "HARIMU_CITY_EXPEDITION_ENABLED": "true",
+      // #1381: a signed-in Korund viewer sees only Korund squares and the squares next to them (docs §11.5). Off: the map reads are unchanged.
+      "HARIMU_KORUND_MAP_FOG_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

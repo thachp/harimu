@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url), x = url.searchParams.get('x'), y = url.searchParams.get('y');
   if (x === null && y === null) return privateJson(listing);
   if (x === null || y === null || !/^-?\d+$/.test(x) || !/^-?\d+$/.test(y)) return privateJson({ error: 'Send integer x and y.', reason: 'bad_request' }, 400);
-  return privateJson({ ...listing, poster: await readSquarePoster(db, Number(x), Number(y), env) });
+  return privateJson({ ...listing, poster: await readSquarePoster(db, Number(x), Number(y), env, Math.floor(Date.now() / 1000)) });
 }
 
 export async function POST(request: Request) {

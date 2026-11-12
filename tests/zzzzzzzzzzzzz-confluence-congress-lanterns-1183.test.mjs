@@ -1,5 +1,6 @@
-/** #1183: Confluence next Congress Lanterns, once per game year (30 real days) from the Varkand Chair anchor.
- *  No offset. The helper takes nowMs only and returns the next date only.
+/** #1183 / #1390: Confluence next Congress Lanterns at every Party Congress (150 real days = 5 game years).
+ *  Reuses the #1113 Party Congress clock, so the lanterns date is the Congress date. No 30-day cycle remains.
+ *  The helper takes nowMs only and returns the next date only.
  *  Flag HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED in HARIMU_GRAY_PACK; #1187 follows.
  *  Flag off: no congressLanterns key. Date only: no lantern count, delegate list, or Party text.
  *  It rides on an existing Confluence read (Party schedule or People's Assembly), the same wiring as #1169.
@@ -8,6 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS, CONFLUENCE_CONGRESS_LANTERNS_CYCLE_MS, confluenceNextCongressLanternsAt } from '../lib/confluence-congress-lanterns.ts';
+import { CONFLUENCE_CONGRESS_INTERVAL_DAYS, CONFLUENCE_CONGRESS_MS, confluenceNextPartyCongressAt } from '../lib/confluence-party.ts';
 import { realDaysPerGameYear } from '../lib/election-calendars.ts';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { publicGovernmentSnapshot } from '../lib/government-disclosure.ts';
@@ -21,23 +23,33 @@ const day = 86_400_000;
 const anchor = VARKAND_CHAIR_ANCHOR_MS;
 const cycle = CONFLUENCE_CONGRESS_LANTERNS_CYCLE_MS;
 const key = 'HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED';
-const block = nextAt => ({ nextAt, cycleDays: 30 });
+const block = nextAt => ({ nextAt, cycleDays: 150 });
 const banned = ['count', 'delegate', 'persona', 'pillar', 'secretary', 'window', 'endsAt'];
 
-test('the next Congress Lanterns falls once per game year (30 real days) from the Chair anchor, with no offset', () => {
+test('the next Congress Lanterns falls on the 150-real-day Party Congress cycle from the Chair anchor', () => {
   assert.equal(anchor, 0);
-  assert.equal(CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS, 30);
-  assert.equal(CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS, realDaysPerGameYear);
-  assert.equal(cycle, 30 * day);
+  assert.equal(CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS, 150);
+  assert.equal(CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS, CONFLUENCE_CONGRESS_INTERVAL_DAYS);
+  assert.equal(CONFLUENCE_CONGRESS_LANTERNS_CYCLE_DAYS, 5 * realDaysPerGameYear);
+  assert.equal(cycle, 150 * day);
+  assert.equal(cycle, CONFLUENCE_CONGRESS_MS);
   assert.equal(confluenceNextCongressLanternsAt(anchor), anchor + cycle);
   assert.equal(confluenceNextCongressLanternsAt(anchor - 1), anchor + cycle);
   assert.equal(confluenceNextCongressLanternsAt(anchor + cycle - 1), anchor + cycle);
   assert.equal(confluenceNextCongressLanternsAt(anchor + cycle), anchor + 2 * cycle);
   assert.equal(confluenceNextCongressLanternsAt(anchor + 29 * day), anchor + cycle);
+  assert.equal(confluenceNextCongressLanternsAt(anchor + 30 * day), anchor + cycle, 'a 30-day boundary is not a lanterns date');
+  assert.equal(confluenceNextCongressLanternsAt(anchor + 149 * day), anchor + cycle);
   assert.equal(confluenceNextCongressLanternsAt.length, 1, 'nowMs only');
 });
 
-test('Congress Lanterns timestamps are safe integers on the 30-day cycle and store no window', () => {
+test('Congress Lanterns nextAt is the Party Congress date at the same now, including mid-cycle', () => {
+  for (const now of [anchor, anchor + 1, anchor + 30 * day, anchor + 31 * day, anchor + 149 * day, anchor + cycle, anchor + cycle + 30 * day, Date.now()]) {
+    assert.equal(confluenceNextCongressLanternsAt(now), confluenceNextPartyCongressAt(now), String(now));
+  }
+});
+
+test('Congress Lanterns timestamps are safe integers on the 150-day cycle and store no window', () => {
   for (const now of [anchor, cycle, cycle - 1, cycle + 0.5, 0.9, -1, Number.MAX_SAFE_INTEGER, Number.MIN_SAFE_INTEGER, NaN, Infinity, -Infinity]) {
     const nextAt = confluenceNextCongressLanternsAt(now);
     assert.equal(Number.isSafeInteger(nextAt), true, String(now));
@@ -103,6 +115,9 @@ test('flag off: the Confluence government read is unchanged; flag on adds congre
   assert.equal('congressLanterns' in partyOnly, false, 'party on, lanterns off: no congressLanterns key');
   const onParty = await gov.readGovernment(r.db, 'confluence', seconds, 'alice', { readOnly: true, confluenceParty: true, confluenceCongressLanterns: true });
   assert.deepEqual(onParty.congressLanterns, expected);
+  assert.equal(onParty.congressLanterns.nextAt, onParty.party.nextCongressAt, 'lanterns date is the Party Congress date');
+  assert.equal(onParty.congressLanterns.cycleDays, 150);
+  assert.equal(onParty.party.nextCongressAt, confluenceNextPartyCongressAt(seconds * 1000));
   assert.equal(onParty.party.nextCongressAt, partyOnly.party.nextCongressAt, 'the 150-day Party Congress is unchanged');
   assert.equal('quotaDay' in onParty, false);
   assert.equal('canalFestival' in onParty, false);

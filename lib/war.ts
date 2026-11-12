@@ -4,7 +4,7 @@ import { isMissingRelation, tolerate } from './db-errors';
 import { pendingRevertStatement, revertPeaceCaptures } from './war-peace-revert'; // #1054
 import { activeNonAggressionPact } from './diplomacy'; // #402
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
-import { kindleCertification, kindleCertificationEnabled } from './kindle-certification-rules';
+import { kindleOutgoingPresidentIsCaretaker } from './kindle-caretaker';
 import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, declarationNextDay, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
   type DeclarationBlock, type DeclarationLimitBlock, type GrievanceInputs, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
 export * from './war-rules';
@@ -124,17 +124,9 @@ const blockedText: Record<DeclarationBlock, (defender: string) => string> = {
   caretaker: () => blockedDeclaration.caretaker.text,
 };
 
-/** #1363: true while Kindle's outgoing President is a caretaker. Same flag and the same `kindleCertification` transition as #1025 (present from certification through endsAt).
- *  Flag off, no ballot, or no transition: false. A missing elections table is not a window. A closed ballot is the confirmed count the election read publishes. */
+/** #1363: true while Kindle's outgoing President is a caretaker. Same helper as a presidential treasury spend (`kindleOutgoingPresidentIsCaretaker`). */
 export async function kindleDeclarationCaretaker(db: GameDatabase, now: number): Promise<boolean> {
-  if (!kindleCertificationEnabled(env)) return false;
-  const row = await db.prepare('SELECT closes_at,closed_at FROM civic_elections ORDER BY opens_at DESC, id DESC LIMIT 1')
-    .first<{ closes_at: number; closed_at: number | null }>().catch(tolerate(isMissingRelation, null));
-  if (!row) return false;
-  const closesAt = Number(row.closes_at);
-  const closed = row.closed_at !== null || now >= closesAt;
-  const certification = kindleCertification({ status: closed ? 'closed' : 'open', closesAt, now, confirmed: closed, winnerName: null });
-  return certification?.transition !== undefined;
+  return kindleOutgoingPresidentIsCaretaker(db, now);
 }
 
 /** Server-side only (the AI leadership path calls this; no route does). Rejects during the Founding Period, under a non-aggression pact,
@@ -239,7 +231,8 @@ export async function setDefenseWindow(db: GameDatabase, command: SetDefenseWind
 export type WarNewsItem = { id: string; title: string; text: string; occurredAt: number; source: 'deterministic'; kind: 'template' | 'decree' };
 const fill = fillWarText;
 /** National news lines for one reader's nation, derived from the war records (read-only, never published as a game event): the declaration in that
- *  nation's voice (ours / against us / the world), the end of mobilization, and the end of the war. Occurred-at values are milliseconds. */
+ *  nation's voice (ours / against us / the world), the end of mobilization, and the end of the war. Occurred-at values are milliseconds.
+ *  #1379: Korund State Media omits `world` (foreign-war) items — docs §11.5 information fog, §8.6, Korund Freedoms. Kindle and Aurelle are unchanged. */
 export function warNewsItems(wars: PublicWar[], readerNation: string): WarNewsItem[] {
   if (!isWarNation(readerNation)) return [];
   const notices = noticesFor(readerNation);
@@ -249,6 +242,7 @@ export function warNewsItems(wars: PublicWar[], readerNation: string): WarNewsIt
   for (const war of wars) {
     const names = { attacker: warNationNames[war.attacker], defender: warNationNames[war.defender], casusBelli: war.casusBelli };
     const side = war.attacker === readerNation ? 'ours' as const : war.defender === readerNation ? 'against-us' as const : 'world' as const;
+    if (side === 'world' && readerNation === 'korund') continue; // #1379: foreign headlines stay off the official feed
     const notice = notices.notices[side];
     items.push({ id: `war:${war.id}:declared`, title: fill(notice.headline, names), text: fill(war.casusBelli ? notice.body : notice.bodyNoGrievance, names), occurredAt: war.declaredAt * 1000, source: 'deterministic', kind });
     if (war.endedAt === null || war.endedAt >= war.mobilizationEndsAt) {

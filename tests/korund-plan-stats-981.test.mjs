@@ -70,7 +70,7 @@ const isWrite = sql => /^\s*(INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|REPLACE)/i.t
 test('flag on: the State Media line equals this week\'s stored food quota, not another week or the lifetime total', async t => {
   const { r, epoch } = await setup(t, true);
   r.setNow((epoch + 1000) * 1000);
-  assert.equal((await news(r)).data.planStat.line, 'Food brigades press on: 0% of plan');
+  assert.equal('planStat' in (await news(r)).data, false, 'an open week with no settlements does not invent 0%');
   await settle(r, 'alice', epoch + 100, 2); await settle(r, 'bob', epoch + 200, 9); // unit 44 of 40
   const edition = (await news(r)).data;
   const ledger = Number((await r.db.prepare('SELECT COALESCE(SUM(food_output),0) AS n FROM korund_settlements WHERE settled_at>=? AND settled_at<?').bind(epoch, epoch + W).first()).n);
@@ -82,7 +82,7 @@ test('flag on: the State Media line equals this week\'s stored food quota, not a
   r.setNow((epoch + W + 50) * 1000);
   const next = (await news(r)).data;
   assert.equal(next.statistics.food, 44, 'lifetime food is unchanged');
-  assert.equal(next.planStat.output, 0); assert.equal(next.planStat.line, 'Food brigades press on: 0% of plan', 'an empty open week does not reuse last week');
+  assert.equal('planStat' in next, false, 'an empty open week omits the widget and does not invent 0% or reuse last week');
   await settle(r, 'alice', epoch + W, 1); await settle(r, 'bob', epoch + 2 * W, 3); // week 2 gets the boundary shift only
   const boundary = (await news(r)).data.planStat;
   assert.equal(boundary.output, 4); assert.equal(boundary.percent, 10); assert.equal(boundary.line, 'Food brigades press on: 10% of plan');

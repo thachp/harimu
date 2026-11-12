@@ -103,8 +103,8 @@ export type GovernmentSnapshot = {
   assemblyElection?: { cycleStartedAt: number; nextElectionAt: number; intervalDays: 150; ballotOpen: false; leadershipHeedsResult: false };
   /** #1169 Confluence: next Quota Day (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_QUOTA_DAY_ENABLED is on. States no quota, target, or bonus. */
   quotaDay?: { nextAt: number; cycleDays: 30 };
-  /** #1183 Confluence: next Congress Lanterns (once per game year = 30 real days). Present only while HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED is on. Date only: no lantern count, delegate list, or Party text. */
-  congressLanterns?: { nextAt: number; cycleDays: 30 };
+  /** #1183 / #1390 Confluence: next Congress Lanterns at every Party Congress (150 real days = 5 game years). Present only while HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED is on. Date only: no lantern count, delegate list, or Party text. The date is the #1113 Party Congress clock. */
+  congressLanterns?: { nextAt: number; cycleDays: 150 };
   /** #1114 Meridian: Paramount Leader roles, 7-seat Standing Committee, and the next Party Congress. Present only while HARIMU_MERIDIAN_PARTY_SCHEDULE_ENABLED is on. */
   partyState?: { paramountLeaderRoles: readonly ['general_secretary', 'state_chair']; standingCommitteeSeats: 7; nextCongressAt: number; congressIntervalDays: 150; termLimitsSuspendable: true; suspendSupermajority: '2/3' };
   /** #1133 Meridian: next Exam Day. Present only while HARIMU_MERIDIAN_EXAM_DAY_ENABLED is on. */

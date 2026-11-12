@@ -24,6 +24,8 @@ const flagOffPins = {
   HARIMU_NOTABLES_ENABLED: 'ai-captured-drafts.test.mjs',
   HARIMU_AI_CABINET_RESPONSES_ENABLED: 'cabinet-response-ai.test.mjs',
   HARIMU_CITY_FOUNDING_ENABLED: 'flag-off-audit-384.test.mjs',
+  HARIMU_CITY_EXPEDITION_ENABLED: 'city-expedition-1371.test.mjs', // #1371 flag off: founding SQL has no citizen count
+  HARIMU_KORUND_MAP_FOG_ENABLED: 'korund-map-fog-1381.test.mjs', // #1381 flag off: map reads stay full
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
@@ -111,6 +113,7 @@ const flagOffPins = {
   HARIMU_DM_CHAT_ENABLED: 'dm-chat-881.test.mjs',
   HARIMU_EMBASSY_CHAT_ENABLED: 'embassy-chat-882.test.mjs',
   HARIMU_CONGREGATION_CHAT_ENABLED: 'congregation-chat-1342.test.mjs',
+  HARIMU_PARTY_CHAT_ENABLED: 'party-chat-1353.test.mjs',
   HARIMU_FOUNDING_PERIOD_ENABLED: 'founding-period-612.test.mjs',
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_AURELLE_TSR_VIEW_ENABLED: 'aurelle-tsr-view-999.test.mjs', // #999 flag off: no crownRateMilli, no line
