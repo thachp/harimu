@@ -1,4 +1,5 @@
-export const viewModes = ['world', 'country', 'square', 'household', 'workplace', 'market', 'government', 'nation'] as const;
+import { neighborhoodEnabled } from './neighborhood.ts';
+export const viewModes = ['world', 'country', 'square', 'neighborhood', 'household', 'workplace', 'market', 'government', 'nation'] as const;
 export type SceneView = typeof viewModes[number];
 export const sceneHistoryKey = 'harimuScenePath';
 /** Keep router scroll/snapshot metadata when adding a local game scene entry. */
@@ -12,7 +13,8 @@ export function isSceneTraversal(state: unknown, pathname: string): boolean {
 export function sceneFromSearch(search: string): SceneView {
   const requested = new URLSearchParams(search).get('view');
   const view = requested === 'city' ? 'square' : requested === 'home' || requested === 'planning' ? 'household' : requested;
-  return viewModes.includes(view as SceneView) ? view as SceneView : 'square';
+  const scene = viewModes.includes(view as SceneView) ? view as SceneView : 'square';
+  return scene === 'neighborhood' && !neighborhoodEnabled() ? 'square' : scene;
 }
 export function nationFromSearch(search: string, validNationIds: readonly string[], fallbackId: string): string {
   const requested = new URLSearchParams(search).get('nation');
@@ -27,7 +29,7 @@ export function viewedNationAfterLoad(search: string, validNationIds: readonly s
 }
 const inspectingViews: readonly string[] = ['world', 'country', 'nation'];
 // A new personal scene must be added to personalViews (and a new inspecting scene to inspectingViews), or it silently inherits the inspected nation.
-const personalViews: readonly string[] = ['square', 'household', 'workplace', 'market'];
+const personalViews: readonly string[] = ['square', 'household', 'workplace', 'market', 'neighborhood'];
 /** #527: which nation a navigation to `nextView` shows. A citizen inspecting another nation on World, Country or Nation keeps it there; the inspection ends when they
  *  open a personal scene (City, Household, Work, Market), or Country or Civic from a personal scene, which are their own nation again. Otherwise a stale inspected
  *  nation survived the walk and Civic opened that nation's government and the URLs dropped nation and city. Civic opened straight from an inspection stays read-only (#91). */

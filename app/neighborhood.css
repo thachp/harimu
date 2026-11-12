@@ -1,0 +1,5 @@
+/* #1315 N1. Neighborhood panel. Flag off: every rule starts at .game-neighborhood. */
+.game-neighborhood .neighborhood-v2{min-width:0}
+.game-neighborhood .neighborhood-v2 h2,.game-neighborhood .neighborhood-v2 h3,.game-neighborhood .neighborhood-v2 p,.game-neighborhood .neighborhood-v2 strong,.game-neighborhood .neighborhood-v2 small,.game-neighborhood .neighborhood-v2 li{overflow-wrap:normal;word-break:normal;hyphens:none}
+.game-neighborhood .neighborhood-v2 h2{font-size:calc(1.5rem * var(--text-scale, 1))}
+.game-neighborhood .neighborhood-v2 h3,.game-neighborhood .neighborhood-v2 p,.game-neighborhood .neighborhood-v2 li,.game-neighborhood .neighborhood-v2 strong,.game-neighborhood .neighborhood-v2 small{font-size:calc(13px * var(--text-scale, 1))}
