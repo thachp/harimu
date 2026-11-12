@@ -117,8 +117,19 @@ for (const backend of ['sqlite', 'postgres']) test(`square price follows owned l
   assert.equal(await stored(r, id), 2503);
   assert.equal(Number((await r.db.prepare('SELECT delta_minor FROM citizen_tessera_ledger WHERE id=?').bind(`tsr-square-${id}`).first()).delta_minor), -2503);
   assert.equal(await tessera(r, 'alice'), 0);
-  const onSql = [...today]; onSql.splice(4, 0, COUNT_SQL);
-  assert.deepEqual(bought.sql, onSql, 'flag on adds only the owned-square count before the insert');
+  const live = m.squareLivePriceSql;
+  const onSql = [...today];
+  onSql.splice(4, 0, COUNT_SQL);
+  onSql[5] = `INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at)
+      SELECT ?,?,?,?,?,${live},? WHERE EXISTS (SELECT 1 FROM world_squares WHERE x=? AND y=? AND zone='wildlands' AND owner IS NULL)
+      AND EXISTS (SELECT 1 FROM world_squares WHERE owner=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND NOT (x=? AND y=?))
+      AND ${balanceSql} >= ${live}
+      ON CONFLICT DO NOTHING`;
+  onSql[6] = `INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
+      SELECT ?,?,-price_minor,'square-purchase',? FROM world_square_purchases WHERE request_id=? AND clerk_user_id=?
+      ON CONFLICT DO NOTHING`;
+  onSql[8] = 'SELECT price_minor FROM world_square_purchases WHERE request_id=?';
+  assert.deepEqual(bought.sql, onSql, 'flag on prices the insert from the live owned count and debits that stored price');
   assert.equal(await priceOf(r, 'alice'), 2505, 'the bought square counts toward the next price');
   await r.db.prepare("INSERT INTO world_squares (x,y,zone,owner,terrain,resource,feature) VALUES (2999,-1,'wildlands','kindle','plains',NULL,NULL)").run();
   const replay = await buy(r, 'alice', id);

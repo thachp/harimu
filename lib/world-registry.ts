@@ -27,6 +27,8 @@ export function squareChargeMinor(owned: number): number {
   const price = Math.floor((squarePriceMinor * (1000 + count) + 500) / 1000);
   return price > 0 ? price : 1;
 }
+/** Same half-up price inside one statement. `?` is the nation id. Counted at insert time, so a second same-nation buy cannot reuse a stale pre-read. */
+export const squareLivePriceSql = `((${squarePriceMinor}*(1000+(SELECT COUNT(*) FROM world_squares WHERE owner=?))+500)/1000)`;
 
 async function ownedSquareCount(db: GameDatabase, nationId: string): Promise<number> {
   const row = await db.prepare('SELECT COUNT(*) AS n FROM world_squares WHERE owner=?').bind(nationId).first<{ n: number }>();
@@ -119,26 +121,51 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   if (squares.length !== mapWidth * mapHeight) return fail(409, 'map_unavailable', 'The world map is not available right now.');
   const site = checkPurchaseSite(squares, nationId, command.x, command.y); if (site) return site;
   const balance = await readTessera(db, userId);
-  // Flag off keeps today's price and does not count owned squares. Flag on: the count is before the INSERT.
-  const priceMinor = squarePriceAntiSnowballEnabled(env) ? squareChargeMinor(await ownedSquareCount(db, nationId)) : squarePriceMinor;
-  if (balance < priceMinor) return fail(409, 'insufficient_tessera', `A square costs ${(priceMinor / 100).toFixed(2)} TSR; you hold ${(balance / 100).toFixed(2)} TSR.`);
+  const dynamic = squarePriceAntiSnowballEnabled(env);
+  // Flag off: today's fixed price, and no owned-square count. The quoted price is only for the refusal message when the flag is on.
+  const priceMinor = dynamic ? squareChargeMinor(await ownedSquareCount(db, nationId)) : squarePriceMinor;
+  if (!dynamic && balance < priceMinor) return fail(409, 'insufficient_tessera', `A square costs ${(priceMinor / 100).toFixed(2)} TSR; you hold ${(balance / 100).toFixed(2)} TSR.`);
   const { x, y, requestId } = command;
   // One batch (one transaction): the purchase row is inserted only if the square is still unowned Wildlands next to the
   // nation's land and the balance still covers the price; the debit and the ownership change follow only if that row exists.
-  await db.batch([
-    db.prepare(`INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at)
+  // Flag on: price_minor is the formula on the nation's count inside that INSERT, and the balance guard uses the same figure.
+  if (!dynamic) {
+    await db.batch([
+      db.prepare(`INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at)
       SELECT ?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM world_squares WHERE x=? AND y=? AND zone='wildlands' AND owner IS NULL)
       AND EXISTS (SELECT 1 FROM world_squares WHERE owner=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND NOT (x=? AND y=?))
       AND ${balanceSql} >= ?
       ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, priceMinor, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, ...tesseraBalanceBinds(userId), priceMinor),
-    db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
+      db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
       SELECT ?,?,?,'square-purchase',? WHERE EXISTS (SELECT 1 FROM world_square_purchases WHERE request_id=? AND clerk_user_id=?)
       ON CONFLICT DO NOTHING`)
-      .bind(`tsr-square-${requestId}`, userId, -priceMinor, now, requestId, userId),
+        .bind(`tsr-square-${requestId}`, userId, -priceMinor, now, requestId, userId),
+      db.prepare(`UPDATE world_squares SET owner=?, zone='frontier' WHERE x=? AND y=? AND EXISTS (SELECT 1 FROM world_square_purchases WHERE request_id=? AND x=? AND y=?)`)
+        .bind(nationId, x, y, requestId, x, y),
+    ]);
+    const created = await db.prepare('SELECT request_id FROM world_square_purchases WHERE request_id=?').bind(requestId).first();
+    if (!created) return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
+    return { ok: true, square: { x, y, owner: nationId, zone: 'frontier' }, priceMinor, tesseraMinor: await readTessera(db, userId) };
+  }
+  await db.batch([
+    db.prepare(`INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at)
+      SELECT ?,?,?,?,?,${squareLivePriceSql},? WHERE EXISTS (SELECT 1 FROM world_squares WHERE x=? AND y=? AND zone='wildlands' AND owner IS NULL)
+      AND EXISTS (SELECT 1 FROM world_squares WHERE owner=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND NOT (x=? AND y=?))
+      AND ${balanceSql} >= ${squareLivePriceSql}
+      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, nationId, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, ...tesseraBalanceBinds(userId), nationId),
+    db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
+      SELECT ?,?,-price_minor,'square-purchase',? FROM world_square_purchases WHERE request_id=? AND clerk_user_id=?
+      ON CONFLICT DO NOTHING`)
+      .bind(`tsr-square-${requestId}`, userId, now, requestId, userId),
     db.prepare(`UPDATE world_squares SET owner=?, zone='frontier' WHERE x=? AND y=? AND EXISTS (SELECT 1 FROM world_square_purchases WHERE request_id=? AND x=? AND y=?)`)
       .bind(nationId, x, y, requestId, x, y),
   ]);
-  const created = await db.prepare('SELECT request_id FROM world_square_purchases WHERE request_id=?').bind(requestId).first();
-  if (!created) return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
-  return { ok: true, square: { x, y, owner: nationId, zone: 'frontier' }, priceMinor, tesseraMinor: await readTessera(db, userId) };
+  const created = await db.prepare('SELECT price_minor FROM world_square_purchases WHERE request_id=?').bind(requestId).first<{ price_minor: number }>();
+  if (!created) {
+    const livePrice = squareChargeMinor(await ownedSquareCount(db, nationId));
+    const liveBalance = await readTessera(db, userId);
+    if (liveBalance < livePrice) return fail(409, 'insufficient_tessera', `A square costs ${(livePrice / 100).toFixed(2)} TSR; you hold ${(liveBalance / 100).toFixed(2)} TSR.`);
+    return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
+  }
+  return { ok: true, square: { x, y, owner: nationId, zone: 'frontier' }, priceMinor: Number(created.price_minor), tesseraMinor: await readTessera(db, userId) };
 }
