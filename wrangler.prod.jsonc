@@ -226,7 +226,9 @@
       // #1282: Dunkar Pass is a Varkand resident city (home, enroll, travel-by-id). Not a country-map pin. citiesForNation stays capital plus two. No garrison duty, key defense, or war-value hooks. Off: the city is absent.
       "HARIMU_VARKAND_DUNKAR_PASS_ENABLED": "false",
       // #1318: inert Better Auth at /api/auth/* and the Twilio Verify adapter. Off: that path is 404 and the database is not opened. Clerk stays the only session authority. Secrets are dashboard-only and are not set here: BETTER_AUTH_SECRET (a different value on each Worker), TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET, TWILIO_VERIFY_SERVICE_SID, and HARIMU_PHONE_HASH_SECRET (the same value on preview and production while they share a database). The base URL is the request origin.
-      "HARIMU_BETTER_AUTH_ENABLED": "false"
+      "HARIMU_BETTER_AUTH_ENABLED": "false",
+      // #467 slice 1: off-chain land lots, tile titles and leases (migration 0123). Tables only; nothing reads or writes them yet. Off and on: square purchase and capture() are unchanged.
+      "HARIMU_LAND_TILES_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",

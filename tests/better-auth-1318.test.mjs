@@ -31,8 +31,8 @@ test('flag off or secret missing is 404 and does not open the database', async (
     assert.equal(response.status, 404);
   }
   assert.equal(await authResponse(off, '/api/author'), null);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_BETTER_AUTH_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_VARKAND_DUNKAR_PASS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_BETTER_AUTH_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VARKAND_DUNKAR_PASS_ENABLED');
   const entry = readFileSync('worker/entry.ts', 'utf8');
   assert.match(entry, /isBetterAuthPath\(url\.pathname\)/);
   assert.match(entry, /createAuth\(env as unknown as BetterAuthEnv, request, ctx\)/);
@@ -62,7 +62,7 @@ test('Twilio Verify uses the Verify URLs and sends nothing when a secret is miss
 });
 
 test('migration 0122 is additive and a registry conflict is refused', async () => {
-  const last = postgresMigrations().at(-1);
+  const last = postgresMigrations().find(m => m.file === '0122_better_auth.sql'); // #467: 0123 now follows; not pinned to the last file
   assert.equal(last.file, '0122_better_auth.sql');
   assert.equal(isDestructive(last.sql), false);
   assert.equal(transactionProblem(last.sql), null);

@@ -86,13 +86,13 @@ test('the flag is preview true and production false, GRAY 65 inside HARIMU_GRAY_
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-18), key);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-18), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-18), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-19), 'HARIMU_HOARVALE_MOOT_OPENING_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-20), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-17), 'HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 82);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-19), key);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-19), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-19), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-20), 'HARIMU_HOARVALE_MOOT_OPENING_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-21), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-18), 'HARIMU_ILMAR_ASSEMBLY_ELECTION_DAY_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); // GRAY 82 is Better Auth; #467 land tiles is last (length is not pinned)
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
