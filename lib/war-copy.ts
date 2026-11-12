@@ -138,11 +138,13 @@ export const activeWarBanner={
  proposal:true,
 } as const;
 
-/** Reasons a declaration was refused, for the AI-leader log and news. Reasons, not threats. */
+/** Reasons a declaration was refused, for the AI-leader log and news. Reasons, not threats.
+ *  #1363 caretaker reuses the #609 / #1025 transition sentence, in this same shape. */
 export const blockedDeclaration={
  foundingPeriod:L('The declaration was not made. War cannot be declared during the Founding Period, a shard\'s first 30 days.'),
  nonAggression:L('The declaration was not made. A non-aggression pact with {defender} is in force.'),
  peaceLock:L('The declaration was not made. A recent peace treaty with {defender} keeps declarations locked.'),
+ caretaker:L('The declaration was not made. Until inauguration, the outgoing AI President cannot spend the treasury or declare war.'),
  proposal:true,
 } as const;
 
