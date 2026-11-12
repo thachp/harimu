@@ -4,7 +4,7 @@ import { isMissingRelation, tolerate } from './db-errors';
 import { pendingRevertStatement, revertPeaceCaptures } from './war-peace-revert'; // #1054
 import { activeNonAggressionPact } from './diplomacy'; // #402
 import { blockedDeclaration, endedNoticesFor, mobilizationStatus, noticesFor, WAR_NAME_MAX } from './war-copy';
-import { kindleCertification, kindleCertificationEnabled } from './kindle-certification-rules';
+import { kindleOutgoingPresidentIsCaretaker } from './kindle-caretaker';
 import { cleanLabel, declarationBlock, declarationLimitBlock, declarationLimits, declarationNextAt, declarationNextDay, grievanceScore, defaultDefenseStartHours, defenseWindowChangeAllowed, defenseWindowConfig, defenseWindowNextChange, isDefenseStartHour, warNations, fillWarText, foundingPeriodEnd, isWarNation, mobilizationEnd, pairKey, peaceLockEnd, requestIdOk, warConfig, warNationNames, warStatus,
   type DeclarationBlock, type DeclarationLimitBlock, type GrievanceInputs, type WarEndKind, type WarNationId, type WarStatus } from './war-rules';
 export * from './war-rules';
@@ -124,17 +124,9 @@ const blockedText: Record<DeclarationBlock, (defender: string) => string> = {
   caretaker: () => blockedDeclaration.caretaker.text,
 };
 
-/** #1363: true while Kindle's outgoing President is a caretaker. Same flag and the same `kindleCertification` transition as #1025 (present from certification through endsAt).
- *  Flag off, no ballot, or no transition: false. A missing elections table is not a window. A closed ballot is the confirmed count the election read publishes. */
+/** #1363: true while Kindle's outgoing President is a caretaker. Same helper as a presidential treasury spend (`kindleOutgoingPresidentIsCaretaker`). */
 export async function kindleDeclarationCaretaker(db: GameDatabase, now: number): Promise<boolean> {
-  if (!kindleCertificationEnabled(env)) return false;
-  const row = await db.prepare('SELECT closes_at,closed_at FROM civic_elections ORDER BY opens_at DESC, id DESC LIMIT 1')
-    .first<{ closes_at: number; closed_at: number | null }>().catch(tolerate(isMissingRelation, null));
-  if (!row) return false;
-  const closesAt = Number(row.closes_at);
-  const closed = row.closed_at !== null || now >= closesAt;
-  const certification = kindleCertification({ status: closed ? 'closed' : 'open', closesAt, now, confirmed: closed, winnerName: null });
-  return certification?.transition !== undefined;
+  return kindleOutgoingPresidentIsCaretaker(db, now);
 }
 
 /** Server-side only (the AI leadership path calls this; no route does). Rejects during the Founding Period, under a non-aggression pact,
