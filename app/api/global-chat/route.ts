@@ -4,7 +4,7 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { uuidPattern, validSquareText } from '@/lib/square-chat-validation';
 import { isShadowMuted, logShadowMuted, parseShadowMute } from '@/lib/chat-shadow-mute';
-import { globalChatClosedFor, globalChatFlagOn, globalChatRefusals, postGlobalChatBinds, postGlobalChatSql, readGlobalChat } from '@/lib/global-chat';
+import { globalChatClosedFor, globalChatFlagOn, globalChatRefusals, postGlobalChatBinds, postGlobalChatSqlFor, readGlobalChat } from '@/lib/global-chat';
 import { readVarkandAlert, varkandAlertEnabled } from '@/lib/varkand-alert'; // #1354
 
 // #881 part 2: global chat. Flag HARIMU_GLOBAL_CHAT_ENABLED off: 404 before auth or any DB access.
@@ -54,13 +54,14 @@ export async function POST(request: Request) {
   const prior = await db.prepare('SELECT user_id,body,deleted FROM global_chat_messages WHERE id=?').bind(id).first<Prior>();
   if (prior) return same(prior) ? view(db, userId, t) : json({ error: 'Request already used.' }, 409);
   await db.prepare('INSERT OR IGNORE INTO square_handles(user_id,handle) VALUES (?,?)').bind(userId, `Citizen-${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`).run();
-  const result = await db.prepare(postGlobalChatSql).bind(...postGlobalChatBinds(id, text, t, userId)).run();
+  const result = await db.prepare(postGlobalChatSqlFor(varkandAlertEnabled(env))).bind(...postGlobalChatBinds(id, text, t, userId)).run();
   if (!result.meta.changes) {
     const replay = await db.prepare('SELECT user_id,body,deleted FROM global_chat_messages WHERE id=?').bind(id).first<Prior>();
     if (replay && !same(replay)) return json({ error: 'Request already used.' }, 409); // another citizen won the same id
     const nowNation = replay ? null : (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id;
     if (!replay && !nowNation) return json({ error: 'Enroll in a nation first.' }, 403); // left the nation between the check and the write: the INSERT refused it
     if (!replay && nowNation === 'korund') return json({ error: globalChatRefusals.nation_closed, reason: 'nation_closed' }, 403); // #1354: moved to Korund mid-request
+    if (!replay && nowNation === 'varkand' && varkandAlertEnabled(env) && (await readVarkandAlert(db)).level === 'red') return json({ error: globalChatRefusals.alert_closed, reason: 'alert_closed' }, 403); // #1360: alert raised to Red mid-request
     if (!replay) return json({ error: 'Wait 10 seconds between messages; limit 20 per hour.', reason: 'rate_limited' }, 429);
   } else if (isShadowMuted(parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE), userId, t)) logShadowMuted(userId, id); // #790
   return view(db, userId, t);

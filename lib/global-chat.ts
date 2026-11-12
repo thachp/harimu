@@ -29,12 +29,20 @@ export function globalChatClosedFor(nationId: string, alert: VarkandAlert = 'gre
 }
 
 /** Inserts only for an enrolled citizen (nation taken from the citizens row, never the client), inside the rate limits. 0 changes: replay, limit or unenrolled.
- *  #1354: a Korund author is refused in the insert too, so a nation change between the route check and the write cannot slip a post in. */
-export const postGlobalChatSql = `INSERT INTO global_chat_messages(id,user_id,nation_id,body,posted_at)
-SELECT ?, clerk_user_id, nation_id, ?, ? FROM citizens WHERE clerk_user_id=? AND nation_id IS NOT NULL AND nation_id<>'korund'
+ *  #1354: a Korund author is refused in the insert too, so a nation change between the route check and the write cannot slip a post in.
+ *  #1360: when HARIMU_VARKAND_ALERT_ENABLED is on, a Varkand author is also refused if the stored Alert Level is Red, so a mid-request raise to Red cannot slip a post in.
+ *  Flag off: the SQL is unchanged and does not mention the alert table. */
+const postGlobalChatSelect = (alertGuard: string) => `INSERT INTO global_chat_messages(id,user_id,nation_id,body,posted_at)
+SELECT ?, clerk_user_id, nation_id, ?, ? FROM citizens WHERE clerk_user_id=? AND nation_id IS NOT NULL AND nation_id<>'korund'${alertGuard}
 AND NOT EXISTS (SELECT 1 FROM global_chat_messages WHERE id=?)
 AND NOT EXISTS (SELECT 1 FROM global_chat_messages WHERE user_id=? AND posted_at>?)
 AND (SELECT COUNT(*) FROM global_chat_messages WHERE user_id=? AND posted_at>?)<${globalChatHourlyLimit}`;
+export const postGlobalChatSql = postGlobalChatSelect('');
+/** Flag-on INSERT also refuses Varkand while the stored level is Red. Flag off returns `postGlobalChatSql`. */
+export const postGlobalChatSqlFor = (alertEnabled: boolean) => alertEnabled
+  ? postGlobalChatSelect(`
+AND NOT (nation_id='varkand' AND EXISTS (SELECT 1 FROM varkand_alert_levels WHERE id=1 AND level='red'))`)
+  : postGlobalChatSql;
 export const postGlobalChatBinds = (id: string, text: string, now: number, userId: string) =>
   [id, text, now, userId, id, userId, now - globalChatGapSeconds, userId, now - 3600];
 
