@@ -1,7 +1,7 @@
 /** #350: server-only commands for declaring a war and ending it (propose, then the other side accepts), behind HARIMU_WAR_ENABLED (default "false").
  *  The caller is a server-only caller (no citizen session; see handleWarCommand), and the acting role is validated against lib/war-authority.ts.
- *  Reuses declareWar / endWar from lib/war.ts, so the Founding Period, the non-aggression pact (#402) and the peace lock are checked there and every command is idempotent by request id.
- *  The section 15 declaration rate limits and casus belli gate (#426) are applied in declareWar behind HARIMU_WAR_DECLARATION_LIMITS_ENABLED. #427: with HARIMU_WAR_ASSEMBLY_ENABLED, Kindle's declaration is a proposal the Assembly votes on (lib/war-assembly.ts). NOT here: surrender and concession terms. */
+ *  Reuses declareWar / endWar from lib/war.ts, so the Founding Period, the non-aggression pact (#402), the peace lock and (#1363) Kindle's transition week are checked there, and every command is idempotent by request id.
+ *  The section 15 declaration rate limits and casus belli gate (#426) are applied in declareWar behind HARIMU_WAR_DECLARATION_LIMITS_ENABLED. #427: with HARIMU_WAR_ASSEMBLY_ENABLED, Kindle's declaration is a proposal the Assembly votes on (lib/war-assembly.ts); that proposal is refused during the same week. NOT here: surrender and concession terms. */
 import type { GameDatabase } from './database-contract';
 import { declareWar, endWar } from './war';
 import { isWarNation, requestIdOk, warNationNames, type WarNationId } from './war-rules';
