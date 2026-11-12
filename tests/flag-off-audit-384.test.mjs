@@ -111,6 +111,7 @@ const flagOffPins = {
   HARIMU_AURELLE_SUCCESSION_ENABLED: 'aurelle-succession-613.test.mjs',
   HARIMU_AURELLE_TSR_VIEW_ENABLED: 'aurelle-tsr-view-999.test.mjs', // #999 flag off: no crownRateMilli, no line
   HARIMU_RELOCATION_SUPPORT_ENABLED: 'relocation-support-470.test.mjs',
+  HARIMU_LAND_TILES_ENABLED: 'land-tiles-467.test.mjs', // #467 flag off (and on): tables only, square purchase and capture() unchanged
   HARIMU_TARGETED_SANCTIONS_ENABLED: 'goods-sanctions-601.test.mjs',
   HARIMU_WAR_ENABLED: 'war-actions.test.mjs',
   HARIMU_WAR_WEARINESS_ENABLED: 'war-weariness.test.mjs',
