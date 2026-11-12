@@ -24,7 +24,8 @@ test('the flag ships "false", is its own var, and the registry route reads it fo
   assert.deepEqual([...cfg.matchAll(/"HARIMU_TESSERA_EXCHANGE_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
   assert.deepEqual([...cfg.matchAll(/"HARIMU_SQUARE_PURCHASE_ENABLED"\s*:\s*"([^"]*)"/g)].map(x => x[1]), ['false']);
   const route = (await readFile(new URL('../app/api/world/registry/route.ts', import.meta.url), 'utf8')).replace(/\/\/.*$/gm, '');
-  assert.match(route, /buyTessera\([^;]*exchangeEnabled\(\)\)/); assert.match(route, /buySquare\([^;]*enabled\(\)\)/); assert.match(route, /kiosk: \{ open: exchangeEnabled\(\)/);
+  assert.match(route, /buyTessera\([^;]*exchangeEnabled\(\)\)/); assert.match(route, /buySquare\([^;]*[^e]enabled\(\)[,)]/); assert.match(route, /kiosk: \{ open: exchangeEnabled\(\)/);
+  assert.doesNotMatch(route, /buySquare\([^;]*exchangeEnabled\(\)/, 'squares never read the exchange flag');
   assert.doesNotMatch(route, /buyTessera\([^;]*[^e]enabled\(\)\)/, 'the exchange never reads the square flag');
   const page = await readFile(new URL('../app/page.tsx', import.meta.url), 'utf8'); assert.match(page, /setKioskOpen\(data\?\.kiosk\?\.open === true\)/);
 });
