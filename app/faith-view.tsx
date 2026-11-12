@@ -2,10 +2,8 @@
 // #1329 F1. Read-only nation faith facts from existing §14 strings. No commands and no new wording.
 import { useEffect, useState } from 'react'; import { PanelV2 } from './panel-v2'; import { NationCrest } from './nation-crest'; import { faithEnabled } from '@/lib/faith-flag';
 import { faithCopy, korundFaithCopy, type FaithId } from '@/lib/faith-copy'; import { holySites } from '@/lib/holy-sites'; import { capitalCityForNation } from '@/lib/cities';
-import { festivalStance } from '@/lib/festival-stance'; import { festivalStanceCopy, type MvpNationId } from '@/lib/mvp-festival-copy'; import { nationFestivalSlots } from '@/lib/game-season'; import './faith-view.css';
-const faithIds = Object.keys(faithCopy) as FaithId[];
-const houses = ['kinward-rite', 'fair-wind-vow', 'open-hand'] as const;
-const mvp = (id: string): id is MvpNationId => id === 'kindle' || id === 'korund' || id === 'aurelle';
+import { festivalStance, festivalStanceLine } from '@/lib/festival-stance'; import { nationFestivalSlots } from '@/lib/game-season'; import './faith-view.css';
+const faithIds = Object.keys(faithCopy) as FaithId[]; const houses = ['kinward-rite', 'fair-wind-vow', 'open-hand'] as const;
 type FaithGet = { enabled?: boolean; supported?: boolean; faith?: { name?: string }; hiddenFaith?: { name?: string } | null; devotion?: { value?: number; max?: number; tier?: { label?: string; line?: string } | null; explanation?: string } };
 type CongGet = { enabled?: boolean; you?: { congregationId?: string | null } | null; congregations?: { id: string; faithName: string; cityName: string; nationId: string }[] };
 const add = (lines: string[], line: string | null | undefined) => { if (line && !lines.includes(line)) lines.push(line); };
@@ -15,7 +13,7 @@ function publicFacts(nation: { id: string; name?: string | null; religion?: stri
   if (nation.id === 'korund') add(lines, korundFaithCopy.publicChoice);
   for (const id of faithIds) if (religion.includes(faithCopy[id].name)) { add(lines, faithCopy[id].name); add(lines, faithCopy[id].description); add(lines, faithCopy[id].holySite); }
   if (nation.id !== 'korund') { const city = capitalCityForNation(nation.id); if (city && (nation.id === 'kindle' || nation.id === 'aurelle')) for (const id of houses) add(lines, `${faithCopy[id].name} · ${city.name}`); }
-  if (mvp(nation.id)) for (const stance of ['endorsed', 'tolerated', 'banned'] as const) if (faithIds.some(id => festivalStance(nation.id, id) === stance)) add(lines, festivalStanceCopy[nation.id][stance]?.text);
+  for (const stance of ['endorsed', 'tolerated', 'banned'] as const) if (faithIds.some(id => festivalStance(nation.id, id) === stance)) add(lines, festivalStanceLine(nation.id, stance));
   if (nation.id !== 'korund') for (const slot of nationFestivalSlots[nation.id] ?? []) add(lines, slot.name);
   for (const id of faithIds) { const site = faithCopy[id].holySite; if (site.toLowerCase().includes(nation.id) || (nation.name && site.includes(nation.name))) add(lines, site); }
   for (const site of Object.values(holySites)) if (site.custodian === nation.id) add(lines, faithCopy[site.faithId].holySite);

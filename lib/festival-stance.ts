@@ -1,6 +1,7 @@
 /** #68: a nation's stance toward a faith's festival (docs §14.2). Kindle treats every faith the same (tolerated).
  *  Aurelle endorses the Kinward Rite and tolerates the others. Korund bans every faith festival in public.
  *  Any other nation has no #68 row. */
+import { festivalStanceCopy } from './mvp-festival-copy.ts';
 export type FestivalStance = 'endorsed' | 'tolerated' | 'banned';
 
 export function festivalStance(nationId: string, faithId: string): FestivalStance | null {
@@ -9,3 +10,4 @@ export function festivalStance(nationId: string, faithId: string): FestivalStanc
   if (nationId === 'korund') return 'banned';
   return null;
 }
+export const festivalStanceLine = (nationId: string, stance: FestivalStance) => (nationId === 'kindle' || nationId === 'aurelle' || nationId === 'korund') ? festivalStanceCopy[nationId][stance]?.text ?? null : null;
