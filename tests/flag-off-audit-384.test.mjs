@@ -196,6 +196,7 @@ const flagOffPins = {
   HARIMU_VARKAND_DUNKAR_PASS_ENABLED: 'varkand-dunkar-pass-1282.test.mjs', // #1282 flag off: no resident city
   HARIMU_BETTER_AUTH_ENABLED: 'better-auth-1318.test.mjs', // #1318 flag off: /api/auth is 404 and the database stays closed
   HARIMU_WORLD_ID_ENABLED: 'world-id-469.test.mjs', // #469 flag off: /api/world-id is 404 and nothing is fetched
+  HARIMU_CONGREGATION_DONATIONS_ENABLED: 'congregation-donations-1340.test.mjs', // #1340 flag off: POST 404 with no DB, GET has no donations key and never reads the table
   HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'zzzzzzzzz-varkand-muster-day-1151.test.mjs', // #1151 flag off: no musterDay key
   HARIMU_VARKAND_LANTERN_WATCH_ENABLED: 'zzzzzzzzzzzzzzz-varkand-lantern-watch-1211.test.mjs', // #1211 flag off: no lanternWatch key
   HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED: 'zzzzzzzzz-confluence-canal-festival-1165.test.mjs', // #1165 flag off: no canalFestival key
