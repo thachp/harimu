@@ -21,10 +21,10 @@ const cityOf = (s: SiegeItem) => s.cityKind === 'outpost' ? `${who(s.cityKey.sli
 export function MilitaryPanel({ nation, citizenNationId = null, wars = null, sieges = null, enabled = militaryEnabled() }: { nation: { id: string; name: string }; citizenNationId?: string | null; wars?: WarState | null; sieges?: readonly SiegeItem[] | null; enabled?: boolean }) {
   const own = enabled && !!citizenNationId && citizenNationId === nation.id;
   const [army, setArmy] = useState<ArmyView | null>(null);
-  useEffect(() => { if (!own) { setArmy(null); return; } let live = true; fetch('/api/army').then(r => r.ok ? r.json() : null).then(d => { if (live) setArmy((d as { army?: ArmyView } | null)?.army ?? null); }).catch(() => { if (live) setArmy(null); }); return () => { live = false; }; }, [own]);
+  useEffect(() => { if (!own) return; let live = true; fetch('/api/army').then(r => r.ok ? r.json() : null).then(d => { if (live) setArmy((d as { army?: ArmyView } | null)?.army ?? null); }).catch(() => { if (live) setArmy(null); }); return () => { live = false; }; }, [own]);
   const formatTime = useDisplayTimestamp();
   if (!enabled) return null;
-  const unit = own ? army?.unit ?? null : null, viewer = isWarNation(nation.id) ? nation.id : null, supply = unit?.supply;
+  const shown = own ? army : null, unit = shown?.unit ?? null, viewer = isWarNation(nation.id) ? nation.id : null, supply = unit?.supply;
   const mine = viewer ? (wars?.wars ?? []).filter(war => war.status !== 'ended' && (war.attacker === viewer || war.defender === viewer)) : [];
   const notices = viewer ? noticesFor(viewer) : undefined, held = (sieges ?? []).filter(s => s.attacker === nation.id || s.defender === nation.id);
   return <div className="military-v2"><PanelV2 title="Military" subtitle={nation.name} household={{ lead: nation.id ? <NationCrest id={nation.id} size={44} force /> : null }} rowsLabel="Military" rows={[]} stats={[]} />
