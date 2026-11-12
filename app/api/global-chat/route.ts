@@ -4,7 +4,8 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { uuidPattern, validSquareText } from '@/lib/square-chat-validation';
 import { isShadowMuted, logShadowMuted, parseShadowMute } from '@/lib/chat-shadow-mute';
-import { globalChatFlagOn, postGlobalChatBinds, postGlobalChatSql, readGlobalChat } from '@/lib/global-chat';
+import { globalChatClosedFor, globalChatFlagOn, globalChatRefusals, postGlobalChatBinds, postGlobalChatSql, readGlobalChat } from '@/lib/global-chat';
+import { readVarkandAlert, varkandAlertEnabled } from '@/lib/varkand-alert'; // #1354
 
 // #881 part 2: global chat. Flag HARIMU_GLOBAL_CHAT_ENABLED off: 404 before auth or any DB access.
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,10 @@ async function citizen(request: Request) {
   const db = await getDatabase();
   const nationId = (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id;
   if (!nationId) return { error: json({ error: 'Enroll in a nation first.' }, 403) };
+  // #1354 (docs §18.1): closed to Korund; closed to Varkand while its stored Alert Level is Red (flag off: Green, not read). Before any chat read or write.
+  const alert = nationId === 'varkand' && varkandAlertEnabled(env) ? (await readVarkandAlert(db)).level : 'green';
+  const closed = globalChatClosedFor(nationId, alert);
+  if (closed) return { error: json({ error: globalChatRefusals[closed], reason: closed }, 403) };
   return { userId, db };
 }
 const view = async (db: Awaited<ReturnType<typeof getDatabase>>, userId: string, t: number) =>
@@ -53,8 +58,9 @@ export async function POST(request: Request) {
   if (!result.meta.changes) {
     const replay = await db.prepare('SELECT user_id,body,deleted FROM global_chat_messages WHERE id=?').bind(id).first<Prior>();
     if (replay && !same(replay)) return json({ error: 'Request already used.' }, 409); // another citizen won the same id
-    if (!replay && !(await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id)
-      return json({ error: 'Enroll in a nation first.' }, 403); // left the nation between the check and the write: the INSERT refused it
+    const nowNation = replay ? null : (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id;
+    if (!replay && !nowNation) return json({ error: 'Enroll in a nation first.' }, 403); // left the nation between the check and the write: the INSERT refused it
+    if (!replay && nowNation === 'korund') return json({ error: globalChatRefusals.nation_closed, reason: 'nation_closed' }, 403); // #1354: moved to Korund mid-request
     if (!replay) return json({ error: 'Wait 10 seconds between messages; limit 20 per hour.', reason: 'rate_limited' }, 429);
   } else if (isShadowMuted(parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE), userId, t)) logShadowMuted(userId, id); // #790
   return view(db, userId, t);
