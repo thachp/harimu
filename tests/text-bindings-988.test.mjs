@@ -21,6 +21,7 @@ test('preview and prod stay at or under 127 text bindings, counting known inject
   assert.ok(previewTotal <= TEXT_BINDING_CEILING, `preview ${previewTotal} = ${Object.keys(preview.vars).length} file vars + ${outsidePreview.length} dashboard name not in the file + ${KEPT_SECRET_TEXT_BINDINGS} secrets`);
   assert.ok(prodTotal <= TEXT_BINDING_CEILING, `production ${prodTotal} = ${Object.keys(prod.vars).length} file vars + ${KEPT_SECRET_TEXT_BINDINGS} secrets`);
   assert.ok(TEXT_BINDING_CEILING - previewTotal >= 3, `preview headroom ${TEXT_BINDING_CEILING - previewTotal} is under 3`);
+  assert.deepEqual([preview.vars.HARIMU_LAND_TILES_ENABLED, prod.vars.HARIMU_LAND_TILES_ENABLED], ['true', 'false'], '#467: one accepted top-level binding (Architect on #1334), not in a pack'); // preview headroom 11 -> 10, production 16 -> 15
 });
 
 test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
