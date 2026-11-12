@@ -7,11 +7,11 @@ import { readFileSync } from 'node:fs';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 
-test('#1342: the flag is packed last after posters in the gray pack, preview on and production off, a direct string wins', () => {
+test('#1342: the flag is packed after donations in the gray pack (indexOf 85), preview on and production off, a direct string wins', () => {
   const F = 'HARIMU_CONGREGATION_CHAT_ENABLED', strip = t => JSON.parse(t.replace(/^\s*\/\/.*$/gm, ''));
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(F), 84);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), F);
+  assert.deepEqual(['HARIMU_WORLD_ID_ENABLED', 'HARIMU_SQUARE_POSTERS_ENABLED', 'HARIMU_CONGREGATION_DONATIONS_ENABLED', F].map(k => FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(k)), [82, 83, 84, 85]); // indexOf pins only; pack length and last slot are not pinned
+  assert.deepEqual([Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(F), Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(F)], [85, 85]);
   assert.equal(preview.vars[F], undefined); assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
