@@ -24,6 +24,7 @@ const flagOffPins = {
   HARIMU_NOTABLES_ENABLED: 'ai-captured-drafts.test.mjs',
   HARIMU_AI_CABINET_RESPONSES_ENABLED: 'cabinet-response-ai.test.mjs',
   HARIMU_CITY_FOUNDING_ENABLED: 'flag-off-audit-384.test.mjs',
+  HARIMU_CITY_EXPEDITION_ENABLED: 'city-expedition-1371.test.mjs', // #1371 flag off: founding SQL has no citizen count
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',
