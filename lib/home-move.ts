@@ -8,6 +8,7 @@ import {cityForNation} from './cities';
 import {readCityLocation} from './city-location';
 import {laborNoteSql} from './korund-wallet';
 import {homeCityMovesSchema,homeCityMovesIndex} from './market-orders';
+import {recordSparkSink} from './spark-origin.ts'; // #465
 export const homeMoveFeeMinor=1000; // 10 units of the nation's wallet currency (ARC ruling on #781)
 /** ARC ruling on #781: the fee is charged in the nation's own wallet currency. Royal Favor is not money; a nation without a wallet currency here
  *  (Aurelle, and any nation not yet open) refuses the move with not_open_yet and charges nothing. */
@@ -105,7 +106,11 @@ export async function moveHomeCity(db:GameDatabase,userId:string,nationId:string
   AND EXISTS(SELECT 1 FROM home_city_moves m WHERE m.request_id=? AND m.clerk_user_id=? AND m.moved_at=?)`).bind(now,userId,cityId,now-internalPermitWaitSeconds,requestId,userId,now));
  await db.batch(stmts);
  const stored=await db.prepare('SELECT clerk_user_id,moved_at FROM home_city_moves WHERE request_id=?').bind(requestId).first<{clerk_user_id:string;moved_at:number}>();
- if(stored&&stored.clerk_user_id===userId)return {ok:true,homeCityId:cityId,feeMinor:homeMoveFeeMinor,currency,nextMoveAt:Number(stored.moved_at)+homeMoveCooldownSeconds,replayed:Number(stored.moved_at)!==now};
+ if(stored&&stored.clerk_user_id===userId){
+  const replayed=Number(stored.moved_at)!==now;
+  if(!replayed&&currency==='SPK'&&homeMoveFeeMinor>0)await recordSparkSink(db,userId,homeMoveFeeMinor,`move:${requestId}`,'home-move-fee',now); // #465
+  return {ok:true,homeCityId:cityId,feeMinor:homeMoveFeeMinor,currency,nextMoveAt:Number(stored.moved_at)+homeMoveCooldownSeconds,replayed};
+ }
  if(needPermit){
   const permit=await activePermit(db,userId,cityId);
   if(!permit||now<Number(permit.requested_at)+internalPermitWaitSeconds)return {ok:false,reason:'permit_required',status:403};
