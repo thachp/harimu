@@ -150,7 +150,9 @@ export async function recordSettledWage(db: GameDatabase, userId: string, shiftI
 export async function recordSparkTransfer(db: GameDatabase, fromId: string, toId: string, gross: number, sinkMinor: number, sourceId: string, occurredAt: number, reason: string, sinkReason: string) {
   if (!Number.isSafeInteger(gross) || gross <= 0 || sinkMinor < 0 || await seen(db, sourceId)) return;
   const [fromPos, toPos] = await Promise.all([position(db, fromId), position(db, toId)]);
-  const parts = splitTransfer(withUntracked(fromPos.lots, fromPos.holdings + gross), gross);
+  // A concurrent debit already lowered holdings, so this snapshot cannot prove the untracked part. Sending it as earned would launder legacy Spark. Unknown is fail-closed.
+  const preHoldings = fromPos.holdings + gross;
+  const parts = sumLots(fromPos.lots) > preHoldings ? [{ origin: 'unknown' as const, amount: gross }] : splitTransfer(withUntracked(fromPos.lots, preHoldings), gross);
   const received = empty();
   for (const part of parts) received[part.origin] += part.amount;
   const credited: SparkLots = { earned: toPos.lots.earned + received.earned, purchased: toPos.lots.purchased + received.purchased, unknown: toPos.lots.unknown + received.unknown };

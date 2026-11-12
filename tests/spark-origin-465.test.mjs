@@ -109,3 +109,17 @@ test('two concurrent NPC buys and a sink with no origin row cannot inflate earne
   assert.deepEqual(missed, { earned: 300, purchased: 0, unknown: 0, total: 300 });
   assert.ok(missed.earned <= 300);
 });
+
+test('racing buys cannot turn a legacy credit into the receiver earned', async t => {
+  const r = await localRuntime(); t.after(() => r.close());
+  assert.equal(await claim(r, 'alice'), 800);
+  await r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES ('leg','alice','sell','food',-1,200,1)").run();
+  assert.equal((await readSparkOriginBalances(r.db, 'alice')).earned, 800);
+  assert.equal(await claim(r, 'bob'), 800);
+  const ids = [uuid(), uuid()];
+  for (const id of ids) assert.equal((await r.call('citizen', 'bob', { action: 'create-listing', requestId: id, item: 'food', quantity: 1, unitMinor: 500 })).status, 200);
+  const buys = await Promise.all(ids.map(listingId => r.call('citizen', 'alice', { action: 'buy-listing', requestId: uuid(), listingId })));
+  assert.deepEqual(buys.map(b => b.status), [200, 200], buys.map(b => b.data.error).join(' '));
+  const [alice, bob] = await Promise.all(['alice', 'bob'].map(id => readSparkOriginBalances(r.db, id)));
+  assert.ok(bob.earned - 800 + alice.earned <= 800, JSON.stringify({ alice, bob }));
+});
