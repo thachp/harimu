@@ -9,6 +9,8 @@ import {confluenceNextCanalFestivalAt} from '@/lib/confluence-canal-festival'; /
 import {fulmaraNextGrandRegattaAt} from '@/lib/fulmara-grand-regatta'; // #1178 clock, read only
 import {hoarvaleNextAuroraNightAt} from '@/lib/hoarvale-aurora-night'; // #1160 clock, read only
 import {meridianNextTurbineDayAt} from '@/lib/meridian-turbine-day'; // #1175 clock, read only
+import {kindleCycleStartAt,type CalendarBindings} from '@/lib/election-calendars'; // #878 / #1117 cycle start
+import {kindleElectionClock} from '@/lib/kindle-election'; // #1117 Ballot Night clock, read only
 import {spaWcBonusEnabled,spaWcNote} from '@/lib/spa-recovery'; // #798
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
@@ -106,7 +108,17 @@ const festivalHosts=[
  {nationId:'meridian',cityId:'shen-springs',festivalFlag:'HARIMU_MERIDIAN_TURBINE_DAY_ENABLED',note:'Hosts Turbine Day',nextAt:meridianNextTurbineDayAt},
  {nationId:'confluence',cityId:'lanu-terraces',festivalFlag:'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED',note:'Hosts the Canal Festival',nextAt:confluenceNextCanalFestivalAt},
 ] as const;
+const FORGEHAVEN_BALLOT_NOTE='Hosts Ballot Night';
+/** #1375: Forgehaven hosts Ballot Night. Reuses #1285 keys. No new flag.
+ *  The date is the #1117 clock at the same now. Held or unset cycle: no keys, no invented date. */
+const forgehavenHost=(nowSeconds:number)=>{
+ if(!flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')||!flagOn(env,'HARIMU_KINDLE_ELECTION_CLOCK_ENABLED'))return {};
+ const nextAt=kindleElectionClock(kindleCycleStartAt(env as unknown as CalendarBindings),nowSeconds*1000)?.nextBallotNightAt;
+ if(!Number.isSafeInteger(nextAt)||!nextAt)return {};
+ return {festivalHostNote:FORGEHAVEN_BALLOT_NOTE,festivalHostNextAt:nextAt};
+};
 const festivalHost=(nationId:string,cityId:string,nowSeconds:number)=>{
+ if(nationId==='kindle'&&cityId==='forgehaven')return forgehavenHost(nowSeconds);
  const row=festivalHosts.find(host=>host.nationId===nationId&&host.cityId===cityId);
  return row&&flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')&&flagOn(env,row.festivalFlag)?{festivalHostNote:row.note,festivalHostNextAt:row.nextAt(nowSeconds*1000)}:{};
 };
