@@ -229,6 +229,8 @@
       "HARIMU_WORLD_ID_ENABLED": "true",
       // #1341: a citizen who bought a square can place one kit poster there (one frame and one slogan). Off: no poster read or write, and the registry response is unchanged.
       "HARIMU_SQUARE_POSTERS_ENABLED": "true",
+      // #1340: Kindle congregation donations (docs 14.4): a current member gives Spark to their own Kindle congregation's fund (migration 0128). Off: POST /api/congregations/donations is 404, GET /api/congregations has no donations key, and nothing reads or writes congregation_donations.
+      "HARIMU_CONGREGATION_DONATIONS_ENABLED": "true",
       // #1342: congregation channel (current members of one joinable congregation; Korund public congregations have none; 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). Off: the route is a 404 and nothing is read.
       "HARIMU_CONGREGATION_CHAT_ENABLED": "true"
     },
