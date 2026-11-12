@@ -27,7 +27,7 @@ export type Place = Point & { cityId: string | null; label: string };
 export type TravelState = { enabled: boolean; supported: boolean; location: Place | null; traveling: null | { from: Place; to: Place; departedAt: number; travelingUntil: number; secondsLeft: number } };
 export type TravelResult = { ok: true; state: TravelState; durationSeconds: number; replay?: true } | { ok: false; status: 400 | 403 | 409; reason: string; error: string };
 const fail = (status: 400 | 403 | 409, reason: string, error: string): TravelResult => ({ ok: false, status, reason, error });
-const cheb = (a: Point, b: Point) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+export const cheb = (a: Point, b: Point) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 export const travelSeconds = (from: Point, to: Point) => Math.min(maximumTravelSeconds, cheb(from, to) * travelSecondsPerSquare);
 
 /** City squares of a nation, mapped by city role (ARC ruling on #264): the capital square is the role 'capital' city and the

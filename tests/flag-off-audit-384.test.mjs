@@ -47,6 +47,7 @@ const flagOffPins = {
   HARIMU_HOARVALE_ENABLED: 'nation-openings.test.mjs',
   HARIMU_VARKAND_ENABLED: 'nation-openings.test.mjs',
   HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED: 'varkand-recruit-term-1095.test.mjs',
+  HARIMU_WAR_EVACUATION_ENABLED: 'war-evacuation-1324.test.mjs', // #1324 flag off: capture moves no one and shows no notice
   HARIMU_VELDWOOD_ENABLED: 'nation-openings.test.mjs',
   HARIMU_FULMARA_ENABLED: 'nation-openings.test.mjs',
   HARIMU_GRAY_MARKET_ENABLED: 'gray-market-43.test.mjs',

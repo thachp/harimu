@@ -13,6 +13,7 @@ import { assaultRefusal, capturableCity, claimSquares, maxCityIdLength, planCapt
 import { canResolveCityAssault, defenseWindowConfig, isWarNation, requestIdOk, warStatus } from './war-rules';
 import { defenseStartHours, readDefenseWindows } from './war';
 import { FOUNDATION_TRUCE_SECONDS, inFoundationTruce, truceText } from './foundation-truce'; // #1070
+import { evacuationStatements } from './war-evacuation'; // #1324
 
 const fail = (status: 400 | 403 | 409, reason: string, error: string) => ({ ok: false as const, status, reason, error });
 const refusalText: Record<string, string> = {
@@ -33,8 +34,8 @@ export type SiegeView = { id: string; warId: string; cityKey: string; attacker: 
 const progress = async (db: GameDatabase, siegeId: string) => ((await db.prepare('SELECT assault_day FROM siege_assaults WHERE siege_id=? ORDER BY assault_day').bind(siegeId).all<{ assault_day: number }>()).results).map(r => Number(r.assault_day));
 
 /** Resolve one successful assault by the attacking nation on a besieged city. Returns the siege progress, and `captured` with what moved when this assault was the second counted day. */
-export async function resolveCityAssault(db: GameDatabase, command: AssaultCommand, now: number, enabled: boolean, options: { lossCap?: boolean } = {}) {
-  const lossCap = options.lossCap === true; // #912
+export async function resolveCityAssault(db: GameDatabase, command: AssaultCommand, now: number, enabled: boolean, options: { lossCap?: boolean; env?: unknown } = {}) {
+  const lossCap = options.lossCap === true, env = options.env; // #912, #1324
   if (!enabled) return fail(403, 'disabled', 'War is not open yet.');
   if (!requestIdOk(command.requestId)) return fail(400, 'bad_request', 'A request id is required.');
   if (!validSeconds(now)) return fail(400, 'bad_request', 'The time must be unix seconds.');
@@ -43,7 +44,7 @@ export async function resolveCityAssault(db: GameDatabase, command: AssaultComma
   if (command.cityId.length > maxCityIdLength) return fail(409, 'city_id_too_long', 'That city id is too long.');
   if (!isWarNation(command.nation) || (command.cityKind !== 'outpost' && command.cityKind !== 'founded') || !command.cityId || !command.warId) return fail(400, 'bad_request', 'Name the war, the attacking nation and the city.');
   const kind = command.cityKind as CityKind, key = siegeCityKey(kind, command.cityId);
-  const replayed = await replayFor(db, command, key, now, lossCap);
+  const replayed = await replayFor(db, command, key, now, lossCap, env);
   if (replayed) return replayed;
   const war = await db.prepare('SELECT id,attacker_nation,defender_nation,declared_at,mobilization_ends_at,ended_at FROM wars WHERE id=?').bind(command.warId).first<WarRow>();
   if (!war) return fail(409, 'not_found', 'No such war.');
@@ -81,12 +82,12 @@ export async function resolveCityAssault(db: GameDatabase, command: AssaultComma
   if ((step.outcome === 'recorded' || step.outcome === 'captured') && await assaultedInSameWindow(db, siege.id, startHour, now)) step = { ...step, outcome: 'duplicate_day' };
   if (step.outcome === 'duplicate_day') {
     // #577 item 1: simultaneous calls with the same request id replay instead of being refused as a second assault today.
-    const same = await replayFor(db, command, key, now, lossCap);
+    const same = await replayFor(db, command, key, now, lossCap, env);
     if (same) return same;
     // #577 item 3: a new request id on a day already counted, with two days recorded and no capture (a crash), repairs the capture instead of refusing.
     if (siege.captured_at === null && days.length >= 2) {
       const last = await db.prepare('SELECT request_id FROM siege_assaults WHERE siege_id=? ORDER BY assault_day DESC LIMIT 1').bind(siege.id).first<{ request_id: string }>();
-      const repaired = last ? await capture(db, siege, kind, centre!, last.request_id, now, lossCap) : null;
+      const repaired = last ? await capture(db, siege, kind, centre!, last.request_id, now, lossCap, env) : null;
       if (repaired && 'refused' in repaired) return refusedCapture(repaired);
       if (repaired) return { ok: true as const, repaired: true as const, captured: repaired, siege: await view(db, (await db.prepare(`SELECT ${siegeColumns} FROM city_sieges WHERE id=?`).bind(siege.id).first<SiegeRow>())!) };
     }
@@ -96,19 +97,19 @@ export async function resolveCityAssault(db: GameDatabase, command: AssaultComma
   const mine = await db.prepare('SELECT request_id,siege_id,assault_day FROM siege_assaults WHERE request_id=?').bind(command.requestId).first<AssaultRow>();
   if (!mine) return fail(409, 'already_assaulted_today', alreadyToday);
   if (step.outcome !== 'captured') return { ok: true as const, siege: await view(db, siege) };
-  const captured = await capture(db, siege, kind, centre!, command.requestId, now, lossCap);
+  const captured = await capture(db, siege, kind, centre!, command.requestId, now, lossCap, env);
   if (captured && 'refused' in captured) return refusedCapture(captured);
   if (!captured) return fail(409, 'nothing_to_capture', nothingToCapture);
   return { ok: true as const, captured, siege: await view(db, (await db.prepare(`SELECT ${siegeColumns} FROM city_sieges WHERE id=?`).bind(siege.id).first<SiegeRow>())!) };
 }
 
 /** The stored outcome of a request id already counted (null when it was not). A request id reused for another war, city or side is refused. A crash between the second assault row and the capture is repaired here. */
-async function replayFor(db: GameDatabase, command: AssaultCommand, key: string, now: number, lossCap = false) {
+async function replayFor(db: GameDatabase, command: AssaultCommand, key: string, now: number, lossCap = false, env?: unknown) {
   const prior = await db.prepare('SELECT a.request_id,a.siege_id,a.assault_day FROM siege_assaults a WHERE a.request_id=?').bind(command.requestId).first<AssaultRow>();
   if (!prior) return null;
   const s = await db.prepare(`SELECT ${siegeColumns} FROM city_sieges WHERE id=?`).bind(prior.siege_id).first<SiegeRow>();
   if (!s || s.war_id !== command.warId || s.city_key !== key || s.attacker_nation !== command.nation) return fail(409, 'request_reused', 'That request id was already used for a different command.');
-  const finished = s.captured_at === null && (await progress(db, s.id)).length >= 2 ? await capture(db, s, s.city_kind, { x: Number(s.center_x), y: Number(s.center_y) }, command.requestId, now, lossCap) : null;
+  const finished = s.captured_at === null && (await progress(db, s.id)).length >= 2 ? await capture(db, s, s.city_kind, { x: Number(s.center_x), y: Number(s.center_y) }, command.requestId, now, lossCap, env) : null;
   if (finished && 'refused' in finished) return refusedCapture(finished); // #912
   const fresh = finished ? (await db.prepare(`SELECT ${siegeColumns} FROM city_sieges WHERE id=?`).bind(s.id).first<SiegeRow>())! : s;
   return { ok: true as const, replay: true as const, ...(finished ? { captured: finished } : {}), siege: await view(db, fresh) };
@@ -126,7 +127,7 @@ async function capturePlan(db: GameDatabase, kind: CityKind, centre: { x: number
 /** Test seam (server-only, no route): the capture step alone, for the real multi-connection race test. */
 export const captureSiegeForTest = (...a: Parameters<typeof capture>) => capture(...a);
 /** Moves national control for the claim squares nobody bought; one batch with the capture record, so it lands whole or not at all. A retry after a crash finds the capture and changes nothing. */
-async function capture(db: GameDatabase, siege: SiegeRow, kind: CityKind, centre: { x: number; y: number }, requestId: string, now: number, lossCap = false) {
+async function capture(db: GameDatabase, siege: SiegeRow, kind: CityKind, centre: { x: number; y: number }, requestId: string, now: number, lossCap = false, env?: unknown) {
   const prior = await db.prepare('SELECT id,squares_transferred,squares_kept_private FROM city_captures WHERE request_id=?').bind(requestId).first<{ id: string; squares_transferred: number; squares_kept_private: number }>();
   if (prior) return { moved: Number(prior.squares_transferred), keptPrivate: Number(prior.squares_kept_private), replay: true as const };
   if (!lossCap) {
@@ -147,6 +148,7 @@ async function capture(db: GameDatabase, siege: SiegeRow, kind: CityKind, centre
     const frontierN = decision.transfer.filter(s => s.zone === 'frontier').length;
     const guard = capGuardSql(siege.defender_nation, frontierN, now), landed = 'EXISTS (SELECT 1 FROM city_captures WHERE id=?)';
     const flip = decision.flipped; // #933: city / siege complete only when every capturable square moved
+    const evac = flip ? await evacuationStatements(db, { env, kind, centre, siege, captureId: id, now }) : []; // #1324: only when the city itself falls
     try { await db.batch([db.prepare(defenderLockSql).bind(siege.defender_nation),
       db.prepare(`INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) SELECT ?,?,?,?,?,?,?,?,? WHERE ${guard}`)
         .bind(id, siege.id, siege.war_id, requestId, siege.attacker_nation, siege.defender_nation, plan.transfer.length, plan.keptPrivate.length, now),
@@ -156,6 +158,7 @@ async function capture(db: GameDatabase, siege: SiegeRow, kind: CityKind, centre
       ]),
       ...(flip && kind === 'founded' ? [db.prepare(`UPDATE world_cities SET nation_id=? WHERE id=? AND nation_id=? AND ${landed}`).bind(siege.attacker_nation, siege.city_key.slice('city:'.length), siege.defender_nation, id)] : []),
       ...(flip ? [db.prepare(`UPDATE city_sieges SET captured_at=? WHERE id=? AND captured_at IS NULL AND ${landed}`).bind(now, siege.id, id)] : []),
+      ...evac,
     ]); } catch (error) {
       const raced = await db.prepare('SELECT squares_transferred,squares_kept_private FROM city_captures WHERE request_id=?').bind(requestId).first<{ squares_transferred: number; squares_kept_private: number }>();
       if (!raced) throw error; return { moved: Number(raced.squares_transferred), keptPrivate: Number(raced.squares_kept_private), replay: true as const };
@@ -165,6 +168,7 @@ async function capture(db: GameDatabase, siege: SiegeRow, kind: CityKind, centre
     await refusalStatement(db, { ...log, lost: after.lost, reason: 'weekly_cap', squares: Math.max(1, plan.transfer.length), limit }).run();
     return { refused: 'weekly_cap' as const, lost: after.lost, limit };
   }
+  const evac = await evacuationStatements(db, { env, kind, centre, siege, captureId: id, now }); // #1324: same batch as the capture insert
   const statements = [
     db.prepare('INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(id, siege.id, siege.war_id, requestId, siege.attacker_nation, siege.defender_nation, plan.transfer.length, plan.keptPrivate.length, now),
@@ -174,6 +178,7 @@ async function capture(db: GameDatabase, siege: SiegeRow, kind: CityKind, centre
     ]),
     ...(kind === 'founded' ? [db.prepare('UPDATE world_cities SET nation_id=? WHERE id=? AND nation_id=?').bind(siege.attacker_nation, siege.city_key.slice('city:'.length), siege.defender_nation)] : []),
     db.prepare('UPDATE city_sieges SET captured_at=? WHERE id=? AND captured_at IS NULL').bind(now, siege.id),
+    ...evac,
   ];
   try { await db.batch(statements); } catch (error) {
     const raced = await db.prepare('SELECT squares_transferred,squares_kept_private FROM city_captures WHERE siege_id=?').bind(siege.id).first<{ squares_transferred: number; squares_kept_private: number }>();
