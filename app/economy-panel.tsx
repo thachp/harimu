@@ -17,7 +17,7 @@ export function EconomyPanel({ nation, citizenNationId = null, plan = null, shif
   const [book, setBook] = useState<OrderBookState | null>(given);
   useEffect(() => { if (!(own && nation.id === 'kindle')) return; let live = true; fetch('/api/market/orders').then(r => r.ok ? r.json() : null).then(data => { const next = data as { open?: boolean; book?: OrderBookState } | null; if (live) setBook(next?.open && next.book ? next.book : null); }).catch(() => { if (live) setBook(null); }); return () => { live = false; }; }, [own, nation.id]);
   if (!enabled) return null;
-  const shown = nation.id === 'kindle' ? book : null, korund = nation.id === 'korund' && plan?.available !== false ? plan : null;
+  const shown = nation.id === 'kindle' ? (own ? book : given) : null, korund = nation.id === 'korund' && plan?.available !== false ? plan : null;
   const jobs = [...new Set([...(mvp(nation.id) ? mvpJobs.filter(job => job.nation === nation.id).map(job => mvpJobTypes[job.type].name) : []), ...(orders ?? []).filter(order => order.nationId === nation.id).map(order => order.name), ...((work?.nationId === nation.id ? work.jobs : undefined) ?? []).map(job => job.name), ...(korund?.bureau?.jobs ?? []).map(job => job.name)])];
   const quota = korund?.quota ?? null, stat = quota ? korundPlanStatLine(quota.unitFood, quota.targetFood) : null, caption = quota ? (quota.unitFood > quota.targetFood ? quotaBar.captions.over : quota.unitFood === quota.targetFood ? quotaBar.captions.on : quotaBar.captions.under) : null;
   const gray = korund?.gray ?? null, active = own ? (shifts ?? []).filter(shift => !shift.claimedAt) : [], assignment = own ? korund?.bureau?.assignment : null;
