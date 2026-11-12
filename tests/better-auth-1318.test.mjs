@@ -32,7 +32,7 @@ test('flag off or secret missing is 404 and does not open the database', async (
   }
   assert.equal(await authResponse(off, '/api/author'), null);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_WORLD_ID_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_BETTER_AUTH_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81);
   const entry = readFileSync('worker/entry.ts', 'utf8');
   assert.match(entry, /isBetterAuthPath\(url\.pathname\)/);
   assert.match(entry, /createAuth\(env as unknown as BetterAuthEnv, request, ctx\)/);

@@ -39,13 +39,12 @@ test('flag off or secret missing is 404 and does not fetch', async () => {
   assert.match(entry, /isWorldIdPath\(url\.pathname\)/);
   assert.match(entry, /handleWorldIdRequest\(request, env as unknown as WorldIdEnv\)/);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), 'HARIMU_WORLD_ID_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_BETTER_AUTH_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
   for (const [file, value] of [['wrangler.jsonc', 'true'], ['wrangler.prod.jsonc', 'false']]) {
     const gray = grayFlags(file);
     assert.equal(gray.flags.at(-1), 'HARIMU_WORLD_ID_ENABLED');
-    assert.equal(gray.flags.at(-2), 'HARIMU_BETTER_AUTH_ENABLED');
+    assert.equal(gray.flags.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81);
     assert.equal(gray.flags.indexOf('HARIMU_WORLD_ID_ENABLED'), 82);
     assert.match(gray.slice, new RegExp(`"HARIMU_WORLD_ID_ENABLED"\\s*:\\s*"${value}"`));
     assert.doesNotMatch(gray.slice, /HARIMU_WORLD_ID_VERIFIER_SECRET"\s*:/);
