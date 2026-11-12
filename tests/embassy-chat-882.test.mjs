@@ -1,4 +1,5 @@
-/** #882: embassy chat between two live nations. Flag off = 404 before auth/DB. Pair channel, rate limits, replay, reports, 4 KB cap, same-id 409. SQLite + PGlite. */
+/** #882: embassy chat between two live nations. Flag off = 404 before auth/DB. Pair channel, rate limits, replay, reports, 4 KB cap, same-id 409.
+ *  #1396: Korund is closed (docs §18.1); the only open pair is kindle|aurelle. SQLite + PGlite. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -26,70 +27,93 @@ for (const backend of ['sqlite', 'postgres']) {
     const orig = r.db.prepare.bind(r.db);
     r.db.prepare = (...a) => { probe.push(a[0]); return orig(...a); };
     for (const user of [null, 'alice']) {
-      const res = await r.call('embassy-chat', user, undefined, 'https://fixture.invalid', '?peerNation=korund');
+      const res = await r.call('embassy-chat', user, undefined, 'https://fixture.invalid', '?peerNation=aurelle');
       assert.equal(res.status, 404); assert.equal(res.data.reason, 'not_found');
     }
-    assert.equal((await r.call('embassy-chat', 'alice', { action: 'post', peerNation: 'korund', id: randomUUID(), text: 'hi' })).status, 404);
+    assert.equal((await r.call('embassy-chat', 'alice', { action: 'post', peerNation: 'aurelle', id: randomUUID(), text: 'hi' })).status, 404);
     assert.equal(probe.length, 0, 'no DB while flag off');
-    for (const value of ['false', 'TRUE', '1', '']) { r.setFixtureEnv('HARIMU_EMBASSY_CHAT_ENABLED', value); assert.equal((await r.call('embassy-chat', 'alice', undefined, 'https://fixture.invalid', '?peerNation=korund')).status, 404, value); }
+    for (const value of ['false', 'TRUE', '1', '']) { r.setFixtureEnv('HARIMU_EMBASSY_CHAT_ENABLED', value); assert.equal((await r.call('embassy-chat', 'alice', undefined, 'https://fixture.invalid', '?peerNation=aurelle')).status, 404, value); }
   });
 
-  test(`#882 ${backend}: channel between two live nations; self/unknown/third-nation refused`, async t => {
+  test(`#882 ${backend}: channel between Kindle and Aurelle; self/unknown/third-nation refused`, async t => {
     const c = await setup(t);
-    assert.equal((await c.r.call('embassy-chat', null, undefined, 'https://fixture.invalid', '?peerNation=korund')).status, 401);
+    assert.equal((await c.r.call('embassy-chat', null, undefined, 'https://fixture.invalid', '?peerNation=aurelle')).status, 401);
     assert.equal((await c.read('alice', 'kindle')).status, 400, 'own nation');
     assert.equal((await c.read('alice', 'confluence')).status, 400, 'not a live embassy nation');
-    const empty = await c.read('alice', 'korund'); assert.equal(empty.status, 200); assert.deepEqual(empty.data.messages, []); assert.equal(empty.data.channelId, 'kindle|korund');
-    assert.equal((await c.post('alice', 'korund', 'hello korund')).status, 200);
+    const empty = await c.read('alice', 'aurelle'); assert.equal(empty.status, 200); assert.deepEqual(empty.data.messages, []); assert.equal(empty.data.channelId, 'aurelle|kindle');
+    assert.equal((await c.post('alice', 'aurelle', 'hello aurelle')).status, 200);
     c.r.setNow(c.r.now + 11_000);
-    assert.equal((await c.post('kora', 'kindle', 'hello kindle')).status, 200);
-    const a = await c.read('alice', 'korund'), b = await c.read('kora', 'kindle');
+    assert.equal((await c.post('aura', 'kindle', 'hello kindle')).status, 200);
+    const a = await c.read('alice', 'aurelle'), b = await c.read('aura', 'kindle');
     assert.equal(a.data.messages.length, 2); assert.equal(b.data.messages.length, 2);
-    assert.deepEqual(a.data.messages.map(m => [m.body, m.nationId, m.mine]), [['hello korund', 'kindle', true], ['hello kindle', 'korund', false]]);
-    // aurelle reading kindle peers into aurelle|kindle, not kindle|korund
-    assert.equal((await c.read('aura', 'kindle')).data.messages.length, 0);
-    c.r.setNow(c.r.now + 11_000);
-    assert.equal((await c.post('alice', 'aurelle', 'other pair')).status, 200);
-    assert.equal((await c.read('alice', 'korund')).data.messages.length, 2, 'other pair is a different channel');
+    assert.deepEqual(a.data.messages.map(m => [m.body, m.nationId, m.mine]), [['hello aurelle', 'kindle', true], ['hello kindle', 'aurelle', false]]);
+  });
+
+  test(`#1396 ${backend}: Korund cannot use embassy chat, and Kindle/Aurelle cannot open a Korund embassy`, async t => {
+    const c = await setup(t);
+    const m = await c.r.importModule('lib/embassy-chat.ts');
+    assert.equal(m.embassyPairOpen('kindle', 'aurelle'), true);
+    assert.equal(m.embassyPairOpen('aurelle', 'kindle'), true);
+    assert.equal(m.embassyPairOpen('kindle', 'korund'), false);
+    assert.equal(m.embassyPairOpen('korund', 'kindle'), false);
+    for (const [user, peer] of [['kora', 'kindle'], ['kora', 'aurelle']]) {
+      const get = await c.read(user, peer);
+      assert.equal(get.status, 403, `${user} GET ${peer}`);
+      assert.equal(get.data.reason, 'nation_closed');
+      assert.match(get.data.error, /Diplomatic Hall is closed/);
+      const posted = await c.post(user, peer, 'should not land');
+      assert.equal(posted.status, 403);
+      assert.equal(posted.data.reason, 'nation_closed');
+    }
+    for (const [user, peer] of [['alice', 'korund'], ['aura', 'korund']]) {
+      const get = await c.read(user, peer);
+      assert.equal(get.status, 403, `${user} GET ${peer}`);
+      assert.equal(get.data.reason, 'peer_closed');
+      assert.match(get.data.error, /not open/);
+      assert.equal((await c.post(user, peer, 'should not land')).data.reason, 'peer_closed');
+    }
+    assert.equal(await c.count(), 0, 'closed requests write nothing');
+    assert.equal((await c.post('alice', 'aurelle', 'open pair still works')).status, 200);
+    assert.equal(await c.count(), 1);
   });
 
   test(`#882 ${backend}: validation, gap, hourly cap, idempotent replay, cross-user id 409, 4 KB body cap, delete`, async t => {
     const c = await setup(t);
-    assert.equal((await c.post('alice', 'korund', '')).status, 400);
-    assert.equal((await c.post('alice', 'korund', 'x'.repeat(281))).status, 400);
-    assert.equal((await c.r.call('embassy-chat', 'alice', { action: 'post', peerNation: 'korund', id: randomUUID(), text: 'hi' }, 'https://evil.invalid')).status, 403);
-    const fat = await c.r.call('embassy-chat', 'alice', { action: 'post', peerNation: 'korund', id: randomUUID(), text: 'hi' }, 'https://fixture.invalid', '', { 'Content-Length': '5000' });
+    assert.equal((await c.post('alice', 'aurelle', '')).status, 400);
+    assert.equal((await c.post('alice', 'aurelle', 'x'.repeat(281))).status, 400);
+    assert.equal((await c.r.call('embassy-chat', 'alice', { action: 'post', peerNation: 'aurelle', id: randomUUID(), text: 'hi' }, 'https://evil.invalid')).status, 403);
+    const fat = await c.r.call('embassy-chat', 'alice', { action: 'post', peerNation: 'aurelle', id: randomUUID(), text: 'hi' }, 'https://fixture.invalid', '', { 'Content-Length': '5000' });
     assert.equal(fat.status, 413, '4 KB cap'); assert.equal(fat.data.error, 'Request too large.');
     const id = randomUUID();
-    assert.equal((await c.post('alice', 'korund', 'one', { id })).status, 200);
-    assert.equal((await c.post('alice', 'korund', 'one', { id })).status, 200, 'idempotent');
-    assert.equal((await c.post('alice', 'korund', 'other', { id })).status, 409);
-    assert.equal((await c.post('kora', 'kindle', 'one', { id })).status, 409, 'cross-user prior 409');
+    assert.equal((await c.post('alice', 'aurelle', 'one', { id })).status, 200);
+    assert.equal((await c.post('alice', 'aurelle', 'one', { id })).status, 200, 'idempotent');
+    assert.equal((await c.post('alice', 'aurelle', 'other', { id })).status, 409);
+    assert.equal((await c.post('aura', 'kindle', 'one', { id })).status, 409, 'cross-user prior 409');
     c.r.setNow(c.r.now + 11_000);
     const raceId = randomUUID();
     const [ra, rb] = await Promise.all([
-      c.post('alice', 'korund', 'race-a', { id: raceId }),
-      c.post('kora', 'kindle', 'race-b', { id: raceId }),
+      c.post('alice', 'aurelle', 'race-a', { id: raceId }),
+      c.post('aura', 'kindle', 'race-b', { id: raceId }),
     ]);
     assert.deepEqual([ra.status, rb.status].sort(), [200, 409], `race ${ra.status},${rb.status}`);
     assert.equal(await c.count(), 2, 'prior one + race winner');
-    assert.equal((await c.post('alice', 'korund', 'too-soon')).status, 429);
+    assert.equal((await c.post('alice', 'aurelle', 'too-soon')).status, 429);
     c.r.setNow(c.r.now + 11_000);
     const gone = randomUUID();
-    assert.equal((await c.post('alice', 'korund', 'bye', { id: gone })).status, 200);
-    assert.equal((await c.r.call('embassy-chat', 'kora', { action: 'delete', peerNation: 'kindle', id: gone })).status, 404, "not kora's");
-    assert.equal((await c.r.call('embassy-chat', 'alice', { action: 'delete', peerNation: 'korund', id: gone })).status, 200);
-    assert.equal((await c.read('kora', 'kindle')).data.messages.filter(m => m.id === gone).length, 0);
+    assert.equal((await c.post('alice', 'aurelle', 'bye', { id: gone })).status, 200);
+    assert.equal((await c.r.call('embassy-chat', 'aura', { action: 'delete', peerNation: 'kindle', id: gone })).status, 404, "not aura's");
+    assert.equal((await c.r.call('embassy-chat', 'alice', { action: 'delete', peerNation: 'aurelle', id: gone })).status, 200);
+    assert.equal((await c.read('aura', 'kindle')).data.messages.filter(m => m.id === gone).length, 0);
   });
 
   test(`#882 ${backend}: peer-nation citizen can report a live embassy message; author and outsiders cannot`, async t => {
     const c = await setup(t);
     c.r.setFixtureEnv('HARIMU_REPORTS_ENABLED', 'true');
     const id = randomUUID();
-    assert.equal((await c.post('alice', 'korund', 'report-me', { id })).status, 200);
-    const ok = await c.r.call('reports', 'kora', { requestId: randomUUID(), targetKind: 'citizen-message', targetId: id, reasonId: 'hate-harassment' });
+    assert.equal((await c.post('alice', 'aurelle', 'report-me', { id })).status, 200);
+    const ok = await c.r.call('reports', 'aura', { requestId: randomUUID(), targetKind: 'citizen-message', targetId: id, reasonId: 'hate-harassment' });
     assert.equal(ok.status, 201, JSON.stringify(ok.data));
     assert.equal((await c.r.call('reports', 'alice', { requestId: randomUUID(), targetKind: 'citizen-message', targetId: id, reasonId: 'hate-harassment' })).status, 404, 'author');
-    assert.equal((await c.r.call('reports', 'aura', { requestId: randomUUID(), targetKind: 'citizen-message', targetId: id, reasonId: 'hate-harassment' })).status, 404, 'other embassy');
+    assert.equal((await c.r.call('reports', 'kora', { requestId: randomUUID(), targetKind: 'citizen-message', targetId: id, reasonId: 'hate-harassment' })).status, 404, 'other embassy');
   });
 }
