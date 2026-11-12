@@ -12,7 +12,9 @@ async function lots(t, { tax = true, backend = 'sqlite' } = {}) {
   await r.call('citizen', 'alice'); await r.call('citizen', 'bob');
   await r.db.batch([
     r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','fixture-cash',-1,50000,1)").bind(randomUUID(), 'alice'),
+    // Food inventory so bob can list. The buy row must debit Spark (table check); a +1 credit offsets it so he does not open at −1, which would leave a later fill's origin lots 1 above holdings (#1337).
     r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'buy','food',5,-1,1)").bind(randomUUID(), 'bob'),
+    r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','fixture-cash',-1,1,1)").bind(randomUUID(), 'bob'),
   ]);
   const wallet = async u => Number((await r.db.prepare('SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id=?').bind(u).first()).balance);
   const { kindleTreasuryBalanceSql } = await r.importModule('lib/economy.ts');
