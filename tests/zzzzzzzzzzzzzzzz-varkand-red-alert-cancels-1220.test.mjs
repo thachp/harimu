@@ -109,15 +109,14 @@ test('flag off: the Varkand government read matches today; flag on marks celebra
   assert.equal('canceled' in today.mandatePlebiscite, false);
   assert.equal(await read({ readOnly: true, varkandRedAlertCancels: true, varkandAlert: true }), null, 'the flag does not open a Varkand read');
   const on = await read({ ...rows, varkandRedAlertCancels: true });
-  assert.deepEqual(on.musterDay, { ...today.musterDay, canceled: true });
-  assert.deepEqual(on.lanternWatch, { ...today.lanternWatch, canceled: true });
-  assert.deepEqual(on.rotationDay, today.rotationDay);
-  assert.equal(on.musterDay.nextAt, today.musterDay.nextAt);
-  assert.equal(on.rotationDay.nextAt, today.rotationDay.nextAt);
+  // #1400: the government read omits canceled celebration keys (no upcoming date). Dates stay on withVarkandRedAlertCancels.
+  assert.equal('musterDay' in on, false);
+  assert.equal('lanternWatch' in on, false);
+  assert.equal('rotationDay' in on, false);
   assert.deepEqual(on.mandatePlebiscite, today.mandatePlebiscite);
   assert.equal('canceled' in on.mandatePlebiscite, false);
   assert.equal(on.directorate.chair.id, today.directorate.chair.id);
-  assert.deepEqual(publicGovernmentSnapshot(on).musterDay, on.musterDay);
+  assert.equal('musterDay' in publicGovernmentSnapshot(on), false);
   const ignored = await read({ ...rows, varkandAlert: false, varkandRedAlertCancels: true });
   const ignoredOff = await read({ ...rows, varkandAlert: false });
   assert.deepEqual(ignored, ignoredOff, 'alert flag off: a stored Red row is not read');
@@ -151,11 +150,9 @@ test('flag off: the Varkand government read matches today; flag on marks celebra
   assert.equal('canceled' in citizenToday.mandatePlebiscite, false);
   r.setFixtureEnv('HARIMU_GRAY_PACK', JSON.stringify({ ...pack, [key]: 'true' }));
   const citizenOn = (await r.call('citizen', 'alice')).data.government;
-  assert.equal(citizenOn.musterDay.canceled, true);
-  assert.equal(citizenOn.lanternWatch.canceled, true);
-  assert.equal(citizenOn.rotationDay.canceled, true);
-  assert.equal(citizenOn.musterDay.nextAt, citizenToday.musterDay.nextAt);
-  assert.equal(citizenOn.rotationDay.nextAt, citizenToday.rotationDay.nextAt);
+  assert.equal('musterDay' in citizenOn, false);
+  assert.equal('lanternWatch' in citizenOn, false);
+  assert.equal('rotationDay' in citizenOn, false);
   assert.equal('canceled' in citizenOn.mandatePlebiscite, false);
   assert.deepEqual(citizenOn.mandatePlebiscite, citizenToday.mandatePlebiscite);
   r.setFixtureEnv(key, 'false');

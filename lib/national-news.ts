@@ -61,13 +61,15 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  return {nationId,...edition,fetchedAt:now,statistics:{citizens:register?.citizens??0,completedShifts:totals?.shifts??0,food:totals?.food??0},...(planStat ? {planStat} : {}),items:items.sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12)};
 }
 
-/** #981: open-week food summed from korund_settlements, percent against the weekly quota. Read-only; flag off never calls it. */
+/** #981: open-week food summed from korund_settlements, percent against the weekly quota. Read-only; flag off never calls it.
+ *  #1388: a week with no settlement rows has no measured fulfilment — omit the widget rather than publish a COALESCE 0% stand-in (§18.2, same rule as #1367 poster fills). A week that settled 0 food is still a real figure. */
 async function readKorundPlanStat(db:GameDatabase,nowMs:number):Promise<KorundPlanStat|undefined> {
  const now = Math.floor(nowMs / 1000);
  const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>();
  const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now / 7200) * 7200;
  const span = korundPlanWindow(epoch, now);
- const row = await db.prepare('SELECT COALESCE(SUM(food_output),0) AS plan_food FROM korund_settlements WHERE settled_at>=? AND settled_at<?').bind(span.start, span.end).first<{plan_food:number}>();
+ const row = await db.prepare('SELECT COUNT(*) AS settled, COALESCE(SUM(food_output),0) AS plan_food FROM korund_settlements WHERE settled_at>=? AND settled_at<?').bind(span.start, span.end).first<{settled:number;plan_food:number}>();
+ if (Number(row?.settled ?? 0) === 0) return undefined;
  const output = Number(row?.plan_food ?? 0), target = korundWeeklyQuotaFood, percent = planFulfilmentPercent(output, target), line = korundPlanStatLine(output, target);
  return line && percent !== null ? { resource: 'food', output, target, percent, line } : undefined;
 }

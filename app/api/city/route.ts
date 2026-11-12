@@ -6,9 +6,11 @@ import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
 import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunkarPassEnv,bindDunmorrowEnv,bindMarrowMillsEnv,bindRuelWorksEnv,bindThessalyWellsEnv,bindVakkHarborEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,STONEHEARTH_BIRTHDAY_NOTE,STONEHEARTH_HOST_NOTE,STONEHEARTH_PLAN_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1261 port, #1270 Ruel Works, #1271 Thessaly Wells, #1275 Marrow Mills, #1279 Dao Works, #1282 Dunkar Pass, #1373 Stonehearth host notes
 import {aurelleNextHearthNightAt} from '@/lib/aurelle-hearth-night'; // #1146 clock, read only
 import {confluenceNextCanalFestivalAt} from '@/lib/confluence-canal-festival'; // #1165 clock, read only
+import {confluenceNextCongressLanternsAt} from '@/lib/confluence-congress-lanterns'; // #1183 / #1390 clock, read only
 import {fulmaraNextGrandRegattaAt} from '@/lib/fulmara-grand-regatta'; // #1178 clock, read only
 import {fulmaraNextExchangeBellAt} from '@/lib/fulmara-exchange-bell'; // #1150 clock, read only
 import {hoarvaleNextAuroraNightAt} from '@/lib/hoarvale-aurora-night'; // #1160 clock, read only
+import {hoarvaleNextMootOpeningAt} from '@/lib/hoarvale-moot-opening'; // #1208 clock, read only
 import {meridianNextTurbineDayAt} from '@/lib/meridian-turbine-day'; // #1175 clock, read only
 import {meridianNextCongressWeekAt} from '@/lib/meridian-congress-week'; // #1189 clock, read only
 import {veldwoodNextVoteDayAt} from '@/lib/veldwood-vote-day'; // #1122 clock, read only
@@ -22,6 +24,8 @@ import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '
 import {cityTreatyReturn,latestCityCapture} from '@/lib/city-capture-history'; // #1028, #1078
 import {peaceRevertEnabled} from '@/lib/war-peace-revert'; // #1078 same flag as #1054
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
+import {readVarkandAlert} from '@/lib/varkand-alert'; // #1400: same stored Alert Level as #1220
+import {varkandFestivalHostFields} from '@/lib/varkand-red-alert-cancels'; // #1400: omit Varkand host note and date at Red
 import {seaLanesStormNote} from '@/lib/game-season'; // #1034
 import {seasonAt} from '@/lib/season-yield'; // #1035 shared season: null without a clock
 bindBrasswellPortEnv(env); // #1241: resident lookup reads the Worker env; flag off adds no city
@@ -78,7 +82,7 @@ export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads,...hearthHost(ctx.nationId,location.currentCityId,ctx.now),...regattaHost(ctx.nationId,location.currentCityId,ctx.now),...festivalHost(ctx.nationId,location.currentCityId,ctx.now)}));
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads,...hearthHost(ctx.nationId,location.currentCityId,ctx.now),...regattaHost(ctx.nationId,location.currentCityId,ctx.now),...await festivalHost(ctx.db,ctx.nationId,location.currentCityId,ctx.now)}));
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
@@ -100,14 +104,14 @@ export async function POST(request:Request){
  if(!results[1].meta.changes)return json({error:'Citizenship changed. Refresh your citizen before traveling.'},409);
  const current=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,current.currentCityId,ctx.now);
- return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads,...hearthHost(ctx.nationId,current.currentCityId,ctx.now),...regattaHost(ctx.nationId,current.currentCityId,ctx.now),...festivalHost(ctx.nationId,current.currentCityId,ctx.now)}));
+ return json(await withTierUnlocks(ctx.db,ctx.nationId,current.currentCityId,{...current,homeCityId:location.homeCityId,...spaField(ctx.nationId,location.homeCityId,current.currentCityId),...reads,...hearthHost(ctx.nationId,current.currentCityId,ctx.now),...regattaHost(ctx.nationId,current.currentCityId,ctx.now),...await festivalHost(ctx.db,ctx.nationId,current.currentCityId,ctx.now)}));
 }
 const spaField=(nationId:string,homeCityId:string,currentCityId:string)=>spaWcBonusEnabled(env)&&cityForNation(nationId,homeCityId)?.spa&&currentCityId===homeCityId?{spaWcNote}:{};
 /** #1259: one read-only line on Corvel Isles. Both flags on, else no keys. The date is the #1178 clock (same nextAt as the government read). */
 const regattaHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='fulmara'&&cityId==='corvel-isles'&&flagOn(env,CORVEL_ISLES_FLAG)&&flagOn(env,'HARIMU_FULMARA_GRAND_REGATTA_ENABLED')?{grandRegattaNote:CORVEL_ISLES_REGATTA_NOTE,grandRegattaNextAt:fulmaraNextGrandRegattaAt(nowSeconds*1000)}:{};
 /** #1242: one read-only line on Dunmorrow. Both flags on, else no keys. The date is the #1146 clock (same nextAt as the government read). */
 const hearthHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='aurelle'&&cityId==='dunmorrow'&&flagOn(env,DUNMORROW_FLAG)&&flagOn(env,'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED')?{hearthNightNote:DUNMORROW_HEARTH_NOTE,hearthNightNextAt:aurelleNextHearthNightAt(nowSeconds*1000)}:{};
-/** #1285 / #1377 / #1384 / #1386: catalog cities that already host a festival, including Ringhall Vote Days, Steamgate Congress Week, and Arcport Exchange Bell. No new city flag. Both HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and that festival's flag, else no keys. The date is that festival's clock (same nextAt as the government read). */
+/** #1285 / #1377 / #1384 / #1386 / #1393 / #1398: catalog cities that already host a festival, including Ringhall Vote Days, Steamgate Congress Week, Arcport Exchange Bell, Meetwater Congress Lanterns, and Rimehall Opening of the Moot. No new city flag. Both HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and that festival's flag, else no keys. The date is that festival's clock (same nextAt as the government read). */
 const festivalHosts=[
  {nationId:'hoarvale',cityId:'isling-springs',festivalFlag:'HARIMU_HOARVALE_AURORA_NIGHT_ENABLED',note:'Hosts Aurora Night',nextAt:hoarvaleNextAuroraNightAt},
  {nationId:'meridian',cityId:'shen-springs',festivalFlag:'HARIMU_MERIDIAN_TURBINE_DAY_ENABLED',note:'Hosts Turbine Day',nextAt:meridianNextTurbineDayAt},
@@ -115,6 +119,8 @@ const festivalHosts=[
  {nationId:'veldwood',cityId:'ringhall',festivalFlag:'HARIMU_VELDWOOD_VOTE_DAY_ENABLED',note:'Hosts Vote Days',nextAt:veldwoodNextVoteDayAt}, // #1377
  {nationId:'meridian',cityId:'steamgate',festivalFlag:'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED',note:'Hosts Congress Week',nextAt:meridianNextCongressWeekAt}, // #1384
  {nationId:'fulmara',cityId:'arcport',festivalFlag:'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED',note:'Hosts the Exchange Bell',nextAt:fulmaraNextExchangeBellAt}, // #1386
+ {nationId:'confluence',cityId:'meetwater',festivalFlag:'HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED',note:'Hosts Congress Lanterns',nextAt:confluenceNextCongressLanternsAt}, // #1393
+ {nationId:'hoarvale',cityId:'rimehall',festivalFlag:'HARIMU_HOARVALE_MOOT_OPENING_ENABLED',note:'Hosts the Opening of the Moot',nextAt:hoarvaleNextMootOpeningAt}, // #1398
 ] as const;
 const FORGEHAVEN_BALLOT_NOTE='Hosts Ballot Night';
 /** #1375: Forgehaven hosts Ballot Night. Reuses #1285 keys. No new flag.
@@ -141,11 +147,13 @@ const stonehearthHost=(nowSeconds:number)=>{
  if(plan)return {festivalHostNote:STONEHEARTH_PLAN_NOTE,festivalHostNextAt:korundNextPlanDayAt(nowMs)};
  return {festivalHostNote:STONEHEARTH_BIRTHDAY_NOTE,festivalHostNextAt:korundNextChairmanBirthdayAt(nowMs)};
 };
-const festivalHost=(nationId:string,cityId:string,nowSeconds:number)=>{
- if(nationId==='kindle'&&cityId==='forgehaven')return forgehavenHost(nowSeconds);
- if(nationId==='korund'&&cityId==='stonehearth')return stonehearthHost(nowSeconds);
- const row=festivalHosts.find(host=>host.nationId===nationId&&host.cityId===cityId);
- return row&&flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')&&flagOn(env,row.festivalFlag)?{festivalHostNote:row.note,festivalHostNextAt:row.nextAt(nowSeconds*1000)}:{};
+const festivalHost=async(db:Awaited<ReturnType<typeof getDatabase>>,nationId:string,cityId:string,nowSeconds:number)=>{
+ const fields=nationId==='kindle'&&cityId==='forgehaven'?forgehavenHost(nowSeconds):nationId==='korund'&&cityId==='stonehearth'?stonehearthHost(nowSeconds):(()=>{
+  const row=festivalHosts.find(host=>host.nationId===nationId&&host.cityId===cityId);
+  return row&&flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')&&flagOn(env,row.festivalFlag)?{festivalHostNote:row.note,festivalHostNextAt:row.nextAt(nowSeconds*1000)}:{};
+ })();
+ if(nationId!=='varkand'||!('festivalHostNote' in fields)||!flagOn(env,'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED')||!flagOn(env,'HARIMU_VARKAND_ALERT_ENABLED'))return fields;
+ return varkandFestivalHostFields(nationId,fields,(await readVarkandAlert(db)).level,true,true); // #1400: same #1220 gate; no Varkand catalog row on origin/dev yet
 };
 /** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads.
  *  #1078: HARIMU_WAR_PEACE_REVERT_ENABLED off does not read city_treaty_returns, so the history object stays the capture alone. */

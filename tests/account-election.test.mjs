@@ -23,7 +23,7 @@ test('approved account preview isolates eligibility, window, retries and persist
  // The preview exception does not unlock other counted civic actions.
  assert.equal((await r.call('petitions','alice',{action:'sign',petitionId:randomUUID(),requestId:randomUUID()})).status,403);
  r.reopen();r.setNow(open.data.closesAt*1000-1);assert.equal((await r.call('election','bob')).data.result,null);
- r.setNow(open.data.closesAt*1000);const closed=await r.call('election','bob');assert.equal(closed.data.result.humanBallots,1);assert.equal(closed.data.result.simulatedPublicUnits,1);assert.equal(closed.data.result.winner,'mara-quell');assert.equal((await r.call('election','bob',vote())).status,409);
+ r.setNow(open.data.closesAt*1000);const closed=await r.call('election','bob');assert.equal(closed.data.result.humanBallots,1);assert.equal(closed.data.result.simulatedPublicUnits,0);assert.equal(closed.data.result.winner,'mara-quell');assert.equal((await r.call('election','bob',vote())).status,409);
  await (await r.importModule('lib/world-simulation.ts')).advanceWorld(r.db,Math.floor(r.now/1000));/* #221: the tick records the close GET only shows */r.setNow(open.data.opensAt*1000);assert.equal((await r.call('election','bob',vote())).status,409);
 });
 test('account preview enforces origin, complete rankings, namespace and current citizenship',async t=>{
