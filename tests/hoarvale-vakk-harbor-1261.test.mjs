@@ -82,20 +82,20 @@ test('Brasswell Port on with Vakk Harbor off: Hoarvale lists still exclude vakk-
   assert.equal(refused.data.reason, 'not_in_nation');
 });
 
-test('the flag is preview true and production false, at(-6) in HARIMU_GRAY_PACK, and the map stays three pins', () => {
+test('the flag is preview true and production false, at(-7) in HARIMU_GRAY_PACK, and the map stays three pins', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-6), FLAG);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-6), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), FLAG);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 81);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-7), FLAG);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-7), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-4), 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-5), 'HARIMU_ILMAR_THESSALY_WELLS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-6), 'HARIMU_CONFLUENCE_RUEL_WORKS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-7), FLAG);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-8), 'HARIMU_ILMAR_LONG_LIGHT_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 82);
   const scene = readFileSync('app/country-scene.tsx', 'utf8');
   assert.match(scene, /citiesForNation\(nationId\)/);
   assert.match(scene, /\{x:50,y:32\},\{x:26,y:76\},\{x:76,y:76\}/);
