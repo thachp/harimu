@@ -23,6 +23,10 @@ export const MARROW_MILLS_FLAG = 'HARIMU_VELDWOOD_MARROW_MILLS_ENABLED';
 export const DUNKAR_PASS_FLAG = 'HARIMU_VARKAND_DUNKAR_PASS_ENABLED';
 /** #1242: the one city-panel line. The next date is the #1146 clock, shown only when that flag is also on. */
 export const DUNMORROW_HEARTH_NOTE = 'Hosts Hearth Night';
+/** #1373: Stonehearth city-panel host lines. Dates are the #1116 / #1147 clocks, shown only when HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and that festival's flag are on. */
+export const STONEHEARTH_PLAN_NOTE = 'Hosts Plan Day';
+export const STONEHEARTH_BIRTHDAY_NOTE = "Hosts the Chairman's Birthday";
+export const STONEHEARTH_HOST_NOTE = 'Hosts Plan Day and the Chairman\'s Birthday';
 // Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
 const roles: Record<string, string> = {"Tarrek Foundry": "Industry", "Kolt Savanna": "Farming", "Lanu Terraces": "Farming", "Oalin Harbor": "Port / fisheries", "Tsenga SEZ": "Trade zone", "Holv Gorge": "Energy / industry", "Strova Mines": "Mining", "Gren Plateau": "Farming", "Windrest": "Silk / crafts", "Highmere": "Farming / fief", "Lume Mesa": "Pilgrimage", "Glassen": "Industry (Sunglass)", "Fjeldmark": "Frostcore / logistics", "Isling Springs": "Spa / tourism", "Voren Light": "Port / signals", "Moorhald": "Farming / peat", "Ashglade": "Timber / crafts", "Fernhollow": "Farming", "Vendezzo": "Shipyard", "Malvara Rods": "Energy (Stormcells)"};
 // Canonical city names and visual lore, GDD nation pages /world/nations/ (read 2026-10-13).

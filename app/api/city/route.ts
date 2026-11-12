@@ -3,12 +3,14 @@ import {getDatabase} from '@/lib/db';
 import {startCityTravel} from '@/lib/travel';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunkarPassEnv,bindDunmorrowEnv,bindMarrowMillsEnv,bindRuelWorksEnv,bindThessalyWellsEnv,bindVakkHarborEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1261 port, #1270 Ruel Works, #1271 Thessaly Wells, #1275 Marrow Mills, #1279 Dao Works, #1282 Dunkar Pass
+import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunkarPassEnv,bindDunmorrowEnv,bindMarrowMillsEnv,bindRuelWorksEnv,bindThessalyWellsEnv,bindVakkHarborEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,STONEHEARTH_BIRTHDAY_NOTE,STONEHEARTH_HOST_NOTE,STONEHEARTH_PLAN_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1261 port, #1270 Ruel Works, #1271 Thessaly Wells, #1275 Marrow Mills, #1279 Dao Works, #1282 Dunkar Pass, #1373 Stonehearth host notes
 import {aurelleNextHearthNightAt} from '@/lib/aurelle-hearth-night'; // #1146 clock, read only
 import {confluenceNextCanalFestivalAt} from '@/lib/confluence-canal-festival'; // #1165 clock, read only
 import {fulmaraNextGrandRegattaAt} from '@/lib/fulmara-grand-regatta'; // #1178 clock, read only
 import {hoarvaleNextAuroraNightAt} from '@/lib/hoarvale-aurora-night'; // #1160 clock, read only
 import {meridianNextTurbineDayAt} from '@/lib/meridian-turbine-day'; // #1175 clock, read only
+import {korundNextChairmanBirthdayAt} from '@/lib/korund-chairman-birthday'; // #1147 clock, read only
+import {korundNextPlanDayAt} from '@/lib/korund-plan-calendar'; // #1116 clock, read only
 import {spaWcBonusEnabled,spaWcNote} from '@/lib/spa-recovery'; // #798
 import {cityCoResidents,cityPresence,readCityLocation} from '@/lib/city-location';
 import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '@/lib/city-tier'; // #979 / #984 / #1014
@@ -106,7 +108,24 @@ const festivalHosts=[
  {nationId:'meridian',cityId:'shen-springs',festivalFlag:'HARIMU_MERIDIAN_TURBINE_DAY_ENABLED',note:'Hosts Turbine Day',nextAt:meridianNextTurbineDayAt},
  {nationId:'confluence',cityId:'lanu-terraces',festivalFlag:'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED',note:'Hosts the Canal Festival',nextAt:confluenceNextCanalFestivalAt},
 ] as const;
+/** #1373: Stonehearth hosts Plan Day and the Chairman's Birthday. Reuses #1285 keys. No new flag.
+ *  Dates are the #1116 / #1147 clocks at the same now. Never 0 or a stand-in. Combined note uses the sooner clock. */
+const stonehearthHost=(nowSeconds:number)=>{
+ if(!flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED'))return {};
+ const plan=flagOn(env,'HARIMU_KORUND_PLAN_CALENDAR_ENABLED');
+ const birthday=flagOn(env,'HARIMU_KORUND_CHAIRMAN_BIRTHDAY_ENABLED');
+ if(!plan&&!birthday)return {};
+ const nowMs=nowSeconds*1000;
+ if(plan&&birthday){
+  const planAt=korundNextPlanDayAt(nowMs);
+  const birthAt=korundNextChairmanBirthdayAt(nowMs);
+  return {festivalHostNote:STONEHEARTH_HOST_NOTE,festivalHostNextAt:Math.min(planAt,birthAt)};
+ }
+ if(plan)return {festivalHostNote:STONEHEARTH_PLAN_NOTE,festivalHostNextAt:korundNextPlanDayAt(nowMs)};
+ return {festivalHostNote:STONEHEARTH_BIRTHDAY_NOTE,festivalHostNextAt:korundNextChairmanBirthdayAt(nowMs)};
+};
 const festivalHost=(nationId:string,cityId:string,nowSeconds:number)=>{
+ if(nationId==='korund'&&cityId==='stonehearth')return stonehearthHost(nowSeconds);
  const row=festivalHosts.find(host=>host.nationId===nationId&&host.cityId===cityId);
  return row&&flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')&&flagOn(env,row.festivalFlag)?{festivalHostNote:row.note,festivalHostNextAt:row.nextAt(nowSeconds*1000)}:{};
 };
