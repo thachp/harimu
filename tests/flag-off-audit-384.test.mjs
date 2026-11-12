@@ -39,6 +39,7 @@ const flagOffPins = {
   HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED: 'city-festival-host-note-1285.test.mjs', // #1285 flag off: no festivalHostNote key, panel unchanged
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_SQUARE_POSTERS_ENABLED: 'square-posters-1341.test.mjs', // #1341 flag off: no poster read or write
+  HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED: 'square-price-anti-snowball-1349.test.mjs', // #1349 flag off: listed and charged price stay 2500; purchase SQL is the #122 path
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
   HARIMU_LABOR_BUREAU_ENABLED: 'labor-bureau-235.test.mjs',
@@ -199,6 +200,7 @@ const flagOffPins = {
   HARIMU_VARKAND_DUNKAR_PASS_ENABLED: 'varkand-dunkar-pass-1282.test.mjs', // #1282 flag off: no resident city
   HARIMU_BETTER_AUTH_ENABLED: 'better-auth-1318.test.mjs', // #1318 flag off: /api/auth is 404 and the database stays closed
   HARIMU_WORLD_ID_ENABLED: 'world-id-469.test.mjs', // #469 flag off: /api/world-id is 404 and nothing is fetched
+  HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED: 'grace-political-actions-1339.test.mjs', // #1339 flag off: the five newer sources do not lock a nation change
   HARIMU_CONGREGATION_DONATIONS_ENABLED: 'congregation-donations-1340.test.mjs', // #1340 flag off: POST 404 with no DB, GET has no donations key and never reads the table
   HARIMU_VARKAND_MUSTER_DAY_ENABLED: 'zzzzzzzzz-varkand-muster-day-1151.test.mjs', // #1151 flag off: no musterDay key
   HARIMU_VARKAND_LANTERN_WATCH_ENABLED: 'zzzzzzzzzzzzzzz-varkand-lantern-watch-1211.test.mjs', // #1211 flag off: no lanternWatch key

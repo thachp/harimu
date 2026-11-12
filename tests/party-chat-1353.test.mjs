@@ -7,11 +7,11 @@ import { readFileSync } from 'node:fs';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 
-test('#1353: the flag is packed after congregation chat in the gray pack (indexOf 86), preview on and production off, a direct string wins', () => {
+test('#1353: the flag is packed last in the gray pack (indexOf 88), after grace and anti-snowball, preview on and production off, a direct string wins', () => {
   const F = 'HARIMU_PARTY_CHAT_ENABLED', strip = t => JSON.parse(t.replace(/^\s*\/\/.*$/gm, ''));
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
-  assert.deepEqual(['HARIMU_WORLD_ID_ENABLED', 'HARIMU_SQUARE_POSTERS_ENABLED', 'HARIMU_CONGREGATION_DONATIONS_ENABLED', 'HARIMU_CONGREGATION_CHAT_ENABLED', F].map(k => FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(k)), [82, 83, 84, 85, 86]); // indexOf pins only
-  assert.deepEqual([Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(F), Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(F)], [86, 86]);
+  assert.deepEqual(['HARIMU_WORLD_ID_ENABLED', 'HARIMU_SQUARE_POSTERS_ENABLED', 'HARIMU_CONGREGATION_DONATIONS_ENABLED', 'HARIMU_CONGREGATION_CHAT_ENABLED', 'HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED', 'HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED', F].map(k => FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(k)), [82, 83, 84, 85, 86, 87, 88]); // indexOf pins only
+  assert.deepEqual([Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(F), Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(F)], [88, 88]);
   assert.equal(preview.vars[F], undefined); assert.equal(prod.vars[F], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[F], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[F], 'false');
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, F), true);
