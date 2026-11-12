@@ -1,4 +1,5 @@
 import type {GameDatabase} from './database-contract';
+import { recordPlayerFill } from './spark-origin.ts'; // #465
 export type PlayerCommand = {
   action: 'create-listing' | 'buy-listing' | 'cancel-listing'; requestId: string;
   item?: string; quantity?: number; unitMinor?: number; listingId?: string;
@@ -85,9 +86,12 @@ export async function executePlayerCommand(db: GameDatabase, userId: string, com
   } else {
     await db.prepare(cancelListingSql).bind(command.requestId, now, command.listingId, userId, command.requestId).run();
   }
-  return matches(await find()) ? { status: 200 } : { status: 409, error: command.action === 'create-listing'
+  const done = await find();
+  if (!matches(done)) return { status: 409, error: command.action === 'create-listing'
     ? 'Listing refused: check available goods, quantity, price, Kindle citizenship and the five-listing limit.'
     : 'Listing unavailable, already closed, insufficient funds, or ownership/citizenship does not permit this action.' };
+  if (command.action === 'buy-listing') await recordPlayerFill(db, command.requestId, { salesTax: !!options.salesTaxSql }); // #465
+  return { status: 200 };
 }
 export async function readPlayerMarket(db: GameDatabase, userId: string): Promise<PlayerMarketState> {
   const columns = `SELECT l.id, l.item, l.quantity, l.unit_minor, l.created_at,
