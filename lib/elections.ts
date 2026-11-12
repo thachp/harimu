@@ -35,11 +35,15 @@ export const voteReceiptSql=`INSERT INTO civic_voter_receipts (election_id,clerk
 export const anonymousBallotSql=`INSERT INTO civic_anonymous_ballots (id,election_id,ranking_json,policy)
  SELECT ?,r.election_id,?,'tier1-human-v1' FROM civic_voter_receipts r WHERE r.request_id=? AND r.clerk_user_id=? AND r.election_id=? AND r.ballot_written=0`;
 export const markBallotWrittenSql=`UPDATE civic_voter_receipts SET ballot_written=1 WHERE request_id=? AND clerk_user_id=? AND election_id=? AND ballot_written=0`;
-async function countedResult(db:GameDatabase,id:string){
+async function ballotGroups(db:GameDatabase,id:string){
  const rows=await db.prepare("SELECT ranking_json,COUNT(*) AS count FROM civic_anonymous_ballots WHERE election_id=? AND policy='tier1-human-v1' GROUP BY ranking_json").bind(id).all<{ranking_json:string;count:number}>();
-  const groups=rows.results.map(row=>({ranking:JSON.parse(row.ranking_json) as string[],count:row.count}));const result=instantRunoffCounts(candidateIds,groups,candidateIds);
-  const receipts=await db.prepare("SELECT COUNT(*) AS count FROM civic_voter_receipts WHERE election_id=? AND ballot_written=1 AND policy='tier1-human-v1'").bind(id).first<{count:number}>();
-  if(receipts?.count!==result.humanBallots)throw Error('Election count could not be confirmed. No result published.');
+ return rows.results.map(row=>({ranking:JSON.parse(row.ranking_json) as string[],count:row.count}));
+}
+/** #1369: human ballots only. An empty bloc ranking is the same rule primaries already use; the Simulated Public bloc is not counted. */
+async function countedResult(db:GameDatabase,id:string){
+ const result=instantRunoffCounts(candidateIds,await ballotGroups(db,id),[]);
+ const receipts=await db.prepare("SELECT COUNT(*) AS count FROM civic_voter_receipts WHERE election_id=? AND ballot_written=1 AND policy='tier1-human-v1'").bind(id).first<{count:number}>();
+ if(receipts?.count!==result.humanBallots)throw Error('Election count could not be confirmed. No result published.');
  return result;
 }
 /** Closes a due election and records its count. Write paths only: POST /api/election and the world tick (#221). */
@@ -65,14 +69,18 @@ async function finalizedResult(db:GameDatabase,now:number,readOnly:boolean,id:st
  }
  if(!saved?.result_json)return null;
  const result=JSON.parse(saved.result_json) as RunoffResult;
- if(result.weightScale!==4||!Number.isSafeInteger(result.humanBallots)||result.humanBallots<0||result.simulatedPublicUnits!==result.humanBallots||!Array.isArray(result.rounds)||result.rounds.length>candidateIds.length||result.winner!==null&&!candidateIds.some(id=>id===result.winner))throw Error('Saved election count could not be verified.');
+ // #1369: a new count is human-only (`simulatedPublicUnits` is 0). A result already stored with the Simulated Public bloc
+ // (`simulatedPublicUnits === humanBallots`) stays as published: it is checked against that old count and never rewritten.
+ const humanOnly=result.simulatedPublicUnits===0,storedBloc=result.humanBallots>0&&result.simulatedPublicUnits===result.humanBallots;
+ if(result.weightScale!==4||!Number.isSafeInteger(result.humanBallots)||result.humanBallots<0||!(humanOnly||storedBloc)||!Array.isArray(result.rounds)||result.rounds.length>candidateIds.length||result.winner!==null&&!candidateIds.some(id=>id===result.winner))throw Error('Saved election count could not be verified.');
  // An explicit aggregate projection, never raw stored JSON or anonymous ballot rows.
  const counts=(value:Record<string,number>)=>Object.fromEntries(candidateIds.filter(id=>Object.hasOwn(value,id)).map(id=>{if(!Number.isSafeInteger(value[id])||value[id]<0)throw Error('Saved election count could not be verified.');return[id,value[id]];}));
  if(result.rounds.some(round=>round.eliminated!==null&&!candidateIds.some(id=>id===round.eliminated)))throw Error('Saved election count could not be verified.');
  const projected={winner:result.winner,humanBallots:result.humanBallots,simulatedPublicUnits:result.simulatedPublicUnits,weightScale:4 as const,rounds:result.rounds.map(round=>({human:counts(round.human),simulatedUnits:counts(round.simulatedUnits),weightedUnits:counts(round.weightedUnits),eliminated:round.eliminated}))};
  // Closing freezes writes; these grouped rankings are bounded to the six
  // permutations. Verify the stored aggregate against that authoritative count.
- const expected=await countedResult(db,id);
+ const fresh=await countedResult(db,id);
+ const expected=storedBloc?instantRunoffCounts(candidateIds,await ballotGroups(db,id),candidateIds):fresh;
  if(JSON.stringify(projected)!==JSON.stringify(expected))throw Error('Saved election aggregate does not match the confirmed count.');
  return projected;
 }
