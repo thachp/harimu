@@ -232,7 +232,9 @@
       // #1340: Kindle congregation donations (docs 14.4): a current member gives Spark to their own Kindle congregation's fund (migration 0128). Off: POST /api/congregations/donations is 404, GET /api/congregations has no donations key, and nothing reads or writes congregation_donations.
       "HARIMU_CONGREGATION_DONATIONS_ENABLED": "true",
       // #1342: congregation channel (current members of one joinable congregation; Korund public congregations have none; 280 chars, 10 s / 20 per hour, 7-day retention, shadow-mute aware). Off: the route is a 404 and nothing is read.
-      "HARIMU_CONGREGATION_CHAT_ENABLED": "true"
+      "HARIMU_CONGREGATION_CHAT_ENABLED": "true",
+      // #1339: the nation-change grace period also ends on an Assembly ballot, a primary ballot, an Aurelle pledge, current party membership, or current congregation office. Off: those five sources are not consulted.
+      "HARIMU_GRACE_ALL_POLITICAL_ACTIONS_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

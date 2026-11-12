@@ -7,7 +7,7 @@ import { peaceRevertEnabled } from '@/lib/war-peace-revert'; // #1054
 import { publicGovernmentSnapshot } from '@/lib/government-disclosure';
 import { withPolicyLedger } from '@/lib/policy-ledger'; // #985
 import { hoarvaleAssentEnabled, withHoarvaleBills } from '@/lib/hoarvale-assent'; // #1089
-import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, enrollmentChangeSql } from '@/lib/citizenship';
+import { validEnrollmentExpectation, citizenshipStatus, enrollmentInitialSql, enrollmentFirstSql, graceAllPoliticalActionsFlag, gracePoliticalActionTaken, runGraceEnrollmentChange } from '@/lib/citizenship';
 import { recordEnrollHome, resolveEnrollHomeCity } from '@/lib/city-location'; // #965
 import { seaFreightQuantity } from '@/lib/game-season'; // #1034
 import { jobTypeOf } from '@/lib/mvp-job-types'; // #1034
@@ -227,7 +227,7 @@ export async function GET(request: Request) {
   const electionDatabase=accountLevel?accountElectionDatabase(database):database;
   // #596: every read below is read-only and independent of the others, so they run together: one wave of round trips instead of about twenty in a row (each is a network hop on preview).
   // Only the reads that need the profile or the verification (election, collective petitions, first week, government) wait for them, in the second wave.
-  const [simulation, capacity, starterFood, [profile, plan, itemResult, decision, politicalAction], verification, market, aurellePlan, korundPlan, nationWork, economy, playerMarket, shifts, founding, succession] = await Promise.all([
+  const [simulation, capacity, starterFood, [profile, plan, itemResult, decision, politicalActionTaken], verification, market, aurellePlan, korundPlan, nationWork, economy, playerMarket, shifts, founding, succession] = await Promise.all([
     readWorldSimulation(database, readNow, { atlasEnv: env, reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warAssembly: (env as unknown as { HARIMU_WAR_ASSEMBLY_ENABLED?: string }).HARIMU_WAR_ASSEMBLY_ENABLED === 'true', warEndings: (env as unknown as { HARIMU_WAR_ENDINGS_ENABLED?: string }).HARIMU_WAR_ENDINGS_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true' }),
     readCapacityProjection(database, userId, readNow, wcInterval),
     pendingStarterFood(database, userId),
@@ -248,10 +248,7 @@ export async function GET(request: Request) {
       FROM citizen_decisions WHERE clerk_user_id = ? AND decision_id = ?`)
       .bind(userId, activeDecisionId)
       .first<CitizenDecisionRow>(),
-    database.prepare(`SELECT EXISTS(
-      SELECT 1 FROM citizen_decisions WHERE clerk_user_id = ?
-      UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id = ? UNION ALL SELECT 1 FROM civic_petition_signatures WHERE clerk_user_id = ? UNION ALL SELECT 1 FROM civic_voter_receipts WHERE clerk_user_id = ? AND ballot_written=1 UNION ALL SELECT 1 FROM poc_voter_receipts WHERE clerk_user_id=? AND ballot_written=1 LIMIT 1
-    ) AS political_action_taken`).bind(userId, userId, userId, userId,userId).first<{ political_action_taken: number }>(),
+    gracePoliticalActionTaken(database, userId, flagOn(env, graceAllPoliticalActionsFlag)), // #1339
   ]),
     readVerification(userId),
     readMarket(database, userId, interval),
@@ -303,7 +300,7 @@ export async function GET(request: Request) {
     ...(nationalService ? { nationalService } : {}),
     ...(evacuation ? { evacuation: { lines: evacuation } } : {}), // #1324
     profile: profile
-      ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
+      ? serializeProfile(profile, decision ?? null, politicalActionTaken)
       : null,
     plan: plan ? {
       horizon: plan.horizon,
@@ -472,9 +469,8 @@ async function handlePost(request: Request) {
     if (!nation) return privateJson({ error: 'Unknown nation.' }, { status: 400 });
     const readCurrent=()=>database.prepare(`SELECT clerk_user_id,nation_id,nation_changes,display_name,capacity,influence,standing,created_at
       FROM citizens WHERE clerk_user_id=?`).bind(userId).first<CitizenProfileRow>();
-    const readPolitical=async()=>Boolean((await database.prepare(`SELECT EXISTS(
-      SELECT 1 FROM citizen_decisions WHERE clerk_user_id=? UNION ALL SELECT 1 FROM government_petitions WHERE clerk_user_id=? UNION ALL SELECT 1 FROM civic_petition_signatures WHERE clerk_user_id=? UNION ALL SELECT 1 FROM civic_voter_receipts WHERE clerk_user_id=? AND ballot_written=1 UNION ALL SELECT 1 FROM poc_voter_receipts WHERE clerk_user_id=? AND ballot_written=1 LIMIT 1
-    ) AS taken`).bind(userId,userId,userId,userId,userId).first<{taken:number}>())?.taken);
+    const graceOn=flagOn(env, graceAllPoliticalActionsFlag); // #1339
+    const readPolitical=()=>gracePoliticalActionTaken(database, userId, graceOn);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
       simulation,verification:await readVerification(userId),
       government:await withHoarvaleBills(database, await withPolicyLedger(database, profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,governmentReadOptions())):null, env), env, Math.floor(Date.parse(now)/1000), profile?.nation_id),
@@ -502,7 +498,7 @@ async function handlePost(request: Request) {
         database.prepare(enrollmentFirstSql).bind(nationId,now,now,userId),
       ]);
     } else {
-      await database.prepare(enrollmentChangeSql).bind(nationId,now,userId,body.expectedNationId,nationId,now,now,userId,userId,userId,userId,userId).run();
+      await runGraceEnrollmentChange(database, graceOn, nationId, now, userId, body.expectedNationId);
     }
     const updated=await readCurrent();
     if (updated?.nation_id===nationId) {
