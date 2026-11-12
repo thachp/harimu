@@ -62,7 +62,7 @@ test('Twilio Verify uses the Verify URLs and sends nothing when a secret is miss
 });
 
 test('migration 0122 is additive and a registry conflict is refused', async () => {
-  const last = postgresMigrations().at(-1);
+  const last = postgresMigrations().find(m => m.file === '0122_better_auth.sql'); // #467: 0123 now follows; not pinned to the last file
   assert.equal(last.file, '0122_better_auth.sql');
   assert.equal(isDestructive(last.sql), false);
   assert.equal(transactionProblem(last.sql), null);
