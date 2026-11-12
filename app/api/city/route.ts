@@ -7,6 +7,7 @@ import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunkarPassEn
 import {aurelleNextHearthNightAt} from '@/lib/aurelle-hearth-night'; // #1146 clock, read only
 import {confluenceNextCanalFestivalAt} from '@/lib/confluence-canal-festival'; // #1165 clock, read only
 import {fulmaraNextGrandRegattaAt} from '@/lib/fulmara-grand-regatta'; // #1178 clock, read only
+import {fulmaraNextExchangeBellAt} from '@/lib/fulmara-exchange-bell'; // #1150 clock, read only
 import {hoarvaleNextAuroraNightAt} from '@/lib/hoarvale-aurora-night'; // #1160 clock, read only
 import {meridianNextTurbineDayAt} from '@/lib/meridian-turbine-day'; // #1175 clock, read only
 import {meridianNextCongressWeekAt} from '@/lib/meridian-congress-week'; // #1189 clock, read only
@@ -106,13 +107,14 @@ const spaField=(nationId:string,homeCityId:string,currentCityId:string)=>spaWcBo
 const regattaHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='fulmara'&&cityId==='corvel-isles'&&flagOn(env,CORVEL_ISLES_FLAG)&&flagOn(env,'HARIMU_FULMARA_GRAND_REGATTA_ENABLED')?{grandRegattaNote:CORVEL_ISLES_REGATTA_NOTE,grandRegattaNextAt:fulmaraNextGrandRegattaAt(nowSeconds*1000)}:{};
 /** #1242: one read-only line on Dunmorrow. Both flags on, else no keys. The date is the #1146 clock (same nextAt as the government read). */
 const hearthHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='aurelle'&&cityId==='dunmorrow'&&flagOn(env,DUNMORROW_FLAG)&&flagOn(env,'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED')?{hearthNightNote:DUNMORROW_HEARTH_NOTE,hearthNightNextAt:aurelleNextHearthNightAt(nowSeconds*1000)}:{};
-/** #1285 / #1377 / #1384: catalog cities that already host a festival, including Ringhall Vote Days and Steamgate Congress Week. No new city flag. Both HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and that festival's flag, else no keys. The date is that festival's clock (same nextAt as the government read). */
+/** #1285 / #1377 / #1384 / #1386: catalog cities that already host a festival, including Ringhall Vote Days, Steamgate Congress Week, and Arcport Exchange Bell. No new city flag. Both HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and that festival's flag, else no keys. The date is that festival's clock (same nextAt as the government read). */
 const festivalHosts=[
  {nationId:'hoarvale',cityId:'isling-springs',festivalFlag:'HARIMU_HOARVALE_AURORA_NIGHT_ENABLED',note:'Hosts Aurora Night',nextAt:hoarvaleNextAuroraNightAt},
  {nationId:'meridian',cityId:'shen-springs',festivalFlag:'HARIMU_MERIDIAN_TURBINE_DAY_ENABLED',note:'Hosts Turbine Day',nextAt:meridianNextTurbineDayAt},
  {nationId:'confluence',cityId:'lanu-terraces',festivalFlag:'HARIMU_CONFLUENCE_CANAL_FESTIVAL_ENABLED',note:'Hosts the Canal Festival',nextAt:confluenceNextCanalFestivalAt},
  {nationId:'veldwood',cityId:'ringhall',festivalFlag:'HARIMU_VELDWOOD_VOTE_DAY_ENABLED',note:'Hosts Vote Days',nextAt:veldwoodNextVoteDayAt}, // #1377
  {nationId:'meridian',cityId:'steamgate',festivalFlag:'HARIMU_MERIDIAN_CONGRESS_WEEK_ENABLED',note:'Hosts Congress Week',nextAt:meridianNextCongressWeekAt}, // #1384
+ {nationId:'fulmara',cityId:'arcport',festivalFlag:'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED',note:'Hosts the Exchange Bell',nextAt:fulmaraNextExchangeBellAt}, // #1386
 ] as const;
 const FORGEHAVEN_BALLOT_NOTE='Hosts Ballot Night';
 /** #1375: Forgehaven hosts Ballot Night. Reuses #1285 keys. No new flag.
