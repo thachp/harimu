@@ -1,5 +1,5 @@
 import type { GameDatabase } from './database-contract';
-import { tesseraBalanceBinds, tesseraBalanceSql } from './tessera-exchange';
+import { tesseraBalanceBinds, tesseraBalanceSql } from './tessera-exchange.ts';
 
 /**
  * #631: a preview-only Tessera TEST faucet, so testers can try Tessera features (squares) while the Spark-to-Tessera exchange stays disabled (Decision 111, #626).
