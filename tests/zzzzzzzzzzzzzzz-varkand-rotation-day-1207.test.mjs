@@ -93,11 +93,11 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-21), key, 'GRAY 63; #1208, #1211, then #1212 follow this flag');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-21), key);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-22), 'HARIMU_WORLD_ATLAS_READS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-21), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); // GRAY 82 is Better Auth; #467 land tiles is last (length is not pinned)
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-20), key, 'GRAY 63; #1208, #1211, then #1212 follow this flag');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-20), key);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-21), 'HARIMU_WORLD_ATLAS_READS_ENABLED');
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-20), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 82);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');

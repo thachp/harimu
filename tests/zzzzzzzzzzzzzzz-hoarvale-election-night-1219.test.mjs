@@ -40,8 +40,8 @@ test('pins, and the read is unchanged with the flag off', async t => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(preview.vars[key], undefined); assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true'); assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-17), key); assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-17), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-17), key); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-16), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED'); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BETTER_AUTH_ENABLED'), 81); // GRAY 82 is Better Auth; #467 land tiles is last (length is not pinned)
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-16), key); assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-16), key);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-16), key); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-15), 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED'); assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 82);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false);
   const r = await localRuntime(); t.after(() => r.close());
   const gov = await r.importModule('lib/government-state.ts');

@@ -11,21 +11,17 @@ import { isDestructive, postgresMigrations, stripComments, transactionProblem } 
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const TABLES = ['land_lots', 'land_titles', 'land_leases', 'land_lease_tiles', 'land_starter_grants', 'land_title_events', 'citizen_primary_lot'];
 
-test('flag is on only for the exact string "true"; packed last in HARIMU_GRAY_PACK, preview true and production false', () => {
+test('flag is on only for the exact string "true"; top-level var (not in any pack), preview true and production false', () => {
   assert.equal(LAND_TILES_FLAG, 'HARIMU_LAND_TILES_ENABLED');
   for (const value of [undefined, '', 'false', 'TRUE', 'True', ' true', 'true ', '1', 'yes', true, 1]) assert.equal(landTilesEnabled({ [LAND_TILES_FLAG]: value }), false, String(value));
-  assert.equal(landTilesEnabled({}), false); assert.equal(landTilesEnabled(undefined), false); assert.equal(landTilesEnabled({ HARIMU_GRAY_PACK: '{bad' }), false);
+  assert.equal(landTilesEnabled({}), false); assert.equal(landTilesEnabled(undefined), false); assert.equal(landTilesEnabled('true'), false);
   assert.equal(landTilesEnabled({ [LAND_TILES_FLAG]: 'true' }), true);
-  assert.equal(landTilesEnabled({ HARIMU_GRAY_PACK: { [LAND_TILES_FLAG]: 'true' } }), true);
-  assert.equal(landTilesEnabled({ HARIMU_GRAY_PACK: { [LAND_TILES_FLAG]: 'true' }, [LAND_TILES_FLAG]: 'false' }), false, 'a direct string wins over the pack');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), LAND_TILES_FLAG); // [ASSUMPTION] last on dev 8924a6f0; length is not pinned
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-2), 'HARIMU_BETTER_AUTH_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-3), 'HARIMU_VARKAND_DUNKAR_PASS_ENABLED');
+  assert.equal(landTilesEnabled({ HARIMU_GRAY_PACK: { [LAND_TILES_FLAG]: 'true' } }), false, 'no pack lookup');
+  for (const [pack, names] of Object.entries(FLAG_PACKS)) assert.equal(names.includes(LAND_TILES_FLAG), false, pack);
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   for (const [config, value] of [[preview, 'true'], [prod, 'false']]) {
-    assert.equal(config.vars[LAND_TILES_FLAG], undefined, 'no new top-level binding');
-    assert.equal(config.vars.HARIMU_GRAY_PACK[LAND_TILES_FLAG], value);
-    assert.equal(Object.keys(config.vars.HARIMU_GRAY_PACK).at(-1), LAND_TILES_FLAG);
+    assert.equal(config.vars[LAND_TILES_FLAG], value, 'one top-level text binding');
+    for (const pack of Object.keys(FLAG_PACKS)) assert.equal(config.vars[pack]?.[LAND_TILES_FLAG], undefined, pack);
     assert.equal(flagOn(config.vars, LAND_TILES_FLAG), value === 'true');
   }
 });
@@ -86,6 +82,6 @@ test('migration 0123 (drizzle/ + db/postgres/) is additive, creates exactly the 
 test('flag off and on: no square purchase, capture() or other runtime file reads the flag or the land tables', () => {
   const files = dir => readdirSync(dir).flatMap(name => { const path = `${dir}/${name}`; return statSync(path).isDirectory() ? files(path) : /\.(ts|tsx|mjs)$/.test(name) ? [path] : []; });
   const readers = ['app', 'lib', 'worker'].flatMap(files).filter(path => /HARIMU_LAND_TILES_ENABLED|land-tiles|\bland_(lots|titles|leases|lease_tiles|starter_grants|title_events)\b|citizen_primary_lot/.test(readFileSync(path, 'utf8')));
-  assert.deepEqual(readers, ['lib/flag-pack.mjs', 'lib/land-tiles.ts']); // the pack registry and the helper only
+  assert.deepEqual(readers, ['lib/land-tiles.ts']); // the helper only
   for (const path of ['lib/siege-actions.ts', 'lib/world-registry.ts']) assert.doesNotMatch(readFileSync(path, 'utf8'), /land_|LAND_TILES/i, path);
 });
