@@ -32,6 +32,7 @@ import { applyQuality, validQualityInput, harvestQuestions, qualityWorkOrderId, 
 import { gradeShift, shiftQualitySecret, issueQualityTicket, redeemQualityTicket, shiftAnswerKey } from '@/lib/shift-quality-key';
 import { marketFlagOn } from '@/lib/market-visibility';
 import { rewards, recoverCapacity, readEconomy, readCapacityProjection, pendingStarterFood, recoveryInterval, settleSql, withholdIncomeTaxSql, settledContributionSql, finishSettledShiftSql } from '@/lib/economy';
+import { recordSettledWage } from '@/lib/spark-origin'; // #465
 import { recoveryIntervalForHome, spaWcBonusEnabled } from '@/lib/spa-recovery'; // #798
 import { shiftRules, readShifts, startShiftSql, debitShiftSql } from '@/lib/work-shifts';
 import {readElection,openPreviewElection,electionIdFor} from '@/lib/elections';
@@ -766,7 +767,7 @@ async function handlePost(request: Request) {
     const taxPercent = incomeTaxPercentNow();
     // One ledger transfer carries both wages and inventory; every write rolls back together.
     // Budget guard is in the insert itself, so concurrent settlements cannot overdraw the pool.
-    await database.batch([
+    const written = await database.batch([
       database.prepare(settleSql).bind(now, shiftId, userId, now),
       // #86: Kindle income tax is withheld from this settlement in the same transaction (only while the flag is on).
       ...(taxPercent > 0 ? [database.prepare(withholdIncomeTaxSql).bind(taxPercent, taxPercent, shiftId, userId, now)] : []),
@@ -778,6 +779,7 @@ async function handlePost(request: Request) {
     const settled = await database.prepare('SELECT shift_id FROM shift_settlements WHERE shift_id = ? AND clerk_user_id = ?')
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return privateJson({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
+    if ((written[0]?.meta?.changes ?? 0) > 0) await recordSettledWage(database, userId, shiftId, Math.floor(Date.parse(now) / 1000)); // #465: this insert only; legacy wages stay unknown
     return privateJson({ ok: true, ...await shiftDayFields(database, userId, Math.floor(Date.parse(now) / 1000)), aurellePlan:await readAurelleView(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
   }
 

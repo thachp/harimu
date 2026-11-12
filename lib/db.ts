@@ -82,6 +82,7 @@ import { hoarvaleBillSchemas } from './hoarvale-assent'; // #1089
 import { listingSchema, fillSchema, cancelSchema, playerReceiptView, openLotsView } from './player-market';
 import { marketItemsSchema, starterSchema, marketEventsSchema, walletViewSql, inventoryViewSql, merchantViewSql, merchantCashSql, marketSeeds } from './market';
 import { economySchema, recoverySchema, rewardSchema, fundSchema, incomeTaxSchema, employerBudgetMinor, rewards } from './economy';
+import { sparkOriginSchemas } from './spark-origin'; // #465
 import { shiftSchema, activeShiftIndex, shiftDayIndex } from './work-shifts';
 import { shiftQualitySchema } from './shift-quality';
 import { env } from 'cloudflare:workers';
@@ -268,6 +269,7 @@ async function initialize(database: GameDatabase) {
   await database.prepare(shiftQualitySchema).run();
 
   await database.batch([database.prepare(economySchema), database.prepare(recoverySchema), database.prepare(rewardSchema), database.prepare(fundSchema), database.prepare(incomeTaxSchema),
+    ...sparkOriginSchemas.map(sql => database.prepare(sql)), // #465
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-employer', ?)").bind(employerBudgetMinor),
     database.prepare("INSERT OR IGNORE INTO economy_funds (id, initial_minor) VALUES ('kindle-treasury', 0)")]);
   await database.batch([

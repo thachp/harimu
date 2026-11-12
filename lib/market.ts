@@ -1,4 +1,5 @@
 import type {GameDatabase} from './database-contract';
+import { recordEconomyEvent } from './spark-origin.ts'; // #465
 export const marketSeeds = [
   ['food', 'Food', 150, 100, 100],
   ['materials', 'Materials', 300, 200, 40],
@@ -144,6 +145,7 @@ export async function executeMarketCommand(db: GameDatabase, userId: string, com
       item, userId, quantity, quantity, quantity, requestId, side, quantity, quantity, side, quantity, quantity).run();
   }
   const completed = await receipt();
+  if (matches(completed) && command.action === 'market-trade') await recordEconomyEvent(db, command.requestId); // #465
   return matches(completed) ? { status: 200 } : { status: 409, error: command.action === 'household-meal'
     ? 'Meal unavailable: check food, capacity, Kindle citizenship and the meal timer.'
     : 'Trade unavailable: check funds, stock, quantity and Kindle citizenship.' };

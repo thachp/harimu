@@ -15,6 +15,7 @@ import { marketGoods, type MarketGood } from './market-orders';
  * Fixed-lot player listings (lib/player-market.ts) stay as they are while this API is behind
  * HARIMU_ORDER_BOOK_ENABLED (default off); #200's board replaces them, and they are retired then.
  */
+import { recordOrderFill } from './spark-origin.ts'; // #465
 import { marketFeeSql } from './market-fee'; // #777
 import { kindleSalesTaxSql } from './kindle-sales-tax'; // #844
 import { orderBookCityId, orderBookLimits, matchOrder, tradeSql, type OrderCommand, type OrderBookState, type RestingOrder } from './order-book-rules';
@@ -68,6 +69,7 @@ export async function matchOpen(db: GameDatabase, orderId: string, now: number, 
       const trade = db.prepare(tradeSql).bind(id, f.qty, f.unitMinor, now, buy, sell, f.qty, f.qty, f.unitMinor, f.unitMinor);
       return [trade, ...(options.fee ? [db.prepare(marketFeeSql).bind(id)] : []), ...(options.salesTax ? [db.prepare(kindleSalesTaxSql).bind(id)] : [])];
     }));
+    for (let i = 0; i < fills.length; i++) await recordOrderFill(db, `t:${orderId}:${round}:${String(i).padStart(3, '0')}`, options); // #465
     if (results.filter((_, i) => i % per === 0).every(r => (r.meta?.changes ?? 0) > 0)) return;
   }
 }
