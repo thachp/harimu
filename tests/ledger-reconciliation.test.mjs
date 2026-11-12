@@ -224,3 +224,26 @@ test('a read never writes: the admin route and the latest-report read leave ever
   await m.readLatestReport(r.db);
   assert.deepEqual(await dump(r), before); assert.equal(JSON.stringify((await r.db.prepare('SELECT * FROM reconciliation_reports').all()).results), reportsBefore);
 });
+
+test('Spark origin lots (#1337): untracked leftover and a matching tracked wallet stay clean; a negative lot and raw lots above holdings are reported and nothing is corrected', async t => {
+  const { r, m } = await setup(t); await seedClean(r);
+  assert.equal((await m.reconcileLedger(r.db)).mismatchCount, 0, 'seeded Spark with no origin rows is untracked leftover, not a mismatch');
+  const at = Math.floor(Date.now() / 1000) - 3600;
+  const addCitizen = (id) => r.db.prepare("INSERT INTO citizens (clerk_user_id,nation_id,display_name,capacity,influence,standing,created_at,updated_at) VALUES (?,'kindle',?,18,0,'Good standing',?,?)").bind(id, id, iso(Date.now()), iso(Date.now())).run();
+  const credit = (id, n) => r.db.prepare("INSERT INTO citizen_economy_events (id,clerk_user_id,kind,item,quantity_delta,wallet_delta,occurred_at) VALUES (?,?,'sell','food',-1,?,?)").bind(`econ-${id}`, id, n, at).run();
+  const origin = (id, origin, delta, tag) => r.db.prepare("INSERT INTO spark_origin_entries (id,clerk_user_id,origin,delta_minor,reason,source_id,occurred_at) VALUES (?,?,?,?,?,?,?)").bind(`${tag}:${id}`, id, origin, delta, 'fixture', tag, at).run();
+  for (const id of ['origin-ok', 'origin-neg', 'origin-over', 'origin-gap']) await addCitizen(id);
+  await credit('origin-ok', 1000); await origin('origin-ok', 'unknown', 1000, 'ok');
+  await origin('origin-neg', 'unknown', -50, 'neg');
+  await credit('origin-over', 1000); await origin('origin-over', 'earned', 1500, 'over');
+  await credit('origin-gap', 700);
+  const before = JSON.stringify((await r.db.prepare('SELECT * FROM spark_origin_entries ORDER BY id').all()).results);
+  const money = await dump(r);
+  const result = await m.reconcileLedger(r.db);
+  const originHits = result.mismatches.filter(x => x.check === 'origin_lot_negative' || x.check === 'origin_lots_over_holdings');
+  assert.ok(originHits.some(x => x.check === 'origin_lot_negative' && x.account === 'origin-neg'), JSON.stringify(result.mismatches));
+  assert.ok(originHits.some(x => x.check === 'origin_lots_over_holdings' && x.account === 'origin-over'), JSON.stringify(result.mismatches));
+  assert.equal(originHits.some(x => x.account === 'origin-ok' || x.account === 'origin-gap' || x.account === 'alice' || x.account === 'bob'), false, JSON.stringify(originHits));
+  assert.deepEqual(JSON.stringify((await r.db.prepare('SELECT * FROM spark_origin_entries ORDER BY id').all()).results), before, 'origin rows were not rewritten');
+  assert.deepEqual(await dump(r), money, 'no wallet, fund or ledger row was touched');
+});
