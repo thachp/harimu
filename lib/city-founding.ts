@@ -10,7 +10,7 @@ import { mapHeight, mapWidth, onGrid, mvpNations, type Zone } from './map-zones'
  */
 export const minCityDistance = 6;
 export const claimRadius = 2;
-/** #1371 docs §15.1 [ASSUMPTION]: an expedition is at least this many `citizens` rows of the founding nation. AI bodies that are not rows are not counted. */
+/** #1371 docs §15.1: at least this many citizens of the founding nation, human or AI. `citizens` has no human/AI column, and no NPC or AI body table belongs to a nation, so the expedition is COUNT(*) of `citizens` for that nation_id. */
 export const expeditionMinCitizens = 10;
 export const cityExpeditionEnabled = (env: unknown) => flagOn(env, 'HARIMU_CITY_EXPEDITION_ENABLED');
 export const foundingAuthorities = {
