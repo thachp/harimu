@@ -1,4 +1,5 @@
 import type { GameDatabase } from './database-contract';
+import { recordSparkSink } from './spark-origin.ts'; // #465
 
 /**
  * #210 (docs 12.5 / 12.8): the real Tessera source for citizens. A Kindle citizen buys Tessera with Spark at a Commons
@@ -82,5 +83,6 @@ export async function buyTessera(db: GameDatabase, userId: string, command: Exch
     return fail(409, 'insufficient_spark', `${(command.tesseraMinor / 100).toFixed(2)} TSR costs ${(cost / 100).toFixed(2)} SPK; you hold ${(sparkMinor / 100).toFixed(2)} SPK.`);
   }
   if (created.clerk_user_id !== userId || Number(created.tessera_minor) !== command.tesseraMinor) return fail(409, 'request_reused', 'That request id was already used for a different exchange.');
+  await recordSparkSink(db, userId, cost, `tessera:${command.requestId}`, 'tessera-exchange', now); // #465: spend keeps origin; it does not mint Tessera eligibility
   return { ok: true, ...(await balances(db, userId)), boughtTesseraMinor: command.tesseraMinor, costSparkMinor: cost };
 }

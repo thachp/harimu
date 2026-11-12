@@ -6,6 +6,7 @@ import type { GameDatabase } from './database-contract';
 import { kindleTreasuryBalanceSql } from './economy';
 import { flagOn } from './flag-pack.mjs';
 import { readReserveBoard } from './spark-supply';
+import { recordSparkIssuance } from './spark-origin.ts'; // #465
 import { DORMANCY_DAYS } from './dormancy-rules';
 export { savingsShieldCreditsSchema } from './market-orders';
 export const savingsShieldEnabled = (env: unknown) => flagOn(env, 'HARIMU_SAVINGS_SHIELD_ENABLED');
@@ -59,5 +60,6 @@ export async function applySavingsShield(db: GameDatabase, userId: string, lastA
   const saved = (await read())!;
   // QA3 nit on #827: only the winning insert logs; a request that lost the race is a replay and stays silent.
   if (won && saved.reason === 'treasury_short') console.warn(`[savings-shield] skipped ${key}: the Kindle treasury cannot cover ${credit}`);
+  if (won && saved.status === 'paid' && Number(saved.credit_minor) > 0) await recordSparkIssuance(db, userId, Number(saved.credit_minor), `shield:${key}`, 'savings-shield', now); // #465
   return { status: saved.status, creditMinor: Number(saved.credit_minor), reason: saved.reason, replayed: !won };
 }

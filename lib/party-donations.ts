@@ -5,6 +5,7 @@
 import type { GameDatabase } from './database-contract';
 import { kindleParties, kindleParty } from './kindle-parties';
 import { donationDisclosureLimit, donationWeek, donationWeeklyCapMinor } from './party-donations-rules';
+import { recordSparkSink } from './spark-origin.ts'; // #465
 export * from './party-donations-rules';
 export { partyDonationsSchema, partyDonationsIndex } from './market-orders';
 
@@ -38,7 +39,7 @@ export async function donate(db: GameDatabase, userId: string, cmd: { partyId: s
     AND COALESCE((SELECT SUM(amount_minor) FROM party_donations WHERE clerk_user_id=? AND party_id=? AND week=?), 0) + ? <= ?
     ON CONFLICT (request_id) DO NOTHING`).bind(cmd.requestId, userId, cmd.partyId, cmd.amountMinor, week, now, userId, cmd.amountMinor, userId, cmd.partyId, week, cmd.amountMinor, donationWeeklyCapMinor).run();
   const written = await db.prepare('SELECT 1 AS x FROM party_donations WHERE request_id=? AND clerk_user_id=?').bind(cmd.requestId, userId).first();
-  if (written) return { ok: true };
+  if (written) { await recordSparkSink(db, userId, cmd.amountMinor, `donation:${cmd.requestId}`, 'party-donation', now); return { ok: true }; } // #465
   const balance = Number((await db.prepare('SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id=?').bind(userId).first<{ balance: number }>())?.balance ?? 0);
   return balance < cmd.amountMinor ? { ok: false, status: 409, error: 'Not enough Spark in your wallet for that donation.', reason: 'insufficient_balance' } : capRefusal();
 }
