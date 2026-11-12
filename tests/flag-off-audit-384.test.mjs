@@ -207,6 +207,7 @@ const flagOffPins = {
   HARIMU_ILMAR_LONG_LIGHT_ENABLED: 'zzzzzzzzzzzzzzzzzz-ilmar-long-light-1260.test.mjs', // #1260 flag off: no longLight key
   HARIMU_VELDWOOD_MARROW_MILLS_ENABLED: 'veldwood-marrow-mills-1275.test.mjs', // #1275 flag off: no resident city
   HARIMU_HOARVALE_AUTO_ASSENT_ENABLED: 'zzzzzzzz-hoarvale-auto-assent-1134.test.mjs', // #1134 flag off: pending bills stay pending
+  HARIMU_BETTER_AUTH_ENABLED: 'better-auth-1318.test.mjs', // #1318 flag off: /api/auth/* is 404 and no database is opened
 };
 
 // #384: boolean switches that are not *_ENABLED. Each one pins its off path in the named test; the rest are deliberate config, pinned by wrangler-prod-501b.

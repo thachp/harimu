@@ -1,0 +1,10 @@
+-- #1318: inert Better Auth tables from `npx auth generate`, then COLLATE "C" and BIGINT epoch milliseconds, plus the permanent phone registry. Additive. Flag HARIMU_BETTER_AUTH_ENABLED.
+-- phone_hmac is HMAC-SHA256 of the E.164 number under Worker secret HARIMU_PHONE_HASH_SECRET. Clearing a number does not remove the row; staff set revoked_at.
+CREATE TABLE IF NOT EXISTS auth_user (id TEXT COLLATE "C" PRIMARY KEY, name TEXT COLLATE "C" NOT NULL, email TEXT COLLATE "C" NOT NULL UNIQUE, email_verified BOOLEAN NOT NULL, image TEXT COLLATE "C", created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL, phone_number TEXT COLLATE "C" UNIQUE, phone_number_verified BOOLEAN);
+CREATE TABLE IF NOT EXISTS auth_session (id TEXT COLLATE "C" PRIMARY KEY, expires_at BIGINT NOT NULL, token TEXT COLLATE "C" NOT NULL UNIQUE, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL, ip_address TEXT COLLATE "C", user_agent TEXT COLLATE "C", user_id TEXT COLLATE "C" NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE);
+CREATE TABLE IF NOT EXISTS auth_account (id TEXT COLLATE "C" PRIMARY KEY, account_id TEXT COLLATE "C" NOT NULL, provider_id TEXT COLLATE "C" NOT NULL, user_id TEXT COLLATE "C" NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE, access_token TEXT COLLATE "C", refresh_token TEXT COLLATE "C", id_token TEXT COLLATE "C", access_token_expires_at BIGINT, refresh_token_expires_at BIGINT, scope TEXT COLLATE "C", password TEXT COLLATE "C", created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL);
+CREATE TABLE IF NOT EXISTS auth_verification (id TEXT COLLATE "C" PRIMARY KEY, identifier TEXT COLLATE "C" NOT NULL, value TEXT COLLATE "C" NOT NULL, expires_at BIGINT NOT NULL, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS auth_session_user_id_idx ON auth_session(user_id);
+CREATE INDEX IF NOT EXISTS auth_account_user_id_idx ON auth_account(user_id);
+CREATE INDEX IF NOT EXISTS auth_verification_identifier_idx ON auth_verification(identifier);
+CREATE TABLE IF NOT EXISTS auth_phone_registry (phone_hmac TEXT COLLATE "C" PRIMARY KEY, user_id TEXT COLLATE "C" NOT NULL UNIQUE, bound_at BIGINT NOT NULL, revoked_at BIGINT);

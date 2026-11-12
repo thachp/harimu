@@ -18,12 +18,19 @@ import { runTesseraRewardCron } from '../lib/tessera-rewards';
 import { runCityTierGrowth } from '../lib/city-tier'; // #952
 import { readVerification } from '../lib/verification';
 import { presenceSocketPath, presenceUpgrade, type PresenceEnv } from '../lib/city-presence';
+import { createAuth, type BetterAuthEnv } from '../lib/better-auth.ts';
 export { CityPresence } from './city-presence';
 
 const worker = {
   async fetch(request: Request, workerEnv: unknown, ctx: ExecutionContext) {
     // WebSocket upgrade for the realtime presence spike (#76); everything else is the vinext app.
-    if (new URL(request.url).pathname === presenceSocketPath) return presenceUpgrade(request, env as unknown as PresenceEnv, { authenticatedUserId, getDatabase, readCityLocation });
+    // #1318: Better Auth is mounted here, not as a vinext catch-all. Flag off or no BETTER_AUTH_SECRET: 404, no database.
+    const pathname = new URL(request.url).pathname;
+    if (pathname === presenceSocketPath) return presenceUpgrade(request, env as unknown as PresenceEnv, { authenticatedUserId, getDatabase, readCityLocation });
+    if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) {
+      const auth = createAuth(workerEnv as BetterAuthEnv, request);
+      return auth ? auth.handler(request) : new Response(null, { status: 404 });
+    }
     return vinext.fetch(request, workerEnv as never, ctx as never);
   },
   // #247: Cron Trigger (wrangler.jsonc "triggers.crons"). AI Cabinet petition responses; a no-op unless enabled.
