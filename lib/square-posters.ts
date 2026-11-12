@@ -130,7 +130,7 @@ export async function applyPoster(db: GameDatabase, userId: string, command: Pos
   if (!frame || !slogan) return fail(409, 'not_in_kit', 'That frame or slogan is not in your nation\'s kit.');
   if (!frameAccepts(kit.nationId, frame, slogan)) return fail(409, 'theme_mismatch', 'That frame only accepts a slogan of the same theme.');
   const text = fillPosterText(slogan.text, await readPosterFills(db, userId, now));
-  if (text === null) return fail(409, 'no_figure', 'That slogan needs a ledger figure that is not available.');
+  if (text === null) return fail(409, 'placeholder', 'That slogan needs a ledger figure that is not available yet.'); // #1367 Architect ruling: keep the #1341 refusal, never a stand-in figure
   await db.batch([
     record(db, userId, command, now),
     db.prepare(`INSERT INTO square_posters(x,y,clerk_user_id,nation_id,frame_id,slogan_id,request_id,placed_at) VALUES (?,?,?,?,?,?,?,?)
