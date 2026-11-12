@@ -7,7 +7,9 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { advanceWorld } from '@/lib/world-simulation';
 import { kindleSalesTaxEnabled } from '@/lib/kindle-sales-tax'; // #844
-import { executeOrderCommand, readOrderBook, validOrderCommand, orderBookLimits } from '@/lib/order-book';
+import { flagOn } from '@/lib/flag-pack.mjs';
+import { postNpcAsksInCity } from '@/lib/npc-supply';
+import { executeOrderCommand, readOrderBook, orderBookVenue, validOrderCommand, orderBookLimits } from '@/lib/order-book';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -25,7 +27,7 @@ export async function GET(request: Request) {
   if (!enabled()) return privateJson({ open: false });
   const db = await getDatabase();
   const ticker = marketTickerOn(env); // #459: the board polls only when this key is present
-  return privateJson({ open: true, book: await readOrderBook(db, userId, { fee: feeOn() }), ...(ticker ? { ticker: true } : {}) });
+  return privateJson({ open: true, book: await readOrderBook(db, userId, { fee: feeOn() }, env), ...(ticker ? { ticker: true } : {}) });
 }
 
 export async function POST(request: Request) {
@@ -43,8 +45,10 @@ export async function POST(request: Request) {
   if (!validOrderCommand(body)) return privateJson({ error: `Send a requestId (UUID) and either a buy/sell order for fruit, meat or wood with quantity 1–${orderBookLimits.maxQty} and an integer limit price 1–${orderBookLimits.maxUnitMinor} Spark cents, or an orderId to cancel.`, reason: 'bad_request' }, 400);
   const command = { ...body, requestId: body.requestId.toLowerCase(), ...('orderId' in body && typeof body.orderId === 'string' ? { orderId: body.orderId.toLowerCase() } : {}) } as typeof body;
   const db = await getDatabase();
+  const now = Math.floor(Date.now() / 1000);
   await advanceWorld(db, undefined, { religiousHarmony: (env as unknown as { HARIMU_RELIGIOUS_HARMONY_ENABLED?: string }).HARIMU_RELIGIOUS_HARMONY_ENABLED === 'true', // #842
     dormancy: (env as unknown as { HARIMU_DORMANCY_ENABLED?: string }).HARIMU_DORMANCY_ENABLED === 'true', npcSupply: true, faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings) }); // #198
-  const result = await executeOrderCommand(db, userId, command, Math.floor(Date.now() / 1000), writeOptions());
-  return privateJson({ ...result, book: await readOrderBook(db, userId, { fee: feeOn() }) }, result.status);
+  if (flagOn(env, 'HARIMU_CITY_LOCAL_BOOKS_ENABLED')) await postNpcAsksInCity(db, await orderBookVenue(db, userId, now, env), now); // #1392
+  const result = await executeOrderCommand(db, userId, command, now, writeOptions(), env);
+  return privateJson({ ...result, book: await readOrderBook(db, userId, { fee: feeOn() }, env) }, result.status);
 }

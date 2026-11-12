@@ -176,7 +176,8 @@ const previewOnFlags = [
   'HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED', // #1349 packed in HARIMU_GRAY_PACK, after grace (index 87)
   'HARIMU_PARTY_CHAT_ENABLED', // #1353 packed in HARIMU_GRAY_PACK, after anti-snowball (index 88)
   'HARIMU_CITY_EXPEDITION_ENABLED', // #1371 packed in HARIMU_GRAY_PACK, after party chat (index 89)
-  'HARIMU_KORUND_MAP_FOG_ENABLED', // #1381 packed in HARIMU_GRAY_PACK, last (index 90)
+  'HARIMU_KORUND_MAP_FOG_ENABLED', // #1381 packed in HARIMU_GRAY_PACK, after expedition (index 90)
+  'HARIMU_CITY_LOCAL_BOOKS_ENABLED', // #1392 packed in HARIMU_GRAY_PACK, last (index 91)
   'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED', // #1134 packed in HARIMU_GRAY_PACK
   'HARIMU_DIPLOMACY_ENABLED',
   'HARIMU_EMBARGO_ENABLED',

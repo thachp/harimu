@@ -18,6 +18,7 @@ import { marketGoods, type MarketGood } from './market-orders';
 import { recordOrderFill } from './spark-origin.ts'; // #465
 import { marketFeeSql } from './market-fee'; // #777
 import { kindleSalesTaxSql } from './kindle-sales-tax'; // #844
+import { flagOn } from './flag-pack.mjs';
 import { orderBookCityId, orderBookLimits, matchOrder, tradeSql, type OrderCommand, type OrderBookState, type RestingOrder } from './order-book-rules';
 export * from './order-book-rules';
 export type BookLevel = { unitMinor: number; qty: number; npc: boolean };
@@ -36,6 +37,17 @@ export const placeSellSql = `${placeOrderBase}
 export const cancelOrderSql = `INSERT INTO market_order_cancellations (request_id, order_id, cancelled_at)
   SELECT ?, o.id, ? FROM market_open_orders o WHERE o.id = ? AND o.citizen_id = ?
     AND NOT EXISTS (SELECT 1 FROM market_orders WHERE id = ?)`;
+const cancelOrderCitySql = `INSERT INTO market_order_cancellations (request_id, order_id, cancelled_at)
+  SELECT ?, o.id, ? FROM market_open_orders o WHERE o.id = ? AND o.citizen_id = ? AND o.city_id = ?
+    AND NOT EXISTS (SELECT 1 FROM market_orders WHERE id = ?)`;
+const localBooksFlag = 'HARIMU_CITY_LOCAL_BOOKS_ENABLED';
+const localBooks = (env: unknown) => flagOn(env, localBooksFlag);
+/** Flag off is the single `'kindle'` venue. Flag on is the stored current city, or `'kindle'` when there is none. */
+export async function orderBookVenue(db: GameDatabase, userId: string, _now: number, env?: unknown): Promise<string> {
+  if (!localBooks(env)) return orderBookCityId;
+  const row = await db.prepare('SELECT current_city_id FROM citizen_city_locations WHERE user_id=?').bind(userId).first<{ current_city_id: string | null }>();
+  return row?.current_city_id || orderBookCityId;
+}
 
 type Receipt = { kind: 'place' | 'cancel'; id: string; citizen_id: string | null; side: string; good: string; qty: number; limit_unit_minor: number; order_id: string | null };
 const sameIntent = (r: Receipt | null, userId: string, c: OrderCommand) => !!r && r.citizen_id === userId && (c.action === 'market-order-place'
@@ -91,17 +103,20 @@ export async function refusedCheck(db: GameDatabase, userId: string, command: Ex
   return undefined;
 }
 
-export async function executeOrderCommand(db: GameDatabase, userId: string, command: OrderCommand, now: number, options: { fee?: boolean; salesTax?: boolean } = {}): Promise<{ status: number; replayed?: boolean; error?: string; refusedCheck?: RefusedCheck }> {
+export async function executeOrderCommand(db: GameDatabase, userId: string, command: OrderCommand, now: number, options: { fee?: boolean; salesTax?: boolean } = {}, env?: unknown): Promise<{ status: number; replayed?: boolean; error?: string; refusedCheck?: RefusedCheck }> {
   const find = () => db.prepare(receiptSql).bind(command.requestId, command.requestId).first<Receipt>();
   const existing = await find();
   if (existing) return sameIntent(existing, userId, command) ? { status: 200, replayed: true } : { status: 409, error: 'Request identifier already used for another intent.' };
+  const city = await orderBookVenue(db, userId, now, env);
   try {
     if (command.action === 'market-order-place') {
-      const base = [command.requestId, orderBookCityId, command.side, command.good, command.qty, command.limitUnitMinor, now,
+      const base = [command.requestId, city, command.side, command.good, command.qty, command.limitUnitMinor, now,
         userId, orderBookLimits.maxOpenOrders, command.requestId];
       await (command.side === 'buy'
         ? db.prepare(placeBuySql).bind(...base, command.qty * command.limitUnitMinor)
         : db.prepare(placeSellSql).bind(...base, command.good, command.qty)).run();
+    } else if (localBooks(env)) {
+      await db.prepare(cancelOrderCitySql).bind(command.requestId, now, command.orderId, userId, city, command.requestId).run();
     } else {
       await db.prepare(cancelOrderSql).bind(command.requestId, now, command.orderId, userId, command.requestId).run();
     }
@@ -120,15 +135,20 @@ export async function executeOrderCommand(db: GameDatabase, userId: string, comm
   return { status: 200 };
 }
 
-export async function readOrderBook(db: GameDatabase, userId: string, options: { fee?: boolean; salesTax?: boolean } = {}): Promise<OrderBookState> {
+export async function readOrderBook(db: GameDatabase, userId: string, options: { fee?: boolean; salesTax?: boolean } = {}, env?: unknown): Promise<OrderBookState> {
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>();
+  const local = localBooks(env), city = await orderBookVenue(db, userId, Math.floor(Date.now() / 1000), env);
   type Row = { good: string; side: string; limit_unit_minor: number; qty: number; npc: number };
   const levels = (await db.prepare(`SELECT good, side, limit_unit_minor, SUM(remaining) AS qty, MAX(CASE WHEN npc_id IS NULL THEN 0 ELSE 1 END) AS npc
-    FROM market_open_orders WHERE city_id = ? GROUP BY good, side, limit_unit_minor`).bind(orderBookCityId).all<Row>()).results;
-  const last = await Promise.all(marketGoods.map(g => db.prepare('SELECT unit_minor FROM market_trades WHERE good = ? ORDER BY filled_at DESC, id DESC LIMIT 1')
-    .bind(g.good).first<{ unit_minor: number }>()));
-  const mine = (await db.prepare(`SELECT id, side, good, qty, remaining, limit_unit_minor, created_at FROM market_open_orders WHERE citizen_id = ?
-    ORDER BY created_at DESC, id`).bind(userId).all<{ id: string; side: 'buy' | 'sell'; good: MarketGood; qty: number; remaining: number; limit_unit_minor: number; created_at: number }>()).results;
+    FROM market_open_orders WHERE city_id = ? GROUP BY good, side, limit_unit_minor`).bind(city).all<Row>()).results;
+  const lastSql = local
+    ? 'SELECT t.unit_minor FROM market_trades t JOIN market_orders s ON s.id = t.sell_order_id WHERE t.good = ? AND s.city_id = ? ORDER BY t.filled_at DESC, t.id DESC LIMIT 1'
+    : 'SELECT unit_minor FROM market_trades WHERE good = ? ORDER BY filled_at DESC, id DESC LIMIT 1';
+  const last = await Promise.all(marketGoods.map(g => db.prepare(lastSql).bind(...(local ? [g.good, city] : [g.good])).first<{ unit_minor: number }>()));
+  const mineSql = local
+    ? `SELECT id, side, good, qty, remaining, limit_unit_minor, created_at FROM market_open_orders WHERE citizen_id = ? AND city_id = ? ORDER BY created_at DESC, id`
+    : `SELECT id, side, good, qty, remaining, limit_unit_minor, created_at FROM market_open_orders WHERE citizen_id = ? ORDER BY created_at DESC, id`;
+  const mine = (await db.prepare(mineSql).bind(...(local ? [userId, city] : [userId])).all<{ id: string; side: 'buy' | 'sell'; good: MarketGood; qty: number; remaining: number; limit_unit_minor: number; created_at: number }>()).results;
   // #777 (flag on only, read-only): the citizen's latest fee lines.
   const fees = options.fee ? (await db.prepare(`SELECT f.trade_id, t.good, t.qty, t.unit_minor, f.fee_minor, t.filled_at FROM market_trade_fees f JOIN market_trades t ON t.id = f.trade_id
     WHERE f.seller_id = ? ORDER BY t.filled_at DESC, f.trade_id DESC LIMIT 5`).bind(userId).all<{ trade_id: string; good: string; qty: number; unit_minor: number; fee_minor: number; filled_at: number }>()).results : null;
