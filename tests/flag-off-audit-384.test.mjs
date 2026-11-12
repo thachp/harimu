@@ -39,6 +39,7 @@ const flagOffPins = {
   HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED: 'city-festival-host-note-1285.test.mjs', // #1285 flag off: no festivalHostNote key, panel unchanged
   HARIMU_SQUARE_PURCHASE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_SQUARE_POSTERS_ENABLED: 'square-posters-1341.test.mjs', // #1341 flag off: no poster read or write
+  HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED: 'square-price-anti-snowball-1349.test.mjs', // #1349 flag off: listed and charged price stay 2500; purchase SQL is the #122 path
   HARIMU_TESSERA_EXCHANGE_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_TEST_FAUCET_ENABLED: 'test-faucet-631.test.mjs',
   HARIMU_LABOR_BUREAU_ENABLED: 'labor-bureau-235.test.mjs',
