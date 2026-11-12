@@ -123,7 +123,7 @@ test('both flags on: the three cities return their note and the government clock
   for (const nationId of ['kindle', 'confluence', 'meridian', 'korund', 'aurelle', 'ilmar', 'hoarvale', 'varkand', 'veldwood', 'fulmara']) {
     const extra = nationId === 'kindle' ? [{ id: 'emberwell' }] : [];
     for (const city of [...citiesForNation(nationId), ...extra]) {
-      if (hosted.has(`${nationId}:${city.id}`) || (nationId === 'korund' && city.id === 'stonehearth') || (nationId === 'veldwood' && city.id === 'ringhall') || (nationId === 'meridian' && city.id === 'steamgate')) continue; // #1373 Stonehearth, #1377 Ringhall, #1384 Steamgate, when their festival flags are on
+      if (hosted.has(`${nationId}:${city.id}`) || (nationId === 'korund' && city.id === 'stonehearth') || (nationId === 'veldwood' && city.id === 'ringhall') || (nationId === 'meridian' && city.id === 'steamgate') || (nationId === 'fulmara' && city.id === 'arcport')) continue; // #1373 Stonehearth, #1377 Ringhall, #1384 Steamgate, #1386 Arcport, when their festival flags are on
       const other = await show('alice', nationId, city.id);
       absent(other.data);
       for (const host of hosts) assert.equal(JSON.stringify(other.data).includes(host.note), false, city.id);
