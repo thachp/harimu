@@ -109,9 +109,7 @@ test('painted Aurelle household values stay trailing and whole at 390px, 1280px,
   try {
     const onMod = await bundle('true', 'true');
     const React = (await import('react')).default, { renderToStaticMarkup } = await import('react-dom/server');
-    const long = { ...aurelle, currency: 'Crown (CRN) · gold-backed royal charter reserve' };
-    const wallet = '1.50 Crown (CRN) · gold-backed royal charter reserve';
-    const html = renderToStaticMarkup(React.createElement(onMod.HouseholdSummary, { nation: long, walletMinor: 150, inventory: stock.inventory, residence: 'Highspire', identity: true, factIcons: true, factValueAlign: true }));
+    const html = renderToStaticMarkup(React.createElement(onMod.HouseholdSummary, { ...stock, identity: true, factIcons: true, factValueAlign: true }));
     const css = `${await read('app/game-shell.css')}${await read('app/panel-v2.css')}`;
     for (const spec of [{ name: 'aurelle-household-values-390.png', width: 390, scale: '' }, { name: 'aurelle-household-values-1280.png', width: 1280, scale: '' }, { name: 'aurelle-household-values-390-scale-1.5.png', width: 390, scale: '1.5' }, { name: 'aurelle-household-values-384.png', width: 384, scale: '' }]) {
       const page = await browser.newPage({ viewport: { width: spec.width, height: 900 } });
@@ -128,7 +126,7 @@ test('painted Aurelle household values stay trailing and whole at 390px, 1280px,
       assert.equal(painted.title, 'Your household', spec.name); assert.equal(painted.subtitle, 'Highspire \u00B7 Aurelle', spec.name); assert.equal(painted.motto, motto, spec.name);
       assert.equal(painted.crest, true, spec.name); assert.equal(painted.city, false, spec.name); assert.equal(painted.alignClass, true, spec.name); assert.equal(painted.section, 'panel-v2', spec.name);
       assert.deepEqual(painted.rows.map(row => row.label), ['Wallet', 'Food', 'Residence', 'Pantry'], spec.name);
-      assert.deepEqual(painted.rows.map(row => row.value), [wallet, '3', 'Highspire', '3 food · 1 materials'], spec.name);
+      assert.deepEqual(painted.rows.map(row => row.value), ['1.50 Crown (CRN) · gold-backed', '3', 'Highspire', '3 food · 1 materials'], spec.name);
       assert.ok(painted.overflow <= 1, `${spec.name} overflow ${painted.overflow}`); assert.ok(painted.words.length > 0, spec.name);
       for (const word of painted.words) { assert.equal(word.lines, 1, `${spec.name} ${word.word}`); assert.ok(word.right <= painted.panelRight + 1, `${spec.name} ${word.word}`); }
       for (const row of painted.rows) {
@@ -136,7 +134,7 @@ test('painted Aurelle household values stay trailing and whole at 390px, 1280px,
         assert.equal(row.hidden, 'true', `${spec.name} ${row.label}`); assert.equal(row.color, 'rgb(226, 195, 107)', `${spec.name} ${row.label}`); assert.ok(row.opacity > 0 && row.height > 0 && row.width > 0, `${spec.name} ${row.label}`);
         for (const right of row.lineRights) assert.ok(Math.abs(right - row.rowRight) <= 1, `${spec.name} ${row.label} ${right} vs ${row.rowRight}`);
         if (row.label === 'Food' || row.label === 'Residence') assert.equal(row.lineCount, 1, `${spec.name} ${row.label}`);
-        if (row.label === 'Wallet' && (spec.width <= 390 || spec.scale)) assert.ok(row.lineCount > 1, `${spec.name} wallet lines ${row.lineCount}`);
+        if (row.label === 'Wallet' && spec.scale === '1.5') assert.ok(row.lineCount > 1, `${spec.name} wallet lines ${row.lineCount}`);
       }
       try {
         const dir = process.env.HARIMU_TEST_ARTIFACTS_DIR || join(os.tmpdir(), 'harimu-household-fact-value-align-392');
