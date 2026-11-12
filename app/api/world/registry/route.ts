@@ -3,7 +3,7 @@ import { env } from 'cloudflare:workers';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
-import { buySquare, parsePurchaseCommand, readTessera, squarePriceMinor } from '@/lib/world-registry';
+import { buySquare, parsePurchaseCommand, readTessera, registryPriceMinor } from '@/lib/world-registry';
 import { applyPoster, parsePosterCommand, postersEnabled, readSquarePoster } from '@/lib/square-posters';
 import { buyTessera, parseExchangeCommand, sparkPerTessera, kioskMinTesseraMinor, kioskMaxTesseraMinor } from '@/lib/tessera-exchange';
 
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   const db = await getDatabase();
-  const listing = { open: enabled(), priceMinor: squarePriceMinor, currency: 'TSR', tesseraMinor: await readTessera(db, userId),
+  const listing = { open: enabled(), priceMinor: await registryPriceMinor(db, userId, env), currency: 'TSR', tesseraMinor: await readTessera(db, userId),
     kiosk: { open: exchangeEnabled(), sparkPerTessera, minTesseraMinor: kioskMinTesseraMinor, maxTesseraMinor: kioskMaxTesseraMinor } };
   // #1341: one square's poster. Flag off leaves this payload unchanged and does not read the poster table. Not attached to GET /api/world/squares.
   if (!postersEnabled(env)) return privateJson(listing);
@@ -61,6 +61,6 @@ export async function POST(request: Request) {
   }
   const command = parsePurchaseCommand(body);
   if (!command) return privateJson({ error: 'Send action "buy-square", integer x/y and a requestId.', reason: 'bad_request' }, 400);
-  const result = await buySquare(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), enabled());
+  const result = await buySquare(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), enabled(), env);
   return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }
