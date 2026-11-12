@@ -475,3 +475,14 @@ CREATE VIEW citizen_inventory_balances AS
 CREATE TABLE nation_stability_scores(nation_id TEXT COLLATE "C" NOT NULL CHECK(nation_id IN('kindle','korund','aurelle')),tick BIGINT NOT NULL CHECK(tick>0),scheduled_at BIGINT NOT NULL,computed_at BIGINT NOT NULL,stability BIGINT NOT NULL CHECK(stability BETWEEN 0 AND 100),unrest BIGINT NOT NULL CHECK(unrest BETWEEN 0 AND 100),inputs_json TEXT COLLATE "C" NOT NULL,breakdown_json TEXT COLLATE "C" NOT NULL,PRIMARY KEY(nation_id,tick));
 
 CREATE INDEX idx_nation_stability_time ON nation_stability_scores(nation_id,scheduled_at);
+
+-- #1318 Better Auth (inert). Same columns as 0122_better_auth.sql. Times are BIGINT unix milliseconds. Phone registry rows are never deleted.
+CREATE TABLE auth_user(id TEXT COLLATE "C" PRIMARY KEY NOT NULL,name TEXT COLLATE "C" NOT NULL,email TEXT COLLATE "C" NOT NULL UNIQUE,email_verified BOOLEAN NOT NULL,image TEXT COLLATE "C",created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,phone_number TEXT COLLATE "C" UNIQUE,phone_number_verified BOOLEAN);
+CREATE TABLE auth_session(id TEXT COLLATE "C" PRIMARY KEY NOT NULL,expires_at BIGINT NOT NULL,token TEXT COLLATE "C" NOT NULL UNIQUE,created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,ip_address TEXT COLLATE "C",user_agent TEXT COLLATE "C",user_id TEXT COLLATE "C" NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE);
+CREATE TABLE auth_account(id TEXT COLLATE "C" PRIMARY KEY NOT NULL,account_id TEXT COLLATE "C" NOT NULL,provider_id TEXT COLLATE "C" NOT NULL,user_id TEXT COLLATE "C" NOT NULL REFERENCES auth_user(id) ON DELETE CASCADE,access_token TEXT COLLATE "C",refresh_token TEXT COLLATE "C",id_token TEXT COLLATE "C",access_token_expires_at BIGINT,refresh_token_expires_at BIGINT,scope TEXT COLLATE "C",password TEXT COLLATE "C",created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL);
+CREATE TABLE auth_verification(id TEXT COLLATE "C" PRIMARY KEY NOT NULL,identifier TEXT COLLATE "C" NOT NULL,value TEXT COLLATE "C" NOT NULL,expires_at BIGINT NOT NULL,created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL);
+CREATE INDEX auth_session_user_id_idx ON auth_session(user_id);
+CREATE INDEX auth_account_user_id_idx ON auth_account(user_id);
+CREATE INDEX auth_verification_identifier_idx ON auth_verification(identifier);
+CREATE TABLE auth_phone_registry(phone_hmac TEXT COLLATE "C" PRIMARY KEY CHECK(phone_hmac ~ '^[0-9a-f]{64}$'),user_id TEXT COLLATE "C" NOT NULL UNIQUE CHECK(user_id <> ''),bound_at BIGINT NOT NULL CHECK(bound_at > 0),revoked_at BIGINT NULL CHECK(revoked_at IS NULL OR revoked_at >= bound_at));
+
