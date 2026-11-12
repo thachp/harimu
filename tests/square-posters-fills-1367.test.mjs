@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
 
 const FLAG = 'HARIMU_SQUARE_POSTERS_ENABLED';
+const korundPlanWeekSeconds = 50400; // lib/korund-plan-stats.ts
 const own = (r, user, nation, x, y) => r.db.prepare('INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at) VALUES (?,?,?,?,?,2500,1)').bind(`buy-${user}-${x}-${y}`, user, nation, x, y).run();
 const place = (r, over = {}) => r.call('world/registry', 'bob', { action: 'place-poster', x: 3, y: 3, frameId: 'korund-frame-mosaic', sloganId: 'korund-slogan-02', requestId: 'poster-fill-0001', ...over });
 const read = (r) => r.call('world/registry', 'alice', undefined, 'https://fixture.invalid', '?x=3&y=3');
@@ -45,6 +46,24 @@ for (const backend of ['sqlite', 'postgres']) {
     const replay = await place(r);
     assert.equal(replay.data.replay, true);
     assert.equal(replay.data.poster.text, 'Output at 120% of plan.');
+  });
+
+  test(`#1367 ${backend}: an open week with no settlement refuses {output_pct} with 409 placeholder, never 0%`, async t => {
+    const r = await setup(t, backend);
+    const refused = await place(r, { requestId: 'poster-fill-empty1' });
+    assert.equal(refused.status, 409);
+    assert.equal(refused.data.reason, 'placeholder');
+    assert.equal((await read(r)).data.poster ?? null, null, 'nothing was placed');
+  });
+
+  test(`#1367 ${backend}: last week's poster shows no figure once a new empty week opens`, async t => {
+    const r = await setup(t, backend);
+    await settleFood(r, 44);
+    assert.equal((await place(r, { requestId: 'poster-fill-week1' })).data.poster.text, 'Output at 110% of plan.');
+    r.setNow(r.now + korundPlanWeekSeconds * 1000); // next plan week, no settlements yet
+    const text = (await read(r)).data.poster.text;
+    assert.doesNotMatch(text, /\d+%/, 'no stand-in figure on read');
+    assert.equal(text, 'Output at {output_pct} of plan.');
   });
 
   test(`#1367 ${backend}: {city} uses the owner's home city, or the capital when none is stored`, async t => {

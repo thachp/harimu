@@ -33,8 +33,9 @@ export async function readPosterFills(db: GameDatabase, userId: string, now: num
   const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{ epoch_seconds: number }>();
   const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now / 7200) * 7200;
   const span = korundPlanWindow(epoch, now);
-  const food = await db.prepare('SELECT COALESCE(SUM(food_output),0) AS plan_food FROM korund_settlements WHERE settled_at>=? AND settled_at<?').bind(span.start, span.end).first<{ plan_food: number }>();
-  const percent = planFulfilmentPercent(Number(food?.plan_food ?? 0), korundWeeklyQuotaFood);
+  const food = await db.prepare('SELECT COUNT(*) AS settled, COALESCE(SUM(food_output),0) AS plan_food FROM korund_settlements WHERE settled_at>=? AND settled_at<?').bind(span.start, span.end).first<{ settled: number; plan_food: number }>();
+  // #1368 review: an open week with no settlement has no figure yet, so {output_pct} stays unset (place: 409 placeholder; never "0%").
+  const percent = Number(food?.settled ?? 0) > 0 ? planFulfilmentPercent(Number(food?.plan_food ?? 0), korundWeeklyQuotaFood) : null;
   const loc = await db.prepare('SELECT home_city_id FROM citizen_city_locations WHERE user_id=? AND nation_id=?').bind(userId, 'korund').first<{ home_city_id: string }>();
   const city = cityForNation('korund', loc?.home_city_id ?? '') ?? capitalCityForNation('korund');
   const last = await db.prepare('SELECT job_id, assigned_at FROM korund_job_assignments WHERE clerk_user_id=? ORDER BY assigned_at DESC LIMIT 1').bind(userId)
