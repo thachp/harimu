@@ -97,12 +97,12 @@ test('the flag is preview true and production false inside HARIMU_GRAY_PACK, and
   assert.equal(prod.vars[key], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[key], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[key], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).at(-22), key, '#1193 follows');
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).at(-22), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-22), key);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-23), 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-21), 'HARIMU_WORLD_ATLAS_READS_ENABLED');
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-20), 'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(key), 60, '#1193 follows');
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(key), 60);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(key), 60);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED'), 59);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_WORLD_ATLAS_READS_ENABLED'), 61);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_VARKAND_ROTATION_DAY_ENABLED'), 62);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, key), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, key), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [key]: 'false' }, key), false, 'a direct string wins');
