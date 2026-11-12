@@ -19,6 +19,7 @@ import { readKorund, validKorundCommand, executeKorund } from '@/lib/korund';
 import { korundRationStabilityEnabled, korundStabilityRecoveryEnabled } from '@/lib/korund-coupons'; // #967, #983
 import { korundStandingEnabled } from '@/lib/korund-standing-rules'; // #994
 import { flagOn } from '@/lib/flag-pack.mjs'; // #988
+import { evacuationEnabled, readEvacuationNotice } from '@/lib/war-evacuation'; // #1324
 import { varkandRecruitTerm } from '@/lib/varkand-recruit-term'; // #1095
 import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
@@ -281,6 +282,7 @@ export async function GET(request: Request) {
   const shiftDay = await shiftDayFields(database, userId, readNow);
   // #1095: flag off, or any nation but Varkand, adds no key. created_at is already on the profile row.
   const nationalService = profile && flagOn(env, 'HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED') ? varkandRecruitTerm(profile, Date.now()) : null;
+  const evacuation = profile && evacuationEnabled(env) ? await readEvacuationNotice(database, userId) : null; // #1324: absent unless both flags are on and this citizen was moved
   return privateJson({ ...(flagPlayable ? { openNations: playable } : {}), ...(cycleStartAt != null ? { cycleStartAt } : {}), ...shiftDay,
     aurellePlan,
     election:profile?.nation_id==='kindle'?{...election,...(accountLevel?{id:accountIdFor(election!.id)}:{})}:null,
@@ -299,6 +301,7 @@ export async function GET(request: Request) {
     government: await withHoarvaleBills(database, await withPolicyLedger(database, governmentRead ? { ...publicGovernmentSnapshot(governmentRead)!, ...(founding && isFoundingNation(profile?.nation_id) ? { founding } : {}), ...(succession && profile?.nation_id === 'aurelle' ? (({ succession: s, crown }) => ({ succession: s, ...(crown ? { crown } : {}) }))(publicSuccession(succession)) : {}) } : null, env), env, civicNow, profile?.nation_id), // #612 founding/succession; #985 ledger; #1089 bills
     shifts,
     ...(nationalService ? { nationalService } : {}),
+    ...(evacuation ? { evacuation: { lines: evacuation } } : {}), // #1324
     profile: profile
       ? serializeProfile(profile, decision ?? null, Boolean(politicalAction?.political_action_taken))
       : null,
