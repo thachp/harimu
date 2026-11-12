@@ -80,5 +80,7 @@
 /* #392 UI 67. Household fact icons only. 18px at 100% text, scaling with --text-scale. Fact words stay whole. The City panel is unchanged. */
 .household-v2 .panel-v2-facts .panel-v2-icon svg{flex:none;font-size:calc(18px * var(--text-scale, 1));width:1em;height:1em}
 .household-v2 .panel-v2-facts :is(dt,dd){overflow-wrap:normal;word-break:normal;hyphens:none;text-wrap:pretty}
+/* #392 UI 68. Household fact values sit on the trailing edge of the row. The class is on the household only while the flag is on, and only fact rows match, so wrapping stats stay left. Whole words. City, Nation, and World stay as they are. */
+.household-v2.household-v2-fact-value-align .panel-v2-facts dd{text-align:right;overflow-wrap:normal;word-break:normal;hyphens:none}
 /* #392 S7 follow-up: City rows and the Household primary carry the same decorative icon as the City pills (UI_V2_CITY), in the pills' gold. */
 .panel-v2 .panel-v2-icon,.nation-overview .panel-v2-icon{display:inline-flex;flex:none;color:#e2c36b}.panel-v2 .panel-v2-rows button>span:nth-child(2){flex:1}.panel-v2 button.panel-v2-primary>span:nth-child(2),.panel-v2 button.panel-v2-secondary>span:nth-child(2){flex:1}
