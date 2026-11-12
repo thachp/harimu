@@ -4,6 +4,7 @@
  *  Flag HARIMU_GLOBAL_CHAT_ENABLED (off in production). DMs follow. */
 import type { GameDatabase } from './database-contract';
 import { isShadowMuted, type MuteWindow } from './chat-shadow-mute';
+import type { VarkandAlert } from './home-move';
 
 export const globalChatSchemas = [
   `CREATE TABLE IF NOT EXISTS global_chat_messages (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id), nation_id TEXT NOT NULL, body TEXT NOT NULL CHECK(length(body) BETWEEN 1 AND 280), posted_at INTEGER NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`,
@@ -13,9 +14,24 @@ export const globalChatSchemas = [
 export const globalChatFlagOn = (b: unknown) => (b as { HARIMU_GLOBAL_CHAT_ENABLED?: string })?.HARIMU_GLOBAL_CHAT_ENABLED === 'true';
 export const globalChatRetentionSeconds = 604800, globalChatGapSeconds = 10, globalChatHourlyLimit = 20, globalChatPageSize = 50;
 
-/** Inserts only for an enrolled citizen (nation taken from the citizens row, never the client), inside the rate limits. 0 changes: replay, limit or unenrolled. */
+/** #1354 (docs §18.1 Global channel): Korund citizens cannot see the global channel and Varkand citizens lose it at Red Alert. The hidden radio item and
+ *  trade-delegate exceptions are out of scope, as in lib/diplomatic-hall.ts. Wording follows the neutral Diplomatic Hall refusals (#600). */
+export const globalChatRefusals = {
+  nation_closed: 'The global channel is closed to your nation.',
+  alert_closed: 'The global channel is closed to your nation during a Red Alert.',
+} as const;
+export type GlobalChatRefusal = keyof typeof globalChatRefusals;
+/** Why this nation cannot use the channel now, or null. `alert` is Varkand's stored level (Green when HARIMU_VARKAND_ALERT_ENABLED is off). */
+export function globalChatClosedFor(nationId: string, alert: VarkandAlert = 'green'): GlobalChatRefusal | null {
+  if (nationId === 'korund') return 'nation_closed';
+  if (nationId === 'varkand' && alert === 'red') return 'alert_closed';
+  return null;
+}
+
+/** Inserts only for an enrolled citizen (nation taken from the citizens row, never the client), inside the rate limits. 0 changes: replay, limit or unenrolled.
+ *  #1354: a Korund author is refused in the insert too, so a nation change between the route check and the write cannot slip a post in. */
 export const postGlobalChatSql = `INSERT INTO global_chat_messages(id,user_id,nation_id,body,posted_at)
-SELECT ?, clerk_user_id, nation_id, ?, ? FROM citizens WHERE clerk_user_id=? AND nation_id IS NOT NULL
+SELECT ?, clerk_user_id, nation_id, ?, ? FROM citizens WHERE clerk_user_id=? AND nation_id IS NOT NULL AND nation_id<>'korund'
 AND NOT EXISTS (SELECT 1 FROM global_chat_messages WHERE id=?)
 AND NOT EXISTS (SELECT 1 FROM global_chat_messages WHERE user_id=? AND posted_at>?)
 AND (SELECT COUNT(*) FROM global_chat_messages WHERE user_id=? AND posted_at>?)<${globalChatHourlyLimit}`;

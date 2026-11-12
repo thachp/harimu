@@ -31,15 +31,15 @@ for (const backend of ['sqlite', 'postgres']) {
   test(`#881g ${backend}: one feed across nations, labeled with each author's server-side nation; unenrolled and anonymous are refused`, async t => {
     const c = await setup(t, backend);
     assert.equal((await c.r.call('global-chat', null)).status, 401);
-    await c.citizen('kora', 'korund'); await c.citizen('aure', 'aurelle'); await c.citizen('nomad', null);
+    await c.citizen('hoar', 'hoarvale'); await c.citizen('aure', 'aurelle'); await c.citizen('nomad', null);
     assert.equal((await c.r.call('global-chat', 'nomad')).status, 403); assert.equal((await c.post('nomad', 'let me in')).status, 403);
     const a = await c.post('alice', '  hello world  ', { nationId: 'korund' }); assert.equal(a.status, 200); assert.equal(a.cache, 'private, no-store');
-    c.later(1); assert.equal((await c.post('kora', 'greetings from Korund')).status, 200);
+    c.later(1); assert.equal((await c.post('hoar', 'greetings from Hoarvale')).status, 200);
     c.later(1); assert.equal((await c.post('aure', 'and Aurelle')).status, 200);
-    for (const viewer of ['alice', 'bob', 'kora', 'aure']) {
+    for (const viewer of ['alice', 'bob', 'hoar', 'aure']) {
       const feed = (await c.read(viewer)).messages;
-      assert.deepEqual(feed.map(m => [m.body, m.nationId]), [['hello world', 'kindle'], ['greetings from Korund', 'korund'], ['and Aurelle', 'aurelle']], viewer);
-      assert.deepEqual(feed.map(m => m.mine), feed.map((_, i) => ({ alice: 0, kora: 1, aure: 2 })[viewer] === i));
+      assert.deepEqual(feed.map(m => [m.body, m.nationId]), [['hello world', 'kindle'], ['greetings from Hoarvale', 'hoarvale'], ['and Aurelle', 'aurelle']], viewer);
+      assert.deepEqual(feed.map(m => m.mine), feed.map((_, i) => ({ alice: 0, hoar: 1, aure: 2 })[viewer] === i));
       assert.ok(feed.every(m => /^Citizen-[0-9a-f]{16}$/.test(m.handle)));
     }
     assert.equal(Number((await c.r.db.prepare('SELECT COUNT(*) AS n FROM square_messages').first()).n) + Number((await c.r.db.prepare('SELECT COUNT(*) AS n FROM city_chat_messages').first()).n), 0, 'square and city chat untouched');
@@ -67,20 +67,20 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 
   test(`#881g ${backend}: own-post delete, 7-day retention, shadow-mute, and reports from anyone but the author`, async t => {
-    const c = await setup(t, backend); c.r.setFixtureEnv('HARIMU_REPORTS_ENABLED', 'true'); await c.citizen('kora', 'korund'); await c.citizen('nomad', null);
+    const c = await setup(t, backend); c.r.setFixtureEnv('HARIMU_REPORTS_ENABLED', 'true'); await c.citizen('hoar', 'hoarvale'); await c.citizen('nomad', null);
     const res = await c.post('bob', 'report me'); assert.equal(res.data.reportsEnabled, true); const msg = res.data.messages[0].id;
     const report = user => c.r.call('reports', user, { requestId: randomUUID(), targetKind: 'citizen-message', targetId: msg, reasonId: 'spam-other' });
     assert.equal((await report('bob')).status, 404, 'not by its author');
-    assert.equal((await report('kora')).status, 201, 'another nation can report a global message');
+    assert.equal((await report('hoar')).status, 201, 'another nation can report a global message');
     assert.equal((await report('alice')).status, 201);
     assert.equal((await c.r.call('global-chat', 'alice', { action: 'delete', id: msg })).status, 404, "not alice's");
     const del = await c.r.call('global-chat', 'bob', { action: 'delete', id: msg }); assert.equal(del.status, 200); assert.deepEqual(del.data.messages, []);
     assert.equal((await c.r.call('global-chat', 'bob', { action: 'delete', id: msg })).status, 404, 'once');
     await c.citizen('carl', 'kindle'); assert.equal((await report('carl')).status, 404, 'a deleted message is not reportable');
     c.later(11); assert.equal((await c.post('alice', 'keep me')).status, 200);
-    c.r.setFixtureEnv('HARIMU_CHAT_SHADOW_MUTE', `kora@${new Date(c.r.now).toISOString().replace(/\.\d{3}Z$/, 'Z')}`);
-    c.later(1); assert.equal((await c.post('kora', 'muted words')).status, 200);
-    assert.deepEqual((await c.read('kora')).messages.map(m => m.body), ['keep me', 'muted words'], 'the author still sees it');
+    c.r.setFixtureEnv('HARIMU_CHAT_SHADOW_MUTE', `hoar@${new Date(c.r.now).toISOString().replace(/\.\d{3}Z$/, 'Z')}`);
+    c.later(1); assert.equal((await c.post('hoar', 'muted words')).status, 200);
+    assert.deepEqual((await c.read('hoar')).messages.map(m => m.body), ['keep me', 'muted words'], 'the author still sees it');
     assert.deepEqual((await c.read('alice')).messages.map(m => m.body), ['keep me'], 'nobody else does');
     c.r.setFixtureEnv('HARIMU_CHAT_SHADOW_MUTE', undefined);
     c.later(7 * 86400 + 60); assert.deepEqual((await c.read('alice')).messages, []); assert.equal(await c.count(), 0, 'purged after 7 days');
