@@ -35,7 +35,7 @@ test('interrupted submission blocks changing rankings and retries the identical 
 });
 test('only a closed snapshot renders aggregate counts and foreign namespace cannot replace current state',async()=>{
  const data=snapshot();data.result={winner:ids[2],humanBallots:2,simulatedPublicUnits:2,weightScale:4,rounds:[{human:{[ids[0]]:0,[ids[1]]:0,[ids[2]]:2},simulatedUnits:{[ids[0]]:2,[ids[1]]:0,[ids[2]]:0},weightedUnits:{[ids[0]]:2,[ids[1]]:0,[ids[2]]:8},eliminated:null}]};
- assert.doesNotMatch(renderToStaticMarkup(harness(data).render()),/Count winner:|2 human ballots/);data.status='closed';const html=renderToStaticMarkup(harness(data).render());assert.match(html,/Count winner: Mara Quell/);assert.match(html,/2 human ballots/);assert.match(html,/0.50 human-vote equivalents/);
+ assert.doesNotMatch(renderToStaticMarkup(harness(data).render()),/Count winner:|2 human ballots/);data.status='closed';const html=renderToStaticMarkup(harness(data).render());assert.match(html,/Count winner: Mara Quell/);assert.match(html,/2 human ballots/);assert.match(html,/Round 1/);assert.match(html,/<th>Humans<\/th>/);assert.doesNotMatch(html,/Simulated Public/);assert.doesNotMatch(html,/SI weight/);assert.doesNotMatch(html,/20%/);
  const h=harness({...snapshot(),nationId:'foreign'});h.all(h.render()).find(node=>node?.type==='form').props.onSubmit({preventDefault(){}});await new Promise(setImmediate);assert.equal(h.received.length,0);assert.match(renderToStaticMarkup(h.render()),/Citizenship or election changed/);
 });
 
