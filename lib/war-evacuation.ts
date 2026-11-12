@@ -1,6 +1,8 @@
 /** #1324 (docs §15.4): on the first successful siege capture, move the defender's enrolled citizens who are there
  *  to the nearest home city that nation still holds. Distance is Chebyshev (`cheb` in lib/travel.ts). Ties go to the
  *  capital, then the lower city id. This is not a voluntary #781 move: no fee, no cooldown, no home_city_moves row.
+ *  #1335: a citizen still travelling into the captured city is diverted the same way, measured from their destination square,
+ *  so nobody finishes travel inside a city that fell while they were en route.
  *  Runs only when HARIMU_WAR_ENABLED and HARIMU_WAR_EVACUATION_ENABLED are both on. Flag off: no statements. */
 import type { DatabaseStatement, GameDatabase } from './database-contract';
 import { isMissingRelation, tolerate } from './db-errors';
@@ -32,7 +34,7 @@ export function evacuationLines(city: string, safeCity: string): readonly string
 }
 
 type Here = { id: string; x: number | null; y: number | null; until: number | null; home: string | null; current: string | null };
-const nearest = (from: { x: number; y: number }, candidates: readonly Place[], capitalId: string | null): Place | null =>
+export const nearest = (from: { x: number; y: number }, candidates: readonly Place[], capitalId: string | null): Place | null =>
   candidates.length ? [...candidates].sort((a, b) => cheb(from, a) - cheb(from, b) || Number(b.cityId === capitalId) - Number(a.cityId === capitalId) || (a.cityId ?? '').localeCompare(b.cityId ?? ''))[0] : null;
 
 /** Statements for the capture batch. Empty unless both flags are on. Each write is a no-op unless this capture row landed. */
@@ -54,11 +56,14 @@ export async function evacuationStatements(db: GameDatabase, input: { env: unkno
     const arrived = row.until != null && Number(row.until) <= now && row.x != null && row.y != null;
     const x = arrived ? Number(row.x) : null, y = arrived ? Number(row.y) : null;
     const onCity = x != null && y != null && squares.some(s => s.x === x && s.y === y);
+    // #1335: still travelling into the captured city. Divert to where evacuation would send them from that square, in this batch.
+    const to = !arrived && row.until != null && row.x != null && row.y != null ? { x: Number(row.x), y: Number(row.y) } : null;
+    const inbound = !!to && squares.some(s => s.x === to.x && s.y === to.y);
     const home = row.home, current = row.current;
-    if (!onCity && home !== capturedId && current !== capturedId) continue;
+    if (!onCity && !inbound && home !== capturedId && current !== capturedId) continue;
     const homePlace = home && home !== capturedId ? places.find(p => p.cityId === home) : undefined;
     const homeSafe = home !== capturedId && !!home && (residentIds.has(home) || !!homePlace);
-    const dest = homeSafe && homePlace ? homePlace : nearest(onCity ? { x: x!, y: y! } : input.centre, candidates, capitalId);
+    const dest = homeSafe && homePlace ? homePlace : nearest(onCity ? { x: x!, y: y! } : inbound ? to! : input.centre, candidates, capitalId);
     if (!dest?.cityId) continue;
     statements.push(db.prepare(`INSERT INTO citizen_travel(user_id,nation_id,from_x,from_y,to_x,to_y,departed_at,traveling_until,request_id)
       SELECT ?,?,?,?,?,?,?,?,? WHERE ${landed} ON CONFLICT(user_id) DO UPDATE SET nation_id=excluded.nation_id,from_x=excluded.from_x,from_y=excluded.from_y,to_x=excluded.to_x,to_y=excluded.to_y,departed_at=excluded.departed_at,traveling_until=excluded.traveling_until,request_id=excluded.request_id WHERE ${landed}`)
