@@ -242,7 +242,9 @@
       // #1371: founding a city needs an expedition of at least 10 citizens of that nation (docs §15.1). Off: founding is unchanged and does not count citizens.
       "HARIMU_CITY_EXPEDITION_ENABLED": "true",
       // #1381: a signed-in Korund viewer sees only Korund squares and the squares next to them (docs §11.5). Off: the map reads are unchanged.
-      "HARIMU_KORUND_MAP_FOG_ENABLED": "true"
+      "HARIMU_KORUND_MAP_FOG_ENABLED": "true",
+      // #1392: each city has its own order book (docs Cities: prices are local). Off: every order stays on the kindle venue.
+      "HARIMU_CITY_LOCAL_BOOKS_ENABLED": "true"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "true",

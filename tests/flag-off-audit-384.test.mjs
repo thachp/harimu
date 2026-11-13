@@ -26,6 +26,7 @@ const flagOffPins = {
   HARIMU_CITY_FOUNDING_ENABLED: 'flag-off-audit-384.test.mjs',
   HARIMU_CITY_EXPEDITION_ENABLED: 'city-expedition-1371.test.mjs', // #1371 flag off: founding SQL has no citizen count
   HARIMU_KORUND_MAP_FOG_ENABLED: 'korund-map-fog-1381.test.mjs', // #1381 flag off: map reads stay full
+  HARIMU_CITY_LOCAL_BOOKS_ENABLED: 'city-local-books-1392.test.mjs', // #1392 flag off: orders stay on kindle
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',

@@ -45,3 +45,24 @@ export async function runNpcSupply(db: GameDatabase, tick: number, scheduledAt: 
     await matchOpen(db, id, now, { cityId: orderBookCityId, good, side: 'sell' }); // #679: book read alongside the order read
   }
 }
+
+/** #1392: copy today's `'kindle'` ask (same qty and price) into one citizen city. `'kindle'` itself stays the tick's job. */
+export async function postNpcAsksInCity(db: GameDatabase, cityId: string, now: number) {
+  if (!cityId || cityId === orderBookCityId) return;
+  const tickRow = await db.prepare('SELECT tick FROM world_ticks ORDER BY tick DESC LIMIT 1').first<{ tick: number }>();
+  const tick = Number(tickRow?.tick ?? 0);
+  if (!(tick > 0)) return;
+  for (const good of Object.keys(npcSupply) as NpcGood[]) {
+    const source = await db.prepare('SELECT qty, limit_unit_minor, created_at FROM market_orders WHERE id=?').bind(npcOrderId(good, tick)).first<{ qty: number; limit_unit_minor: number; created_at: number }>();
+    if (!source) continue;
+    const id = `${npcOrderId(good, tick)}:${cityId}`;
+    if (await db.prepare('SELECT id FROM market_orders WHERE id=?').bind(id).first()) continue;
+    await db.batch([
+      db.prepare(`INSERT OR IGNORE INTO market_order_cancellations (request_id, order_id, cancelled_at)
+        SELECT 'npc-cancel:' || id, id, ? FROM market_open_orders WHERE npc_id = ? AND good = ? AND side = 'sell' AND city_id = ? AND id != ?`).bind(now, npcSupplierId, good, cityId, id),
+      db.prepare(`INSERT OR IGNORE INTO market_orders (id, city_id, citizen_id, npc_id, side, good, qty, limit_unit_minor, created_at)
+        VALUES (?, ?, NULL, ?, 'sell', ?, ?, ?, ?)`).bind(id, cityId, npcSupplierId, good, Number(source.qty), Number(source.limit_unit_minor), Number(source.created_at)),
+    ]);
+    await matchOpen(db, id, now, { cityId, good, side: 'sell' });
+  }
+}

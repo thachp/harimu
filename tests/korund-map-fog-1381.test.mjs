@@ -10,7 +10,7 @@ const PUBLIC_SQUARES = 'public, max-age=300, s-maxage=3600, stale-while-revalida
 const strip = text => JSON.parse(text.replace(/^\s*\/\/.*$/gm, ''));
 const key = (x, y) => `${x},${y}`;
 
-test('the flag is last in HARIMU_GRAY_PACK at index 90, preview on and production off, and is not its own binding', () => {
+test('the Korund map fog flag is at index 90 in HARIMU_GRAY_PACK (after expedition, before city local books), preview on and production off, and is not its own binding', () => {
   const preview = strip(readFileSync('wrangler.jsonc', 'utf8')), prod = strip(readFileSync('wrangler.prod.jsonc', 'utf8'));
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CITY_EXPEDITION_ENABLED'), 89);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 90);
