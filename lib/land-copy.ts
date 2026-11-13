@@ -26,7 +26,7 @@ export type Line={text:string;proposal:true};
 export type Zone='heartland'|'frontier'|'wildlands'|'commons';
 export type LandNation='kindle'|'korund'|'aurelle';
 export type PurchaseReason='out_of_bounds'|'map_unavailable'|'heartland'|'commons'|'frontier'|'owned'|'not_adjacent'|'disabled'|'no_nation'|'request_reused'|'insufficient_tessera'|'square_taken';
-export type FoundingReason='disabled'|'no_authority'|'wrong_authority'|'out_of_bounds'|'map_unavailable'|'centre_heartland'|'centre_commons'|'centre_frontier'|'centre_owned'|'too_close'|'block_off_map'|'block_commons'|'block_claimed'|'request_reused'|'site_taken';
+export type FoundingReason='disabled'|'no_authority'|'wrong_authority'|'out_of_bounds'|'map_unavailable'|'centre_heartland'|'centre_commons'|'centre_frontier'|'centre_owned'|'too_close'|'block_off_map'|'block_commons'|'block_claimed'|'request_reused'|'site_taken'|'expedition_short';
 /** A line in a nation's voice; `aiBadge` is true only where the Crown speaks in its own voice ("Be it known"). */
 export type VoicedLine={text:string;aiBadge:boolean;proposal:true};
 export type LandNationCopy={nationId:LandNation;byline:{name:string;proposal:boolean};authority:Line;
@@ -37,7 +37,7 @@ const V=(text:string):VoicedLine=>({text,aiBadge:/^Be it known/.test(text),propo
 export const ZONES:readonly Zone[]=['heartland','frontier','wildlands','commons'];
 export const LAND_NATIONS:readonly LandNation[]=['kindle','korund','aurelle'];
 export const PURCHASE_REASONS:readonly PurchaseReason[]=['out_of_bounds','map_unavailable','heartland','commons','frontier','owned','not_adjacent','disabled','no_nation','request_reused','insufficient_tessera','square_taken'];
-export const FOUNDING_REASONS:readonly FoundingReason[]=['disabled','no_authority','wrong_authority','out_of_bounds','map_unavailable','centre_heartland','centre_commons','centre_frontier','centre_owned','too_close','block_off_map','block_commons','block_claimed','request_reused','site_taken'];
+export const FOUNDING_REASONS:readonly FoundingReason[]=['disabled','no_authority','wrong_authority','out_of_bounds','map_unavailable','centre_heartland','centre_commons','centre_frontier','centre_owned','too_close','block_off_map','block_commons','block_claimed','request_reused','site_taken','expedition_short'];
 
 /** One-line tooltip per zone (§6.1). */
 export const zoneTooltips:Readonly<Record<Zone,Line>>={
@@ -94,6 +94,7 @@ export const foundingRefusals:Readonly<Record<FoundingReason,Line>>={
  block_claimed:L('The radius-2 claim would take claimed land. Pick a clearer site.'),
  request_reused:L('That request was used for another founding. Start again.'),
  site_taken:L('Another founding claimed the land first. Nothing was claimed.'),
+ expedition_short:L('The nation is short of citizens for an expedition. Nothing was claimed.'),
 };
 
 /** Founding in each nation's own voice, reflecting who decides (§15.1, v0.7: the nation's AI leadership). {site} is where the
