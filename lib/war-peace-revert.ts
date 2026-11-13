@@ -132,10 +132,13 @@ export async function sweepUnrevertedTreaties(db: GameDatabase, now: number): Pr
   return repaired;
 }
 
-/** Derived on read. Flag off: the caller does not call this, so the table is never read. */
+/** Derived on read. Flag off: the caller does not call this, so the table is never read.
+ *  #1405 (docs §11.5 / §8.6, follow-up to #1379): only a party to the war sees the line, same as treaty and embargo news. */
 export async function peaceRevertNewsItems(db: GameDatabase, readerNation: string) {
   if (!isWarNation(readerNation)) return [];
-  const rows = (await db.prepare("SELECT war_id, squares, reverted_at FROM war_peace_reverts WHERE status='done' ORDER BY reverted_at DESC, war_id LIMIT 20").all<{ war_id: string; squares: number; reverted_at: number }>().catch(none([] as { war_id: string; squares: number; reverted_at: number }[]))).results;
+  const rows = (await db.prepare(`SELECT r.war_id, r.squares, r.reverted_at FROM war_peace_reverts r JOIN wars w ON w.id=r.war_id
+    WHERE r.status='done' AND (w.attacker_nation=? OR w.defender_nation=?) ORDER BY r.reverted_at DESC, r.war_id LIMIT 20`)
+    .bind(readerNation, readerNation).all<{ war_id: string; squares: number; reverted_at: number }>().catch(none([] as { war_id: string; squares: number; reverted_at: number }[]))).results;
   const kind = readerNation === 'aurelle' ? 'decree' as const : 'template' as const;
   return rows.map(row => ({ id: `war:${row.war_id}:peace-revert`, title: 'Occupied squares returned', text: peaceRevertLine(Number(row.squares)), occurredAt: Number(row.reverted_at) * 1000, source: 'deterministic' as const, kind }));
 }
