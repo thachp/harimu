@@ -4,7 +4,7 @@ import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { uuidPattern, validSquareText } from '@/lib/square-chat-validation';
 import { isShadowMuted, logShadowMuted, parseShadowMute } from '@/lib/chat-shadow-mute';
-import { embassyChannelId, embassyChatFlagOn, isEmbassyNation, postEmbassyChatBinds, postEmbassyChatSql, readEmbassyChat } from '@/lib/embassy-chat';
+import { embassyChannelId, embassyChatFlagOn, embassyChatRefusals, embassyPairOpen, isEmbassyNation, postEmbassyChatBinds, postEmbassyChatSql, readEmbassyChat } from '@/lib/embassy-chat';
 
 // #882: embassy chat between two live nations. Flag HARIMU_EMBASSY_CHAT_ENABLED off: 404 before auth or any DB access.
 export const dynamic = 'force-dynamic';
@@ -20,6 +20,12 @@ async function citizen(request: Request) {
   return { userId, db, nationId };
 }
 const peerOf = (value: unknown) => typeof value === 'string' && isEmbassyNation(value) ? value : null;
+const embassyClosed = (nationId: string, peerNation: string) => {
+  if (embassyPairOpen(nationId, peerNation)) return null;
+  return nationId === 'korund'
+    ? json({ error: embassyChatRefusals.nation_closed, reason: 'nation_closed' }, 403)
+    : json({ error: embassyChatRefusals.peer_closed, reason: 'peer_closed' }, 403);
+};
 const view = async (db: Awaited<ReturnType<typeof getDatabase>>, userId: string, nationId: string, peerNation: string, t: number) =>
   json({ ...await readEmbassyChat(db, userId, nationId, peerNation, t, parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE)), reportsEnabled: vars().HARIMU_REPORTS_ENABLED === 'true' });
 
@@ -28,6 +34,7 @@ export async function GET(request: Request) {
   const c = await citizen(request); if (c.error) return c.error;
   const peerNation = peerOf(new URL(request.url).searchParams.get('peerNation'));
   if (!peerNation || peerNation === c.nationId) return json({ error: 'Choose another nation\'s embassy.' }, 400);
+  const closed = embassyClosed(c.nationId, peerNation); if (closed) return closed;
   return view(c.db, c.userId, c.nationId, peerNation, now());
 }
 export async function POST(request: Request) {
@@ -38,6 +45,7 @@ export async function POST(request: Request) {
   const c = await citizen(request); if (c.error) return c.error;
   const { db, userId, nationId } = c, t = now(), peerNation = peerOf(body.peerNation);
   if (!peerNation || peerNation === nationId) return json({ error: 'Choose another nation\'s embassy.' }, 400);
+  const closed = embassyClosed(nationId, peerNation); if (closed) return closed;
   if (typeof body.id !== 'string' || !uuidPattern.test(body.id)) return json({ error: 'Invalid message.' }, 400);
   const id = body.id.toLowerCase();
   if (body.action === 'delete') {
@@ -57,8 +65,9 @@ export async function POST(request: Request) {
   if (!result.meta.changes) {
     const replay = await db.prepare('SELECT user_id,body,deleted FROM embassy_chat_messages WHERE id=?').bind(id).first<Prior>();
     if (replay && !same(replay)) return json({ error: 'Request already used.' }, 409);
-    if (!replay && !(await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id)
-      return json({ error: 'Enroll in a nation first.' }, 403);
+    const nowNation = replay ? null : (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id;
+    if (!replay && !nowNation) return json({ error: 'Enroll in a nation first.' }, 403);
+    if (!replay && nowNation === 'korund') return json({ error: embassyChatRefusals.nation_closed, reason: 'nation_closed' }, 403); // #1396: moved to Korund mid-request
     if (!replay) return json({ error: 'Wait 10 seconds between messages; limit 20 per hour.', reason: 'rate_limited' }, 429);
   } else if (isShadowMuted(parseShadowMute(vars().HARIMU_CHAT_SHADOW_MUTE), userId, t)) logShadowMuted(userId, id);
   return view(db, userId, nationId, peerNation, t);
