@@ -15,12 +15,12 @@ test('catalog: capitals and Heartland cities; MVP frontier outposts; unknown omi
     }
   }
   assert.equal(cityCaptureNote('kindle', capitalCityForNation('kindle').id), HEARTLAND_CAPTURE_NOTE);
-  for (const nation of ['kindle', 'korund', 'aurelle']) {
+  for (const nation of ['kindle', 'korund', 'aurelle', 'confluence']) {
     const outpost = outpostCityForNation(nation);
     assert.ok(outpost, nation);
     assert.equal(cityCaptureNote(nation, outpost.id), FRONTIER_CAPTURE_NOTE, nation);
   }
-  assert.equal(outpostCityForNation('confluence'), undefined);
+  assert.equal(outpostCityForNation('confluence').id, 'meesa-ford'); // #1415
   assert.equal(cityCaptureNote('kindle', 'not-a-city'), null); // [ASSUMPTION] unknown / founded omit
   assert.equal(HEARTLAND_CAPTURE_NOTE, 'Heartland city: can never be captured.');
   assert.equal(FRONTIER_CAPTURE_NOTE, 'Frontier city: can be besieged and captured in war (two assaults on different days).');

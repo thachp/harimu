@@ -155,12 +155,14 @@ export function residentCitiesForNation(nationId: string): readonly City[] { ret
 export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? vakkResidents().find(byId(nationId, cityId)) ?? ruelWorksResidents().find(byId(nationId, cityId)) ?? thessalyResidents().find(byId(nationId, cityId)) ?? marrowMillsResidents().find(byId(nationId, cityId)) ?? daoResidents().find(byId(nationId, cityId)) ?? dunkarPassResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
 
-/** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its
- *  docs role. Not part of the capital + two cities catalog above, so city lists and vignettes are unchanged. */
+/** #123 / #1415: each seeded nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its
+ *  docs role. Not part of the capital + two cities catalog above, so city lists and vignettes are unchanged.
+ *  #1415: Meesa Ford names the existing #487 Confluence outpost square. */
 const outposts: Record<string, { name: string; role: CityRole; description: string }> = {
   kindle: { name: 'Ashby Crossing', role: 'frontier', description: 'Frontier / mining border village in the western badlands.' },
   korund: { name: 'Krel Arsenal', role: 'frontier', description: 'Military / industry frontier fortress in the eastern border passes.' },
   aurelle: { name: 'Vale Bridge', role: 'frontier', description: 'Frontier / trade fortified bridge town on the southern border gorge.' },
+  confluence: { name: 'Meesa Ford', role: 'frontier', description: 'Frontier / trade river fort and banded-price market on the border with Meridian.' }, // #1415, #487 square
 };
 export function outpostCityForNation(nationId: string): City | undefined {
   const o = outposts[nationId]; if (!o) return undefined;
