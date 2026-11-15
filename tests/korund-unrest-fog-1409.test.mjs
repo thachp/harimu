@@ -13,8 +13,10 @@ for (const backend of ['sqlite', 'postgres']) test(`Korund unrest fog (${backend
   r.setMapOverlays(true);
   await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'").run();
   await r.db.prepare(ins).bind('kindle', 1, 1, 1, 50, 45, '{}', '{}').run();
-  await r.db.prepare(ins).bind('aurelle', 1, 1, 1, 40, 64, '{}', '{}').run();
+  await r.db.prepare(ins).bind('aurelle', 1, 1, 1, 60, 30, '{}', '{}').run();
   await r.db.prepare(ins).bind('korund', 1, 1, 1, 23, 77, '{}', '{}').run();
+  // QA1 review 5908068774: Aurelle owns one square next to Korund (inside the fog) and its heartland far away (outside), so the square fog itself is pinned.
+  await r.db.prepare("UPDATE world_squares SET owner='aurelle' WHERE x=21 AND y=4").run();
   r.setFixtureEnv(FLAG, 'true');
 
   const squaresFull = await r.call('world/squares', 'bob');
@@ -34,6 +36,10 @@ for (const backend of ['sqlite', 'postgres']) test(`Korund unrest fog (${backend
   assert.ok(full.data.cells.some(([x, y]) => !visible(at(x, y))), 'the full map includes a cell outside the fog');
   assert.ok(fog.data.cells.every(([x, y]) => visible(at(x, y))), 'every remaining cell is on a Korund square or a neighbour');
   assert.ok(fog.data.cells.length < full.data.cells.length);
+  const aurelleCells = cells => cells.filter(([x, y]) => at(x, y).owner === 'aurelle');
+  assert.ok(visible(at(21, 4)) && aurelleCells(full.data.cells).some(([x, y]) => !visible(at(x, y))), 'Aurelle owns squares both inside and outside the fog');
+  assert.ok(fog.data.cells.length > 0, 'the fogged map is not empty');
+  assert.deepEqual(aurelleCells(fog.data.cells).map(([x, y]) => key(x, y)), ['21,4'], "only Aurelle's square inside the fog keeps its unrest cell");
   assert.ok(fog.data.nations.every(n => visibleOwners.has(n.nationId)), 'nation scores are only for owners of remaining squares');
   assert.ok(full.data.nations.some(n => !visibleOwners.has(n.nationId)), "a distant nation's score is omitted from the fogged list");
   assert.deepEqual(fog.data.unpublished, visibleOwners.has('korund') ? ['korund'] : []);
