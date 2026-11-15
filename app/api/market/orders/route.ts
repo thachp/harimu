@@ -43,7 +43,10 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>;
   try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send an order command.', reason: 'bad_request' }, 400); }
   if (!validOrderCommand(body)) return privateJson({ error: `Send a requestId (UUID) and either a buy/sell order for fruit, meat or wood with quantity 1–${orderBookLimits.maxQty} and an integer limit price 1–${orderBookLimits.maxUnitMinor} Spark cents, or an orderId to cancel.`, reason: 'bad_request' }, 400);
-  const command = { ...body, requestId: body.requestId.toLowerCase(), ...('orderId' in body && typeof body.orderId === 'string' ? { orderId: body.orderId.toLowerCase() } : {}) } as typeof body;
+  const requestId = body.requestId.toLowerCase();
+  const command = body.action === 'market-order-cancel'
+    ? { action: 'market-order-cancel' as const, requestId, orderId: (body.orderId as string).toLowerCase() }
+    : { action: 'market-order-place' as const, requestId, side: body.side as 'buy' | 'sell', good: body.good as 'fruit' | 'meat' | 'wood', qty: body.qty as number, limitUnitMinor: body.limitUnitMinor as number };
   const db = await getDatabase();
   const now = Math.floor(Date.now() / 1000);
   await advanceWorld(db, undefined, { religiousHarmony: (env as unknown as { HARIMU_RELIGIOUS_HARMONY_ENABLED?: string }).HARIMU_RELIGIOUS_HARMONY_ENABLED === 'true', // #842
