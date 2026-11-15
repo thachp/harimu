@@ -27,6 +27,8 @@ export const DUNMORROW_HEARTH_NOTE = 'Hosts Hearth Night';
 export const STONEHEARTH_PLAN_NOTE = 'Hosts Plan Day';
 export const STONEHEARTH_BIRTHDAY_NOTE = "Hosts the Chairman's Birthday";
 export const STONEHEARTH_HOST_NOTE = 'Hosts Plan Day and the Chairman\'s Birthday';
+/** #1437: Lume Mesa city-panel line. ARC-ruled §7.6 wording: destination, not host. Date is the #1196 clock, shown only when HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED are on. */
+export const LUME_MESA_PILGRIMAGE_NOTE = 'Destination of the Great Pilgrimage';
 // Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
 const roles: Record<string, string> = {"Tarrek Foundry": "Industry", "Kolt Savanna": "Farming", "Lanu Terraces": "Farming", "Oalin Harbor": "Port / fisheries", "Tsenga SEZ": "Trade zone", "Holv Gorge": "Energy / industry", "Strova Mines": "Mining", "Gren Plateau": "Farming", "Windrest": "Silk / crafts", "Highmere": "Farming / fief", "Lume Mesa": "Pilgrimage", "Glassen": "Industry (Sunglass)", "Fjeldmark": "Frostcore / logistics", "Isling Springs": "Spa / tourism", "Voren Light": "Port / signals", "Moorhald": "Farming / peat", "Ashglade": "Timber / crafts", "Fernhollow": "Farming", "Vendezzo": "Shipyard", "Malvara Rods": "Energy (Stormcells)"};
 // Canonical city names and visual lore, GDD nation pages /world/nations/ (read 2026-10-13).
