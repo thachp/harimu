@@ -132,4 +132,18 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.equal((await untaxed.buy('bob', plain)).status, 200);
     assert.equal(Number((await untaxed.r.db.prepare('SELECT COUNT(*) AS n FROM player_fill_sales_tax').first()).n), 0);
   });
+
+  test(`${backend}: a non-owner cannot cancel a Kindle lot`, async t => {
+    const { r, at, list, cancel, lots, food, open } = await board(t, { backend, books: true });
+    await at('alice', 'forgehaven'); await at('bob', 'forgehaven');
+    const created = await list('alice', 2, 1000);
+    assert.equal(created.status, 200, JSON.stringify(created.data));
+    const id = open(created.data.playerMarket.listings).id;
+    const held = await food('alice');
+    const refused = await cancel('bob', id);
+    assert.equal(refused.status, 409);
+    assert.equal((await lots('alice')).find(lot => lot.id === id).status, 'open');
+    assert.equal(Number((await r.db.prepare('SELECT COUNT(*) AS n FROM player_cancellations WHERE listing_id=?').bind(id).first()).n), 0);
+    assert.equal(await food('alice'), held, 'the owner\'s escrow is unchanged');
+  });
 }
