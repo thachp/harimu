@@ -21,17 +21,11 @@ import { ForeignAffairsPanel } from './foreign-affairs-panel'; // #308
 import type { SimulationState } from '@/lib/world-simulation';
 import type { VerificationState } from '@/lib/verification';
 import type { GovernmentSnapshot, PetitionTopic } from '@/lib/government';
+import { governmentDeadlineRows } from '@/lib/government-deadlines'; // #1422
 
-/** Term and deadline instants already on the government read. No new clock. Index keys. */
+/** Term and holiday instants already on the government read. No new clock. Index keys. #1422 fills the remaining holiday rows. */
 function GovernmentDeadlines({ snapshot, epochMs }: { snapshot: GovernmentSnapshot; epochMs?: number }) {
-  const rows: { label: string; at: number }[] = [];
-  if (snapshot.federalCouncil) rows.push({ label: 'Council election', at: snapshot.federalCouncil.nextElectionAt });
-  if (snapshot.directorate) rows.push({ label: 'Rotation Day', at: snapshot.directorate.nextRotationAt });
-  if (snapshot.mandatePlebiscite) rows.push({ label: 'Mandate Plebiscite', at: snapshot.mandatePlebiscite.nextAt });
-  if (snapshot.sanctum) {
-    rows.push({ label: 'Next Stillday', at: snapshot.sanctum.nextStilldayAt });
-    rows.push({ label: 'Great Pilgrimage', at: snapshot.sanctum.nextGreatPilgrimageAt });
-  }
+  const rows = governmentDeadlineRows(snapshot);
   if (!rows.length) return null;
   return <ul aria-label="Government deadlines">{rows.map((row, index) => <li key={index}><GameTimer endsAt={row.at} epochMs={epochMs} label={row.label} /></li>)}</ul>;
 }

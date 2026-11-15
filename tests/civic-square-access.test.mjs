@@ -18,7 +18,7 @@ async function component(file,name) {
   const NationDocument=['government-panel.tsx','leader-panel.tsx'].includes(file)?await component('nation-document.tsx','NationDocument'):null;
   const StabilityPanel=file==='government-panel.tsx'?await component('stability-panel.tsx','StabilityPanel'):null;
   const exports={};
-  new Function('exports','require',compiled)(exports,name=>name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='./report-button'?{ReportButton:()=>null}:name==='./city-presence-live'?{LiveCityPresence:()=>null}:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./nation-document'?{NationDocument}:name==='./nation-crest'?{NationCrest:()=>null}:name==='../lib/aurelle-sealed-scrolls'?require('../lib/aurelle-sealed-scrolls.ts'):name==='../lib/nation-themes'?require('../lib/nation-themes.ts'):name==='./leader-panel'?{LeaderPanel}:name==='./ai-disclosure'?{AiBadge,AiTextTag}:name==='../lib/leader-personas'?require('../lib/leader-personas.ts'):name.endsWith('.css')?{}:name==='../lib/square-chat-validation'?squareValidation:name==='@/lib/nation-discovery'?require('../lib/nation-discovery.ts'):name==='@/lib/varkand-dispatch'?require('../lib/varkand-dispatch.ts'):name==='./varkand-dispatch'?{VarkandAlertBanner:()=>null,VarkandDispatchStamp:()=>null}:name==='./ilmar-glass-edict'?{ilmarGlassEdictsEnabled:()=>false,IlmarGlassEdict:({children})=>children}:name==='./fulmara-share-ticker'?{fulmaraShareTickerEnabled:()=>false,fulmaraShareLines:()=>[],FulmaraShareRegister:({children})=>children}:name==='./ilmar-prism-shares'?{ilmarPrismSharesEnabled:()=>false,IlmarPrismShares:()=>null}:name==='./hoarvale-royal-assent'?{hoarvaleRoyalAssentEnabled:()=>false,HoarvaleRoyalAssentBills:()=>null}:name==='./meridian-party-congress'?{meridianPartyCongressEnabled:()=>false,MeridianPartyCongress:()=>null}:name==='./nation-overview'?{NationOverview:()=>null}:name==='./game-timer'?{GameTimer}:name==='./stability-panel'?{StabilityPanel}:name==='./war-banner'?{WarBanner:()=>null}:name==='./foreign-affairs-panel'?{ForeignAffairsPanel:()=>null}:name==='../lib/government-disclosure'?require('../lib/government-disclosure.ts'):name==='../lib/decision-disclosure-copy'?require('../lib/decision-disclosure-copy.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):require(name));
+  new Function('exports','require',compiled)(exports,name=>name==='@/lib/action-reasons'?require('../lib/action-reasons.ts'):name==='./report-button'?{ReportButton:()=>null}:name==='./city-presence-live'?{LiveCityPresence:()=>null}:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./nation-document'?{NationDocument}:name==='./nation-crest'?{NationCrest:()=>null}:name==='../lib/aurelle-sealed-scrolls'?require('../lib/aurelle-sealed-scrolls.ts'):name==='../lib/nation-themes'?require('../lib/nation-themes.ts'):name==='./leader-panel'?{LeaderPanel}:name==='./ai-disclosure'?{AiBadge,AiTextTag}:name==='../lib/leader-personas'?require('../lib/leader-personas.ts'):name.endsWith('.css')?{default:{}}:name==='../lib/square-chat-validation'?squareValidation:name==='@/lib/nation-discovery'?require('../lib/nation-discovery.ts'):name==='@/lib/varkand-dispatch'?require('../lib/varkand-dispatch.ts'):name==='./varkand-dispatch'?{VarkandAlertBanner:()=>null,VarkandDispatchStamp:()=>null}:name==='./ilmar-glass-edict'?{ilmarGlassEdictsEnabled:()=>false,IlmarGlassEdict:({children})=>children}:name==='./fulmara-share-ticker'?{fulmaraShareTickerEnabled:()=>false,fulmaraShareLines:()=>[],FulmaraShareRegister:({children})=>children}:name==='./ilmar-prism-shares'?{ilmarPrismSharesEnabled:()=>false,IlmarPrismShares:()=>null}:name==='./hoarvale-royal-assent'?{hoarvaleRoyalAssentEnabled:()=>false,HoarvaleRoyalAssentBills:()=>null}:name==='./meridian-party-congress'?{meridianPartyCongressEnabled:()=>false,MeridianPartyCongress:()=>null}:name==='./nation-overview'?{NationOverview:()=>null}:name==='./game-timer'?{GameTimer}:name==='./stability-panel'?{StabilityPanel}:name==='./war-banner'?{WarBanner:()=>null}:name==='./foreign-affairs-panel'?{ForeignAffairsPanel:()=>null}:name==='../lib/government-disclosure'?require('../lib/government-disclosure.ts'):name==='../lib/decision-disclosure-copy'?require('../lib/decision-disclosure-copy.ts'):name==='../lib/game-time'?require('../lib/game-time.ts'):name==='@/lib/government-deadlines'?require('../lib/government-deadlines.ts'):require(name));
   return exports[name];
 }
 const SquareChat=await component('square-chat.tsx','SquareChat');
@@ -91,4 +91,21 @@ test('all MVP leaders have portraits, SI badges, programme status and lawful dis
 test('dock chat outside City keeps nation conversation but disables presence with an explicit reason',()=>{
  const html=render(SquareChat,{enabled:true,nationId:'kindle',cityId:'kindle-capital',session:'ready',presenceAllowed:false});
  assert.match(html,/Open your current City view before sharing presence/);assert.match(html,/<input[^>]*disabled/);assert.doesNotMatch(html,/<input[^>]*checked/);
+});
+
+test('#1422: with countdown dual time on, GovernmentPanel lists a helper-only holiday row', () => {
+  const previous = process.env.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME;
+  process.env.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME = 'true';
+  try {
+    const snapshot = {
+      ...simulateGovernment({nationId:'kindle',availableBudgetMinor:1000,foodSecurity:80,petitionCounts:{}}),
+      electionClock: { nextBallotNightAt: Date.now() + 2 * 86_400_000, termEndsAt: Date.now() + 3 * 86_400_000, termDays: 150, maxConsecutiveTerms: 2 },
+    };
+    const html = render(GovernmentPanel,{snapshot,nationId:'kindle',localDemo:true,pending:false,onPetition(){}});
+    assert.match(html,/aria-label="Government deadlines"/);
+    assert.match(html,/Ballot Night/);
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME;
+    else process.env.NEXT_PUBLIC_HARIMU_COUNTDOWN_DUAL_TIME = previous;
+  }
 });
