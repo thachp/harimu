@@ -11,7 +11,7 @@ import {validRanking} from '@/lib/instant-runoff';
 import {trustedBallotPrivacyReady,ballotPrivacyReason} from '@/lib/ballot-privacy';
 import {generalElectionSlate,type PrimaryBindings} from '@/lib/primaries';
 import {presidentialCycle,presidentialWindow,type CalendarBindings} from '@/lib/election-calendars';
-import {candidateIds,electionIdFor,openPreviewElection,readElection,voteReceiptSql,anonymousBallotSql,markBallotWrittenSql,type ElectionSnapshot} from '@/lib/elections';
+import {candidateIds,electionIdFor,openPreviewElection,readElection,voteReceiptStatement,anonymousBallotSql,markBallotWrittenSql,type ElectionSnapshot} from '@/lib/elections';
 import {kindleCertification,kindleCertificationEnabled} from '@/lib/kindle-certification-rules';
 export const dynamic='force-dynamic';
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -63,7 +63,7 @@ async function handleVote(request:Request){
  }
  // #918: the vote opens only inside the calendar window (day 30 + k*120, 72 h); held when HARIMU_KINDLE_CYCLE_START_AT is unset or malformed.
  await openPreviewElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),general.slate,presidentialWindow(env as unknown as CalendarBindings,now)?.opensAt??null,cid);
- await db.batch([db.prepare(voteReceiptSql).bind(requestId,now,userId,cid,now,now),db.prepare(anonymousBallotSql).bind(crypto.randomUUID(),JSON.stringify(body.ranking),requestId,userId,cid),db.prepare(markBallotWrittenSql).bind(requestId,userId,cid)]);
+ await db.batch([await voteReceiptStatement(db,requestId,userId,cid,now),db.prepare(anonymousBallotSql).bind(crypto.randomUUID(),JSON.stringify(body.ranking),requestId,userId,cid),db.prepare(markBallotWrittenSql).bind(requestId,userId,cid)]);
  const saved=await receipt();if(!saved||saved.clerk_user_id!==userId||saved.election_id!==pub||saved.ballot_written!==1)return json({error:'Already voted, voting closed, or citizenship changed. Refresh your ballot status.'},409);
  return json({ok:true,...published(await readElection(db,userId,now,accountLevel||trustedBallotPrivacyReady(),false,false,general.slate,false,undefined,cid),now),id:pub,electionEligibility:{eligible:accountLevel||verification.countedActionsEligible,scope:accountLevel?'preview-citizen':'tier1',reason:accountLevel?'Signed-in Kindle citizens may vote once in this preview PoC.':verification.reason},verification});
 }

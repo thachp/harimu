@@ -15,7 +15,7 @@ const snapshot=()=>({nationId:'kindle',id:'kindle-presidential-poc-1',candidates
 function harness(data,{failure=false}={}){
  let cursor=0,refCursor=0,fail=failure;const states=[data,[...ids],'',false,false,false],refs=[],requests=[],received=[];
  const react={useCallback:fn=>fn,useEffect(){},useRef(initial){const i=refCursor++;return refs[i]??(refs[i]={current:initial});},useState(initial){const i=cursor++;if(!(i in states))states[i]=initial;return[states[i],value=>states[i]=typeof value==='function'?value(states[i]):value];}};
- const exports={};new Function('exports','require','fetch',source)(exports,name=>name==='react'?react:name==='./nation-document'?nation:name==='./ai-disclosure'?tags:name==='./game-timer'?{GameTimer:()=>React.createElement('span',null,'Fixture ballot clock')}:name==='./action-button'?actions:name==='./kindle-civic-ballot'?civic:name==='../lib/instant-runoff'?require('../lib/instant-runoff.ts'):name==='../lib/election-ids'?require('../lib/election-ids.ts'):require(name),async(url,options)=>{requests.push({url,body:options?.body});if(fail){fail=false;throw Error('Fixture connection interrupted.');}return{ok:true,status:200,json:async()=>({...data,voted:true})};});
+ const exports={};new Function('exports','require','fetch',source)(exports,name=>name==='react'?react:name==='./nation-document'?nation:name==='./ai-disclosure'?tags:name==='./game-timer'?{GameTimer:()=>React.createElement('span',null,'Fixture ballot clock')}:name==='./action-button'?actions:name==='./kindle-civic-ballot'?civic:name==='../lib/instant-runoff'?require('../lib/instant-runoff.ts'):name==='../lib/election-ids'?require('../lib/election-ids.ts'):name==='../lib/kindle-certification-copy'?require('../lib/kindle-certification-copy.ts'):require(name),async(url,options)=>{requests.push({url,body:options?.body});if(fail){fail=false;throw Error('Fixture connection interrupted.');}return{ok:true,status:200,json:async()=>({...data,voted:true})};});
  const render=()=>{cursor=0;refCursor=0;return exports.RankedBallot({onSnapshot:value=>received.push(value)});};
  const all=node=>[node,...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child=>typeof child==='object'?all(child):[child])];
  const action=text=>all(render()).find(node=>node?.type===actions.ActionButton&&node.props.children===text);
@@ -77,6 +77,16 @@ test('#936 ranked ballot accepts a cycle-N election id (QA2)',async()=>{
  h2.all(h2.render()).find(node=>node?.type==='form').props.onSubmit({preventDefault(){}});await new Promise(setImmediate);
  assert.equal(h2.received[0].id,'kindle-presidential-account-poc-1-cycle-2');
 });
+test('#1416 a closed ballot shows each district with the #609 caption; an open ballot does not',async()=>{
+ const {resultsCaption}=await import('../lib/kindle-certification-copy.ts');
+ const line=(district,count)=>resultsCaption.district.replace('{district}',district).replace('{count}',String(count));
+ const closed=()=>{const data=snapshot();data.status='closed';data.result={winner:ids[0],humanBallots:3,simulatedPublicUnits:0,weightScale:4,rounds:[{human:{[ids[0]]:3,[ids[1]]:0,[ids[2]]:0},simulatedUnits:{[ids[0]]:0,[ids[1]]:0,[ids[2]]:0},weightedUnits:{[ids[0]]:0,[ids[1]]:0,[ids[2]]:0},eliminated:null}],districts:[{districtId:'forgehaven',name:'Forgehaven',ballots:2},{districtId:'kolt-savanna',name:'Kolt Savanna',ballots:1}]};return data;};
+ const html=renderToStaticMarkup(harness(closed()).render());
+ assert.match(html,/Forgehaven: 2 ballots/);assert.match(html,/Kolt Savanna: 1 ballots/);
+ assert.equal(line('Forgehaven',2),'Forgehaven: 2 ballots');assert.equal(line('Kolt Savanna',1),'Kolt Savanna: 1 ballots');
+ assert.doesNotMatch(renderToStaticMarkup(harness(snapshot()).render()),/Forgehaven: 2 ballots|Kolt Savanna: 1 ballots/);
+});
+
 if(process.env.HARIMU_BALLOT_FIXTURE){
  const css=(await Promise.all(['globals.css','game-shell.css'].map(file=>readFile(new URL(`../app/${file}`,import.meta.url),'utf8')))).join('\n');const data={...snapshot(),privacyReady:false,status:'waiting',opensAt:null,closesAt:null};
  await writeFile(process.env.HARIMU_BALLOT_FIXTURE,`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Harimu isolated ballot fixture</title><style>${css}\nbody{background:#0b1c24;color:#dce7e8;padding:16px;font-family:Inter,system-ui,sans-serif}main{max-width:420px;margin:auto}.game-inspector-body{padding:0;overflow:visible}</style><main><h1>Isolated ballot fixture</h1><p>Fixture characters and records only. No live ballot or authentication requests.</p><div class="game-inspector-body">${renderToStaticMarkup(harness(data).render())}</div></main></html>`);
