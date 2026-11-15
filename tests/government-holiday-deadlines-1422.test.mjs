@@ -17,6 +17,7 @@ test('#1422: a Kindle snapshot lists Ballot Night, Founders\' Forge Day, and Mar
     { label: 'Ballot Night', at: T + 1 },
     { label: "Founders' Forge Day", at: T + 3 },
     { label: 'Market Bell', at: T + 4 },
+    { label: 'Presidential term end', at: T + 2 },
   ]);
 });
 
