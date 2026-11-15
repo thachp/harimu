@@ -66,6 +66,15 @@ test('#1422: canceled Varkand celebrations are omitted; Mandate Plebiscite and d
   ]);
 });
 
+test('#1422: a canceled rotationDay with no directorate lists no Rotation Day row (#1207 without #1085)', () => {
+  const rows = governmentDeadlineRows({
+    rotationDay: { nextAt: T + 80, cycleDays: 60, canceled: true },
+    lanternWatch: { nextAt: T + 81, cycleDays: 30 },
+  });
+  assert.equal(rows.some(row => row.label === 'Rotation Day'), false);
+  assert.deepEqual(rows, [{ label: 'Lantern Watch', at: T + 81 }]);
+});
+
 test('#1422: rotationDay and lanternWatch list when they are present and not canceled, and an empty snapshot has no rows', () => {
   const listed = governmentDeadlineRows({
     rotationDay: { nextAt: T + 40, cycleDays: 60 },
