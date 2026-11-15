@@ -38,7 +38,8 @@ export const civicRankFlagOn = (env: unknown) => (env as { HARIMU_CIVIC_RANK_ENA
  *  (the PKs on (petition_id|election_id, clerk_user_id) already forbid them today). */
 export const civicInputsSql = `SELECT (SELECT COUNT(*) FROM work_shifts WHERE clerk_user_id=? AND claimed_at IS NOT NULL) AS shifts,
  (SELECT COUNT(DISTINCT petition_id) FROM civic_petition_signatures WHERE clerk_user_id=?)+(SELECT COUNT(DISTINCT election_id) FROM civic_voter_receipts WHERE clerk_user_id=? AND ballot_written=1)
- +(SELECT COUNT(DISTINCT election_id) FROM poc_voter_receipts WHERE clerk_user_id=? AND ballot_written=1)+(SELECT COUNT(DISTINCT election_id) FROM primary_voter_receipts WHERE clerk_user_id=? AND ballot_written=1) AS civic_acts,
+ +(SELECT COUNT(DISTINCT election_id) FROM poc_voter_receipts WHERE clerk_user_id=? AND ballot_written=1)+(SELECT COUNT(DISTINCT election_id) FROM primary_voter_receipts WHERE clerk_user_id=? AND ballot_written=1)
+ +(SELECT COUNT(DISTINCT election_id) FROM assembly_voter_receipts WHERE clerk_user_id=? AND ballot_written=1) AS civic_acts,
  COALESCE((SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id=?),0) AS wallet_minor`;
 /** First-week `kindle-7-rank` is complete once the rank is Citizen or above (a ledger probe; Citizen needs shifts only, pinned by a test). */
 export const citizenRankShifts = CITIZEN_MIN_SHIFTS;
