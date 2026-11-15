@@ -26,6 +26,9 @@ import {peaceRevertEnabled} from '@/lib/war-peace-revert'; // #1078 same flag as
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
 import {readVarkandAlert} from '@/lib/varkand-alert'; // #1400: same stored Alert Level as #1220
 import {varkandFestivalHostFields} from '@/lib/varkand-red-alert-cancels'; // #1400: omit Varkand host note and date at Red
+import {varkandNextLanternWatchAt} from '@/lib/varkand-lantern-watch'; // #1211 clock, read only
+import {varkandNextMusterDayAt} from '@/lib/varkand-muster-day'; // #1151 clock, read only
+import {varkandNextRotationDayAt} from '@/lib/varkand-rotation-day'; // #1207 clock, read only
 import {seaLanesStormNote} from '@/lib/game-season'; // #1034
 import {seasonAt} from '@/lib/season-yield'; // #1035 shared season: null without a clock
 bindBrasswellPortEnv(env); // #1241: resident lookup reads the Worker env; flag off adds no city
@@ -111,7 +114,7 @@ const spaField=(nationId:string,homeCityId:string,currentCityId:string)=>spaWcBo
 const regattaHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='fulmara'&&cityId==='corvel-isles'&&flagOn(env,CORVEL_ISLES_FLAG)&&flagOn(env,'HARIMU_FULMARA_GRAND_REGATTA_ENABLED')?{grandRegattaNote:CORVEL_ISLES_REGATTA_NOTE,grandRegattaNextAt:fulmaraNextGrandRegattaAt(nowSeconds*1000)}:{};
 /** #1242: one read-only line on Dunmorrow. Both flags on, else no keys. The date is the #1146 clock (same nextAt as the government read). */
 const hearthHost=(nationId:string,cityId:string,nowSeconds:number)=>nationId==='aurelle'&&cityId==='dunmorrow'&&flagOn(env,DUNMORROW_FLAG)&&flagOn(env,'HARIMU_AURELLE_HEARTH_NIGHT_ENABLED')?{hearthNightNote:DUNMORROW_HEARTH_NOTE,hearthNightNextAt:aurelleNextHearthNightAt(nowSeconds*1000)}:{};
-/** #1285 / #1377 / #1384 / #1386 / #1393 / #1398: catalog cities that already host a festival, including Ringhall Vote Days, Steamgate Congress Week, Arcport Exchange Bell, Meetwater Congress Lanterns, and Rimehall Opening of the Moot. No new city flag. Both HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and that festival's flag, else no keys. The date is that festival's clock (same nextAt as the government read). */
+/** #1285 / #1377 / #1384 / #1386 / #1393 / #1398 / #1403: catalog cities that already host a festival, including Ringhall Vote Days, Steamgate Congress Week, Arcport Exchange Bell, Meetwater Congress Lanterns, Rimehall Opening of the Moot, and Voren Light Lantern Watch. Watchfast's two events use a Stonehearth-style helper, not a second catalog row. No new city flag. Both HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and that festival's flag, else no keys. The date is that festival's clock (same nextAt as the government read). */
 const festivalHosts=[
  {nationId:'hoarvale',cityId:'isling-springs',festivalFlag:'HARIMU_HOARVALE_AURORA_NIGHT_ENABLED',note:'Hosts Aurora Night',nextAt:hoarvaleNextAuroraNightAt},
  {nationId:'meridian',cityId:'shen-springs',festivalFlag:'HARIMU_MERIDIAN_TURBINE_DAY_ENABLED',note:'Hosts Turbine Day',nextAt:meridianNextTurbineDayAt},
@@ -121,6 +124,7 @@ const festivalHosts=[
  {nationId:'fulmara',cityId:'arcport',festivalFlag:'HARIMU_FULMARA_EXCHANGE_BELL_ENABLED',note:'Hosts the Exchange Bell',nextAt:fulmaraNextExchangeBellAt}, // #1386
  {nationId:'confluence',cityId:'meetwater',festivalFlag:'HARIMU_CONFLUENCE_CONGRESS_LANTERNS_ENABLED',note:'Hosts Congress Lanterns',nextAt:confluenceNextCongressLanternsAt}, // #1393
  {nationId:'hoarvale',cityId:'rimehall',festivalFlag:'HARIMU_HOARVALE_MOOT_OPENING_ENABLED',note:'Hosts the Opening of the Moot',nextAt:hoarvaleNextMootOpeningAt}, // #1398
+ {nationId:'varkand',cityId:'voren-light',festivalFlag:'HARIMU_VARKAND_LANTERN_WATCH_ENABLED',note:'Hosts Lantern Watch',nextAt:varkandNextLanternWatchAt}, // #1403
 ] as const;
 const FORGEHAVEN_BALLOT_NOTE='Hosts Ballot Night';
 /** #1375: Forgehaven hosts Ballot Night. Reuses #1285 keys. No new flag.
@@ -147,13 +151,32 @@ const stonehearthHost=(nowSeconds:number)=>{
  if(plan)return {festivalHostNote:STONEHEARTH_PLAN_NOTE,festivalHostNextAt:korundNextPlanDayAt(nowMs)};
  return {festivalHostNote:STONEHEARTH_BIRTHDAY_NOTE,festivalHostNextAt:korundNextChairmanBirthdayAt(nowMs)};
 };
+const WATCHFAST_HOST_NOTE='Hosts Muster Day and Rotation Day';
+const WATCHFAST_MUSTER_NOTE='Hosts Muster Day';
+const WATCHFAST_ROTATION_NOTE='Hosts Rotation Day';
+/** #1403: Watchfast hosts Muster Day and Rotation Day. Reuses #1285 keys and the #1373 Stonehearth two-event helper. No new flag.
+ *  Dates are the #1151 / #1207 clocks at the same now. Never 0 or a stand-in. Combined note uses the sooner clock. */
+const watchfastHost=(nowSeconds:number)=>{
+ if(!flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED'))return {};
+ const muster=flagOn(env,'HARIMU_VARKAND_MUSTER_DAY_ENABLED');
+ const rotation=flagOn(env,'HARIMU_VARKAND_ROTATION_DAY_ENABLED');
+ if(!muster&&!rotation)return {};
+ const nowMs=nowSeconds*1000;
+ if(muster&&rotation){
+  const musterAt=varkandNextMusterDayAt(nowMs);
+  const rotationAt=varkandNextRotationDayAt(nowMs);
+  return {festivalHostNote:WATCHFAST_HOST_NOTE,festivalHostNextAt:Math.min(musterAt,rotationAt)};
+ }
+ if(muster)return {festivalHostNote:WATCHFAST_MUSTER_NOTE,festivalHostNextAt:varkandNextMusterDayAt(nowMs)};
+ return {festivalHostNote:WATCHFAST_ROTATION_NOTE,festivalHostNextAt:varkandNextRotationDayAt(nowMs)};
+};
 const festivalHost=async(db:Awaited<ReturnType<typeof getDatabase>>,nationId:string,cityId:string,nowSeconds:number)=>{
- const fields=nationId==='kindle'&&cityId==='forgehaven'?forgehavenHost(nowSeconds):nationId==='korund'&&cityId==='stonehearth'?stonehearthHost(nowSeconds):(()=>{
+ const fields=nationId==='kindle'&&cityId==='forgehaven'?forgehavenHost(nowSeconds):nationId==='korund'&&cityId==='stonehearth'?stonehearthHost(nowSeconds):nationId==='varkand'&&cityId==='watchfast'?watchfastHost(nowSeconds):(()=>{
   const row=festivalHosts.find(host=>host.nationId===nationId&&host.cityId===cityId);
   return row&&flagOn(env,'HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED')&&flagOn(env,row.festivalFlag)?{festivalHostNote:row.note,festivalHostNextAt:row.nextAt(nowSeconds*1000)}:{};
  })();
  if(nationId!=='varkand'||!('festivalHostNote' in fields)||!flagOn(env,'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED')||!flagOn(env,'HARIMU_VARKAND_ALERT_ENABLED'))return fields;
- return varkandFestivalHostFields(nationId,fields,(await readVarkandAlert(db)).level,true,true); // #1400: same #1220 gate; no Varkand catalog row on origin/dev yet
+ return varkandFestivalHostFields(nationId,fields,(await readVarkandAlert(db)).level,true,true); // #1401: same #1220 gate hides Watchfast and Voren Light at Red
 };
 /** #1028: flag off keeps the two existing reads, in order, and does not touch city_captures. Flag on overlaps one indexed capture read with those reads.
  *  #1078: HARIMU_WAR_PEACE_REVERT_ENABLED off does not read city_treaty_returns, so the history object stays the capture alone. */
