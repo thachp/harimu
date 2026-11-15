@@ -97,7 +97,7 @@ export async function GET(request: Request) {
   ]);
   const bands = populationBands(nationResult.results.map(nation => nation.id), Object.fromEntries(enrollmentResult.results.map(row => [row.nation_id, Number(row.citizens)])), undefined, id => !nationIsPreview(id));
 
-  const userId = await authenticatedUserId(request); // #1434: signed-out stays public; only a Korund viewer is filtered
+  const userId = await authenticatedUserId(request); // #1434: only a Korund viewer is filtered
   const nation = userId
     ? (await database.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id
     : undefined;
@@ -158,6 +158,6 @@ export async function GET(request: Request) {
         occurredAt: event.occurred_at,
       })),
     },
-    { headers: { 'Cache-Control': nation === 'korund' ? 'private, no-store' : 'public, max-age=30, stale-while-revalidate=120' } }, // #1434
+    { headers: { 'Cache-Control': 'private, no-store' } }, // #1434: the body depends on the viewer (Korund war fog is always on), so no response is shared-cacheable (QA1 review 5908590507)
   );
 }

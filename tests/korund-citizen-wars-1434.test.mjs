@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
 
 const H = 3_600;
-const PUBLIC_WORLD = 'public, max-age=30, stale-while-revalidate=120';
+const PRIVATE_WORLD = 'private, no-store'; // QA1 review 5908590507: the body depends on the viewer, so every response is private
 
 const ids = (list) => [...(list ?? [])].map((row) => row.id).sort();
 
@@ -41,13 +41,13 @@ for (const backend of ['sqlite', 'postgres']) {
 
       const bobWorld = await r.call('world', 'bob');
       assert.equal(bobWorld.status, 200);
-      assert.equal(bobWorld.cache, PUBLIC_WORLD, 'a Kindle viewer of GET /api/world keeps the public cache header');
+      assert.equal(bobWorld.cache, PRIVATE_WORLD, 'a Kindle GET /api/world is private too, so a shared cache cannot serve it to a Korund session');
       assert.deepEqual(ids(bobWorld.data.simulation.wars?.wars), ['w-foreign', 'w-korund'], 'a Kindle viewer of GET /api/world still receives both wars');
       assert.deepEqual(ids(bobWorld.data.simulation.sieges), ['s-foreign', 's-korund'], 'a Kindle viewer of GET /api/world still receives both sieges');
 
       const signedOut = await r.call('world', null);
       assert.equal(signedOut.status, 200);
-      assert.equal(signedOut.cache, PUBLIC_WORLD, 'a signed-out GET /api/world keeps the public cache header');
+      assert.equal(signedOut.cache, PRIVATE_WORLD, 'a signed-out GET /api/world is private too, so a shared cache cannot serve it to a Korund session');
       assert.deepEqual(ids(signedOut.data.simulation.wars?.wars), ['w-foreign', 'w-korund'], 'a signed-out viewer of GET /api/world still receives both wars');
       assert.deepEqual(ids(signedOut.data.simulation.sieges), ['s-foreign', 's-korund'], 'a signed-out viewer of GET /api/world still receives both sieges');
     } finally {
