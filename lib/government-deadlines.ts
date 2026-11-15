@@ -1,8 +1,9 @@
-/** #1422 / #1426: civic government deadline rows from holiday and non-holiday civic clocks
+/** #1422 / #1426 / #1432: civic government deadline rows from holiday and non-holiday civic clocks
  *  already on the government read. Pure: no new flag, no migration, no invented dates.
  *  Labels match the docs / atlas names; the five rows already shown in GovernmentDeadlines keep
  *  their existing labels. #1426 appends Party Congress, People's Assembly election, Council of Ten
- *  election, Lodestar election, Tribune session, Great Council window, and Presidential term end. */
+ *  election, Lodestar election, Tribune session, Great Council window, and Presidential term end.
+ *  #1432 appends Moot term and Investiture deadline, converting snapshot seconds to ms instants. */
 import type { GovernmentSnapshot } from './government.ts';
 
 export type GovernmentDeadlineRow = { label: string; at: number };
@@ -82,5 +83,13 @@ export function governmentDeadlineRows(snapshot: GovernmentSnapshot): Government
   }
   if (snapshot.crownCalendar) push(rows, seen, 'Great Council window', snapshot.crownCalendar.nextGreatCouncilWindowAt);
   if (snapshot.electionClock) push(rows, seen, 'Presidential term end', snapshot.electionClock.termEndsAt);
+  // #1432: Hoarvale moot.dissolvesBy and investitureDeadline are integer seconds
+  // on the snapshot (docs §7.7, #1096). Convert to epoch milliseconds only here
+  // so GameTimer receives instants, not 1970 dates. Producers and other
+  // consumers stay in seconds.
+  if (snapshot.moot) {
+    push(rows, seen, 'Moot term', snapshot.moot.dissolvesBy * 1000);
+    push(rows, seen, 'Investiture deadline', snapshot.moot.investitureDeadline * 1000);
+  }
   return rows;
 }
