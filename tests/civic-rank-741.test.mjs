@@ -61,7 +61,8 @@ for (const backend of ['sqlite', 'postgres']) {
     for (let i = 3; i < 10; i++) await r.db.prepare("INSERT INTO work_shifts (id,clerk_user_id,work_order_id,order_name,output,capacity_spent,started_at,completes_at,claimed_at) VALUES (?,'alice','harvest','Harvest','food',1,?,?,?)").bind(`s741-alice-${i}`, iso(r.now - 7200000), iso(r.now - 3600000), iso(r.now - 1000)).run();
     // #778 dedupe: re-signing / re-voting the same ballot must not add a civic act (rejected by the PK, and COUNT(DISTINCT) would collapse it anyway).
     await assert.rejects(r.db.prepare("INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,ballot_written,policy) VALUES ('e741a','alice','rq-dup',0,1,'tier1-human-v1')").run());
-    assert.match(civicInputsSql, /COUNT\(DISTINCT petition_id\)/); assert.equal(civicInputsSql.match(/COUNT\(DISTINCT election_id\)/g).length, 3, 'one act per ballot in each receipt table');
+    assert.match(civicInputsSql, /COUNT\(DISTINCT petition_id\)/); assert.equal(civicInputsSql.match(/COUNT\(DISTINCT election_id\)/g).length, 4, 'one act per ballot in each receipt table');
+    assert.match(civicInputsSql, /COUNT\(DISTINCT election_id\) FROM assembly_voter_receipts WHERE clerk_user_id=\? AND ballot_written=1/);
     const rank = (await r.call('citizen/civic-rank', 'alice')).data.civicRank;
     assert.deepEqual([rank.rank, rank.progress.have.shifts, rank.progress.have.civicActs], ['Emberwarden', 10, 2]);
     await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='bob'").run();
@@ -107,6 +108,26 @@ async function receipt(r, id, written) {
   await r.db.prepare("INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,ballot_written,policy) VALUES (?,?,?,0,?,'tier1-human-v1')").bind(id, 'alice', `rq-${id}`, written).run();
 }
 for (const backend of ['sqlite', 'postgres']) {
+  test(`Assembly civic act (${backend}): one written ballot adds one act; a duplicate adds none; existing kinds are unchanged`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close());
+    await r.call('citizen', 'alice'); r.setFixtureEnv('HARIMU_CIVIC_RANK_ENABLED', 'true');
+    const acts = async () => (await r.call('citizen/civic-rank', 'alice')).data.civicRank.progress.have.civicActs;
+    assert.equal(await acts(), 0);
+    const names = JSON.stringify(['a', 'b', 'c']);
+    await r.db.prepare("INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) VALUES (?,'kindle',?,0,259200)").bind('cv-1402', names).run();
+    await r.db.prepare("INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,ballot_written,policy) VALUES (?,?,?,0,1,'tier1-human-v1')").bind('cv-1402', 'alice', 'rq-cv-1402').run();
+    await r.db.prepare("INSERT INTO poc_elections (id,nation_id,candidates_json,opens_at,closes_at) VALUES (?,'kindle',?,0,259200)").bind('poc-1402', names).run();
+    await r.db.prepare("INSERT INTO poc_voter_receipts (election_id,clerk_user_id,request_id,checked_at,ballot_written,policy) VALUES (?,?,?,0,1,'preview-citizen-v1')").bind('poc-1402', 'alice', 'rq-poc-1402').run();
+    await r.db.prepare("INSERT INTO primary_elections (id,nation_id,policy,opens_at,closes_at) VALUES (?,'kindle','preview-citizen-v1',0,259200)").bind('pri-1402').run();
+    await r.db.prepare("INSERT INTO primary_voter_receipts (election_id,clerk_user_id,party_id,request_id,checked_at,ballot_written,policy) VALUES (?,?,'steady-hand',?,0,1,'preview-citizen-v1')").bind('pri-1402', 'alice', 'rq-pri-1402').run();
+    assert.equal(await acts(), 3, 'existing kinds are unchanged: one act each');
+    await r.db.prepare("INSERT INTO assembly_elections (id,nation_id,policy,opens_at,closes_at) VALUES (?,'kindle','preview-citizen-v1',0,259200)").bind('asm-1402').run();
+    await r.db.prepare("INSERT INTO assembly_voter_receipts (election_id,clerk_user_id,district_id,request_id,checked_at,ballot_written,policy) VALUES (?,?,'forgehaven',?,1,1,'preview-citizen-v1')").bind('asm-1402', 'alice', 'rq-asm-1402').run();
+    assert.equal(await acts(), 4, 'an Assembly ballot adds exactly one civic act');
+    await assert.rejects(r.db.prepare("INSERT INTO assembly_voter_receipts (election_id,clerk_user_id,district_id,request_id,checked_at,ballot_written,policy) VALUES ('asm-1402','alice','forgehaven','rq-asm-dup',2,1,'preview-citizen-v1')").run());
+    assert.equal(await acts(), 4, 'a duplicate Assembly ballot adds none');
+  });
+
   test(`civic inputs (${backend}): unclaimed shifts and unwritten ballots do not count; Leading Citizen needs the 500 SPK wallet (499 fails)`, async t => {
     const r = await localRuntime({ backend }); t.after(() => r.close());
     await r.call('citizen', 'alice'); r.setFixtureEnv('HARIMU_CIVIC_RANK_ENABLED', 'true');
