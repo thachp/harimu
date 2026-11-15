@@ -1,6 +1,8 @@
-/** #1422: civic government deadline rows from holiday clocks already on the government read.
- *  Pure: no new flag, no migration, no invented dates. Labels match the docs / atlas names;
- *  the five rows already shown in GovernmentDeadlines keep their existing labels. */
+/** #1422 / #1426: civic government deadline rows from holiday and non-holiday civic clocks
+ *  already on the government read. Pure: no new flag, no migration, no invented dates.
+ *  Labels match the docs / atlas names; the five rows already shown in GovernmentDeadlines keep
+ *  their existing labels. #1426 appends Party Congress, People's Assembly election, Council of Ten
+ *  election, Lodestar election, Tribune session, Great Council window, and Presidential term end. */
 import type { GovernmentSnapshot } from './government.ts';
 
 export type GovernmentDeadlineRow = { label: string; at: number };
@@ -68,5 +70,17 @@ export function governmentDeadlineRows(snapshot: GovernmentSnapshot): Government
   if (snapshot.charterDay) push(rows, seen, 'Charter Day', snapshot.charterDay.nextAt);
   if (snapshot.fairWindBlessing) push(rows, seen, 'Fair-Wind Blessing', snapshot.fairWindBlessing.nextAt);
   if (snapshot.dockStrikeRemembrance) push(rows, seen, 'Dock Strike remembrance', snapshot.dockStrikeRemembrance.nextAt);
+  // #1426: non-holiday civic clocks already on the snapshot. Party Congress from party and
+  // partyState shares one label, so the first present key wins. Missing keys stay omitted.
+  if (snapshot.party) push(rows, seen, 'Party Congress', snapshot.party.nextCongressAt);
+  if (snapshot.partyState) push(rows, seen, 'Party Congress', snapshot.partyState.nextCongressAt);
+  if (snapshot.assemblyElection) push(rows, seen, "People's Assembly election", snapshot.assemblyElection.nextElectionAt);
+  if (snapshot.grandCouncil) {
+    push(rows, seen, 'Council of Ten election', snapshot.grandCouncil.councilOfTenNextElectionAt);
+    push(rows, seen, 'Lodestar election', snapshot.grandCouncil.lodestarNextElectionAt);
+    push(rows, seen, 'Tribune session', snapshot.grandCouncil.tribuneSessionEndsAt);
+  }
+  if (snapshot.crownCalendar) push(rows, seen, 'Great Council window', snapshot.crownCalendar.nextGreatCouncilWindowAt);
+  if (snapshot.electionClock) push(rows, seen, 'Presidential term end', snapshot.electionClock.termEndsAt);
   return rows;
 }
