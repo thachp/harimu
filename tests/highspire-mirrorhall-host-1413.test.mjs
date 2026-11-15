@@ -40,7 +40,7 @@ const show = async (r, user, nationId, cityId) => {
   return travel;
 };
 const clear = r => {
-  for (const key of [HOST, CORONATION, FEAST, 'HARIMU_CITY_PACK', 'HARIMU_GRAY_PACK']) r.setFixtureEnv(key, undefined);
+  for (const key of [HOST, CORONATION, FEAST, 'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED', 'HARIMU_CITY_PACK', 'HARIMU_GRAY_PACK']) r.setFixtureEnv(key, undefined);
 };
 
 test('both flags on: Highspire and Mirrorhall match the government clocks; siblings have no note', async t => {
@@ -71,6 +71,8 @@ test('both flags on: Highspire and Mirrorhall match the government clocks; sibli
   const ilmarGov = (await r.call('citizen', 'alice')).data.government;
   assert.equal(mirrorhall.data.festivalHostNextAt, ilmarGov.feastOfFirstLight.nextAt);
   assert.equal(ilmarGov.feastOfFirstLight.cycleDays, 15);
+  // #1437: Lume Mesa may have its own pilgrimage note when that flag is on; it must not inherit the Feast note.
+  r.setFixtureEnv('HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED', 'false');
   for (const cityId of ['lume-mesa', 'glassen']) {
     const sibling = await show(r, 'alice', 'ilmar', cityId);
     absent(sibling.data);

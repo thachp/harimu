@@ -3,7 +3,7 @@ import {getDatabase} from '@/lib/db';
 import {startCityTravel} from '@/lib/travel';
 import {env} from 'cloudflare:workers';
 import {isSameOriginCommand,readCommandObject} from '@/lib/command-request';
-import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunkarPassEnv,bindDunmorrowEnv,bindMarrowMillsEnv,bindRuelWorksEnv,bindThessalyWellsEnv,bindVakkHarborEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,STONEHEARTH_BIRTHDAY_NOTE,STONEHEARTH_HOST_NOTE,STONEHEARTH_PLAN_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1261 port, #1270 Ruel Works, #1271 Thessaly Wells, #1275 Marrow Mills, #1279 Dao Works, #1282 Dunkar Pass, #1373 Stonehearth host notes
+import {bindBrasswellPortEnv,bindCorvelIslesEnv,bindDaoWorksEnv,bindDunkarPassEnv,bindDunmorrowEnv,bindMarrowMillsEnv,bindRuelWorksEnv,bindThessalyWellsEnv,bindVakkHarborEnv,CORVEL_ISLES_FLAG,CORVEL_ISLES_REGATTA_NOTE,DUNMORROW_FLAG,DUNMORROW_HEARTH_NOTE,LUME_MESA_PILGRIMAGE_NOTE,STONEHEARTH_BIRTHDAY_NOTE,STONEHEARTH_HOST_NOTE,STONEHEARTH_PLAN_NOTE,cityForNation,cityImportsFields,citySpecialtyFields,cityCaptureNote,cityCivicUnitNote,cityGovernorFields} from '@/lib/cities'; // #996 specialty, #1001 imports, #1002 capture, #1006 civic unit, #1007 governor, #1241 port, #1242 Dunmorrow, #1259 Corvel Isles, #1261 port, #1270 Ruel Works, #1271 Thessaly Wells, #1275 Marrow Mills, #1279 Dao Works, #1282 Dunkar Pass, #1373 Stonehearth host notes, #1437 Lume Mesa
 import {aurelleNextCoronationDayAt} from '@/lib/aurelle-coronation-day'; // #1191 clock, read only
 import {aurelleNextHearthNightAt} from '@/lib/aurelle-hearth-night'; // #1146 clock, read only
 import {confluenceNextCanalFestivalAt} from '@/lib/confluence-canal-festival'; // #1165 clock, read only
@@ -13,6 +13,7 @@ import {fulmaraNextExchangeBellAt} from '@/lib/fulmara-exchange-bell'; // #1150 
 import {hoarvaleNextAuroraNightAt} from '@/lib/hoarvale-aurora-night'; // #1160 clock, read only
 import {hoarvaleNextMootOpeningAt} from '@/lib/hoarvale-moot-opening'; // #1208 clock, read only
 import {ilmarNextFeastOfFirstLightAt} from '@/lib/ilmar-feast-of-first-light'; // #1137 clock, read only
+import {ilmarNextGreatPilgrimageAt} from '@/lib/ilmar-great-pilgrimage'; // #1196 clock, read only
 import {meridianNextTurbineDayAt} from '@/lib/meridian-turbine-day'; // #1175 clock, read only
 import {meridianNextCongressWeekAt} from '@/lib/meridian-congress-week'; // #1189 clock, read only
 import {veldwoodNextVoteDayAt} from '@/lib/veldwood-vote-day'; // #1122 clock, read only
@@ -129,6 +130,7 @@ const festivalHosts=[
  {nationId:'varkand',cityId:'voren-light',festivalFlag:'HARIMU_VARKAND_LANTERN_WATCH_ENABLED',note:'Hosts Lantern Watch',nextAt:varkandNextLanternWatchAt}, // #1403
  {nationId:'aurelle',cityId:'highspire',festivalFlag:'HARIMU_AURELLE_CORONATION_DAY_ENABLED',note:'Hosts Coronation Day',nextAt:aurelleNextCoronationDayAt}, // #1413
  {nationId:'ilmar',cityId:'mirrorhall',festivalFlag:'HARIMU_ILMAR_FEAST_OF_FIRST_LIGHT_ENABLED',note:'Hosts the Feast of First Light',nextAt:ilmarNextFeastOfFirstLightAt}, // #1413
+ {nationId:'ilmar',cityId:'lume-mesa',festivalFlag:'HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED',note:LUME_MESA_PILGRIMAGE_NOTE,nextAt:ilmarNextGreatPilgrimageAt}, // #1437
 ] as const;
 const FORGEHAVEN_BALLOT_NOTE='Hosts Ballot Night';
 /** #1375: Forgehaven hosts Ballot Night. Reuses #1285 keys. No new flag.
