@@ -42,6 +42,9 @@ test('#1416 district is stored at vote time, hidden while open, and published af
   assert.equal(open.data.status, 'open'); assert.equal(open.data.result, null);
   assert.equal(JSON.stringify(open.data).includes('"districts"'), false);
   await r.db.prepare("UPDATE civic_voter_receipts SET district_id=NULL WHERE clerk_user_id='dani'").run();
+  await citizen(r, 'erin');
+  // QA1 mutant 1: an unwritten receipt (ballot_written=0) with a district is never a published ballot.
+  await r.db.prepare("INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,ballot_written,policy,district_id) VALUES (?,'erin','rq-erin-unwritten',?,0,'tier1-human-v1','forgehaven')").bind(electionId, Math.floor(r.now / 1000)).run();
   r.setNow(open.data.closesAt * 1000);
   const closed = await r.call('election', 'bob');
   assert.equal(closed.data.status, 'closed');
@@ -88,4 +91,29 @@ INSERT INTO civic_anonymous_ballots (id, election_id, ranking_json, policy) VALU
   assert.equal((await pg.query("SELECT district_id FROM civic_voter_receipts WHERE clerk_user_id='old'")).rows[0].district_id, null);
   assert.equal((await pg.query("SELECT column_name FROM information_schema.columns WHERE table_name='civic_anonymous_ballots' AND column_name='district_id'")).rows.length, 0);
   await pg.close();
+});
+
+test('#1416 a closed read refuses a saved result whose district counts were tampered with', async t => {
+  const r = await localRuntime({ ballotPrivacyReady: true }); t.after(() => r.close());
+  const elections = await r.importModule('lib/elections.ts');
+  const { candidateIds, electionId } = elections;
+  eligible(r, 'alice'); eligible(r, 'bob');
+  await home(r, 'alice', 'tarrek-foundry');
+  for (const user of ['alice', 'bob']) assert.equal((await r.call('election', user, vote(electionId, [...candidateIds]))).status, 200);
+  const open = await r.call('election', 'alice');
+  r.setNow(open.data.closesAt * 1000);
+  await (await r.importModule('lib/world-simulation.ts')).advanceWorld(r.db, Math.floor(r.now / 1000));
+  const closed = await r.call('election', 'alice');
+  assert.equal(closed.data.status, 'closed');
+  assert.ok(closed.data.result.districts.length > 0);
+  const row = await r.db.prepare('SELECT result_json FROM civic_elections WHERE id=?').bind(electionId).first();
+  const saved = JSON.parse(row.result_json);
+  assert.ok(Array.isArray(saved.districts) && saved.districts.length > 0);
+  saved.districts[0].ballots += 1;
+  await r.db.prepare('UPDATE civic_elections SET result_json=? WHERE id=?').bind(JSON.stringify(saved), electionId).run();
+  await assert.rejects(
+    elections.readElection(r.db, 'alice', Math.floor(r.now / 1000), true),
+    /does not match the confirmed count/,
+    'a tampered district total is refused, never published',
+  );
 });
