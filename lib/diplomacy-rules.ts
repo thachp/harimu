@@ -43,6 +43,23 @@ export const treatyBreakPenalty: Readonly<Record<TreatyKind, { legitimacy: numbe
 export type TreatyBreakPenalty = { nation: TreatyNationId; legitimacy: number; reputation: number; applied: false };
 export const treatyBreakPenaltyFor = (kind: TreatyKind, breaker: TreatyNationId): TreatyBreakPenalty => ({ nation: breaker, ...treatyBreakPenalty[kind], applied: false });
 
+/** #1474: derived World Reputation per MVP nation from broken treaties. Starts at 0 and adds
+ *  treatyBreakPenalty[kind].reputation for each treaty with status === 'broken' and brokenBy === nation.
+ *  brokenPacts counts only breaks whose reputation penalty is non-zero. Nothing is stored. */
+export type WorldReputation = { score: number; brokenPacts: number };
+export type WorldReputationMap = Record<TreatyNationId, WorldReputation>;
+export function worldReputation(treaties: readonly { kind: TreatyKind; status: string; brokenBy: TreatyNationId | null }[]): WorldReputationMap {
+  const result = Object.fromEntries(treatyNations.map(nation => [nation, { score: 0, brokenPacts: 0 }])) as WorldReputationMap;
+  for (const treaty of treaties) {
+    if (treaty.status !== 'broken' || !isTreatyNation(treaty.brokenBy) || !isTreatyKind(treaty.kind)) continue;
+    const penalty = treatyBreakPenalty[treaty.kind].reputation;
+    result[treaty.brokenBy].score += penalty;
+    if (penalty !== 0) result[treaty.brokenBy].brokenPacts += 1;
+  }
+  return result;
+}
+
+
 /** #400 [ASSUMPTION]: scheduled AI-leader proposals. A deterministic stand-in for the utility model (not a simulation): at most one proposal per
  *  real-time slot (one day, 12 game days at the 12x clock), rotating through the six pair-and-kind candidates, the proposer alternating each full
  *  rotation. A refused proposal of the same pair and kind is not repeated for `treatyProposalCooldownSlots` slots. */
