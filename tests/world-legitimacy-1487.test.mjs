@@ -140,6 +140,63 @@ for (const backend of ['sqlite', 'postgres']) {
     }
   });
 
+  test(`#1487 21 NAP breaks give legitimacy exactly −105, a plain sum with no floor or decay (${backend})`, async () => {
+    const r = await localRuntime({ backend });
+    try {
+      r.setFixtureEnv('HARIMU_DIPLOMACY_ENABLED', 'true');
+      const now = Math.floor(r.now / 1000);
+      for (let i = 0; i < 21; i += 1) {
+        await insertTreaty(r, { id: `nap-${i}`, kind: 'non-aggression', proposer: 'kindle', other: 'aurelle', status: 'broken', brokenBy: 'kindle', now, proposedAt: now - 100 + i });
+      }
+      const world = await r.call('world', null);
+      assert.equal(world.status, 200);
+      assert.equal(world.data.simulation.treaties.treaties.length, 20, 'the public treaty list stays at LIMIT 20');
+      assert.equal(world.data.simulation.reputation.kindle.legitimacy, -105, '21 NAP breaks are a plain sum (−5 each) with no floor or decay, including the break off LIMIT 20');
+      assert.equal(world.data.simulation.reputation.kindle.brokenPacts, 21);
+      assert.equal(world.data.simulation.reputation.aurelle.legitimacy, 0);
+      assert.equal(world.data.simulation.reputation.korund.legitimacy, 0);
+      const citizen = await r.call('citizen', 'bob');
+      assert.equal(citizen.data.simulation.reputation.kindle.legitimacy, -105);
+    } finally {
+      await r.close();
+    }
+  });
+
+  test(`#1487 Korund fog still returns only Korund's reputation entry, legitimacy included (${backend})`, async () => {
+    const r = await localRuntime({ backend });
+    try {
+      r.setFixtureEnv('HARIMU_DIPLOMACY_ENABLED', 'true');
+      await r.db.prepare("UPDATE citizens SET nation_id='korund' WHERE clerk_user_id='alice'").run();
+      const now = Math.floor(r.now / 1000);
+      const preview = await r.call('world', null);
+      const epoch = preview.data.simulation.clock.epochSeconds;
+      await insertTreaty(r, { id: 't-aurelle', kind: 'non-aggression', proposer: 'kindle', other: 'aurelle', status: 'broken', brokenBy: 'aurelle', now, proposedAt: epoch + 1, endedAt: epoch + 1 * gameDaySeconds });
+      await insertTreaty(r, { id: 't-korund-proposer', kind: 'non-aggression', proposer: 'korund', other: 'kindle', status: 'broken', brokenBy: 'korund', now, proposedAt: epoch + 2, endedAt: epoch + 2 * gameDaySeconds });
+      await insertTreaty(r, { id: 't-korund-other', kind: 'non-aggression', proposer: 'aurelle', other: 'korund', status: 'broken', brokenBy: 'korund', now, proposedAt: epoch + 3, endedAt: epoch + 3 * gameDaySeconds });
+      await insertTreaty(r, { id: 't-kindle', kind: 'non-aggression', proposer: 'kindle', other: 'korund', status: 'broken', brokenBy: 'kindle', now, proposedAt: epoch + 4, endedAt: epoch + 4 * gameDaySeconds });
+
+      const aliceCitizen = await r.call('citizen', 'alice');
+      assert.deepEqual(Object.keys(aliceCitizen.data.simulation.reputation).sort(), ['korund'], 'a Korund viewer of GET /api/citizen has only the korund reputation key');
+      assert.equal(aliceCitizen.data.simulation.reputation.korund.legitimacy, -10, 'Korund\'s entry includes legitimacy for both sides of the Korund pair');
+      assert.equal('aurelle' in aliceCitizen.data.simulation.reputation, false, 'a Korund viewer does not receive Aurelle\'s legitimacy');
+      assert.equal('kindle' in aliceCitizen.data.simulation.reputation, false, 'a Korund viewer does not receive Kindle\'s legitimacy');
+
+      const aliceWorld = await r.call('world', 'alice');
+      assert.deepEqual(Object.keys(aliceWorld.data.simulation.reputation).sort(), ['korund'], 'a Korund viewer of GET /api/world has only the korund reputation key');
+      assert.equal(aliceWorld.data.simulation.reputation.korund.legitimacy, -10);
+      assert.equal('aurelle' in aliceWorld.data.simulation.reputation, false);
+      assert.equal('kindle' in aliceWorld.data.simulation.reputation, false);
+
+      const bobCitizen = await r.call('citizen', 'bob');
+      assert.deepEqual(Object.keys(bobCitizen.data.simulation.reputation).sort(), ['aurelle', 'kindle', 'korund'], 'a Kindle viewer still receives every nation\'s entry, legitimacy included');
+      assert.equal(bobCitizen.data.simulation.reputation.aurelle.legitimacy, -5);
+      assert.equal(bobCitizen.data.simulation.reputation.kindle.legitimacy, -5);
+      assert.equal(bobCitizen.data.simulation.reputation.korund.legitimacy, -10);
+    } finally {
+      await r.close();
+    }
+  });
+
   test(`#1487 flag off sends no reputation key (${backend})`, async () => {
     const r = await localRuntime({ backend });
     try {
@@ -207,7 +264,7 @@ const run = (files, pattern) => {
   return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, ...files], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
 };
 
-test('#1487 mutations: dropping * n, using the reputation penalty, and zeroing legitimacy all fail', () => {
+test('#1487 mutations: dropping * n, using the reputation penalty, zeroing legitimacy, a −100 floor, and dropping the Korund filter all fail', () => {
   const file = 'tests/world-legitimacy-1487.test.mjs';
   const cases = [
     {
@@ -227,6 +284,18 @@ test('#1487 mutations: dropping * n, using the reputation penalty, and zeroing l
       find: 'legitimacy: derivedLegitimacy[nation] ?? 0',
       replace: 'legitimacy: 0',
       pattern: 'attaches legitimacy from every break|21 Kindle NAP breaks are all counted',
+    },
+    {
+      file: 'lib/diplomacy-rules.ts',
+      find: 'result[row.brokenBy] += treatyBreakPenalty[row.kind].legitimacy * n;',
+      replace: 'result[row.brokenBy] = Math.max(-100, result[row.brokenBy] + treatyBreakPenalty[row.kind].legitimacy * n);',
+      pattern: 'exactly −105, a plain sum with no floor',
+    },
+    {
+      file: 'lib/war.ts',
+      find: '...(simulation.reputation ? { reputation: simulation.reputation.korund !== undefined ? { korund: simulation.reputation.korund } : {} } : {}),',
+      replace: '...(simulation.reputation ? { reputation: simulation.reputation } : {}),',
+      pattern: "only Korund's reputation entry, legitimacy included",
     },
   ];
   for (const c of cases) {
