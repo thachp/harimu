@@ -1,6 +1,8 @@
 import type { GameDatabase } from './database-contract';
 import { mapHeight, mapWidth, mvpNations } from './map-zones';
 import { citiesForNation, outpostCityForNation } from './cities';
+import { cityVisitAllowed, type PermitOpts } from './home-move';
+import { readCityLocation } from './city-location';
 
 /**
  * Travel between owned and city squares with a travel timer (#123, docs 6: squares are the unit of movement).
@@ -72,11 +74,16 @@ export async function travelBlock(db: GameDatabase, userId: string, now: number,
   return null;
 }
 
-/** #123 (ARC ruling on #264): with travel enabled, POST /api/city {action:'travel'} becomes a timed journey to that city's square. */
-export async function startCityTravel(db: GameDatabase, userId: string, cityId: string, requestId: string, now: number): Promise<TravelResult> {
+/** #123 (ARC ruling on #264): with travel enabled, POST /api/city {action:'travel'} becomes a timed journey to that city's square.
+ *  #1444: the same closed-system permit as a home move, not consumed by the visit. */
+export async function startCityTravel(db: GameDatabase, userId: string, cityId: string, requestId: string, now: number, permit: PermitOpts = { enabled: false }): Promise<TravelResult> {
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const place = (await citySquares(db, citizen?.nation_id ?? '')).find(p => p.cityId === cityId);
   if (!place) return fail(409, 'no_square', 'That city has no square on the map yet, so it cannot be reached by travel.');
+  if (permit.enabled && citizen?.nation_id) {
+    const here = (await readCityLocation(db, userId, citizen.nation_id, now)).currentCityId;
+    if (!await cityVisitAllowed(db, userId, citizen.nation_id, cityId, here, now, permit)) return fail(403, 'permit_required', 'permit_required');
+  }
   return startTravel(db, userId, { x: place.x, y: place.y, requestId }, now, true);
 }
 export function parseTravelCommand(body: Record<string, unknown>): { x: number; y: number; requestId: string } | null {

@@ -1,6 +1,6 @@
-/** News editions for the seven non-MVP nations (issue #108). Content only: not yet read by readNationalNews in
- * lib/national-news.ts, which still serves Kindle, Korund and Aurelle. Wiring these in is a follow-up once each nation opens.
- * Outlet names follow the culture bible (thachp/harimu-docs#3); `canon` marks names fixed there, the rest are proposals.
+/** News editions for the seven non-MVP nations (issue #108). #1443 wires Confluence (*The Current Daily*) into
+ * readNationalNews; the other six stay content-only until each edition is opened. Kindle, Korund and Aurelle stay in
+ * lib/national-news.ts. Outlet names follow the culture bible / §18.2; `canon` marks names fixed there, the rest are proposals.
  * Press freedom restates each nation's Freedoms row (harimu-docs content/world/nations/*.mdx).
  * Like lib/news-templates.ts, the voice lives only in the words: every number is copied from the ledger row passed in. */
 import type {LedgerRow,TemplateHeadline} from './news-templates';
@@ -21,7 +21,7 @@ const s=(n:number,one:string,many:string)=>`${n} ${n===1?one:many}`;
 const label=(outlet:string,source='the system ledger')=>`(${outlet} template · figures copied from ${source} and cannot be edited.)`;
 
 export const newsEditions:Readonly<Record<EditionNationId,NewsEditionContent>>={
- confluence:{nationId:'confluence',outlet:'The Current Daily',canon:false,masthead:'Many streams, one current.',style:'state',secondaryOutlet:'licensed local sheets',
+ confluence:{nationId:'confluence',outlet:'The Current Daily',canon:true,masthead:'Many streams, one current.',style:'state',secondaryOutlet:'licensed local sheets',
   pressFreedom:'moderate',freedomsRow:'One official newspaper plus licensed local outlets; speech free on daily life, restricted on the Party leadership.',
   templateKind:'template',label:label('Current Daily'),recordTitles:{work:'Guidance Plan work recorded',register:'Household registration recorded',market:'Bread Hall exchanges recorded'},
   templates:[
@@ -31,9 +31,9 @@ export const newsEditions:Readonly<Record<EditionNationId,NewsEditionContent>>={
    {id:'confluence-food',when:r=>r.food>0,render:r=>({title:'Many streams report a full basket',text:`${r.food} food shared to the Bread Halls. Not a grain wasted.`})},
    {id:'confluence-register',when:r=>r.citizens>0,render:r=>({title:'New households join the current',text:`${s(r.citizens,'citizen','citizens')} registered with a household this period.`})},
   ]},
- meridian:{nationId:'meridian',outlet:'Steamgate Measure',canon:false,masthead:'Rise by measure.',style:'state',secondaryOutlet:'Tsenga SEZ business wire (Great Filter applied)',
+ meridian:{nationId:'meridian',outlet:'Steamgate Herald',canon:true,masthead:'Rise by measure.',style:'state',secondaryOutlet:'SEZ business press (economic news only; Great Filter applied)',
   pressFreedom:'low-moderate',freedomsRow:'Tightly managed press and politics; the Great Filter limits foreign news.',
-  templateKind:'template',label:label('Steamgate Measure'),recordTitles:{work:'Output recorded',register:'Residence registration recorded',market:'Exchange board activity recorded'},
+  templateKind:'template',label:label('Steamgate Herald'),recordTitles:{work:'Output recorded',register:'Residence registration recorded',market:'Exchange board activity recorded'},
   templates:[
    {id:'meridian-shifts-busy',when:r=>r.shifts>=10,render:r=>({title:'Output rises by measure',text:`${s(r.shifts,'shift','shifts')} completed. The measure is met.`})},
    {id:'meridian-shifts-some',when:r=>r.shifts>0&&r.shifts<10,render:r=>({title:'Steady output reported',text:`${s(r.shifts,'shift','shifts')} completed this period, by official count.`})},
@@ -41,9 +41,9 @@ export const newsEditions:Readonly<Record<EditionNationId,NewsEditionContent>>={
    {id:'meridian-trades',when:r=>r.trades>0,render:r=>({title:'SEZ exchange boards report activity',text:`${s(r.trades,'trade','trades')} cleared, ${r.quantity} goods moved through the zone.`})},
    {id:'meridian-register',when:r=>r.citizens>0,render:r=>({title:'New residents enter the register',text:`${s(r.citizens,'citizen','citizens')} received residence permits.`})},
   ]},
- ilmar:{nationId:'ilmar',outlet:'The Clear Record',canon:false,masthead:'Be a clear vessel.',style:'court',
+ ilmar:{nationId:'ilmar',outlet:'The Lamp',canon:true,masthead:'Be a clear vessel.',style:'court',
   pressFreedom:'low-moderate',freedomsRow:'Sanctum-approved press; no reporting on Stilldays.',
-  templateKind:'decree',label:label('Clear Record','the sanctum ledger'),recordTitles:{work:'Endowment service recorded',register:'Entry to the Vigil rolls recorded',market:'Endowment exchanges recorded'},
+  templateKind:'decree',label:label('The Lamp','the sanctum ledger'),recordTitles:{work:'Endowment service recorded',register:'Entry to the Vigil rolls recorded',market:'Endowment exchanges recorded'},
   templates:[
    {id:'ilmar-shifts-some',when:r=>r.shifts>0,render:r=>({title:'Endowment service entered in the record',text:`${s(r.shifts,'shift','shifts')} of service completed, stated plainly.`})},
    {id:'ilmar-shifts-none',when:r=>r.shifts===0,render:()=>({title:'The record is clear and still',text:'No service is entered this period. A quiet record is still a true one.'})},
@@ -60,9 +60,9 @@ export const newsEditions:Readonly<Record<EditionNationId,NewsEditionContent>>={
    {id:'hoarvale-trades',when:r=>r.trades>0,render:r=>({title:'Trading Houses keep the books warm',text:`${s(r.trades,'trade','trades')} recorded · ${r.quantity} goods transferred.`})},
    {id:'hoarvale-register',when:r=>r.citizens>0,render:r=>({title:'New faces at the hearth',text:`${s(r.citizens,'citizen','citizens')} joined the register. Share the warmth.`})},
   ]},
- varkand:{nationId:'varkand',outlet:'Watchfast Signal',canon:false,masthead:'Hold the line in the fog.',style:'bulletin',
+ varkand:{nationId:'varkand',outlet:'The Directorate Bulletin',canon:true,masthead:'Hold the line in the fog.',style:'bulletin',
   pressFreedom:'low',freedomsRow:'Variable by Alert Level: licensed press at Green; censorship at Amber; martial law and foreign-news fog at Red.',
-  templateKind:'template',label:label('Watchfast Signal','the Directorate ledger'),recordTitles:{work:'National Service shifts logged',register:'Muster roll entries logged',market:'Arsenal issue logged'},
+  templateKind:'template',label:label('The Directorate Bulletin','the Directorate ledger'),recordTitles:{work:'National Service shifts logged',register:'Muster roll entries logged',market:'Arsenal issue logged'},
   templates:[
    {id:'varkand-shifts-some',when:r=>r.shifts>0,render:r=>({title:'Shifts logged',text:`${s(r.shifts,'shift','shifts')} complete. Line held.`})},
    {id:'varkand-shifts-none',when:r=>r.shifts===0,render:()=>({title:'No shifts logged',text:'Zero shifts this period. Stand by.'})},
@@ -79,7 +79,7 @@ export const newsEditions:Readonly<Record<EditionNationId,NewsEditionContent>>={
    {id:'veldwood-trades',when:r=>r.trades>0,render:r=>({title:'Ringhall market report',text:`${s(r.trades,'trade','trades')} recorded · ${r.quantity} goods transferred.`})},
    {id:'veldwood-register',when:r=>r.citizens>0,render:r=>({title:'New voices in the ring',text:`${s(r.citizens,'citizen','citizens')} joined. Every voice counts the same.`})},
   ]},
- fulmara:{nationId:'fulmara',outlet:'Arcport Exchange Bulletin',canon:false,masthead:'Ride the storm, own the wind. · Owned by a chartered trading house',style:'press',secondaryOutlet:"a dockworkers' sheet",
+ fulmara:{nationId:'fulmara',outlet:'Arcport Exchange Bulletin',canon:false,masthead:'Ride the storm, own the wind. · Owned by a chartered trading house',style:'press',secondaryOutlet:"the Tribune's Dock Sheet",
   pressFreedom:'medium-high',freedomsRow:'Free press mostly owned by trading houses; ownership disclosed on every masthead.',
   templateKind:'template',label:label('Exchange Bulletin'),recordTitles:{work:'Dock and yard shifts recorded',register:'Charter registrations recorded',market:'Exchange trades recorded'},
   templates:[
@@ -91,7 +91,7 @@ export const newsEditions:Readonly<Record<EditionNationId,NewsEditionContent>>={
   ]},
 };
 
-/** Varkand masthead prefix. Every Watchfast Signal edition is headed by the current Alert Level. */
+/** Varkand masthead prefix. Every Directorate Bulletin edition is headed by the current Alert Level. */
 export const alertMasthead:Readonly<Record<AlertLevel,string>>={green:'ALERT GREEN · Licensed press',amber:'ALERT AMBER · Censored bulletin',red:'ALERT RED · Martial law bulletin'};
 
 export function editionMasthead(nationId:EditionNationId,alert:AlertLevel='green'):string{

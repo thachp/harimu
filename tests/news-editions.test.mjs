@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { newsEditions, editionHeadlines, editionMasthead } from '../lib/news-editions.ts';
 
 const ids=['confluence','meridian','ilmar','hoarvale','varkand','veldwood','fulmara'];
@@ -13,6 +14,14 @@ test('one edition per non-MVP nation with outlet, masthead, record titles and pr
     assert.equal(new Set(e.templates.map(t=>t.id)).size, e.templates.length); assert.ok(e.templates.length>=4);
   }
   assert.equal(newsEditions.veldwood.outlet,'The Canopy'); assert.equal(newsEditions.veldwood.canon,true);
+  assert.equal(newsEditions.confluence.outlet,'The Current Daily'); assert.equal(newsEditions.confluence.canon,true);
+  assert.equal(newsEditions.meridian.outlet,'Steamgate Herald'); assert.equal(newsEditions.meridian.canon,true);
+  assert.equal(newsEditions.ilmar.outlet,'The Lamp'); assert.equal(newsEditions.ilmar.canon,true);
+  assert.equal(newsEditions.varkand.outlet,'The Directorate Bulletin'); assert.equal(newsEditions.varkand.canon,true);
+  assert.match(newsEditions.meridian.label,/Steamgate Herald/);
+  assert.match(newsEditions.ilmar.label,/The Lamp/);
+  assert.match(newsEditions.varkand.label,/The Directorate Bulletin/);
+  assert.equal(newsEditions.fulmara.secondaryOutlet,"the Tribune's Dock Sheet");
   assert.equal(newsEditions.ilmar.templateKind,'decree');
   assert.match(newsEditions.fulmara.masthead,/Owned by/);
   assert.equal('korund' in newsEditions, false);
@@ -45,4 +54,22 @@ test('invalid rows publish nothing; no AI, reward or real-money wording', () => 
   assert.deepEqual(editionHeadlines('fulmara',{...rows[1],trades:1.5}),[]);
   const all=JSON.stringify(ids.flatMap(id=>rows.flatMap(r=>editionHeadlines(id,r))));
   assert.doesNotMatch(all,/AI-generated|reward|bonus|grant|invest|real money/i);
+});
+
+test('§18.2 official newspaper names are pinned in source; old proposal names are gone', () => {
+  const editions=readFileSync('lib/news-editions.ts','utf8');
+  const guide=readFileSync('docs/NEWS_STYLE_GUIDE.md','utf8');
+  assert.match(editions,/meridian:\{nationId:'meridian',outlet:'Steamgate Herald',canon:true,/);
+  assert.match(editions,/ilmar:\{nationId:'ilmar',outlet:'The Lamp',canon:true,/);
+  assert.match(editions,/varkand:\{nationId:'varkand',outlet:'The Directorate Bulletin',canon:true,/);
+  assert.match(editions,/secondaryOutlet:"the Tribune's Dock Sheet"/);
+  assert.match(guide,/\*Steamgate Herald\*/);
+  assert.match(guide,/\*The Lamp\*/);
+  assert.match(guide,/\*The Directorate Bulletin\*/);
+  assert.match(guide,/Tribune's \*Dock Sheet\*/);
+  // Built in parts so this file itself does not contain the retired proposal strings.
+  const retired=new RegExp(['Steamgate Meas'+'ure','The Clear Rec'+'ord','Clear Rec'+'ord','Watchfast Sig'+'nal'].join('|'));
+  for (const [name,src] of [['lib/news-editions.ts',editions],['docs/NEWS_STYLE_GUIDE.md',guide]]) {
+    assert.doesNotMatch(src,retired,name);
+  }
 });
