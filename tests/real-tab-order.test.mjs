@@ -28,7 +28,6 @@ async function load(rel) {
     if (name === '@phosphor-icons/react') return new Proxy({}, { get: () => () => null });
     if (name === '@clerk/nextjs') return { useClerk: () => ({ mountUserButton() {}, unmountUserButton() {} }) };
     if (name.startsWith('@/lib/')) return require(`../lib/${name.slice(6)}.ts`);
-    if (name === '../lib/kindle-newspapers') { const press = require('../lib/press-templates.ts'); return { PRESS_HEADLINE_MAX: press.PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX: press.PRESS_PARAGRAPH_MAX, kindleNewspaperExistsError: 'You already founded a newspaper.' }; }
     if (name.startsWith('../lib/')) return require(`${name}.ts`);
     return require(name);
   }, mod);
