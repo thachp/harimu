@@ -11,6 +11,9 @@ import { worldReputation, treatyBreakPenalty, treatyNations } from '../lib/diplo
 const D = 86_400;
 const zero = { score: 0, brokenPacts: 0 };
 const zeros = () => Object.fromEntries(treatyNations.map((nation) => [nation, { ...zero }]));
+const emptyRecord = { record: [], earlierBreaks: 0 };
+const withRecord = (map, records = {}) => Object.fromEntries(Object.entries(map).map(([nation, value]) => [nation, { ...value, ...(records[nation] ?? emptyRecord) }]));
+const napBreak = (epochSeconds, brokenAt, other) => ({ other, kind: 'non-aggression', brokenAt, brokenGameDay: Math.floor(Math.max(0, brokenAt - epochSeconds) * 12 / 86400) + 1, penalty: -10 });
 
 const treaty = (over = {}) => ({ kind: 'non-aggression', status: 'broken', brokenBy: 'aurelle', ...over });
 
@@ -52,15 +55,16 @@ for (const backend of ['sqlite', 'postgres']) {
       const bobCitizen = await r.call('citizen', 'bob');
       assert.equal(bobCitizen.status, 200);
       assert.equal(bobCitizen.cache, 'private, no-store');
-      assert.deepEqual(bobCitizen.data.simulation.reputation, { ...zeros(), aurelle: { score: -10, brokenPacts: 1 } }, 'a Kindle viewer of GET /api/citizen scores only the broken NAP against Aurelle');
+      const expectedAurelle = (clock) => withRecord({ ...zeros(), aurelle: { score: -10, brokenPacts: 1 } }, { aurelle: { record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0 } });
+      assert.deepEqual(bobCitizen.data.simulation.reputation, expectedAurelle(bobCitizen.data.simulation.clock), 'a Kindle viewer of GET /api/citizen scores only the broken NAP against Aurelle');
 
       const bobWorld = await r.call('world', 'bob');
       assert.equal(bobWorld.status, 200);
       assert.equal(bobWorld.cache, 'private, no-store');
-      assert.deepEqual(bobWorld.data.simulation.reputation, { ...zeros(), aurelle: { score: -10, brokenPacts: 1 } }, 'a Kindle viewer of GET /api/world scores only the broken NAP against Aurelle');
+      assert.deepEqual(bobWorld.data.simulation.reputation, expectedAurelle(bobWorld.data.simulation.clock), 'a Kindle viewer of GET /api/world scores only the broken NAP against Aurelle');
 
       const signedOut = await r.call('world', null);
-      assert.deepEqual(signedOut.data.simulation.reputation, { ...zeros(), aurelle: { score: -10, brokenPacts: 1 } }, 'a signed-out GET /api/world still includes every nation\'s reputation');
+      assert.deepEqual(signedOut.data.simulation.reputation, expectedAurelle(signedOut.data.simulation.clock), 'a signed-out GET /api/world still includes every nation\'s reputation');
     } finally {
       await r.close();
     }
@@ -78,22 +82,24 @@ for (const backend of ['sqlite', 'postgres']) {
       const aliceCitizen = await r.call('citizen', 'alice');
       assert.equal(aliceCitizen.status, 200);
       assert.equal(aliceCitizen.cache, 'private, no-store');
-      assert.deepEqual(aliceCitizen.data.simulation.reputation.korund, { score: -10, brokenPacts: 1 }, 'a Korund viewer keeps Korund\'s reputation entry');
+      const korundRecord = (clock) => ({ score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0 });
+      assert.deepEqual(aliceCitizen.data.simulation.reputation.korund, korundRecord(aliceCitizen.data.simulation.clock), 'a Korund viewer keeps Korund\'s reputation entry');
       assert.ok(!('aurelle' in aliceCitizen.data.simulation.reputation) && !('kindle' in aliceCitizen.data.simulation.reputation), 'a Korund viewer does not receive a non-Korund reputation entry');
       assert.deepEqual(Object.keys(aliceCitizen.data.simulation.reputation).sort(), ['korund'], 'a Korund viewer of GET /api/citizen has only the korund reputation key');
 
       const aliceWorld = await r.call('world', 'alice');
       assert.equal(aliceWorld.status, 200);
       assert.equal(aliceWorld.cache, 'private, no-store');
-      assert.deepEqual(aliceWorld.data.simulation.reputation.korund, { score: -10, brokenPacts: 1 }, 'a Korund viewer of GET /api/world keeps Korund\'s reputation entry');
+      assert.deepEqual(aliceWorld.data.simulation.reputation.korund, korundRecord(aliceWorld.data.simulation.clock), 'a Korund viewer of GET /api/world keeps Korund\'s reputation entry');
       assert.ok(!('aurelle' in aliceWorld.data.simulation.reputation) && !('kindle' in aliceWorld.data.simulation.reputation), 'a Korund viewer does not receive a non-Korund reputation entry');
       assert.deepEqual(Object.keys(aliceWorld.data.simulation.reputation).sort(), ['korund'], 'a Korund viewer of GET /api/world has only the korund reputation key');
 
       const bobCitizen = await r.call('citizen', 'bob');
+      const clock = bobCitizen.data.simulation.clock;
       assert.deepEqual(bobCitizen.data.simulation.reputation, {
-        aurelle: { score: -10, brokenPacts: 1 },
-        kindle: { ...zero },
-        korund: { score: -10, brokenPacts: 1 },
+        aurelle: { score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0 },
+        kindle: { ...zero, ...emptyRecord },
+        korund: { score: -10, brokenPacts: 1, record: [napBreak(clock.epochSeconds, now - 5, 'kindle')], earlierBreaks: 0 },
       }, 'a Kindle viewer still receives every nation\'s reputation');
     } finally {
       await r.close();
