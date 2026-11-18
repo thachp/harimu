@@ -25,11 +25,33 @@ export const registryNations = ['kindle', 'korund', 'aurelle'] as const;
 /** In HARIMU_GRAY_PACK (preview "true", production "false"); a direct env string wins. Exactly "true" is on. */
 export const squarePriceAntiSnowballEnabled = (env: unknown) => flagOn(env, 'HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED');
 
-/** Chebyshev distance from (x, y) to the nation's capital. Unknown nation: 0 (the owned-only term). */
-export function squareCapitalDistance(nationId: string, x: number, y: number): number {
-  const capital = mvpNations.find(n => n.id === nationId)?.capital;
-  if (!capital) return 0;
+/** Capital of a live map nation, or null if that nation has none in mvpNations. */
+export function nationCapital(nationId: string): { x: number; y: number } | null {
+  return mvpNations.find(n => n.id === nationId)?.capital ?? null;
+}
+
+export const noCapitalError = 'The World Registry cannot price a square for a nation without a capital.';
+export const purchaseBadRequestError = 'Send action "buy-square", integer x/y and a requestId.';
+export const purchaseOutOfBoundsError = 'That square is off the map.';
+
+/** Chebyshev distance from (x, y) to the nation's capital. No capital: null (callers must fail closed; never fall back to 0). */
+export function squareCapitalDistance(nationId: string, x: number, y: number): number | null {
+  const capital = nationCapital(nationId);
+  if (!capital) return null;
   return Math.max(Math.abs(x - capital.x), Math.abs(y - capital.y));
+}
+
+/** Parse GET /api/world/registry x/y the same way a purchase treats coordinates: missing both is "no square"; anything else must be two integers on the map. */
+export function parseRegistrySquareQuery(x: string | null, y: string | null):
+  | { ok: true; at?: { x: number; y: number } }
+  | { ok: false; status: 400; reason: 'bad_request' | 'out_of_bounds'; error: string } {
+  if (x === null && y === null) return { ok: true };
+  if (x === null || y === null || !/^-?\d+$/.test(x) || !/^-?\d+$/.test(y)) {
+    return { ok: false, status: 400, reason: 'bad_request', error: purchaseBadRequestError };
+  }
+  const xi = Number(x), yi = Number(y);
+  if (xi < 0 || yi < 0 || xi >= mapWidth || yi >= mapHeight) return { ok: false, status: 400, reason: 'out_of_bounds', error: purchaseOutOfBoundsError };
+  return { ok: true, at: { x: xi, y: yi } };
 }
 
 /** Nearest minor unit, half up, at least 1. `owned` and `distance` are clamped to non-negative integers. */
@@ -53,9 +75,26 @@ export async function registryPriceMinor(db: GameDatabase, userId: string, env: 
   if (!squarePriceAntiSnowballEnabled(env)) return squarePriceMinor;
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id;
+  // Without `at`, list the d = 0 term (owned only). With `at`, registryListingPrice has already refused a missing capital.
   const distance = nationId && at ? squareCapitalDistance(nationId, at.x, at.y) : 0;
+  if (distance === null) throw new Error('registryPriceMinor requires a capital when a square is given');
   if (!nationId) return squareChargeMinor(0, distance);
   return squareChargeMinor(await ownedSquareCount(db, nationId), distance);
+}
+
+export type RegistryListingResult =
+  | { ok: true; priceMinor: number }
+  | { ok: false; status: 400 | 403; reason: string; error: string };
+
+/** GET listing price. Non-integer or off-map x/y is the same 400 as a purchase. Flag on and a square asked: no capital is 403, not d = 0. */
+export async function registryListingPrice(db: GameDatabase, userId: string, env: unknown, x: string | null, y: string | null): Promise<RegistryListingResult> {
+  const parsed = parseRegistrySquareQuery(x, y);
+  if (!parsed.ok) return parsed;
+  if (squarePriceAntiSnowballEnabled(env) && parsed.at) {
+    const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
+    if (!citizen?.nation_id || nationCapital(citizen.nation_id) === null) return { ok: false, status: 403, reason: 'no_capital', error: noCapitalError };
+  }
+  return { ok: true, priceMinor: await registryPriceMinor(db, userId, env, parsed.at) };
 }
 
 export const worldRegistrySchemas = [
@@ -102,7 +141,7 @@ const zoneReason: Record<Exclude<Zone, 'wildlands'>, string> = {
 
 /** Pure eligibility check (no debit): bounds, zone, ownership and adjacency to the nation's land. */
 export function checkPurchaseSite(squares: readonly Square[], nationId: string, x: number, y: number): PurchaseResult | null {
-  if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight) return fail(400, 'out_of_bounds', 'That square is off the map.');
+  if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight) return fail(400, 'out_of_bounds', purchaseOutOfBoundsError);
   const square = squares.find(s => s.x === x && s.y === y);
   if (!square) return fail(409, 'map_unavailable', 'The world map is not available right now.');
   if (square.zone === 'heartland' || square.zone === 'commons') return fail(409, square.zone, zoneReason[square.zone]);
@@ -160,7 +199,11 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
     if (!created) return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
     return { ok: true, square: { x, y, owner: nationId, zone: 'frontier' }, priceMinor: squarePriceMinor, tesseraMinor: await readTessera(db, userId) };
   }
-  const distance = squareCapitalDistance(nationId, x, y);
+  // d comes from the stored square row and the buyer's capital at purchase time; never from the client.
+  const stored = squares.find(s => s.x === x && s.y === y);
+  if (!stored) return fail(409, 'map_unavailable', 'The world map is not available right now.');
+  const distance = squareCapitalDistance(nationId, stored.x, stored.y);
+  if (distance === null) return fail(403, 'no_capital', noCapitalError);
   await db.batch([
     db.prepare(`INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at)
       SELECT ?,?,?,?,?,${squareLivePriceSql},? WHERE EXISTS (SELECT 1 FROM world_squares WHERE x=? AND y=? AND zone='wildlands' AND owner IS NULL)

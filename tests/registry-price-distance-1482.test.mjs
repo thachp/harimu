@@ -30,13 +30,13 @@ async function site(r, x, y, n = 1) {
   }
 }
 
-test('#1482 pure rules: d = 0 matches today; d = 10 is 20% more; rounding and the floor hold', async t => {
+test('#1482 pure rules: d = 0 matches today; d = 10 is 20% more; 2502.5 rounds half up to 2503', async t => {
   const r = await localRuntime(); t.after(() => r.close());
   const m = await r.importModule('lib/world-registry.ts');
   assert.equal(m.squareDistanceDivisor, 50);
   assert.equal(m.squareChargeMinor(0), 2500);
   assert.equal(m.squareChargeMinor(0, 0), 2500, 'd = 0 is today\'s price');
-  assert.equal(m.squareChargeMinor(1, 0), 2503);
+  assert.equal(m.squareChargeMinor(1, 0), 2503, '2500 × 1.001 = 2502.5 rounds half up to 2503');
   assert.equal(m.squareChargeMinor(1), 2503, 'omitted distance is d = 0');
   assert.equal(m.squareChargeMinor(0, 1), 2550, 'd = 1 is 2% more');
   assert.equal(m.squareChargeMinor(0, 10), 3000, 'd = 10 is 20% more');
@@ -48,11 +48,11 @@ test('#1482 pure rules: d = 0 matches today; d = 10 is 20% more; rounding and th
   assert.equal(m.squareCapitalDistance('kindle', kindle.x, kindle.y), 0);
   assert.equal(m.squareCapitalDistance('kindle', 9, 8), 4);
   assert.equal(m.squareCapitalDistance('kindle', 15, 4), 10);
-  assert.equal(m.squareCapitalDistance('unknown', 9, 8), 0);
+  assert.equal(m.squareCapitalDistance('unknown', 9, 8), null, 'no capital is null, not d = 0');
 });
 
 for (const backend of ['sqlite', 'postgres']) {
-  test(`#1482 (${backend}): charged price follows d = 0 and the far-square charge; listing equals charge; the client cannot pick the price`, async t => {
+  test(`#1482 (${backend}): charged price follows d = 0 and the far-square charge; listing equals charge; the client cannot pick the price or d`, async t => {
     const r = await localRuntime({ backend }); t.after(() => r.close());
     r.setSquarePurchase(true); r.setFixtureEnv(FLAG, 'true');
     const m = await r.importModule('lib/world-registry.ts');
@@ -86,9 +86,9 @@ for (const backend of ['sqlite', 'postgres']) {
 
     await site(r, 9, 8, 1);
     await setTessera(r, 'alice', 2703);
-    const sneaky = await buy(r, 'alice', 9, 8, { priceMinor: 1, price: 1 });
+    const sneaky = await buy(r, 'alice', 9, 8, { priceMinor: 1, price: 1, d: 0 });
     assert.equal(sneaky.status, 200, JSON.stringify(sneaky.data));
-    assert.equal(sneaky.data.priceMinor, 2703, 'the client cannot pick the price');
+    assert.equal(sneaky.data.priceMinor, 2703, 'the client cannot pick the price or d');
     assert.equal(Number((await r.db.prepare('SELECT price_minor FROM world_square_purchases WHERE x=9 AND y=8').first()).price_minor), 2703);
   });
 
@@ -121,7 +121,76 @@ for (const backend of ['sqlite', 'postgres']) {
     try { await listed(r, 'alice', '?x=9&y=8'); } finally { r.db.prepare = prep; r.db.batch = batch; }
     assert.deepEqual(wrote, [], 'GET listing never writes');
   });
+
+  test(`#1482 (${backend}): a nation with no capital is refused; there is no d=0 fallback`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close());
+    r.setSquarePurchase(true); r.setFixtureEnv(FLAG, 'true');
+    const zones = await r.importModule('lib/map-zones.ts');
+    const m = await r.importModule('lib/world-registry.ts');
+    await site(r, 9, 8, 1);
+    await setTessera(r, 'alice', 10000);
+    const kept = zones.mvpNations.slice();
+    zones.mvpNations.splice(0, zones.mvpNations.length);
+    t.after(() => { zones.mvpNations.splice(0, zones.mvpNations.length, ...kept); });
+    try {
+      assert.equal(m.nationCapital('kindle'), null);
+      assert.equal(m.squareCapitalDistance('kindle', 9, 8), null);
+      const bare = await listed(r, 'alice');
+      assert.equal(bare.status, 200, 'listing without x/y still uses the d = 0 owned term');
+      assert.equal(bare.data.priceMinor, 2503);
+      const at = await listed(r, 'alice', '?x=9&y=8');
+      assert.equal(at.status, 403);
+      assert.equal(at.data.reason, 'no_capital');
+      assert.equal(at.data.error, m.noCapitalError);
+      assert.equal('priceMinor' in at.data, false, 'no price is listed');
+      const refused = await buy(r, 'alice', 9, 8);
+      assert.equal(refused.status, 403, JSON.stringify(refused.data));
+      assert.equal(refused.data.reason, 'no_capital');
+      assert.equal(refused.data.error, m.noCapitalError);
+      assert.notEqual(refused.data.priceMinor, 2503, 'must not fall back to d = 0');
+      assert.equal(await r.db.prepare('SELECT request_id FROM world_square_purchases WHERE x=9 AND y=8').first(), null, 'nothing was charged');
+      assert.equal((await r.db.prepare('SELECT owner FROM world_squares WHERE x=9 AND y=8').first()).owner, null);
+    } finally {
+      zones.mvpNations.splice(0, zones.mvpNations.length, ...kept);
+    }
+    assert.ok(m.nationCapital('kindle'), 'capitals are restored');
+  });
+
+  test(`#1482 (${backend}): listing with and without x/y; non-integer or out-of-map x/y is the purchase 400`, async t => {
+    const r = await localRuntime({ backend }); t.after(() => r.close());
+    r.setSquarePurchase(true); r.setFixtureEnv(FLAG, 'true');
+    const m = await r.importModule('lib/world-registry.ts');
+    await site(r, 9, 8, 1);
+    await setTessera(r, 'alice', 2703);
+    assert.equal(await priceOf(r, 'alice'), 2503, 'without x/y the listing is the d = 0 term');
+    assert.equal(await priceOf(r, 'alice', '?x=9&y=8'), 2703, 'with x/y the listing is the per-square price');
+    const bad = await listed(r, 'alice', '?x=9.5&y=8');
+    const half = await r.call('world/registry', 'alice', { action: 'buy-square', x: 9.5, y: 8, requestId: 'req-half00' });
+    assert.equal(bad.status, 400);
+    assert.equal(half.status, 400);
+    assert.equal(bad.data.reason, 'bad_request');
+    assert.equal(bad.data.reason, half.data.reason);
+    assert.equal(bad.data.error, half.data.error);
+    assert.equal(bad.data.error, m.purchaseBadRequestError);
+    const onlyX = await listed(r, 'alice', '?x=9');
+    assert.equal(onlyX.status, 400);
+    assert.equal(onlyX.data.reason, 'bad_request');
+    assert.equal(onlyX.data.error, m.purchaseBadRequestError);
+    const off = await listed(r, 'alice', '?x=30&y=0');
+    const offBuy = await r.call('world/registry', 'alice', { action: 'buy-square', x: 30, y: 0, requestId: 'req-offmap0' });
+    assert.equal(off.status, 400);
+    assert.equal(offBuy.status, 400);
+    assert.equal(off.data.reason, 'out_of_bounds');
+    assert.equal(off.data.reason, offBuy.data.reason);
+    assert.equal(off.data.error, offBuy.data.error);
+    assert.equal(off.data.error, m.purchaseOutOfBoundsError);
+    const neg = await listed(r, 'alice', '?x=-1&y=0');
+    assert.equal(neg.status, 400);
+    assert.equal(neg.data.reason, 'out_of_bounds');
+    assert.equal(neg.data.error, m.purchaseOutOfBoundsError);
+  });
 }
+
 
 const mutate = (file, find, replace) => {
   const original = readFileSync(file, 'utf8');
@@ -135,26 +204,32 @@ const run = (files, pattern) => {
   return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, ...files], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
 };
 
-test('#1482 mutations: dropping distance, a wrong divisor, and honoring a client price all fail', () => {
+test('#1482 mutations: a d=0 capital fallback, accepting non-integer x, and honoring a client d or price all fail', () => {
   const file = 'tests/registry-price-distance-1482.test.mjs';
   const cases = [
     {
       file: 'lib/world-registry.ts',
-      find: 'const distance = squareCapitalDistance(nationId, x, y);',
-      replace: 'const distance = 0;',
-      pattern: 'far-square charge',
+      find: 'if (!capital) return null;',
+      replace: 'if (!capital) return 0;',
+      pattern: 'no capital is refused',
+    },
+    {
+      file: 'lib/world-registry.ts',
+      find: '/^-?\\d+$/',
+      replace: '/^-?\\d+(?:\\.\\d+)?$/',
+      pattern: 'non-integer or out-of-map',
+    },
+    {
+      file: 'app/api/world/registry/route.ts',
+      find: 'const result = await buySquare(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), enabled(), env);',
+      replace: "if (typeof body.priceMinor === 'number' || typeof body.d === 'number') return privateJson({ ok: true, square: { x: command.x, y: command.y, owner: 'kindle', zone: 'frontier' }, priceMinor: typeof body.priceMinor === 'number' ? body.priceMinor : 1, tesseraMinor: 0 });\n  const result = await buySquare(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), enabled(), env);",
+      pattern: 'the client cannot pick the price or d',
     },
     {
       file: 'lib/world-registry.ts',
       find: 'export const squareDistanceDivisor = 50;',
       replace: 'export const squareDistanceDivisor = 100;',
       pattern: 'd = 10 is 20% more',
-    },
-    {
-      file: 'app/api/world/registry/route.ts',
-      find: "const result = await buySquare(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), enabled(), env);",
-      replace: "if (typeof body.priceMinor === 'number') return privateJson({ ok: true, square: { x: command.x, y: command.y, owner: 'kindle', zone: 'frontier' }, priceMinor: body.priceMinor, tesseraMinor: 0 });\n  const result = await buySquare(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), enabled(), env);",
-      pattern: 'the client cannot pick the price',
     },
   ];
   for (const c of cases) {
