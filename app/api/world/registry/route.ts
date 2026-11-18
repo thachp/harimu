@@ -22,11 +22,13 @@ export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   const db = await getDatabase();
-  const listing = { open: enabled(), priceMinor: await registryPriceMinor(db, userId, env), currency: 'TSR', tesseraMinor: await readTessera(db, userId),
+  const url = new URL(request.url), x = url.searchParams.get('x'), y = url.searchParams.get('y');
+  // #1482: when both x and y are integers, priceMinor is that square's anti-snowball price (including distance).
+  const at = x !== null && y !== null && /^-?\d+$/.test(x) && /^-?\d+$/.test(y) ? { x: Number(x), y: Number(y) } : undefined;
+  const listing = { open: enabled(), priceMinor: await registryPriceMinor(db, userId, env, at), currency: 'TSR', tesseraMinor: await readTessera(db, userId),
     kiosk: { open: exchangeEnabled(), sparkPerTessera, minTesseraMinor: kioskMinTesseraMinor, maxTesseraMinor: kioskMaxTesseraMinor } };
   // #1341: one square's poster. Flag off leaves this payload unchanged and does not read the poster table. Not attached to GET /api/world/squares.
   if (!postersEnabled(env)) return privateJson(listing);
-  const url = new URL(request.url), x = url.searchParams.get('x'), y = url.searchParams.get('y');
   if (x === null && y === null) return privateJson(listing);
   if (x === null || y === null || !/^-?\d+$/.test(x) || !/^-?\d+$/.test(y)) return privateJson({ error: 'Send integer x and y.', reason: 'bad_request' }, 400);
   const xi = Number(x), yi = Number(y);

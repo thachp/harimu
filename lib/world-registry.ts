@@ -1,6 +1,6 @@
 import type { GameDatabase } from './database-contract';
 import { flagOn } from './flag-pack.mjs';
-import { mapHeight, mapWidth, onGrid, type Zone } from './map-zones';
+import { mapHeight, mapWidth, mvpNations, onGrid, type Zone } from './map-zones.ts';
 import { tesseraBalanceBinds, tesseraBalanceSql as balanceSql } from './tessera-exchange';
 
 /**
@@ -11,37 +11,51 @@ import { tesseraBalanceBinds, tesseraBalanceSql as balanceSql } from './tessera-
  * Tessera source (#210): citizens buy Tessera with Spark at the Clearing House kiosk (lib/tessera-exchange.ts).
  * The temporary 50.00 TSR starter grant is removed; 'starter-grant' rows already written stay in the ledger as history.
  *
- * #1349: HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED (docs §15.1 [ASSUMPTION]) prices a square at
- * round(squarePriceMinor × (1 + owned/1000)) minor units. With the flag on, `owned` is how many world_squares
- * the buyer's nation already owns, counted inside the purchase INSERT. Rounding is nearest, half up, and the
- * result is at least 1. Flag off: the price stays squarePriceMinor. This flag does not open the registry.
+ * #1349 / #1482: HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED (docs §15.1 [ASSUMPTION]) prices a square at
+ * round(squarePriceMinor × (1 + owned/1000) × (1 + d/50)) minor units, where d is Chebyshev distance from the
+ * square to the buying nation's capital (`mvpNations`; same metric as lib/map-zones.ts). With the flag on, `owned`
+ * is how many world_squares the buyer's nation already owns, counted inside the purchase INSERT; d is a pure
+ * function of (x, y, nation) and is bound into that INSERT. Rounding is nearest, half up, and the result is at least 1.
+ * At d = 0 the price matches the #1349 owned-only term. Flag off: the price stays squarePriceMinor. This flag does not open the registry.
  */
 export const squarePriceMinor = 2500; // 25.00 TSR
+/** #1482 [ASSUMPTION]: docs §15.1 give no distance figure; 1/50 per square (a square 10 out costs 20% more). */
+export const squareDistanceDivisor = 50;
 export const registryNations = ['kindle', 'korund', 'aurelle'] as const;
 /** In HARIMU_GRAY_PACK (preview "true", production "false"); a direct env string wins. Exactly "true" is on. */
 export const squarePriceAntiSnowballEnabled = (env: unknown) => flagOn(env, 'HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED');
 
-/** Nearest minor unit, half up, at least 1. `owned` is clamped to a non-negative integer. */
-export function squareChargeMinor(owned: number): number {
+/** Chebyshev distance from (x, y) to the nation's capital. Unknown nation: 0 (the owned-only term). */
+export function squareCapitalDistance(nationId: string, x: number, y: number): number {
+  const capital = mvpNations.find(n => n.id === nationId)?.capital;
+  if (!capital) return 0;
+  return Math.max(Math.abs(x - capital.x), Math.abs(y - capital.y));
+}
+
+/** Nearest minor unit, half up, at least 1. `owned` and `distance` are clamped to non-negative integers. */
+export function squareChargeMinor(owned: number, distance = 0): number {
   const count = Number.isSafeInteger(owned) && owned > 0 ? owned : 0;
-  const price = Math.floor((squarePriceMinor * (1000 + count) + 500) / 1000);
+  const d = Number.isSafeInteger(distance) && distance > 0 ? distance : 0;
+  const price = Math.floor((squarePriceMinor * (1000 + count) * (squareDistanceDivisor + d) + 500 * squareDistanceDivisor) / (1000 * squareDistanceDivisor));
   return price > 0 ? price : 1;
 }
-/** Same half-up price inside one statement. `?` is the nation id. Counted at insert time, so a second same-nation buy cannot reuse a stale pre-read. */
-export const squareLivePriceSql = `((${squarePriceMinor}*(1000+(SELECT COUNT(*) FROM world_squares WHERE owner=?))+500)/1000)`;
+/** Same half-up price inside one statement. First `?` is the nation id (counted at insert time); second `?` is d. */
+export const squareLivePriceSql = `CAST((${squarePriceMinor}*(1000+(SELECT COUNT(*) FROM world_squares WHERE owner=?))*(${squareDistanceDivisor}+?)+${500 * squareDistanceDivisor})/${1000 * squareDistanceDivisor} AS INTEGER)`;
 
 async function ownedSquareCount(db: GameDatabase, nationId: string): Promise<number> {
   const row = await db.prepare('SELECT COUNT(*) AS n FROM world_squares WHERE owner=?').bind(nationId).first<{ n: number }>();
   return Number(row?.n ?? 0);
 }
 
-/** Listed price for a signed-in citizen. Flag off returns squarePriceMinor and does not read world_squares. */
-export async function registryPriceMinor(db: GameDatabase, userId: string, env: unknown): Promise<number> {
+/** Listed price for a signed-in citizen. Flag off returns squarePriceMinor and does not read world_squares.
+ *  #1482: when `at` is a square, the price includes Chebyshev distance to the citizen's capital; without it the d = 0 term is listed. */
+export async function registryPriceMinor(db: GameDatabase, userId: string, env: unknown, at?: { x: number; y: number }): Promise<number> {
   if (!squarePriceAntiSnowballEnabled(env)) return squarePriceMinor;
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id;
-  if (!nationId) return squareChargeMinor(0);
-  return squareChargeMinor(await ownedSquareCount(db, nationId));
+  const distance = nationId && at ? squareCapitalDistance(nationId, at.x, at.y) : 0;
+  if (!nationId) return squareChargeMinor(0, distance);
+  return squareChargeMinor(await ownedSquareCount(db, nationId), distance);
 }
 
 export const worldRegistrySchemas = [
@@ -146,12 +160,13 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
     if (!created) return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
     return { ok: true, square: { x, y, owner: nationId, zone: 'frontier' }, priceMinor: squarePriceMinor, tesseraMinor: await readTessera(db, userId) };
   }
+  const distance = squareCapitalDistance(nationId, x, y);
   await db.batch([
     db.prepare(`INSERT INTO world_square_purchases(request_id,clerk_user_id,nation_id,x,y,price_minor,purchased_at)
       SELECT ?,?,?,?,?,${squareLivePriceSql},? WHERE EXISTS (SELECT 1 FROM world_squares WHERE x=? AND y=? AND zone='wildlands' AND owner IS NULL)
       AND EXISTS (SELECT 1 FROM world_squares WHERE owner=? AND x BETWEEN ? AND ? AND y BETWEEN ? AND ? AND NOT (x=? AND y=?))
       AND ${balanceSql} >= ${squareLivePriceSql}
-      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, nationId, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, ...tesseraBalanceBinds(userId), nationId),
+      ON CONFLICT DO NOTHING`).bind(requestId, userId, nationId, x, y, nationId, distance, now, x, y, nationId, x - 1, x + 1, y - 1, y + 1, x, y, ...tesseraBalanceBinds(userId), nationId, distance),
     db.prepare(`INSERT INTO citizen_tessera_ledger(id,clerk_user_id,delta_minor,reason,occurred_at)
       SELECT ?,?,-price_minor,'square-purchase',? FROM world_square_purchases WHERE request_id=? AND clerk_user_id=?
       ON CONFLICT DO NOTHING`)
@@ -161,7 +176,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   ]);
   const created = await db.prepare('SELECT price_minor FROM world_square_purchases WHERE request_id=?').bind(requestId).first<{ price_minor: number }>();
   if (!created) {
-    const livePrice = squareChargeMinor(await ownedSquareCount(db, nationId));
+    const livePrice = squareChargeMinor(await ownedSquareCount(db, nationId), distance);
     const liveBalance = await readTessera(db, userId);
     if (liveBalance < livePrice) return fail(409, 'insufficient_tessera', `A square costs ${(livePrice / 100).toFixed(2)} TSR; you hold ${(liveBalance / 100).toFixed(2)} TSR.`);
     return fail(409, 'square_taken', 'The square was sold or your balance changed; nothing was charged.');
