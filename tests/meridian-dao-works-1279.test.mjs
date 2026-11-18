@@ -173,6 +173,7 @@ test('flag off: enroll, travel, home and the panel omit Dao Works; flag on: resi
   r.setNow(r.now + 60_000);
   const afterPermit = await r.call('city-home', 'vale', { cityId: 'dao-works', requestId: randomUUID() });
   assert.equal(afterPermit.data.reason, 'not_open_yet', 'a granted permit still meets the existing no-currency refusal');
+  r.setFixtureEnv('HARIMU_INTERNAL_PERMIT_ENABLED', undefined);
   assert.deepEqual(citiesForNation('meridian').map(c => c.id), catalogIds);
   shenStays();
   r.setFixtureEnv(FLAG, 'false');

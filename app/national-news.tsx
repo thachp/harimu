@@ -14,6 +14,9 @@ import { wireFiller } from '../lib/wire-bylines';
 import { pressPacks } from '../lib/press-templates';
 import { newsIntroFor } from '../lib/news-intro-copy'; // #688: AI wording only when this edition holds a model-written item (the server never writes one with HARIMU_AI_NEWS_ENABLED off)
 
+const isPlayerArticle=(item:NationalNews['items'][number])=>item.source==='player'||item.kind==='player-article';
+const playerAuthor=(name:unknown)=>typeof name==='string'&&name.trim()?name.trim():'A citizen';
+
 export function NewsEdition({news}:{news:NationalNews & {reportsEnabled?:boolean}}) {
  const formatTime=useDisplayTimestamp();
  return <NationDocument nationId={news.nationId} className={`national-news news-${news.style}`} label={news.title} documentLabel={news.style==='press'?'National press':news.style==='state'?'State Media':'Court gazette'}>
@@ -23,7 +26,7 @@ export function NewsEdition({news}:{news:NationalNews & {reportsEnabled?:boolean
   {news.templatesOnly&&<p className="news-template-mode" data-template-mode="true">{templateMode.footer.text}</p>}
   {news.personaMuted&&<p className="news-persona-muted" data-persona-muted="true">{personaMuted.notice.text}</p>}
   {!news.items.length && <p>No recorded national articles yet. Your statistics above are current; sample city noticeboard stories are separate.</p>}
-  <ol className="national-news-items">{news.items.map(item=><li key={item.id} data-news-id={item.id} tabIndex={-1}><article><h3>{item.title}</h3><time className="news-dateline" dateTime={new Date(item.occurredAt).toISOString()}>{formatTime(item.occurredAt)}</time>{item.source==='system'?<small className="news-source">System record</small>:<AiTextTag provenance={item.source==='model'?'model':'deterministic'}/>}{item.kind==='template'&&<small className="news-source">State Media template</small>}{item.kind==='decree'&&<small className="news-source">Court gazette · decree</small>}<p>{item.text}</p>{news.templatesOnly&&item.source!=='system'&&<small className="news-source news-template-mode">{templateMode.footer.text}</small>}{(news.reportsEnabled===true&&(item.source==='model'||item.source==='deterministic'))&&<ReportButton kind="ai-news" targetId={item.id}/>}</article></li>)}</ol>
+  <ol className="national-news-items">{news.items.map(item=>{const player=isPlayerArticle(item);return <li key={item.id} data-news-id={item.id} data-news-kind={player?'player-article':undefined} tabIndex={-1}><article><h3>{item.title}</h3><time className="news-dateline" dateTime={new Date(item.occurredAt).toISOString()}>{formatTime(item.occurredAt)}</time>{player?<><p className="news-paper-name">{item.paperName}</p><p className="news-byline">{playerAuthor(item.authorName)}</p>{(item.paragraphs?.length?item.paragraphs:[item.text]).map((paragraph,index)=><p key={index}>{paragraph}</p>)}</>:<>{item.source==='system'?<small className="news-source">System record</small>:<AiTextTag provenance={item.source==='model'?'model':'deterministic'}/>}{item.kind==='template'&&<small className="news-source">State Media template</small>}{item.kind==='decree'&&<small className="news-source">Court gazette · decree</small>}<p>{item.text}</p>{news.templatesOnly&&item.source!=='system'&&<small className="news-source news-template-mode">{templateMode.footer.text}</small>}{(news.reportsEnabled===true&&(item.source==='model'||item.source==='deterministic'))&&<ReportButton kind="ai-news" targetId={item.id}/>}</>}</article></li>;})}</ol>
   {(()=>{const pack=wireFiller(news.nationId,pressPacks);return pack&&<WireStories pack={pack} />;})()}
  </NationDocument>;
 }

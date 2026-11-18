@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
+import {randomUUID} from 'node:crypto';
 import {test} from 'node:test';
+import {localRuntime} from './helpers/local-runtime.mjs';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import ts from 'typescript';
@@ -100,3 +102,96 @@ test('#742: an edition in templates-only mode shows the template-mode footer; a 
  const html=renderToStaticMarkup(React.createElement(real.NewsEdition,{news:{...edition('korund'),templatesOnly:true}}));
  assert.equal(html.split(footer).length-1,2,'one edition footer plus one on the non-system item');assert.match(html,/data-template-mode="true"/);
 });
+
+const FLAG='HARIMU_KINDLE_NEWSPAPERS_ENABLED';
+const playerArticle=(over={})=>({id:'player-1',title:'Shifts posted',text:'Twelve shifts cleared at the yard.\n\nWages are on the board.',source:'player',kind:'player-article',paperName:'Harbor Ledger',authorName:'Ada Shore',paragraphs:['Twelve shifts cleared at the yard.','Wages are on the board.'],occurredAt:1768489200000,...over});
+const renderEdition=news=>renderToStaticMarkup(React.createElement(real.NewsEdition,{news}));
+const playerBlock=html=>{const start=html.indexOf('data-news-kind="player-article"');assert.ok(start>=0);return html.slice(start,html.indexOf('</li>',start));};
+const showsAsText=(html,raw)=>{
+  assert.equal(html.includes(raw),false,raw);
+  const lt=raw.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+  const hex=raw.replaceAll('&','&amp;').replaceAll('<','&#x3C;').replaceAll('>','&#x3E;');
+  assert.ok(html.includes(lt)||html.includes(hex),raw);
+};
+
+test('#1461 a player article shows the paper name and byline, and never an AI or template label',()=>{
+  const footer=require('../lib/kill-switch-copy.ts').templateMode.footer.text;
+  const news=edition('kindle');news.items.push(playerArticle());news.templatesOnly=true;
+  const html=renderEdition(news),block=playerBlock(html);
+  assert.match(block,/class="news-paper-name">Harbor Ledger</);
+  assert.match(block,/class="news-byline">Ada Shore</);
+  assert.match(block,/Shifts posted/);
+  assert.match(block,/Twelve shifts cleared at the yard\./);
+  assert.match(block,/Wages are on the board\./);
+  assert.doesNotMatch(block,/AI-generated|Simulated statement|System record|ai-text-tag|news-template-mode/);
+  assert.equal(block.includes(footer),false);
+  assert.match(html,/System record/);
+  assert.match(html,/Simulated statement/);
+  assert.match(html,new RegExp(footer));
+});
+
+test('#1461 markup in the paper name, headline, byline and paragraphs renders as literal text',()=>{
+  const news=edition('kindle');
+  news.items.push(playerArticle({
+    title:'<script>alert(1)</script>',
+    paperName:'<img src=x onerror=alert(1)>',
+    authorName:'<em>x</em>',
+    paragraphs:['<script>x</script>','<img src=x onerror=alert(1)>'],
+    text:'<script>x</script>',
+  }));
+  const html=renderEdition(news),block=playerBlock(html);
+  for(const raw of ['<script>alert(1)</script>','<img src=x onerror=alert(1)>','<em>x</em>','<script>x</script>']) showsAsText(block,raw);
+  assert.doesNotMatch(block,/<script[\s>]|<img[\s>]|<em[\s>]/);
+  assert.doesNotMatch(source,/dangerouslySetInnerHTML/);
+});
+
+test('#1461 a missing or blank author name falls back to A citizen',()=>{
+  for(const authorName of [undefined,'','   ']){
+    const block=playerBlock(renderEdition({...edition('kindle'),items:[...edition('kindle').items,playerArticle({authorName})]}));
+    assert.match(block,/class="news-byline">A citizen</,String(authorName));
+    assert.doesNotMatch(block,/>Ada Shore</);
+  }
+  assert.match(source,/typeof name\s*===\s*'string'\s*&&\s*name\.trim\(\)\s*\?\s*name\.trim\(\)\s*:\s*'A citizen'/);
+});
+
+test('#1461 flag off: a Kindle, Korund or Aurelle edition with no player items is unchanged',()=>{
+  for(const nationId of ['kindle','korund','aurelle']){
+    const html=renderEdition(edition(nationId));
+    assert.doesNotMatch(html,/news-paper-name|news-byline|data-news-kind="player-article"|A citizen/,nationId);
+    assert.match(html,/System record/,nationId);
+    assert.match(html,/Simulated statement/,nationId);
+    assert.doesNotMatch(html,/AI-generated/,nationId);
+  }
+});
+
+test('#1461 flag-off GET /api/news renders without player chrome',async t=>{
+  const r=await localRuntime();t.after(()=>r.close());
+  const res=await r.call('news','alice');
+  assert.equal(res.status,200);
+  assert.ok(res.data.items.every(i=>i.kind!=='player-article'&&i.source!=='player'));
+  const html=renderEdition(res.data);
+  assert.doesNotMatch(html,/news-paper-name|news-byline|data-news-kind="player-article"/);
+  assert.match(html,/System record/);
+});
+
+test('#1461 flag on: the edition shows a published article with a byline and no AI label',async t=>{
+  const r=await localRuntime();t.after(()=>r.close());
+  r.setFixtureEnv(FLAG,'true');
+  await r.db.prepare("UPDATE citizens SET display_name='Ada Shore' WHERE clerk_user_id='alice'").run();
+  assert.equal((await r.call('news','alice',{action:'found-paper',requestId:randomUUID(),name:'Harbor Ledger'})).status,200);
+  assert.equal((await r.call('news','alice',{action:'publish',requestId:randomUUID(),headline:'Shifts posted',paragraphs:['Twelve shifts cleared at the yard.','Wages are on the board.']})).status,200);
+  const res=await r.call('news','bob');
+  assert.equal(res.status,200);
+  const html=renderEdition(res.data),block=playerBlock(html);
+  assert.match(block,/class="news-paper-name">Harbor Ledger</);
+  assert.match(block,/class="news-byline">Ada Shore</);
+  assert.match(block,/Shifts posted/);
+  assert.doesNotMatch(block,/AI-generated|Simulated statement|ai-text-tag/);
+});
+
+test('#1461 long paper names and headlines wrap: no horizontal overflow at 375px',async()=>{
+  const css=await readFile(new URL('../app/game-shell.css',import.meta.url),'utf8');
+  assert.match(css,/\.national-news-items article\{[^}]*overflow-wrap:anywhere/);
+  assert.match(css,/\.national-news-items h3,\s*\.national-news-items p,\s*\.national-news-items \.news-paper-name,\s*\.national-news-items \.news-byline\{[^}]*overflow-wrap:anywhere/);
+});
+
