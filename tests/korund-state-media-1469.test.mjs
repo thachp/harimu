@@ -37,7 +37,7 @@ async function spy(r,fn){const prepare=r.db.prepare.bind(r.db),seen={sql:[]};r.d
 test('flag is preview true, production false, GRAY 95 at index 94, and the pack length goes up by 1',()=>{
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_RANKS_ENABLED'),93);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG),94);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length,96);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length,97);
   const preview=JSON.parse(readFileSync('wrangler.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   const prod=JSON.parse(readFileSync('wrangler.prod.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   assert.equal(preview.vars[FLAG],undefined);
@@ -45,7 +45,7 @@ test('flag is preview true, production false, GRAY 95 at index 94, and the pack 
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG],'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG],'false');
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG),94);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).length,96);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).length,97);
   assert.equal(flagOn({HARIMU_GRAY_PACK:preview.vars.HARIMU_GRAY_PACK},FLAG),true);
   assert.equal(flagOn({HARIMU_GRAY_PACK:prod.vars.HARIMU_GRAY_PACK},FLAG),false);
 });

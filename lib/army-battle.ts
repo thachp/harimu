@@ -4,10 +4,11 @@
  *  captured. ARC on #910: a finished battle is stored once by the world tick (migration 0096 mirrors armyBattleSchemas); GETs read the stored row and derive only a
  *  running battle. Behind HARIMU_ARMY_BATTLES_ENABLED (needs HARIMU_ARMY_SUPPLY_ENABLED and its flags). #1052: a running battle also applies the unit's
  *  squad-stance mix (counts only). A stored battle is read back as stored. #1061: a live response carries only the viewer's side;
- *  the mix is frozen on the stored row and both sides are visible once the battle has resolved. No new flag. */
+ *  the mix is frozen on the stored row and both sides are visible once the battle has resolved. #1491: HARIMU_BATTLE_TERRAIN_ENABLED
+ *  (needs army battles) adds the staging square's terrain to the defender's bonus on battles that are not stored yet. A stored battle is read back as stored, with no terrain fields. */
 import type { GameDatabase } from './database-contract';
 import { armyUnits, unitForNation } from './army-rules';
-import { marchArrivalAt, marchPace, readActiveWars, unitMarch, type ArmyWar } from './army-map';
+import { marchArrivalAt, marchPace, readActiveWars, terrainMap, unitMarch, type ArmyWar } from './army-map';
 import { applySupplyLoss, armySupplyEnabled, PERCENT, unitSupply } from './army-supply';
 import { marchTimeFactor, type MarchPace } from './winter-march'; // #1038: battle start follows the slowed march
 import { flagOn } from './flag-pack.mjs';
@@ -17,12 +18,23 @@ import { woundedUntil } from './army-wounds';
 export { transferBattleSquares } from './war-loss-cap';
 
 export const armyBattlesEnabled = (env: unknown) => armySupplyEnabled(env) && flagOn(env, 'HARIMU_ARMY_BATTLES_ENABLED');
+/** #1491: staging-square terrain adds to the defender's bonus. Off, or army battles off: resolveBattle's bonus stays 0 and responses gain no terrain keys. */
+export const battleTerrainEnabled = (env: unknown) => armyBattlesEnabled(env) && flagOn(env, 'HARIMU_BATTLE_TERRAIN_ENABLED');
 /** Docs §15.3: a round every 10 real minutes. */
 export const BATTLE_ROUND_SECONDS = 600;
 /** [ASSUMPTION] Tuning values (the docs give none). */
 export const BATTLE_MAX_ROUNDS = 6;              // after this many rounds the side with more of its starting strength left wins
 export const BATTLE_DAMAGE_PCT = 20;             // each round a side hits for this share of its morale-weighted strength
 export const BATTLE_FORTIFICATION_BONUS_PCT = 25; // the defender fights from its fortified capital (terrain/fortification)
+/** [ASSUMPTION] #1491 placeholders (docs §15.3 name terrain and give no figures). Unknown or missing terrain is 0.
+ *  These points add to BATTLE_FORTIFICATION_BONUS_PCT, so the defender's bonus is at most 35. */
+export const BATTLE_TERRAIN_BONUS_PCT: Readonly<Record<string, number>> = {
+  plains: 0, city: 0, 'river edge': 5, forest: 5, wetland: 5, hills: 10, 'old-growth forest': 10, mountains: 10,
+};
+export const battleTerrainBonusPct = (terrain: string | undefined) => terrain ? BATTLE_TERRAIN_BONUS_PCT[terrain] ?? 0 : 0;
+/** The attacker's staging square: the last point of the route, or the march origin when the route is empty. */
+export const stagingSquare = (march: { home: { x: number; y: number }; route: readonly { x: number; y: number }[] }) =>
+  march.route.length ? march.route[march.route.length - 1] : march.home;
 /** #738 battle losses (ARC): a unit's last stored battle caps its strength at what it had left, recovering this share of its full strength per game
  *  day after the battle ended, until the cap reaches full strength. */
 export const BATTLE_LOSS_RECOVERY_PCT_PER_GAME_DAY = 10;
@@ -48,7 +60,7 @@ const scaleBy = (base: number, pct: number) => base + Math.trunc(base * pct / PE
 const withStance = (base: number, dealtPct: number, takenPct: number) => scaleBy(scaleBy(base, dealtPct), takenPct);
 /** Pure and deterministic: plays `roundsElapsed` rounds (at most BATTLE_MAX_ROUNDS). Both sides hit at once each round. If both break in the same
  *  round the attacker retreats (ties go to the defender). The capital is never captured: an attacker win only costs the defender strength. */
-export function resolveBattle(attacker: Side, defender: Side, roundsElapsed: number): BattleResult {
+export function resolveBattle(attacker: Side, defender: Side, roundsElapsed: number, terrainBonusPct = 0): BattleResult {
   let a = attacker.strength, d = defender.strength;
   const done = (rounds: number, status: BattleResult['status'], retreated: BattleResult['retreated']) => ({ rounds, attackerStrength: a, defenderStrength: d, status, retreated });
   if (broken(a, attacker.strength)) return done(0, 'defender_won', 'attacker');
@@ -56,7 +68,7 @@ export function resolveBattle(attacker: Side, defender: Side, roundsElapsed: num
   const rounds = Math.max(0, Math.min(BATTLE_MAX_ROUNDS, Math.floor(roundsElapsed)));
   const aShift = stanceShiftPct(attacker.stances), dShift = stanceShiftPct(defender.stances);
   for (let r = 1; r <= rounds; r++) {
-    const toDefender = withStance(hit({ strength: a, morale: attacker.morale }), aShift, dShift), toAttacker = withStance(hit({ strength: d, morale: defender.morale }, BATTLE_FORTIFICATION_BONUS_PCT), dShift, aShift);
+    const toDefender = withStance(hit({ strength: a, morale: attacker.morale }), aShift, dShift), toAttacker = withStance(hit({ strength: d, morale: defender.morale }, BATTLE_FORTIFICATION_BONUS_PCT + terrainBonusPct), dShift, aShift);
     a = Math.max(0, a - toAttacker); d = Math.max(0, d - toDefender);
     if (broken(a, attacker.strength)) return done(r, 'defender_won', 'attacker');
     if (broken(d, defender.strength)) return done(r, 'attacker_won', 'defender');
@@ -96,7 +108,7 @@ export const battleStanceColumns = [
 /** One battle per war, attacking unit and staging arrival (ARC on #910). */
 export const battleKey = (warId: string, attackerUnit: string, startedAt: number) => `${warId}:${attackerUnit}:${startedAt}`;
 export type StancePair = { attacker: StanceCounts; defender: StanceCounts };
-export type Battle = BattleResult & { attackerNationId: string; defenderNationId: string; startedAt: number; stored: boolean; stances?: StancePair };
+export type Battle = BattleResult & { attackerNationId: string; defenderNationId: string; startedAt: number; stored: boolean; stances?: StancePair; terrain?: string | null; terrainBonusPct?: number };
 type StoredRow = { battle_key: string; rounds: number; status: 'attacker_won' | 'defender_won'; retreated: 'attacker' | 'defender' | null; attacker_strength: number; defender_strength: number; attacker_hold: number | null; attacker_advance: number | null; attacker_fall_back: number | null; defender_hold: number | null; defender_advance: number | null; defender_fall_back: number | null };
 /** Null on any column means a row stored before #1061: no mix to show. Zero is a real count. */
 export function stancesFromRow(row: Pick<StoredRow, 'attacker_hold' | 'attacker_advance' | 'attacker_fall_back' | 'defender_hold' | 'defender_advance' | 'defender_fall_back'>): StancePair | undefined {
@@ -133,14 +145,15 @@ export function cardStanceCounts(battle: { status: string; attackerNationId: str
 }
 /** The battles at `now` for every staged attacking unit: the stored result once decided (never changes), else derived from current strength and morale.
  *  One read for stored rows; current strength is read only for battles not yet stored. Never writes. */
-export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], now: number, pace: MarchPace | null = null): Promise<(Battle & { key: string; attackerUnit: string; defenderUnit: string; warId: string })[]> {
+export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], now: number, pace: MarchPace | null = null, options?: { terrain?: boolean }): Promise<(Battle & { key: string; attackerUnit: string; defenderUnit: string; warId: string })[]> {
   const staged = armyUnits.flatMap(unit => {
     const march = unitMarch(unit.nationId, wars, now), defender = march ? unitForNation(march.war.defender_nation) : null;
     if (!march || !defender || !march.war.id) return [];
     const startedAt = marchArrivalAt(march, undefined, pace ? marchTimeFactor(pace.epochSeconds, march.war.mobilization_ends_at, true) : 1);
-    return now < startedAt ? [] : [{ unit, defender, startedAt, warId: march.war.id, key: battleKey(march.war.id, unit.id, startedAt) }];
+    return now < startedAt ? [] : [{ unit, defender, startedAt, warId: march.war.id, key: battleKey(march.war.id, unit.id, startedAt), march }];
   });
   if (!staged.length) return [];
+  const ground = options?.terrain === true ? terrainMap() : null;
   const stored = new Map(((await db.prepare(`SELECT battle_key, rounds, status, retreated, attacker_strength, defender_strength, attacker_hold, attacker_advance, attacker_fall_back, defender_hold, defender_advance, defender_fall_back FROM army_battles WHERE battle_key IN (${staged.map(() => '?').join(',')})`)
     .bind(...staged.map(s => s.key)).all<StoredRow>()).results ?? []).map(r => [r.battle_key, r]));
   return Promise.all(staged.map(async s => {
@@ -159,9 +172,11 @@ export async function readBattles(db: GameDatabase, wars: readonly ArmyWar[], no
     // #738 battle losses: both sides start from the strength their last stored battle left them (recovering per game day).
     const attFull = applyCarriedLoss(s.unit.id, att.strength, attLoss, now), defFull = applyCarriedLoss(s.defender.id, def.strength, defLoss, now);
     const attacker = { strength: applySupplyLoss(attFull, unitSupply(s.unit.nationId, wars, now, undefined, pace).strengthLossPct), morale: att.morale, stances: attStances }, defender = { strength: defFull, morale: def.morale, stances: defStances };
-    const resolved = resolveBattle(attacker, defender, roundsAt(s.startedAt, now));
+    const square = ground ? stagingSquare(s.march) : null, terrain = ground && square ? ground.get(`${square.x},${square.y}`) ?? null : null, terrainBonusPct = ground ? battleTerrainBonusPct(terrain ?? undefined) : 0;
+    const resolved = resolveBattle(attacker, defender, roundsAt(s.startedAt, now), terrainBonusPct);
     // Keep the mix on a finished derived battle too, so the tick can freeze it. The API still strips the other side while status is ongoing.
-    return { ...base, stored: false, ...resolved, stances: { attacker: attStances, defender: defStances } };
+    // #1491: terrain is attached only while the battle is derived. A stored row above is returned without these keys.
+    return { ...base, stored: false, ...resolved, stances: { attacker: attStances, defender: defStances }, ...(ground ? { terrain, terrainBonusPct } : {}) };
   }));
 }
 /** Pure: strength after carried losses. `left` is what the unit had at the end of its last stored battle; it recovers by
@@ -188,8 +203,8 @@ export const destroyedUnit = (b: { retreated: 'attacker' | 'defender' | null; at
   b.retreated === 'attacker' ? b.attackerUnit : b.retreated === 'defender' ? b.defenderUnit : null;
 /** World tick (write path, behind the flag): store every finished, not yet stored battle once. INSERT ... ON CONFLICT DO NOTHING on the battle key, so
  *  concurrent ticks store exactly one row and a later strength change never alters it. */
-export async function recordFinishedBattles(db: GameDatabase, now: number, winter = false) {
-  const done = (await readBattles(db, await readActiveWars(db), now, await marchPace(db, winter))).filter(b => !b.stored && b.status !== 'ongoing');
+export async function recordFinishedBattles(db: GameDatabase, now: number, winter = false, terrain = false) {
+  const done = (await readBattles(db, await readActiveWars(db), now, await marchPace(db, winter), terrain ? { terrain: true } : undefined)).filter(b => !b.stored && b.status !== 'ongoing');
   if (!done.length) return;
   // #911 (ARC on #944): only a unit that retreated broken is destroyed; its members are wounded (never killed), in the same batch; conditional too,
   // so a replay keeps the first times. A round-limit loss (retreated null) wounds no one.
