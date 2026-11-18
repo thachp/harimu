@@ -1,6 +1,7 @@
 import {foundingNewsItems,readFoundingEvents} from './founding-period'; // #612
 import {editionHeadlines,newsEditions} from './news-editions'; // #1443
 import {readPlayerArticles} from './kindle-newspapers'; // #1453, #1475
+import {readKorundStateMediaArticles} from './korund-state-media.ts'; // #1469
 import type {GameDatabase} from './database-contract';
 import type { GovernmentSnapshot } from './government';
 import { publicGovernmentSnapshot, governmentDisclosure } from './government-disclosure';
@@ -24,7 +25,7 @@ export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean;confluence?:boolean;kindleNewspapers?:boolean;aurelleBroadsheets?:boolean;readerId?:string;shadowMute?:unknown}={}):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean;confluence?:boolean;kindleNewspapers?:boolean;aurelleBroadsheets?:boolean;korundStateMedia?:boolean;readerId?:string;shadowMute?:unknown}={}):Promise<NationalNews|null> {
  if(nationId==='confluence')return options.confluence?readConfluenceCurrentDaily(db,now):null; // #1443 existing opening flag; no new flag
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
@@ -63,6 +64,7 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  const planStat = nationId === 'korund' && options.planStats ? await readKorundPlanStat(db, now) : undefined;
  if(nationId==='kindle'&&options.kindleNewspapers&&options.readerId)items.push(...await readPlayerArticles(db,'kindle',options.readerId,options.shadowMute)); // #1453 flag off never queries
  if(nationId==='aurelle'&&options.aurelleBroadsheets&&options.readerId)items.push(...await readPlayerArticles(db,'aurelle',options.readerId,options.shadowMute)); // #1475 flag off never queries
+ if(nationId==='korund'&&options.korundStateMedia&&options.readerId)items.push(...await readKorundStateMediaArticles(db,options.readerId,now,options.shadowMute)); // #1469 flag off never queries
  return {nationId,...edition,fetchedAt:now,statistics:{citizens:register?.citizens??0,completedShifts:totals?.shifts??0,food:totals?.food??0},...(planStat ? {planStat} : {}),items:items.sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12)};
 }
 

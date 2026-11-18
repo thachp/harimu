@@ -24,9 +24,9 @@ const spy = async (r, fn) => {
 };
 const touchesArticles = sql => sql.some(q => /kindle_articles|kindle_newspapers/.test(q));
 
-test('flag is preview true, production false, index 94 after Aurelle ranks, and listed in previewOnFlags', () => {
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_RANKS_ENABLED'), 93);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 94);
+test('flag is preview true, production false, GRAY 96 at index 95, and listed in previewOnFlags', () => {
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED'), 94);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 95);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.at(-1), FLAG);
   const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
@@ -34,8 +34,8 @@ test('flag is preview true, production false, index 94 after Aurelle ranks, and 
   assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 94);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 94);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 95);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 95);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, FLAG), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, FLAG), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [FLAG]: 'false' }, FLAG), false);
