@@ -10,6 +10,8 @@ const FLAG='HARIMU_KINDLE_NEWSPAPERS_ENABLED';
 const kindleNewspaperFlagOffError='Kindle newspapers are not available yet.';
 const kindleNewspaperNationError='Only a Kindle citizen can found a newspaper or publish an article.';
 const kindleNewspaperExistsError='You already founded a newspaper.';
+const kindleNewspaperMissingError='Found a newspaper before publishing an article.';
+const kindleNewspaperRequestReusedError='That request id was already used for a different newspaper or article.';
 const kindleNewspaperTextError=`The newspaper name and headline must be 1–${PRESS_HEADLINE_MAX} characters, without control characters.`;
 const kindleNewspaperParagraphError=`Publish one or two paragraphs, each 1–${PRESS_PARAGRAPH_MAX} characters, without control characters.`;
 const get=(r,user)=>r.call('news',user,undefined,'https://fixture.invalid','');
@@ -78,6 +80,12 @@ test('a Kindle citizen founds a paper and another reader sees the bylined articl
   assert.equal(replay.status,200);
   assert.equal(replay.data.paper.id,founded.data.paper.id);
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM kindle_newspapers').first()).n,1);
+  const stolen=await post(r,'bob',{action:'found-paper',requestId,name:'Harbor Ledger'});
+  assert.equal(stolen.status,409);
+  assert.equal(stolen.data.error,kindleNewspaperRequestReusedError);
+  assert.equal(stolen.data.paper,undefined);
+  assert.doesNotMatch(JSON.stringify(stolen.data),/Harbor Ledger|${founded.data.paper.id}/);
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM kindle_newspapers').first()).n,1);
   const second=await post(r,'alice',{action:'found-paper',requestId:randomUUID(),name:'Second Sheet'});
   assert.equal(second.status,403);
   assert.equal(second.data.error,kindleNewspaperExistsError);
@@ -87,6 +95,12 @@ test('a Kindle citizen founds a paper and another reader sees the bylined articl
   const again=await post(r,'alice',{action:'publish',requestId:pubId,headline:'Shifts posted',paragraphs:['Twelve shifts cleared at the yard.','Wages are on the board.']});
   assert.equal(again.status,200);
   assert.equal(again.data.article.id,published.data.article.id);
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM kindle_articles').first()).n,1);
+  const grabbed=await post(r,'bob',{action:'publish',requestId:pubId,headline:'Shifts posted',paragraphs:['Twelve shifts cleared at the yard.','Wages are on the board.']});
+  assert.equal(grabbed.status,409);
+  assert.equal(grabbed.data.error,kindleNewspaperRequestReusedError);
+  assert.equal(grabbed.data.article,undefined);
+  assert.doesNotMatch(JSON.stringify(grabbed.data),/Shifts posted|Harbor Ledger|${published.data.article.id}/);
   assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM kindle_articles').first()).n,1);
   const bob=await get(r,'bob');
   assert.equal(bob.status,200);
@@ -171,5 +185,36 @@ test('signed-out POST is 401 and wiring stays behind the existing opening pack f
   assert.match(news,/source:'system'\|'deterministic'\|'model'\|'player'/);
   const lib=readFileSync('lib/kindle-newspapers.ts','utf8');
   assert.match(lib,/const mine = await db\.prepare\('SELECT id FROM kindle_newspapers WHERE founder_user_id=\?'\)\.bind\(userId\)\.first\(\);\s*if \(mine\) return \{ status: 403 as const, error: kindleNewspaperExistsError \}/);
+  assert.match(lib,/if \(prior\.founder_user_id !== userId\) return \{ status: 409 as const, error: kindleNewspaperRequestReusedError \}/);
+  assert.match(lib,/if \(prior\.author_user_id !== userId\) return \{ status: 409 as const, error: kindleNewspaperRequestReusedError \}/);
+  assert.match(lib,/SELECT id,name FROM kindle_newspapers WHERE founder_user_id=\?/);
+  assert.match(lib,/ORDER BY a\.published_at DESC, a\.id DESC LIMIT 6/);
+});
+
+test('only the founder can publish to their paper',async t=>{
+  const r=await localRuntime();t.after(()=>r.close());
+  on(r);
+  assert.equal((await post(r,'alice',{action:'found-paper',requestId:randomUUID(),name:'Harbor Ledger'})).status,200);
+  const published=await post(r,'bob',{action:'publish',requestId:randomUUID(),headline:'Shifts posted',paragraphs:['One paragraph of news.']});
+  assert.equal(published.status,403);
+  assert.equal(published.data.error,kindleNewspaperMissingError);
+  assert.equal((await r.db.prepare("SELECT COUNT(*) AS n FROM kindle_articles WHERE author_user_id='bob'").first()).n,0);
+  assert.equal((await r.db.prepare('SELECT COUNT(*) AS n FROM kindle_articles').first()).n,0);
+});
+
+test('the Kindle edition shows only the latest six player articles',async t=>{
+  const r=await localRuntime();t.after(()=>r.close());
+  on(r);
+  assert.equal((await post(r,'alice',{action:'found-paper',requestId:randomUUID(),name:'Harbor Ledger'})).status,200);
+  const headlines=[];
+  for(let i=1;i<=7;i++){
+    r.setNow(r.now+60_000);
+    const headline=`Dispatch ${i}`;
+    headlines.push(headline);
+    assert.equal((await post(r,'alice',{action:'publish',requestId:randomUUID(),headline,paragraphs:['One paragraph of news.']})).status,200);
+  }
+  const items=(await get(r,'bob')).data.items.filter(i=>i.kind==='player-article');
+  assert.equal(items.length,6);
+  assert.deepEqual(items.map(i=>i.title),[...headlines].slice(1).reverse());
 });
 
