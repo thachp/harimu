@@ -60,7 +60,7 @@ export type PublicWar = { id: string; attacker: WarNationId; defender: WarNation
   status: WarStatus; endedAt: number | null; endKind: WarEndKind | null; peaceLockEndsAt: number | null };
 export type DefenseWindowState = { startHourUtc: number; changedAt: number | null; nextChangeAt: number | null };
 export type WarState = { wars: PublicWar[]; foundingPeriodEndsAt: number | null; defenseWindows: Record<WarNationId, DefenseWindowState> };
-/** #1434 / #1439 / #1441 / #1451 / #1474: a Korund viewer of the citizen or world simulation does not receive wars, sieges, treaties, embargoes, war proposals, or war endings Korund is not in, and keeps only Korund's own war-weariness level and World Reputation entry. Other nations and a missing nation are unchanged. This is the news half (like #1379), not the map-fog flag. */
+/** #1434 / #1439 / #1441 / #1451 / #1474 / #1473: a Korund viewer of the citizen or world simulation does not receive wars, sieges, treaties, embargoes, war proposals, or war endings Korund is not in, and keeps only Korund's own war-weariness level, World Reputation entry, and defense window. Other nations and a missing nation are unchanged. This is the news half (like #1379), not the map-fog flag. */
 export function presentKorundWorldSimulation<T extends {
   wars?: WarState;
   sieges?: readonly { warId: string; attacker: string; defender: string }[];
@@ -76,9 +76,10 @@ export function presentKorundWorldSimulation<T extends {
   const involves = (a: string, b: string) => a === 'korund' || b === 'korund';
   const wars = (simulation.wars?.wars ?? []).filter(war => involves(war.attacker, war.defender));
   const ids = new Set(wars.map(war => war.id));
+  const defenseWindows = simulation.wars?.defenseWindows;
   return {
     ...simulation,
-    ...(simulation.wars ? { wars: { ...simulation.wars, wars } } : {}),
+    ...(simulation.wars ? { wars: { ...simulation.wars, wars, ...(defenseWindows ? { defenseWindows: (defenseWindows.korund !== undefined ? { korund: defenseWindows.korund } : {}) as typeof defenseWindows } : {}) } } : {}),
     ...(simulation.sieges ? { sieges: simulation.sieges.filter(siege => involves(siege.attacker, siege.defender) || ids.has(siege.warId)) } : {}),
     ...(simulation.treaties ? { treaties: { ...simulation.treaties, treaties: simulation.treaties.treaties.filter(treaty => involves(treaty.proposer, treaty.other)) } } : {}),
     ...(simulation.embargoes ? { embargoes: { ...simulation.embargoes, embargoes: simulation.embargoes.embargoes.filter(embargo => involves(embargo.actor, embargo.target)) } } : {}),
