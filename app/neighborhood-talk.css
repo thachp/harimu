@@ -1,0 +1,7 @@
+/* #1445 slice 2. Flag off: no .game-neighborhood-talk, so none of this applies. */
+.game-neighborhood-talk .neighborhood-talk-webgl{position:fixed;z-index:3;top:var(--hud-height);left:0;right:var(--sidebar-width);bottom:var(--context-height);margin:0;padding:24px;overflow-wrap:normal;word-break:normal;hyphens:none}
+.game-neighborhood-talk.game-rail-on .neighborhood-talk-webgl{left:var(--rail-width)}
+.game-neighborhood-talk .neighborhood-talk{display:grid;gap:8px;min-width:0}
+.game-neighborhood-talk .neighborhood-talk h3,.game-neighborhood-talk .neighborhood-talk p,.game-neighborhood-talk .neighborhood-talk button,.game-neighborhood-talk .neighborhood-talk li,.game-neighborhood-talk .neighborhood-talk label,.game-neighborhood-talk .neighborhood-talk textarea{overflow-wrap:normal;word-break:normal;hyphens:none;font-size:calc(13px * var(--text-scale, 1))}
+.game-neighborhood-talk .neighborhood-talk textarea{width:100%;max-width:100%;min-height:5rem;box-sizing:border-box;font:inherit}
+.game-neighborhood-talk .neighborhood-talk button:focus-visible,.game-neighborhood-talk .neighborhood-talk textarea:focus-visible,.game-neighborhood-talk .neighborhood-walk-panel button:focus-visible,.game-neighborhood-talk .neighborhood-talk-webgl:focus-visible{outline:3px solid #d0ad54;outline-offset:2px}
