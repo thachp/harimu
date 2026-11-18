@@ -9,7 +9,7 @@ import { graySeizureSchemas } from './gray-seizure';
 import { nationWorkSchemas } from './nation-work'; // #490
 import { presidiumSchemas } from './korund-presidium';
 import { marketSchemas, marketGoodsSeedSql, marketOpenOrdersView, marketTradeFeesSchema, marketTradeFeesIndex } from './market-orders';
-import {accountElectionEnabled,accountElectionSchemas} from './preview-election';
+import {accountElectionEnabled,accountElectionSchemas,accountElectionSql} from './preview-election';
 import {aiNewsSchemas} from './ai-news';
 import {korundQueueSchemas} from './korund-queue';
 import {korundCouponSchemas} from './korund-coupons';
@@ -25,7 +25,7 @@ import {stabilitySchemas} from './stability';
 import {selectStorageBackend,assertPostgresApplicationRole,assertStorageMarker,storageMarkerIds,postgresRuntimeEnabled,productionKeepsWriteJournal} from './storage-selection';
 import type {GameDatabase} from './database-contract';
 import {addressSchemas} from './weekly-addresses';
-import {electionSchemas} from './elections';
+import {electionSchemas,receiptDistrictColumn} from './elections';
 import {assemblySchemas} from './assembly';
 import {primarySchemas} from './primaries';
 import {collectivePetitionSchemas} from './collective-petitions';
@@ -511,6 +511,12 @@ async function initialize(database: GameDatabase) {
   const battleCols = await database.prepare('PRAGMA table_info(army_battles)').all<{ name: string }>();
   if (battleCols.results.length > 0 && !battleCols.results.some(column => column.name === 'attacker_hold')) await database.batch(battleStanceColumns.map(sql => database.prepare(sql)));
 
+  // #1416 (migration 0130): presidential receipts record a district. The account-preview copy uses the same INSERT with the table renamed.
+  const receiptCols = await database.prepare('PRAGMA table_info(civic_voter_receipts)').all<{ name: string }>();
+  if (receiptCols.results.length > 0 && !receiptCols.results.some(column => column.name === 'district_id')) await database.prepare(receiptDistrictColumn).run();
+  const pocReceiptCols = await database.prepare('PRAGMA table_info(poc_voter_receipts)').all<{ name: string }>();
+  if (pocReceiptCols.results.length > 0 && !pocReceiptCols.results.some(column => column.name === 'district_id')) await database.prepare(accountElectionSql(receiptDistrictColumn)).run();
+
   // #400: treaties gained broken_by (migration 0040); a local database created before it gets the column once.
   const treatyColumns = await database.prepare('PRAGMA table_info(treaties)').all<{ name: string }>();
   if (treatyColumns.results.length > 0 && !treatyColumns.results.some((column) => column.name === 'broken_by')) {
@@ -623,7 +629,9 @@ const postgresReady=isolateOnce(async(database:GameDatabase,bindings:PostgresBin
     assertStorageMarker(markers.results,bindings.HARIMU_PRODUCTION_STORAGE==='true');
     if(accountElectionEnabled(bindings)){
       const schema=await database.prepare("SELECT COUNT(*) AS count FROM pg_tables WHERE schemaname='public' AND tablename IN ('poc_elections','poc_voter_receipts','poc_anonymous_ballots')").first<{count:number}>();
-      if(schema?.count!==3){if(bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED!=='true')throw Error('Approved preview election migration required.');const {initializeAccountElectionSchema}=await import('./postgres/driver');await initializeAccountElectionSchema(bindings.HYPERDRIVE!.connectionString);}
+      // #1416: the vote INSERT is rewritten onto poc_voter_receipts, so an existing preview copy needs the same nullable column.
+      const district=schema?.count===3?await database.prepare("SELECT 1 AS ok FROM information_schema.columns WHERE table_schema='public' AND table_name='poc_voter_receipts' AND column_name='district_id'").first():null;
+      if(schema?.count!==3||!district){if(bindings.HARIMU_POSTGRES_TEMPORARY_ADMIN_APPROVED!=='true'){if(schema?.count!==3)throw Error('Approved preview election migration required.');}else{const {initializeAccountElectionSchema}=await import('./postgres/driver');await initializeAccountElectionSchema(bindings.HYPERDRIVE!.connectionString);}}
     }
 });
 // #92: readiness never writes AI reservations. Only a real, enabled, gateway-routed inference reserves budget.

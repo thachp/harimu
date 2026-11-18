@@ -74,12 +74,16 @@ test('the header names no other lib module path', () => {
   const head=readFileSync('lib/kindle-certification-copy.ts','utf8').split('*/')[0];
   assert.doesNotMatch(head,/\blib\/|\.ts\b|app\/|components\//);
 });
-test('unwired: nothing in app/, components/ or lib/ imports kindle-certification-copy, except the #1025 transition banner', () => {
+test('unwired: nothing in app/, components/ or lib/ imports kindle-certification-copy, except the #1025 transition banner and the #1416 district caption', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
   const rules=readFileSync('lib/kindle-certification-rules.ts','utf8');
   assert.match(rules,/kindle-certification-copy/);
   assert.match(rules,/transitionBanner/);
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&f!=='lib/kindle-certification-rules.ts'&&!f.endsWith('kindle-certification-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/kindle-certification-copy/,f);
+  const ballot=readFileSync('app/ranked-ballot.tsx','utf8');
+  assert.match(ballot,/kindle-certification-copy/);
+  assert.match(ballot,/resultsCaption\.district/);
+  const allowed=new Set(['lib/kindle-certification-rules.ts','app/ranked-ballot.tsx']);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!allowed.has(f)&&!f.endsWith('kindle-certification-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/kindle-certification-copy/,f);
 });
 test('one canonical byline: the press bodies open with the Kindle pack byline from the press templates, and this module defines none of its own', () => {
   assert.deepEqual(kindlePress.byline,{name:'Kindle Press',proposal:false});

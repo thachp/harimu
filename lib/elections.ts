@@ -1,6 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import {instantRunoffCounts,type RunoffResult} from './instant-runoff';
 import {trustedBallotPrivacyReady,ballotPrivacyReason} from './ballot-privacy';
+import {citizenDistrict,districtBallotCounts,type DistrictBallotCount} from './citizen-district';
 export const electionId='kindle-presidential-poc-1';
 /** #936: one election row per voting window. Cycle 0 (and a held calendar) keeps the original id, so the first window and its existing rows are unchanged. */
 export const electionIdFor=(cycle:number|null)=>cycle?`${electionId}-cycle-${cycle}`:electionId;
@@ -13,12 +14,16 @@ export const electionCandidates=[
 export const candidateIds=electionCandidates.map(candidate=>candidate.id);
 export const electionSchemas=[
  `CREATE TABLE IF NOT EXISTS civic_elections (id TEXT PRIMARY KEY,nation_id TEXT NOT NULL CHECK(nation_id='kindle'),candidates_json TEXT NOT NULL CHECK(json_valid(candidates_json) AND json_array_length(candidates_json)=3),opens_at INTEGER NOT NULL,closes_at INTEGER NOT NULL,closed_at INTEGER,result_json TEXT,CHECK(closes_at=opens_at+259200),CHECK(closed_at IS NULL OR closed_at>=closes_at),CHECK(result_json IS NULL OR (closed_at IS NOT NULL AND json_valid(result_json))))`,
- `CREATE TABLE IF NOT EXISTS civic_voter_receipts (election_id TEXT NOT NULL REFERENCES civic_elections(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),request_id TEXT NOT NULL UNIQUE,checked_at INTEGER NOT NULL,ballot_written INTEGER NOT NULL DEFAULT 0 CHECK(ballot_written IN (0,1)),policy TEXT NOT NULL CHECK(policy='tier1-human-v1'),PRIMARY KEY(election_id,clerk_user_id)) WITHOUT ROWID`,
+ `CREATE TABLE IF NOT EXISTS civic_voter_receipts (election_id TEXT NOT NULL REFERENCES civic_elections(id),clerk_user_id TEXT NOT NULL REFERENCES citizens(clerk_user_id),request_id TEXT NOT NULL UNIQUE,checked_at INTEGER NOT NULL,ballot_written INTEGER NOT NULL DEFAULT 0 CHECK(ballot_written IN (0,1)),policy TEXT NOT NULL CHECK(policy='tier1-human-v1'),district_id TEXT,PRIMARY KEY(election_id,clerk_user_id)) WITHOUT ROWID`,
  // No citizen, receipt identifier, timestamp or rowid can directly link a ranking to a voter.
  `CREATE TABLE IF NOT EXISTS civic_anonymous_ballots (id TEXT PRIMARY KEY,election_id TEXT NOT NULL REFERENCES civic_elections(id),ranking_json TEXT NOT NULL CHECK(json_valid(ranking_json) AND json_array_length(ranking_json)=3),policy TEXT NOT NULL CHECK(policy='tier1-human-v1')) WITHOUT ROWID`,
  `CREATE INDEX IF NOT EXISTS idx_anonymous_ballots_election ON civic_anonymous_ballots(election_id)`,
 ];
-export type ElectionSnapshot={nationId:'kindle';id:string;candidates:readonly {id:string;name:string;platform:string}[];status:'waiting'|'open'|'closed';opensAt:number|null;closesAt:number|null;voted:boolean;result:RunoffResult|null;privacyReady:boolean;privacyReason:string};
+export type {DistrictBallotCount};
+export type ElectionResult=RunoffResult&{districts?:DistrictBallotCount[]};
+export type ElectionSnapshot={nationId:'kindle';id:string;candidates:readonly {id:string;name:string;platform:string}[];status:'waiting'|'open'|'closed';opensAt:number|null;closesAt:number|null;voted:boolean;result:ElectionResult|null;privacyReady:boolean;privacyReason:string};
+/** #1416 (migration 0130): a local database created before the column existed gets it once. Null is a pre-migration receipt. */
+export const receiptDistrictColumn='ALTER TABLE civic_voter_receipts ADD COLUMN district_id TEXT';
 export type Slate=readonly {id:string;name:string;platform:string}[];
 /** #307: `slate` is today's three candidates unless a closed party primary supplies one nominee per party (same slot ids). */
 /** #918: `opensAt` is the calendar window's open (lib/election-calendars presidentialWindow); routes pass null while the calendar is held, and nothing opens. */
@@ -28,10 +33,14 @@ export async function openPreviewElection(db:GameDatabase,userId:string,now:numb
  // the separately namespaced, approved account-level preview exception.
  await db.prepare(`INSERT INTO civic_elections (id,nation_id,candidates_json,opens_at,closes_at) SELECT ?,'kindle',?,?,?+259200 FROM citizens WHERE clerk_user_id=? AND nation_id='kindle' ON CONFLICT(id) DO NOTHING`).bind(id,JSON.stringify(slate),opensAt,opensAt,userId).run();
 }
-export const voteReceiptSql=`INSERT INTO civic_voter_receipts (election_id,clerk_user_id,request_id,checked_at,policy)
- SELECT e.id,c.clerk_user_id,?,?,'tier1-human-v1' FROM civic_elections e JOIN citizens c ON c.clerk_user_id=?
+export const voteReceiptSql=`INSERT INTO civic_voter_receipts (election_id,clerk_user_id,district_id,request_id,checked_at,policy)
+ SELECT e.id,c.clerk_user_id,?,?,?,'tier1-human-v1' FROM civic_elections e JOIN citizens c ON c.clerk_user_id=?
  WHERE e.id=? AND c.nation_id='kindle' AND e.nation_id='kindle' AND e.closed_at IS NULL AND e.opens_at<=? AND e.closes_at>?
  ON CONFLICT DO NOTHING`;
+/** District is server-derived at receipt time (#1416). The request cannot name one. */
+export async function voteReceiptStatement(db:GameDatabase,requestId:string,userId:string,electionId:string,now:number){
+ return db.prepare(voteReceiptSql).bind(await citizenDistrict(db,userId),requestId,now,userId,electionId,now,now);
+}
 export const anonymousBallotSql=`INSERT INTO civic_anonymous_ballots (id,election_id,ranking_json,policy)
  SELECT ?,r.election_id,?,'tier1-human-v1' FROM civic_voter_receipts r WHERE r.request_id=? AND r.clerk_user_id=? AND r.election_id=? AND r.ballot_written=0`;
 export const markBallotWrittenSql=`UPDATE civic_voter_receipts SET ballot_written=1 WHERE request_id=? AND clerk_user_id=? AND election_id=? AND ballot_written=0`;
@@ -39,12 +48,27 @@ async function ballotGroups(db:GameDatabase,id:string){
  const rows=await db.prepare("SELECT ranking_json,COUNT(*) AS count FROM civic_anonymous_ballots WHERE election_id=? AND policy='tier1-human-v1' GROUP BY ranking_json").bind(id).all<{ranking_json:string;count:number}>();
  return rows.results.map(row=>({ranking:JSON.parse(row.ranking_json) as string[],count:row.count}));
 }
-/** #1369: human ballots only. An empty bloc ranking is the same rule primaries already use; the Simulated Public bloc is not counted. */
+/** #1416: written human receipts with a district. A null district (a receipt from before migration 0130) stays in the national total and out of this list. */
+async function humanDistrictCounts(db:GameDatabase,id:string){
+ const rows=await db.prepare("SELECT district_id,COUNT(*) AS count FROM civic_voter_receipts WHERE election_id=? AND ballot_written=1 AND policy='tier1-human-v1' AND district_id IS NOT NULL GROUP BY district_id").bind(id).all<{district_id:string;count:number}>();
+ return districtBallotCounts(rows.results);
+}
+function storedDistricts(value:unknown):DistrictBallotCount[]{
+ if(!Array.isArray(value))throw Error('Saved election count could not be verified.');
+ return value.map(row=>{
+  if(!row||typeof row!=='object')throw Error('Saved election count could not be verified.');
+  const {districtId,name,ballots}=row as DistrictBallotCount;
+  if(typeof districtId!=='string'||districtId.length===0||districtId.length>80||typeof name!=='string'||name.length===0||name.length>80||!Number.isSafeInteger(ballots)||ballots<1)throw Error('Saved election count could not be verified.');
+  return {districtId,name,ballots};
+ });
+}
+/** #1369: human ballots only. An empty bloc ranking is the same rule primaries already use; the Simulated Public bloc is not counted.
+ *  #1416: a new count also carries each district's written human ballots. A count stored before that field stays as published. */
 async function countedResult(db:GameDatabase,id:string){
  const result=instantRunoffCounts(candidateIds,await ballotGroups(db,id),[]);
  const receipts=await db.prepare("SELECT COUNT(*) AS count FROM civic_voter_receipts WHERE election_id=? AND ballot_written=1 AND policy='tier1-human-v1'").bind(id).first<{count:number}>();
  if(receipts?.count!==result.humanBallots)throw Error('Election count could not be confirmed. No result published.');
- return result;
+ return {...result,districts:await humanDistrictCounts(db,id)};
 }
 /** Closes a due election and records its count. Write paths only: POST /api/election and the world tick (#221). */
 export async function finalizeDueElection(db:GameDatabase,now:number){
@@ -68,7 +92,7 @@ async function finalizedResult(db:GameDatabase,now:number,readOnly:boolean,id:st
   saved=await db.prepare('SELECT result_json FROM civic_elections WHERE id=? AND closed_at IS NOT NULL').bind(id).first<{result_json:string}>();
  }
  if(!saved?.result_json)return null;
- const result=JSON.parse(saved.result_json) as RunoffResult;
+ const result=JSON.parse(saved.result_json) as ElectionResult;
  // #1369: a new count is human-only (`simulatedPublicUnits` is 0). A result already stored with the Simulated Public bloc
  // (`simulatedPublicUnits === humanBallots`) stays as published: it is checked against that old count and never rewritten.
  const humanOnly=result.simulatedPublicUnits===0,storedBloc=result.humanBallots>0&&result.simulatedPublicUnits===result.humanBallots;
@@ -76,12 +100,16 @@ async function finalizedResult(db:GameDatabase,now:number,readOnly:boolean,id:st
  // An explicit aggregate projection, never raw stored JSON or anonymous ballot rows.
  const counts=(value:Record<string,number>)=>Object.fromEntries(candidateIds.filter(id=>Object.hasOwn(value,id)).map(id=>{if(!Number.isSafeInteger(value[id])||value[id]<0)throw Error('Saved election count could not be verified.');return[id,value[id]];}));
  if(result.rounds.some(round=>round.eliminated!==null&&!candidateIds.some(id=>id===round.eliminated)))throw Error('Saved election count could not be verified.');
- const projected={winner:result.winner,humanBallots:result.humanBallots,simulatedPublicUnits:result.simulatedPublicUnits,weightScale:4 as const,rounds:result.rounds.map(round=>({human:counts(round.human),simulatedUnits:counts(round.simulatedUnits),weightedUnits:counts(round.weightedUnits),eliminated:round.eliminated}))};
+ const savedDistricts=Object.hasOwn(result,'districts')?storedDistricts(result.districts):undefined;
+ const projected={winner:result.winner,humanBallots:result.humanBallots,simulatedPublicUnits:result.simulatedPublicUnits,weightScale:4 as const,rounds:result.rounds.map(round=>({human:counts(round.human),simulatedUnits:counts(round.simulatedUnits),weightedUnits:counts(round.weightedUnits),eliminated:round.eliminated})),...(savedDistricts?{districts:savedDistricts}:{})};
  // Closing freezes writes; these grouped rankings are bounded to the six
  // permutations. Verify the stored aggregate against that authoritative count.
+ // District totals are checked on their own so a count stored before #1416 still matches its IRV aggregate.
  const fresh=await countedResult(db,id);
  const expected=storedBloc?instantRunoffCounts(candidateIds,await ballotGroups(db,id),candidateIds):fresh;
- if(JSON.stringify(projected)!==JSON.stringify(expected))throw Error('Saved election aggregate does not match the confirmed count.');
+ const irv=(value:RunoffResult&{districts?:DistrictBallotCount[]})=>{const copy={...value};delete copy.districts;return copy;};
+ if(JSON.stringify(irv(projected))!==JSON.stringify(irv(expected)))throw Error('Saved election aggregate does not match the confirmed count.');
+ if(savedDistricts&&JSON.stringify(savedDistricts)!==JSON.stringify(fresh.districts))throw Error('Saved election aggregate does not match the confirmed count.');
  return projected;
 }
 
