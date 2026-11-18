@@ -2,6 +2,7 @@ import { economyEnabled } from './economy-flag.ts';
 import { faithEnabled } from './faith-flag.ts';
 import { militaryEnabled } from './military.ts';
 import { neighborhoodEnabled } from './neighborhood.ts';
+import { isDistrictSlot, neighborhoodWalkEnabled } from './neighborhood-walk.ts';
 export const viewModes = ['world', 'country', 'square', 'neighborhood', 'household', 'workplace', 'market', 'government', 'nation', 'military', 'economy', 'faith'] as const;
 export type SceneView = typeof viewModes[number];
 export const sceneHistoryKey = 'harimuScenePath';
@@ -17,7 +18,7 @@ export function sceneFromSearch(search: string): SceneView {
   const requested = new URLSearchParams(search).get('view');
   const view = requested === 'city' ? 'square' : requested === 'home' || requested === 'planning' ? 'household' : requested;
   const scene = viewModes.includes(view as SceneView) ? view as SceneView : 'square';
-  return scene === 'neighborhood' && !neighborhoodEnabled() ? 'square' : scene === 'military' && !militaryEnabled() ? 'nation' : scene === 'economy' && !economyEnabled() ? 'nation' : scene === 'faith' && !faithEnabled() ? 'nation' : scene;
+  return scene === 'neighborhood' && !neighborhoodEnabled() && !neighborhoodWalkEnabled() ? 'square' : scene === 'military' && !militaryEnabled() ? 'nation' : scene === 'economy' && !economyEnabled() ? 'nation' : scene === 'faith' && !faithEnabled() ? 'nation' : scene;
 }
 export function nationFromSearch(search: string, validNationIds: readonly string[], fallbackId: string): string {
   const requested = new URLSearchParams(search).get('nation');
@@ -99,6 +100,7 @@ export function sceneUrl(href: string, scene: SceneView, nationId?: string, city
   } else url.searchParams.delete('nation');
   // A city belongs to one nation; never carry a previous nation's city forward (#55).
   if (cityId) url.searchParams.set('city', cityId); else url.searchParams.delete('city');
+  if (scene !== 'neighborhood') url.searchParams.delete('district');
   return url.href;
 }
 /**
@@ -126,6 +128,8 @@ export function normalizeSceneSearch(search: string, nationIds: readonly string[
   const city = params.get('city');
   const validNation = params.get('nation');
   if (city !== null && (validNation ? !cityInNation(validNation, city) : !nationIds.some(id => cityInNation(id, city)))) params.delete('city');
+  const district = params.get('district');
+  if (district !== null && (!neighborhoodWalkEnabled() || params.get('view') !== 'neighborhood' || !isDistrictSlot(district))) params.delete('district');
   const out = params.toString();
   return out ? `?${out}` : '';
 }
