@@ -111,6 +111,21 @@ export const treatyProposalCooldownSlots = 3;
 export const treatyAiLeaders: Readonly<Record<TreatyNationId, string>> = { kindle: "Kindle's AI Cabinet", korund: "Korund's AI Chairman", aurelle: "Aurelle's AI Crown" };
 export const treatySlot = (now: number) => Math.floor(now / treatyProposalSlotSeconds);
 export const treatyProposalRequestId = (slot: number) => `ai-slot-${slot}`;
+
+/** #1490 [ASSUMPTION]: a trade agreement that expired by term is eligible for renewal for 24 real hours. Older ones never renew. */
+export const renewalWindowSeconds = 86400;
+/** A gapless renewed term: ratified at the old end, then one trade term at the shared clock compression. */
+export function renewedTerm(oldEndsAt: number, compression: number): { ratifiedAt: number; endsAt: number } {
+  return { ratifiedAt: oldEndsAt, endsAt: oldEndsAt + treatyTermSeconds('trade', compression) };
+}
+/** request_id for a renewal of `oldId`. Must pass treatyRequestIdOk; long ids are hashed to fit the 64-character cap. */
+export function treatyRenewalRequestId(oldId: string): string {
+  const raw = `renew-${oldId}`;
+  if (treatyRequestIdOk(raw)) return raw;
+  let hash = 2166136261;
+  for (let i = 0; i < oldId.length; i++) hash = Math.imul(hash ^ oldId.charCodeAt(i), 16777619);
+  return `renew-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
 const treatyPairs: ReadonlyArray<readonly [TreatyNationId, TreatyNationId]> = [['kindle', 'korund'], ['kindle', 'aurelle'], ['korund', 'aurelle']];
 export function treatyCandidates(slot: number): Array<{ proposer: TreatyNationId; other: TreatyNationId; kind: TreatyKind }> {
   const all = treatyPairs.flatMap(pair => treatyKinds.map(kind => ({ pair, kind })));
