@@ -75,16 +75,12 @@ export async function travelBlock(db: GameDatabase, userId: string, now: number,
 }
 
 /** #123 (ARC ruling on #264): with travel enabled, POST /api/city {action:'travel'} becomes a timed journey to that city's square.
- *  #1444: the same closed-system permit as a home move, not consumed by the visit. */
+ *  #1444 / #1448: startTravel applies the same unconsumed closed-system permit. */
 export async function startCityTravel(db: GameDatabase, userId: string, cityId: string, requestId: string, now: number, permit: PermitOpts = { enabled: false }): Promise<TravelResult> {
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const place = (await citySquares(db, citizen?.nation_id ?? '')).find(p => p.cityId === cityId);
   if (!place) return fail(409, 'no_square', 'That city has no square on the map yet, so it cannot be reached by travel.');
-  if (permit.enabled && citizen?.nation_id) {
-    const here = (await readCityLocation(db, userId, citizen.nation_id, now)).currentCityId;
-    if (!await cityVisitAllowed(db, userId, citizen.nation_id, cityId, here, now, permit)) return fail(403, 'permit_required', 'permit_required');
-  }
-  return startTravel(db, userId, { x: place.x, y: place.y, requestId }, now, true);
+  return startTravel(db, userId, { x: place.x, y: place.y, requestId }, now, true, permit);
 }
 export function parseTravelCommand(body: Record<string, unknown>): { x: number; y: number; requestId: string } | null {
   if (body.action !== 'start-travel' || !Number.isInteger(body.x) || !Number.isInteger(body.y)) return null;
@@ -92,7 +88,7 @@ export function parseTravelCommand(body: Record<string, unknown>): { x: number; 
   return { x: body.x as number, y: body.y as number, requestId: body.requestId };
 }
 
-export async function startTravel(db: GameDatabase, userId: string, command: { x: number; y: number; requestId: string }, now: number, enabled: boolean): Promise<TravelResult> {
+export async function startTravel(db: GameDatabase, userId: string, command: { x: number; y: number; requestId: string }, now: number, enabled: boolean, permit: PermitOpts = { enabled: false }): Promise<TravelResult> {
   if (!enabled) return fail(403, 'disabled', 'Travel is not enabled yet.');
   const prior = await db.prepare('SELECT user_id,to_x,to_y,departed_at,traveling_until FROM citizen_travel WHERE request_id=?').bind(command.requestId).first<{ user_id: string; to_x: number; to_y: number; departed_at: number; traveling_until: number }>();
   if (prior) {
@@ -107,11 +103,15 @@ export async function startTravel(db: GameDatabase, userId: string, command: { x
   if (to.x === here.x && to.y === here.y) return fail(409, 'already_here', 'You are already there.');
   const citizen = (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string }>())!;
   const cities = await citySquares(db, citizen.nation_id);
-  const isCity = cities.some(c => c.x === to.x && c.y === to.y);
-  if (!isCity) {
+  const dest = cities.find(c => c.x === to.x && c.y === to.y);
+  if (!dest) {
     const square = await db.prepare('SELECT owner FROM world_squares WHERE x=? AND y=?').bind(to.x, to.y).first<{ owner: string | null }>();
     if (square?.owner !== citizen.nation_id) return fail(409, 'not_owned', 'You can only travel to your nation\'s cities or to squares your nation owns.');
     if (cheb(here, to) !== 1) return fail(409, 'not_adjacent', 'Without a city at the destination you can only travel to an adjacent owned square.');
+  } else if (permit.enabled && dest.cityId) {
+    // #1448: a closed-system city square needs a granted permit for this citizen and this city. The visit does not consume it.
+    const currentCityId = (await readCityLocation(db, userId, citizen.nation_id, now)).currentCityId;
+    if (!await cityVisitAllowed(db, userId, citizen.nation_id, dest.cityId, currentCityId, now, permit)) return fail(403, 'permit_required', 'permit_required');
   }
   const duration = travelSeconds(here, to);
   // Upsert guarded so a concurrent start (or one still en route) cannot overwrite an active journey.

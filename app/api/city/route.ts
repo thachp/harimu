@@ -27,8 +27,8 @@ import {cityTierUnlockFields,cityTierFestivalNote,cityTierPopulationNote} from '
 import {cityTreatyReturn,latestCityCapture} from '@/lib/city-capture-history'; // #1028, #1078
 import {peaceRevertEnabled} from '@/lib/war-peace-revert'; // #1078 same flag as #1054
 import {flagOn} from '@/lib/flag-pack.mjs'; // #988 / #1003
-import {readVarkandAlert,varkandAlertEnabled} from '@/lib/varkand-alert'; // #1400: same stored Alert Level as #1220; #1444 permit gate
-import {cityVisitAllowed,type VarkandAlert} from '@/lib/home-move'; // #1444: reuse #992, do not consume
+import {readVarkandAlert} from '@/lib/varkand-alert'; // #1400: same stored Alert Level as #1220
+import {cityVisitAllowed,visitPermitOpts} from '@/lib/home-move'; // #1444: reuse #992, do not consume
 import {varkandFestivalHostFields} from '@/lib/varkand-red-alert-cancels'; // #1400: omit Varkand host note and date at Red
 import {varkandNextLanternWatchAt} from '@/lib/varkand-lantern-watch'; // #1211 clock, read only
 import {varkandNextMusterDayAt} from '@/lib/varkand-muster-day'; // #1151 clock, read only
@@ -91,10 +91,6 @@ export async function GET(request:Request){
  const reads=await cityReads(ctx.db,ctx.userId,ctx.nationId,location.currentCityId,ctx.now);
  return json(await withTierUnlocks(ctx.db,ctx.nationId,location.currentCityId,{...location,...spaField(ctx.nationId,location.homeCityId,location.currentCityId),...reads,...hearthHost(ctx.nationId,location.currentCityId,ctx.now),...regattaHost(ctx.nationId,location.currentCityId,ctx.now),...await festivalHost(ctx.db,ctx.nationId,location.currentCityId,ctx.now)}));
 }
-/** #1444: same alert source as the #992 home-move route. Off, or not Varkand: Green. */
-const permitOn=()=>flagOn(env,'HARIMU_INTERNAL_PERMIT_ENABLED');
-const envAlert=():VarkandAlert=>{const v=(env as unknown as {HARIMU_VARKAND_ALERT?:string}).HARIMU_VARKAND_ALERT;return v==='amber'||v==='red'||v==='green'?v:'green';};
-async function visitPermitOpts(db:Parameters<typeof readVarkandAlert>[0],nationId:string){return {enabled:true,alert:nationId!=='varkand'?'green' as VarkandAlert:varkandAlertEnabled(env)?(await readVarkandAlert(db)).level:envAlert()};}
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Enroll in a nation first.'},403);
@@ -103,13 +99,14 @@ export async function POST(request:Request){
  if((env as unknown as {HARIMU_TRAVEL_ENABLED?:string}).HARIMU_TRAVEL_ENABLED==='true'){
   if(body.action!=='travel'||typeof body.cityId!=='string')return json({error:'Choose a city in your current nation.'},400);
   const requestId=typeof body.requestId==='string'&&/^[A-Za-z0-9-]{8,64}$/.test(body.requestId)?body.requestId:crypto.randomUUID();
-  const result=await startCityTravel(ctx.db,ctx.userId,body.cityId,requestId,ctx.now,permitOn()?await visitPermitOpts(ctx.db,ctx.nationId):{enabled:false});
+  const result=await startCityTravel(ctx.db,ctx.userId,body.cityId,requestId,ctx.now,await visitPermitOpts(ctx.db,ctx.nationId,env));
   return result.ok?json({...result,timed:true}):json({error:result.error,reason:result.reason},result.status);
  }
  if(body.action!=='travel'||typeof body.cityId!=='string'||!cityForNation(ctx.nationId,body.cityId))return json({error:'Choose a city in your current nation.'},400);
- if(permitOn()){
+ const permit=await visitPermitOpts(ctx.db,ctx.nationId,env);
+ if(permit.enabled){
   const before=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
-  if(!await cityVisitAllowed(ctx.db,ctx.userId,ctx.nationId,body.cityId,before.currentCityId,ctx.now,await visitPermitOpts(ctx.db,ctx.nationId)))return json({error:'permit_required',reason:'permit_required'},403);
+  if(!await cityVisitAllowed(ctx.db,ctx.userId,ctx.nationId,body.cityId,before.currentCityId,ctx.now,permit))return json({error:'permit_required',reason:'permit_required'},403);
  }
  const location=await readCityLocation(ctx.db,ctx.userId,ctx.nationId,ctx.now);
  const results=await ctx.db.batch([
