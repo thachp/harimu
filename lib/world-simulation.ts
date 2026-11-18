@@ -25,6 +25,7 @@ import { readHarmonyScores } from './religious-harmony';
 import { readWars, type WarState } from './war'; // #309
 import { readSiegeSnapshot, type SiegeSnapshotItem } from './siege-actions'; // #620
 import { readTreaties, runDiplomacy, type TreatyState } from './diplomacy'; // #308
+import { worldReputation, type WorldReputationMap } from './diplomacy-rules'; // #1474
 import { readEmbargoes, runEmbargo, type EmbargoState } from './embargo'; // #363
 import { decideProposedGoodsSanctions } from './goods-sanctions'; // #601
 import { decideKindleWarProposals, readWarProposals } from './war-assembly'; // #427
@@ -80,7 +81,7 @@ export type WorldClock = {
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
 export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecution | null;
-  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; sieges?: SiegeSnapshotItem[]; weariness?: PublicWeariness; treaties?: TreatyState; embargoes?: EmbargoState; reserve?: ReserveBoard; warProposals?: Awaited<ReturnType<typeof readWarProposals>>; warEndings?: Awaited<ReturnType<typeof readWarEndings>> };
+  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; sieges?: SiegeSnapshotItem[]; weariness?: PublicWeariness; treaties?: TreatyState; reputation?: WorldReputationMap; embargoes?: EmbargoState; reserve?: ReserveBoard; warProposals?: Awaited<ReturnType<typeof readWarProposals>>; warEndings?: Awaited<ReturnType<typeof readWarEndings>> };
 
 type RunnerOptions = Parameters<typeof advanceWorld>[2];
 /** #679: one flag-gated world runner. `run` is only called when its flag is on. */
@@ -242,5 +243,5 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     ...(dividendDayAt == null ? {} : { dividendDayAt }), ...worldAtlasClockFields(now, options.atlasEnv, canceledNames)}, // #1193/#1239: atlasEnv is the Worker env; flag off adds nothing; canceledNames skips Red Alert celebrations
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!,reputation:worldReputation(treaties!.treaties)}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
 }
