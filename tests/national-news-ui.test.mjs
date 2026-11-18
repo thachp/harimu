@@ -12,7 +12,7 @@ const compile=async file=>ts.transpileModule(await readFile(new URL(`../app/${fi
 const tags={};new Function('exports','require',await compile('ai-disclosure.tsx'))(tags,require);
 const documents={};new Function('exports','require',await compile('nation-document.tsx'))(documents,name=>name==='../lib/nation-themes'?require('../lib/nation-themes.ts'):require(name));
 const source=await compile('national-news.tsx');
-const real={};new Function('exports','require',source)(real,name=>name==='./wire-stories'?{WireStories:()=>null}:name==='../lib/wire-bylines'?require('../lib/wire-bylines.ts'):name==='../lib/press-templates'?require('../lib/press-templates.ts'):name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/kill-switch-copy'?require('../lib/kill-switch-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name));
+const real={};new Function('exports','require',source)(real,name=>name==='./wire-stories'?{WireStories:()=>null}:name==='../lib/wire-bylines'?require('../lib/wire-bylines.ts'):name==='../lib/press-templates'?require('../lib/press-templates.ts'):name==='../lib/kindle-newspapers'?{PRESS_HEADLINE_MAX:require('../lib/press-templates.ts').PRESS_HEADLINE_MAX,PRESS_PARAGRAPH_MAX:require('../lib/press-templates.ts').PRESS_PARAGRAPH_MAX,kindleNewspaperExistsError:'You already founded a newspaper.'}:name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/kill-switch-copy'?require('../lib/kill-switch-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name));
 const edition=nationId=>({nationId,title:{kindle:'Kindle Press',korund:'Korund State Media',aurelle:'Aurelle Court Gazette'}[nationId],style:{kindle:'press',korund:'state',aurelle:'court'}[nationId],fetchedAt:1768489200000,statistics:{citizens:2,completedShifts:1,food:4},items:[{id:'record',title:'Work recorded',text:'4 food recorded',source:'system',occurredAt:1768489200000},{id:'policy',title:'Statement',text:'A bounded proposal.',source:'deterministic',occurredAt:1768489200000}]});
 const all=n=>[n,...[n?.props?.children].flat(Infinity).filter(Boolean).flatMap(c=>typeof c==='object'?all(c):[c])];
 test('all national editions show truthful statistics and distinguish system, SI and actual AI content',()=>{
@@ -37,7 +37,7 @@ function harness(){
  let cursor=0,effects=[],slots=[],requests=[],closeOrder=[];
  const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useRef(){const i=cursor++;if(!(i in slots))slots[i]={current:{showModal(){},close(){closeOrder.push('native-close');},focus(){}}};return slots[i];},useEffect(fn){effects.push(fn);}};
  const fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
- const exports={};new Function('exports','require','fetch','document',source)(exports,name=>name==='./wire-stories'?{WireStories:()=>null}:name==='../lib/wire-bylines'?require('../lib/wire-bylines.ts'):name==='../lib/press-templates'?require('../lib/press-templates.ts'):name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/kill-switch-copy'?require('../lib/kill-switch-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react-dom'?{createPortal:node=>node}:name==='react'?react:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name),fetch,{body:{}});
+ const exports={};new Function('exports','require','fetch','document',source)(exports,name=>name==='./wire-stories'?{WireStories:()=>null}:name==='../lib/wire-bylines'?require('../lib/wire-bylines.ts'):name==='../lib/press-templates'?require('../lib/press-templates.ts'):name==='../lib/kindle-newspapers'?{PRESS_HEADLINE_MAX:require('../lib/press-templates.ts').PRESS_HEADLINE_MAX,PRESS_PARAGRAPH_MAX:require('../lib/press-templates.ts').PRESS_PARAGRAPH_MAX,kindleNewspaperExistsError:'You already founded a newspaper.'}:name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/kill-switch-copy'?require('../lib/kill-switch-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react-dom'?{createPortal:node=>node}:name==='react'?react:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name),fetch,{body:{}});
  let dialogType;
  const props={nationId:'kindle',session:'ready',configured:true};
  const renderControl=()=>{cursor=0;effects=[];return exports.NationalNewsControl(props);};
@@ -195,3 +195,147 @@ test('#1461 long paper names and headlines wrap: no horizontal overflow at 375px
   assert.match(css,/\.national-news-items h3,\s*\.national-news-items p,\s*\.national-news-items \.news-paper-name,\s*\.national-news-items \.news-byline\{[^}]*overflow-wrap:anywhere/);
 });
 
+
+function writerModule(){
+  let cursor=0,effects=[],slots=[],requests=[],published=0;
+  const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},useRef(initial){const i=cursor++;if(!(i in slots))slots[i]={current:initial??null};return slots[i];},useEffect(fn){effects.push(fn);}};
+  const fetch=(url,options)=>new Promise(resolve=>requests.push({url,options,resolve}));
+  const exports={};new Function('exports','require','fetch','document',source)(exports,name=>name==='./wire-stories'?{WireStories:()=>null}:name==='../lib/wire-bylines'?require('../lib/wire-bylines.ts'):name==='../lib/press-templates'?require('../lib/press-templates.ts'):name==='../lib/kindle-newspapers'?{PRESS_HEADLINE_MAX:require('../lib/press-templates.ts').PRESS_HEADLINE_MAX,PRESS_PARAGRAPH_MAX:require('../lib/press-templates.ts').PRESS_PARAGRAPH_MAX,kindleNewspaperExistsError:'You already founded a newspaper.'}:name==='../lib/news-intro-copy'?require('../lib/news-intro-copy.ts'):name==='../lib/kill-switch-copy'?require('../lib/kill-switch-copy.ts'):name==='../lib/morning-brief'?require('../lib/morning-brief.ts'):name==='./nation-document'?documents:name==='./display-preferences'?{useDisplayTimestamp:()=>require('../lib/display-preferences.ts').displayTimestamp}:name==='react-dom'?{createPortal:node=>node}:name==='react'?react:name==='./weekly-addresses'?{WeeklyAddresses:()=>null}:name==='./ai-disclosure'?tags:require(name),fetch,{body:{}});
+  const render=()=>{cursor=0;effects=[];return exports.NewspaperWriter({onPublished:()=>{published++;}});};
+  const reply=(req,{ok=true,status=200,data={}})=>req.resolve({ok,status,json:async()=>data});
+  const labeled=(tree,text)=>{const label=all(tree).find(n=>n?.type==='label'&&all(n).includes(text));assert.ok(label,text);return all(label).find(n=>n?.type==='input'||n?.type==='textarea');};
+  const flush=async()=>{for(let i=0;i<20;i++)await Promise.resolve();};
+  return {exports,render,requests,published:()=>published,reply,labeled,flush,reset(){slots=[];cursor=0;effects=[];requests.length=0;published=0;}};
+}
+
+test('#1465 writer is hidden when the flag is off or the viewer is not a Kindle citizen',()=>{
+  const isWriter=n=>typeof n?.type==='function'&&n.type.name==='NewspaperWriter';
+  const ui=harness();
+  const off=ui.render();
+  assert.equal(all(off).some(isWriter),false);
+  const offText=all(off).filter(n=>typeof n==='string').join('\n');
+  assert.doesNotMatch(offText,/Found a newspaper|Publish an article|Newspaper writer|Found paper|Publish article|Publish in /);
+  ui.dialogProps.kindleNewspapers=false;
+  const explicitOff=ui.render();
+  assert.equal(all(explicitOff).some(isWriter),false);
+  ui.dialogProps.kindleNewspapers=true;
+  ui.dialogProps.nationId='korund';
+  const korund=ui.render();
+  assert.equal(all(korund).some(isWriter),false);
+  ui.dialogProps.nationId='aurelle';
+  assert.equal(all(ui.render()).some(isWriter),false);
+  ui.dialogProps.nationId='kindle';
+  assert.ok(all(ui.render()).some(isWriter));
+});
+
+test('#1465 flag-off NewsDialog chrome is unchanged: no writer nodes in the tree',()=>{
+  const ui=harness();
+  const tree=ui.render();
+  const tags=all(tree).filter(n=>n&&typeof n==='object').map(n=>typeof n.type==='string'?n.type:n.type?.name);
+  assert.ok(tags.includes('dialog'));
+  assert.equal(tags.includes('NewspaperWriter'),false);
+  assert.equal(all(tree).some(n=>n?.props?.className==='news-writer'),false);
+});
+
+test('#1465 found then publish posts the right payloads and reuses requestId on retry',async()=>{
+  const ui=writerModule();
+  let tree=ui.render();
+  assert.match(all(tree).filter(n=>typeof n==='string').join('\n'),/Found a newspaper/);
+  ui.labeled(tree,'Newspaper name').props.onChange({target:{value:'Harbor Ledger'}});
+  tree=ui.render();
+  all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});
+  await ui.flush();
+  assert.equal(ui.requests.length,1);
+  assert.equal(ui.requests[0].url,'/api/news');
+  assert.equal(ui.requests[0].options.method,'POST');
+  const first=JSON.parse(ui.requests[0].options.body);
+  assert.equal(first.action,'found-paper');
+  assert.equal(first.name,'Harbor Ledger');
+  assert.match(first.requestId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  tree=ui.render();
+  all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});
+  await ui.flush();
+  assert.equal(ui.requests.length,2);
+  const retry=JSON.parse(ui.requests[1].options.body);
+  assert.deepEqual(retry,first);
+  ui.reply(ui.requests[0],{data:{paper:{name:'Harbor Ledger'}}});
+  ui.reply(ui.requests[1],{data:{paper:{name:'Harbor Ledger'}}});
+  await ui.flush();
+  tree=ui.render();
+  const foundText=all(tree).filter(n=>typeof n==='string').join('\n');
+  assert.match(foundText,/Publish in /);
+  assert.match(foundText,/Harbor Ledger/);
+  assert.doesNotMatch(foundText,/Found a newspaper/);
+  ui.labeled(tree,'Headline').props.onChange({target:{value:'Shifts posted'}});
+  ui.labeled(ui.render(),'First paragraph').props.onChange({target:{value:'Twelve shifts cleared at the yard.'}});
+  tree=ui.render();
+  const beforePublish=ui.requests.length;
+  all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});
+  await ui.flush();
+  assert.equal(ui.requests.length,beforePublish+1);
+  const published=JSON.parse(ui.requests.at(-1).options.body);
+  assert.equal(published.action,'publish');
+  assert.equal(published.headline,'Shifts posted');
+  assert.deepEqual(published.paragraphs,['Twelve shifts cleared at the yard.']);
+  assert.match(published.requestId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+  tree=ui.render();
+  all(tree).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});
+  await ui.flush();
+  const publishedRetry=JSON.parse(ui.requests.at(-1).options.body);
+  assert.deepEqual(publishedRetry,published);
+  ui.reply(ui.requests.at(-2),{ok:true,data:{article:{id:'a1'}}});
+  await ui.flush();
+  assert.equal(ui.published(),1);
+});
+
+test('#1465 the writer shows the server visible reason for 403, 409 and validation errors',async()=>{
+  const ui=writerModule();
+  let tree=ui.render();
+  ui.labeled(tree,'Newspaper name').props.onChange({target:{value:'Harbor Ledger'}});
+  all(ui.render()).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});
+  await ui.flush();
+  ui.reply(ui.requests[0],{ok:false,status:403,data:{error:'You already founded a newspaper.'}});
+  await ui.flush();
+  tree=ui.render();
+  const text=all(tree).filter(n=>typeof n==='string').join('\n');
+  assert.match(text,/You already founded a newspaper\./);
+  assert.match(text,/Publish an article/);
+  ui.labeled(tree,'Headline').props.onChange({target:{value:'Shifts posted'}});
+  ui.labeled(ui.render(),'First paragraph').props.onChange({target:{value:'Twelve shifts cleared at the yard.'}});
+  all(ui.render()).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});
+  await ui.flush();
+  const publishReq=ui.requests.at(-1);
+  ui.reply(publishReq,{ok:false,status:409,data:{error:'That request id was already used for a different newspaper or article.'}});
+  await ui.flush();
+  tree=ui.render();
+  assert.match(all(tree).filter(n=>typeof n==='string').join('\n'),/That request id was already used for a different newspaper or article\./);
+  const alert=all(tree).find(n=>n?.type==='p'&&n.props?.role==='alert');
+  assert.equal(all(alert).filter(n=>typeof n==='string').join(''),'That request id was already used for a different newspaper or article.');
+  all(ui.render()).find(n=>n?.type==='form').props.onSubmit({preventDefault(){}});
+  await ui.flush();
+  ui.reply(ui.requests.at(-1),{ok:false,status:400,data:{error:'The newspaper name and headline must be 1–40 characters, without control characters.'}});
+  await ui.flush();
+  tree=ui.render();
+  assert.match(all(tree).filter(n=>typeof n==='string').join('\n'),/The newspaper name and headline must be 1–40 characters, without control characters\./);
+});
+
+test('#1465 writer paper name, headline and paragraphs are text nodes, and limits come from kindle-newspapers',async()=>{
+  const tsx=await readFile(new URL('../app/national-news.tsx',import.meta.url),'utf8');
+  assert.match(tsx,/from '\.\.\/lib\/kindle-newspapers'/);
+  assert.match(tsx,/PRESS_HEADLINE_MAX/);
+  assert.match(tsx,/PRESS_PARAGRAPH_MAX/);
+  assert.doesNotMatch(tsx,/dangerouslySetInnerHTML/);
+  const ui=writerModule();
+  let tree=ui.render();
+  const name=ui.labeled(tree,'Newspaper name');
+  assert.equal(name.props.maxLength,require('../lib/press-templates.ts').PRESS_HEADLINE_MAX);
+  name.props.onChange({target:{value:'<script>x</script>'}});
+  tree=ui.render();
+  assert.equal(ui.labeled(tree,'Newspaper name').props.value,'<script>x</script>');
+});
+
+test('#1465 writer CSS uses full-width 44px targets and wraps at 375px',async()=>{
+  const css=await readFile(new URL('../app/game-shell.css',import.meta.url),'utf8');
+  assert.match(css,/\.news-writer\{[^}]*overflow-wrap:anywhere/);
+  assert.match(css,/\.news-writer input,\s*\.news-writer textarea,\s*\.news-writer button\{[^}]*width:100%[^}]*min-height:44px/);
+});
