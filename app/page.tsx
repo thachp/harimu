@@ -109,6 +109,7 @@ import { Newspaper } from '@phosphor-icons/react';
 import { briefDayKey, claimDailyBrief, morningBriefSections, type MorningBriefHeadline } from '@/lib/morning-brief';
 import { CityCoResidents } from './city-coresidents';
 import { CivicRankCard } from './civic-rank-card';
+import { AurelleRankCard } from './aurelle-rank-card';
 import { PollCard } from './poll-card'; // #740
 import { PlankVotes } from './plank-votes'; // #831
 import { PartyDonations } from './party-donations'; // #863
@@ -117,6 +118,7 @@ import { KindleBudgetCard, useKindleBudget } from './kindle-budget-card';
 import { ArmyCard } from './army-card'; // #738
 import { IVotedBadge } from './i-voted-badge'; // #782
 import type { CivicRank } from '@/lib/civic-rank-rules';
+import type { AurelleRank } from '@/lib/aurelle-rank';
 import { WorldZones } from './world-zones';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { clerkConfigured } from './providers';
@@ -495,8 +497,9 @@ function ClerkAccountControl() {
 type CitizenSnapshot = {
   /** #872: present only when a flag-opened nation is playable for this account (nationPlayable). */
   openNations?: string[];
-  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; armyMap?: boolean; civicRank?: boolean; kindleBudget?: boolean; enrollHomeCity?: boolean; brasswellPort?: boolean; dunmorrow?: boolean; corvelIsles?: boolean; vakkHarbor?: boolean; ruelWorks?: boolean; thessalyWells?: boolean; marrowMills?: boolean; daoWorks?: boolean; dunkarPass?: boolean; kindleNewspapers?: boolean };
+  flags?: { market?: boolean; diplomaticHall?: boolean; mapOverlays?: boolean; armyMap?: boolean; civicRank?: boolean; kindleBudget?: boolean; enrollHomeCity?: boolean; brasswellPort?: boolean; dunmorrow?: boolean; corvelIsles?: boolean; vakkHarbor?: boolean; ruelWorks?: boolean; thessalyWells?: boolean; marrowMills?: boolean; daoWorks?: boolean; dunkarPass?: boolean; kindleNewspapers?: boolean; aurelleRanks?: boolean };
   civicRank?: CivicRank;
+  aurelleRank?: AurelleRank;
   firstWeek?: { completed: string[] } | null;
   profile: {
     nationId: string | null;
@@ -694,6 +697,7 @@ export default function Home() {
   const [overlaysFlag, setOverlaysFlag] = useState(false); // #82
   const [armyMapFlag, setArmyMapFlag] = useState(false); // #738 slice 4: flags.armyMap
   const [civicRank, setCivicRank] = useState<CivicRank | null>(null); // #741
+  const [aurelleRank, setAurelleRank] = useState<AurelleRank | null>(null); // #1359
   const [budgetFlag, setBudgetFlag] = useState(false); // #811: HARIMU_KINDLE_BUDGET_VIEW_ENABLED, from the citizen snapshot
   const [kindleNewspapersFlag, setKindleNewspapersFlag] = useState(false); // #1465: HARIMU_KINDLE_NEWSPAPERS_ENABLED, from the citizen snapshot
   const [enrollHomeCity, setEnrollHomeCity] = useState(false); // #965: HARIMU_ENROLL_HOME_CITY_ENABLED, from the citizen snapshot
@@ -1398,7 +1402,7 @@ export default function Home() {
     if ('cycleStartAt' in snapshot) setCycleStartAt(typeof snapshot.cycleStartAt === 'number' ? snapshot.cycleStartAt : null); // #969
     if ('collectivePetitions' in snapshot)setCollectivePetitions(snapshot.collectivePetitions??null);
     if ('government' in snapshot) setGovernment(snapshot.government ?? null);
-    if (snapshot.flags) { bindBrasswellPortEnv({ [BRASSWELL_PORT_FLAG]: snapshot.flags.brasswellPort === true ? 'true' : 'false' }); bindDunmorrowEnv({ [DUNMORROW_FLAG]: snapshot.flags.dunmorrow === true ? 'true' : 'false' }); bindCorvelIslesEnv({ [CORVEL_ISLES_FLAG]: snapshot.flags.corvelIsles === true ? 'true' : 'false' }); bindVakkHarborEnv({ [VAKK_HARBOR_FLAG]: snapshot.flags.vakkHarbor === true ? 'true' : 'false' }); bindRuelWorksEnv({ [RUEL_WORKS_FLAG]: snapshot.flags.ruelWorks === true ? 'true' : 'false' }); bindThessalyWellsEnv({ [THESSALY_WELLS_FLAG]: snapshot.flags.thessalyWells === true ? 'true' : 'false' }); bindMarrowMillsEnv({ [MARROW_MILLS_FLAG]: snapshot.flags.marrowMills === true ? 'true' : 'false' }); bindDaoWorksEnv({ [DAO_WORKS_FLAG]: snapshot.flags.daoWorks === true ? 'true' : 'false' }); bindDunkarPassEnv({ [DUNKAR_PASS_FLAG]: snapshot.flags.dunkarPass === true ? 'true' : 'false' }); setBudgetFlag(snapshot.flags.kindleBudget === true); setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setArmyMapFlag(snapshot.flags.armyMap === true); setEnrollHomeCity(snapshot.flags.enrollHomeCity === true); setKindleNewspapersFlag(snapshot.flags.kindleNewspapers === true); setCivicRank(snapshot.civicRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle. #1241, #1242, #1259, #1261, #1270, #1271, #1275, #1279, and #1282: each resident list follows its own flag; absent while off
+    if (snapshot.flags) { bindBrasswellPortEnv({ [BRASSWELL_PORT_FLAG]: snapshot.flags.brasswellPort === true ? 'true' : 'false' }); bindDunmorrowEnv({ [DUNMORROW_FLAG]: snapshot.flags.dunmorrow === true ? 'true' : 'false' }); bindCorvelIslesEnv({ [CORVEL_ISLES_FLAG]: snapshot.flags.corvelIsles === true ? 'true' : 'false' }); bindVakkHarborEnv({ [VAKK_HARBOR_FLAG]: snapshot.flags.vakkHarbor === true ? 'true' : 'false' }); bindRuelWorksEnv({ [RUEL_WORKS_FLAG]: snapshot.flags.ruelWorks === true ? 'true' : 'false' }); bindThessalyWellsEnv({ [THESSALY_WELLS_FLAG]: snapshot.flags.thessalyWells === true ? 'true' : 'false' }); bindMarrowMillsEnv({ [MARROW_MILLS_FLAG]: snapshot.flags.marrowMills === true ? 'true' : 'false' }); bindDaoWorksEnv({ [DAO_WORKS_FLAG]: snapshot.flags.daoWorks === true ? 'true' : 'false' }); bindDunkarPassEnv({ [DUNKAR_PASS_FLAG]: snapshot.flags.dunkarPass === true ? 'true' : 'false' }); setBudgetFlag(snapshot.flags.kindleBudget === true); setMarketFlag(snapshot.flags.market === true); setHallFlag(snapshot.flags.diplomaticHall === true); setOverlaysFlag(snapshot.flags.mapOverlays === true); setArmyMapFlag(snapshot.flags.armyMap === true); setEnrollHomeCity(snapshot.flags.enrollHomeCity === true); setKindleNewspapersFlag(snapshot.flags.kindleNewspapers === true); setCivicRank(snapshot.civicRank ?? null); setAurelleRank(snapshot.aurelleRank ?? null); } // #741: civicRank rides with the full GET; absent with the flag off or outside Kindle. #1241, #1242, #1259, #1261, #1270, #1271, #1275, #1279, and #1282: each resident list follows its own flag; absent while off
     if ('firstWeek' in snapshot) setServerWeekIds(snapshot.firstWeek?.completed ?? null);
     if (snapshot.demoGovernment) setDemoGovernment(snapshot.demoGovernment);
     setDemoReceipts(snapshot.demoReceipts ?? []);
@@ -1898,6 +1902,7 @@ export default function Home() {
     {clerkConfigured && citizenSessionStatus==='ready' && citizenNation && <NotableControl key={citizenSessionKey+citizenNation.id} nationId={citizenNation.id} />}
     <p>{activeCity?.name ?? citizenNation?.capital ?? 'The city'} · A citizen’s daily life runs through home, work, market and civic institutions.</p>
     {clerkConfigured && citizenNation?.id === 'kindle' && <CivicRankCard civicRank={civicRank} />}
+    {clerkConfigured && citizenNation?.id === 'aurelle' && <AurelleRankCard aurelleRank={aurelleRank} />}
     {clerkConfigured && citizenNation?.id === 'kindle' && <KindleBudgetCard budget={kindleBudget} />}
     {clerkConfigured && citizenNation?.id === 'kindle' && <IVotedBadge />}
     {clerkConfigured && citizenNation && <CityCoResidents residents={currentCityAccount?.coResidents} cityName={activeCity?.name ?? citizenNation.capital} />}
