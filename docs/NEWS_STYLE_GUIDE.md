@@ -37,7 +37,7 @@ Taken from the moderation content policy. These override every nation's voice.
 - **Sample lines:** "Price boards hum: 15 trades cleared." · "Shifts settled, wages posted." · "New sparks in the Republic."
 - **Banned:** implying the state favors any faith (strict separation); hiding a figure behind vague words; mocking voters rather than candidates.
 
-## The Confluence: *The Current Daily* (proposal)
+## The Confluence: *The Current Daily* (canon)
 
 - **Tone:** calm, collective "we", water metaphors, target-focused.
 - **Sample lines:** "Guidance Plan on course in the terraces." · "Many streams report a full harvest."
