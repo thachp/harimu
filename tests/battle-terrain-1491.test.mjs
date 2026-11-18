@@ -104,9 +104,17 @@ test('flag off is byte-identical, flag on carries the staging square, a stored b
   const cardFalse = await r.call('army', 'alice');
   assert.equal(JSON.stringify(offFalse.data), JSON.stringify(off.data), 'flag false matches flag unset');
   assert.equal(JSON.stringify(cardFalse.data.army.unit.battle), JSON.stringify(cardOff.data.army.unit.battle));
-  assert.equal(JSON.stringify(off.data).includes('terrain'), false);
-  assert.equal(JSON.stringify(cardOff.data).includes('terrain'), false);
   assert.equal(off.cache, 'private, no-store');
+  const offRead = await r.importModule('lib/army-battle.ts'), offMap = await r.importModule('lib/army-map.ts');
+  const derivedOff = (await offRead.readBattles(r.db, await offMap.readActiveWars(r.db), now)).find(b => b.attackerNationId === 'kindle');
+  assert.equal(Object.hasOwn(derivedOff, 'terrain'), false, 'flag off: readBattles adds no terrain');
+  assert.equal(Object.hasOwn(derivedOff, 'terrainBonusPct'), false, 'flag off: readBattles adds no terrainBonusPct');
+  for (const battle of offFalse.data.battles) {
+    assert.equal(Object.hasOwn(battle, 'terrain'), false, 'flag off: the API adds no terrain key');
+    assert.equal(Object.hasOwn(battle, 'terrainBonusPct'), false);
+  }
+  assert.equal(Object.hasOwn(cardFalse.data.army.unit.battle, 'terrain'), false, 'flag off: the card line is absent');
+  assert.equal(Object.hasOwn(cardFalse.data.army.unit.battle, 'terrainBonusPct'), false);
 
   r.setFixtureEnv(FLAG, 'true');
   const read = await spy(r, () => r.call('army/battles', null));
