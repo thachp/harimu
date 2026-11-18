@@ -29,6 +29,7 @@ const flagOffPins = {
   HARIMU_CITY_LOCAL_BOOKS_ENABLED: 'city-local-books-1392.test.mjs', // #1392 flag off: orders stay on kindle
   HARIMU_KINDLE_NEWSPAPERS_ENABLED: 'kindle-newspapers-1453.test.mjs', // #1453 flag off: actions refused, no kindle_articles query
   HARIMU_AURELLE_RANKS_ENABLED: 'aurelle-ranks-1359.test.mjs', // #1359 flag off: no aurelleRank payload and no card
+  HARIMU_AURELLE_BROADSHEETS_ENABLED: 'aurelle-broadsheets-1475.test.mjs', // #1475 flag off: Aurelle POST refused, no kindle_articles query
   HARIMU_CITY_TIER_GROWTH_ENABLED: 'city-tier-growth-952.test.mjs',
   HARIMU_CITY_TIER_UNLOCKS_ENABLED: 'city-tier-unlocks-979.test.mjs',
   HARIMU_CITY_TIER_FESTIVAL_NOTE_ENABLED: 'city-tier-festival-note-984.test.mjs',

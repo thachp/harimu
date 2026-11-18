@@ -250,7 +250,9 @@
       // #1453: Kindle citizens may found a newspaper and publish bylined articles (docs §18.2, §18.4). Off: both actions are refused, GET /api/news is unchanged, and kindle_articles is not queried.
       "HARIMU_KINDLE_NEWSPAPERS_ENABLED": "false",
       // #1359: Aurelle noble ranks from lifetime earned Royal Favor (docs §11.6). Off: no aurelleRank field and no card. GRAY 94.
-      "HARIMU_AURELLE_RANKS_ENABLED": "false"
+      "HARIMU_AURELLE_RANKS_ENABLED": "false",
+      // #1475: an Aurelle citizen may found one broadsheet and publish bylined articles in the Court Gazette (docs §18.2, §18.4). Off: the action is refused, GET /api/news is unchanged, and kindle_articles is not queried. Index 94, after Aurelle ranks.
+      "HARIMU_AURELLE_BROADSHEETS_ENABLED": "false"
     },
     // #844: Kindle sales tax: each fill on Kindle's goods market or fixed-lot listing sale (Kindle's market by definition; any seller nation) remits 5% of the gross from the proceeds to kindle-treasury (migrations 0081, 0083). Off: no tax row written and no tax INSERT runs; balances still sum the empty tax tables.
     "HARIMU_KINDLE_SALES_TAX_ENABLED": "false",

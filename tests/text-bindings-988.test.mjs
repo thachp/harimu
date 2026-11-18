@@ -38,7 +38,8 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_CITY_LOCAL_BOOKS_ENABLED'), 91); // #1392 follows Korund map fog. Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_KINDLE_NEWSPAPERS_ENABLED'), 92); // #1453 follows city local books (GRAY 93). Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_RANKS_ENABLED'), 93); // #1359 follows newspapers (GRAY 94). Pack length is not pinned.
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 94);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_BROADSHEETS_ENABLED'), 94); // #1475 follows ranks. Pack length is not pinned.
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 95);
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.at(-1), 'HARIMU_WAR_EVACUATION_ENABLED'); // #1324 entry 10, after national service. Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.at(-2), 'HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED'); // #1095 stays entry 9
   assert.equal(FLAG_PACKS.HARIMU_CITY_PACK.length, 13); // #1034 sea lanes and #1028 capture history stay inside the pack. #1285 festival host note is last
@@ -504,8 +505,12 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_KINDLE_NEWSPAPERS_ENABLED'), 92);
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_AURELLE_RANKS_ENABLED'), 93);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_AURELLE_RANKS_ENABLED'), 93);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length, 94);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).length, 94);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_AURELLE_BROADSHEETS_ENABLED'), 94);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf('HARIMU_AURELLE_BROADSHEETS_ENABLED'), 94);
+  assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_AURELLE_BROADSHEETS_ENABLED, 'true');
+  assert.equal(prod.vars.HARIMU_GRAY_PACK.HARIMU_AURELLE_BROADSHEETS_ENABLED, 'false');
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length, 95);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).length, 95);
   assert.equal(preview.vars.HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, undefined, 'Varkand red-alert cancels is not its own binding');
   assert.equal(prod.vars.HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK.HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED, 'true');

@@ -1,5 +1,7 @@
 /** #1453 slice 1: Kindle citizens may found one newspaper and publish bylined articles (docs §18.2, §18.4).
- *  Flag HARIMU_KINDLE_NEWSPAPERS_ENABLED (GRAY 93). Flag off: no query and every action is refused. */
+ *  Flag HARIMU_KINDLE_NEWSPAPERS_ENABLED (GRAY 93). Flag off: no query and every action is refused.
+ *  #1475: the same tables hold an Aurelle broadsheet, keyed by the founder's current citizens.nation_id.
+ *  Flag HARIMU_AURELLE_BROADSHEETS_ENABLED. Flag off: no query and the Aurelle action is refused. */
 import type { GameDatabase } from './database-contract';
 import type { NewsItem } from './national-news';
 import { PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX } from './press-templates.ts';
@@ -8,7 +10,11 @@ import { isShadowMuted, parseShadowMute } from './chat-shadow-mute.ts';
 import { uuidPattern } from './square-chat-validation.ts';
 
 export const KINDLE_NEWSPAPERS_FLAG = 'HARIMU_KINDLE_NEWSPAPERS_ENABLED';
+export const AURELLE_BROADSHEETS_FLAG = 'HARIMU_AURELLE_BROADSHEETS_ENABLED';
 export const kindleNewspaperFlagOffError = 'Kindle newspapers are not available yet.';
+export const aurelleBroadsheetFlagOffError = 'Aurelle broadsheets are not available yet.';
+/** #1475 proposal copy (docs §18.2, §18.4). */
+export const aurelleBroadsheetCopy = { found: 'Found a broadsheet', publish: 'Publish to your broadsheet', tag: 'Tolerated broadsheet', proposal: true } as const;
 export const kindleNewspaperNationError = 'Only a Kindle citizen can found a newspaper or publish an article.';
 export const kindleNewspaperExistsError = 'You already founded a newspaper.';
 export const kindleNewspaperMissingError = 'Found a newspaper before publishing an article.';
@@ -93,17 +99,20 @@ const paragraphsOf = (body: string): string[] => {
 const presentArticle = (row: { id: string; headline: string; body: string; published_at: number; request_id: string; paper_name: string }) =>
   ({ id: row.id, headline: row.headline, paragraphs: paragraphsOf(row.body), publishedAt: Number(row.published_at) * 1000, requestId: row.request_id, paperName: row.paper_name });
 
-/** Latest Kindle player articles. Flag-off callers must not invoke this (it queries kindle_articles). LIMIT 6 matches the edition's register and market reads. Same-second ties use id DESC (deterministic; UUID is not monotonic, and Postgres has no portable rowid, so 0132 is unchanged). */
-export async function readKindlePlayerArticles(db: GameDatabase, readerId: string, shadowMuteRaw: unknown): Promise<NewsItem[]> {
+/** Latest player articles for one nation. The paper belongs to its founder's current citizens.nation_id, so a broadsheet never appears in the Kindle edition and a Kindle paper never appears in the Court Gazette. Flag-off callers must not invoke this (it queries kindle_articles). LIMIT 6 matches the edition's register and market reads. Same-second ties use id DESC (deterministic; UUID is not monotonic, and Postgres has no portable rowid, so 0132 is unchanged). Shadow-mute matches #1453: the author still sees their own article. */
+export async function readPlayerArticles(db: GameDatabase, nationId: string, readerId: string, shadowMuteRaw: unknown): Promise<NewsItem[]> {
   const rows = (await db.prepare(`SELECT a.id,a.headline,a.body,a.published_at,a.author_user_id,n.name AS paper_name,COALESCE(c.display_name,'A citizen') AS author_name
     FROM kindle_articles a JOIN kindle_newspapers n ON n.id=a.newspaper_id JOIN citizens c ON c.clerk_user_id=a.author_user_id
-    ORDER BY a.published_at DESC, a.id DESC LIMIT 6`).all<{ id: string; headline: string; body: string; published_at: number; author_user_id: string; paper_name: string; author_name: string }>()).results ?? [];
+    JOIN citizens founder ON founder.clerk_user_id=n.founder_user_id
+    WHERE founder.nation_id=?
+    ORDER BY a.published_at DESC, a.id DESC LIMIT 6`).bind(nationId).all<{ id: string; headline: string; body: string; published_at: number; author_user_id: string; paper_name: string; author_name: string }>()).results ?? [];
   const muted = parseShadowMute(shadowMuteRaw);
   return rows.filter(row => row.author_user_id === readerId || !isShadowMuted(muted, row.author_user_id, Number(row.published_at))).map(row => {
     const paragraphs = paragraphsOf(row.body);
     return {
       id: row.id, title: row.headline, text: paragraphs.join('\n\n'), occurredAt: Number(row.published_at) * 1000,
       source: 'player' as const, kind: 'player-article' as const, paperName: row.paper_name, authorName: row.author_name, paragraphs,
+      ...(nationId === 'aurelle' ? { tag: aurelleBroadsheetCopy.tag } : {}),
     };
   });
 }
