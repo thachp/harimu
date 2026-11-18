@@ -45,6 +45,15 @@ export const foreignAffairsPanel={
  proposal:true,
 } as const;
 
+/** #1474: one line for the viewer's nation's derived World Reputation. `{score}` and `{count}` are filled by the panel; `pact`/`pacts` pick the singular. */
+export const reputationPanel={
+ line:L('World Reputation: {score} ({count} {pacts})'),
+ zero:L('No broken treaties on record'),
+ pact:'broken pact',
+ pacts:'broken pacts',
+ proposal:true,
+} as const;
+
 /** One line per kind of treaty, from §13.2. `name` is the pre-formatted {treaty} value #308 is expected to pass. */
 export const treatyKinds:Readonly<Record<TreatyKind,{name:string;effect:Line}>>={
  'non-aggression':{name:'non-aggression pact',effect:L('No war declarations between the signatories.')},

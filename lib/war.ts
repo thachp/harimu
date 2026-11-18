@@ -60,7 +60,7 @@ export type PublicWar = { id: string; attacker: WarNationId; defender: WarNation
   status: WarStatus; endedAt: number | null; endKind: WarEndKind | null; peaceLockEndsAt: number | null };
 export type DefenseWindowState = { startHourUtc: number; changedAt: number | null; nextChangeAt: number | null };
 export type WarState = { wars: PublicWar[]; foundingPeriodEndsAt: number | null; defenseWindows: Record<WarNationId, DefenseWindowState> };
-/** #1434 / #1439 / #1441 / #1451: a Korund viewer of the citizen or world simulation does not receive wars, sieges, treaties, embargoes, war proposals, or war endings Korund is not in, and keeps only Korund's own war-weariness level. Other nations and a missing nation are unchanged. This is the news half (like #1379), not the map-fog flag. */
+/** #1434 / #1439 / #1441 / #1451 / #1474: a Korund viewer of the citizen or world simulation does not receive wars, sieges, treaties, embargoes, war proposals, or war endings Korund is not in, and keeps only Korund's own war-weariness level and World Reputation entry. Other nations and a missing nation are unchanged. This is the news half (like #1379), not the map-fog flag. */
 export function presentKorundWorldSimulation<T extends {
   wars?: WarState;
   sieges?: readonly { warId: string; attacker: string; defender: string }[];
@@ -69,9 +69,10 @@ export function presentKorundWorldSimulation<T extends {
   warProposals?: readonly { defender: string; warId?: string | null }[];
   warEndings?: readonly { warId: string; proposer: string; other: string }[];
   weariness?: Partial<Record<string, string>>;
+  reputation?: Partial<Record<string, { score: number; brokenPacts: number }>>;
 }>(simulation: T, nationId: string | null | undefined): T {
   if (nationId !== 'korund') return simulation;
-  if (!simulation.wars && !simulation.sieges && !simulation.treaties && !simulation.embargoes && !simulation.warProposals && !simulation.warEndings && !simulation.weariness) return simulation;
+  if (!simulation.wars && !simulation.sieges && !simulation.treaties && !simulation.embargoes && !simulation.warProposals && !simulation.warEndings && !simulation.weariness && !simulation.reputation) return simulation;
   const involves = (a: string, b: string) => a === 'korund' || b === 'korund';
   const wars = (simulation.wars?.wars ?? []).filter(war => involves(war.attacker, war.defender));
   const ids = new Set(wars.map(war => war.id));
@@ -84,6 +85,7 @@ export function presentKorundWorldSimulation<T extends {
     ...(simulation.warProposals ? { warProposals: simulation.warProposals.filter(proposal => proposal.defender === 'korund' || (proposal.warId != null && ids.has(proposal.warId))) } : {}),
     ...(simulation.warEndings ? { warEndings: simulation.warEndings.filter(ending => involves(ending.proposer, ending.other) || ids.has(ending.warId)) } : {}),
     ...(simulation.weariness ? { weariness: simulation.weariness.korund !== undefined ? { korund: simulation.weariness.korund } : {} } : {}),
+    ...(simulation.reputation ? { reputation: simulation.reputation.korund !== undefined ? { korund: simulation.reputation.korund } : {} } : {}),
   };
 }
 const columns = 'id,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at,ended_at,end_kind';
