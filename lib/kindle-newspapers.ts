@@ -3,6 +3,7 @@
 import type { GameDatabase } from './database-contract';
 import type { NewsItem } from './national-news';
 import { PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX } from './press-templates';
+export { PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX };
 import { isShadowMuted, parseShadowMute } from './chat-shadow-mute';
 import { uuidPattern } from './square-chat-validation';
 
