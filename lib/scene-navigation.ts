@@ -2,7 +2,7 @@ import { economyEnabled } from './economy-flag.ts';
 import { faithEnabled } from './faith-flag.ts';
 import { militaryEnabled } from './military.ts';
 import { neighborhoodEnabled } from './neighborhood.ts';
-import { isDistrictType, neighborhoodWalkEnabled } from './neighborhood-walk.ts';
+import { isDistrictSlot, neighborhoodWalkEnabled } from './neighborhood-walk.ts';
 export const viewModes = ['world', 'country', 'square', 'neighborhood', 'household', 'workplace', 'market', 'government', 'nation', 'military', 'economy', 'faith'] as const;
 export type SceneView = typeof viewModes[number];
 export const sceneHistoryKey = 'harimuScenePath';
@@ -129,7 +129,7 @@ export function normalizeSceneSearch(search: string, nationIds: readonly string[
   const validNation = params.get('nation');
   if (city !== null && (validNation ? !cityInNation(validNation, city) : !nationIds.some(id => cityInNation(id, city)))) params.delete('city');
   const district = params.get('district');
-  if (district !== null && (!neighborhoodWalkEnabled() || params.get('view') !== 'neighborhood' || !isDistrictType(district))) params.delete('district');
+  if (district !== null && (!neighborhoodWalkEnabled() || params.get('view') !== 'neighborhood' || !isDistrictSlot(district))) params.delete('district');
   const out = params.toString();
   return out ? `?${out}` : '';
 }

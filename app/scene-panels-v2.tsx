@@ -25,7 +25,7 @@ import { cityCapitalRowDedupeEnabled } from '@/lib/city-capital-row-dedupe';
 import { cityPlaceIcon } from './city-pill';
 import { neighborhoodEnabled } from '@/lib/neighborhood';
 import { desktopGateEnabled } from '@/lib/desktop-gate';
-import { districtNames, neighborhoodWalkEnabled, rememberDistrict } from '@/lib/neighborhood-walk';
+import { districtLabels, neighborhoodWalkEnabled, rememberDistrict } from '@/lib/neighborhood-walk';
 import { CityCoResidents } from './city-coresidents';
 import type { CoResident } from '@/lib/city-location';
 import { captureHistoryLine, treatyReturnLine, type CityCaptureHistory } from '@/lib/city-capture-history'; // #1028, #1078
@@ -101,7 +101,7 @@ export function CitySummary({ cityName, city, nation, destinations, onView, tier
   const subtitle = identity ? cityIdentitySubtitle(city, nation) : nation.name;
   const tagline = identity ? cityIdentityTagline(city?.description) : null;
   const neighborhoodRow = neighborhoodEnabled() ? [{ id: 'neighborhood', label: 'Neighborhood', detail: `${cityName.trim() || nation.capital} · ${nation.name}`, onSelect: () => onView('neighborhood') }] : [];
-  const walkRows = neighborhoodWalkEnabled() && desktopGateEnabled() ? districtNames(tierUnlocks?.districtSlots).map((name, index) => ({ id: `walk-${index}`, label: name, detail: `${cityName.trim() || nation.capital} · ${nation.name}`, onSelect: () => { rememberDistrict(name); onView('neighborhood'); } })) : [];
+  const walkRows = neighborhoodWalkEnabled() && desktopGateEnabled() ? districtLabels(tierUnlocks?.districtSlots).map((name, index) => ({ id: `walk-${index}`, label: name, detail: `${cityName.trim() || nation.capital} · ${nation.name}`, onSelect: () => { rememberDistrict(index); onView('neighborhood'); } })) : [];
   const panel = <PanelV2 title={cityName} subtitle={subtitle} mark={identity ? <Buildings size={44} /> : undefined} tagline={tagline} taglineBeside={taglineBeside} primaryKicker={identity ? cityIdentityKicker(Boolean(primary)) : null} rowsLabel="City destinations" headerStats={headerStats} stats={[...[cityStatusStat(city)].filter(stat => stat !== null).filter(() => !headerOn), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...hearthStats, ...regattaStats, ...festivalHostStats, ...captureStats, ...historyStats, ...civicUnitStats, ...governorStats, ...(headerOn && cityCapitalRowDedupe && cityStatusStat(city) ? [] : [{ label: 'Capital', value: nation.capital }]), ...(headerOn ? [] : [{ label: 'Currency', value: nation.currency }])]}
     rows={[...(aligned ? aligned.map(place => ({ id: place.id, label: place.label, detail: place.detail, icon: placeIcon(place.id), onSelect: () => onView(place.view) })) : destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? placeIcon(card.id) : undefined, onSelect: () => onView(card.id) }))), ...walkRows, ...neighborhoodRow]}
     primary={primary} cityIconSizeSync={cityIconSizeSync} cityHeaderWordWrap={cityHeaderWordWrap} cityHeaderHyphenKeep={cityHeaderHyphenKeep} />; // S7 follow-up: with the City pills on, rows carry the pill's icon. #392 place rows: the five pills, same order and icons, then the Household primary.

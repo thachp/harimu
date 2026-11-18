@@ -1,18 +1,18 @@
 /** #1445. NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK is HARIMU_UI_PACK index 71. Only "true" enables it. */
-import { cityTierUnlockFields } from './city-tier.ts'; import type { CoResident } from './city-location.ts'; import { notableProfile } from './notable-profiles.ts';
+import { cityTierUnlockFields } from './city-tier.ts'; import type { CoResident } from './city-location.ts';
 export const NEIGHBORHOOD_WALK_FLAG = 'NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK';
 const districtKey = 'harimu:walk-district';
 export function neighborhoodWalkFlag(): string | undefined { try { return process.env.NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK; } catch { return undefined; } }
 export function neighborhoodWalkEnabled(value: string | undefined = neighborhoodWalkFlag()): boolean { return value === 'true'; }
-/** Spec §15.2. Market is the given label for market/plan depot. Extra slots repeat these six. */
+/** Spec §15.2. Market is the given label for market/plan depot. A later copy is "Residential 2". */
 export const districtTypes = ['Residential', 'Industrial', 'Market', 'Civic', 'Military', 'Sacred'] as const;
 export type DistrictName = (typeof districtTypes)[number];
-export function isDistrictType(name: string): name is DistrictName { return (districtTypes as readonly string[]).includes(name); }
-export function slotCount(slots: number | null | undefined): number { return typeof slots === 'number' && Number.isFinite(slots) ? Math.max(0, Math.floor(slots)) : cityTierUnlockFields(1).districtSlots; }
-export function districtNames(slots: number | null | undefined): DistrictName[] { const n = slotCount(slots); return Array.from({ length: n }, (_, i) => districtTypes[i % districtTypes.length]); }
-export function districtsForTier(tier: number): DistrictName[] { return districtNames(cityTierUnlockFields(tier).districtSlots); }
-export function rememberDistrict(name: string) { try { sessionStorage.setItem(districtKey, name); } catch { /* the URL param is set once Neighborhood is open */ } }
-export function districtFromSearch(search: string, slots: number | null | undefined): DistrictName { const names = districtNames(slots); let stored = ''; try { stored = sessionStorage.getItem(districtKey) ?? ''; } catch { stored = ''; } return names.find(name => name === (new URLSearchParams(search).get('district') || stored)) ?? names[0] ?? 'Residential'; }
+const maxSlots = () => cityTierUnlockFields(4).districtSlots;
+export function isDistrictSlot(value: string): boolean { if (!/^\d+$/.test(value)) return false; const index = Number(value); return String(index) === value && index < maxSlots(); }
+export function slotCount(slots: number | null | undefined): number { return typeof slots === 'number' && Number.isFinite(slots) ? Math.max(0, Math.min(maxSlots(), Math.floor(slots))) : cityTierUnlockFields(1).districtSlots; }
+export function districtLabels(slots: number | null | undefined): string[] { const types = Array.from({ length: slotCount(slots) }, (_, i) => districtTypes[i % districtTypes.length]); return types.map((type, index) => { const seen = types.slice(0, index + 1).filter(item => item === type).length; return seen > 1 ? `${type} ${seen}` : type; }); }
+export function rememberDistrict(index: number) { try { sessionStorage.setItem(districtKey, String(index)); } catch { /* the URL param is set once Neighborhood is open */ } }
+export function districtIndex(search: string, slots: number | null | undefined): number { const n = slotCount(slots); let stored = ''; try { stored = sessionStorage.getItem(districtKey) ?? ''; } catch { stored = ''; } const raw = new URLSearchParams(search).get('district') ?? (stored || null); if (raw == null || !/^\d+$/.test(raw)) return 0; const index = Number(raw); return String(index) === raw && index < n ? index : 0; }
 export type Spot = { x: number; z: number };
 const ring = (count: number, radius: number, turn = 0): Spot[] => Array.from({ length: count }, (_, i) => { const a = (Math.PI * 2 * i) / Math.max(count, 1) + turn; return { x: Math.cos(a) * radius, z: Math.sin(a) * radius }; });
 export function houseSlots(count: number): Spot[] { return ring(Math.max(4, count), 8); }
@@ -22,5 +22,5 @@ export function stepWalk(x: number, z: number, yaw: number, forward: number, str
   let nx = Math.max(-14, Math.min(14, x + (Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * 0.16)), nz = Math.max(-14, Math.min(14, z + (Math.cos(yaw) * forward - Math.sin(yaw) * strafe) * 0.16));
   for (const house of houses) { const dx = nx - house.x, dz = nz - house.z, min = 1.35, len = Math.hypot(dx, dz); if (len < min) { nx = house.x + (len ? dx / len : 1) * min; nz = house.z + (len ? dz / len : 0) * min; } } return { x: nx, z: nz };
 }
-export type ResidentCard = { name: string; status: CoResident['status']; kind: 'AI citizen' | 'Citizen'; you: boolean; role?: string };
-export function residentCard(resident: CoResident, nationId: string): ResidentCard { const notable = resident.kind === 'ai' ? notableProfile(nationId) : null; return { name: notable?.name ?? resident.name, status: resident.status, kind: resident.kind === 'ai' ? 'AI citizen' : 'Citizen', you: resident.you, ...(notable ? { role: notable.role } : {}) }; }
+export type ResidentCard = { name: string; status: CoResident['status']; kind: 'AI citizen' | 'Citizen'; you: boolean };
+export function residentCard(resident: CoResident): ResidentCard { return { name: resident.name, status: resident.status, kind: resident.kind === 'ai' ? 'AI citizen' : 'Citizen', you: resident.you }; }
