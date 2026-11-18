@@ -136,8 +136,10 @@ for (const backend of ['sqlite', 'postgres']) {
       assert.equal(m.nationCapital('kindle'), null);
       assert.equal(m.squareCapitalDistance('kindle', 9, 8), null);
       const bare = await listed(r, 'alice');
-      assert.equal(bare.status, 200, 'listing without x/y still uses the d = 0 owned term');
-      assert.equal(bare.data.priceMinor, 2503);
+      assert.equal(bare.status, 403, 'bare GET also refuses a missing capital');
+      assert.equal(bare.data.reason, 'no_capital');
+      assert.equal(bare.data.error, m.noCapitalError);
+      assert.equal('priceMinor' in bare.data, false, 'bare GET lists no price');
       const at = await listed(r, 'alice', '?x=9&y=8');
       assert.equal(at.status, 403);
       assert.equal(at.data.reason, 'no_capital');
