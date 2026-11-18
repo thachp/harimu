@@ -1,4 +1,4 @@
-/** #1364: a same-nation buy pays the anti-snowball price for the count at insert time. SQLite and PGlite. */
+/** #1364 / #1482: a same-nation buy pays the anti-snowball price for the count at insert time, including distance. SQLite and PGlite. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
@@ -29,9 +29,9 @@ for (const backend of ['sqlite', 'postgres']) test(`concurrent same-nation buys 
   const [a, b] = [randomUUID(), randomUUID()];
   const [first, second] = await Promise.all([buy(r, 'alice', 9, 8, a), buy(r, 'alice', 8, 8, b)]);
   assert.equal(first.status, 200, JSON.stringify(first.data)); assert.equal(second.status, 200, JSON.stringify(second.data));
-  assert.deepEqual([await priceOf(r, a), await priceOf(r, b)].sort((x, y) => x - y), [2503, 2505]);
-  assert.deepEqual([first.data.priceMinor, second.data.priceMinor].sort((x, y) => x - y), [2503, 2505]);
-  assert.equal(Number((await ledger(r, a)).delta_minor) + Number((await ledger(r, b)).delta_minor), -(2503 + 2505));
+  assert.deepEqual([await priceOf(r, a), await priceOf(r, b)].sort((x, y) => x - y), [2703, 2705]);
+  assert.deepEqual([first.data.priceMinor, second.data.priceMinor].sort((x, y) => x - y), [2703, 2705]);
+  assert.equal(Number((await ledger(r, a)).delta_minor) + Number((await ledger(r, b)).delta_minor), -(2703 + 2705));
   assert.equal(Number((await r.db.prepare("SELECT COUNT(*) AS n FROM world_squares WHERE owner='kindle' AND x IN (8,9) AND y=8").first()).n), 2);
 });
 
@@ -43,10 +43,10 @@ for (const backend of ['sqlite', 'postgres']) test(`the insert balance guard use
   r.db.prepare = sql => { seen.push(sql); return prepare(sql); };
   const broke = await buy(r, 'alice', 9, 8);
   r.db.prepare = prepare;
-  assert.equal(broke.data.reason, 'insufficient_tessera'); assert.match(broke.data.error, /costs 25\.03 TSR; you hold 25\.00 TSR/);
+  assert.equal(broke.data.reason, 'insufficient_tessera'); assert.match(broke.data.error, /costs 27\.03 TSR; you hold 25\.00 TSR/);
   const insert = seen.find(sql => sql.startsWith('INSERT INTO world_square_purchases'));
   assert.match(insert, /SELECT COUNT\(\*\) FROM world_squares WHERE owner=\?/);
-  assert.match(insert, />= \(\(2500\*\(1000\+\(SELECT COUNT\(\*\) FROM world_squares WHERE owner=\?\)\)\+500\)\/1000\)/);
+  assert.match(insert, />= CAST\(\(2500\*\(1000\+\(SELECT COUNT\(\*\) FROM world_squares WHERE owner=\?\)\)\*\(50\+\?\)\+25000\)\/50000 AS INTEGER\)/);
   assert.equal(await r.db.prepare('SELECT request_id FROM world_square_purchases WHERE x=9 AND y=8').first(), null);
   assert.equal(await r.db.prepare("SELECT COUNT(*) AS n FROM citizen_tessera_ledger WHERE reason='square-purchase'").first().then(row => Number(row.n)), 0);
   assert.equal((await r.db.prepare('SELECT owner FROM world_squares WHERE x=9 AND y=8').first()).owner, null);
