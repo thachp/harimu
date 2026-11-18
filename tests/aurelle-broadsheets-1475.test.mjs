@@ -1,12 +1,16 @@
 /** #1475: an Aurelle citizen founds one broadsheet and publishes bylined articles in the Court Gazette.
  *  Storage reuses kindle_newspapers / kindle_articles, keyed by the founder's current citizens.nation_id. No migration. */
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
+import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
 import { FLAG_PACKS, flagOn } from '../lib/flag-pack.mjs';
 import { aurelleBroadsheetCopy } from '../lib/kindle-newspapers.ts';
+const require = createRequire(import.meta.url);
 
 const FLAG = 'HARIMU_AURELLE_BROADSHEETS_ENABLED';
 const KINDLE = 'HARIMU_KINDLE_NEWSPAPERS_ENABLED';
@@ -43,12 +47,16 @@ test('flag is preview true, production false, GRAY 96 at index 95, and listed in
   assert.equal(aurelleBroadsheetCopy.proposal, true);
   assert.equal(aurelleBroadsheetCopy.found, 'Found a broadsheet');
   assert.equal(aurelleBroadsheetCopy.publish, 'Publish to your broadsheet');
+  assert.equal(aurelleBroadsheetCopy.name, 'Broadsheet name');
+  assert.equal(aurelleBroadsheetCopy.writer, 'Broadsheet writer');
   assert.equal(aurelleBroadsheetCopy.tag, 'Tolerated broadsheet');
   const ui = readFileSync('app/national-news.tsx', 'utf8');
   const post = readFileSync('app/api/news/route.ts', 'utf8').slice(readFileSync('app/api/news/route.ts', 'utf8').indexOf('export async function POST'));
   assert.match(ui, /kindleNewspapers&&nationId==='kindle'\|\|aurelleBroadsheets&&nationId==='aurelle'/);
   assert.match(ui, /aurelleBroadsheetCopy\.found/);
   assert.match(ui, /aurelleBroadsheetCopy\.publish/);
+  assert.match(ui, /aurelleBroadsheetCopy\.name/);
+  assert.match(ui, /aurelleBroadsheetCopy\.writer/);
   assert.match(ui, /news-broadsheet-tag/);
   assert.doesNotMatch(ui, /function Broadsheet|BroadsheetWriter/);
   assert.ok(post.indexOf('SELECT nation_id FROM citizens') < post.indexOf('AURELLE_BROADSHEETS_FLAG'));
@@ -151,4 +159,49 @@ for (const backend of ['sqlite', 'postgres']) test(`#1475 broadsheets on ${backe
   const latest = player((await r.call('news', 'cara')).data);
   assert.deepEqual(latest.map(i => i.title), ['Dispatch 7', 'Dispatch 6', 'Dispatch 5', 'Dispatch 4', 'Dispatch 3', 'Dispatch 2']);
   assert.equal(latest.every(i => i.tag === 'Tolerated broadsheet' && !/AI-generated/i.test(JSON.stringify(i))), true);
+});
+
+test('#1475 Aurelle writer uses broadsheet wording and the Kindle writer stays a newspaper', async () => {
+  const source = ts.transpileModule(await readFile(new URL('../app/national-news.tsx', import.meta.url), 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText;
+  const papers = require('../lib/kindle-newspapers.ts');
+  let cursor = 0, slots = [];
+  const react = { useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; }, useRef(initial) { const i = cursor++; if (!(i in slots)) slots[i] = { current: initial ?? null }; return slots[i]; }, useEffect() {} };
+  const requests = [];
+  const fetch = (url, options) => new Promise(resolve => requests.push({ url, options, resolve }));
+  const exports = {};
+  const local = name => name === '../lib/kindle-newspapers' ? papers
+    : name === './wire-stories' ? { WireStories() { return null; } }
+    : name === '../lib/wire-bylines' ? require('../lib/wire-bylines.ts')
+    : name === '../lib/press-templates' ? require('../lib/press-templates.ts')
+    : name === '../lib/news-intro-copy' ? require('../lib/news-intro-copy.ts')
+    : name === '../lib/kill-switch-copy' ? require('../lib/kill-switch-copy.ts')
+    : name === '../lib/morning-brief' ? require('../lib/morning-brief.ts')
+    : name === './nation-document' ? { NationDocument() { return null; } }
+    : name === './display-preferences' ? { useDisplayTimestamp: () => require('../lib/display-preferences.ts').displayTimestamp }
+    : name === 'react-dom' ? { createPortal: node => node }
+    : name === 'react' ? react
+    : name === './weekly-addresses' ? { WeeklyAddresses() { return null; } }
+    : name === './ai-disclosure' ? { AiTextTag() { return null; } }
+    : require(name);
+  new Function('exports', 'require', 'fetch', 'document', source)(exports, local, fetch, { body: {} });
+  const all = node => [node, ...[node?.props?.children].flat(Infinity).filter(Boolean).flatMap(child => typeof child === 'object' ? all(child) : [child])];
+  const words = tree => [...all(tree).filter(node => typeof node === 'string'), ...all(tree).map(node => node?.props?.['aria-label']).filter(Boolean)].join('\n');
+  const render = broadsheet => { cursor = 0; return exports.NewspaperWriter({ onPublished() {}, broadsheet }); };
+  const aurelle = words(render(true));
+  for (const line of ['Found a broadsheet', 'Broadsheet name', 'Broadsheet writer']) assert.match(aurelle, new RegExp(line));
+  assert.doesNotMatch(aurelle, /Newspaper name|Found paper|Newspaper writer|Found a newspaper|Publish article/);
+  const kindle = words((() => { slots = []; return render(false); })());
+  for (const line of ['Found a newspaper', 'Newspaper name', 'Found paper', 'Newspaper writer']) assert.match(kindle, new RegExp(line));
+  assert.doesNotMatch(kindle, /Broadsheet name|Broadsheet writer|Found a broadsheet|Publish to your broadsheet/);
+  slots = [];
+  let tree = render(true);
+  all(tree).find(node => node?.type === 'input').props.onChange({ target: { value: 'Court Sheet' } });
+  tree = render(true);
+  all(tree).find(node => node?.type === 'form').props.onSubmit({ preventDefault() {} });
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+  requests[0].resolve({ ok: true, json: async () => ({ paper: { name: 'Court Sheet' } }) });
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+  const published = words(render(true));
+  assert.match(published, /Publish to your broadsheet/);
+  assert.doesNotMatch(published, /Publish article|Publish in /);
 });

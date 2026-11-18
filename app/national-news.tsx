@@ -101,9 +101,9 @@ export function NewspaperWriter({onPublished,broadsheet=false}:{onPublished:()=>
   }catch{setError('The article could not be published.');}
   finally{setBusy(false);}
  };
- return <section className="news-writer" aria-label="Newspaper writer">
+ return <section className="news-writer" aria-label={broadsheet?aurelleBroadsheetCopy.writer:'Newspaper writer'}>
   {error&&<p role="alert">{error}</p>}
-  {!founded?<form onSubmit={found}><h2>{broadsheet?aurelleBroadsheetCopy.found:'Found a newspaper'}</h2><label>Newspaper name<input value={name} onChange={event=>setName(event.target.value)} maxLength={PRESS_HEADLINE_MAX} autoComplete="off" required/></label><button type="submit" disabled={busy}>Found paper</button></form>
-  :<form onSubmit={publish}><h2>{broadsheet?aurelleBroadsheetCopy.publish:paperName?<>Publish in {paperName}</>:'Publish an article'}</h2><label>Headline<input value={headline} onChange={event=>setHeadline(event.target.value)} maxLength={PRESS_HEADLINE_MAX} autoComplete="off" required/></label><label>First paragraph<textarea value={p1} onChange={event=>setP1(event.target.value)} maxLength={PRESS_PARAGRAPH_MAX} required rows={3}/></label><label>Second paragraph<textarea value={p2} onChange={event=>setP2(event.target.value)} maxLength={PRESS_PARAGRAPH_MAX} rows={3}/></label><button type="submit" disabled={busy}>Publish article</button></form>}
+  {!founded?<form onSubmit={found}><h2>{broadsheet?aurelleBroadsheetCopy.found:'Found a newspaper'}</h2><label>{broadsheet?aurelleBroadsheetCopy.name:'Newspaper name'}<input value={name} onChange={event=>setName(event.target.value)} maxLength={PRESS_HEADLINE_MAX} autoComplete="off" required/></label><button type="submit" disabled={busy}>{broadsheet?aurelleBroadsheetCopy.found:'Found paper'}</button></form>
+  :<form onSubmit={publish}><h2>{broadsheet?aurelleBroadsheetCopy.publish:paperName?<>Publish in {paperName}</>:'Publish an article'}</h2><label>Headline<input value={headline} onChange={event=>setHeadline(event.target.value)} maxLength={PRESS_HEADLINE_MAX} autoComplete="off" required/></label><label>First paragraph<textarea value={p1} onChange={event=>setP1(event.target.value)} maxLength={PRESS_PARAGRAPH_MAX} required rows={3}/></label><label>Second paragraph<textarea value={p2} onChange={event=>setP2(event.target.value)} maxLength={PRESS_PARAGRAPH_MAX} rows={3}/></label><button type="submit" disabled={busy}>{broadsheet?aurelleBroadsheetCopy.publish:'Publish article'}</button></form>}
  </section>;
 }

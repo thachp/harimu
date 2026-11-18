@@ -14,7 +14,7 @@ export const AURELLE_BROADSHEETS_FLAG = 'HARIMU_AURELLE_BROADSHEETS_ENABLED';
 export const kindleNewspaperFlagOffError = 'Kindle newspapers are not available yet.';
 export const aurelleBroadsheetFlagOffError = 'Aurelle broadsheets are not available yet.';
 /** #1475 proposal copy (docs §18.2, §18.4). */
-export const aurelleBroadsheetCopy = { found: 'Found a broadsheet', publish: 'Publish to your broadsheet', tag: 'Tolerated broadsheet', proposal: true } as const;
+export const aurelleBroadsheetCopy = { found: 'Found a broadsheet', publish: 'Publish to your broadsheet', name: 'Broadsheet name', writer: 'Broadsheet writer', tag: 'Tolerated broadsheet', proposal: true } as const;
 export const kindleNewspaperNationError = 'Only a Kindle citizen can found a newspaper or publish an article.';
 export const kindleNewspaperExistsError = 'You already founded a newspaper.';
 export const kindleNewspaperMissingError = 'Found a newspaper before publishing an article.';
