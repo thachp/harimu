@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   const db = await getDatabase();
   const url = new URL(request.url), x = url.searchParams.get('x'), y = url.searchParams.get('y');
-  // #1482: listing price for ?x=&y=, or the d = 0 term when both are omitted. Non-integer or off-map coords are the purchase 400.
+  // #1482 / #1492: listing price for ?x=&y=, or the d = 0 term when both are omitted. Flag on: no nation or no capital is refused on both paths. Non-integer or off-map coords are the purchase 400.
   const priced = await registryListingPrice(db, userId, env, x, y);
   if (!priced.ok) return privateJson({ error: priced.error, reason: priced.reason }, priced.status);
   const listing = { open: enabled(), priceMinor: priced.priceMinor, currency: 'TSR', tesseraMinor: await readTessera(db, userId),
