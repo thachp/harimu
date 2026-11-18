@@ -3,7 +3,7 @@ import { env } from 'cloudflare:workers';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
-import { buySquare, parsePurchaseCommand, readTessera, registryPriceMinor } from '@/lib/world-registry';
+import { buySquare, parsePurchaseCommand, purchaseBadRequestError, readTessera, registryListingPrice } from '@/lib/world-registry.ts';
 import { applyPoster, parsePosterCommand, postersEnabled, readSquarePoster } from '@/lib/square-posters';
 import { buyTessera, parseExchangeCommand, sparkPerTessera, kioskMinTesseraMinor, kioskMaxTesseraMinor } from '@/lib/tessera-exchange';
 import { flagOn } from '@/lib/flag-pack.mjs';
@@ -22,13 +22,15 @@ export async function GET(request: Request) {
   const userId = await authenticatedUserId(request);
   if (!userId) return privateJson({ error: 'Sign in required.' }, 401);
   const db = await getDatabase();
-  const listing = { open: enabled(), priceMinor: await registryPriceMinor(db, userId, env), currency: 'TSR', tesseraMinor: await readTessera(db, userId),
+  const url = new URL(request.url), x = url.searchParams.get('x'), y = url.searchParams.get('y');
+  // #1482 / #1492: listing price for ?x=&y=, or the d = 0 term when both are omitted. Flag on: no nation or no capital is refused on both paths. Non-integer or off-map coords are the purchase 400.
+  const priced = await registryListingPrice(db, userId, env, x, y);
+  if (!priced.ok) return privateJson({ error: priced.error, reason: priced.reason }, priced.status);
+  const listing = { open: enabled(), priceMinor: priced.priceMinor, currency: 'TSR', tesseraMinor: await readTessera(db, userId),
     kiosk: { open: exchangeEnabled(), sparkPerTessera, minTesseraMinor: kioskMinTesseraMinor, maxTesseraMinor: kioskMaxTesseraMinor } };
   // #1341: one square's poster. Flag off leaves this payload unchanged and does not read the poster table. Not attached to GET /api/world/squares.
   if (!postersEnabled(env)) return privateJson(listing);
-  const url = new URL(request.url), x = url.searchParams.get('x'), y = url.searchParams.get('y');
   if (x === null && y === null) return privateJson(listing);
-  if (x === null || y === null || !/^-?\d+$/.test(x) || !/^-?\d+$/.test(y)) return privateJson({ error: 'Send integer x and y.', reason: 'bad_request' }, 400);
   const xi = Number(x), yi = Number(y);
   // #1429: a signed-in Korund viewer, with HARIMU_KORUND_MAP_FOG_ENABLED on, does not receive a poster on a square outside
   // Korund and its Chebyshev-1 neighbours (docs §11.5). Flag off skips the squares read. Hidden squares do not query square_posters.
@@ -73,7 +75,7 @@ export async function POST(request: Request) {
     return bought.ok ? privateJson(bought) : privateJson({ error: bought.error, reason: bought.reason }, bought.status);
   }
   const command = parsePurchaseCommand(body);
-  if (!command) return privateJson({ error: 'Send action "buy-square", integer x/y and a requestId.', reason: 'bad_request' }, 400);
+  if (!command) return privateJson({ error: purchaseBadRequestError, reason: 'bad_request' }, 400);
   const result = await buySquare(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), enabled(), env);
   return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }
