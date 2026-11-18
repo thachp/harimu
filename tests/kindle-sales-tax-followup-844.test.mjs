@@ -62,13 +62,14 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.deepEqual(await taxes(), [{ seller_id: 'bob', tax_minor: 100 }]); assert.equal(await wallet('bob'), bob0 - 100); assert.equal(await treasury(), tr0 + 100);
   });
 
-  test(`${backend}: pin: fixed-lot listings are Kindle-only and have no market column (a market column must come first, then the tax SQL keys on it)`, async t => {
+  test(`${backend}: pin: fixed-lot sales stay Kindle citizens; city_id is the venue and sales tax does not filter on it`, async t => {
     const { r } = await lots(t, { backend });
-    const cols = Object.keys((await r.db.prepare('SELECT * FROM player_listings LIMIT 0').all()).results[0] ?? {});
     const { listingSchema, createListingSql, fillListingSql } = await r.importModule('lib/player-market.ts');
-    assert.doesNotMatch(listingSchema, /\b(city|market|venue|nation)\w*\b/i, 'player_listings gained a market column: update playerFillSalesTaxSql to key on it');
+    const { playerFillSalesTaxSql } = await r.importModule('lib/kindle-sales-tax.ts');
+    assert.match(listingSchema, /city_id TEXT NOT NULL DEFAULT 'kindle'/);
     assert.match(createListingSql, /c\.nation_id = 'kindle'/); assert.match(fillListingSql, /b\.nation_id = 'kindle' AND s\.nation_id = 'kindle'/);
-    assert.ok(Array.isArray(cols));
+    assert.match(fillListingSql, /city_id/);
+    assert.doesNotMatch(playerFillSalesTaxSql, /city_id/, 'a non-Kindle listing city would have to filter this SQL');
   });
 
   test(`${backend}: QA1: a 0-tax fixed-lot sale (gross 19) lands the fill with no tax row`, async t => {
