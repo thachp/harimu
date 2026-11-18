@@ -257,7 +257,7 @@ export async function GET(request: Request) {
     readKorund(database,userId,Math.floor(Date.now()/1000),korundReadOptions()),
     nationWorkPlanPart(database,userId),
     readEconomy(database, userId, wcInterval, { readOnly: true, now: readNow, incomeTaxPercent: incomeTaxPercentNow() }),
-    readPlayerMarket(database, userId),
+    readPlayerMarket(database, userId, env),
     readShifts(database, userId),
     foundingOn ? readFoundingState(database, readNow) : null, // #612: read-only, flag off: not read
     successionOn() ? readSuccession(database) : null, // #613: read-only, flag off: not read
@@ -440,9 +440,9 @@ async function handlePost(request: Request) {
   if (body.action === 'create-listing' || body.action === 'buy-listing' || body.action === 'cancel-listing') {
     if (!validPlayerCommand(body)) return privateJson({ error: 'Use valid request/listing identifiers, 1–10 goods and an integer price from 1 to 1000 Spark cents.' }, { status: 400 });
     const command = { ...body, requestId: body.requestId.toLowerCase(), listingId: typeof body.listingId === 'string' ? body.listingId.toLowerCase() : undefined };
-    const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), kindleSalesTaxEnabled(env as never) ? { salesTaxSql: playerFillSalesTaxSql } : {}); // #844 follow-up
+    const result = await executePlayerCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), { ...(kindleSalesTaxEnabled(env as never) ? { salesTaxSql: playerFillSalesTaxSql } : {}), env }); // #844 follow-up, #1428 city
     return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }),
-      playerMarket: await readPlayerMarket(database, userId) }, { status: result.status });
+      playerMarket: await readPlayerMarket(database, userId, env) }, { status: result.status });
   }
 
   if (body.action === 'market-trade' || body.action === 'household-meal') {
@@ -451,7 +451,7 @@ async function handlePost(request: Request) {
     const result = await executeMarketCommand(database, userId, command, Math.floor(Date.parse(now) / 1000), interval);
     const citizen = await database.prepare('SELECT capacity FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ capacity: number }>();
     return privateJson({ ...result, aurellePlan:await readAurelleView(database,userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }),
-      market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId), capacity: citizen?.capacity ?? 0 }, { status: result.status });
+      market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId, env), capacity: citizen?.capacity ?? 0 }, { status: result.status });
   }
 
   // #138: preview-only QA nation switch for allowlisted accounts; 404 everywhere else.
@@ -477,7 +477,7 @@ async function handlePost(request: Request) {
       government:await withHoarvaleBills(database, await withPolicyLedger(database, profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,governmentReadOptions())):null, env), env, Math.floor(Date.parse(now)/1000), profile?.nation_id),
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),
-      economy:await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database,userId),
+      economy:await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }),market:await readMarket(database,userId,interval),playerMarket:await readPlayerMarket(database, userId, env),
     },{status:ok?200:409});
     const current=await readCurrent();
     // A repeated choice has no further effect, including after an uncertain response.
@@ -748,7 +748,7 @@ async function handlePost(request: Request) {
       return privateJson({ error: 'Finish your active shift, check your citizenship and available capacity.',
         shifts, capacity: profile?.capacity ?? 0, ...shiftDay }, { status: 409 });
     }
-    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), ...shiftDay, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, aurellePlan:await readAurelleView(database,userId), ...shiftDay, shifts, capacity: profile?.capacity ?? 0, economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId, env) });
   }
 
   if (body.action === 'claim-work') {
@@ -777,7 +777,7 @@ async function handlePost(request: Request) {
       .bind(shiftId, userId).first();
     if (!settled && !shift.claimed_at) return privateJson({ error: 'Employer funds unavailable. Your finished shift is retained; retry later.' }, { status: 409 });
     if ((written[0]?.meta?.changes ?? 0) > 0) await recordSettledWage(database, userId, shiftId, Math.floor(Date.parse(now) / 1000)); // #465: this insert only; legacy wages stay unknown
-    return privateJson({ ok: true, ...await shiftDayFields(database, userId, Math.floor(Date.parse(now) / 1000)), aurellePlan:await readAurelleView(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId) });
+    return privateJson({ ok: true, ...await shiftDayFields(database, userId, Math.floor(Date.parse(now) / 1000)), aurellePlan:await readAurelleView(database,userId), shifts: await readShifts(database, userId), economy: await readEconomy(database, userId, wcInterval, { incomeTaxPercent: incomeTaxPercentNow() }), market: await readMarket(database, userId, interval), playerMarket: await readPlayerMarket(database, userId, env) });
   }
 
   return privateJson({ error: 'Unknown action.' }, { status: 400 });
