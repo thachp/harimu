@@ -474,7 +474,7 @@ async function handlePost(request: Request) {
     const graceOn=flagOn(env, graceAllPoliticalActionsFlag); // #1339
     const readPolitical=()=>gracePoliticalActionTaken(database, userId, graceOn);
     const response=async(profile:CitizenProfileRow|null,ok:boolean,error?:string)=>privateJson({ok,error,nationId:profile?.nation_id??null,capacity:profile?.capacity??null,
-      simulation,verification:await readVerification(userId),
+      simulation: presentKorundWorldSimulation(simulation, profile?.nation_id), verification:await readVerification(userId), // #1449
       government:await withHoarvaleBills(database, await withPolicyLedger(database, profile?.nation_id?publicGovernmentSnapshot(await readGovernment(database,profile.nation_id,Math.floor(Date.parse(now)/1000),userId,governmentReadOptions())):null, env), env, Math.floor(Date.parse(now)/1000), profile?.nation_id),
       citizenship:profile?serializeCitizenship(profile,await readPolitical()):null,
       aurellePlan:await readAurelleView(database,userId),korundPlan:await readKorund(database,userId,Math.floor(Date.parse(now)/1000),korundReadOptions()),
