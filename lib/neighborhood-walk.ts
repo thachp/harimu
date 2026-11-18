@@ -1,6 +1,6 @@
 /** #1445. NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK is HARIMU_UI_PACK index 71. Only "true" enables it. */
 import { cityTierUnlockFields } from './city-tier.ts'; import type { CoResident } from './city-location.ts';
-export const NEIGHBORHOOD_WALK_FLAG = 'NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK';
+export const NEIGHBORHOOD_WALK_FLAG = 'NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK'; export const emptyResidents: readonly CoResident[] = [];
 const districtKey = 'harimu:walk-district';
 export function neighborhoodWalkFlag(): string | undefined { try { return process.env.NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK; } catch { return undefined; } }
 export function neighborhoodWalkEnabled(value: string | undefined = neighborhoodWalkFlag()): boolean { return value === 'true'; }
@@ -19,7 +19,7 @@ export function houseSlots(count: number): Spot[] { return ring(Math.max(4, coun
 export function residentSpots(count: number): Spot[] { return ring(count, 3.2, -Math.PI / 2); }
 export function nearestResident(x: number, z: number, spots: readonly Spot[], range = 1.7): number { let best = -1, bestD = range * range; spots.forEach((spot, index) => { const d = (spot.x - x) ** 2 + (spot.z - z) ** 2; if (d <= bestD) { bestD = d; best = index; } }); return best; }
 export function stepWalk(x: number, z: number, yaw: number, forward: number, strafe: number, houses: readonly Spot[]): Spot {
-  let nx = Math.max(-14, Math.min(14, x + (Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * 0.16)), nz = Math.max(-14, Math.min(14, z + (Math.cos(yaw) * forward - Math.sin(yaw) * strafe) * 0.16));
+  let nx = Math.max(-14, Math.min(14, x + (Math.sin(yaw) * forward - Math.cos(yaw) * strafe) * 0.16)), nz = Math.max(-14, Math.min(14, z + (Math.cos(yaw) * forward + Math.sin(yaw) * strafe) * 0.16));
   for (const house of houses) { const dx = nx - house.x, dz = nz - house.z, min = 1.35, len = Math.hypot(dx, dz); if (len < min) { nx = house.x + (len ? dx / len : 1) * min; nz = house.z + (len ? dz / len : 0) * min; } } return { x: nx, z: nz };
 }
 export type ResidentCard = { name: string; status: CoResident['status']; kind: 'AI citizen' | 'Citizen'; you: boolean };
