@@ -60,7 +60,7 @@ export type PublicWar = { id: string; attacker: WarNationId; defender: WarNation
   status: WarStatus; endedAt: number | null; endKind: WarEndKind | null; peaceLockEndsAt: number | null };
 export type DefenseWindowState = { startHourUtc: number; changedAt: number | null; nextChangeAt: number | null };
 export type WarState = { wars: PublicWar[]; foundingPeriodEndsAt: number | null; defenseWindows: Record<WarNationId, DefenseWindowState> };
-/** #1434 / #1439 / #1441 / #1451 / #1474 / #1473: a Korund viewer of the citizen or world simulation does not receive wars, sieges, treaties, embargoes, war proposals, or war endings Korund is not in, and keeps only Korund's own war-weariness level, World Reputation entry, and defense window. Other nations and a missing nation are unchanged. This is the news half (like #1379), not the map-fog flag. */
+/** #1434 / #1439 / #1441 / #1451 / #1474 / #1473 / #1480: a Korund viewer of the citizen or world simulation does not receive wars, sieges, treaties, embargoes, war proposals, or war endings Korund is not in, and keeps only Korund's own war-weariness level, World Reputation entry (including its broken-treaty record), and defense window. Other nations and a missing nation are unchanged. This is the news half (like #1379), not the map-fog flag. */
 export function presentKorundWorldSimulation<T extends {
   wars?: WarState;
   sieges?: readonly { warId: string; attacker: string; defender: string }[];
@@ -69,7 +69,7 @@ export function presentKorundWorldSimulation<T extends {
   warProposals?: readonly { defender: string; warId?: string | null }[];
   warEndings?: readonly { warId: string; proposer: string; other: string }[];
   weariness?: Partial<Record<string, string>>;
-  reputation?: Partial<Record<string, { score: number; brokenPacts: number }>>;
+  reputation?: Partial<Record<string, { score: number; brokenPacts: number; record?: { other: string; kind: string; brokenAt: number; brokenGameDay: number; penalty: number }[]; earlierBreaks?: number }>>;
 }>(simulation: T, nationId: string | null | undefined): T {
   if (nationId !== 'korund') return simulation;
   if (!simulation.wars && !simulation.sieges && !simulation.treaties && !simulation.embargoes && !simulation.warProposals && !simulation.warEndings && !simulation.weariness && !simulation.reputation) return simulation;
