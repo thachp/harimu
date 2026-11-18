@@ -12,7 +12,7 @@ export async function GET(request:Request){
  const ctx=await context(request);if(!ctx)return json({error:'Sign in required.'},401);if(!ctx.nationId)return json({error:'Choose citizenship before reading addresses.'},403);
  const raw=new URL(request.url).searchParams.get('beforeWeek');if(raw!==null&&(!/^\d{1,8}$/.test(raw)||Number(raw)<1))return json({error:'Invalid archive page.'},400);
  const archive=await readAddressArchive(ctx.db,ctx.userId,ctx.nationId,ctx.now,raw===null?undefined:Number(raw),presidiumOptions());
- return archive?json(archive):json({error:'Your nation’s authored address archive is not available.'},404);
+ return archive?json({...archive,reportsEnabled:(env as unknown as {HARIMU_REPORTS_ENABLED?:string}).HARIMU_REPORTS_ENABLED==='true'}):json({error:'Your nation’s authored address archive is not available.'},404);
 }
 export async function POST(request:Request){
  if(!isSameOriginCommand(request))return json({error:'Same-origin request required.'},403);
