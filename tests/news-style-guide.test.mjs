@@ -13,3 +13,8 @@ test('provenance labels match NewsItem source kinds; Notable rule present', () =
   assert.match(guide, /Emberwarden/);
   assert.match(guide, /Kindle Press.*Korund State Media.*Aurelle Court Gazette/s);
 });
+test('The Current Daily is marked canon; Arcport Exchange Bulletin stays a proposal', () => {
+  assert.match(guide, /The Confluence: \*The Current Daily\* \(canon\)/);
+  assert.doesNotMatch(guide, /The Confluence: \*The Current Daily\* \(proposal\)/);
+  assert.match(guide, /Fulmara: \*Arcport Exchange Bulletin\* \(proposal\)/);
+});
