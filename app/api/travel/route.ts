@@ -2,6 +2,8 @@ import { env } from 'cloudflare:workers';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
+import { flagOn } from '@/lib/flag-pack.mjs';
+import { visitPermitOpts } from '@/lib/home-move';
 import { parseTravelCommand, readTravel, startTravel } from '@/lib/travel';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +25,12 @@ export async function POST(request: Request) {
   try { body = await readCommandObject(request, 1024); } catch { return privateJson({ error: 'Send a start-travel command.', reason: 'bad_request' }, 400); }
   const command = parseTravelCommand(body);
   if (!command) return privateJson({ error: 'Send action "start-travel", integer x/y and a requestId.', reason: 'bad_request' }, 400);
-  const result = await startTravel(await getDatabase(), userId, command, Math.floor(Date.now() / 1000), travelEnabled());
+  const db = await getDatabase();
+  const now = Math.floor(Date.now() / 1000);
+  const citizen = flagOn(env, 'HARIMU_INTERNAL_PERMIT_ENABLED')
+    ? await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>()
+    : null;
+  const permit = citizen?.nation_id ? await visitPermitOpts(db, citizen.nation_id, env) : { enabled: false as const };
+  const result = await startTravel(db, userId, command, now, travelEnabled(), permit);
   return result.ok ? privateJson(result) : privateJson({ error: result.error, reason: result.reason }, result.status);
 }
