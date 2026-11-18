@@ -2,10 +2,10 @@
  *  Flag HARIMU_KINDLE_NEWSPAPERS_ENABLED (GRAY 93). Flag off: no query and every action is refused. */
 import type { GameDatabase } from './database-contract';
 import type { NewsItem } from './national-news';
-import { PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX } from './press-templates';
+import { PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX } from './press-templates.ts';
 export { PRESS_HEADLINE_MAX, PRESS_PARAGRAPH_MAX };
-import { isShadowMuted, parseShadowMute } from './chat-shadow-mute';
-import { uuidPattern } from './square-chat-validation';
+import { isShadowMuted, parseShadowMute } from './chat-shadow-mute.ts';
+import { uuidPattern } from './square-chat-validation.ts';
 
 export const KINDLE_NEWSPAPERS_FLAG = 'HARIMU_KINDLE_NEWSPAPERS_ENABLED';
 export const kindleNewspaperFlagOffError = 'Kindle newspapers are not available yet.';
