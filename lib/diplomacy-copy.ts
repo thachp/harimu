@@ -45,12 +45,18 @@ export const foreignAffairsPanel={
  proposal:true,
 } as const;
 
-/** #1474: one line for the viewer's nation's derived World Reputation. `{score}` and `{count}` are filled by the panel; `pact`/`pacts` pick the singular. */
+/** #1474 / #1480: the viewer's World Reputation score and the broken-treaty record behind it.
+ *  `{score}`, `{count}`, `{pacts}`, `{treaty}`, `{nation}`, `{day}`, and `{penalty}` are filled by the panel.
+ *  `pact`/`pacts` and `break`/`breaks` pick the singular. Score 0 keeps `zero` and shows no record. */
 export const reputationPanel={
  line:L('World Reputation: {score} ({count} {pacts})'),
  zero:L('No broken treaties on record'),
+ record:L('{treaty} with {nation}, broken on day {day} ({penalty})'),
+ earlier:L('and {count} earlier {breaks}'),
  pact:'broken pact',
  pacts:'broken pacts',
+ break:'break',
+ breaks:'breaks',
  proposal:true,
 } as const;
 

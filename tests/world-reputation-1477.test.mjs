@@ -52,9 +52,14 @@ for (const backend of ['sqlite', 'postgres']) {
       }
       const world = await r.call('world', null);
       assert.equal(world.status, 200);
+      const epoch = world.data.simulation.clock.epochSeconds;
+      const oldBrokenAt = (now - 1_000) + 5;
       assert.equal(world.data.simulation.treaties.treaties.length, OLD_LIST_CAP, 'the public treaty list stays capped');
       assert.equal(world.data.simulation.treaties.treaties.some((t) => t.id === 'old-break'), false, 'the older break is off the LIMIT 20 list');
-      assert.deepEqual(world.data.simulation.reputation, { ...zeros(), aurelle: { score: NAP, brokenPacts: 1 } }, 'the older break still counts toward reputation');
+      assert.deepEqual(world.data.simulation.reputation, {
+        ...Object.fromEntries(treatyNations.map((nation) => [nation, { score: 0, brokenPacts: 0, record: [], earlierBreaks: 0 }])),
+        aurelle: { score: NAP, brokenPacts: 1, record: [{ other: 'kindle', kind: 'non-aggression', brokenAt: oldBrokenAt, brokenGameDay: Math.floor(Math.max(0, oldBrokenAt - epoch) * 12 / 86400) + 1, penalty: NAP }], earlierBreaks: 0 },
+      }, 'the older break still counts toward reputation and is still in the record');
     } finally {
       await r.close();
     }
@@ -71,9 +76,16 @@ for (const backend of ['sqlite', 'postgres']) {
       await insertTreaty(r, { id: 'aurelle-break', kind: 'non-aggression', proposer: 'kindle', other: 'aurelle', status: 'broken', brokenBy: 'aurelle', now, proposedAt: now - 200 });
       const world = await r.call('world', null);
       assert.equal(world.status, 200);
-      assert.deepEqual(world.data.simulation.reputation.kindle, { score: NAP * (OLD_LIST_CAP + 1), brokenPacts: OLD_LIST_CAP + 1 });
-      assert.deepEqual(world.data.simulation.reputation.aurelle, { score: NAP, brokenPacts: 1 });
-      assert.deepEqual(world.data.simulation.reputation.korund, zero);
+      const epoch = world.data.simulation.clock.epochSeconds;
+      const kindleAt = (i) => (now - 100 + i) + 5;
+      const kindleItem = (i) => ({ other: 'korund', kind: 'non-aggression', brokenAt: kindleAt(i), brokenGameDay: Math.floor(Math.max(0, kindleAt(i) - epoch) * 12 / 86400) + 1, penalty: NAP });
+      const aurelleAt = (now - 200) + 5;
+      assert.equal(world.data.simulation.reputation.kindle.score, NAP * (OLD_LIST_CAP + 1));
+      assert.equal(world.data.simulation.reputation.kindle.brokenPacts, OLD_LIST_CAP + 1);
+      assert.equal(world.data.simulation.reputation.kindle.earlierBreaks, 11);
+      assert.deepEqual(world.data.simulation.reputation.kindle.record, Array.from({ length: 10 }, (_, i) => kindleItem(OLD_LIST_CAP - i)));
+      assert.deepEqual(world.data.simulation.reputation.aurelle, { score: NAP, brokenPacts: 1, record: [{ other: 'kindle', kind: 'non-aggression', brokenAt: aurelleAt, brokenGameDay: Math.floor(Math.max(0, aurelleAt - epoch) * 12 / 86400) + 1, penalty: NAP }], earlierBreaks: 0 });
+      assert.deepEqual(world.data.simulation.reputation.korund, { ...zero, record: [], earlierBreaks: 0 });
       const citizen = await r.call('citizen', 'bob');
       assert.deepEqual(citizen.data.simulation.reputation, world.data.simulation.reputation);
     } finally {

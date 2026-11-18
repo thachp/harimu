@@ -21,10 +21,20 @@ export function ForeignAffairsPanel({ treaties, embargoes, reputation, nationId 
   const reputationLine = reputation
     ? (score === 0 ? reputationPanel.zero.text : fill(reputationPanel.line.text, { score: scoreLabel, count: String(reputation.brokenPacts), pacts: reputation.brokenPacts === 1 ? reputationPanel.pact : reputationPanel.pacts }))
     : null;
+  const record = score === 0 ? [] : (reputation?.record ?? []);
+  const earlier = reputation?.earlierBreaks ?? 0;
+  const penaltyLabel = (value: number) => value < 0 ? `−${Math.abs(value)}` : String(value);
+  const recordItems = record.map((item, index) => {
+    const line = fill(reputationPanel.record.text, { treaty: treatyKindNames[item.kind], nation: treatyNationNames[item.other], day: String(item.brokenGameDay), penalty: penaltyLabel(item.penalty) });
+    return <li key={`${item.kind}:${item.other}:${item.brokenAt}:${index}`}>{line}</li>;
+  });
+  const earlierLine = earlier > 0 ? fill(reputationPanel.earlier.text, { count: String(earlier), breaks: earlier === 1 ? reputationPanel.break : reputationPanel.breaks }) : null;
   return <section aria-label="Foreign affairs">
     <h4>{foreignAffairsPanel.header}</h4>
     <p>{foreignAffairsPanel.aiNote.text}</p>
     {reputationLine ? <p>{reputationLine}</p> : null}
+    {recordItems.length > 0 ? <ul aria-label="Broken-treaty record">{recordItems}</ul> : null}
+    {earlierLine ? <p>{earlierLine}</p> : null}
     {mine.length === 0 && embargoesMine.length === 0 ? <p>{foreignAffairsPanel.emptyState}</p> : <ul>{mine.map(treaty => {
       const other = treaty.proposer === nationId ? treaty.other : treaty.proposer;
       const values = { nationA: treatyNationNames[nationId], nationB: treatyNationNames[other], treaty: treatyKindNames[treaty.kind], endsAt: treaty.endsAt === null ? '' : formatTime(treaty.endsAt * 1000) };
