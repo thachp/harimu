@@ -25,6 +25,7 @@ export async function initializeAccountElectionSchema(connectionString:string){
  const client=new Client({connectionString,connectionTimeoutMillis});
  try{await client.connect();await client.query('BEGIN');await client.query('SET LOCAL search_path TO public,pg_catalog');await client.query('SELECT pg_advisory_xact_lock(728391462)');
   for(const sql of accountElectionSchemas)await client.query(postgresSql(sql).text);
+  await client.query(postgresSql('ALTER TABLE poc_voter_receipts ADD COLUMN IF NOT EXISTS district_id TEXT').text); // #1416: same receipt column as civic_voter_receipts; the vote INSERT is rewritten onto this table
   await client.query('COMMIT');
  }catch{await client.query('ROLLBACK').catch(()=>{});throw Error('Preview election schema migration failed.');}finally{await client.end().catch(()=>{});}
 }
