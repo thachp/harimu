@@ -334,6 +334,11 @@ async function initialize(database: GameDatabase) {
     ...marketSeeds.map((item) => database.prepare('INSERT OR IGNORE INTO market_items (item, label, buy_minor, sell_minor, initial_stock) VALUES (?, ?, ?, ?, ?)').bind(...item)),
     database.prepare(walletViewSql), database.prepare(inventoryViewSql), database.prepare(merchantViewSql), database.prepare(merchantCashSql),
   ]);
+  // #1428 (migration 0131): city_id. A table just created from listingSchema already has it; older rows default to 'kindle'.
+  const listingCols = await database.prepare('PRAGMA table_info(player_listings)').all<{ name: string }>();
+  if (listingCols.results.length > 0 && !listingCols.results.some(column => column.name === 'city_id')) {
+    await database.prepare("ALTER TABLE player_listings ADD COLUMN city_id TEXT NOT NULL DEFAULT 'kindle'").run();
+  }
   const playerBalancesInstalled = await database.prepare("SELECT id FROM economy_migrations WHERE id = 'player-market-v1'").first();
   if (!playerBalancesInstalled) {
     // Atomic view replacement upgrades v11 balances without a missing-view window.
