@@ -6,9 +6,11 @@
 import type {GameDatabase} from './database-contract';
 import {cityForNation} from './cities';
 import {readCityLocation} from './city-location';
+import {flagOn} from './flag-pack.mjs';
 import {laborNoteSql} from './korund-wallet';
 import {homeCityMovesSchema,homeCityMovesIndex} from './market-orders';
 import {recordSparkSink} from './spark-origin.ts'; // #465
+import {readVarkandAlert,varkandAlertEnabled} from './varkand-alert';
 export const homeMoveFeeMinor=1000; // 10 units of the nation's wallet currency (ARC ruling on #781)
 /** ARC ruling on #781: the fee is charged in the nation's own wallet currency. Royal Favor is not money; a nation without a wallet currency here
  *  (Aurelle, and any nation not yet open) refuses the move with not_open_yet and charges nothing. */
@@ -59,6 +61,14 @@ export async function readPermitForCity(db:GameDatabase,userId:string,cityId:str
 export async function cityVisitAllowed(db:GameDatabase,userId:string,nationId:string,cityId:string,currentCityId:string|null,now:number,opts:PermitOpts):Promise<boolean>{
  if(!opts.enabled||cityId===currentCityId||!requiresInternalPermit(nationId,opts.alert??'green'))return true;
  return (await readPermitForCity(db,userId,cityId,now)).status==='granted';
+}
+/** #1444 / #1448: the permit flag plus the #992 Varkand alert. Flag off returns immediately and reads nothing. */
+export async function visitPermitOpts(db:GameDatabase,nationId:string,env:unknown):Promise<PermitOpts>{
+ if(!flagOn(env,'HARIMU_INTERNAL_PERMIT_ENABLED'))return {enabled:false};
+ const raw=(env as {HARIMU_VARKAND_ALERT?:string}).HARIMU_VARKAND_ALERT;
+ const fallback:VarkandAlert=raw==='amber'||raw==='red'||raw==='green'?raw:'green';
+ const alert:VarkandAlert=nationId!=='varkand'?'green':varkandAlertEnabled(env)?(await readVarkandAlert(db)).level:fallback;
+ return {enabled:true,alert};
 }
 export type PermitRequestResult={ok:true;permit:PermitView;replayed:boolean}|{ok:false;reason:'not_required'|'not_your_nation'|'request_conflict';status:number};
 /** Request (or replay) a single-use permit for a target city. Granted automatically after internalPermitWaitSeconds. */
