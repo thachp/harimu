@@ -181,6 +181,7 @@ const previewOnFlags = [
   'HARIMU_KINDLE_NEWSPAPERS_ENABLED', // #1453 packed in HARIMU_GRAY_PACK (index 92, GRAY 93)
   'HARIMU_AURELLE_RANKS_ENABLED', // #1359 packed in HARIMU_GRAY_PACK, after newspapers (index 93, GRAY 94)
   'HARIMU_AURELLE_BROADSHEETS_ENABLED', // #1475 packed in HARIMU_GRAY_PACK, after Korund writers (index 95, GRAY 96)
+  'HARIMU_BATTLE_TERRAIN_ENABLED', // #1491 packed in HARIMU_GRAY_PACK. Assigned GRAY 98 (index 97, after #1490). Dense pack: next entry until that flag lands.
   'HARIMU_HOARVALE_AUTO_ASSENT_ENABLED', // #1134 packed in HARIMU_GRAY_PACK
   'HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED', // #1469 packed in HARIMU_GRAY_PACK (index 94, GRAY 95)
   'HARIMU_DIPLOMACY_ENABLED',
