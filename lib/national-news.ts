@@ -1,5 +1,6 @@
 import {foundingNewsItems,readFoundingEvents} from './founding-period'; // #612
 import {editionHeadlines,newsEditions} from './news-editions'; // #1443
+import {readKindlePlayerArticles} from './kindle-newspapers'; // #1453
 import type {GameDatabase} from './database-contract';
 import type { GovernmentSnapshot } from './government';
 import { publicGovernmentSnapshot, governmentDisclosure } from './government-disclosure';
@@ -14,16 +15,16 @@ import { rallyNewsItems } from './rallies'; // #867
 import { korundWeeklyQuotaFood } from './korund-coupons'; // #981 target, same constant as the quota bar
 import { korundPlanStatLine, korundPlanWindow, planFulfilmentPercent } from './korund-plan-stats'; // #981
 
-export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model';kind?:NewsItemKind};
-/** record: system ledger fact; template: Korund State Media template built only from ledger figures; decree: Aurelle court gazette entry; article: model-written article. */
-export type NewsItemKind='record'|'template'|'decree'|'article';
+export type NewsItem = {id:string;title:string;text:string;occurredAt:number;source:'system'|'deterministic'|'model'|'player';kind?:NewsItemKind;paperName?:string;authorName?:string;paragraphs?:string[]};
+/** record: system ledger fact; template: Korund State Media template built only from ledger figures; decree: Aurelle court gazette entry; article: model-written article; player-article: a Kindle citizen's bylined paper. */
+export type NewsItemKind='record'|'template'|'decree'|'article'|'player-article';
 /** #981: one State Media line for the open week's food quota. Absent when the flag is off. `line` is the only text a citizen is shown. */
 export type KorundPlanStat = { resource: 'food'; output: number; target: number; percent: number; line: string };
 export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'court';fetchedAt:number;statistics:{citizens:number;completedShifts:number;food:number};items:NewsItem[];templatesOnly?:boolean;personaMuted?:boolean;planStat?:KorundPlanStat};
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean;confluence?:boolean}={}):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean;confluence?:boolean;kindleNewspapers?:boolean;readerId?:string;shadowMute?:unknown}={}):Promise<NationalNews|null> {
  if(nationId==='confluence')return options.confluence?readConfluenceCurrentDaily(db,now):null; // #1443 existing opening flag; no new flag
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
@@ -60,6 +61,7 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
   if(snapshot){const disclosure=governmentDisclosure(snapshot);items.push({id:`${nationId}:policy:${tick.tick}`,title:nationId==='aurelle'?`By order of the Crown: ${disclosure.title}`:disclosure.title,text:nationId==='aurelle'?`The Herald proclaims: ${disclosure.text}`:disclosure.text,occurredAt:tick.processed_at*1000,source:'deterministic',kind:nationId==='aurelle'?'decree':'record'});}
  }
  const planStat = nationId === 'korund' && options.planStats ? await readKorundPlanStat(db, now) : undefined;
+ if(nationId==='kindle'&&options.kindleNewspapers&&options.readerId)items.push(...await readKindlePlayerArticles(db,options.readerId,options.shadowMute)); // #1453 flag off never queries
  return {nationId,...edition,fetchedAt:now,statistics:{citizens:register?.citizens??0,completedShifts:totals?.shifts??0,food:totals?.food??0},...(planStat ? {planStat} : {}),items:items.sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12)};
 }
 
