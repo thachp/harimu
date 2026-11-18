@@ -1,9 +1,9 @@
 'use client';
-// #743 slice 1: the out-of-character Report control for a city chat message or a Notable reply. All text comes from lib/report-copy.ts.
+// #743 / #1462: the out-of-character Report control. All text comes from lib/report-copy.ts (#457). No player-article button: that kind has no reader UI.
 import {useEffect,useRef,useState} from 'react';
 import {reasonsFor,reportActions,reportHeader,reportNote,reportStates,reportTargetFor} from '../lib/report-copy';
 
-export type ReportKind='citizen-message'|'notable-reply';
+export type ReportKind='citizen-message'|'notable-reply'|'ai-leader-address'|'ai-news';
 type Status='idle'|'sending'|'sent'|'duplicate'|'failed';
 
 export function ReportButton({kind,targetId}:{kind:ReportKind;targetId:string}){
