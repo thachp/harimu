@@ -151,6 +151,31 @@ for (const backend of ['sqlite', 'postgres']) {
     }
   });
 
+  test(`#1480 an older counting break off the LIMIT 20 list still appears in the record (${backend})`, async () => {
+    const r = await localRuntime({ backend });
+    try {
+      r.setFixtureEnv('HARIMU_DIPLOMACY_ENABLED', 'true');
+      const now = Math.floor(r.now / 1000);
+      const preview = await r.call('world', null);
+      const epoch = preview.data.simulation.clock.epochSeconds;
+      await insertTreaty(r, { id: 'old-break', kind: 'non-aggression', proposer: 'kindle', other: 'aurelle', status: 'broken', brokenBy: 'aurelle', now, proposedAt: now - 1_000, endedAt: now - 995 });
+      for (let i = 0; i < 20; i += 1) {
+        await insertTreaty(r, { id: `newer-expired-${i}`, kind: 'trade', proposer: 'kindle', other: 'korund', status: 'expired', brokenBy: null, now, proposedAt: now - 10 + i });
+      }
+      const world = await r.call('world', 'bob');
+      assert.equal(world.data.simulation.treaties.treaties.length, 20, 'the public treaty list stays capped');
+      assert.equal(world.data.simulation.treaties.treaties.some((t) => t.id === 'old-break'), false, 'the older break is off the LIMIT 20 list');
+      assert.deepEqual(world.data.simulation.reputation.aurelle, {
+        score: -10, brokenPacts: 1, earlierBreaks: 0,
+        record: [expectedBreak(epoch, now - 995, 'kindle')],
+      }, 'the older break is still in the uncapped record');
+      const citizen = await r.call('citizen', 'bob');
+      assert.deepEqual(citizen.data.simulation.reputation.aurelle.record, [expectedBreak(epoch, now - 995, 'kindle')]);
+    } finally {
+      await r.close();
+    }
+  });
+
   test(`#1480 flag off sends no reputation key (${backend})`, async () => {
     const r = await localRuntime({ backend });
     try {
