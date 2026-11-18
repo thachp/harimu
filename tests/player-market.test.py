@@ -21,11 +21,11 @@ class PlayerMarketTests(unittest.TestCase):
     def create(self,user='alice',quantity=2,price=150,id=None):
         id=id or str(uuid.uuid4())
         with self.db:
-            count=self.db.execute(sql('createListingSql'),(id,'food',quantity,price,1000,user,'food',quantity,id)).rowcount
+            count=self.db.execute(sql('createListingSql'),(id,'food',quantity,price,1000,'kindle',user,'food',quantity,id)).rowcount
         return id,count
     def fill(self,lot,user='bob',id=None):
         id=id or str(uuid.uuid4())
-        with self.db:return self.db.execute(sql('fillListingSql'),(id,1001,user,lot,id)).rowcount
+        with self.db:return self.db.execute(sql('fillListingSql'),(id,1001,user,lot,'kindle',id)).rowcount
     def cancel(self,lot,user='alice',id=None):
         id=id or str(uuid.uuid4())
         with self.db:return self.db.execute(sql('cancelListingSql'),(id,1001,lot,user,id)).rowcount
@@ -91,7 +91,7 @@ class PlayerMarketTests(unittest.TestCase):
     def test_concurrent_reservations_cannot_overdraw_owned_goods(self):
         def worker(db,_):
             request=str(uuid.uuid4())
-            db.execute(sql('createListingSql'),(request,'food',4,100,1000,'alice','food',4,request))
+            db.execute(sql('createListingSql'),(request,'food',4,100,1000,'kindle','alice','food',4,request))
         self.concurrent(worker)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM player_listings').fetchone()[0],1)
         self.assertEqual(self.food(),2)
@@ -100,7 +100,7 @@ class PlayerMarketTests(unittest.TestCase):
         self.db.execute("INSERT INTO shift_settlements VALUES ('carl','carl',2000,'food',0,'')");self.db.commit()
         def worker(db,user):
             buyer='alice' if user=='alice' else 'carl';request=str(uuid.uuid4())
-            db.execute(sql('fillListingSql'),(request,1001,buyer,lot,request))
+            db.execute(sql('fillListingSql'),(request,1001,buyer,lot,'kindle',request))
         self.concurrent(worker)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM player_fills').fetchone()[0],1)
         self.assertEqual(sum(self.balance(u) for u in ['alice','bob','carl']),6000)
@@ -109,7 +109,7 @@ class PlayerMarketTests(unittest.TestCase):
         def worker(db,user):
             request=str(uuid.uuid4())
             if user=='alice':db.execute(sql('cancelListingSql'),(request,1001,lot,user,request))
-            else:db.execute(sql('fillListingSql'),(request,1001,user,lot,request))
+            else:db.execute(sql('fillListingSql'),(request,1001,user,lot,'kindle',request))
         self.concurrent(worker)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM player_fills').fetchone()[0]+self.db.execute('SELECT COUNT(*) FROM player_cancellations').fetchone()[0],1)
         self.assertEqual(self.food()+self.food('bob'),12)
@@ -123,7 +123,7 @@ class PlayerMarketTests(unittest.TestCase):
             barrier=threading.Barrier(2);failures=[];results={}
             def command(connection,user):
                 if user=='alice':return connection.execute(sql('cancelListingSql'),(requests[user],1001,lot,user,requests[user])).rowcount
-                return connection.execute(sql('fillListingSql'),(requests[user],1001,user,lot,requests[user])).rowcount
+                return connection.execute(sql('fillListingSql'),(requests[user],1001,user,lot,'kindle',requests[user])).rowcount
             def worker(user):
                 connection=sqlite3.connect(path,timeout=10)
                 try:
@@ -154,8 +154,8 @@ class PlayerMarketTests(unittest.TestCase):
                 self.assertEqual(connection.execute('SELECT stock FROM merchant_inventory_balances').fetchone()[0],100)
                 # A buyer cannot cancel the owner's separate lot; an owner cannot buy it.
                 other=str(uuid.uuid4())
-                connection.execute(sql('createListingSql'),(other,'food',1,100,1002,'alice','food',1,other))
+                connection.execute(sql('createListingSql'),(other,'food',1,100,1002,'kindle','alice','food',1,other))
                 denied=str(uuid.uuid4())
                 self.assertEqual(connection.execute(sql('cancelListingSql'),(denied,1003,other,'bob',denied)).rowcount,0)
-                self.assertEqual(connection.execute(sql('fillListingSql'),(denied,1003,'alice',other,denied)).rowcount,0)
+                self.assertEqual(connection.execute(sql('fillListingSql'),(denied,1003,'alice',other,'kindle',denied)).rowcount,0)
 if __name__=='__main__':unittest.main()
