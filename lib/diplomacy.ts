@@ -4,7 +4,7 @@ import { gameTimeCompression } from './game-time';
 import { assemblyIncumbents } from './assembly-rules';
 import { brokenPactLine, ratificationFor, ratificationHeadlines, treatyStatusLines, DIPLOMACY_NAME_MAX, type RatificationKey } from './diplomacy-copy';
 import { cleanTreatyLabel, decideTreaty, isTreatyKind, isTreatyNation, treatyActorMax, treatyKindNames, treatyNationNames, treatyPairKey, treatyRequestIdOk, treatyStatus, treatyTermSeconds, treatyBreakPenaltyFor, treatyAiLeaders, treatyCandidates, treatyProposalCooldownSlots, treatyProposalRequestId, treatyProposalSlotSeconds, treatySlot,
-  type PartySeats, type Ratification, type TreatyDbStatus, type TreatyBreakPenalty, type TreatyKind, type TreatyNationId, type TreatyStatus } from './diplomacy-rules';
+  worldReputationBreaksSql, worldReputationFromBreaks, type PartySeats, type Ratification, type TreatyDbStatus, type TreatyBreakPenalty, type TreatyKind, type TreatyNationId, type TreatyStatus, type WorldReputationMap } from './diplomacy-rules';
 export * from './diplomacy-rules';
 
 /** #308: AI treaties PoC (non-aggression pact, trade agreement) behind HARIMU_DIPLOMACY_ENABLED (default "false"). Canon: harimu-docs 13.1, 13.2
@@ -175,6 +175,14 @@ export async function runDiplomacyCron(db: GameDatabase, now: number, bindings: 
 export async function readTreaties(db: GameDatabase, now: number): Promise<TreatyState> {
   const rows = (await db.prepare(`SELECT ${columns} FROM treaties WHERE status<>'rejected' ORDER BY proposed_at DESC, id LIMIT 20`).all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] }))).results;
   return { treaties: rows.map(row => publicTreaty(row, now)).filter((t): t is PublicTreaty => t !== null) };
+}
+
+/** #1477: uncapped per-nation count of broken treaties with a non-zero treatyBreakPenalty[kind].reputation.
+ *  Independent of readTreaties (which stays at LIMIT 20). Flag off: the caller does not call this. A missing table reads as the zero baseline. */
+export { worldReputationBreaksSql };
+export async function readWorldReputation(db: GameDatabase): Promise<WorldReputationMap> {
+  const rows = (await db.prepare(worldReputationBreaksSql).all<{ broken_by: string; kind: string; n: number }>().catch(tolerate(isMissingRelation, { results: [] as { broken_by: string; kind: string; n: number }[] }))).results ?? [];
+  return worldReputationFromBreaks(rows.map(row => ({ brokenBy: row.broken_by, kind: row.kind, n: Number(row.n) })));
 }
 
 /** For the war declaration path (#309/#348 wires it later): is there a non-aggression pact in force between the two nations? Fails open when the table is missing. */
