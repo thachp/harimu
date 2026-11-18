@@ -24,9 +24,9 @@ test('flag is on only for the exact string "true", pack index 72, preview on and
   for (const sel of rules) for (const part of sel.split(',')) assert.match(part.trim(), /^\.game-neighborhood-talk\b/, part);
   assert.doesNotMatch(css, /overflow-wrap:\s*anywhere|word-break:\s*break-all/); assert.match(css, /:focus-visible/);
   const scene = await read('app/neighborhood-walk.tsx'), talk = await read('app/neighborhood-talk.tsx'), panels = await read('app/scene-panels-v2.tsx'), page = await read('app/page.tsx');
-  assert.match(scene, /setOpen\(talk \? resident\.key : i\)/); assert.match(scene, /key=\{talk \? person\.key : 'card'\}/); assert.match(scene, /talk \? residentStatusLabel\(card\.status\) : card\.status/);
-  assert.equal(WEBGL_UNAVAILABLE, 'This neighborhood needs 3D graphics, which your browser has turned off. Try another browser or turn on hardware acceleration.'); assert.match(scene, /WEBGL_UNAVAILABLE/);
-  assert.match(talk, /fetch\('\/api\/city-chat'/); assert.match(talk, /<ReportButton kind="citizen-message" targetId=\{message\.id\} \/>/); assert.doesNotMatch(talk, /Hello|traveler|Elara/);
+  assert.match(scene, /setOpen\(talk \? resident\.key : i\)/); assert.match(scene, /key=\{talk \? person\.key : 'card'\}/); assert.match(scene, /talk && !person\.you \? <NeighborhoodCityTalk/); assert.doesNotMatch(scene, /person\.key === open\)\) setOpen\(null\)/);
+  assert.equal(WEBGL_UNAVAILABLE, 'This neighborhood needs 3D graphics, which your browser has turned off. Try another browser or turn on hardware acceleration.'); assert.match(scene, /WEBGL_UNAVAILABLE/); assert.match(scene, /residentStatusLabel\(card\.status\)/);
+  assert.match(talk, /fetch\('\/api\/city-chat'/); assert.match(talk, /<ReportButton kind="citizen-message" targetId=\{message\.id\} \/>/); assert.match(talk, /catch \{ setError\(unavailable\)/); assert.match(talk, /if \(busy \|\| posting\.current\) return/); assert.match(talk, /intent\.current \?\?=/); assert.match(talk, /disabled=\{busy\}/); assert.doesNotMatch(talk, /Hello|traveler|Elara/);
   assert.match(panels, /ShieldCheck/); assert.match(panels, /BookOpen/); assert.match(panels, /icon: talk \? districtMark\(name\) : undefined/); assert.match(page, /neighborhoodTalkEnabled\(\) && neighborhoodList/);
   assert.match(await read('app/game-shell.tsx'), /neighborhoodTalkEnabled\(\) \? ' game-neighborhood-talk'/);
 });
@@ -47,9 +47,10 @@ test('the open card follows the resident key, WebGL failure uses the exact copy,
     await page.waitForFunction(() => document.querySelectorAll('.neighborhood-walk-card').length === 0);
     await mount(page, [ada, bren]);
     await page.locator('button', { hasText: 'Ada' }).click(); await page.waitForSelector('.neighborhood-walk-card');
-    assert.match(await page.locator('.neighborhood-walk-card').innerText(), /Idle/);
+    assert.match(await page.locator('.neighborhood-walk-card').innerText(), /Idle/); assert.equal(await page.getByRole('button', { name: 'Talk' }).count(), 0);
+    await page.getByRole('button', { name: 'Close' }).click(); await page.locator('button', { hasText: 'Bren' }).click(); await page.waitForSelector('.neighborhood-walk-card');
     await page.evaluate(() => { window.__urls = []; const reply = body => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })); window.fetch = (url, init) => { window.__urls.push(String(url) + ' ' + (init?.method ?? 'GET')); return reply({ nationId: 'kindle', cityId: 'forgehaven', reportsEnabled: true, messages: [{ id: 'm1', handle: 'Citizen-abc', body: 'Stored line', postedAt: 1, mine: false }] }); }; });
-    await page.getByRole('button', { name: 'Talk' }).click(); await page.waitForSelector('.neighborhood-talk');
+    await page.getByRole('button', { name: 'Talk' }).click(); await page.getByText('Stored line').waitFor();
     assert.deepEqual(await page.evaluate(() => window.__urls), ['/api/city-chat GET']);
     const chat = await page.locator('.neighborhood-talk').innerText(); assert.match(chat, /Forgehaven/); assert.match(chat, /Stored line/); assert.match(chat, /Report this message/); assert.doesNotMatch(chat, /Hello|traveler/);
     await page.getByRole('button', { name: 'Neighborhood' }).click(); assert.equal(await page.evaluate(() => window.__summary), 1);
