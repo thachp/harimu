@@ -27,6 +27,8 @@ export const DUNMORROW_HEARTH_NOTE = 'Hosts Hearth Night';
 export const STONEHEARTH_PLAN_NOTE = 'Hosts Plan Day';
 export const STONEHEARTH_BIRTHDAY_NOTE = "Hosts the Chairman's Birthday";
 export const STONEHEARTH_HOST_NOTE = 'Hosts Plan Day and the Chairman\'s Birthday';
+/** #1437: Lume Mesa city-panel line. ARC-ruled §7.6 wording: destination, not host. Date is the #1196 clock, shown only when HARIMU_CITY_FESTIVAL_HOST_NOTE_ENABLED and HARIMU_ILMAR_GREAT_PILGRIMAGE_ENABLED are on. */
+export const LUME_MESA_PILGRIMAGE_NOTE = 'Destination of the Great Pilgrimage';
 // Role column of the Cities table on each nation page (docs.harimu.com/world/nations/*, read 2026-10-14).
 const roles: Record<string, string> = {"Tarrek Foundry": "Industry", "Kolt Savanna": "Farming", "Lanu Terraces": "Farming", "Oalin Harbor": "Port / fisheries", "Tsenga SEZ": "Trade zone", "Holv Gorge": "Energy / industry", "Strova Mines": "Mining", "Gren Plateau": "Farming", "Windrest": "Silk / crafts", "Highmere": "Farming / fief", "Lume Mesa": "Pilgrimage", "Glassen": "Industry (Sunglass)", "Fjeldmark": "Frostcore / logistics", "Isling Springs": "Spa / tourism", "Voren Light": "Port / signals", "Moorhald": "Farming / peat", "Ashglade": "Timber / crafts", "Fernhollow": "Farming", "Vendezzo": "Shipyard", "Malvara Rods": "Energy (Stormcells)"};
 // Canonical city names and visual lore, GDD nation pages /world/nations/ (read 2026-10-13).
@@ -150,17 +152,22 @@ const daoResidents = (): readonly City[] => daoWorksEnabled() ? [daoWorks] : [];
 const dunkarPassResidents = (): readonly City[] => dunkarPassEnabled() ? [dunkarPass] : [];
 const byId = (nationId: string, cityId: string) => (city: City) => city.nationId === nationId && city.id === cityId;
 export function citiesForNation(nationId: string): readonly City[] { return catalog.filter(city => city.nationId === nationId); }
+/** #1421: these residents enroll only while their flag is on. The city id still belongs to the nation. */
+const gatedResidents: readonly City[] = [brasswellPort, corvelIsles, dunmorrow, vakkHarbor, ruelWorks, thessalyWells, marrowMills, daoWorks, dunkarPass];
+export function gatedResidentCitiesForNation(nationId: string): readonly City[] { return gatedResidents.filter(city => city.nationId === nationId); }
 /** Catalog cities plus spa additions (#798), plus Brasswell (#1241), Dunmorrow (#1242), Corvel Isles (#1259), Vakk Harbor (#1261), Ruel Works (#1270), Thessaly Wells (#1271), Marrow Mills (#1275), Dao Works (#1279), and Dunkar Pass (#1282) when each flag is on. */
 export function residentCitiesForNation(nationId: string): readonly City[] { return [...citiesForNation(nationId), ...spaAdditions.filter(city => city.nationId === nationId), ...portResidents().filter(city => city.nationId === nationId), ...dunmorrowResidents().filter(city => city.nationId === nationId), ...corvelResidents().filter(city => city.nationId === nationId), ...vakkResidents().filter(city => city.nationId === nationId), ...ruelWorksResidents().filter(city => city.nationId === nationId), ...thessalyResidents().filter(city => city.nationId === nationId), ...marrowMillsResidents().filter(city => city.nationId === nationId), ...daoResidents().filter(city => city.nationId === nationId), ...dunkarPassResidents().filter(city => city.nationId === nationId)]; }
 export function cityForNation(nationId: string, cityId: string): City | undefined { return catalog.find(byId(nationId, cityId)) ?? spaAdditions.find(byId(nationId, cityId)) ?? portResidents().find(byId(nationId, cityId)) ?? dunmorrowResidents().find(byId(nationId, cityId)) ?? corvelResidents().find(byId(nationId, cityId)) ?? vakkResidents().find(byId(nationId, cityId)) ?? ruelWorksResidents().find(byId(nationId, cityId)) ?? thessalyResidents().find(byId(nationId, cityId)) ?? marrowMillsResidents().find(byId(nationId, cityId)) ?? daoResidents().find(byId(nationId, cityId)) ?? dunkarPassResidents().find(byId(nationId, cityId)); }
 export function capitalCityForNation(nationId: string): City | undefined { return catalog.find(city => city.nationId === nationId && city.capital); }
 
-/** #123: each MVP nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its
- *  docs role. Not part of the capital + two cities catalog above, so city lists and vignettes are unchanged. */
+/** #123 / #1415: each seeded nation's frontier outpost (the T1 border city on Frontier squares, docs 'Cities of Harimu' > War) by its
+ *  docs role. Not part of the capital + two cities catalog above, so city lists and vignettes are unchanged.
+ *  #1415: Meesa Ford names the existing #487 Confluence outpost square. */
 const outposts: Record<string, { name: string; role: CityRole; description: string }> = {
   kindle: { name: 'Ashby Crossing', role: 'frontier', description: 'Frontier / mining border village in the western badlands.' },
   korund: { name: 'Krel Arsenal', role: 'frontier', description: 'Military / industry frontier fortress in the eastern border passes.' },
   aurelle: { name: 'Vale Bridge', role: 'frontier', description: 'Frontier / trade fortified bridge town on the southern border gorge.' },
+  confluence: { name: 'Meesa Ford', role: 'frontier', description: 'Frontier / trade river fort and banded-price market on the border with Meridian.' }, // #1415, #487 square
 };
 export function outpostCityForNation(nationId: string): City | undefined {
   const o = outposts[nationId]; if (!o) return undefined;

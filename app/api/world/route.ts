@@ -11,6 +11,8 @@ import { armyBattlesEnabled } from '@/lib/army-battle';
 import { winterMarchEnabled } from '@/lib/winter-march'; // #1038
 import { flagOn } from '@/lib/flag-pack.mjs'; // #988
 import { readVarkandAlert, varkandAlertEnabled } from '@/lib/varkand-alert'; // #1081
+import { authenticatedUserId } from '@/lib/auth'; // #1434
+import { presentKorundWorldSimulation } from '@/lib/war'; // #1434
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +67,7 @@ type WorldEventRow = {
   occurred_at: string;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   const database = await getDatabase();
   const simulation = await advanceWorld(database, undefined, { atlasEnv: env, religiousHarmony: (env as unknown as { HARIMU_RELIGIOUS_HARMONY_ENABLED?: string }).HARIMU_RELIGIOUS_HARMONY_ENABLED === 'true', // #842
     dormancy: (env as unknown as { HARIMU_DORMANCY_ENABLED?: string }).HARIMU_DORMANCY_ENABLED === 'true', reserve: (env as unknown as { HARIMU_SPARK_SUPPLY_ENABLED?: string }).HARIMU_SPARK_SUPPLY_ENABLED === 'true', npcSupply: (env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED === 'true', aurelleRising: flagOn(env, 'HARIMU_AURELLE_RISING_ENABLED'), aurelleCoup: flagOn(env, 'HARIMU_AURELLE_COUP_ENABLED'), favorDecay: (env as unknown as { HARIMU_FAVOR_DECAY_ENABLED?: string }).HARIMU_FAVOR_DECAY_ENABLED === 'true', kindleAssembly: assemblyTickConfig(env as unknown as AssemblyBindings), primaries: primaryTickConfig(env as unknown as PrimaryBindings), korundPresidium: (env as unknown as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string }).HARIMU_KORUND_PRESIDIUM_ENABLED === 'true', faithFestivals: (env as unknown as { HARIMU_FAITH_ENABLED?: string }).HARIMU_FAITH_ENABLED === 'true', war: (env as unknown as { HARIMU_WAR_ENABLED?: string }).HARIMU_WAR_ENABLED === 'true', warWeariness: wearinessEnabled(env as unknown as WearinessBindings), warWearinessLosses: wearinessLossesEnabled(env as unknown as WearinessBindings), diplomacy: (env as unknown as { HARIMU_DIPLOMACY_ENABLED?: string }).HARIMU_DIPLOMACY_ENABLED === 'true', embargo: (env as unknown as { HARIMU_EMBARGO_ENABLED?: string }).HARIMU_EMBARGO_ENABLED === 'true', foundingPeriod: (env as unknown as { HARIMU_FOUNDING_PERIOD_ENABLED?: string }).HARIMU_FOUNDING_PERIOD_ENABLED === 'true', armyBattles: armyBattlesEnabled(env) /* #738 battles: record finished battles once */, winterMarch: winterMarchEnabled(env) /* #1038 */ });
@@ -95,12 +97,16 @@ export async function GET() {
   ]);
   const bands = populationBands(nationResult.results.map(nation => nation.id), Object.fromEntries(enrollmentResult.results.map(row => [row.nation_id, Number(row.citizens)])), undefined, id => !nationIsPreview(id));
 
+  const userId = await authenticatedUserId(request); // #1434: only a Korund viewer is filtered
+  const nation = userId
+    ? (await database.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id
+    : undefined;
   return Response.json(
     {
       // #1041 / #1048: server flagOn of HARIMU_UI_PACK. The HUD reads these booleans; the browser bundle does not read the flags.
       worldAges: flagOn(env, 'HARIMU_WORLD_AGES_ENABLED'),
       faithFestivalHud: flagOn(env, 'HARIMU_FAITH_FESTIVAL_HUD_ENABLED'),
-      simulation,
+      simulation: presentKorundWorldSimulation(simulation, nation), // #1434
       nations: nationResult.results.map((nation) => ({
         id: nation.id,
         name: nation.name,
@@ -152,6 +158,6 @@ export async function GET() {
         occurredAt: event.occurred_at,
       })),
     },
-    { headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=120' } },
+    { headers: { 'Cache-Control': 'private, no-store' } }, // #1434: the body depends on the viewer (Korund war fog is always on), so no response is shared-cacheable (QA1 review 5908590507)
   );
 }

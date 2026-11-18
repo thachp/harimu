@@ -23,6 +23,7 @@ import { evacuationEnabled, readEvacuationNotice } from '@/lib/war-evacuation'; 
 import { varkandRecruitTerm } from '@/lib/varkand-recruit-term'; // #1095
 import { readNationWork, validNationWorkCommand, executeNationWork } from '@/lib/nation-work'; // #490
 import { advanceWorld, readWorldSimulation } from '@/lib/world-simulation';
+import { presentKorundWorldSimulation } from '@/lib/war'; // #1434
 import { readVerification } from '@/lib/verification';
 import { petitionSql, petitionEligibilitySql, readGovernment, latchGovernmentReviews } from '@/lib/government-state';
 import { kindleSalesTaxEnabled, playerFillSalesTaxSql } from '@/lib/kindle-sales-tax'; // #844 follow-up
@@ -290,7 +291,7 @@ export async function GET(request: Request) {
     firstWeek,
     ...(civicRank ? { civicRank } : {}), // #741: Kindle only, flag on only
     flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true', mapOverlays: (env as unknown as { HARIMU_MAP_OVERLAYS_ENABLED?: string }).HARIMU_MAP_OVERLAYS_ENABLED === 'true', ...(armyMapEnabled(env) ? { armyMap: true } : {}), /* #738 slice 4: only when on, like civicRank */ ...(civicRankOn ? { civicRank: true } : {}), ...((env as unknown as { HARIMU_KINDLE_BUDGET_VIEW_ENABLED?: string }).HARIMU_KINDLE_BUDGET_VIEW_ENABLED === 'true' ? { kindleBudget: true } : {}), ...(enrollHomeOn() ? { enrollHomeCity: true } : {}), ...(flagOn(env, 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED') ? { brasswellPort: true } : {}), ...(flagOn(env, DUNMORROW_FLAG) ? { dunmorrow: true } : {}), ...(flagOn(env, CORVEL_ISLES_FLAG) ? { corvelIsles: true } : {}), ...(flagOn(env, 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED') ? { vakkHarbor: true } : {}), ...(flagOn(env, RUEL_WORKS_FLAG) ? { ruelWorks: true } : {}), ...(flagOn(env, THESSALY_WELLS_FLAG) ? { thessalyWells: true } : {}), ...(flagOn(env, MARROW_MILLS_FLAG) ? { marrowMills: true } : {}), ...(flagOn(env, DAO_WORKS_FLAG) ? { daoWorks: true } : {}), ...(flagOn(env, DUNKAR_PASS_FLAG) ? { dunkarPass: true } : {}) }, // #965: absent while off; #1241, #1242, #1259, #1261, #1270, #1271, #1275, #1279: absent while off; #1282: absent while off // #811: flag off adds nothing // #82: the Overlays group renders only while this is true; // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
-    simulation,
+    simulation: presentKorundWorldSimulation(simulation, profile?.nation_id), // #1434
     verification,
     economy,
     market,
