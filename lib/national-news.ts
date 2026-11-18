@@ -1,4 +1,5 @@
 import {foundingNewsItems,readFoundingEvents} from './founding-period'; // #612
+import {editionHeadlines,newsEditions} from './news-editions'; // #1443
 import type {GameDatabase} from './database-contract';
 import type { GovernmentSnapshot } from './government';
 import { publicGovernmentSnapshot, governmentDisclosure } from './government-disclosure';
@@ -22,7 +23,8 @@ export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
-export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean}={}):Promise<NationalNews|null> {
+export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean;confluence?:boolean}={}):Promise<NationalNews|null> {
+ if(nationId==='confluence')return options.confluence?readConfluenceCurrentDaily(db,now):null; // #1443 existing opening flag; no new flag
  if(!Object.hasOwn(editions,nationId))return null;
  const edition=editions[nationId as keyof typeof editions];
  if(!edition)return null;
@@ -59,6 +61,20 @@ export async function readNationalNews(db:GameDatabase,nationId:string,now:numbe
  }
  const planStat = nationId === 'korund' && options.planStats ? await readKorundPlanStat(db, now) : undefined;
  return {nationId,...edition,fetchedAt:now,statistics:{citizens:register?.citizens??0,completedShifts:totals?.shifts??0,food:totals?.food??0},...(planStat ? {planStat} : {}),items:items.sort((a,b)=>b.occurredAt-a.occurredAt).slice(0,12)};
+}
+
+
+/** #1443: Confluence's official paper, The Current Daily (§18.2). Shift counts come only from
+ *  nation_wage_settlements (#490). Food, trades and market quantity stay 0 this slice — no invented basket. */
+async function readConfluenceCurrentDaily(db:GameDatabase,now:number):Promise<NationalNews>{
+ const edition=newsEditions.confluence;
+ const [register,totals]=await Promise.all([
+  db.prepare('SELECT COUNT(*) AS citizens FROM citizens WHERE nation_id=?').bind('confluence').first<{citizens:number}>(),
+  db.prepare('SELECT COUNT(*) AS shifts FROM nation_wage_settlements WHERE nation_id=?').bind('confluence').first<{shifts:number}>(),
+ ]);
+ const citizens=Number(register?.citizens??0),shifts=Number(totals?.shifts??0);
+ const items=editionHeadlines('confluence',{shifts,food:0,trades:0,quantity:0,citizens}).map((h,i)=>({id:`confluence:template:${i}`,title:h.title,text:h.text,occurredAt:now,source:'deterministic' as const,kind:'template' as const}));
+ return {nationId:'confluence',title:edition.outlet,style:'state',fetchedAt:now,statistics:{citizens,completedShifts:shifts,food:0},items};
 }
 
 /** #981: open-week food summed from korund_settlements, percent against the weekly quota. Read-only; flag off never calls it.
