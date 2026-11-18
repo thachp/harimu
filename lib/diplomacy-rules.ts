@@ -46,15 +46,50 @@ export const treatyBreakPenaltyFor = (kind: TreatyKind, breaker: TreatyNationId)
 /** #1474: derived World Reputation per MVP nation from broken treaties. Starts at 0 and adds
  *  treatyBreakPenalty[kind].reputation for each treaty with status === 'broken' and brokenBy === nation.
  *  brokenPacts counts only breaks whose reputation penalty is non-zero. Nothing is stored. */
-export type WorldReputation = { score: number; brokenPacts: number };
+export type WorldReputationScore = { score: number; brokenPacts: number };
+export type WorldReputationBreak = { other: TreatyNationId; kind: TreatyKind; brokenAt: number; brokenGameDay: number; penalty: number };
+export type WorldReputation = WorldReputationScore & { record: WorldReputationBreak[]; earlierBreaks: number };
+export type WorldReputationScoreMap = Record<TreatyNationId, WorldReputationScore>;
 export type WorldReputationMap = Record<TreatyNationId, WorldReputation>;
-export function worldReputation(treaties: readonly { kind: TreatyKind; status: string; brokenBy: TreatyNationId | null }[]): WorldReputationMap {
-  const result = Object.fromEntries(treatyNations.map(nation => [nation, { score: 0, brokenPacts: 0 }])) as WorldReputationMap;
+export const worldReputationRecordLimit = 10;
+/** Same game-day formula as the world clock: day 1 at epoch, 12× compression. */
+export const worldReputationGameDay = (epochSeconds: number, atSeconds: number) => Math.floor(Math.max(0, atSeconds - epochSeconds) * 12 / 86400) + 1;
+export function worldReputation(treaties: readonly { kind: TreatyKind; status: string; brokenBy: TreatyNationId | null }[]): WorldReputationScoreMap {
+  const result = Object.fromEntries(treatyNations.map(nation => [nation, { score: 0, brokenPacts: 0 }])) as WorldReputationScoreMap;
   for (const treaty of treaties) {
     if (treaty.status !== 'broken' || !isTreatyNation(treaty.brokenBy) || !isTreatyKind(treaty.kind)) continue;
     const penalty = treatyBreakPenalty[treaty.kind].reputation;
     result[treaty.brokenBy].score += penalty;
     if (penalty !== 0) result[treaty.brokenBy].brokenPacts += 1;
+  }
+  return result;
+}
+
+/** #1480: attach the broken-treaty record behind each nation's score. Only kinds with a non-zero
+ *  treatyBreakPenalty[kind].reputation. Newest first (brokenAt, then id). The visible record is capped
+ *  at worldReputationRecordLimit; earlierBreaks is how many older counting breaks the cap omits. The
+ *  score still counts all of them. Consumes a list of break rows (today: the PublicTreaty list; after
+ *  #1479: the uncapped source). Nothing is stored. */
+export function withWorldReputationRecord(
+  scores: WorldReputationScoreMap,
+  treaties: readonly { id?: string; kind: string; status?: string; brokenBy: string | null; proposer: string; other: string; brokenAt: number | null }[],
+  epochSeconds: number,
+): WorldReputationMap {
+  const collected = Object.fromEntries(treatyNations.map(nation => [nation, [] as (WorldReputationBreak & { id: string })[]])) as Record<TreatyNationId, (WorldReputationBreak & { id: string })[]>;
+  for (const treaty of treaties) {
+    if ((treaty.status != null && treaty.status !== 'broken') || !isTreatyNation(treaty.brokenBy) || !isTreatyKind(treaty.kind)) continue;
+    const penalty = treatyBreakPenalty[treaty.kind].reputation;
+    if (penalty === 0 || !isTreatyNation(treaty.proposer) || !isTreatyNation(treaty.other)) continue;
+    const other = treaty.brokenBy === treaty.proposer ? treaty.other : treaty.brokenBy === treaty.other ? treaty.proposer : null;
+    if (!isTreatyNation(other)) continue;
+    const brokenAt = treaty.brokenAt ?? 0;
+    collected[treaty.brokenBy].push({ other, kind: treaty.kind, brokenAt, brokenGameDay: worldReputationGameDay(epochSeconds, brokenAt), penalty, id: treaty.id ?? '' });
+  }
+  const result = {} as WorldReputationMap;
+  for (const nation of treatyNations) {
+    const all = collected[nation].sort((a, b) => b.brokenAt - a.brokenAt || b.id.localeCompare(a.id));
+    const record = all.slice(0, worldReputationRecordLimit).map(item => ({ other: item.other, kind: item.kind, brokenAt: item.brokenAt, brokenGameDay: item.brokenGameDay, penalty: item.penalty }));
+    result[nation] = { ...(scores[nation] ?? { score: 0, brokenPacts: 0 }), record, earlierBreaks: Math.max(0, all.length - worldReputationRecordLimit) };
   }
   return result;
 }
