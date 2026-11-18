@@ -27,6 +27,7 @@ async function load(rel) {
     if (name === './square-chat') return { SquareChat: () => null };
     if (name === '@phosphor-icons/react') return new Proxy({}, { get: () => () => null });
     if (name === '@clerk/nextjs') return { useClerk: () => ({ mountUserButton() {}, unmountUserButton() {} }) };
+    if (name === '../lib/kindle-newspapers' || name === '@/lib/kindle-newspapers') return { PRESS_HEADLINE_MAX: 40, PRESS_PARAGRAPH_MAX: 140, kindleNewspaperExistsError: 'You already founded a newspaper.' };
     if (name.startsWith('@/lib/')) return require(`../lib/${name.slice(6)}.ts`);
     if (name.startsWith('../lib/')) return require(`${name}.ts`);
     return require(name);
