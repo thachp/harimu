@@ -9,7 +9,7 @@ import ts from 'typescript';
 import {instantRunoffCounts} from '../lib/instant-runoff.ts';
 const require=createRequire(import.meta.url),rules={};
 const source=ts.transpileModule(await readFile(new URL('../lib/elections.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
-new Function('exports','require',source)(rules,name=>name==='./instant-runoff'?require('../lib/instant-runoff.ts'):name==='./ballot-privacy'?require('../lib/ballot-privacy.ts'):require(name));
+new Function('exports','require',source)(rules,name=>name==='./instant-runoff'?require('../lib/instant-runoff.ts'):name==='./ballot-privacy'?require('../lib/ballot-privacy.ts'):name==='./citizen-district'?{async citizenDistrict(){return 'forgehaven';},districtBallotCounts(){return [];}}:require(name));
 const {candidateIds,electionId,ballotWindowSeconds}=rules;
 const eligible=(r,user)=>r.setVerification(user,{userId:user,emailVerified:true,phoneVerified:true,phoneUnique:true,revoked:false,checkedAt:r.now,expiresAt:r.now+60000});
 const vote=(ranking=candidateIds)=>({action:'vote',electionId,requestId:randomUUID(),ranking});
@@ -40,7 +40,7 @@ test('results stay hidden before exact close, then the human-only tally is immut
  const r=await localRuntime({ballotPrivacyReady:true});t.after(()=>r.close());eligible(r,'alice');eligible(r,'bob');const a=await r.call('election','alice',vote([...candidateIds].reverse()));await r.call('election','bob',vote([...candidateIds].reverse()));const close=a.data.closesAt;
  r.setNow(close*1000-1);const before=await r.call('election','bob');assert.equal(before.data.result,null);assert.equal(before.data.status,'open');
  r.setNow(close*1000);const result=await r.call('election','alice');assert.equal(result.data.status,'closed');assert.equal(result.data.result.humanBallots,2);assert.equal(result.data.result.simulatedPublicUnits,0);assert.equal(result.data.result.winner,candidateIds[2]);assert.equal(result.data.result.weightScale,4);assert.equal(result.data.result.rounds[0].human[candidateIds[2]],2);
- assert.deepEqual(result.data.result,instantRunoffCounts(candidateIds,[{ranking:[...candidateIds].reverse(),count:2}],[]));
+ const {districts:hiddenDistricts,...irv}=result.data.result;assert.deepEqual(irv,instantRunoffCounts(candidateIds,[{ranking:[...candidateIds].reverse(),count:2}],[]));assert.ok(Array.isArray(hiddenDistricts));
  r.reopen();r.setNow(close*1000+1000);assert.deepEqual((await r.call('election','bob')).data.result,result.data.result);assert.doesNotMatch(JSON.stringify(result.data),/ranking_json|ballot_id|receipt|clerk_user_id|"alice"|"bob"/);
  await (await r.importModule('lib/world-simulation.ts')).advanceWorld(r.db,Math.floor(r.now/1000));/* #221: the tick records the close GET only shows */r.setNow(close*1000-5000);eligible(r,'bob');assert.equal((await r.call('election','bob',vote())).status,409);assert.equal((await r.call('election','alice')).data.status,'closed');
 });
@@ -60,7 +60,7 @@ test('#1369 the old 20% bloc would elect Ines; the human-only count elects Mara 
  assert.equal(bloc.simulatedPublicUnits/(bloc.humanBallots*bloc.weightScale+bloc.simulatedPublicUnits),.2);
  assert.equal(human.winner,candidateIds[2],'human ballots elect Mara');assert.equal(human.simulatedPublicUnits,0);assert.notEqual(human.winner,bloc.winner);
  r.setNow(open.data.closesAt*1000);const closed=await r.call('election','alice');
- assert.equal(closed.data.result.humanBallots,4);assert.equal(closed.data.result.simulatedPublicUnits,0);assert.deepEqual(closed.data.result,human);
+ assert.equal(closed.data.result.humanBallots,4);assert.equal(closed.data.result.simulatedPublicUnits,0);const {districts:closedDistricts,...closedIrv}=closed.data.result;assert.deepEqual(closedIrv,human);assert.ok(Array.isArray(closedDistricts));
  await (await r.importModule('lib/world-simulation.ts')).advanceWorld(r.db,Math.floor(r.now/1000));
  const stored=JSON.stringify(bloc);
  await r.db.prepare('UPDATE civic_elections SET result_json=? WHERE id=?').bind(stored,electionId).run();
