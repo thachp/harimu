@@ -43,20 +43,28 @@ export const treatyBreakPenalty: Readonly<Record<TreatyKind, { legitimacy: numbe
 export type TreatyBreakPenalty = { nation: TreatyNationId; legitimacy: number; reputation: number; applied: false };
 export const treatyBreakPenaltyFor = (kind: TreatyKind, breaker: TreatyNationId): TreatyBreakPenalty => ({ nation: breaker, ...treatyBreakPenalty[kind], applied: false });
 
-/** #1474: derived World Reputation per MVP nation from broken treaties. Starts at 0 and adds
+/** #1474 / #1477: derived World Reputation per MVP nation from broken treaties. Starts at 0 and adds
  *  treatyBreakPenalty[kind].reputation for each treaty with status === 'broken' and brokenBy === nation.
- *  brokenPacts counts only breaks whose reputation penalty is non-zero. Nothing is stored. */
+ *  brokenPacts counts only breaks whose reputation penalty is non-zero. Nothing is stored.
+ *  #1477: score and brokenPacts are computed from an uncapped per-nation count (worldReputationFromBreaks), never from a LIMITed list. */
 export type WorldReputation = { score: number; brokenPacts: number };
 export type WorldReputationMap = Record<TreatyNationId, WorldReputation>;
-export function worldReputation(treaties: readonly { kind: TreatyKind; status: string; brokenBy: TreatyNationId | null }[]): WorldReputationMap {
+export const worldReputationBreaksSql = "SELECT broken_by, kind, COUNT(*) AS n FROM treaties WHERE status='broken' AND broken_by IS NOT NULL GROUP BY broken_by, kind";
+export type WorldReputationBreakRow = { brokenBy: string | null; kind: string; n: number };
+export function worldReputationFromBreaks(rows: readonly WorldReputationBreakRow[]): WorldReputationMap {
   const result = Object.fromEntries(treatyNations.map(nation => [nation, { score: 0, brokenPacts: 0 }])) as WorldReputationMap;
-  for (const treaty of treaties) {
-    if (treaty.status !== 'broken' || !isTreatyNation(treaty.brokenBy) || !isTreatyKind(treaty.kind)) continue;
-    const penalty = treatyBreakPenalty[treaty.kind].reputation;
-    result[treaty.brokenBy].score += penalty;
-    if (penalty !== 0) result[treaty.brokenBy].brokenPacts += 1;
+  for (const row of rows) {
+    if (!isTreatyNation(row.brokenBy) || !isTreatyKind(row.kind)) continue;
+    const n = Math.max(0, Math.floor(Number(row.n) || 0));
+    const penalty = treatyBreakPenalty[row.kind].reputation;
+    result[row.brokenBy].score += penalty * n;
+    if (penalty !== 0) result[row.brokenBy].brokenPacts += n;
   }
   return result;
+}
+export function worldReputation(treaties: readonly { kind: TreatyKind; status: string; brokenBy: TreatyNationId | null }[]): WorldReputationMap {
+  return worldReputationFromBreaks(treaties.flatMap(treaty =>
+    treaty.status === 'broken' ? [{ brokenBy: treaty.brokenBy, kind: treaty.kind, n: 1 }] : []));
 }
 
 
