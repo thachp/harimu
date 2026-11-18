@@ -78,7 +78,8 @@ test('the header names no other lib module path', () => {
   const head=readFileSync('lib/aurelle-rank-copy.ts','utf8').split('*/')[0];
   assert.doesNotMatch(head,/\blib\/|\.ts\b|app\/|components\//);
 });
-test('unwired: nothing in app/, components/ or lib/ imports aurelle-rank-copy', () => {
+test('copy imports: only the #1359 rank card and read path import aurelle-rank-copy', () => {
   const walk=d=>{ try { return readdirSync(d).flatMap(f=>{const p=`${d}/${f}`; return statSync(p).isDirectory()?walk(p):[p];}); } catch { return []; } };
-  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!f.endsWith('aurelle-rank-copy.ts')) assert.doesNotMatch(readFileSync(f,'utf8'),/aurelle-rank-copy/, f);
+  const allowed=new Set(['lib/aurelle-rank-copy.ts','lib/aurelle-rank.ts','app/aurelle-rank-card.tsx']);
+  for (const f of [...walk('app'),...walk('components'),...walk('lib')]) if (/\.(t|j)sx?$/.test(f)&&!allowed.has(f)) assert.doesNotMatch(readFileSync(f,'utf8'),/aurelle-rank-copy/, f);
 });

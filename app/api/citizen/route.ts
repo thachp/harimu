@@ -43,6 +43,8 @@ import { authenticatedUserId } from '@/lib/auth';
 import { refreshClerkRiskSignal } from '@/lib/clerk-risk-signals'; // #943
 import { readCivicRank } from '@/lib/civic-rank';
 import { civicRankFlagOn } from '@/lib/civic-rank-rules';
+import { readAurelleRank } from '@/lib/aurelle-rank'; // #1359
+import { AURELLE_RANKS_FLAG } from '@/lib/aurelle-rank-rules'; // #1359
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { env } from 'cloudflare:workers';
 import { armyMapEnabled } from '@/lib/army-map'; // #738 slice 4
@@ -267,12 +269,14 @@ export async function GET(request: Request) {
   // #969: one additive field, and only while the top-bar countdown flag is on. Unset cycle start stays omitted (calendars held, no invented date).
   const cycleStartAt = (env as unknown as { NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN?: string }).NEXT_PUBLIC_HARIMU_TOPBAR_COUNTDOWN === 'true' ? kindleCycleStartAt(env as unknown as CalendarBindings) : null;
   const civicRankOn = civicRankFlagOn(env); // #741
-  const [election, collectivePetitions, firstWeek, governmentRead, civicRank] = await Promise.all([
+  const aurelleRanksOn = flagOn(env, AURELLE_RANKS_FLAG); // #1359
+  const [election, collectivePetitions, firstWeek, governmentRead, civicRank, aurelleRank] = await Promise.all([
     profile?.nation_id==='kindle'?readElection(electionDatabase,userId,civicNow,accountLevel||undefined,accountLevel||verification.countedActionsEligible,true,undefined,false,presidentialWindow(env as unknown as CalendarBindings,civicNow),electionIdFor(presidentialCycle(env as unknown as CalendarBindings,civicNow))):null,
     profile?.nation_id==='kindle'?readCollectivePetitions(database,userId,civicNow,verification.countedActionsEligible):null,
     profile ? readFirstWeekProgress(database,userId) : null,
     profile?.nation_id ? readGovernment(database, profile.nation_id, Math.floor(Date.now()/1000), userId, governmentReadOptions(true)) : null,
     civicRankOn && profile?.nation_id === 'kindle' ? readCivicRank(database, userId, profile.nation_id) : null, // #741: one aggregate, in the second wave (no extra serial round trip)
+    aurelleRanksOn && profile?.nation_id === 'aurelle' ? readAurelleRank(database, userId, profile.nation_id) : null, // #1359: one aggregate, flag off: not read
   ]);
   if (profile && capacity) profile.capacity = capacity.capacity;
   if (starterFood && market.householdRecord) market.householdRecord = { ...market.householdRecord, starterFoodGranted: starterFood };
@@ -291,7 +295,8 @@ export async function GET(request: Request) {
     ...(() => { const board = confluencePriceBoard(profile?.nation_id, userId, env as never); return board ? { confluencePriceBoard: board } : {}; })(), // #487: pure, no query
     firstWeek,
     ...(civicRank ? { civicRank } : {}), // #741: Kindle only, flag on only
-    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true', mapOverlays: (env as unknown as { HARIMU_MAP_OVERLAYS_ENABLED?: string }).HARIMU_MAP_OVERLAYS_ENABLED === 'true', ...(armyMapEnabled(env) ? { armyMap: true } : {}), /* #738 slice 4: only when on, like civicRank */ ...(civicRankOn ? { civicRank: true } : {}), ...((env as unknown as { HARIMU_KINDLE_BUDGET_VIEW_ENABLED?: string }).HARIMU_KINDLE_BUDGET_VIEW_ENABLED === 'true' ? { kindleBudget: true } : {}), ...(flagOn(env, KINDLE_NEWSPAPERS_FLAG) ? { kindleNewspapers: true } : {}), ...(enrollHomeOn() ? { enrollHomeCity: true } : {}), ...(flagOn(env, 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED') ? { brasswellPort: true } : {}), ...(flagOn(env, DUNMORROW_FLAG) ? { dunmorrow: true } : {}), ...(flagOn(env, CORVEL_ISLES_FLAG) ? { corvelIsles: true } : {}), ...(flagOn(env, 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED') ? { vakkHarbor: true } : {}), ...(flagOn(env, RUEL_WORKS_FLAG) ? { ruelWorks: true } : {}), ...(flagOn(env, THESSALY_WELLS_FLAG) ? { thessalyWells: true } : {}), ...(flagOn(env, MARROW_MILLS_FLAG) ? { marrowMills: true } : {}), ...(flagOn(env, DAO_WORKS_FLAG) ? { daoWorks: true } : {}), ...(flagOn(env, DUNKAR_PASS_FLAG) ? { dunkarPass: true } : {}) }, // #965: absent while off; #1241, #1242, #1259, #1261, #1270, #1271, #1275, #1279: absent while off; #1282: absent while off // #811: flag off adds nothing // #82: the Overlays group renders only while this is true; // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
+    ...(aurelleRank ? { aurelleRank } : {}), // #1359: Aurelle only, flag on only
+    flags: { market: marketFlagOn((env as unknown as { HARIMU_ORDER_BOOK_ENABLED?: string }).HARIMU_ORDER_BOOK_ENABLED), diplomaticHall: (env as unknown as { HARIMU_DIPLOMATIC_HALL_ENABLED?: string }).HARIMU_DIPLOMATIC_HALL_ENABLED === 'true', mapOverlays: (env as unknown as { HARIMU_MAP_OVERLAYS_ENABLED?: string }).HARIMU_MAP_OVERLAYS_ENABLED === 'true', ...(armyMapEnabled(env) ? { armyMap: true } : {}), /* #738 slice 4: only when on, like civicRank */ ...(civicRankOn ? { civicRank: true } : {}), ...((env as unknown as { HARIMU_KINDLE_BUDGET_VIEW_ENABLED?: string }).HARIMU_KINDLE_BUDGET_VIEW_ENABLED === 'true' ? { kindleBudget: true } : {}), ...(flagOn(env, KINDLE_NEWSPAPERS_FLAG) ? { kindleNewspapers: true } : {}), ...(flagOn(env, AURELLE_RANKS_FLAG) ? { aurelleRanks: true } : {}), ...(enrollHomeOn() ? { enrollHomeCity: true } : {}), ...(flagOn(env, 'HARIMU_KINDLE_BRASSWELL_PORT_ENABLED') ? { brasswellPort: true } : {}), ...(flagOn(env, DUNMORROW_FLAG) ? { dunmorrow: true } : {}), ...(flagOn(env, CORVEL_ISLES_FLAG) ? { corvelIsles: true } : {}), ...(flagOn(env, 'HARIMU_HOARVALE_VAKK_HARBOR_ENABLED') ? { vakkHarbor: true } : {}), ...(flagOn(env, RUEL_WORKS_FLAG) ? { ruelWorks: true } : {}), ...(flagOn(env, THESSALY_WELLS_FLAG) ? { thessalyWells: true } : {}), ...(flagOn(env, MARROW_MILLS_FLAG) ? { marrowMills: true } : {}), ...(flagOn(env, DAO_WORKS_FLAG) ? { daoWorks: true } : {}), ...(flagOn(env, DUNKAR_PASS_FLAG) ? { dunkarPass: true } : {}) }, // #965: absent while off; #1241, #1242, #1259, #1261, #1270, #1271, #1275, #1279: absent while off; #1282: absent while off // #811: flag off adds nothing // #82: the Overlays group renders only while this is true; // #599: the hall tab shows only while this is true; // #344: the UI hides Market entry points while this is false
     simulation: presentKorundWorldSimulation(simulation, profile?.nation_id), // #1434
     verification,
     economy,
