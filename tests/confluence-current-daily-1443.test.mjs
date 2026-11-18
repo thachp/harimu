@@ -37,8 +37,29 @@ test('Confluence citizen gets The Current Daily when the opening flag is on',asy
   assert.equal(res.data.style,'state');
   assert.deepEqual(res.data.statistics,{citizens:1,completedShifts:0,food:0});
   assert.ok(res.data.items.some(i=>i.title==='The canals wait for the next stream'));
+  // #1446 QA1: food stays 0 this slice, so the Bread Halls basket template must not appear.
+  assert.ok(res.data.items.every(i=>i.title!=='Many streams report a full basket'));
+  assert.ok(res.data.items.every(i=>!/Bread Halls/.test(`${i.title} ${i.text}`)));
+  // Register template uses the citizen count (acceptance 4); exact #108 wording.
+  const register=res.data.items.find(i=>i.title==='New households join the current');
+  assert.ok(register, 'register item present');
+  assert.match(register.text,/1 citizen registered with a household this period/);
   assert.ok(res.data.items.every(i=>i.source==='deterministic'&&i.kind==='template'));
   assert.doesNotMatch(JSON.stringify(res.data),/Private alice|clerk_user_id/);
+});
+
+test('two Confluence citizens get the plural register line from the #108 template',async t=>{
+  const r=await localRuntime();t.after(()=>r.close());
+  await r.db.prepare("UPDATE citizens SET nation_id='confluence' WHERE clerk_user_id IN ('alice','bob')").run();
+  gate(r,true);
+  const res=await read(r,'alice');
+  assert.equal(res.status,200);
+  assert.equal(res.data.statistics.citizens,2);
+  assert.ok(res.data.items.every(i=>i.title!=='Many streams report a full basket'));
+  assert.ok(res.data.items.every(i=>!/Bread Halls/.test(`${i.title} ${i.text}`)));
+  const register=res.data.items.find(i=>i.title==='New households join the current');
+  assert.ok(register, 'register item present');
+  assert.match(register.text,/2 citizens registered with a household this period/);
 });
 
 test('Confluence off still 404s, gated as today',async t=>{
