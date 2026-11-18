@@ -1,5 +1,7 @@
 import type {GameDatabase} from './database-contract';
 import { recordPlayerFill } from './spark-origin.ts'; // #465
+import { flagOn } from './flag-pack.mjs';
+import { orderBookCityId } from './order-book-rules.ts'; // #1428 uses the #1404 venue rule
 export type PlayerCommand = {
   action: 'create-listing' | 'buy-listing' | 'cancel-listing'; requestId: string;
   item?: string; quantity?: number; unitMinor?: number; listingId?: string;
@@ -12,7 +14,8 @@ export const listingSchema = `CREATE TABLE IF NOT EXISTS player_listings (
   item TEXT NOT NULL CHECK(item IN ('food','materials','knowledge')),
   quantity INTEGER NOT NULL CHECK(typeof(quantity) = 'integer' AND quantity BETWEEN 1 AND 10),
   unit_minor INTEGER NOT NULL CHECK(typeof(unit_minor) = 'integer' AND unit_minor BETWEEN 1 AND 1000),
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  city_id TEXT NOT NULL DEFAULT 'kindle' -- #1428: legacy venue; migration 0131 backfills existing rows
 )`;
 export const fillSchema = `CREATE TABLE IF NOT EXISTS player_fills (
   request_id TEXT PRIMARY KEY, listing_id TEXT NOT NULL UNIQUE REFERENCES player_listings(id),
@@ -30,20 +33,30 @@ export const playerReceiptView = `CREATE VIEW IF NOT EXISTS player_request_recei
   SELECT id AS request_id, seller_id AS user_id, 'create-listing' AS action, id AS listing_id FROM player_listings
   UNION ALL SELECT request_id, buyer_id AS user_id, 'buy-listing' AS action, listing_id FROM player_fills
   UNION ALL SELECT request_id, seller_id AS user_id, 'cancel-listing' AS action, listing_id FROM player_cancellations`;
+/** Escrow and the five-listing cap count every open lot. The board read and buy filter by city separately (#1428). */
 export const openLotsView = `CREATE VIEW IF NOT EXISTS player_open_lots AS
   SELECT l.* FROM player_listings l WHERE NOT EXISTS (SELECT 1 FROM player_fills WHERE listing_id = l.id)
     AND NOT EXISTS (SELECT 1 FROM player_cancellations WHERE listing_id = l.id)`;
-export const createListingSql = `INSERT INTO player_listings (id, seller_id, item, quantity, unit_minor, created_at)
-  SELECT ?, c.clerk_user_id, ?, ?, ?, ? FROM citizens c
+const localBooksFlag = 'HARIMU_CITY_LOCAL_BOOKS_ENABLED';
+/** #1404 venue: flag off is 'kindle'. Flag on is the stored current city, or 'kindle' when there is none. */
+export async function listingVenue(db: GameDatabase, userId: string, env?: unknown): Promise<string> {
+  if (!flagOn(env, localBooksFlag)) return orderBookCityId;
+  const row = await db.prepare('SELECT current_city_id FROM citizen_city_locations WHERE user_id=?').bind(userId).first<{ current_city_id: string | null }>();
+  return row?.current_city_id || orderBookCityId;
+}
+export const createListingSql = `INSERT INTO player_listings (id, seller_id, item, quantity, unit_minor, created_at, city_id)
+  SELECT ?, c.clerk_user_id, ?, ?, ?, ?, ? FROM citizens c
   WHERE c.clerk_user_id = ? AND c.nation_id = 'kindle'
     AND COALESCE((SELECT quantity FROM citizen_inventory_balances WHERE clerk_user_id = c.clerk_user_id AND item = ?), 0) >= ?
     AND (SELECT COUNT(*) FROM player_open_lots WHERE seller_id = c.clerk_user_id) < 5
     AND NOT EXISTS (SELECT 1 FROM player_request_receipts WHERE request_id = ?)`;
 // One row records the entire transfer; wallets, goods and listing state derive from it.
+// city_id is read from the table, not the view, so a view created before migration 0131 still fills.
 export const fillListingSql = `INSERT INTO player_fills (request_id, listing_id, buyer_id, seller_id, item, quantity, amount_minor, filled_at)
   SELECT ?, l.id, b.clerk_user_id, l.seller_id, l.item, l.quantity, l.unit_minor * l.quantity, ? FROM player_open_lots l
   JOIN citizens b ON b.clerk_user_id = ? JOIN citizens s ON s.clerk_user_id = l.seller_id
   WHERE l.id = ? AND b.nation_id = 'kindle' AND s.nation_id = 'kindle' AND l.seller_id != b.clerk_user_id
+    AND (SELECT p.city_id FROM player_listings p WHERE p.id = l.id) = ?
     AND (SELECT balance FROM citizen_wallet_balances WHERE clerk_user_id = b.clerk_user_id) >= l.unit_minor * l.quantity
     AND NOT EXISTS (SELECT 1 FROM player_request_receipts WHERE request_id = ?)`;
 // Owners may reclaim escrow even if they changed nation after creating a listing.
@@ -65,7 +78,7 @@ export function parseSparkPrice(value: string): number | null {
   const minor = Number(whole) * 100 + Number(cents.padEnd(2, '0'));
   return minor >= 1 && minor <= 1000 ? minor : null;
 }
-export async function executePlayerCommand(db: GameDatabase, userId: string, command: PlayerCommand, now: number, options: { salesTaxSql?: string } = {}) {
+export async function executePlayerCommand(db: GameDatabase, userId: string, command: PlayerCommand, now: number, options: { salesTaxSql?: string; env?: unknown } = {}) {
   const find = () => db.prepare(`SELECT r.user_id, r.action, r.listing_id, l.item, l.quantity, l.unit_minor
     FROM player_request_receipts r JOIN player_listings l ON l.id = r.listing_id WHERE r.request_id = ?`)
     .bind(command.requestId).first<{ user_id: string; action: string; listing_id: string; item: string; quantity: number; unit_minor: number }>();
@@ -75,11 +88,12 @@ export async function executePlayerCommand(db: GameDatabase, userId: string, com
       : r.listing_id === command.listingId);
   const existing = await find();
   if (existing) return matches(existing) ? { status: 200, replayed: true } : { status: 409, error: 'Request identifier already used for another intent.' };
+  const venue = command.action === 'cancel-listing' ? orderBookCityId : await listingVenue(db, userId, options.env);
   if (command.action === 'create-listing') {
-    await db.prepare(createListingSql).bind(command.requestId, command.item, command.quantity, command.unitMinor, now,
+    await db.prepare(createListingSql).bind(command.requestId, command.item, command.quantity, command.unitMinor, now, venue,
       userId, command.item, command.quantity, command.requestId).run();
   } else if (command.action === 'buy-listing') {
-    const fill = db.prepare(fillListingSql).bind(command.requestId, now, userId, command.listingId, command.requestId);
+    const fill = db.prepare(fillListingSql).bind(command.requestId, now, userId, command.listingId, venue, command.requestId);
     // #844 follow-up: with the sales tax on, the route passes lib/kindle-sales-tax playerFillSalesTaxSql (kept out of this file so it has no runtime import);
     // the guarded tax INSERT rides in the same batch (no row unless the fill landed). Off: the single run, unchanged.
     if (options.salesTaxSql) await db.batch([fill, db.prepare(options.salesTaxSql).bind(command.requestId)]); else await fill.run();
@@ -93,19 +107,20 @@ export async function executePlayerCommand(db: GameDatabase, userId: string, com
   if (command.action === 'buy-listing') await recordPlayerFill(db, command.requestId, { salesTax: !!options.salesTaxSql }); // #465
   return { status: 200 };
 }
-export async function readPlayerMarket(db: GameDatabase, userId: string): Promise<PlayerMarketState> {
+export async function readPlayerMarket(db: GameDatabase, userId: string, env?: unknown): Promise<PlayerMarketState> {
   const columns = `SELECT l.id, l.item, l.quantity, l.unit_minor, l.created_at,
     CASE WHEN EXISTS (SELECT 1 FROM player_fills WHERE listing_id = l.id) THEN 'sold'
       WHEN EXISTS (SELECT 1 FROM player_cancellations WHERE listing_id = l.id) THEN 'cancelled' ELSE 'open' END AS status
     FROM player_listings l`;
   type Row = { id: string; item: string; quantity: number; unit_minor: number; created_at: number; status: PlayerLot['status'] };
+  const venue = await listingVenue(db, userId, env);
   const [citizen, mine, others] = await Promise.all([
     db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id = ?').bind(userId).first<{ nation_id: string | null }>(),
     db.prepare(`SELECT * FROM (${columns} WHERE l.seller_id = ?) own_lots ORDER BY (status = 'open') DESC, created_at DESC, id DESC LIMIT 20`).bind(userId).all<Row>(),
-    db.prepare(`${columns} WHERE l.seller_id != ? AND l.id IN (SELECT id FROM player_open_lots)
+    db.prepare(`${columns} WHERE l.seller_id != ? AND l.city_id = ? AND l.id IN (SELECT id FROM player_open_lots)
       AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id = ? AND nation_id = 'kindle')
       AND EXISTS (SELECT 1 FROM citizens WHERE clerk_user_id = l.seller_id AND nation_id = 'kindle')
-      ORDER BY l.created_at DESC, l.id DESC LIMIT 40`).bind(userId,userId).all<Row>(),
+      ORDER BY l.created_at DESC, l.id DESC LIMIT 40`).bind(userId, venue, userId).all<Row>(),
   ]);
   const serialize = (r: Row, owned: boolean): PlayerLot => ({ id: r.id, item: r.item, quantity: r.quantity,
     unitMinor: r.unit_minor, createdAt: new Date(r.created_at * 1000).toISOString(), status: r.status, mine: owned });

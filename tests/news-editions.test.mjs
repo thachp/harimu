@@ -13,6 +13,7 @@ test('one edition per non-MVP nation with outlet, masthead, record titles and pr
     assert.equal(new Set(e.templates.map(t=>t.id)).size, e.templates.length); assert.ok(e.templates.length>=4);
   }
   assert.equal(newsEditions.veldwood.outlet,'The Canopy'); assert.equal(newsEditions.veldwood.canon,true);
+  assert.equal(newsEditions.confluence.outlet,'The Current Daily'); assert.equal(newsEditions.confluence.canon,true);
   assert.equal(newsEditions.ilmar.templateKind,'decree');
   assert.match(newsEditions.fulmara.masthead,/Owned by/);
   assert.equal('korund' in newsEditions, false);

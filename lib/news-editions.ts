@@ -1,6 +1,6 @@
-/** News editions for the seven non-MVP nations (issue #108). Content only: not yet read by readNationalNews in
- * lib/national-news.ts, which still serves Kindle, Korund and Aurelle. Wiring these in is a follow-up once each nation opens.
- * Outlet names follow the culture bible (thachp/harimu-docs#3); `canon` marks names fixed there, the rest are proposals.
+/** News editions for the seven non-MVP nations (issue #108). #1443 wires Confluence (*The Current Daily*) into
+ * readNationalNews; the other six stay content-only until each edition is opened. Kindle, Korund and Aurelle stay in
+ * lib/national-news.ts. Outlet names follow the culture bible / §18.2; `canon` marks names fixed there, the rest are proposals.
  * Press freedom restates each nation's Freedoms row (harimu-docs content/world/nations/*.mdx).
  * Like lib/news-templates.ts, the voice lives only in the words: every number is copied from the ledger row passed in. */
 import type {LedgerRow,TemplateHeadline} from './news-templates';
@@ -21,7 +21,7 @@ const s=(n:number,one:string,many:string)=>`${n} ${n===1?one:many}`;
 const label=(outlet:string,source='the system ledger')=>`(${outlet} template · figures copied from ${source} and cannot be edited.)`;
 
 export const newsEditions:Readonly<Record<EditionNationId,NewsEditionContent>>={
- confluence:{nationId:'confluence',outlet:'The Current Daily',canon:false,masthead:'Many streams, one current.',style:'state',secondaryOutlet:'licensed local sheets',
+ confluence:{nationId:'confluence',outlet:'The Current Daily',canon:true,masthead:'Many streams, one current.',style:'state',secondaryOutlet:'licensed local sheets',
   pressFreedom:'moderate',freedomsRow:'One official newspaper plus licensed local outlets; speech free on daily life, restricted on the Party leadership.',
   templateKind:'template',label:label('Current Daily'),recordTitles:{work:'Guidance Plan work recorded',register:'Household registration recorded',market:'Bread Hall exchanges recorded'},
   templates:[
