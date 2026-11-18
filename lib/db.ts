@@ -65,6 +65,7 @@ import { cityChatSchemas } from './city-chat'; // #881
 import { congregationChatSchemas } from './congregation-chat'; // #1342
 import { partyChatSchemas } from './party-chat'; // #1353
 import { kindleNewspaperSchemas } from './kindle-newspapers'; // #1453 (migration 0132)
+import { korundStateMediaSchemas } from './korund-state-media.ts'; // #1469 (migration 0134)
 import { globalChatSchemas } from './global-chat'; // #881 part 2
 import { dmChatSchemas } from './dm-chat'; // #881 part 3
 import { embassyChatSchemas } from './embassy-chat'; // #882
@@ -302,7 +303,7 @@ async function initialize(database: GameDatabase) {
     ...dmChatSchemas.map(sql=>database.prepare(sql)), // #881 part 3
     ...embassyChatSchemas.map(sql=>database.prepare(sql)), // #882
     ...congregationChatSchemas.map(sql=>database.prepare(sql)), // #1342
-    ...partyChatSchemas.map(sql=>database.prepare(sql)), ...kindleNewspaperSchemas.map(sql=>database.prepare(sql)), // #1353, #1453 (migration 0132)
+    ...partyChatSchemas.map(sql=>database.prepare(sql)), ...kindleNewspaperSchemas.map(sql=>database.prepare(sql)), ...korundStateMediaSchemas.map(sql=>database.prepare(sql)), // #1353, #1453 (migration 0132), #1469 (migration 0134)
     ...armySchemas.map(sql=>database.prepare(sql)), // #738
     ...armyDrillSchemas.map(sql=>database.prepare(sql)), // #738 slice 2
     ...conscriptionSchemas.map(sql=>database.prepare(sql)), // #738 slice 3
