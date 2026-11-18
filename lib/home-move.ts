@@ -55,6 +55,11 @@ export function permitStatusOf(row:PermitRow|null,now:number):PermitView{
 export async function readPermitForCity(db:GameDatabase,userId:string,cityId:string,now:number):Promise<PermitView>{
  return permitStatusOf(await activePermit(db,userId,cityId),now);
 }
+/** #1444: a visit to another city in a closed system needs a granted permit. The visit does not consume it. Same city, an open nation, and the flag off are allowed. */
+export async function cityVisitAllowed(db:GameDatabase,userId:string,nationId:string,cityId:string,currentCityId:string|null,now:number,opts:PermitOpts):Promise<boolean>{
+ if(!opts.enabled||cityId===currentCityId||!requiresInternalPermit(nationId,opts.alert??'green'))return true;
+ return (await readPermitForCity(db,userId,cityId,now)).status==='granted';
+}
 export type PermitRequestResult={ok:true;permit:PermitView;replayed:boolean}|{ok:false;reason:'not_required'|'not_your_nation'|'request_conflict';status:number};
 /** Request (or replay) a single-use permit for a target city. Granted automatically after internalPermitWaitSeconds. */
 export async function requestInternalPermit(db:GameDatabase,userId:string,nationId:string,cityId:string,requestId:string,now:number,opts:PermitOpts):Promise<PermitRequestResult>{

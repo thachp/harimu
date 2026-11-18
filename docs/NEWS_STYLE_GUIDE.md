@@ -37,13 +37,13 @@ Taken from the moderation content policy. These override every nation's voice.
 - **Sample lines:** "Price boards hum: 15 trades cleared." · "Shifts settled, wages posted." · "New sparks in the Republic."
 - **Banned:** implying the state favors any faith (strict separation); hiding a figure behind vague words; mocking voters rather than candidates.
 
-## The Confluence: *The Current Daily* (proposal)
+## The Confluence: *The Current Daily* (canon)
 
 - **Tone:** calm, collective "we", water metaphors, target-focused.
 - **Sample lines:** "Guidance Plan on course in the terraces." · "Many streams report a full harvest."
 - **Banned:** open ridicule of the Four Pillars in citizen-voiced copy (criticism stays indirect); inventing ballot results the leadership "had to" follow.
 
-## Meridian: *Steamgate Measure* (proposal; separate SEZ business wire)
+## Meridian: *Steamgate Herald* (canon; SEZ business press, economic news only)
 
 - **Tone:** crisp and aspirational, with statistics and growth language. Two registers: onshore bulletin and SEZ wire.
 - **Sample lines:** "Output rises by measure." · "Tsenga SEZ exchange boards close higher."
@@ -61,7 +61,7 @@ Taken from the moderation content policy. These override every nation's voice.
 - **Sample lines:** "By order of the Crown: subjects received." · "The royal store does brisk trade."
 - **Banned:** publishing council deliberations; gossip presented as decree; implying a gazette entry grants a charter, fief, title or Favor.
 
-## Ilmar Sanctum: *The Clear Record* (proposal)
+## Ilmar Sanctum: *The Lamp* (canon)
 
 - **Tone:** measured, fact-first, light-and-glass metaphors. A clouded statement is the worst insult.
 - **Sample lines:** "The Vigil is kept in Mirrorhall." · "Endowment shares posted for the season."
@@ -73,7 +73,7 @@ Taken from the moderation content policy. These override every nation's voice.
 - **Sample lines:** "Moot passes the budget, eventually." · "Coalition holds, steam rising."
 - **Banned:** insulting the Sovereign (Crown Etiquette); bragging about Honors.
 
-## Varkand: *Watchfast Signal* (proposal)
+## Varkand: *The Directorate Bulletin* (canon)
 
 - **Tone:** terse and procedural. Every edition is headed by the Alert Level: relaxed at Green, clipped at Red.
 - **Sample lines:** "ALERT GREEN · Passes rarely checked." · "ALERT AMBER · Curfew on public squares."
@@ -85,7 +85,7 @@ Taken from the moderation content policy. These override every nation's voice.
 - **Sample lines:** "Every voice in the ring: initiative goes to referendum." · "Dividend Day notice posted."
 - **Banned:** telling citizens how to vote; uneven airtime on Vote Days; boasting about wealth.
 
-## Fulmara: *Arcport Exchange Bulletin* (proposal) plus a dockworkers' sheet
+## Fulmara: *Arcport Exchange Bulletin* (proposal) plus the Tribune's *Dock Sheet* (canon)
 
 - **Tone:** quick, cosmopolitan, deal-making. Every outlet discloses which trading house owns it.
 - **Sample lines:** "Share register moves at the Exchange Bell." · "Fair winds: convoy returns safe."

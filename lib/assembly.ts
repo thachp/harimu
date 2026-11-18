@@ -3,8 +3,10 @@ import type { GameDatabase } from './database-contract';
 import { accountElectionEnabled } from './preview-election';
 import { trustedBallotPrivacyReady, ballotPrivacyReason } from './ballot-privacy';
 import { kindleParties } from './kindle-parties';
-import { assemblyDistricts, assemblyIncumbents, assemblyPartyIds, assemblyResult, assemblyHeadlines, assemblySeatsPerDistrict, assemblySeatsUp, capitalDistrict, carryIncumbents, isDistrict, nextAssemblyOpen, planAssembly, type AssemblyPlan, type AssemblyResult, type AssemblyTiming, type Incumbents, type PartySeats } from './assembly-rules';
+import { assemblyDistricts, assemblyIncumbents, assemblyPartyIds, assemblyResult, assemblyHeadlines, assemblySeatsPerDistrict, assemblySeatsUp, carryIncumbents, nextAssemblyOpen, planAssembly, type AssemblyPlan, type AssemblyResult, type AssemblyTiming, type Incumbents, type PartySeats } from './assembly-rules';
+import { citizenDistrict } from './citizen-district';
 export * from './assembly-rules';
+export { citizenDistrict };
 
 /** #283: Kindle mid-term Assembly election (party list, D'Hondt per district, human ballots only since #449).
  *  Three additive tables, separate from the presidential civic_* tables. The ballot table has no timestamp and no citizen, and its
@@ -82,12 +84,6 @@ export const assemblyReceiptSql = `INSERT INTO assembly_voter_receipts (election
 export const assemblyBallotSql = `INSERT INTO assembly_anonymous_ballots (id,election_id,district_id,party_id,policy)
  SELECT ?,r.election_id,r.district_id,?,r.policy FROM assembly_voter_receipts r WHERE r.request_id=? AND r.clerk_user_id=? AND r.election_id=? AND r.ballot_written=0`;
 export const assemblyMarkWrittenSql = 'UPDATE assembly_voter_receipts SET ballot_written=1 WHERE request_id=? AND clerk_user_id=? AND election_id=? AND ballot_written=0';
-
-/** Read-only: the citizen's district is the home city when it is one of the Assembly districts, else the capital. */
-export async function citizenDistrict(db: GameDatabase, userId: string): Promise<string> {
-  const row = await db.prepare("SELECT home_city_id FROM citizen_city_locations WHERE user_id=? AND nation_id='kindle'").bind(userId).first<{ home_city_id: string }>();
-  return row && isDistrict(row.home_city_id) ? row.home_city_id : capitalDistrict;
-}
 
 /** The election id the clock points at (the plan's, else the scope's base id, which never has a row). */
 export const assemblyElectionIdFor = (scope: AssemblyScope, timing: AssemblyTiming, now: number) => planAssembly(scope.id, timing, now)?.id ?? scope.id;
