@@ -242,20 +242,29 @@ test('#1495 mutations: floor off-by-one, own score, trade gating, the LIMIT 20 l
     },
     {
       file: 'lib/world-simulation.ts',
-      find: 'runDiplomacy(db, now, { napReputationGate: options.napReputationGate === true })',
-      replace: 'runDiplomacy(db, now, { napReputationGate: true })',
+      find: 'runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, \'HARIMU_TRADE_RENEWAL_ENABLED\'), embargo: options.embargo === true, napReputationGate: options.napReputationGate === true })',
+      replace: 'runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, \'HARIMU_TRADE_RENEWAL_ENABLED\'), embargo: options.embargo === true, napReputationGate: true })',
       pattern: 'flag off ratifies the same Kindle–Korund fixture',
     },
   ];
-  for (const c of cases) {
-    const steps = c.finds ?? [[c.find, c.replace]];
-    const restores = [];
-    try {
-      for (const [find, replace] of steps) restores.push(mutate(c.file, find, replace));
-      const result = run([file], c.pattern);
-      assert.notEqual(result.status, 0, `mutant survived (${c.find ?? c.finds[0][0]}):\n${result.stdout}\n${result.stderr}`);
-    } finally {
-      for (const restore of restores.reverse()) restore();
+  const mutated = new Set(cases.map((c) => c.file));
+  try {
+    for (const c of cases) {
+      const steps = c.finds ?? [[c.find, c.replace]];
+      const restores = [];
+      try {
+        for (const [find, replace] of steps) restores.push(mutate(c.file, find, replace));
+        const result = run([file], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${c.find ?? c.finds[0][0]}):\n${result.stdout}\n${result.stderr}`);
+      } finally {
+        for (const restore of restores.reverse()) restore();
+      }
+    }
+  } finally {
+    const status = spawnSync('git', ['status', '--porcelain', '--', ...mutated], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname });
+    if (status.stdout.trim()) {
+      spawnSync('git', ['checkout', '--', ...mutated], { cwd: new URL('..', import.meta.url).pathname });
+      assert.equal(status.stdout.trim(), '', `mutation test left dirty sources:\n${status.stdout}`);
     }
   }
 });
