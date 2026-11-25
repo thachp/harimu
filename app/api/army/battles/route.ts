@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { marchPace, nationCapital, readActiveWars } from '@/lib/army-map';
-import { armyBattlesEnabled, presentBattle, readBattles } from '@/lib/army-battle';
+import { armyBattlesEnabled, battleTerrainEnabled, presentBattle, readBattles } from '@/lib/army-battle';
 import { winterMarchEnabled } from '@/lib/winter-march'; // #1038
 import { flagOn } from '@/lib/flag-pack.mjs';
 import { korundFogSquares, korundMapFogFlag } from '@/lib/korund-map-fog';
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const db = await getDatabase(), now = Math.floor(Date.now() / 1000);
   const userId = await authenticatedUserId(request);
   const nation = userId ? (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id ?? null : null;
-  const battles = await readBattles(db, await readActiveWars(db), now, await marchPace(db, winterMarchEnabled(env)));
+  const battles = await readBattles(db, await readActiveWars(db), now, await marchPace(db, winterMarchEnabled(env)), battleTerrainEnabled(env) ? { terrain: true } : undefined);
   const headers = { 'Cache-Control': 'private, no-store' };
   // #1425: flag off skips the squares read so the existing read set stays the same.
   if (!flagOn(env, korundMapFogFlag) || nation !== 'korund') return Response.json({ battles: battles.map(b => presentBattle(b, nation)) }, { headers });
