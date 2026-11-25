@@ -4,11 +4,8 @@ import { authenticatedUserId } from '@/lib/auth';
 import { getDatabase } from '@/lib/db';
 import { isSameOriginCommand, readCommandObject } from '@/lib/command-request';
 import { buySquare, parsePurchaseCommand, purchaseBadRequestError, readTessera, registryListingPrice } from '@/lib/world-registry.ts';
-import { applyPoster, parsePosterCommand, postersEnabled, readSquarePoster } from '@/lib/square-posters';
+import { applyPoster, parsePosterCommand, postersEnabled, readVisiblePoster } from '@/lib/square-posters';
 import { buyTessera, parseExchangeCommand, sparkPerTessera, kioskMinTesseraMinor, kioskMaxTesseraMinor } from '@/lib/tessera-exchange';
-import { flagOn } from '@/lib/flag-pack.mjs';
-import { korundFogSquares, korundMapFogFlag } from '@/lib/korund-map-fog';
-import { readWorldSquares } from '@/lib/map-zones';
 
 export const dynamic = 'force-dynamic';
 const privateJson = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'private, no-store' } });
@@ -32,16 +29,9 @@ export async function GET(request: Request) {
   if (!postersEnabled(env)) return privateJson(listing);
   if (x === null && y === null) return privateJson(listing);
   const xi = Number(x), yi = Number(y);
-  // #1429: a signed-in Korund viewer, with HARIMU_KORUND_MAP_FOG_ENABLED on, does not receive a poster on a square outside
-  // Korund and its Chebyshev-1 neighbours (docs §11.5). Flag off skips the squares read. Hidden squares do not query square_posters.
-  if (flagOn(env, korundMapFogFlag)) {
-    const nation = (await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>())?.nation_id;
-    if (nation === 'korund') {
-      const visible = new Set(korundFogSquares((await readWorldSquares(db)).squares).map(square => `${square.x},${square.y}`));
-      if (!visible.has(`${xi},${yi}`)) return privateJson({ ...listing, poster: null });
-    }
-  }
-  return privateJson({ ...listing, poster: await readSquarePoster(db, xi, yi, env, Math.floor(Date.now() / 1000)) });
+  // #1429: fog is applied inside readVisiblePoster. #1503: reportsEnabled and poster.mine (no clerk_user_id).
+  const poster = await readVisiblePoster(db, userId, xi, yi, env, Math.floor(Date.now() / 1000));
+  return privateJson({ ...listing, poster: poster ?? null, reportsEnabled: (env as unknown as { HARIMU_REPORTS_ENABLED?: string }).HARIMU_REPORTS_ENABLED === 'true' });
 }
 
 export async function POST(request: Request) {
