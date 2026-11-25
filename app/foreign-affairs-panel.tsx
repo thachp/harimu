@@ -2,7 +2,7 @@
 import type { PublicTreaty } from '@/lib/diplomacy';
 import type { WorldReputation } from '@/lib/diplomacy-rules';
 import type { PublicEmbargo } from '@/lib/embargo';
-import { foreignAffairsPanel, reputationPanel, treatyKinds as treatyKindCopy, treatyRenewalTag, treatyStatusLines } from '@/lib/diplomacy-copy';
+import { foreignAffairsPanel, legitimacyPanel, reputationPanel, treatyKinds as treatyKindCopy, treatyRenewalTag, treatyStatusLines } from '@/lib/diplomacy-copy';
 import { embargoPress, embargoPrivate } from '@/lib/embargo-copy'; // #363
 import { isTreatyNation, treatyKindNames, treatyNationNames } from '@/lib/diplomacy-rules';
 import { useDisplayTimestamp } from './display-preferences';
@@ -29,10 +29,16 @@ export function ForeignAffairsPanel({ treaties, embargoes, reputation, nationId 
     return <li key={`${item.kind}:${item.other}:${item.brokenAt}:${index}`}>{line}</li>;
   });
   const earlierLine = earlier > 0 ? fill(reputationPanel.earlier.text, { count: String(earlier), breaks: earlier === 1 ? reputationPanel.break : reputationPanel.breaks }) : null;
+  const legitimacyScore = reputation?.legitimacy ?? 0;
+  const legitimacyLabel = legitimacyScore < 0 ? `−${Math.abs(legitimacyScore)}` : String(legitimacyScore);
+  const legitimacyLine = reputation
+    ? (legitimacyScore === 0 ? legitimacyPanel.zero.text : fill(legitimacyPanel.line.text, { score: legitimacyLabel }))
+    : null;
   return <section aria-label="Foreign affairs">
     <h4>{foreignAffairsPanel.header}</h4>
     <p>{foreignAffairsPanel.aiNote.text}</p>
     {reputationLine ? <p>{reputationLine}</p> : null}
+    {legitimacyLine ? <p>{legitimacyLine}</p> : null}
     {recordItems.length > 0 ? <ul aria-label="Broken-treaty record">{recordItems}</ul> : null}
     {earlierLine ? <p>{earlierLine}</p> : null}
     {mine.length === 0 && embargoesMine.length === 0 ? <p>{foreignAffairsPanel.emptyState}</p> : <ul>{mine.map(treaty => {

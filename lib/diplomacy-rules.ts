@@ -50,7 +50,7 @@ export const treatyBreakPenaltyFor = (kind: TreatyKind, breaker: TreatyNationId)
  *  #1480: withWorldReputationRecord attaches the visible broken-treaty record; the SQL is the same uncapped #1477 source, with one row per break. */
 export type WorldReputationScore = { score: number; brokenPacts: number };
 export type WorldReputationBreak = { other: TreatyNationId; kind: TreatyKind; brokenAt: number; brokenGameDay: number; penalty: number };
-export type WorldReputation = WorldReputationScore & { record: WorldReputationBreak[]; earlierBreaks: number };
+export type WorldReputation = WorldReputationScore & { record: WorldReputationBreak[]; earlierBreaks: number; legitimacy: number };
 export type WorldReputationScoreMap = Record<TreatyNationId, WorldReputationScore>;
 export type WorldReputationMap = Record<TreatyNationId, WorldReputation>;
 export const worldReputationRecordLimit = 10;
@@ -69,6 +69,20 @@ export function worldReputationFromBreaks(rows: readonly WorldReputationBreakRow
   }
   return result;
 }
+
+/** #1487: derived Nation Legitimacy per MVP nation from the same uncapped broken-treaty rows as #1477 / #1480.
+ *  Starts at 0 and adds treatyBreakPenalty[kind].legitimacy for each break. Trade stays 0; a broken NAP is −5.
+ *  Nothing is stored. Callers keep using worldReputationFromBreaks for the Reputation score and brokenPacts. */
+export function worldLegitimacyFromBreaks(rows: readonly WorldReputationBreakRow[]): Record<TreatyNationId, number> {
+  const result = Object.fromEntries(treatyNations.map(nation => [nation, 0])) as Record<TreatyNationId, number>;
+  for (const row of rows) {
+    if (!isTreatyNation(row.brokenBy) || !isTreatyKind(row.kind)) continue;
+    const n = Math.max(0, Math.floor(Number(row.n) || 0));
+    result[row.brokenBy] += treatyBreakPenalty[row.kind].legitimacy * n;
+  }
+  return result;
+}
+
 export function worldReputation(treaties: readonly { kind: TreatyKind; status: string; brokenBy: TreatyNationId | null }[]): WorldReputationScoreMap {
   return worldReputationFromBreaks(treaties.flatMap(treaty =>
     treaty.status === 'broken' ? [{ brokenBy: treaty.brokenBy, kind: treaty.kind, n: 1 }] : []));
@@ -82,6 +96,7 @@ export function withWorldReputationRecord(
   scores: WorldReputationScoreMap,
   treaties: readonly { id?: string; kind: string; status?: string; brokenBy: string | null; proposer: string; other: string; brokenAt: number | null }[],
   epochSeconds: number,
+  legitimacyByNation?: Readonly<Record<TreatyNationId, number>>,
 ): WorldReputationMap {
   const collected = Object.fromEntries(treatyNations.map(nation => [nation, [] as (WorldReputationBreak & { id: string })[]])) as Record<TreatyNationId, (WorldReputationBreak & { id: string })[]>;
   for (const treaty of treaties) {
@@ -93,11 +108,13 @@ export function withWorldReputationRecord(
     const brokenAt = treaty.brokenAt ?? 0;
     collected[treaty.brokenBy].push({ other, kind: treaty.kind, brokenAt, brokenGameDay: worldReputationGameDay(epochSeconds, brokenAt), penalty, id: treaty.id ?? '' });
   }
+  const derivedLegitimacy = legitimacyByNation ?? worldLegitimacyFromBreaks(treaties.flatMap(item =>
+    (item.status == null || item.status === 'broken') && isTreatyKind(item.kind) ? [{ brokenBy: item.brokenBy, kind: item.kind, n: 1 }] : []));
   const result = {} as WorldReputationMap;
   for (const nation of treatyNations) {
     const all = collected[nation].sort((a, b) => b.brokenAt - a.brokenAt || b.id.localeCompare(a.id));
     const record = all.slice(0, worldReputationRecordLimit).map(item => ({ other: item.other, kind: item.kind, brokenAt: item.brokenAt, brokenGameDay: item.brokenGameDay, penalty: item.penalty }));
-    result[nation] = { ...(scores[nation] ?? { score: 0, brokenPacts: 0 }), record, earlierBreaks: Math.max(0, all.length - worldReputationRecordLimit) };
+    result[nation] = { ...(scores[nation] ?? { score: 0, brokenPacts: 0 }), record, earlierBreaks: Math.max(0, all.length - worldReputationRecordLimit), legitimacy: derivedLegitimacy[nation] ?? 0 };
   }
   return result;
 }
