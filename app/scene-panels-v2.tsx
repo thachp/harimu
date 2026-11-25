@@ -25,9 +25,9 @@ import { cityCapitalRowDedupeEnabled } from '@/lib/city-capital-row-dedupe';
 import { cityPlaceIcon } from './city-pill';
 import { neighborhoodEnabled } from '@/lib/neighborhood';
 import { desktopGateEnabled } from '@/lib/desktop-gate';
-import { districtLabels, neighborhoodWalkEnabled, rememberDistrict } from '@/lib/neighborhood-walk';
+import { districtIndex, districtLabels, neighborhoodWalkEnabled, rememberDistrict } from '@/lib/neighborhood-walk';
 import { neighborhoodTalkEnabled } from '@/lib/neighborhood-talk';
-import { cityDriveEnabled, driveHere, enterDistrict } from '@/lib/city-drive';
+import { cityDriveEnabled, driveEntry, driveHere, enterDistrict } from '@/lib/city-drive';
 import { CityCoResidents } from './city-coresidents';
 import type { CoResident } from '@/lib/city-location';
 import { captureHistoryLine, treatyReturnLine, type CityCaptureHistory } from '@/lib/city-capture-history'; // #1028, #1078
@@ -37,6 +37,7 @@ import { worldExploreEnabled } from '@/lib/world-atlas'; // #392 Explore card is
  *  page.tsx never decides it (tests/ui-v2-panel.test.mjs renders these flag off and on, and pins that page.tsx passes no `enabled`). Existing copy only. */
 type Nation = { id: string; name: string; shortName?: string; government: string; capital: string; currency: string; economy: string; religion: string; population?: string | number | null };
 type View = 'country' | 'square' | 'nation' | 'neighborhood' | CityDestination['id'];
+function districtIcon(name: string, size: 16 | '1em') { const type = name.split(' ')[0]; return type === 'Residential' ? cityPlaceIcon('household', size) : type === 'Industrial' ? cityPlaceIcon('workplace', size) : type === 'Market' ? cityPlaceIcon('market', size) : type === 'Civic' ? cityPlaceIcon('government', size) : type === 'Military' ? <ShieldCheck size={size} weight="bold" /> : <BookOpen size={size} weight="bold" />; }
 
 /** World, top of the panel: summary header, stats, chevron rows and the primary action (flag on); nothing (flag off).
  *  NEXT_PUBLIC_HARIMU_WORLD_EXPLORE demotes that primary to a secondary button so the atlas Explore action is the only gold CTA. */
@@ -102,10 +103,10 @@ export function CitySummary({ cityName, city, nation, destinations, onView, tier
   // #392 UI 44. The buildings mark is the concept's city glyph, not a crest. The inspector header already shows the nation crest above this panel.
   const subtitle = identity ? cityIdentitySubtitle(city, nation) : nation.name;
   const tagline = identity ? cityIdentityTagline(city?.description) : null;
-  const talk = neighborhoodTalkEnabled(), districtMark = (name: string) => { const type = name.split(' ')[0], size = cityIconSizeSync ? '1em' as const : 16; return type === 'Residential' ? placeIcon('household') : type === 'Industrial' ? placeIcon('workplace') : type === 'Market' ? placeIcon('market') : type === 'Civic' ? placeIcon('government') : type === 'Military' ? <ShieldCheck size={size} weight="bold" /> : <BookOpen size={size} weight="bold" />; };
-  const neighborhoodRow = neighborhoodEnabled() ? [{ id: 'neighborhood', label: 'Neighborhood', detail: `${cityName.trim() || nation.capital} · ${nation.name}`, onSelect: () => { if (talk) onNeighborhoodList?.(); onView('neighborhood'); } }] : [];
-  const walkRows = neighborhoodWalkEnabled() && desktopGateEnabled() ? districtLabels(tierUnlocks?.districtSlots).map((name, index) => ({ id: `walk-${index}`, label: name, detail: `${cityName.trim() || nation.capital} · ${nation.name}`, icon: talk ? districtMark(name) : undefined, onSelect: () => { rememberDistrict(index); if (talk) onNeighborhoodWalk?.(); onView('neighborhood'); } })) : [];
-  const driveRows = cityDriveEnabled() && desktopGateEnabled() ? districtLabels(driveSlots ?? tierUnlocks?.districtSlots).map((name, index) => ({ id: `drive-${index}`, label: name, detail: 'Drive here', icon: talk ? districtMark(name) : undefined, onSelect: () => { if (!driveHere(index)) { onNeighborhoodWalk?.(); enterDistrict(index, onView); } } })) : [];
+  const talk = neighborhoodTalkEnabled(), size = cityIconSizeSync ? '1em' as const : 16;
+  const neighborhoodRow = neighborhoodEnabled() ? [{ id: 'neighborhood', label: 'Neighborhood', detail: `${cityName.trim() || nation.capital} · ${nation.name}`, icon: talk ? districtIcon('Residential', size) : undefined, onSelect: () => { if (talk) onNeighborhoodList?.(); onView('neighborhood'); } }] : [];
+  const walkRows = neighborhoodWalkEnabled() && desktopGateEnabled() ? districtLabels(tierUnlocks?.districtSlots).map((name, index) => ({ id: `walk-${index}`, label: name, detail: `${cityName.trim() || nation.capital} · ${nation.name}`, icon: talk ? districtIcon(name, size) : undefined, onSelect: () => { rememberDistrict(index); if (talk) onNeighborhoodWalk?.(); onView('neighborhood'); } })) : [];
+  const driveRows = cityDriveEnabled() && desktopGateEnabled() ? districtLabels(driveSlots ?? tierUnlocks?.districtSlots).map((name, index) => ({ id: `drive-${index}`, label: name, detail: 'Drive here', icon: talk ? districtIcon(name, size) : undefined, onSelect: () => { if (!driveHere(index)) driveEntry(talk, onNeighborhoodWalk, () => enterDistrict(index, onView)); } })) : [];
   const panel = <PanelV2 title={cityName} subtitle={subtitle} mark={identity ? <Buildings size={44} /> : undefined} tagline={tagline} taglineBeside={taglineBeside} primaryKicker={identity ? cityIdentityKicker(Boolean(primary)) : null} rowsLabel="City destinations" headerStats={headerStats} stats={[...[cityStatusStat(city)].filter(stat => stat !== null).filter(() => !headerOn), ...tierStats, ...populationStats, ...festivalStats, ...specialtyStats, ...hearthStats, ...regattaStats, ...festivalHostStats, ...captureStats, ...historyStats, ...civicUnitStats, ...governorStats, ...(headerOn && cityCapitalRowDedupe && cityStatusStat(city) ? [] : [{ label: 'Capital', value: nation.capital }]), ...(headerOn ? [] : [{ label: 'Currency', value: nation.currency }])]}
     rows={[...(aligned ? aligned.map(place => ({ id: place.id, label: place.label, detail: place.detail, icon: placeIcon(place.id), onSelect: () => onView(place.view) })) : destinations.filter(card => card !== home).map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: icons ? placeIcon(card.id) : undefined, onSelect: () => onView(card.id) }))), ...(cityDriveEnabled() && desktopGateEnabled() ? driveRows : walkRows), ...neighborhoodRow]}
     primary={primary} cityIconSizeSync={cityIconSizeSync} cityHeaderWordWrap={cityHeaderWordWrap} cityHeaderHyphenKeep={cityHeaderHyphenKeep} />; // S7 follow-up: with the City pills on, rows carry the pill's icon. #392 place rows: the five pills, same order and icons, then the Household primary.
@@ -113,10 +114,13 @@ export function CitySummary({ cityName, city, nation, destinations, onView, tier
 }
 
 /** #1315 N1. The city catalog has no neighborhood name, so the title stays Neighborhood. Who lives here is cityCoResidents. Work and Market keep the City destination copy. */
-export function NeighborhoodSummary({ cityName, nation, destinations, residents, onView, enabled = neighborhoodEnabled() }: { cityName: string; nation: { id: string; name: string }; destinations: CityDestination[]; residents?: CoResident[] | null; onView: (view: View) => void; enabled?: boolean }) {
+export function NeighborhoodSummary({ cityName, nation, destinations, residents, onView, onWalk, slots = null, enabled = neighborhoodEnabled() }: { cityName: string; nation: { id: string; name: string }; destinations: CityDestination[]; residents?: CoResident[] | null; onView: (view: View) => void; onWalk?: () => void; slots?: number | null; enabled?: boolean }) {
   if (!enabled) return null;
   const nearby = destinations.filter(card => card.id === 'workplace' || card.id === 'market');
-  return <div className="neighborhood-v2"><PanelV2 title="Neighborhood" subtitle={`${cityName} · ${nation.name}`} household={{ lead: nation.id ? <NationCrest id={nation.id} size={44} force /> : null }} rowsLabel="City destinations" rows={nearby.map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: cityPlaceIcon(card.id), onSelect: () => onView(card.id) }))} stats={[]} /><CityCoResidents residents={residents} cityName={cityName} /></div>;
+  const back = onWalk ? districtLabels(slots)[districtIndex('', slots)] : '';
+  const walkBack = onWalk && back ? [{ id: 'walk', label: back, detail: `${cityName} · ${nation.name}`, icon: districtIcon(back, 16), onSelect: onWalk }] : [];
+  const rows = [...walkBack, ...nearby.map(card => ({ id: card.id, label: card.label, detail: card.detail, icon: cityPlaceIcon(card.id), onSelect: () => onView(card.id) }))];
+  return <div className="neighborhood-v2"><PanelV2 title="Neighborhood" subtitle={`${cityName} · ${nation.name}`} household={{ lead: nation.id ? <NationCrest id={nation.id} size={44} force /> : null }} rowsLabel="City destinations" rows={rows} stats={[]} /><CityCoResidents residents={residents} cityName={cityName} /></div>;
 }
 
 /** #392 S9 (NEXT_PUBLIC_HARIMU_UI_V2_HOUSEHOLD): the Household panel head, existing data only. Wallet, Food, Residence, and Pantry (food and materials from the

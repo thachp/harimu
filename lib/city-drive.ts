@@ -35,8 +35,10 @@ export function gateHit(x: number, z: number, gates: readonly Spot[], radius = 1
   return best;
 }
 export function minimapPoint(x: number, z: number, size: number, span = 18): { x: number; y: number } {
-  const half = size / 2; return { x: half + (x / span) * (half - 6), y: half + (z / span) * (half - 6) };
+  const half = size / 2; return { x: half + (x / span) * (half - 6), y: half - (z / span) * (half - 6) };
 }
+/** Drive-here with no scene, and a reduced-motion cut, use the walk row's talk guard. */
+export function driveEntry(talk: boolean, onWalk: (() => void) | undefined, enter: () => void) { if (talk) onWalk?.(); enter(); }
 export function driveToward(x: number, z: number, yaw: number, gate: Spot): { steer: number; throttle: number } {
   let diff = Math.atan2(gate.x - x, gate.z - z) - yaw; while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
   return { steer: Math.max(-1, Math.min(1, -diff * 4)), throttle: Math.abs(diff) < 0.35 ? 1 : 0 };

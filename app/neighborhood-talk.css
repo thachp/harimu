@@ -5,3 +5,4 @@
 .game-neighborhood-talk .neighborhood-talk h3,.game-neighborhood-talk .neighborhood-talk p,.game-neighborhood-talk .neighborhood-talk button,.game-neighborhood-talk .neighborhood-talk li,.game-neighborhood-talk .neighborhood-talk label,.game-neighborhood-talk .neighborhood-talk textarea{overflow-wrap:normal;word-break:normal;hyphens:none;font-size:calc(13px * var(--text-scale, 1))}
 .game-neighborhood-talk .neighborhood-talk textarea{width:100%;max-width:100%;min-height:5rem;box-sizing:border-box;font:inherit}
 .game-neighborhood-talk .neighborhood-talk button:focus-visible,.game-neighborhood-talk .neighborhood-talk textarea:focus-visible,.game-neighborhood-talk .neighborhood-walk-panel button:focus-visible,.game-neighborhood-talk .neighborhood-talk-webgl:focus-visible{outline:3px solid #d0ad54;outline-offset:2px}
+.game-neighborhood-talk.game-talk-mute .neighborhood-talk-muted{display:grid;gap:4px;overflow-wrap:normal;word-break:normal;hyphens:none}
