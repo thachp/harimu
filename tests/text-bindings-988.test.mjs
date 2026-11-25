@@ -41,7 +41,7 @@ test('flag packs still answer env.HARIMU_* and a direct string wins', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_KORUND_STATE_MEDIA_WRITERS_ENABLED'), 94); // #1469 follows Aurelle ranks (GRAY 95). Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_AURELLE_BROADSHEETS_ENABLED'), 95); // #1475 follows Korund writers (GRAY 96). Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96); // #1490 follows broadsheets (GRAY 97). Pack length is not pinned.
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BATTLE_TERRAIN_ENABLED'), 97); // #1491 follows trade renewal (GRAY 98). Pack length is not pinned.
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_BATTLE_TERRAIN_ENABLED'), 97); // #1491 follows trade renewal (GRAY 98). Pack length is 98.
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length, 98);
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.at(-1), 'HARIMU_WAR_EVACUATION_ENABLED'); // #1324 entry 10, after national service. Pack length is not pinned.
   assert.equal(FLAG_PACKS.HARIMU_ARMY_PACK.at(-2), 'HARIMU_VARKAND_NATIONAL_SERVICE_ENABLED'); // #1095 stays entry 9
