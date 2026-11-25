@@ -9,7 +9,7 @@ import { localRuntime } from './helpers/local-runtime.mjs';
 import { worldReputation, withWorldReputationRecord, worldReputationRecordLimit, worldReputationGameDay, treatyBreakPenalty, treatyNations } from '../lib/diplomacy-rules.ts';
 
 const D = 86_400;
-const zero = { score: 0, brokenPacts: 0, record: [], earlierBreaks: 0 };
+const zero = { score: 0, brokenPacts: 0, record: [], earlierBreaks: 0, legitimacy: 0 };
 const zeros = () => Object.fromEntries(treatyNations.map((nation) => [nation, { ...zero, record: [] }]));
 const gameDaySeconds = D / 12;
 const breakItem = (over = {}) => ({ kind: 'non-aggression', status: 'broken', brokenBy: 'aurelle', proposer: 'kindle', other: 'aurelle', brokenAt: 100, id: 't', ...over });
@@ -166,7 +166,7 @@ for (const backend of ['sqlite', 'postgres']) {
       assert.equal(world.data.simulation.treaties.treaties.length, 20, 'the public treaty list stays capped');
       assert.equal(world.data.simulation.treaties.treaties.some((t) => t.id === 'old-break'), false, 'the older break is off the LIMIT 20 list');
       assert.deepEqual(world.data.simulation.reputation.aurelle, {
-        score: -10, brokenPacts: 1, earlierBreaks: 0,
+        score: -10, brokenPacts: 1, earlierBreaks: 0, legitimacy: -5,
         record: [expectedBreak(epoch, now - 995, 'kindle')],
       }, 'the older break is still in the uncapped record');
       const citizen = await r.call('citizen', 'bob');
@@ -234,7 +234,7 @@ test('#1480 Foreign affairs panel lists the record, the overflow line, and keeps
     assert.doesNotMatch(html(singular), /and 1 earlier breaks/);
     assert.match(html({ score: 0, brokenPacts: 0, record: [], earlierBreaks: 0 }, 'kindle'), /No broken treaties on record/);
     assert.doesNotMatch(html({ score: 0, brokenPacts: 0, record: [{ other: 'kindle', kind: 'non-aggression', brokenAt: 1, brokenGameDay: 1, penalty: -10 }], earlierBreaks: 0 }, 'kindle'), /broken on day|earlier/);
-    assert.doesNotMatch(html(undefined, 'kindle'), /World Reputation:|No broken treaties on record|broken on day|earlier/, 'no reputation prop: the line and record are omitted');
+    assert.doesNotMatch(html(undefined, 'kindle'), /World Reputation:|No broken treaties on record|Legitimacy:|No legitimacy losses on record|broken on day|earlier/, 'no reputation prop: the line and record are omitted');
   } finally {
     await rt.close();
   }
