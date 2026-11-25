@@ -1,14 +1,14 @@
 /** #1505: an AI leader embargoes a nation that broke a treaty with it. No migration. HARIMU_AI_TREATY_EMBARGO_ENABLED is index 97 today, reserved as GRAY 101. */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, test } from 'node:test';
 import { FLAG_PACKS } from '../lib/flag-pack.mjs';
 import { aiEmbargoCandidates, aiEmbargoGrievanceWindowSeconds, aiEmbargoLifts, aiEmbargoRefusalCooldownSeconds, aiEmbargoRequestId, embargoRequestIdOk } from '../lib/embargo-rules.ts';
 import { grievanceConfig } from '../lib/war-rules.ts';
 import { treatyAiLeaders, treatySlot } from '../lib/diplomacy-rules.ts';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 
 const FLAG = 'HARIMU_AI_TREATY_EMBARGO_ENABLED';
 const WINDOW = aiEmbargoGrievanceWindowSeconds;
@@ -180,16 +180,15 @@ describe('#1505', { concurrency: 1 }, () => {
       { file: 'lib/diplomacy.ts', find: 'flagOn(bindings, \'HARIMU_AI_TREATY_EMBARGO_ENABLED\')', replace: 'true', pattern: cron },
       { file: 'lib/embargo.ts', find: 'if (taken) return { status: \'ok\' as const, proposed: false, lifted: liftedIds.size };', replace: 'if (false) return { status: \'ok\' as const, proposed: false, lifted: liftedIds.size };', pattern: cron },
     ];
-    for (const c of cases) {
-      const original = readFileSync(c.file, 'utf8');
-      const next = original.replace(c.find, c.replace);
-      assert.notEqual(next, original, `mutant did not apply in ${c.file}`);
-      writeFileSync(c.file, next);
-      try {
-        const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-        const result = spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', c.pattern, 'tests/ai-treaty-embargo-1505.test.mjs'], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
-        assert.notEqual(result.status, 0, `mutant survived (${c.pattern}):\n${result.stdout}\n${result.stderr}`);
-      } finally { writeFileSync(c.file, original); }
-    }
+    const tree = mutantTree(); // #1508: mutants stay in a private copy so parallel shards do not compile them
+    try {
+      for (const c of cases) {
+        const restore = tree.mutate(c.file, c.find, c.replace);
+        try {
+          const result = tree.run(['tests/ai-treaty-embargo-1505.test.mjs'], c.pattern);
+          assert.notEqual(result.status, 0, `mutant survived (${c.pattern}):\n${result.stdout}\n${result.stderr}`);
+        } finally { restore(); }
+      }
+    } finally { tree.close(); }
   });
 });
