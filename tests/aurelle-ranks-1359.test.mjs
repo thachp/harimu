@@ -1,14 +1,14 @@
 /** #1359: Aurelle noble ranks from lifetime earned Royal Favor (docs §11.6). Flag HARIMU_AURELLE_RANKS_ENABLED, GRAY 94. */
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {readFileSync,writeFileSync} from 'node:fs';
-import {spawnSync} from 'node:child_process';
+import {readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {test} from 'node:test';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import ts from 'typescript';
 import {localRuntime} from './helpers/local-runtime.mjs';
+import {mutantTree} from './helpers/mutant-tree.mjs';
 import {FLAG_PACKS} from '../lib/flag-pack.mjs';
 import {flagOn} from '../lib/flag-pack.mjs';
 import {aurelleRankAt,aurelleRankThresholds,AURELLE_RANKS_FLAG} from '../lib/aurelle-rank-rules.ts';
@@ -135,18 +135,6 @@ for(const backend of ['sqlite','postgres']) test(`#1359 GET /api/citizen: flag o
   assert.equal('aurelleRanks' in offAgain.flags,false);
 });
 
-const mutate=(file,find,replace)=>{
-  const original=readFileSync(file,'utf8');
-  const next=original.replace(find,replace);
-  assert.notEqual(next,original,`mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file,next);
-  return ()=>writeFileSync(file,original);
-};
-const run=(files,pattern)=>{
-  const env={...process.env}; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node',['--experimental-strip-types','--test','--test-concurrency=1','--test-name-pattern',pattern,...files],{encoding:'utf8',cwd:new URL('..',import.meta.url).pathname,env});
-};
-
 test('#1359 mutations: threshold boundaries, earned-vs-balance source, and the flag gate all fail',()=>{
   const file='tests/aurelle-ranks-1359.test.mjs';
   const cases=[
@@ -156,11 +144,14 @@ test('#1359 mutations: threshold boundaries, earned-vs-balance source, and the f
     {file:'lib/aurelle-rank.ts',find:'SELECT COALESCE(SUM(favor),0) AS earned FROM aurelle_settlements WHERE clerk_user_id=?',replace:"SELECT MAX(0,COALESCE((SELECT SUM(favor) FROM aurelle_settlements WHERE clerk_user_id=?),0)-COALESCE((SELECT SUM(amount) FROM aurelle_favor_spends WHERE clerk_user_id=?),0)) AS earned",files:[file],pattern:'spends do not demote'},
     {file:'app/api/citizen/route.ts',find:'aurelleRanksOn && profile?.nation_id === \'aurelle\' ? readAurelleRank(database, userId, profile.nation_id) : null',replace:'profile?.nation_id === \'aurelle\' ? readAurelleRank(database, userId, profile.nation_id) : null',files:[file],pattern:'flag off has no field'},
   ];
-  for(const c of cases){
-    const restore=mutate(c.file,c.find,c.replace);
-    try{
-      const result=run(c.files,c.pattern);
-      assert.notEqual(result.status,0,`mutant survived (${c.find} -> ${c.replace}):\n${result.stdout}\n${result.stderr}`);
-    }finally{restore();}
-  }
+  const tree = mutantTree(); // #1509: mutants live only in a tmpdir copy, never in the shared tree that parallel test files read
+  try {
+    for(const c of cases){
+      const restore=tree.mutate(c.file,c.find,c.replace);
+      try{
+        const result=tree.run(c.files,c.pattern);
+        assert.notEqual(result.status,0,`mutant survived (${c.find} -> ${c.replace}):\n${result.stdout}\n${result.stderr}`);
+      }finally{restore();}
+    }
+  } finally { tree.close(); }
 });
