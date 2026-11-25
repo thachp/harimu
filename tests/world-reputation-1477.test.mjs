@@ -1,9 +1,8 @@
 /** #1477: World Reputation score and brokenPacts come from a dedicated, uncapped per-nation count, not from readTreaties' LIMIT 20 list. */
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 import { worldReputation, worldReputationFromBreaks, worldReputationBreaksSql, treatyBreakPenalty, treatyNations } from '../lib/diplomacy-rules.ts';
 
 const D = 86_400;
@@ -109,17 +108,6 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-const mutate = (file, find, replace) => {
-  const original = readFileSync(file, 'utf8');
-  const next = original.replace(find, replace);
-  assert.notEqual(next, original, `mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file, next);
-  return () => writeFileSync(file, original);
-};
-const run = (files, pattern) => {
-  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, ...files], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
-};
 
 test('#1477 mutations: re-adding the list cap, a wrong nation key, and an off-by-one on n all fail', () => {
   const file = 'tests/world-reputation-1477.test.mjs';
@@ -145,13 +133,16 @@ test('#1477 mutations: re-adding the list cap, a wrong nation key, and an off-by
       pattern: 'the count SQL has no LIMIT|do not bleed across nations',
     },
   ];
-  for (const c of cases) {
-    const steps = c.finds ?? [[c.find, c.replace]];
-    const restores = [];
-    try {
-      for (const [find, replace] of steps) restores.push(mutate(c.file, find, replace));
-      const result = run([file], c.pattern);
-      assert.notEqual(result.status, 0, `mutant survived (${JSON.stringify(steps)}):\n${result.stdout}\n${result.stderr}`);
-    } finally { while (restores.length) restores.pop()(); }
-  }
+  const tree = mutantTree(); // #1480: never mutate the shared tree that parallel test files read
+  try {
+    for (const c of cases) {
+      const steps = c.finds ?? [[c.find, c.replace]];
+      const restores = [];
+      try {
+        for (const [find, replace] of steps) restores.push(tree.mutate(c.file, find, replace));
+        const result = tree.run([file], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${JSON.stringify(steps)}):\n${result.stdout}\n${result.stderr}`);
+      } finally { while (restores.length) restores.pop()(); }
+    }
+  } finally { tree.close(); }
 });
