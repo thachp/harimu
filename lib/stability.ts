@@ -34,8 +34,10 @@ export type StabilityInputs = {
  rationCuts?: number;
  /** #983: Korund cities taking one Stability step back up this game week. Absent unless that step applies, so flag-off inputs_json is unchanged. */
  rationRecovery?: number;
+ /** #1506: Aurelle Crown Currency Confidence (0–100) as of the tick, only while HARIMU_CROWN_CONFIDENCE_STABILITY_ENABLED and HARIMU_CROWN_DEBASEMENT_ENABLED are on. Absent otherwise, so flag-off inputs_json is unchanged. */
+ crownConfidence?: number;
 };
-export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war'|'harmony'|'ration'|'rationRecovery';
+export type StabilityInputId = 'baseline'|'food'|'work'|'promises'|'petitions'|'festival'|'war'|'harmony'|'ration'|'rationRecovery'|'currency';
 export type ScoreTerm = {input: StabilityInputId; points: number; detail: string};
 export type StabilityScore = {stability: number; unrest: number; breakdown: {stability: ScoreTerm[]; unrest: ScoreTerm[]}};
 export type StabilityRecord = StabilityScore & {nationId: StabilityNation; tick: number; scheduledAt: number; inputs: StabilityInputs};
@@ -71,6 +73,16 @@ export function harmonyStabilityPoints(score: number) {
  const p = Math.trunc((score-HARMONY_STABILITY_NEUTRAL)/HARMONY_STABILITY_STEP)*HARMONY_STABILITY_POINTS_PER_STEP;
  return Math.max(-HARMONY_STABILITY_CAP, Math.min(HARMONY_STABILITY_CAP, p)) || 0; // no -0
 }
+/** #1506 [ASSUMPTION, ARC on #1506, citing docs §10.1 / §12.4]: Currency Confidence feeds Stability. 0 points at Confidence ≥ 90, then −1 Stability point per 5 Confidence below 90, capped at −10; the term never raises Stability. */
+export const CROWN_CONFIDENCE_STABILITY_NEUTRAL = 90;
+export const CROWN_CONFIDENCE_STABILITY_STEP = 5;
+export const CROWN_CONFIDENCE_STABILITY_POINTS_PER_STEP = 1;
+export const CROWN_CONFIDENCE_STABILITY_CAP = 10;
+export function crownConfidenceStabilityPoints(confidence: number) {
+ const c = Math.max(0, Math.min(100, Math.round(Number(confidence) || 0)));
+ const pts = -CROWN_CONFIDENCE_STABILITY_POINTS_PER_STEP * Math.floor(Math.max(0, CROWN_CONFIDENCE_STABILITY_NEUTRAL - c) / CROWN_CONFIDENCE_STABILITY_STEP);
+ return Math.max(-CROWN_CONFIDENCE_STABILITY_CAP, pts) || 0; // no -0; never positive
+}
 /** Pure scoring. Same inputs always give the same score. */
 export function computeStability(raw: Partial<StabilityInputs>): StabilityScore {
  const i = {citizens: count(raw.citizens), fed: count(raw.fed), worked: count(raw.worked), promisesKept: count(raw.promisesKept), promisesBroken: count(raw.promisesBroken), petitionBacklog: count(raw.petitionBacklog)};
@@ -103,6 +115,10 @@ export function computeStability(raw: Partial<StabilityInputs>): StabilityScore 
  const recovered = count(raw.rationRecovery);
  if (recovered > 0) { const base = stability.reduce((t, x) => t+x.points, 0), pts = Math.min(Math.max(0, 100-base), recovered*korundRationStabilityStep);
   stability.push({input:'rationRecovery',points:pts,detail:'Stability recovers with the plan.'}); }
+ // #1506 [ASSUMPTION, ARC on #1506, citing docs §10.1 / §12.4]: Currency Confidence adds crownConfidenceStabilityPoints, fitted so the score stays 0–100 and the breakdown still sums exactly. The term is present whenever the input is (including a 0-point term at baseline 100).
+ if (raw.crownConfidence !== undefined) { const n = Math.max(0, Math.min(100, Math.round(Number(raw.crownConfidence) || 0))), base = stability.reduce((t, x) => t+x.points, 0);
+  const pts = Math.max(-base, Math.min(100-base, crownConfidenceStabilityPoints(n)));
+  stability.push({input:'currency',points:pts,detail:`Crown Currency Confidence ${n}/100`}); }
  const unrest: ScoreTerm[] = [
   {input:'baseline',points:unrestBaseline,detail:'Baseline'},
   {input:'food',points:food.unrest,detail:foodDetail},{input:'work',points:work.unrest,detail:workDetail},
@@ -143,8 +159,8 @@ export async function readStabilityInputs(db: GameDatabase, nationId: StabilityN
 }
 
 /** Statements that record one game day's scores. INSERT OR IGNORE makes retries no-ops. */
-export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string; harmony?: Readonly<Record<string, number>>; rationCuts?: number; rationRecovery?: number} = {}) {
- return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); if (nationId === 'korund' && options.rationCuts) inputs.rationCuts = options.rationCuts; if (nationId === 'korund' && options.rationRecovery) inputs.rationRecovery = options.rationRecovery; const score = computeStability(inputs);
+export async function stabilityStatements(db: GameDatabase, tick: number, scheduledAt: number, now: number, options: {holidayNations?: ReadonlySet<string>; warWeariness?: Readonly<Record<string, number>>; dormantBefore?: string; harmony?: Readonly<Record<string, number>>; rationCuts?: number; rationRecovery?: number; crownConfidence?: number} = {}) {
+ return Promise.all(stabilityNations.map(async nationId => { const inputs = await readStabilityInputs(db, nationId, scheduledAt, options); if (nationId === 'korund' && options.rationCuts) inputs.rationCuts = options.rationCuts; if (nationId === 'korund' && options.rationRecovery) inputs.rationRecovery = options.rationRecovery; if (nationId === 'aurelle' && options.crownConfidence !== undefined) inputs.crownConfidence = options.crownConfidence; const score = computeStability(inputs);
   return db.prepare('INSERT OR IGNORE INTO nation_stability_scores (nation_id,tick,scheduled_at,computed_at,stability,unrest,inputs_json,breakdown_json) VALUES (?,?,?,?,?,?,?,?)')
    .bind(nationId, tick, scheduledAt, now, score.stability, score.unrest, JSON.stringify(inputs), JSON.stringify(score.breakdown)); }));
 }
