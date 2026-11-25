@@ -1,12 +1,12 @@
 /** #1495: a low World Reputation score makes a non-aggression pact harder to ratify. Flag HARIMU_NAP_REPUTATION_GATE_ENABLED (GRAY 99). */
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
 import { createElement } from 'react';
 import ts from 'typescript';
 import { test } from 'node:test';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 import { decideTreaty, pactReputationFloor, napReputationGateFlag, treatyBreakPenalty, treatyNations } from '../lib/diplomacy-rules.ts';
 import { worldReputationBreaksSql } from '../lib/diplomacy-rules.ts';
 
@@ -199,18 +199,6 @@ test('#1495 Korund fog hides a Kindle–Aurelle refusal; the panel shows the ref
   }
 });
 
-const mutate = (file, find, replace) => {
-  const original = readFileSync(file, 'utf8');
-  const next = original.replace(find, replace);
-  assert.notEqual(next, original, `mutant did not apply in ${file}: ${String(find)}`);
-  writeFileSync(file, next);
-  return () => writeFileSync(file, original);
-};
-const run = (files, pattern) => {
-  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, ...files], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
-};
-
 test('#1495 mutations: floor off-by-one, own score, trade gating, the LIMIT 20 list, and ignoring the flag all fail', () => {
   const file = 'tests/nap-reputation-gate-1495.test.mjs';
   const cases = [
@@ -247,24 +235,16 @@ test('#1495 mutations: floor off-by-one, own score, trade gating, the LIMIT 20 l
       pattern: 'flag off ratifies the same Kindle–Korund fixture',
     },
   ];
-  const mutated = new Set(cases.map((c) => c.file));
+  const tree = mutantTree(); // #1480: never mutate the shared tree that parallel test files read
   try {
     for (const c of cases) {
       const steps = c.finds ?? [[c.find, c.replace]];
       const restores = [];
       try {
-        for (const [find, replace] of steps) restores.push(mutate(c.file, find, replace));
-        const result = run([file], c.pattern);
-        assert.notEqual(result.status, 0, `mutant survived (${c.find ?? c.finds[0][0]}):\n${result.stdout}\n${result.stderr}`);
-      } finally {
-        for (const restore of restores.reverse()) restore();
-      }
+        for (const [find, replace] of steps) restores.push(tree.mutate(c.file, find, replace));
+        const result = tree.run([file], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${JSON.stringify(steps)}):\n${result.stdout}\n${result.stderr}`);
+      } finally { while (restores.length) restores.pop()(); }
     }
-  } finally {
-    const status = spawnSync('git', ['status', '--porcelain', '--', ...mutated], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname });
-    if (status.stdout.trim()) {
-      spawnSync('git', ['checkout', '--', ...mutated], { cwd: new URL('..', import.meta.url).pathname });
-      assert.equal(status.stdout.trim(), '', `mutation test left dirty sources:\n${status.stdout}`);
-    }
-  }
+  } finally { tree.close(); }
 });
