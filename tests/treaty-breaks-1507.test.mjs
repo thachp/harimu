@@ -70,6 +70,7 @@ for (const backend of ['sqlite', 'postgres']) {
     await insertEmbargo(r, { id: 'e-kk', actor: 'korund', target: 'kindle', now });
     await insertEmbargo(r, { id: 'e-ak', actor: 'korund', target: 'aurelle', now });
 
+    // A4 "a GET writes nothing" is for readTreaties / readWorldReputation only. GET /api/world is the production tick and can write when the flag is on, like expiry, renewal and proposals.
     const beforeReads = await Promise.all(['t-quiet', 't-ak', 't-trade'].map(id => row(id)));
     await d.readTreaties(r.db, now);
     await d.readWorldReputation(r.db, now);
@@ -136,14 +137,43 @@ for (const backend of ['sqlite', 'postgres']) {
     await d.runDiplomacy(r.db, now, { treatyBreak: false });
     assert.equal((await row('t-off')).status, 'in_force');
   });
+
+  test(`#1507 (${backend}): world tick with diplomacy on and HARIMU_TREATY_BREAK_ENABLED on writes a break`, async t => {
+    const { r, now, row } = await setup(t, backend);
+    await insertTreaty(r, { id: 't-on', proposer: 'kindle', other: 'korund', now });
+    await insertEmbargo(r, { id: 'e-on', actor: 'korund', target: 'kindle', now });
+    r.setFixtureEnv('HARIMU_DIPLOMACY_ENABLED', 'true');
+    r.setFixtureEnv(FLAG, 'true');
+    r.setNow(now * 1000);
+    const world = await r.call('world', null);
+    assert.equal(world.status, 200);
+    const broke = await row('t-on');
+    assert.equal(broke.status, 'broken', 'world tick with HARIMU_TREATY_BREAK_ENABLED on writes a break');
+    assert.equal(broke.broken_by, 'kindle', 'broken_by is the embargo target');
+  });
+
+  test(`#1507 (${backend}): a lifted or proposed embargo from the counterpart leaves the NAP in force`, async t => {
+    const { r, d, now, row } = await setup(t, backend);
+    await insertTreaty(r, { id: 't-lift', proposer: 'kindle', other: 'korund', now, at: now - 20 });
+    await insertEmbargo(r, { id: 'e-lift', actor: 'korund', target: 'kindle', now, status: 'lifted' });
+    await insertTreaty(r, { id: 't-prop', proposer: 'aurelle', other: 'korund', now, at: now - 10 });
+    await insertEmbargo(r, { id: 'e-prop', actor: 'korund', target: 'aurelle', now, status: 'proposed' });
+    await d.runDiplomacy(r.db, now, { treatyBreak: true });
+    assert.equal((await row('t-lift')).status, 'in_force', 'a lifted embargo from the counterpart leaves the NAP in force');
+    assert.equal((await row('t-prop')).status, 'in_force', 'a proposed embargo from the counterpart leaves the NAP in force');
+    assert.equal(await d.activeNonAggressionPact(r.db, 'kindle', 'korund', now), true);
+    assert.equal(await d.activeNonAggressionPact(r.db, 'aurelle', 'korund', now), true);
+  });
 }
 
-test('#1507 mutations: breaking when the flag is off, breaking with no trigger or a trade, swapping broken_by, and ignoring the one-per-slot guard all fail', () => {
+test('#1507 mutations: breaking when the flag is off, forcing the world tick off or on, breaking with no trigger, a non-in-force embargo, or a trade, swapping broken_by, and ignoring the one-per-slot guard all fail', () => {
   const cases = [
     { file: 'lib/diplomacy.ts', find: 'if (options.treatyBreak === true) await breakDueNonAggressionPacts(db, now);', replace: 'if (true) await breakDueNonAggressionPacts(db, now);', pattern: 'HARIMU_TREATY_BREAK_ENABLED off writes no break' },
     { file: 'lib/world-simulation.ts', find: "treatyBreak: flagOn(options.atlasEnv, 'HARIMU_TREATY_BREAK_ENABLED')", replace: 'treatyBreak: true', pattern: 'HARIMU_TREATY_BREAK_ENABLED off writes no break' },
+    { file: 'lib/world-simulation.ts', find: "treatyBreak: flagOn(options.atlasEnv, 'HARIMU_TREATY_BREAK_ENABLED')", replace: 'treatyBreak: false', pattern: 'HARIMU_TREATY_BREAK_ENABLED on writes a break' },
     { file: 'lib/diplomacy.ts', find: "WHERE t.kind='non-aggression' AND t.status='in_force' AND t.ends_at>?", replace: "WHERE t.kind IN ('non-aggression','trade') AND t.status='in_force' AND t.ends_at>?", pattern: 'trade is not broken' },
     { file: 'lib/diplomacy.ts', find: "JOIN embargoes e ON e.status='in_force' AND e.target_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation<>e.target_nation", replace: "JOIN embargoes e ON e.status='in_force'", pattern: 'a pact without the trigger stays in force' },
+    { file: 'lib/diplomacy.ts', find: "JOIN embargoes e ON e.status='in_force' AND e.target_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation<>e.target_nation", replace: "JOIN embargoes e ON e.status<>'' AND e.target_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation IN (t.proposer_nation, t.other_nation) AND e.actor_nation<>e.target_nation", pattern: 'a lifted or proposed embargo from the counterpart leaves the NAP in force' },
     { file: 'lib/diplomacy.ts', find: 'e.target_nation AS breaker', replace: 'e.actor_nation AS breaker', pattern: "the injured nation's napBrokenByTarget is true" },
     { file: 'lib/diplomacy.ts', find: "SELECT 1 AS found FROM treaties WHERE status='broken' AND ended_at>=? AND ended_at<?", replace: "SELECT 1 AS found FROM treaties WHERE status='broken' AND ended_at>=? AND ended_at<? AND 1=0", pattern: 'a second break is a no-op in the same slot' },
   ];
