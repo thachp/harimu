@@ -1,13 +1,12 @@
 /** #1487: Nation Legitimacy per MVP nation, derived from the same uncapped broken-treaty rows as World Reputation. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { readFile } from 'node:fs/promises';
 import { createElement } from 'react';
 import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 import { worldLegitimacyFromBreaks, worldReputation, worldReputationFromBreaks, withWorldReputationRecord, treatyBreakPenalty, treatyNations } from '../lib/diplomacy-rules.ts';
 
 const D = 86_400;
@@ -252,17 +251,6 @@ test('#1487 Foreign affairs panel shows Legitimacy with the Unicode minus, the z
   }
 });
 
-const mutate = (file, find, replace) => {
-  const original = readFileSync(file, 'utf8');
-  const next = original.replace(find, replace);
-  assert.notEqual(next, original, `mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file, next);
-  return () => writeFileSync(file, original);
-};
-const run = (files, pattern) => {
-  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, ...files], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
-};
 
 test('#1487 mutations: dropping * n, using the reputation penalty, zeroing legitimacy, a −100 floor, and dropping the Korund filter all fail', () => {
   const file = 'tests/world-legitimacy-1487.test.mjs';
@@ -298,11 +286,14 @@ test('#1487 mutations: dropping * n, using the reputation penalty, zeroing legit
       pattern: "only Korund's reputation entry, legitimacy included",
     },
   ];
-  for (const c of cases) {
-    const restore = mutate(c.file, c.find, c.replace);
-    try {
-      const result = run([file], c.pattern);
-      assert.notEqual(result.status, 0, `mutant survived (${c.find}):\n${result.stdout}\n${result.stderr}`);
-    } finally { restore(); }
-  }
+  const tree = mutantTree(); // #1480: never mutate the shared tree that parallel test files read
+  try {
+    for (const c of cases) {
+      const restore = tree.mutate(c.file, c.find, c.replace);
+      try {
+        const result = tree.run([file], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${c.find}):\n${result.stdout}\n${result.stderr}`);
+      } finally { restore(); }
+    }
+  } finally { tree.close(); }
 });
