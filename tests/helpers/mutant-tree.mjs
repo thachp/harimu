@@ -37,6 +37,12 @@ export function mutantTree({ repoRoot = defaultRepoRoot } = {}) {
     }
   };
   assertLinked();
+  // Probe run: a child in the copy must actually load typescript through the link before any mutant is judged.
+  const probe = spawnSync('node', ['--input-type=module', '-e', "const ts = await import('typescript'); if (typeof ts.default.transpileModule !== 'function') process.exit(3);"], { encoding: 'utf8', cwd: root });
+  if (probe.status !== 0) {
+    rmSync(root, { recursive: true, force: true });
+    throw new Error(`mutantTree: probe run in ${root} could not load typescript through the node_modules link (status ${probe.status}); refusing, since every mutant would count as caught:\n${probe.stderr}`);
+  }
   return {
     root,
     /** Apply one find/replace to `file` (repo-relative) in the copy. Returns the restore function. */
