@@ -68,6 +68,11 @@ export const legitimacyPanel={
  proposal:true,
 } as const;
 
+/** #1496: Aurelle-only line under World Reputation. `{n}` is the in-window decree count. Shown only when n > 0. */
+export const debasementReputationPanel={
+ line:L('Crown debasements in the last 3 years: {n}'),
+} as const;
+
 /** #1495: why a ratifying body refused a non-aggression pact. `{body}` is Assembly, Chairman, or Crown; `{nation}` is the counterpart with low World Reputation. */
 export const napReputationRefusal=L('The {body} refused a non-aggression pact with {nation} because of low World Reputation.');
 
