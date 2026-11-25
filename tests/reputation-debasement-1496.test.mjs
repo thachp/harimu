@@ -11,7 +11,7 @@ import { mutantTree } from './helpers/mutant-tree.mjs';
 import { crownConfig, gameYear } from '../lib/crown-debasement-rules.ts';
 import {
   debasementCountInWindow, debasementReputationMaxCount, debasementReputationPenalty, debasementReputationWindowYears,
-  treatyBreakPenalty, treatyNations, withDebasementReputation, worldReputation,
+  pactReputationFloor, treatyBreakPenalty, treatyNations, withDebasementReputation, worldReputation,
 } from '../lib/diplomacy-rules.ts';
 
 const zeroScore = () => Object.fromEntries(treatyNations.map((nation) => [nation, { score: 0, brokenPacts: 0 }]));
@@ -71,6 +71,13 @@ const insertBreak = async (r, { id, brokenBy = 'aurelle', proposer = 'kindle', o
   await r.db.prepare('INSERT INTO treaties (id,request_id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at,broken_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .bind(id, `r-${id}`, pair, 'non-aggression', proposer, other, 'AI', at, 'broken', at, at, at + 90 * 86400, ended, brokenBy).run();
 };
+
+const insertProposedNap = async (r, { id, proposer, other, now }) => {
+  const pair = [proposer, other].sort().join(':');
+  await r.db.prepare('INSERT INTO treaties (id,request_id,pair_key,kind,proposer_nation,other_nation,proposed_by,proposed_at,status,decided_at,ratified_at,ends_at,ended_at,broken_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(id, `r-${id}`, pair, 'non-aggression', proposer, other, 'AI', now - 1, 'proposed', null, null, null, null, null).run();
+};
+
 
 for (const backend of ['sqlite', 'postgres']) {
   test(`#1496 GET /api/world and GET /api/citizen include Aurelle's windowed debasements and score (${backend})`, async () => {
@@ -171,6 +178,63 @@ for (const backend of ['sqlite', 'postgres']) {
       assert.equal(baseline.aurelle.score, treatyBreakPenalty['non-aggression'].reputation);
     } finally {
       await r.close();
+    }
+  });
+
+  test(`#1496 the NAP gate uses the same debasement-adjusted score as the displayed reputation (${backend})`, async () => {
+    const setup = async (debasement, { breaks = 1, decrees = 2, prefix }) => {
+      const r = await localRuntime({ backend });
+      r.setFixtureEnv('HARIMU_DIPLOMACY_ENABLED', 'true');
+      r.setFixtureEnv('HARIMU_NAP_REPUTATION_GATE_ENABLED', 'true');
+      r.setFixtureEnv('HARIMU_REPUTATION_DEBASEMENT_ENABLED', debasement ? 'true' : 'false');
+      const preview = await r.call('world', null);
+      const epoch = preview.data.simulation.clock.epochSeconds;
+      const current = 5;
+      r.setNow(atYear(epoch, current) * 1000);
+      const now = Math.floor(r.now / 1000);
+      for (let i = 0; i < breaks; i++) {
+        await insertBreak(r, { id: `${prefix}-break-${i}`, brokenBy: 'aurelle', proposer: 'korund', other: 'aurelle', now: now - i });
+      }
+      for (let i = 0; i < decrees; i++) {
+        await insertDecree(r, { id: `${prefix}-d-${i}`, year: current - i });
+      }
+      await insertProposedNap(r, { id: `${prefix}-nap`, proposer: 'korund', other: 'aurelle', now });
+      return r;
+    };
+
+    const on = await setup(true, { prefix: 'on' });
+    try {
+      const world = await on.call('world', null);
+      assert.equal(world.status, 200);
+      assert.equal(world.data.simulation.reputation.aurelle.score, pactReputationFloor, 'displayed score is −20');
+      assert.equal(world.data.simulation.reputation.aurelle.debasements, 2);
+      const row = await on.db.prepare("SELECT status, ratification_json FROM treaties WHERE id='on-nap'").first();
+      assert.equal(row.status, 'rejected', 'the gate uses the same −20 score');
+      assert.equal(JSON.parse(row.ratification_json).find((item) => item.nation === 'korund').reason, 'low_reputation');
+    } finally {
+      await on.close();
+    }
+
+    const off = await setup(false, { prefix: 'off' });
+    try {
+      const world = await off.call('world', null);
+      assert.equal(world.data.simulation.reputation.aurelle.score, treatyBreakPenalty['non-aggression'].reputation);
+      assert.equal('debasements' in world.data.simulation.reputation.aurelle, false);
+      const row = await off.db.prepare("SELECT status FROM treaties WHERE id='off-nap'").first();
+      assert.equal(row.status, 'in_force', 'without debasement the score is −10 and the pact ratifies');
+    } finally {
+      await off.close();
+    }
+
+    const alone = await setup(true, { breaks: 0, decrees: 3, prefix: 'alone' });
+    try {
+      const world = await alone.call('world', null);
+      assert.equal(world.data.simulation.reputation.aurelle.score, -15);
+      assert.equal(world.data.simulation.reputation.aurelle.debasements, 3);
+      const row = await alone.db.prepare("SELECT status FROM treaties WHERE id='alone-nap'").first();
+      assert.equal(row.status, 'in_force', 'debasement alone is capped at −15 and does not trip the NAP gate');
+    } finally {
+      await alone.close();
     }
   });
 }
@@ -286,6 +350,12 @@ test('#1496 mutation tests: window bounds, cap, nation, and unfiltered counts fa
       find: 'if (y >= oldest && y <= currentYear) n += 1;',
       replace: 'if (y >= oldest) n += 1;',
       pattern: '#1496 window',
+    },
+    {
+      file: 'lib/diplomacy.ts',
+      find: 'options.napReputationGate ? await readWorldReputation(db, now, { debasement: options.debasement === true }) : null',
+      replace: 'options.napReputationGate ? await readWorldReputation(db, now) : null',
+      pattern: '#1496 the NAP gate uses the same debasement-adjusted score',
     },
   ];
   const tree = mutantTree(); // #1508: never mutate the shared tree that parallel test files read

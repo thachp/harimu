@@ -17,7 +17,7 @@
 
 export { COUP_NAME_MAX as DIPLOMACY_NAME_MAX } from './palace-coup-copy';
 
-export const DIPLOMACY_PLACEHOLDERS=['{nationA}','{nationB}','{treaty}','{endsAt}'] as const;
+export const DIPLOMACY_PLACEHOLDERS=['{nationA}','{nationB}','{treaty}','{endsAt}','{body}','{nation}'] as const;
 export const DIPLOMACY_LABEL_MAX=40;
 export const DIPLOMACY_BODY_MAX=140;
 
@@ -72,6 +72,9 @@ export const legitimacyPanel={
 export const debasementReputationPanel={
  line:L('Crown debasements in the last 3 years: {n}'),
 } as const;
+
+/** #1495: why a ratifying body refused a non-aggression pact. `{body}` is Assembly, Chairman, or Crown; `{nation}` is the counterpart with low World Reputation. */
+export const napReputationRefusal=L('The {body} refused a non-aggression pact with {nation} because of low World Reputation.');
 
 /** One line per kind of treaty, from §13.2. `name` is the pre-formatted {treaty} value #308 is expected to pass. */
 export const treatyKinds:Readonly<Record<TreatyKind,{name:string;effect:Line}>>={

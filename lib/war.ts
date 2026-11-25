@@ -70,9 +70,10 @@ export function presentKorundWorldSimulation<T extends {
   warEndings?: readonly { warId: string; proposer: string; other: string }[];
   weariness?: Partial<Record<string, string>>;
   reputation?: Partial<Record<string, { score: number; brokenPacts: number; record?: { other: string; kind: string; brokenAt: number; brokenGameDay: number; penalty: number }[]; earlierBreaks?: number; legitimacy?: number; debasements?: number }>>;
+  napReputationRefusals?: readonly { proposer: string; other: string }[];
 }>(simulation: T, nationId: string | null | undefined): T {
   if (nationId !== 'korund') return simulation;
-  if (!simulation.wars && !simulation.sieges && !simulation.treaties && !simulation.embargoes && !simulation.warProposals && !simulation.warEndings && !simulation.weariness && !simulation.reputation) return simulation;
+  if (!simulation.wars && !simulation.sieges && !simulation.treaties && !simulation.embargoes && !simulation.warProposals && !simulation.warEndings && !simulation.weariness && !simulation.reputation && !simulation.napReputationRefusals) return simulation;
   const involves = (a: string, b: string) => a === 'korund' || b === 'korund';
   const wars = (simulation.wars?.wars ?? []).filter(war => involves(war.attacker, war.defender));
   const ids = new Set(wars.map(war => war.id));
@@ -87,6 +88,7 @@ export function presentKorundWorldSimulation<T extends {
     ...(simulation.warEndings ? { warEndings: simulation.warEndings.filter(ending => involves(ending.proposer, ending.other) || ids.has(ending.warId)) } : {}),
     ...(simulation.weariness ? { weariness: simulation.weariness.korund !== undefined ? { korund: simulation.weariness.korund } : {} } : {}),
     ...(simulation.reputation ? { reputation: simulation.reputation.korund !== undefined ? { korund: simulation.reputation.korund } : {} } : {}),
+    ...(simulation.napReputationRefusals ? { napReputationRefusals: simulation.napReputationRefusals.filter(item => involves(item.proposer, item.other)) } : {}),
   };
 }
 const columns = 'id,attacker_nation,defender_nation,casus_belli,declared_by,declared_at,mobilization_ends_at,ended_at,end_kind';

@@ -24,7 +24,7 @@ import { recordFinishedBattles } from './army-battle';
 import { readHarmonyScores } from './religious-harmony';
 import { readWars, type WarState } from './war'; // #309
 import { readSiegeSnapshot, type SiegeSnapshotItem } from './siege-actions'; // #620
-import { readTreaties, readWorldReputation, runDiplomacy, type TreatyState } from './diplomacy'; // #308, #1477
+import { readTreaties, readWorldReputation, readNapReputationRefusals, runDiplomacy, type TreatyState, type NapReputationRefusal } from './diplomacy'; // #308, #1477, #1495
 import type { WorldReputationMap } from './diplomacy-rules'; // #1474
 import { readEmbargoes, runEmbargo, type EmbargoState } from './embargo'; // #363
 import { decideProposedGoodsSanctions } from './goods-sanctions'; // #601
@@ -81,7 +81,7 @@ export type WorldClock = {
 export type PolicyExecution = { tick: number; nationId: string; topic: string; foodQuantity: number;
   spendMinor: number; scheduledAt: number; executedAt: number };
 export type SimulationState = { clock: WorldClock; latestExecution: PolicyExecution | null;
-  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; sieges?: SiegeSnapshotItem[]; weariness?: PublicWeariness; treaties?: TreatyState; reputation?: WorldReputationMap; embargoes?: EmbargoState; reserve?: ReserveBoard; warProposals?: Awaited<ReturnType<typeof readWarProposals>>; warEndings?: Awaited<ReturnType<typeof readWarEndings>> };
+  supplierFoodRemaining: number; supplierCashMinor: number; stability?: PublicStability[]; wars?: WarState; sieges?: SiegeSnapshotItem[]; weariness?: PublicWeariness; treaties?: TreatyState; reputation?: WorldReputationMap; napReputationRefusals?: NapReputationRefusal[]; embargoes?: EmbargoState; reserve?: ReserveBoard; warProposals?: Awaited<ReturnType<typeof readWarProposals>>; warEndings?: Awaited<ReturnType<typeof readWarEndings>> };
 
 type RunnerOptions = Parameters<typeof advanceWorld>[2];
 /** #679: one flag-gated world runner. `run` is only called when its flag is on. */
@@ -108,7 +108,7 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
     [{ name: 'korundPresidium', on: options.korundPresidium === true, run: () => runKorundPresidium(db, now) },
      { name: 'korundRaids', on: options.faithFestivals === true, run: () => runKorundRaids(db, now).catch(warnOnly('Korund inspection')) }],
     // #308 AI treaties, then #601 targeted goods sanctions (only the citizen POST path passes it, never a GET), then #363 embargoes.
-    [{ name: 'diplomacy', on: options.diplomacy === true, run: () => runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, 'HARIMU_TRADE_RENEWAL_ENABLED'), embargo: options.embargo === true }).catch(warnOnly('diplomacy')) },
+    [{ name: 'diplomacy', on: options.diplomacy === true, run: () => runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, 'HARIMU_TRADE_RENEWAL_ENABLED'), embargo: options.embargo === true, napReputationGate: options.napReputationGate === true, debasement: flagOn(options.atlasEnv, 'HARIMU_REPUTATION_DEBASEMENT_ENABLED') }).catch(warnOnly('diplomacy')) },
      { name: 'targetedSanctions', on: options.targetedSanctions === true, run: () => decideProposedGoodsSanctions(db, now).catch(warnOnly('goods sanction')) },
      { name: 'embargo', on: options.embargo === true, run: () => runEmbargo(db, now).catch(warnOnly('embargo')) },
      // #427: the Kindle Assembly votes on pending war declarations after diplomacy, so a pact ratified this tick blocks the declaration on re-check
@@ -123,7 +123,7 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
     // #879 integrity risk scores (docs §20): one idempotent upsert for staff review. HARIMU_RISK_SCORING_ENABLED; citizen POST path only, never a GET. Off: this runner does not run.
     [{ name: 'riskScoring', on: options.riskScoring === true, run: () => runRiskScoring(db, now).catch(warnOnly('risk scoring')) }],
     // #738 battles (ARC on #910): finished battles are stored once (conditional insert), so a decided battle never changes; GETs only read them.
-    [{ name: 'armyBattles', on: options.armyBattles === true, run: () => recordFinishedBattles(db, now, options.winterMarch === true) }],
+    [{ name: 'armyBattles', on: options.armyBattles === true, run: () => recordFinishedBattles(db, now, options.winterMarch === true, options.battleTerrain === true) }],
   ];
 }
 /** #679: run the chains concurrently, each in order. A runner that throws ends its own chain and still fails the request, but only after every other chain has
@@ -136,7 +136,7 @@ export async function runWorldChains(chains: WorldRunner[][]): Promise<void> {
 }
 
 /** Request-driven bounded catch-up, not an always-on scheduler. Transactions own transfers. */
-export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { atlasEnv?: unknown; armyBattles?: boolean; winterMarch?: boolean; religiousHarmony?: boolean; reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; riskScoring?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; peaceRevert?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
+export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { atlasEnv?: unknown; armyBattles?: boolean; battleTerrain?: boolean; winterMarch?: boolean; religiousHarmony?: boolean; reserve?: boolean; npcSupply?: boolean; aurelleRising?: boolean; aurelleCoup?: boolean; favorDecay?: boolean; kindleAssembly?: AssemblyTickConfig | null; voteBuyingWatch?: boolean; riskScoring?: boolean; dormancy?: boolean; primaries?: { scope: PrimaryScope; openAt: number | null } | null; korundPresidium?: boolean; faithFestivals?: boolean; diplomacy?: boolean; napReputationGate?: boolean; embargo?: boolean; targetedSanctions?: boolean; war?: boolean; warAssembly?: boolean; warEndings?: boolean; peaceRevert?: boolean; warLimits?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; foundingPeriod?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #221: due preview elections close and record their count on the tick, so GET /api/election never writes.
   await Promise.all([db, accountElectionDatabase(db)].map(electionDb => finalizeDueElection(electionDb, now).catch(error => { console.warn('[world] due election finalize failed', error instanceof Error ? error.name : 'unknown'); }))); // #668: the two ballots are separate rows, so they close concurrently
@@ -201,14 +201,14 @@ export async function advanceWorld(db: GameDatabase, now = Math.floor(Date.now()
   // preview flags on waited for all of them in a row (about 80 round trips, ~30 s on preview). Runners that touch separate state run as concurrent chains (see
   // worldRunnerChains); inside a chain the old order is kept. Every runner is idempotent per tick or time as before.
   await runWorldChains(worldRunnerChains(db, now, options));
-  return readWorldSimulation(db, now, { war: options.war, warAssembly: options.warAssembly, warEndings: options.warEndings, warWeariness: options.warWeariness, warWearinessLosses: options.warWearinessLosses, diplomacy: options.diplomacy, embargo: options.embargo, reserve: options.reserve, atlasEnv: options.atlasEnv });
+  return readWorldSimulation(db, now, { war: options.war, warAssembly: options.warAssembly, warEndings: options.warEndings, warWeariness: options.warWeariness, warWearinessLosses: options.warWearinessLosses, diplomacy: options.diplomacy, napReputationGate: options.napReputationGate, embargo: options.embargo, reserve: options.reserve, atlasEnv: options.atlasEnv });
 
 }
 
 /** #205: the same snapshot advanceWorld returns, computed without any write. Due-but-unprocessed ticks show as
  *  pendingTicks; the next write path (or GET /api/world) processes them. */
 /** #309: `war` (HARIMU_WAR_ENABLED) adds the derived war state; with it off nothing is queried or returned. */
-export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { atlasEnv?: unknown; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; diplomacy?: boolean; embargo?: boolean; reserve?: boolean } = {}): Promise<SimulationState> {
+export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Date.now()/1000), options: { atlasEnv?: unknown; war?: boolean; warAssembly?: boolean; warEndings?: boolean; warWeariness?: boolean; warWearinessLosses?: boolean; diplomacy?: boolean; napReputationGate?: boolean; embargo?: boolean; reserve?: boolean } = {}): Promise<SimulationState> {
   if (!Number.isSafeInteger(now) || now<0) throw new Error('Invalid authoritative world time.');
   // #668: every read here is independent, so they share one round of round trips instead of queueing (the flag-gated war, treaty, embargo and reserve reads included).
   const none = Promise.resolve(undefined);
@@ -216,7 +216,7 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
   const atlasCancelsOn = options.atlasEnv != null
     && flagOn(options.atlasEnv, 'HARIMU_VARKAND_RED_ALERT_CANCELS_ENABLED')
     && varkandAlertEnabled(options.atlasEnv);
-  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,reputation,embargoes,reserve,warProposals,warEndings,atlasAlert] = await Promise.all([
+  const [clock,latest,execution,supply,stability,wars,sieges,weariness,treaties,reputation,napReputationRefusals,embargoes,reserve,warProposals,warEndings,atlasAlert] = await Promise.all([
     db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{epoch_seconds:number}>(),
     db.prepare('SELECT COALESCE(MAX(tick),0) AS tick FROM world_ticks').first<{tick:number}>(),
     db.prepare('SELECT tick,nation_id,topic,food_quantity,spend_minor,scheduled_at,executed_at FROM government_policy_executions ORDER BY tick DESC LIMIT 1')
@@ -229,6 +229,7 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     options.war && options.warWeariness ? readPublicWeariness(db,now,{ losses: options.warWearinessLosses }) : none,
     options.diplomacy ? readTreaties(db,now) : none,
     options.diplomacy ? readWorldReputation(db, now, { debasement: flagOn(options.atlasEnv, 'HARIMU_REPUTATION_DEBASEMENT_ENABLED') }) : none, // #1477/#1480/#1496: uncapped count and record, not the LIMIT 20 list
+    options.diplomacy && options.napReputationGate ? readNapReputationRefusals(db) : none, // #1495: rejected NAPs with low_reputation; flag off omits the key
     options.embargo ? readEmbargoes(db) : none,
     options.reserve ? readReserveBoard(db,now) : none,
     options.war && options.warAssembly ? readWarProposals(db) : none, // #427: the Assembly's pending and recent votes, read-only
@@ -244,5 +245,5 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     ...(dividendDayAt == null ? {} : { dividendDayAt }), ...worldAtlasClockFields(now, options.atlasEnv, canceledNames)}, // #1193/#1239: atlasEnv is the Worker env; flag off adds nothing; canceledNames skips Red Alert celebrations
     latestExecution:execution ? {tick:execution.tick,nationId:execution.nation_id,topic:execution.topic,foodQuantity:execution.food_quantity,
       spendMinor:execution.spend_minor,scheduledAt:execution.scheduled_at,executedAt:execution.executed_at}:null,
-    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!,reputation:reputation!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
+    supplierFoodRemaining:supply?.food ?? 0,supplierCashMinor:supply?.cash ?? 0,stability,...(options.war?{wars:wars!,sieges:sieges!}:{}),...(options.war&&options.warWeariness?{weariness:weariness!}:{}),...(options.war&&options.warAssembly?{warProposals:warProposals!}:{}),...(options.war&&options.warEndings?{warEndings:warEndings!}:{}),...(options.diplomacy?{treaties:treaties!,reputation:reputation!}:{}),...(options.diplomacy&&options.napReputationGate?{napReputationRefusals:napReputationRefusals!}:{}),...(options.embargo?{embargoes:embargoes!}:{}),...(options.reserve?{reserve:reserve!}:{})};
 }

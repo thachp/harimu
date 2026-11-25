@@ -13,12 +13,12 @@ test('flag is on only for the exact string "true", pack index 72, preview on and
   const previous = process.env[key];
   try { delete process.env[key]; assert.equal(neighborhoodTalkEnabled(), false); process.env[key] = 'true'; assert.equal(neighborhoodTalkEnabled(), true); }
   finally { if (previous === undefined) delete process.env[key]; else process.env[key] = previous; }
-  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 73); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(72), key, 'index 72'); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(71), 'NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK'); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(70), 'NEXT_PUBLIC_HARIMU_FAITH');
+  assert.equal(FLAG_PACKS.HARIMU_UI_PACK.length, 74); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(72), key, 'index 72'); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(71), 'NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_WALK'); assert.equal(FLAG_PACKS.HARIMU_UI_PACK.at(70), 'NEXT_PUBLIC_HARIMU_FAITH');
   const preview = strip(await read('wrangler.jsonc')), prod = strip(await read('wrangler.prod.jsonc'));
   assert.equal(preview.vars[key], undefined); assert.equal(prod.vars[key], undefined); assert.equal(preview.vars.HARIMU_UI_PACK[key], 'true'); assert.equal(prod.vars.HARIMU_UI_PACK[key], 'false');
   assert.equal(expandFlagPacks(preview.vars)[key], 'true'); assert.equal(expandFlagPacks(prod.vars)[key], 'false'); assert.equal(varsForProcessEnv(preview.vars)[key], 'true'); assert.equal(varsForProcessEnv(prod.vars)[key], 'false');
   assert.equal(varsForProcessEnv({ HARIMU_UI_PACK: preview.vars.HARIMU_UI_PACK, [key]: 'false' })[key], 'false');
-  assert.match(await read('lib/neighborhood-talk.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_TALK/); assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 73/);
+  assert.match(await read('lib/neighborhood-talk.ts'), /try \{ return process\.env\.NEXT_PUBLIC_HARIMU_NEIGHBORHOOD_TALK/); assert.match(await read('tests/text-bindings-988.test.mjs'), /HARIMU_UI_PACK\.length, 74/);
   assert.match(await read('tests/wrangler-prod-501b.test.mjs'), new RegExp(key)); assert.match(await read('tests/flag-off-audit-384.test.mjs'), new RegExp(key));
   const css = await read('app/neighborhood-talk.css'), rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|\})([^{}]+)\{/g)].map(m => m[1].trim()).filter(Boolean);
   for (const sel of rules) for (const part of sel.split(',')) assert.match(part.trim(), /^\.game-neighborhood-talk\b/, part);
