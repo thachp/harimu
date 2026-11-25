@@ -1,10 +1,9 @@
 /** #1482: World Registry price also rises with Chebyshev distance from the capital (docs §15.1). No new flag. */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 
 const FLAG = 'HARIMU_SQUARE_PRICE_ANTI_SNOWBALL_ENABLED';
 const buy = (r, user, x, y, over = {}) => r.call('world/registry', user, { action: 'buy-square', x, y, requestId: randomUUID(), ...over });
@@ -193,19 +192,6 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-
-const mutate = (file, find, replace) => {
-  const original = readFileSync(file, 'utf8');
-  const next = original.replace(find, replace);
-  assert.notEqual(next, original, `mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file, next);
-  return () => writeFileSync(file, original);
-};
-const run = (files, pattern) => {
-  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, ...files], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
-};
-
 test('#1482 mutations: a d=0 capital fallback, accepting non-integer x, and honoring a client d or price all fail', () => {
   const file = 'tests/registry-price-distance-1482.test.mjs';
   const cases = [
@@ -234,11 +220,14 @@ test('#1482 mutations: a d=0 capital fallback, accepting non-integer x, and hono
       pattern: 'd = 10 is 20% more',
     },
   ];
-  for (const c of cases) {
-    const restore = mutate(c.file, c.find, c.replace);
-    try {
-      const result = run([file], c.pattern);
-      assert.notEqual(result.status, 0, `mutant survived (${c.find}):\n${result.stdout}\n${result.stderr}`);
-    } finally { restore(); }
-  }
+  const tree = mutantTree(); // #1509: mutants live only in a tmpdir copy, never in the shared tree that parallel test files read
+  try {
+    for (const c of cases) {
+      const restore = tree.mutate(c.file, c.find, c.replace);
+      try {
+        const result = tree.run([file], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${c.find}):\n${result.stdout}\n${result.stderr}`);
+      } finally { restore(); }
+    }
+  } finally { tree.close(); }
 });

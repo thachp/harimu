@@ -3,8 +3,9 @@ import { isMissingRelation, tolerate } from './db-errors';
 import { gameTimeCompression } from './game-time';
 import { assemblyIncumbents } from './assembly-rules';
 import { brokenPactLine, ratificationFor, ratificationHeadlines, treatyStatusLines, DIPLOMACY_NAME_MAX, type RatificationKey } from './diplomacy-copy';
+import { gameYear } from './crown-debasement-rules';
 import { cleanTreatyLabel, decideTreaty, isTreatyKind, isTreatyNation, treatyActorMax, treatyKindNames, treatyNationNames, treatyPairKey, treatyRequestIdOk, treatyStatus, treatyTermSeconds, treatyBreakPenaltyFor, treatyAiLeaders, treatyCandidates, treatyProposalCooldownSlots, treatyProposalRequestId, treatyProposalSlotSeconds, treatySlot,
-  worldReputationBreaksSql, worldReputationFromBreaks, worldLegitimacyFromBreaks, withWorldReputationRecord, renewalWindowSeconds, renewedTerm, treatyRenewalRequestId, type PartySeats, type Ratification, type TreatyDbStatus, type TreatyBreakPenalty, type TreatyKind, type TreatyNationId, type TreatyStatus, type WorldReputationMap } from './diplomacy-rules';
+  worldReputationBreaksSql, worldReputationFromBreaks, worldLegitimacyFromBreaks, withWorldReputationRecord, debasementCountInWindow, withDebasementReputation, renewalWindowSeconds, renewedTerm, treatyRenewalRequestId, type PartySeats, type Ratification, type TreatyDbStatus, type TreatyBreakPenalty, type TreatyKind, type TreatyNationId, type TreatyStatus, type WorldReputationMap } from './diplomacy-rules';
 export * from './diplomacy-rules';
 
 /** #308: AI treaties PoC (non-aggression pact, trade agreement) behind HARIMU_DIPLOMACY_ENABLED (default "false"). Canon: harimu-docs 13.1, 13.2
@@ -108,11 +109,11 @@ export async function expireDueTreaties(db: GameDatabase, now: number) {
 
 /** Decides every `proposed` treaty with each signatory's ratifying body (docs 13.1). Approved: in force for the fixed game-time term from this second.
  *  Refused: recorded as rejected (not published). Each update is guarded by `status='proposed'`, so a repeated or concurrent tick decides once. */
-export async function decideProposedTreaties(db: GameDatabase, now: number, options: { napReputationGate?: boolean } = {}) {
+export async function decideProposedTreaties(db: GameDatabase, now: number, options: { napReputationGate?: boolean; debasement?: boolean } = {}) {
   const rows = (await db.prepare(`SELECT ${columns} FROM treaties WHERE status='proposed' ORDER BY proposed_at,id LIMIT 20`).all<Row>()).results;
   if (!rows.length) return 0;
   const seats = await kindleSeats(db);
-  const scores = options.napReputationGate ? await readWorldReputation(db, now) : null;
+  const scores = options.napReputationGate ? await readWorldReputation(db, now, { debasement: options.debasement === true }) : null;
   let decided = 0;
   for (const row of rows) {
     const verdict = decideTreaty(row.kind, row.proposer_nation, row.other_nation, seats, scores), json = JSON.stringify(verdict.ratifications);
@@ -150,7 +151,7 @@ export async function renewDueTradeAgreements(db: GameDatabase, now: number, opt
 }
 
 /** World tick (HARIMU_DIPLOMACY_ENABLED on): expire due terms, renew due trade agreements when that flag is on, break at most one triggered NAP when HARIMU_TREATY_BREAK_ENABLED is on, then decide pending proposals. */
-export async function runDiplomacy(db: GameDatabase, now: number, options: { renewal?: boolean; treatyBreak?: boolean; embargo?: boolean; napReputationGate?: boolean } = {}) {
+export async function runDiplomacy(db: GameDatabase, now: number, options: { renewal?: boolean; treatyBreak?: boolean; embargo?: boolean; napReputationGate?: boolean; debasement?: boolean } = {}) {
   await expireDueTreaties(db, now);
   if (options.renewal === true) await renewDueTradeAgreements(db, now, { embargo: options.embargo });
   if (options.treatyBreak === true) await breakDueNonAggressionPacts(db, now);
@@ -236,20 +237,33 @@ export async function readTreaties(db: GameDatabase, now: number): Promise<Treat
   return { treaties: rows.map(row => publicTreaty(row, now)).filter((t): t is PublicTreaty => t !== null) };
 }
 
-/** #1477 / #1480 / #1487: uncapped per-nation count of broken treaties with a non-zero treatyBreakPenalty[kind].reputation,
+/** #1477 / #1480 / #1487 / #1496: uncapped per-nation count of broken treaties with a non-zero treatyBreakPenalty[kind].reputation,
  *  plus the broken-treaty record behind each score and Nation Legitimacy from the same rows. Independent of readTreaties
- *  (which stays at LIMIT 20). Flag off: the caller does not call this. A missing table reads as the zero baseline. */
+ *  (which stays at LIMIT 20). When options.debasement is on, one parallel uncapped read of crown_decrees.game_year adds
+ *  the windowed Aurelle debasement penalty; a missing relation reads as 0. Flag off: the caller does not call this.
+ *  A missing treaties table reads as the zero baseline. */
 export { worldReputationBreaksSql };
-export async function readWorldReputation(db: GameDatabase, now = Math.floor(Date.now() / 1000)): Promise<WorldReputationMap> {
+export async function readWorldReputation(db: GameDatabase, now = Math.floor(Date.now() / 1000), options: { debasement?: boolean } = {}): Promise<WorldReputationMap> {
   type Row = { id: string; broken_by: string; kind: string; proposer_nation: string; other_nation: string; ended_at: number | null; n: number };
-  const rows = (await db.prepare(worldReputationBreaksSql).all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] }))).results ?? [];
+  type YearRow = { game_year: number };
+  const breakQuery = db.prepare(worldReputationBreaksSql).all<Row>().catch(tolerate(isMissingRelation, { results: [] as Row[] }));
+  const decreeQuery = options.debasement
+    ? db.prepare('SELECT game_year FROM crown_decrees').all<YearRow>().catch(tolerate(isMissingRelation, { results: [] as YearRow[] }))
+    : undefined;
+  const [breakResult, decreeResult] = options.debasement
+    ? await Promise.all([breakQuery, decreeQuery])
+    : [await breakQuery, undefined];
+  const rows = breakResult?.results ?? [];
   const scores = worldReputationFromBreaks(rows.map(row => ({ brokenBy: row.broken_by, kind: row.kind, n: Number(row.n) })));
   const legitimacy = worldLegitimacyFromBreaks(rows.map(row => ({ brokenBy: row.broken_by, kind: row.kind, n: Number(row.n) })));
   const clock = await db.prepare("SELECT epoch_seconds FROM world_clock WHERE id='main'").first<{ epoch_seconds: number }>().catch(tolerate(isMissingRelation, null));
   const epoch = clock ? Number(clock.epoch_seconds) : Math.floor(now / 7200) * 7200;
-  return withWorldReputationRecord(scores, rows.map(row => ({
+  const attached = withWorldReputationRecord(scores, rows.map(row => ({
     id: row.id, kind: row.kind, status: 'broken', brokenBy: row.broken_by, proposer: row.proposer_nation, other: row.other_nation, brokenAt: row.ended_at,
   })), epoch, legitimacy);
+  if (!options.debasement) return attached;
+  const years = (decreeResult?.results ?? []).map(row => Number(row.game_year));
+  return withDebasementReputation(attached, debasementCountInWindow(years, gameYear(now, epoch)));
 }
 
 /** For the war declaration path (#309/#348 wires it later): is there a non-aggression pact in force between the two nations? Fails open when the table is missing. */

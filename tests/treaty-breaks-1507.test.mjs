@@ -1,4 +1,4 @@
-/** #1507: the diplomacy world tick can break an in-force NAP when the counterpart already has an in-force embargo against the breaker. No migration. HARIMU_TREATY_BREAK_ENABLED is GRAY 102 (index 98 on this base, after #1502; #1497 and GRAY 100/101 have not landed). */
+/** #1507: the diplomacy world tick can break an in-force NAP when the counterpart already has an in-force embargo against the breaker. No migration. HARIMU_TREATY_BREAK_ENABLED is GRAY 102 (index 100 on this base, after #1510; #1511 has not landed). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -11,17 +11,17 @@ const D = 86400;
 const FLAG = 'HARIMU_TREATY_BREAK_ENABLED';
 const pair = (a, b) => [a, b].sort().join(':');
 
-test('flag is preview true, production false, GRAY 102 at index 98, and listed in previewOnFlags', () => {
+test('flag is preview true, production false, GRAY 102 at index 100, and listed in previewOnFlags', () => {
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_TRADE_RENEWAL_ENABLED'), 96);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 98); // GRAY 102 after the NAP reputation gate (index 97, GRAY 99). #1497 (GRAY 98) and GRAY 100/101 have not landed. indexOf only, no at(-1).
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG), 100); // GRAY 102 after Crown debasement (index 99, GRAY 100). #1511 has not landed. indexOf only, no at(-1).
   const preview = JSON.parse(readFileSync('wrangler.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   const prod = JSON.parse(readFileSync('wrangler.prod.jsonc', 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   assert.equal(preview.vars[FLAG], undefined);
   assert.equal(prod.vars[FLAG], undefined);
   assert.equal(preview.vars.HARIMU_GRAY_PACK[FLAG], 'true');
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG], 'false');
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 98);
-  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 98);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 100);
+  assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG), 100);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK }, FLAG), true);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: prod.vars.HARIMU_GRAY_PACK }, FLAG), false);
   assert.equal(flagOn({ HARIMU_GRAY_PACK: preview.vars.HARIMU_GRAY_PACK, [FLAG]: 'false' }, FLAG), false, 'a direct string wins over the pack');
