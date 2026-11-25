@@ -143,7 +143,7 @@ export const kindleStances: Readonly<Record<TreatyKind, Readonly<Record<'korund'
   'non-aggression': { korund: { 'steady-hand': true, 'open-ledger': true, 'dockside-builders': false }, aurelle: { 'steady-hand': true, 'open-ledger': false, 'dockside-builders': false } },
   trade: { korund: { 'steady-hand': true, 'open-ledger': false, 'dockside-builders': true }, aurelle: { 'steady-hand': false, 'open-ledger': true, 'dockside-builders': false } },
 };
-export type Ratification = { nation: TreatyNationId; body: 'Assembly' | 'Chairman' | 'Crown'; passed: boolean; rule: 'two-thirds' | 'simple-majority' | 'sole'; yes?: number; total?: number };
+export type Ratification = { nation: TreatyNationId; body: 'Assembly' | 'Chairman' | 'Crown'; passed: boolean; rule: 'two-thirds' | 'simple-majority' | 'sole'; yes?: number; total?: number; reason?: 'low_reputation' };
 
 /** Docs 13.1: a treaty needs two-thirds of the Assembly, a trade deal a simple majority (more than half). Integers only. */
 export function kindleRatification(kind: TreatyKind, other: TreatyNationId, seats: PartySeats): Ratification {
@@ -157,9 +157,21 @@ export function kindleRatification(kind: TreatyKind, other: TreatyNationId, seat
 /** Korund: the Chairman alone ratifies; Aurelle: the Crown by decree. One AI actor each [ASSUMPTION: always yes]. */
 export const soleRatification = (nation: 'korund' | 'aurelle'): Ratification => ({ nation, body: nation === 'korund' ? 'Chairman' : 'Crown', passed: true, rule: 'sole' });
 
-/** Both signatories' ratifying bodies must approve (docs 13.1: each nation's own body ratifies). */
-export function decideTreaty(kind: TreatyKind, a: TreatyNationId, b: TreatyNationId, kindleSeats: PartySeats): { approved: boolean; ratifications: Ratification[] } {
+/** #1495: a non-aggression pact is refused when the counterpart's World Reputation score is at or below this floor (two broken NAPs at −10). Trade is not gated. */
+export const pactReputationFloor = -20;
+export const napReputationGateFlag = 'HARIMU_NAP_REPUTATION_GATE_ENABLED';
+
+/** Both signatories' ratifying bodies must approve (docs 13.1: each nation's own body ratifies).
+ *  #1495: when `scores` is passed, a signatory whose counterpart is at or below pactReputationFloor refuses a non-aggression pact
+ *  (`reason: 'low_reputation'`), overriding a stance-based or sole yes. A side that already failed is left unchanged. Omitting `scores` is today's rule. */
+export function decideTreaty(kind: TreatyKind, a: TreatyNationId, b: TreatyNationId, kindleSeats: PartySeats, scores?: Readonly<Record<string, { score: number }>> | null): { approved: boolean; ratifications: Ratification[] } {
   const side = (nation: TreatyNationId, other: TreatyNationId) => nation === 'kindle' ? kindleRatification(kind, other, kindleSeats) : soleRatification(nation);
-  const ratifications = [side(a, b), side(b, a)];
+  const ratifications = [side(a, b), side(b, a)].map((ratification, index) => {
+    if (kind !== 'non-aggression' || !scores || !ratification.passed) return ratification;
+    const counterpart = index === 0 ? b : a;
+    const score = scores[counterpart]?.score ?? 0;
+    if (score > pactReputationFloor) return ratification;
+    return { ...ratification, passed: false, reason: 'low_reputation' as const };
+  });
   return { approved: ratifications.every(r => r.passed), ratifications };
 }
