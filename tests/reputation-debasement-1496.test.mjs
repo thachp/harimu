@@ -7,14 +7,14 @@ import { test } from 'node:test';
 import { createElement } from 'react';
 import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 import { crownConfig, gameYear } from '../lib/crown-debasement-rules.ts';
 import {
   debasementCountInWindow, debasementReputationMaxCount, debasementReputationPenalty, debasementReputationWindowYears,
-  treatyBreakPenalty, treatyNations, withDebasementReputation, worldReputation, withWorldReputationRecord,
+  treatyBreakPenalty, treatyNations, withDebasementReputation, worldReputation,
 } from '../lib/diplomacy-rules.ts';
 
 const zeroScore = () => Object.fromEntries(treatyNations.map((nation) => [nation, { score: 0, brokenPacts: 0 }]));
-const zeroAttached = () => Object.fromEntries(treatyNations.map((nation) => [nation, { score: 0, brokenPacts: 0, record: [], earlierBreaks: 0, legitimacy: 0 }]));
 
 test('#1496 pure helper: 0 decrees leave Aurelle unchanged; 2 in-window lower the score by 10; Kindle and Korund are never charged; broken-pact penalties add up', () => {
   assert.equal(debasementReputationPenalty, -5);
@@ -46,6 +46,8 @@ test('#1496 window: just inside (current − 2) counts, just outside (current �
   assert.equal(debasementCountInWindow([current - 2], current), 1, 'just inside the window');
   assert.equal(debasementCountInWindow([current - 3], current), 0, 'just outside the window');
   assert.equal(debasementCountInWindow([current - 4], current), 0, 'a decree older than 3 game years does not count');
+  assert.equal(debasementCountInWindow([current + 1], current), 0, 'a future-year decree does not count');
+  assert.equal(debasementCountInWindow([current, current + 1], current), 1, 'a current-year decree still counts next to a future one');
   assert.equal(debasementCountInWindow([current, current - 1, current - 2, current - 3], current), 3);
   assert.equal(withDebasementReputation(zeroScore(), 4).aurelle.score, -15, 'a raw count of 4 is capped at −15');
   assert.equal(withDebasementReputation(zeroScore(), 4).aurelle.debasements, 3);
@@ -84,10 +86,11 @@ for (const backend of ['sqlite', 'postgres']) {
       await insertDecree(r, { id: 'd-now', year: current });
       await insertDecree(r, { id: 'd-in', year: current - 2 });
       await insertDecree(r, { id: 'd-out', year: current - 3 });
+      await insertDecree(r, { id: 'd-future', year: current + 1 });
       const world = await r.call('world', 'bob');
       assert.equal(world.status, 200);
       const aurelle = world.data.simulation.reputation.aurelle;
-      assert.equal(aurelle.debasements, 2, 'the older-than-window decree is omitted');
+      assert.equal(aurelle.debasements, 2, 'decrees older than the window or in a future year are omitted');
       assert.equal(aurelle.score, -10);
       assert.equal(world.data.simulation.reputation.kindle.debasements, 0);
       assert.equal(world.data.simulation.reputation.korund.debasements, 0);
@@ -159,12 +162,13 @@ for (const backend of ['sqlite', 'postgres']) {
       const preview = await r.call('world', null);
       const epoch = preview.data.simulation.clock.epochSeconds;
       r.setNow(atYear(epoch, 3) * 1000);
+      await insertBreak(r, { id: `t-off-${backend}`, now: Math.floor(r.now / 1000) });
+      const baseline = (await r.call('world', 'bob')).data.simulation.reputation;
       await insertDecree(r, { id: 'd-off', year: 3 });
       const world = await r.call('world', 'bob');
-      const aurelle = world.data.simulation.reputation.aurelle;
-      assert.equal(aurelle.score, 0);
-      assert.equal('debasements' in aurelle, false, 'flag off omits the field');
-      assert.deepEqual(withWorldReputationRecord(worldReputation([]), [], epoch).aurelle, { ...zeroAttached().aurelle });
+      assert.deepEqual(world.data.simulation.reputation, baseline, 'flag off leaves the whole reputation map equal to the pre-decree baseline');
+      assert.equal('debasements' in world.data.simulation.reputation.aurelle, false, 'flag off omits the field');
+      assert.equal(baseline.aurelle.score, treatyBreakPenalty['non-aggression'].reputation);
     } finally {
       await r.close();
     }
@@ -244,4 +248,54 @@ test('#1496 Foreign affairs panel shows the windowed copy only when n > 0 on Aur
   } finally {
     await rt.close();
   }
+});
+
+test('#1496 mutation tests: window bounds, cap, nation, and unfiltered counts fail the assertions above', () => {
+  const file = 'tests/reputation-debasement-1496.test.mjs';
+  const cases = [
+    {
+      file: 'lib/diplomacy-rules.ts',
+      find: 'currentYear - (debasementReputationWindowYears - 1)',
+      replace: 'currentYear - debasementReputationWindowYears',
+      pattern: '#1496 window',
+    },
+    {
+      file: 'lib/diplomacy-rules.ts',
+      find: 'Math.min(debasementReputationMaxCount, Math.floor(Number(count) || 0))',
+      replace: 'Math.floor(Number(count) || 0)',
+      pattern: '#1496 window',
+    },
+    {
+      file: 'lib/diplomacy-rules.ts',
+      find: `kindle: { ...map.kindle, debasements: 0 },
+    korund: { ...map.korund, debasements: 0 },
+    aurelle: { ...map.aurelle, score: (map.aurelle?.score ?? 0) + debasementReputationPenalty * n, debasements: n },`,
+      replace: `kindle: { ...map.kindle, score: (map.kindle?.score ?? 0) + debasementReputationPenalty * n, debasements: n },
+    korund: { ...map.korund, debasements: 0 },
+    aurelle: { ...map.aurelle, debasements: 0 },`,
+      pattern: '#1496 pure helper',
+    },
+    {
+      file: 'lib/diplomacy-rules.ts',
+      find: 'if (y >= oldest && y <= currentYear) n += 1;',
+      replace: 'n += 1;',
+      pattern: '#1496 window',
+    },
+    {
+      file: 'lib/diplomacy-rules.ts',
+      find: 'if (y >= oldest && y <= currentYear) n += 1;',
+      replace: 'if (y >= oldest) n += 1;',
+      pattern: '#1496 window',
+    },
+  ];
+  const tree = mutantTree(); // #1508: never mutate the shared tree that parallel test files read
+  try {
+    for (const c of cases) {
+      const restore = tree.mutate(c.file, c.find, c.replace);
+      try {
+        const result = tree.run([file], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${c.find} -> ${c.replace}):\n${result.stdout}\n${result.stderr}`);
+      } finally { restore(); }
+    }
+  } finally { tree.close(); }
 });
