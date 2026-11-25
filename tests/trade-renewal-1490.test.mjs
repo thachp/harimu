@@ -1,13 +1,12 @@
 /** #1490: trade agreements that expire by term can be re-ratified for a fresh, gapless term. No migration. HARIMU_TRADE_RENEWAL_ENABLED is GRAY 97 (index 96). */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import ts from 'typescript';
 import { localRuntime } from './helpers/local-runtime.mjs';
+import { mutantTree } from './helpers/mutant-tree.mjs';
 
 const D = 86400;
 const term = (d, compression = 12) => d.treatyTermSeconds('trade', compression);
@@ -182,17 +181,6 @@ for (const backend of ['sqlite', 'postgres']) {
   });
 }
 
-const mutate = (file, find, replace) => {
-  const original = readFileSync(file, 'utf8');
-  const next = original.replace(find, replace);
-  assert.notEqual(next, original, `mutant did not apply in ${file}: ${find}`);
-  writeFileSync(file, next);
-  return () => writeFileSync(file, original);
-};
-const run = (pattern) => {
-  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
-  return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, 'tests/trade-renewal-1490.test.mjs'], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
-};
 
 test('#1490 mutations: renewing when the flag is off, renewing a too-old or NAP row, ignoring open war, and forcing the world-tick renewal path on all fail', () => {
   const cases = [
@@ -202,11 +190,14 @@ test('#1490 mutations: renewing when the flag is off, renewing a too-old or NAP 
     { file: 'lib/diplomacy.ts', find: 'const blocked = (options.embargo === true && await embargoInForce(db, row.proposer_nation, row.other_nation)) || await openWarBetween(db, row.proposer_nation, row.other_nation);', replace: 'const blocked = false;', pattern: 'open war is refused once' },
     { file: 'lib/world-simulation.ts', find: "renewal: flagOn(options.atlasEnv, 'HARIMU_TRADE_RENEWAL_ENABLED')", replace: 'renewal: true', pattern: 'HARIMU_TRADE_RENEWAL_ENABLED off writes no renewal' },
   ];
-  for (const c of cases) {
-    const restore = mutate(c.file, c.find, c.replace);
-    try {
-      const result = run(c.pattern);
-      assert.notEqual(result.status, 0, `mutant survived (${c.pattern}):\n${result.stdout}\n${result.stderr}`);
-    } finally { restore(); }
-  }
+  const tree = mutantTree(); // #1480: never mutate the shared tree that parallel test files read
+  try {
+    for (const c of cases) {
+      const restore = tree.mutate(c.file, c.find, c.replace);
+      try {
+        const result = tree.run(['tests/trade-renewal-1490.test.mjs'], c.pattern);
+        assert.notEqual(result.status, 0, `mutant survived (${c.pattern}):\n${result.stdout}\n${result.stderr}`);
+      } finally { restore(); }
+    }
+  } finally { tree.close(); }
 });
