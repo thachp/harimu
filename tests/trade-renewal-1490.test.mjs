@@ -1,4 +1,4 @@
-/** #1490: trade agreements that expire by term can be re-ratified for a fresh, gapless term. No migration. Flag pack slot (GRAY 98 / index 97) waits for #1491 on dev. */
+/** #1490: trade agreements that expire by term can be re-ratified for a fresh, gapless term. No migration. HARIMU_TRADE_RENEWAL_ENABLED is GRAY 97 (index 96). */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -164,6 +164,22 @@ for (const backend of ['sqlite', 'postgres']) {
     assert.match(withTag, /Renewed/);
     assert.doesNotMatch(withoutTag, /Renewed/);
   });
+
+  test(`#1490 (${backend}): world tick with diplomacy on and HARIMU_TRADE_RENEWAL_ENABLED off writes no renewal`, async t => {
+    const ctx = await setup(t, backend);
+    const { r, d, rows } = ctx;
+    const { live, ends } = await expireTrade(ctx);
+    r.setFixtureEnv('HARIMU_DIPLOMACY_ENABLED', 'true');
+    r.setFixtureEnv('HARIMU_TRADE_RENEWAL_ENABLED', 'false');
+    r.setNow((ends + 60) * 1000);
+    const before = (await rows()).length;
+    const world = await r.call('world', null);
+    assert.equal(world.status, 200);
+    assert.equal('treaties' in (world.data.simulation ?? {}), true, 'diplomacy stays on');
+    assert.equal((await rows()).some(x => x.request_id === d.treatyRenewalRequestId(live.id)), false, 'world tick with HARIMU_TRADE_RENEWAL_ENABLED off writes no renewal');
+    assert.equal((await rows()).length, before);
+    assert.equal((await rows()).find(x => x.id === live.id).status, 'expired');
+  });
 }
 
 const mutate = (file, find, replace) => {
@@ -178,15 +194,16 @@ const run = (pattern) => {
   return spawnSync('node', ['--experimental-strip-types', '--test', '--test-concurrency=1', '--test-name-pattern', pattern, 'tests/trade-renewal-1490.test.mjs'], { encoding: 'utf8', cwd: new URL('..', import.meta.url).pathname, env });
 };
 
-test('#1490 mutations: renewing when the flag is off, renewing a too-old or NAP row, and ignoring open war all fail', () => {
+test('#1490 mutations: renewing when the flag is off, renewing a too-old or NAP row, ignoring open war, and forcing the world-tick renewal path on all fail', () => {
   const cases = [
-    { find: 'if (options.renewal === true) await renewDueTradeAgreements(db, now, { embargo: options.embargo });', replace: 'if (true) await renewDueTradeAgreements(db, now, { embargo: options.embargo });', pattern: 'flag off writes no renewal' },
-    { find: "WHERE kind='trade' AND status='expired' AND ended_at=ends_at AND ends_at>?", replace: "WHERE kind='trade' AND status='expired' AND ended_at=ends_at AND ends_at>=?", pattern: 'too old and is not renewed' },
-    { find: "WHERE kind='trade' AND status='expired' AND ended_at=ends_at AND ends_at>?", replace: "WHERE kind IN ('trade','non-aggression') AND status='expired' AND ended_at=ends_at AND ends_at>?", pattern: 'a NAP is never renewed' },
-    { find: 'const blocked = (options.embargo === true && await embargoInForce(db, row.proposer_nation, row.other_nation)) || await openWarBetween(db, row.proposer_nation, row.other_nation);', replace: 'const blocked = false;', pattern: 'open war is refused once' },
+    { file: 'lib/diplomacy.ts', find: 'if (options.renewal === true) await renewDueTradeAgreements(db, now, { embargo: options.embargo });', replace: 'if (true) await renewDueTradeAgreements(db, now, { embargo: options.embargo });', pattern: 'flag off writes no renewal' },
+    { file: 'lib/diplomacy.ts', find: "WHERE kind='trade' AND status='expired' AND ended_at=ends_at AND ends_at>?", replace: "WHERE kind='trade' AND status='expired' AND ended_at=ends_at AND ends_at>=?", pattern: 'too old and is not renewed' },
+    { file: 'lib/diplomacy.ts', find: "WHERE kind='trade' AND status='expired' AND ended_at=ends_at AND ends_at>?", replace: "WHERE kind IN ('trade','non-aggression') AND status='expired' AND ended_at=ends_at AND ends_at>?", pattern: 'a NAP is never renewed' },
+    { file: 'lib/diplomacy.ts', find: 'const blocked = (options.embargo === true && await embargoInForce(db, row.proposer_nation, row.other_nation)) || await openWarBetween(db, row.proposer_nation, row.other_nation);', replace: 'const blocked = false;', pattern: 'open war is refused once' },
+    { file: 'lib/world-simulation.ts', find: "renewal: flagOn(options.atlasEnv, 'HARIMU_TRADE_RENEWAL_ENABLED')", replace: 'renewal: true', pattern: 'HARIMU_TRADE_RENEWAL_ENABLED off writes no renewal' },
   ];
   for (const c of cases) {
-    const restore = mutate('lib/diplomacy.ts', c.find, c.replace);
+    const restore = mutate(c.file, c.find, c.replace);
     try {
       const result = run(c.pattern);
       assert.notEqual(result.status, 0, `mutant survived (${c.pattern}):\n${result.stdout}\n${result.stderr}`);
