@@ -108,7 +108,7 @@ export function worldRunnerChains(db: GameDatabase, now: number, options: Runner
     [{ name: 'korundPresidium', on: options.korundPresidium === true, run: () => runKorundPresidium(db, now) },
      { name: 'korundRaids', on: options.faithFestivals === true, run: () => runKorundRaids(db, now).catch(warnOnly('Korund inspection')) }],
     // #308 AI treaties, then #601 targeted goods sanctions (only the citizen POST path passes it, never a GET), then #363 embargoes.
-    [{ name: 'diplomacy', on: options.diplomacy === true, run: () => runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, 'HARIMU_TRADE_RENEWAL_ENABLED'), embargo: options.embargo === true, napReputationGate: options.napReputationGate === true }).catch(warnOnly('diplomacy')) },
+    [{ name: 'diplomacy', on: options.diplomacy === true, run: () => runDiplomacy(db, now, { renewal: flagOn(options.atlasEnv, 'HARIMU_TRADE_RENEWAL_ENABLED'), embargo: options.embargo === true, napReputationGate: options.napReputationGate === true, debasement: flagOn(options.atlasEnv, 'HARIMU_REPUTATION_DEBASEMENT_ENABLED') }).catch(warnOnly('diplomacy')) },
      { name: 'targetedSanctions', on: options.targetedSanctions === true, run: () => decideProposedGoodsSanctions(db, now).catch(warnOnly('goods sanction')) },
      { name: 'embargo', on: options.embargo === true, run: () => runEmbargo(db, now).catch(warnOnly('embargo')) },
      // #427: the Kindle Assembly votes on pending war declarations after diplomacy, so a pact ratified this tick blocks the declaration on re-check
@@ -228,7 +228,7 @@ export async function readWorldSimulation(db: GameDatabase, now = Math.floor(Dat
     options.war ? readSiegeSnapshot(db,now) : none,
     options.war && options.warWeariness ? readPublicWeariness(db,now,{ losses: options.warWearinessLosses }) : none,
     options.diplomacy ? readTreaties(db,now) : none,
-    options.diplomacy ? readWorldReputation(db, now) : none, // #1477/#1480: uncapped count and record, not the LIMIT 20 list
+    options.diplomacy ? readWorldReputation(db, now, { debasement: flagOn(options.atlasEnv, 'HARIMU_REPUTATION_DEBASEMENT_ENABLED') }) : none, // #1477/#1480/#1496: uncapped count and record, not the LIMIT 20 list
     options.diplomacy && options.napReputationGate ? readNapReputationRefusals(db) : none, // #1495: rejected NAPs with low_reputation; flag off omits the key
     options.embargo ? readEmbargoes(db) : none,
     options.reserve ? readReserveBoard(db,now) : none,
