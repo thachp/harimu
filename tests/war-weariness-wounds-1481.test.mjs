@@ -38,7 +38,7 @@ async function captureSquares(r, war, attacker, defender, lost, at) {
   await r.db.prepare('INSERT INTO city_captures (id,siege_id,war_id,request_id,attacker_nation,defender_nation,squares_transferred,squares_kept_private,captured_at) VALUES (?,?,?,?,?,?,?,?,?)').bind(cap, siege, war, randomUUID(), attacker, defender, lost, 0, at).run();
 }
 async function setup(t, { backend, weeks = 2 } = {}) {
-  const r = await localRuntime(backend ? { backend } : {}); t.after(() => r.close());
+  const r = await localRuntime({ backend: backend ?? 'sqlite' }); t.after(() => r.close());
   r.setFixtureEnv('HARIMU_WAR_ENABLED', 'true');
   r.setFixtureEnv('HARIMU_WAR_WEARINESS_ENABLED', 'true');
   await citizen(r, 'ava', 'aurelle'); await citizen(r, 'kai', 'korund'); await citizen(r, 'kim', 'kindle');
@@ -56,8 +56,8 @@ async function setup(t, { backend, weeks = 2 } = {}) {
 const scoreOf = async (r, nation) => { const x = await r.db.prepare('SELECT unrest,inputs_json,breakdown_json FROM nation_stability_scores WHERE tick=1 AND nation_id=?').bind(nation).first(); return { unrest: x.unrest, inputs: JSON.parse(x.inputs_json), unrestTerms: JSON.parse(x.breakdown_json).unrest }; };
 const warTerm = s => s.unrestTerms.find(x => x.input === 'war');
 
-for (const backend of [undefined, 'postgres']) {
-  const label = backend ?? 'sqlite';
+for (const backend of ['sqlite', 'postgres']) {
+  const label = backend;
 
   test(`#1481 (${label}): 25 wounds add floor(n/10) capped at 10; the winning attacker is not charged; 9 add nothing`, async t => {
     const { read, base, war, scheduledAt, roundSeconds, r } = await setup(t, { backend });
@@ -126,7 +126,9 @@ for (const backend of [undefined, 'postgres']) {
     try { await wear.readWarWeariness(r.db, scheduledAt, { losses: true }); } finally { r.db.prepare = prep; r.db.batch = batch; }
     assert.deepEqual(writes, [], 'reads never write');
     // #584: DROP TABLE fails on the PGlite fixture; pin the missing-table case to SQLite.
-    if (!backend) {
+    // Pass backend: 'sqlite' explicitly so HARIMU_TEST_STORAGE=postgres (CI Postgres shards) cannot override it.
+    if (backend === 'sqlite') {
+      assert.equal(r.storageEngine, 'sqlite');
       await r.db.prepare('DROP TABLE army_wounds').run();
       assert.deepEqual(await read(), { kindle: 6, korund: 2 + 3, aurelle: 0 }, 'missing army_wounds reads as zero casualties; lost squares still count');
       await r.db.prepare('DROP TABLE army_battles').run();
