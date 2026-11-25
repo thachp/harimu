@@ -31,6 +31,7 @@ export function nationCapital(nationId: string): { x: number; y: number } | null
 }
 
 export const noCapitalError = 'The World Registry cannot price a square for a nation without a capital.';
+export const noNationError = 'Only Kindle, Korund and Aurelle citizens can buy squares in this preview.';
 export const purchaseBadRequestError = 'Send action "buy-square", integer x/y and a requestId.';
 export const purchaseOutOfBoundsError = 'That square is off the map.';
 
@@ -75,7 +76,7 @@ export async function registryPriceMinor(db: GameDatabase, userId: string, env: 
   if (!squarePriceAntiSnowballEnabled(env)) return squarePriceMinor;
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id;
-  // Without `at`, list the d = 0 term (owned only). With `at`, registryListingPrice has already refused a missing capital.
+  // Without `at`, list the d = 0 term (owned only). registryListingPrice has already refused a missing nation or capital when the flag is on.
   const distance = nationId && at ? squareCapitalDistance(nationId, at.x, at.y) : 0;
   if (distance === null) throw new Error('registryPriceMinor requires a capital when a square is given');
   if (!nationId) return squareChargeMinor(0, distance);
@@ -86,13 +87,16 @@ export type RegistryListingResult =
   | { ok: true; priceMinor: number }
   | { ok: false; status: 400 | 403; reason: string; error: string };
 
-/** GET listing price. Non-integer or off-map x/y is the same 400 as a purchase. Flag on and a square asked: no capital is 403, not d = 0. */
+/** GET listing price. Non-integer or off-map x/y is the same 400 as a purchase.
+ *  Flag on: no nation is 403 no_nation (both bare and per-square), matching purchase; no capital is 403 no_capital, including a bare GET. Flag off does not require a nation or capital. */
 export async function registryListingPrice(db: GameDatabase, userId: string, env: unknown, x: string | null, y: string | null): Promise<RegistryListingResult> {
   const parsed = parseRegistrySquareQuery(x, y);
   if (!parsed.ok) return parsed;
-  if (squarePriceAntiSnowballEnabled(env) && parsed.at) {
+  if (squarePriceAntiSnowballEnabled(env)) {
     const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
-    if (!citizen?.nation_id || nationCapital(citizen.nation_id) === null) return { ok: false, status: 403, reason: 'no_capital', error: noCapitalError };
+    const nationId = citizen?.nation_id ?? null;
+    if (!nationId || !(registryNations as readonly string[]).includes(nationId)) return { ok: false, status: 403, reason: 'no_nation', error: noNationError };
+    if (nationCapital(nationId) === null) return { ok: false, status: 403, reason: 'no_capital', error: noCapitalError };
   }
   return { ok: true, priceMinor: await registryPriceMinor(db, userId, env, parsed.at) };
 }
@@ -162,7 +166,7 @@ export async function buySquare(db: GameDatabase, userId: string, command: Purch
   if (!enabled) return fail(403, 'disabled', 'The World Registry is not open yet.');
   const citizen = await db.prepare('SELECT nation_id FROM citizens WHERE clerk_user_id=?').bind(userId).first<{ nation_id: string | null }>();
   const nationId = citizen?.nation_id ?? null;
-  if (!nationId || !(registryNations as readonly string[]).includes(nationId)) return fail(403, 'no_nation', 'Only Kindle, Korund and Aurelle citizens can buy squares in this preview.');
+  if (!nationId || !(registryNations as readonly string[]).includes(nationId)) return fail(403, 'no_nation', noNationError);
   const prior = await db.prepare('SELECT clerk_user_id,nation_id,x,y,price_minor FROM world_square_purchases WHERE request_id=?').bind(command.requestId)
     .first<{ clerk_user_id: string; nation_id: string; x: number; y: number; price_minor: number }>();
   if (prior) {
