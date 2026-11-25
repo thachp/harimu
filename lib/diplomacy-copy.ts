@@ -101,6 +101,9 @@ export const treatyStatusLines:Readonly<Record<TreatyStatus,readonly Line[]>>={
 /** One line for a broken non-aggression pact: names the cost, never a number (§13.2). */
 export const brokenPactLine=L('The pact between {nationA} and {nationB} was broken. Breaking it costs Legitimacy and global Reputation.');
 
+/** #1490: short tag on a renewed in-force trade agreement. Placeholder for Content. */
+export const treatyRenewalTag=L('Renewed');
+
 /** Ratification news: each names its own ratifying body (§13.1). The Kindle Assembly has one variant for the treaty vote and one for
  * the trade vote. Headlines are fixed (no placeholder) so they stay within 40 characters at any name length. */
 export const ratificationNews:readonly RatificationNews[]=[

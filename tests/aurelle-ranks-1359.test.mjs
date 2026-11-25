@@ -43,7 +43,7 @@ const spend=(r,user,amount,spentAt=r.now)=>r.db.prepare("INSERT INTO aurelle_fav
 test('flag is preview true, production false, GRAY 94 at index 93, and the pack length goes up by 1',()=>{
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf('HARIMU_KINDLE_NEWSPAPERS_ENABLED'),92);
   assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.indexOf(FLAG),93);
-  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length,96);
+  assert.equal(FLAG_PACKS.HARIMU_GRAY_PACK.length,97);
   const preview=JSON.parse(readFileSync('wrangler.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   const prod=JSON.parse(readFileSync('wrangler.prod.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
   assert.equal(preview.vars[FLAG],undefined);
@@ -52,7 +52,7 @@ test('flag is preview true, production false, GRAY 94 at index 93, and the pack 
   assert.equal(prod.vars.HARIMU_GRAY_PACK[FLAG],'false');
   assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).indexOf(FLAG),93);
   assert.equal(Object.keys(prod.vars.HARIMU_GRAY_PACK).indexOf(FLAG),93);
-  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length,96);
+  assert.equal(Object.keys(preview.vars.HARIMU_GRAY_PACK).length,97);
   assert.equal(flagOn({HARIMU_GRAY_PACK:preview.vars.HARIMU_GRAY_PACK},FLAG),true);
   assert.equal(flagOn({HARIMU_GRAY_PACK:prod.vars.HARIMU_GRAY_PACK},FLAG),false);
   assert.equal(flagOn({HARIMU_GRAY_PACK:preview.vars.HARIMU_GRAY_PACK,[FLAG]:'false'},FLAG),false,'a direct string wins over the pack');
