@@ -32,6 +32,8 @@ test('migration 0135 keeps existing rows, widens target_kind and adds target_sna
     {id: 'row-2', target_kind: 'square-poster', target_id: '9,8', note: null, target_snapshot: 'Strike your own spark.'},
   ]);
   assert.ok(lite.prepare("SELECT 1 AS ok FROM sqlite_master WHERE type='index' AND name='idx_moderation_reports_reporter'").get());
+  lite.exec(next('cap-ok', 'req-cap-ok', 'square-poster', '1,1', 'x'.repeat(280)));
+  assert.throws(() => lite.exec(next('cap-bad', 'req-cap-bad', 'square-poster', '1,2', 'x'.repeat(281))));
   const {PGlite} = await import('@electric-sql/pglite');
   const pg = new PGlite(); await pg.waitReady;
   await pg.exec(readFileSync('db/postgres/0070_moderation_reports.sql', 'utf8'));
@@ -47,6 +49,8 @@ test('migration 0135 keeps existing rows, widens target_kind and adds target_sna
     {id: 'row-2', target_kind: 'square-poster', note: null, target_snapshot: 'Strike your own spark.'},
   ]);
   assert.ok((await pg.query("SELECT 1 AS ok FROM pg_indexes WHERE indexname='idx_moderation_reports_reporter'")).rows.length === 1);
+  await pg.exec(next('cap-ok', 'req-cap-ok', 'square-poster', '1,1', 'x'.repeat(280)));
+  await assert.rejects(pg.exec(next('cap-bad', 'req-cap-bad', 'square-poster', '1,2', 'x'.repeat(281))));
   await pg.close();
 });
 
