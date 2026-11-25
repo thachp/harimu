@@ -26,7 +26,7 @@ export async function GET(request:Request){
   // #742: in templates-only mode no model article is read or shown, and the edition carries the template-mode footer.
   // #764: a muted news desk keeps the deterministic items and shows the persona-muted notice.
   const templated=aiTemplatesOnly(bindings,citizen.nation_id);const edition=withAiNews(news,templated?[]:await readAiNews(db,citizen.nation_id),templated);
-  if(aiPersonaMuted(bindings,aiPathPersonas['ai-news'](citizen.nation_id)))edition.personaMuted=true;return privateJson(edition);}
+  if(aiPersonaMuted(bindings,aiPathPersonas['ai-news'](citizen.nation_id)))edition.personaMuted=true;return privateJson({...edition,reportsEnabled:(env as unknown as {HARIMU_REPORTS_ENABLED?:string}).HARIMU_REPORTS_ENABLED==='true'});}
  return news?privateJson(news):privateJson({error:'Your nation’s news edition is not built yet.'},404);
 }
 export async function POST(request:Request){

@@ -45,7 +45,7 @@ test('refusals: guest, cross-origin, missing or own target, bad reason, AI-only 
   assert.equal((await report('alice', {targetKind: 'citizen-message', targetId: own, reasonId: 'spam-other'})).status, 404, 'not your own message');
   assert.equal((await report('alice', {targetKind: 'citizen-message', targetId: msg, reasonId: 'made-up'})).status, 400);
   assert.equal((await report('alice', {targetKind: 'citizen-message', targetId: msg, reasonId: 'ai-inappropriate'})).status, 400);
-  assert.equal((await report('alice', {targetKind: 'ai-news', targetId: msg, reasonId: 'spam-other'})).status, 400, 'only slice-1 targets');
+  assert.equal((await report('alice', {targetKind: 'ai-news', targetId: msg, reasonId: 'spam-other'})).status, 404, 'a chat id is not an AI news item');
   assert.equal((await report('alice', {targetKind: 'citizen-message', targetId: msg, reasonId: 'spam-other', note: 'x'.repeat(281)})).status, 400);
   assert.equal((await r.call('reports', 'alice', {targetKind: 'citizen-message', targetId: msg, reasonId: 'spam-other'})).status, 400, 'request id required');
   assert.deepEqual(await rows(r.db), []);

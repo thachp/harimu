@@ -316,6 +316,7 @@ export async function readVerification(userId) {
   const simulation = await import(pathToFileURL(join(directory, 'lib/world-simulation.mjs')).href);
   await getDatabase(); // Real additive schema bootstrap and seed initialization.
   env.DB.sqlite.exec(await readFile(join(root, 'drizzle/0070_moderation_reports.sql'), 'utf8')); // #743: the table comes only from its migration
+  env.DB.sqlite.exec(await readFile(join(root, 'drizzle/0133_report_ai_targets.sql'), 'utf8')); // #1462: widen target_kind; rows copied
   env.DB.sqlite.exec(await readFile(join(root, 'drizzle/0123_land_tiles.sql'), 'utf8')); // #467 slice 1: the land tables come only from their migration
   env.DB.sqlite.exec(await readFile(join(root, 'drizzle/0126_square_posters.sql'), 'utf8')); // #1341: poster tables (also created by lib/db.ts)
   env.DB.sqlite.exec(await readFile(join(root, 'tests/helpers/auth-tables-0122.sql'), 'utf8')); // #1322: #1319 auth_* tables are Postgres-only (0122); the fixture snapshot still needs them for repoTables()

@@ -1,13 +1,14 @@
 import {foundingNewsItems,readFoundingEvents} from './founding-period'; // #612
 import {editionHeadlines,newsEditions} from './news-editions'; // #1443
-import {readPlayerArticles} from './kindle-newspapers'; // #1453, #1475
-import {readKorundStateMediaArticles} from './korund-state-media.ts'; // #1469
+import {AURELLE_BROADSHEETS_FLAG,KINDLE_NEWSPAPERS_FLAG,readPlayerArticles} from './kindle-newspapers'; // #1453, #1475
+import {KORUND_STATE_MEDIA_FLAG,readKorundStateMediaArticles} from './korund-state-media.ts'; // #1469
 import type {GameDatabase} from './database-contract';
 import type { GovernmentSnapshot } from './government';
 import { publicGovernmentSnapshot, governmentDisclosure } from './government-disclosure';
 import { presidiumRumors, readPresidium } from './korund-presidium';
 import { readWars, warNewsItems } from './war'; // #309
-import { peaceRevertNewsItems } from './war-peace-revert'; // #1054
+import {peaceRevertEnabled,peaceRevertNewsItems} from './war-peace-revert'; // #1054
+import {flagOn} from './flag-pack.mjs'; // #988
 import { readTreaties, treatyNewsItems } from './diplomacy'; // #308
 import { embargoNewsItems, readEmbargoes } from './embargo'; // #363
 import { goodsSanctionNewsItems, readGoodsSanctions } from './goods-sanctions'; // #601
@@ -21,8 +22,15 @@ export type NewsItem = {id:string;title:string;text:string;occurredAt:number;sou
 export type NewsItemKind='record'|'template'|'decree'|'article'|'player-article';
 /** #981: one State Media line for the open week's food quota. Absent when the flag is off. `line` is the only text a citizen is shown. */
 export type KorundPlanStat = { resource: 'food'; output: number; target: number; percent: number; line: string };
-export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'court';fetchedAt:number;statistics:{citizens:number;completedShifts:number;food:number};items:NewsItem[];templatesOnly?:boolean;personaMuted?:boolean;planStat?:KorundPlanStat};
+export type NationalNews = {nationId:string;title:string;style:'press'|'state'|'court';fetchedAt:number;statistics:{citizens:number;completedShifts:number;food:number};items:NewsItem[];templatesOnly?:boolean;personaMuted?:boolean;planStat?:KorundPlanStat;reportsEnabled?:boolean};
 const editions={kindle:{title:'Kindle Press',style:'press'},korund:{title:'Korund State Media',style:'state'},aurelle:{title:'Aurelle Court Gazette',style:'court'}} as const;
+
+/** The same flag set the news route passes to readNationalNews, so a report sees the edition the citizen can already read. */
+export function newsEditionOptions(raw: object, userId: string) {
+ const env = raw as { HARIMU_KORUND_PRESIDIUM_ENABLED?: string; HARIMU_WAR_ENABLED?: string; HARIMU_DIPLOMACY_ENABLED?: string; HARIMU_EMBARGO_ENABLED?: string; HARIMU_TARGETED_SANCTIONS_ENABLED?: string; HARIMU_FAITH_ENABLED?: string; HARIMU_FOUNDING_PERIOD_ENABLED?: string; HARIMU_KINDLE_RALLIES_ENABLED?: string; HARIMU_CHAT_SHADOW_MUTE?: string };
+ const on = (key: keyof typeof env) => env[key] === 'true';
+ return { korundPresidium: on('HARIMU_KORUND_PRESIDIUM_ENABLED'), war: on('HARIMU_WAR_ENABLED'), diplomacy: on('HARIMU_DIPLOMACY_ENABLED'), embargo: on('HARIMU_EMBARGO_ENABLED'), targetedSanctions: on('HARIMU_TARGETED_SANCTIONS_ENABLED'), faith: on('HARIMU_FAITH_ENABLED'), foundingPeriod: on('HARIMU_FOUNDING_PERIOD_ENABLED'), rallies: on('HARIMU_KINDLE_RALLIES_ENABLED'), planStats: flagOn(raw, 'HARIMU_KORUND_PLAN_STATS_ENABLED'), peaceRevert: peaceRevertEnabled(raw), confluence: flagOn(raw, 'HARIMU_CONFLUENCE_ENABLED'), ...(flagOn(raw, KINDLE_NEWSPAPERS_FLAG) ? { kindleNewspapers: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}), ...(flagOn(raw, AURELLE_BROADSHEETS_FLAG) ? { aurelleBroadsheets: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}), ...(flagOn(raw, KORUND_STATE_MEDIA_FLAG) ? { korundStateMedia: true, readerId: userId, shadowMute: env.HARIMU_CHAT_SHADOW_MUTE } : {}) };
+}
 
 /** Derived from durable records; this reader never publishes or changes a game event. */
 export async function readNationalNews(db:GameDatabase,nationId:string,now:number,options:{korundPresidium?:boolean;war?:boolean;peaceRevert?:boolean;faith?:boolean;diplomacy?:boolean;embargo?:boolean;targetedSanctions?:boolean;foundingPeriod?:boolean;rallies?:boolean;planStats?:boolean;confluence?:boolean;kindleNewspapers?:boolean;aurelleBroadsheets?:boolean;korundStateMedia?:boolean;readerId?:string;shadowMute?:unknown}={}):Promise<NationalNews|null> {
